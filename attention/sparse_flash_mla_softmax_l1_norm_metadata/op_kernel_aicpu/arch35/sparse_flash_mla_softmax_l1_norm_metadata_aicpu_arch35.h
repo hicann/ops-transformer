@@ -96,6 +96,11 @@ inline bool SparseFlashMlaSoftmaxL1NormMetadataCpuKernel::BuildMetadata()
     }
 
     int64_t totalCoreNum = std::min<int64_t>(std::min(totalNum, aicCoreNum_), SMLA_METADATA_MAX_CORE_NUM);
+    if (totalCoreNum == 0) {
+        auto* metadataData = reinterpret_cast<SMLA_METADATA_T*>(metadata_->GetData());
+        std::fill_n(metadataData, SMLA_METADATA_SIZE, static_cast<SMLA_METADATA_T>(0));
+        return true;
+    }
     int64_t formerCoreProcessNum = CeilDiv(totalNum, totalCoreNum);
     int64_t remainCoreProcessNum = totalNum / totalCoreNum;
     int64_t remainder = totalNum % totalCoreNum;

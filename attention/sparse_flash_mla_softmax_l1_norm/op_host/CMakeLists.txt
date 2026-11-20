@@ -10,13 +10,14 @@
 
 cmake_minimum_required(VERSION 3.18.4)
 
-# Only Ascend 950/960dt has a PyPTO kernel implementation for this operator.
-if(NOT "ascend950" IN_LIST ASCEND_COMPUTE_UNIT AND NOT "ascend960dt" IN_LIST ASCEND_COMPUTE_UNIT)
-    message(STATUS "[sparse_flash_mla_softmax_l1_norm] Skipped: PyPTO kernel only supports ascend950/ascend960dt (soc=${ASCEND_COMPUTE_UNIT})")
+set(_SMLA_L1_NORM_WITH_PYPTO OFF)
+if ("ascend950" IN_LIST ASCEND_COMPUTE_UNIT OR "ascend960dt" IN_LIST ASCEND_COMPUTE_UNIT)
+    set(_SMLA_L1_NORM_WITH_PYPTO ON)
+    require_pypto_pro(sparse_flash_mla_softmax_l1_norm)
+elseif (NOT "ascend910b" IN_LIST ASCEND_COMPUTE_UNIT AND NOT "ascend910_93" IN_LIST ASCEND_COMPUTE_UNIT)
+    message(STATUS "[sparse_flash_mla_softmax_l1_norm] Skipped: unsupported soc=${ASCEND_COMPUTE_UNIT}")
     return()
 endif()
-
-require_pypto_pro(sparse_flash_mla_softmax_l1_norm)
 add_op_to_compiled_list()
 
 set(CONDITION_UNIT ${ASCEND_COMPUTE_UNIT})
@@ -26,7 +27,9 @@ if (BUILD_OPEN_PROJECT)
     sparse_flash_mla_softmax_l1_norm_def.cpp
     )
     add_modules_sources(OPTYPE sparse_flash_mla_softmax_l1_norm ACLNNTYPE aclnn)
-    enable_pypto_kernel(sparse_flash_mla_softmax_l1_norm)
+    if (_SMLA_L1_NORM_WITH_PYPTO)
+        enable_pypto_kernel(sparse_flash_mla_softmax_l1_norm)
+    endif()
 endif()
 
 # ascend950 条件编译——缺少此项会导致 kernel binary 未编译
@@ -68,6 +71,12 @@ else()
         OP_NAME SparseFlashMlaSoftmaxL1Norm
         OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
+    )
+endif()
+if(NOT _SMLA_L1_NORM_WITH_PYPTO)
+    add_ops_compile_options(
+        OP_NAME SparseFlashMlaSoftmaxL1Norm
+        OPTIONS --cce-auto-sync=off
     )
 endif()
 

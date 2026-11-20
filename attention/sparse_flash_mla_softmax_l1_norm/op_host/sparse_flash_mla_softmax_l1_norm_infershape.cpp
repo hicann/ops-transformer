@@ -77,7 +77,7 @@ static ge::graphStatus InferShapeSparseFlashMlaSoftmaxL1Norm(gert::InferShapeCon
                     return ge::GRAPH_FAILED);
         outShape->SetDimNum(3);
         outShape->SetDim(0, queryShape->GetDim(0)); // T1
-        outShape->SetDim(1, keyShape->GetDim(0));   // T2
+        outShape->SetDim(1, keyShape->GetDim(1));   // N2
         if (sparseIndiceShape != nullptr && sparseIndiceShape->GetShapeSize() != 0) {
             outShape->SetDim(2, sparseIndiceShape->GetDim(2)); // K
         } else {

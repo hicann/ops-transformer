@@ -39,6 +39,47 @@ static const char* A5SocInfo = R"JSON({
   }
 })JSON";
 
+static const char* A2SocInfo = R"JSON({
+  "hardware_info": {
+    "BT_SIZE": 0,
+    "load3d_constraints": "1",
+    "Intrinsic_fix_pipe_l0c2out": false,
+    "Intrinsic_data_move_l12ub": true,
+    "Intrinsic_data_move_l0c2ub": true,
+    "Intrinsic_data_move_out2l1_nd2nz": false,
+    "UB_SIZE": 262144,
+    "L2_SIZE": 134217728,
+    "L1_SIZE": 524288,
+    "L0A_SIZE": 65536,
+    "L0B_SIZE": 65536,
+    "L0C_SIZE": 262144,
+    "vector_core_cnt": 40,
+    "cube_core_cnt": 20,
+    "socVersion": "Ascend910B3"
+  }
+})JSON";
+
+// Atlas A3 uses the same Arch22 kernel as A2, but has a distinct SOC string.
+static const char* A3SocInfo = R"JSON({
+  "hardware_info": {
+    "BT_SIZE": 0,
+    "load3d_constraints": "1",
+    "Intrinsic_fix_pipe_l0c2out": false,
+    "Intrinsic_data_move_l12ub": true,
+    "Intrinsic_data_move_l0c2ub": true,
+    "Intrinsic_data_move_out2l1_nd2nz": false,
+    "UB_SIZE": 262144,
+    "L2_SIZE": 134217728,
+    "L1_SIZE": 524288,
+    "L0A_SIZE": 65536,
+    "L0B_SIZE": 65536,
+    "L0C_SIZE": 262144,
+    "vector_core_cnt": 40,
+    "cube_core_cnt": 20,
+    "socVersion": "Ascend910_93"
+  }
+})JSON";
+
 class SparseMlaSoftmaxL1NormTiling : public testing::Test {
 protected:
     static void SetUpTestCase() {}
@@ -51,14 +92,15 @@ static optiling::smlasoftmaxl1norm::SparseFlashMlaSoftmaxL1NormCompileInfo g_com
 
 // ---------------------------------------------------------------------------
 // 辅助：构造 BSND 布局上下文。
-// tiling 硬约束：D==512、N2==1、G∈[1,128]、maskMode∈{0,3}、cmpRatio∈[1,128]、
+// tiling 硬约束：D∈{256,512}、N2==1、G∈[1,128]、maskMode∈{0,3}、cmpRatio∈[1,128]、
 // lse 为 4 维 [B, N2, Sq, G]、BSND 下 cu_seqlens 必须为空。
 // ---------------------------------------------------------------------------
 static gert::TilingContextPara MakeBsndContext(int64_t b, int64_t sq, int64_t sk, int64_t g, int64_t n2, int64_t d,
                                                int64_t maskMode = 0, int64_t cmpRatio = 1,
                                                const std::string& layoutQ = "BSND", const std::string& layoutK = "BSND",
                                                float softmaxScale = 1.0f, int64_t maxSeqlenK = 0,
-                                               ge::DataType dtype = ge::DT_FLOAT16)
+                                               ge::DataType dtype = ge::DT_FLOAT16,
+                                               const char* socVersion = "Ascend950", const char* socInfo = A5SocInfo)
 {
     return gert::TilingContextPara("SparseFlashMlaSoftmaxL1Norm",
                                    {
@@ -97,7 +139,7 @@ static gert::TilingContextPara MakeBsndContext(int64_t b, int64_t sq, int64_t sk
                                        {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>(layoutQ)},
                                        {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>(layoutK)},
                                    },
-                                   &g_compileInfo, "Ascend950", A5SocInfo, 4096);
+                                   &g_compileInfo, socVersion, socInfo, 4096);
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +149,28 @@ TEST_F(SparseMlaSoftmaxL1NormTiling, Arch35_Bsnd_D512_NoMask)
 {
     auto para = MakeBsndContext(1, 256, 256, 4, 1, 512);
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, UINT64_MAX);
+}
+
+// D=256 is supported by the native A2/A3 kernel.
+TEST_F(SparseMlaSoftmaxL1NormTiling, Arch22_Bsnd_D256_NoMask)
+{
+    auto para = MakeBsndContext(1, 256, 256, 4, 1, 256, 0, 1, "BSND", "BSND", 1.0f, 0, ge::DT_FLOAT16, "Ascend910B3",
+                                A2SocInfo);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, UINT64_MAX);
+}
+
+TEST_F(SparseMlaSoftmaxL1NormTiling, Arch22_A3_Bsnd_D256_NoMask)
+{
+    auto para = MakeBsndContext(1, 256, 256, 4, 1, 256, 0, 1, "BSND", "BSND", 1.0f, 0, ge::DT_FLOAT16, "Ascend910_93",
+                                A3SocInfo);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, UINT64_MAX);
+}
+
+TEST_F(SparseMlaSoftmaxL1NormTiling, Arch35_Reject_D256)
+{
+    auto para = MakeBsndContext(1, 256, 256, 4, 1, 256);
+    TilingInfo tilingInfo;
+    EXPECT_FALSE(ExecuteTiling(para, tilingInfo));
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +238,7 @@ TEST_F(SparseMlaSoftmaxL1NormTiling, Arch35_Reject_UnsupportedLayout)
 }
 
 // ---------------------------------------------------------------------------
-// 非法：D != 512（ValidateShapeRanges 约束回归）
+// 非法：D 不在 {256,512}（ValidateShapeRanges 约束回归）
 // ---------------------------------------------------------------------------
 TEST_F(SparseMlaSoftmaxL1NormTiling, Arch35_Reject_D_Not512)
 {
@@ -199,7 +263,8 @@ TEST_F(SparseMlaSoftmaxL1NormTiling, Arch35_Reject_N2_Not1)
 // ---------------------------------------------------------------------------
 static gert::TilingContextPara MakeTndContext(int64_t b, int64_t t1, int64_t t2, int64_t g, int64_t n2, int64_t d,
                                               int64_t maskMode = 0, int64_t cmpRatio = 1,
-                                              ge::DataType dtype = ge::DT_FLOAT16)
+                                              ge::DataType dtype = ge::DT_FLOAT16, const char* socVersion = "Ascend950",
+                                              const char* socInfo = A5SocInfo)
 {
     return gert::TilingContextPara("SparseFlashMlaSoftmaxL1Norm",
                                    {
@@ -238,7 +303,7 @@ static gert::TilingContextPara MakeTndContext(int64_t b, int64_t t1, int64_t t2,
                                        {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
                                        {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("TND")},
                                    },
-                                   &g_compileInfo, "Ascend950", A5SocInfo, 4096);
+                                   &g_compileInfo, socVersion, socInfo, 4096);
 }
 
 // ---------------------------------------------------------------------------
@@ -251,16 +316,20 @@ TEST_F(SparseMlaSoftmaxL1NormTiling, Arch35_Bsnd_D512_Bf16)
 }
 
 // ---------------------------------------------------------------------------
-// TND 布局：当前 tiling 的 ValidateAndExtractShapesTnd 使用 GetInputShape（非
-// Optional 版本）读取 cu_seqlens，在有空前置可选输入（sparse_indices）时物理
-// 索引错位导致 B 值读错。此为 tiling 侧已知问题（应改用 GetOptionalInputShape），
-// 在修复前 TND 用例标记为预期拒绝。修复后改回 GRAPH_SUCCESS 即可。
+// TND layout with empty preceding optional inputs.  The tiling implementation
+// must use GetOptionalInputShape for cu_seqlens, otherwise older CANN releases
+// read the compact input list and derive a wrong batch size.
 // ---------------------------------------------------------------------------
-TEST_F(SparseMlaSoftmaxL1NormTiling, Arch35_Tnd_D512_KnownTilingIssue)
+TEST_F(SparseMlaSoftmaxL1NormTiling, Arch35_Tnd_D512)
 {
     auto para = MakeTndContext(2, 512, 384, 4, 1, 512);
-    TilingInfo tilingInfo;
-    EXPECT_FALSE(ExecuteTiling(para, tilingInfo));
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, UINT64_MAX);
+}
+
+TEST_F(SparseMlaSoftmaxL1NormTiling, Arch22_Tnd_D256_Bf16)
+{
+    auto para = MakeTndContext(2, 512, 384, 8, 1, 256, 0, 4, ge::DT_BF16, "Ascend910B3", A2SocInfo);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, UINT64_MAX);
 }
 
 // ---------------------------------------------------------------------------

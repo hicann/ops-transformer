@@ -7,8 +7,8 @@ English | [简体中文](./README.md)
 | Product                                                      | Supported |
 | ------------------------------------------------------------ | :------: |
 | <term>Ascend 950PR&950DT products</term>                       |    √     |
-| <term>Atlas A3 products</term>     |    ×     |
-| <term>Atlas A2 products</term>     |    ×     |
+| <term>Atlas A3 products</term>     |    √     |
+| <term>Atlas A2 products</term>     |    √     |
 | <term>Atlas 200I/500 A2 inference products</term>                      |    ×     |
 | <term>Atlas inference products</term>                              |    ×     |
 | <term>Atlas training products</term>                              |    ×     |
@@ -53,7 +53,7 @@ English | [简体中文](./README.md)
 - BSND scenario: batch_size, max_seqlen_q, and max_seqlen_k must be passed in to obtain shape information.
 - TND scenario: cu_seqlens_q and cu_seqlens_k must be passed in to obtain correct shape information. When batch_size is 0, the batch is inferred from the shape of cu_seqlens_q.
 - Layout constraints: layout_q must be BSND or TND, layout_k supports BSND and TND, and layout_k must be consistent with layout_q.
-- Head constraints: num_heads_q and num_heads_k must be positive numbers, num_heads_q must be divisible by num_heads_k, and head_dim only supports 512.
+- Head constraints: num_heads_q and num_heads_k must be positive numbers, num_heads_q must be divisible by num_heads_k, and head_dim supports 256 or 512.
 - Load balancing constraints:
     - topk supports non-negative numbers, and 0 indicates no sparsity.
     - The value range of cmp_ratio is [1, 128].

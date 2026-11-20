@@ -29,7 +29,8 @@ uint32_t SparseFlashMlaSoftmaxL1NormMetadataCpuKernel::Compute(CpuKernelContext&
         return KERNEL_STATUS_PARAM_INVALID;
     }
     ValidSocVersion socVersion = ProcessSocVersion();
-    if (socVersion == ValidSocVersion::ASCEND950 || socVersion == ValidSocVersion::ASCEND960) {
+    if (socVersion == ValidSocVersion::ASCEND910 || socVersion == ValidSocVersion::ASCEND950 ||
+        socVersion == ValidSocVersion::ASCEND960) {
         return BuildMetadata() ? KERNEL_STATUS_OK : KERNEL_STATUS_PARAM_INVALID;
     }
     KERNEL_LOG_ERROR("Unsupported soc version: %s", socVersion_.c_str());
@@ -87,14 +88,18 @@ ValidSocVersion SparseFlashMlaSoftmaxL1NormMetadataCpuKernel::ProcessSocVersion(
 {
     const std::string ascend950 = "Ascend950";
     const std::string ascend960 = "Ascend960";
+    const std::string ascend910 = "Ascend910";
     const std::string ascend920 = "Ascend920";
+    if (socVersion_.find(ascend910) != std::string::npos) {
+        return ValidSocVersion::ASCEND910;
+    }
     if (socVersion_.find(ascend950) != std::string::npos) {
         return ValidSocVersion::ASCEND950;
     }
     if (socVersion_.find(ascend960) != std::string::npos || socVersion_.find(ascend920) != std::string::npos) {
         return ValidSocVersion::ASCEND960;
     }
-    return ValidSocVersion::ASCEND910;
+    return ValidSocVersion::UNSUPPORTED;
 }
 
 bool SparseFlashMlaSoftmaxL1NormMetadataCpuKernel::ParamsCheck()

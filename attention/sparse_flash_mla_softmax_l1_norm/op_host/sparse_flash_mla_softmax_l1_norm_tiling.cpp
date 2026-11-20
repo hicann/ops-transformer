@@ -12,8 +12,10 @@
  * \file sparse_flash_mla_softmax_l1_norm_tiling.cpp
  * \brief 补充完整的参数校验，支持 BSND 和 TND 布局
  */
-#include <string>
+#include <algorithm>
+#include <cstring>
 #include <set>
+#include <string>
 #include "sparse_flash_mla_softmax_l1_norm_tiling.h"
 #include "log/log.h"
 #include "err/ops_err.h"
@@ -37,7 +39,8 @@ constexpr int64_t TOPK_LENGTH_IDX = 9;
 constexpr int64_t METADATA_IDX = 10;
 constexpr int64_t SOFTMAX_L1_NORM_IDX = 0;
 
-constexpr int64_t DIM_LIMIT = 512;
+constexpr int64_t DIM_256 = 256;
+constexpr int64_t DIM_512 = 512;
 constexpr int64_t N1_MIN = 1;
 constexpr int64_t N1_MAX = 128;
 constexpr int64_t N2_VALUE = 1;
@@ -54,6 +57,13 @@ constexpr int64_t CMP_RATIO_ATTR_IDX = 2;
 constexpr int64_t MASK_MODE_ATTR_IDX = 3;
 constexpr int64_t LAYOUT_Q_ATTR_IDX = 4;
 constexpr int64_t LAYOUT_K_ATTR_IDX = 5;
+// ACLNN reserves 112 bytes for this operator's tiling payload on A2/A3.
+// The arch22 format uses 24 words and stays 32-byte aligned.
+constexpr int32_t ARCH22_TILING_WORDS = 24;
+constexpr int32_t ARCH22_TILING_MAGIC = 0x53464D4C;
+constexpr int64_t ARCH22_NARROW_TILE = 128;
+constexpr int64_t ARCH22_WIDE_TILE = 256;
+constexpr int64_t ARCH22_WORKSPACE_SLOTS = 2;
 
 struct TilingShapeInfo {
     int64_t bSize = 0;
@@ -89,6 +99,61 @@ static int64_t AlignData(const int64_t a, const int64_t b)
         return a;
     }
     return (a + b - 1U) / b * b;
+}
+
+static bool IsSupportedHeadDim(int64_t dim)
+{
+    return dim == DIM_256 || dim == DIM_512;
+}
+
+static ge::graphStatus WriteArch22Tiling(gert::TilingContext* context, const TilingShapeInfo& info, float scaleValue,
+                                         int64_t maxSeqlenK, int64_t cmpRatio, int64_t maskMode, bool isTnd,
+                                         bool isSparse, int64_t kLength, int64_t numCores, int64_t outRowLen,
+                                         bool hasSequsedQ, bool hasSequsedK, bool hasTopkLength, int64_t packRows,
+                                         int64_t scoreTile)
+{
+    auto raw = context->GetRawTilingData();
+    OP_CHECK_IF(raw == nullptr || raw->GetData() == nullptr,
+                OP_LOGE(context->GetNodeName(), "raw tiling data is null."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(raw->GetCapacity() < ARCH22_TILING_WORDS * sizeof(int32_t),
+                OP_LOGE(context->GetNodeName(), "raw tiling capacity(%zu) is smaller than %zu.", raw->GetCapacity(),
+                        ARCH22_TILING_WORDS * sizeof(int32_t)),
+                return ge::GRAPH_FAILED);
+
+    int32_t* words = reinterpret_cast<int32_t*>(raw->GetData());
+    std::memset(words, 0, ARCH22_TILING_WORDS * sizeof(int32_t));
+    int32_t scaleBits = 0;
+    std::memcpy(&scaleBits, &scaleValue, sizeof(scaleBits));
+    const auto dtype = context->GetInputDesc(QUERY_IDX)->GetDataType();
+    const int64_t totalTasks = isTnd ? info.t1 : info.bSize * AlignData(info.sqSize, packRows) / packRows;
+    const int64_t wsSlotFloats = AlignData(info.gSize * packRows, 16) * scoreTile;
+
+    words[0] = ARCH22_TILING_MAGIC;
+    words[1] = static_cast<int32_t>(info.bSize);
+    words[2] = static_cast<int32_t>(info.sqSize);
+    words[3] = static_cast<int32_t>(info.skSize);
+    words[4] = static_cast<int32_t>(info.gSize);
+    words[5] = static_cast<int32_t>(info.dSize);
+    words[6] = static_cast<int32_t>(info.t1);
+    words[7] = static_cast<int32_t>(info.t2);
+    words[8] = static_cast<int32_t>(maxSeqlenK);
+    words[9] = static_cast<int32_t>(kLength);
+    words[10] = static_cast<int32_t>(cmpRatio);
+    words[11] = static_cast<int32_t>(totalTasks);
+    words[12] = static_cast<int32_t>(numCores);
+    words[13] = static_cast<int32_t>(outRowLen);
+    words[14] = static_cast<int32_t>(wsSlotFloats);
+    words[15] = static_cast<int32_t>(maskMode);
+    words[16] = isTnd ? 1 : 0;
+    words[17] = isSparse ? 1 : 0;
+    words[18] = (dtype == ge::DT_BF16) ? 1 : 0;
+    words[19] = hasSequsedQ ? 1 : 0;
+    words[20] = hasSequsedK ? 1 : 0;
+    words[21] = hasTopkLength ? 1 : 0;
+    words[22] = scaleBits;
+    words[23] = static_cast<int32_t>(packRows);
+    raw->SetDataSize(ARCH22_TILING_WORDS * sizeof(int32_t));
+    return ge::GRAPH_SUCCESS;
 }
 
 static ge::graphStatus ParseAttrs(gert::TilingContext* context, float& scaleValue, int64_t& maxSeqlenK,
@@ -170,6 +235,10 @@ static ge::graphStatus ValidateDtypes(gert::TilingContext* context, const string
         validQKDtypes.find(keyDtype) == validQKDtypes.end(),
         OP_LOGE(opName, "key dtype only supports FLOAT16/BFLOAT16, but got %s.", DataTypeToStr(keyDtype).c_str()),
         return ge::GRAPH_FAILED);
+    OP_CHECK_IF(queryDtype != keyDtype,
+                OP_LOGE(opName, "query and key must have the same dtype, but got %s and %s.",
+                        DataTypeToStr(queryDtype).c_str(), DataTypeToStr(keyDtype).c_str()),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(lseDtype != ge::DT_FLOAT,
                 OP_LOGE(opName, "lse dtype must be FLOAT32, but got %s.", DataTypeToStr(lseDtype).c_str()),
                 return ge::GRAPH_FAILED);
@@ -258,9 +327,12 @@ static ge::graphStatus ValidateAndExtractShapesTnd(gert::TilingContext* context,
 
     int64_t keyN2Size = keyShape->GetStorageShape().GetDim(1);
     int64_t keyDSize = keyShape->GetStorageShape().GetDim(2);
+    OP_CHECK_IF(keyDSize != info.dSize,
+                OP_LOGE(opName, "query D(%lld) must be equal to key D(%lld).", info.dSize, keyDSize),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(keyN2Size != N2_VALUE, OP_LOGE(opName, "key N2 must be 1, but got %lld.", keyN2Size),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(keyDSize != DIM_LIMIT, OP_LOGE(opName, "key D must be 512, but got %lld.", keyDSize),
+    OP_CHECK_IF(!IsSupportedHeadDim(keyDSize), OP_LOGE(opName, "key D must be 256 or 512, but got %lld.", keyDSize),
                 return ge::GRAPH_FAILED);
 
     auto cuSeqQInput = context->GetOptionalInputTensor(CU_SEQLENS_Q_IDX);
@@ -270,8 +342,14 @@ static ge::graphStatus ValidateAndExtractShapesTnd(gert::TilingContext* context,
     OP_CHECK_IF(cuSeqKInput == nullptr, OP_LOGE(opName, "cuSeqlensK must be provided when layout is TND."),
                 return ge::GRAPH_FAILED);
 
-    auto cuSeqQShape = context->GetInputShape(CU_SEQLENS_Q_IDX);
-    auto cuSeqKShape = context->GetInputShape(CU_SEQLENS_K_IDX);
+    // cu_seqlens are optional API slots.  GetInputShape() indexes the compact
+    // required-input list on some CANN releases and therefore can read the
+    // preceding sparse slot when it is absent.  Use the optional accessor so
+    // TND remains correct with any combination of optional inputs.
+    auto cuSeqQShape = context->GetOptionalInputShape(CU_SEQLENS_Q_IDX);
+    auto cuSeqKShape = context->GetOptionalInputShape(CU_SEQLENS_K_IDX);
+    OP_CHECK_IF(cuSeqQShape == nullptr || cuSeqKShape == nullptr,
+                OP_LOGE(opName, "cuSeqlens shapes must be provided when layout is TND."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         cuSeqQShape->GetStorageShape().GetDimNum() != DIM_NUM_ONE,
         OP_LOGE(opName, "cuSeqlensQ dim num must be 1, but got %zu.", cuSeqQShape->GetStorageShape().GetDimNum()),
@@ -317,7 +395,10 @@ static ge::graphStatus ValidateAndExtractShapesBsnd(gert::TilingContext* context
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(keyN2Size != N2_VALUE, OP_LOGE(opName, "key N2 must be 1, but got %lld.", keyN2Size),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(keyDSize != DIM_LIMIT, OP_LOGE(opName, "key D must be 512, but got %lld.", keyDSize),
+    OP_CHECK_IF(keyDSize != info.dSize,
+                OP_LOGE(opName, "query D(%lld) must be equal to key D(%lld).", info.dSize, keyDSize),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!IsSupportedHeadDim(keyDSize), OP_LOGE(opName, "key D must be 256 or 512, but got %lld.", keyDSize),
                 return ge::GRAPH_FAILED);
 
     auto cuSeqQInput = context->GetOptionalInputTensor(CU_SEQLENS_Q_IDX);
@@ -340,7 +421,7 @@ static ge::graphStatus ValidateShapeRanges(gert::TilingContext* context, const T
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(n2SizeFromKey != N2_VALUE, OP_LOGE(opName, "N2 must be 1, but got %lld.", n2SizeFromKey),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(info.dSize != DIM_LIMIT, OP_LOGE(opName, "D must be 512, but got %lld.", info.dSize),
+    OP_CHECK_IF(!IsSupportedHeadDim(info.dSize), OP_LOGE(opName, "D must be 256 or 512, but got %lld.", info.dSize),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -500,9 +581,20 @@ static ge::graphStatus GetPlatformInfo(gert::TilingContext* context, const strin
 static ge::graphStatus SparseFlashMlaSoftmaxL1NormTilingFunc(gert::TilingContext* context)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
+    const auto socVersion = ascendcPlatform.GetSocVersion();
+    const bool isArch22 = socVersion == platform_ascendc::SocVersion::ASCEND910B ||
+                          socVersion == platform_ascendc::SocVersion::ASCEND910_93;
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
     uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
     uint32_t blockDim = ascendcPlatform.CalcTschBlockDim(aivNum, aicNum, aivNum);
+    if (isArch22) {
+        if (aicNum > 0 && blockDim > aicNum) {
+            blockDim = aicNum;
+        }
+        if (blockDim == 0) {
+            blockDim = aicNum;
+        }
+    }
     context->SetBlockDim(blockDim);
 
     float scaleValue;
@@ -547,6 +639,9 @@ static ge::graphStatus SparseFlashMlaSoftmaxL1NormTilingFunc(gert::TilingContext
     if (ValidateShapeRanges(context, info, isTnd, opName) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
+    OP_CHECK_IF(!isArch22 && info.dSize != DIM_512,
+                OP_LOGE(opName, "D=256 is only supported on A2/A3, but got D=%lld.", info.dSize),
+                return ge::GRAPH_FAILED);
     if (ValidateLseShape(context, info, isTnd, opName) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
@@ -559,11 +654,34 @@ static ge::graphStatus SparseFlashMlaSoftmaxL1NormTilingFunc(gert::TilingContext
     if (ValidateSparseInfo(context, maskMode, isTnd, layoutQ, opName, isSparse, kLength) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
+    OP_CHECK_IF(isTnd && !isSparse && maxSeqlenK <= 0,
+                OP_LOGE(opName, "maxSeqlenK must be greater than 0 for dense TND layout."), return ge::GRAPH_FAILED);
 
     bool has_seqused_q = (context->GetOptionalInputTensor(SEQUSED_Q_IDX) != nullptr);
     bool has_seqused_k = (context->GetOptionalInputTensor(SEQUSED_K_IDX) != nullptr);
     bool has_topk_length = (context->GetOptionalInputTensor(TOPK_LENGTH_IDX) != nullptr);
 
+    // Dense BSND rows share the same K matrix. Pack them into a 64- or 128-row GEMM to amortize K loads
+    // and cross-core synchronization. Keep paths with row-dependent validity on the one-row schedule.
+    const int64_t logicalRows = isTnd ? info.t1 : info.bSize * info.sqSize;
+    const bool canPackDense = isArch22 && !isTnd && !isSparse && maskMode == 0 && !has_seqused_q && !has_seqused_k &&
+                              info.gSize <= 64 && (64 % info.gSize == 0) && logicalRows * info.gSize >= 512;
+    const int64_t widePackRows = canPackDense ? (64 / info.gSize) : 1;
+    const int64_t tallPackRows = canPackDense ? (128 / info.gSize) : 1;
+    const int64_t wideTasks = info.bSize * AlignData(info.sqSize, widePackRows) / widePackRows;
+    const int64_t tallTasks = info.bSize * AlignData(info.sqSize, tallPackRows) / tallPackRows;
+    const bool tallRoundsFit =
+        aicNum > 0 && 2 * ((tallTasks + aicNum - 1) / aicNum) <= (wideTasks + aicNum - 1) / aicNum;
+    const bool useTallTile = canPackDense && (info.gSize >= 16 || (info.gSize == 8 && tallRoundsFit));
+    const bool useWideTile = canPackDense && !useTallTile;
+    const int64_t packRows = useTallTile ? tallPackRows : (useWideTile ? widePackRows : 1);
+    const int64_t scoreTile = useWideTile ? ARCH22_WIDE_TILE : ARCH22_NARROW_TILE;
+
+    const int64_t initTotalNum = isArch22 ? (isTnd ? info.t1 * (isSparse ? kLength : info.t2) :
+                                                     info.bSize * info.sqSize * (isSparse ? kLength : info.skSize)) :
+                                            (isTnd ? info.t1 * (isSparse ? kLength : maxSeqlenK) :
+                                                     info.bSize * info.sqSize * (isSparse ? kLength : info.skSize));
+#ifdef GET_TPL_TILING_KEY
     OpTiling* tilingData = context->GetTilingData<OpTiling>();
     tilingData->b = info.bSize;
     tilingData->sq = info.sqSize;
@@ -580,31 +698,61 @@ static ge::graphStatus SparseFlashMlaSoftmaxL1NormTilingFunc(gert::TilingContext
     tilingData->has_seqused_k = has_seqused_k;
     tilingData->has_topk_length = has_topk_length;
 
-    if (isTnd) {
-        tilingData->init_total_num = info.t1 * (isSparse ? kLength : maxSeqlenK);
-    } else {
-        tilingData->init_total_num = info.bSize * info.sqSize * (isSparse ? kLength : info.skSize);
-    }
+    tilingData->init_total_num = initTotalNum;
+#endif
     AiCoreParams aicoreParams_;
     if (GetPlatformInfo(context, opName, aicoreParams_) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    int64_t perCoreNum = AlignData(tilingData->init_total_num, static_cast<int64_t>(aicoreParams_.numBlocks)) /
+    int64_t perCoreNum = AlignData(initTotalNum, static_cast<int64_t>(aicoreParams_.numBlocks)) /
                          static_cast<int64_t>(aicoreParams_.numBlocks);
+#ifdef GET_TPL_TILING_KEY
     tilingData->init_per_core_num = AlignData(perCoreNum, 8 * 1024);
 
     uint64_t tilingKey = GET_TPL_TILING_KEY(static_cast<uint64_t>(maskMode), static_cast<uint64_t>(isTnd ? 1 : 0),
                                             static_cast<uint64_t>(isSparse ? 1 : 0));
+#else
+    uint64_t tilingKey = 0;
+#endif
     context->SetTilingKey(tilingKey);
 
+    const int64_t totalTasks = isTnd ? info.t1 : info.bSize * AlignData(info.sqSize, packRows) / packRows;
+    const int64_t maxCores = std::max<int64_t>(1, std::min<int64_t>(aicNum, totalTasks));
+    const int64_t taskRounds = std::max<int64_t>(1, (totalTasks + maxCores - 1) / maxCores);
+    // Use the fewest cores that preserve the minimum task-round count. This avoids partially
+    // occupied last rounds (for example 32 tasks on 24 cores) and reduces cross-core contention.
+    const int64_t numCores = std::max<int64_t>(1, (totalTasks + taskRounds - 1) / taskRounds);
+    const int64_t outRowLen = isSparse ? kLength : (isTnd ? maxSeqlenK : info.skSize);
+    const size_t scoreWorkspace = static_cast<size_t>(numCores) * ARCH22_WORKSPACE_SLOTS *
+                                  static_cast<size_t>(AlignData(info.gSize * packRows, 16) * scoreTile) * sizeof(float);
+    // Large sparse rows are gathered by the two AIV sub-cores into per-AIC ping-pong slots before Nd2Nz.
+    const size_t sparseMergeWorkspace = isSparse ? static_cast<size_t>(numCores) * ARCH22_WORKSPACE_SLOTS *
+                                                       static_cast<size_t>(scoreTile) *
+                                                       static_cast<size_t>(info.dSize) * sizeof(uint16_t) :
+                                                   0;
+    const size_t userWorkspace = scoreWorkspace + sparseMergeWorkspace;
     size_t workspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
-    if (!isTnd) {
-        workspaceSize += static_cast<size_t>(info.gSize) * static_cast<size_t>(info.skSize) * sizeof(float);
+    if (isArch22) {
+        workspaceSize += userWorkspace;
+        blockDim = static_cast<uint32_t>(numCores);
+        context->SetBlockDim(blockDim);
     } else {
-        workspaceSize += static_cast<size_t>(info.gSize) * static_cast<size_t>(info.t2) * sizeof(float);
+        workspaceSize +=
+            static_cast<size_t>(info.gSize) * static_cast<size_t>(isTnd ? info.t2 : info.skSize) * sizeof(float);
     }
     size_t* workSpaces = context->GetWorkspaceSizes(1);
     workSpaces[0] = workspaceSize;
+    if (isArch22) {
+        context->SetScheduleMode(1);
+    }
+
+    if (isArch22) {
+        if (WriteArch22Tiling(context, info, scaleValue, maxSeqlenK, cmpRatio, maskMode, isTnd, isSparse, kLength,
+                              numCores, outRowLen, has_seqused_q, has_seqused_k, has_topk_length, packRows,
+                              scoreTile) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
+    }
 
     OP_LOGI(context->GetNodeName(),
             "SparseFlashMlaSoftmaxL1Norm tiling2 completed: blockDim=%u, B=%lld, Sq=%lld, Sk=%lld, G=%lld, D=%lld, "

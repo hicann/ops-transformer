@@ -8,9 +8,13 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-# Only Ascend 950/960dt has a PyPTO kernel implementation for this operator.
-if(NOT "ascend950" IN_LIST ASCEND_COMPUTE_UNIT AND NOT "ascend960dt" IN_LIST ASCEND_COMPUTE_UNIT)
-    message(STATUS "[sparse_flash_mla_softmax_l1_norm] Skipped: PyPTO kernel only supports ascend950/ascend960dt (soc=${ASCEND_COMPUTE_UNIT})")
+# Ascend 950/960dt use the PyPTO implementation; Ascend 910B/910_93 use the
+# native Arch22 implementation.
+if(NOT "ascend950" IN_LIST ASCEND_COMPUTE_UNIT AND
+   NOT "ascend960dt" IN_LIST ASCEND_COMPUTE_UNIT AND
+   NOT "ascend910b" IN_LIST ASCEND_COMPUTE_UNIT AND
+   NOT "ascend910_93" IN_LIST ASCEND_COMPUTE_UNIT)
+    message(STATUS "[sparse_flash_mla_softmax_l1_norm] Skipped: unsupported soc=${ASCEND_COMPUTE_UNIT}")
     return()
 endif()
 

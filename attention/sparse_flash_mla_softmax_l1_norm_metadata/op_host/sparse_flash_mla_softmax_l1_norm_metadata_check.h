@@ -34,7 +34,8 @@ inline constexpr int64_t SMLA_METADATA_SIZE = 64;
 inline constexpr int64_t SMLA_NUM_HEADS_Q_LOWER_BOUND = 1;
 inline constexpr int64_t SMLA_NUM_HEADS_Q_UPPER_BOUND = 128;
 inline constexpr int64_t SMLA_NUM_HEADS_K = 1;
-inline constexpr int64_t SMLA_HEAD_DIM = 512;
+inline constexpr int64_t SMLA_HEAD_DIM_MIN = 256;
+inline constexpr int64_t SMLA_HEAD_DIM_MAX = 512;
 
 inline bool IsTensorExistSmlaL1Norm(const aclTensor* tensor)
 {
@@ -132,9 +133,8 @@ aclnnStatus CheckSingleParamSmlaL1Norm(int64_t batchSize, int64_t maxSeqLenQ, in
         return ACLNN_ERR_PARAM_INVALID;
     }
     // head_dim 校验
-    if (headDim != SMLA_HEAD_DIM) {
-        OP_LOGE_FOR_INVALID_VALUE(SMLA_ACLNN_OP_NAME, "head_dim", std::to_string(headDim),
-                                  std::to_string(SMLA_HEAD_DIM));
+    if (headDim != SMLA_HEAD_DIM_MIN && headDim != SMLA_HEAD_DIM_MAX) {
+        OP_LOGE_FOR_INVALID_VALUE(SMLA_ACLNN_OP_NAME, "head_dim", std::to_string(headDim), "256 or 512");
         return ACLNN_ERR_PARAM_INVALID;
     }
     // topk 非负校验

@@ -8,10 +8,10 @@
 - <term>Ascend 950PR&950DT products</term>: Supported
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 products</term>: Not supported
+- <term>Atlas A3 products</term>: Supported
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 products</term>: Not supported
+- <term>Atlas A2 products</term>: Supported
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 inference products</term>: Not supported
@@ -130,7 +130,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
             <td>BFLOAT16, FLOAT16</td>
             <td>ND</td>
             <td>(B,S1,N1,D), (T1,N1,D)<br>
-            B: Support Generalization; S1: Support Generalization; N1: Support 1-128; D: 512; T1: B × S1
+            B: Support Generalization; S1: Support Generalization; N1: Support 1-128; D: A2/A3 supports 256 or 512, and A5 supports only 512; T1: B × S1
             </td>
             <td>√</td>
         </tr>
@@ -143,7 +143,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
             <td>BFLOAT16, FLOAT16</td>
             <td>ND</td>
             <td>(B,S2,N2,D), (T2,N2,D)<br>
-            B: Keep Consistent with the B of q; S2: supports generalization; N2: 1; D: 512; T2: B × S2
+            B: Keep Consistent with the B of q; S2: supports generalization; N2: 1; D: A2/A3 supports 256 or 512, and A5 supports only 512; T2: B × S2
             </td>
             <td>√</td>
         </tr>
@@ -478,8 +478,8 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
         </tr>
         <tr>
             <td>D</td>
-            <td>512</td>
-            <td>-</td>
+            <td>A2/A3: 256, 512; A5: 512</td>
+            <td>D=256 is supported by the native A2/A3 implementation.</td>
         </tr>
         <tr>
             <td>layout</td>

@@ -7,8 +7,8 @@ English | [简体中文](./README.md)
 | Product                                                      | Supported |
 | ------------------------------------------------------------ | :------: |
 | <term>Ascend 950PR&950DT products</term>                       |    √     |
-| <term>Atlas A3 products</term>     |    ×     |
-| <term>Atlas A2 products</term>     |    ×     |
+| <term>Atlas A3 products</term>     |    √     |
+| <term>Atlas A2 products</term>     |    √     |
 | <term>Atlas 200I/500 A2 inference products</term>                      |    ×     |
 | <term>Atlas inference products</term>                              |    ×     |
 | <term>Atlas training products</term>                              |    ×     |
@@ -79,7 +79,7 @@ English | [简体中文](./README.md)
     - S1 and S2: Generally supported. S1 and S2 of different lengths are supported.
     - N1: 1 to 128 is supported, and num_heads_q must be divisible by num_heads_k.
     - N2: Only 1 is supported.
-    - D: Only 512 is supported.
+    - D: 256 and 512 are supported on A2/A3; only 512 is supported on A5.
 - Supported mask_mode values:
     - 0: No mask operation is performed.
     - 3: Mask of the rightDownCausal mode, corresponding to the lower-triangle scenario partitioned by the right vertex.

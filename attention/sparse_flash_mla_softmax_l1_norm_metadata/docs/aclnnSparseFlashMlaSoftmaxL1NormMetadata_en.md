@@ -8,10 +8,10 @@
 - <term>Ascend 950PR&950DT products</term>: Supported
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 products</term>: Not supported
+- <term>Atlas A3 products</term>: Supported
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 products</term>: Not supported
+- <term>Atlas A2 products</term>: Supported
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 inference products</term>: Not supported
@@ -208,7 +208,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
       <td>headDim</td>
       <td>Input</td>
       <td>Indicates the head dimension of q/k.</td>
-      <td>Currently, only 512 is supported.</td>
+      <td>256 or 512 is supported.</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -426,7 +426,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
   - head constraints
     - numHeadsQ: range [1, 128].
     - Currently, only numHeadsK = 1 is supported.
-    - Currently, only headDim = 512 is supported.
+    - headDim supports 256 or 512.
     - numHeadsQ must be divisible by numHeadsK.
   - Load balancing constraint
     - topk supports non-negative values. 0 indicates no sparsity.

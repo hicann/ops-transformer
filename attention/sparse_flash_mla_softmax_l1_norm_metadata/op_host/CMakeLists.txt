@@ -10,3 +10,13 @@
 add_op_to_compiled_list()
 
 add_modules_sources(OPTYPE sparse_flash_mla_softmax_l1_norm_metadata ACLNNTYPE aclnn)
+
+# This operator intentionally keeps a hand-written public API header because
+# its argument list contains the metadata-specific optional tensors and scalar
+# attributes.  There is no *_def.cpp for opbuild to regenerate that header,
+# so install it explicitly with the generated aclnn headers.
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/op_api/aclnn_sparse_flash_mla_softmax_l1_norm_metadata.h
+    DESTINATION ${ACLNN_INC_INSTALL_DIR}
+    OPTIONAL
+)

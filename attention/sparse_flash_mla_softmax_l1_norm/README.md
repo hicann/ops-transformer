@@ -5,8 +5,8 @@
 | 产品                                                         | 是否支持 |
 | ------------------------------------------------------------ | :------: |
 | <term>Ascend 950PR&950DT系列产品</term>                       |    √     |
-| <term>Atlas A3系列产品</term>     |    ×     |
-| <term>Atlas A2系列产品</term>     |    ×     |
+| <term>Atlas A3系列产品</term>     |    √     |
+| <term>Atlas A2系列产品</term>     |    √     |
 | <term>Atlas 200I/500 A2推理产品</term>                      |    ×     |
 | <term>Atlas推理系列产品</term>                              |    ×     |
 | <term>Atlas训练系列产品</term>                              |    ×     |
@@ -77,7 +77,7 @@
     - S1、S2：泛化支持，支持S1、S2不等长。
     - N1：支持1~128，且num_heads_q必须能被num_heads_k整除。
     - N2：仅支持1。
-    - D：仅支持512。
+    - D：A2/A3支持256和512；A5仅支持512。
 - mask_mode支持：
     - 0：不做mask操作。
     - 3：rightDownCausal模式的mask，对应以右顶点为划分的下三角场景。

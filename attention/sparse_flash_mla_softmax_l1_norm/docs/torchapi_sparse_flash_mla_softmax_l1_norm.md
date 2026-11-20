@@ -6,10 +6,10 @@
 - <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2推理产品</term>：不支持
@@ -114,9 +114,9 @@ cann_ops_transformer.sparse_flash_mla_softmax_l1_norm(
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 |--------|----------|-----------|------|----------|-------------|
 | q | Tensor | 必选 | attention结构的输入Q，对应公式中的$Q$。`layout_q`="BSND"时shape为(B,S1,N1,D)；`layout_q`="TND"时shape为(T1,N1,D)。 | float16、bfloat16 | (B,S1,N1,D)、(T1,N1,D) |
-| k | Tensor | 必选 | attention结构的输入K，对应公式中的$K$，与q的B保持一致，S2支持泛化，N2=1。 | float16、bfloat16 | (B,S2,N2,D)、(T2,N2,D) |
-| softmax_lse | Tensor | 必选 | 注意力正向计算的输出softmax_lse，与q的B保持一致，N2=1，S1与q的S1保持一致，G=N1/N2。 | float32 | (B,N2,S1,G)、(N2,T1,G) |
-| sparse_indices | Tensor | 可选 | 稀疏场景下选择的k中权重较高的注意力索引，与q的B/S1保持一致，N2=1，K支持泛化。 | int32 | (B,S1,N2,K)、(T1,N2,K) |
+| k | Tensor | 必选 | attention结构的输入K，对应公式中的$K$，与q的B保持一致，S2支持泛化，N2=1。A2/A3支持D=256或512，A5仅支持D=512。 | float16、bfloat16 | (B,S2,N2,D)、(T2,N2,D) |
+| softmax_lse | Tensor | 必选 | 注意力正向计算的输出softmax_lse。与q的B保持一致，N2=1，S1与q的S1保持一致，G=N1/N2。 | float32 | (B,N2,S1,G)、(N2,T1,G) |
+| sparse_indices | Tensor | 可选 | 稀疏场景下选择的k中权重较高的注意力索引。与q的B/S1保持一致，N2=1，K支持泛化。 | int32 | (B,S1,N2,K)、(T1,N2,K) |
 | cu_seqlens_q | Tensor | 可选 | 每个Batch中q的有效token数的累加和形式。`layout_q`为TND时该参数必传，长度与B+1保持一致，累加和与T1保持一致。 | int32 | (B+1,) |
 | cu_seqlens_k | Tensor | 可选 | 每个Batch中k的有效token数的累加和形式。`layout_k`为TND时该参数必传，长度与B+1保持一致，累加和与T2保持一致。 | int32 | (B+1,) |
 | seqused_q | Tensor | 可选 | 表示不同batch中q实际参与运算的token数。 | int32 | (B,) |
@@ -137,7 +137,7 @@ cann_ops_transformer.sparse_flash_mla_softmax_l1_norm(
 |--------|----------|-----------|------|----------|-------------|
 | num_heads_q | int | 必选 | 表示公式中$Q$的头数（即N1），当前支持1~128。 | int | - |
 | num_heads_k | int | 必选 | 表示公式中$key$的头数（即N2），当前仅支持1。 | int | - |
-| head_dim | int | 必选 | 表示头的维度（即D），当前仅支持512。 | int | - |
+| head_dim | int | 必选 | 表示头的维度（即D）。A2/A3支持256或512，A5仅支持512。 | int | - |
 | cu_seqlens_q | Tensor | 可选 | 表示每个Batch中q的有效token数的累加和形式，当`layout_q`为TND时该参数必传，累加和与T1保持一致。 | int32 | (B+1,) |
 | cu_seqlens_k | Tensor | 可选 | 表示每个Batch中k的有效token数的累加和形式，当`layout_k`为TND时该参数必传，累加和与T2保持一致。 | int32 | (B+1,) |
 | seqused_q | Tensor | 可选 | 表示不同batch中q实际参与运算的token数。 | int32 | (B,) |
@@ -199,7 +199,7 @@ Metadata字段布局：
     | S1、S2 | 支持泛化 | 支持S1、S2不等长。 |
     | N1 | 1~128 | num_heads_q必须能被num_heads_k整除。 |
     | N2 | 1 | 当前仅支持N2=1。 |
-    | D | 512 | q、k最后一维需保持一致。 |
+    | D | A2/A3：256、512；A5：512 | q、k最后一维需保持一致。D=256仅由A2/A3原生实现支持。 |
     | layout_q/k | BSND / TND，必须一致 | - |
     | cmp_ratio | 1~128 | - |
 

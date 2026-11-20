@@ -8,10 +8,10 @@
 - <term>Ascend 950PR&950DT products</term>: Supported
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3 products</term>: Not supported
+- <term>Atlas A3 products</term>: Supported
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2 products</term>: Not supported
+- <term>Atlas A2 products</term>: Supported
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2 inference products</term>: Not supported
@@ -116,7 +116,7 @@ cann_ops_transformer.sparse_flash_mla_softmax_l1_norm(
 | Name | Type | Required/Optional | Description | Data Type | Dimension (Shape) |
 |--------|----------|-----------|------|----------|-------------|
 | q | Tensor | Required | Input Q of the attention structure, corresponding to $Q$ in the formula. When `layout_q` is "BSND", the shape is (B,S1,N1,D); when `layout_q` is "TND", the shape is (T1,N1,D). | float16, bfloat16 | (B,S1,N1,D), (T1,N1,D) |
-| k | Tensor | Required | Input K of the attention structure, corresponding to $K$ in the formula. B remains consistent with that of q, S2 supports generalization, and N2=1. | float16, bfloat16 | (B,S2,N2,D), (T2,N2,D) |
+| k | Tensor | Required | Input K of the attention structure, corresponding to $K$ in the formula. B remains consistent with that of q, S2 supports generalization, and N2=1. A2/A3 supports D=256 or 512, and A5 supports only D=512. | float16, bfloat16 | (B,S2,N2,D), (T2,N2,D) |
 | softmax_lse | Tensor | Required | Output softmax_lse of the forward attention computation. B remains consistent with that of q, N2=1, S1 remains consistent with S1 of q, and G=N1/N2. | float32 | (B,N2,S1,G), (N2,T1,G) |
 | sparse_indices | Tensor | Optional | Attention indices with higher weights selected from k in sparse use cases. B/S1 remain consistent with those of q, N2=1, and K supports generalization. | int32 | (B,S1,N2,K), (T1,N2,K) |
 | cu_seqlens_q | Tensor | Optional | Cumulative sum of the number of valid tokens of q in each batch. This parameter is mandatory when `layout_q` is TND. The length remains consistent with B+1, and the accumulated sum remains consistent with T1. | int32 | (B+1,) |
@@ -139,7 +139,7 @@ cann_ops_transformer.sparse_flash_mla_softmax_l1_norm(
 |--------|----------|-----------|------|----------|-------------|
 | num_heads_q | int | Required | Indicates the number of heads of $Q$ in the formula (N1). Currently supports 1-128. | int | - |
 | num_heads_k | int | Required | Indicates the number of heads of $key$ in the formula (N2). Currently only supports 1. | int | - |
-| head_dim | int | Required | Indicates the head dimension (D). Currently only supports 512. | int | - |
+| head_dim | int | Required | Indicates the head dimension (D). A2/A3 supports 256 or 512, and A5 supports only 512. | int | - |
 | cu_seqlens_q | Tensor | Optional | Indicates the accumulated sum of the number of valid tokens of q in each batch. This parameter is mandatory when `layout_q` is TND. The accumulated sum must remain consistent with T1. | int32 | (B+1,) |
 | cu_seqlens_k | Tensor | Optional | Indicates the accumulated sum of the number of valid tokens of k in each batch. This parameter is mandatory when `layout_k` is TND. The accumulated sum must remain consistent with T2. | int32 | (B+1,) |
 | seqused_q | Tensor | Optional | Indicates the number of tokens of q that actually participate in the operation in different batches. | int32 | (B,) |
@@ -201,7 +201,7 @@ Metadata layout:
     | S1, S2 | Support generalization | S1 and S2 of different lengths are supported. |
     | N1 | 1-128 | num_heads_q must be divisible by num_heads_k. |
     | N2 | 1 | Currently only supports N2=1. |
-    | D | 512 | The last dimension of q and k must remain consistent. |
+    | D | A2/A3: 256, 512; A5: 512 | The last dimension of q and k must remain consistent. D=256 is supported by the native A2/A3 implementation. |
     | layout_q/k | BSND / TND, must be the same | - |
     | cmp_ratio | 1-128 | - |
 

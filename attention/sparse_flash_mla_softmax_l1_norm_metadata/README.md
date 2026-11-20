@@ -5,8 +5,8 @@
 | 产品                                                         | 是否支持 |
 | ------------------------------------------------------------ | :------: |
 | <term>Ascend 950PR&950DT系列产品</term>                       |    √     |
-| <term>Atlas A3系列产品</term>     |    ×     |
-| <term>Atlas A2系列产品</term>     |    ×     |
+| <term>Atlas A3系列产品</term>     |    √     |
+| <term>Atlas A2系列产品</term>     |    √     |
 | <term>Atlas 200I/500 A2推理产品</term>                      |    ×     |
 | <term>Atlas推理系列产品</term>                              |    ×     |
 | <term>Atlas训练系列产品</term>                              |    ×     |
@@ -51,7 +51,7 @@
 - BSND场景：必传batch_size、max_seqlen_q和max_seqlen_k参数以获取shape信息。
 - TND场景：必传cu_seqlens_q和cu_seqlens_k参数以获取正确shape信息。当batch_size为0时，通过cu_seqlens_q的shape推导batch。
 - layout约束：layout_q必须为BSND或TND，layout_k支持BSND和TND，layout_k需与layout_q保持一致。
-- head约束：num_heads_q、num_heads_k必须为正数，且num_heads_q必须能被num_heads_k整除, head_dim只支持512。
+- head约束：num_heads_q、num_heads_k必须为正数，且num_heads_q必须能被num_heads_k整除，head_dim支持256或512。
 - 负载均衡约束：
     - topk支持非负数，0表示无稀疏。
     - cmp_ratio取值范围为[1, 128]。

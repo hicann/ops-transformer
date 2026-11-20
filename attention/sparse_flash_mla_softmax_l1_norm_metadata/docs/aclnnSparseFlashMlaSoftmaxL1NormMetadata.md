@@ -6,10 +6,10 @@
 - <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2推理产品</term>：不支持
@@ -206,7 +206,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
       <td>headDim</td>
       <td>输入</td>
       <td>表示q/k的head dimension。</td>
-      <td>当前仅支持512。</td>
+      <td>支持256或512。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -424,7 +424,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
   - head约束
     - numHeadsQ取值范围为[1, 128]。
     - numHeadsK当前仅支持1。
-    - headDim当前仅支持512。
+    - headDim支持256或512。
     - numHeadsQ必须能被numHeadsK整除。
   - 负载均衡约束
     - topk支持非负数，0表示无稀疏。

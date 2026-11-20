@@ -261,7 +261,7 @@ def sparse_flash_mla_softmax_l1_norm(
 
     Args:
         q (Tensor): 查询张量，shape (B,S1,N1,D) 或 (T1,N1,D)，dtype float16/bfloat16。
-        k (Tensor): 键张量，shape (B,S2,N2,D) 或 (T2,N2,D)，dtype 与 q 一致，N2=1，D=512。
+        k (Tensor): 键张量，shape (B,S2,N2,D) 或 (T2,N2,D)，dtype 与 q 一致，N2=1，D=256或512。
         softmax_lse (Tensor): 注意力正向计算的 softmax_lse 输出，shape (B,N2,S1,G) 或 (N2,T1,G)，dtype float32。
         sparse_indices (Tensor, optional): 稀疏场景下选择的注意力索引，dtype int32。
         cu_seqlens_q (Tensor, optional): TND 场景下 q 的累积序列长度，shape (B+1,)，dtype int32。

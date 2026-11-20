@@ -6,10 +6,10 @@
 - <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
-- <term>Atlas A2系列产品</term>：不支持
+- <term>Atlas A2系列产品</term>：支持
 <!-- end id3 -->
 <!-- npu="310b" id4 -->
 - <term>Atlas 200I/500 A2推理产品</term>：不支持
@@ -131,7 +131,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
             <td>(B,S1,N1,D)、(T1,N1,D)<br>
-            B：支持泛化；S1：支持泛化；N1：支持1~128；D：512；T1：B × S1
+            B：支持泛化；S1：支持泛化；N1：支持1~128；D：A2/A3支持256或512，A5仅支持512；T1：B × S1
             </td>
             <td>√</td>
         </tr>
@@ -145,7 +145,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
             <td>(B,S2,N2,D)、(T2,N2,D)<br>
-            B：与q的B保持一致；S2：支持泛化；N2：1；D：512；T2：B × S2
+            B：与q的B保持一致；S2：支持泛化；N2：1；D：A2/A3支持256或512，A5仅支持512；T2：B × S2
             </td>
             <td>√</td>
         </tr>
@@ -507,8 +507,8 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1Norm(
         </tr>
         <tr>
             <td>D</td>
-            <td>512</td>
-            <td>-</td>
+            <td>A2/A3：256、512；A5：512</td>
+            <td>D=256仅由A2/A3原生实现支持。</td>
         </tr>
         <tr>
             <td>layout</td>
