@@ -56,6 +56,8 @@ stages:
           repository: read
           id-token: write
         name: ST_gate
+        needs:
+          - JOB_pre
         if: env.TARGET_BRANCH == 'master'
         runs-on: ["self-hosted", "arch=x64", "spec=small"]
         container:
