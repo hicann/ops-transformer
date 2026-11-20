@@ -63,6 +63,9 @@ using namespace MoeEpCombineLayout;
 static constexpr uint32_t WIN_ADDR_ALIGN = 512;
 // PR 111 requires each committed batch to contain fewer WQEBBs than the SQ depth.
 static constexpr uint32_t HCOMM_BATCH_CAPACITY = 256;
+// SQ capacity in WQEBBs, matching the original Combine template.
+static constexpr uint32_t HCOMM_SQ_CAPACITY = 32768U;
+static constexpr uint32_t HCOMM_MAX_WRITE_WQEBB = 2U;
 static constexpr uint32_t HCOMM_PLAIN_WRITE_WQE_BYTES = 64;
 static constexpr uint32_t HCOMM_BATCH_BUFFER_BYTES = HCOMM_BATCH_CAPACITY * HCOMM_PLAIN_WRITE_WQE_BYTES;
 constexpr uint64_t UB_ALIGN = 32UL;
@@ -186,10 +189,7 @@ private:
     GM_ADDR activeRemoteWindow_{nullptr};
     uint32_t preparedWriteCount_{0};
     uint32_t preparedCqeCount_{0};
-    uint32_t batchCapacity_{HCOMM_BATCH_CAPACITY};
-    uint32_t cqCapacity_{0};
-    uint32_t cqeIntervalLimit_{0};
-    uint32_t wqebbSinceCqe_{0};
+    uint32_t sqPendingWqebb_{0};
     bool activeBatchInitialized_{false};
 };
 
@@ -289,7 +289,6 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::FlushPrepared
         hcomm_.BatchCommit(activeBatchHandle_);
         preparedWriteCount_ = 0;
         preparedCqeCount_ = 0;
-        batchCapacity_ = HCOMM_BATCH_CAPACITY;
     }
     if (!keepHandle) {
         activeBatchHandle_ = {};
@@ -314,14 +313,7 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::BeginPrepared
         }
         activeBatchHandle_ = hcomm_.MakeBatchHandle(static_cast<CommHandle>(commHandle), hcommBatchTensor_,
                                                     HCOMM_BATCH_BUFFER_BYTES, winRankAddr_[dstRank]);
-        const auto& handle = activeBatchHandle_.handle;
-        const uint32_t sqDepth = handle.sqContext.contextInfo.ubJfs.sqDepth;
-        cqCapacity_ = handle.cqContext.contextInfo.ubJfc.cqDepth;
-        wqebbSinceCqe_ = handle.cursor.sqHead - handle.cursor.sqTail;
-        // Leave a full batch of headroom so BatchCommit can poll an already submitted CQE before SQ overflow.
-        cqeIntervalLimit_ = sqDepth - HCOMM_BATCH_CAPACITY - kTokenWqebbCount;
-        const uint32_t available = sqDepth - wqebbSinceCqe_;
-        batchCapacity_ = available < HCOMM_BATCH_CAPACITY ? available : HCOMM_BATCH_CAPACITY;
+        sqPendingWqebb_ = 0U;
         activeJettyHandle_ = commHandle;
         activeBatchInitialized_ = true;
     }
@@ -334,7 +326,7 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::BeginPrepared
 template <TemplateMoeEpCombineTypeClass>
 __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::ReservePreparedWrites(uint32_t wqebbCount)
 {
-    if (preparedWriteCount_ + wqebbCount > batchCapacity_) {
+    if (preparedWriteCount_ + wqebbCount > HCOMM_BATCH_CAPACITY) {
         FlushPreparedWrites(true);
     }
 }
@@ -343,7 +335,7 @@ template <TemplateMoeEpCombineTypeClass>
 __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::ReservePreparedCqe()
 {
     // BatchCommit can poll older CQEs, but the current batch itself must fit in the CQ.
-    if (preparedCqeCount_ == cqCapacity_) {
+    if (preparedCqeCount_ == Mc2Kernel::MOE_SHARED_JETTY_CQ_DEPTH) {
         FlushPreparedWrites(true);
     }
 }
@@ -355,17 +347,22 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::PrepareWrite(
 {
     // Single-SGE WQE occupies 1 WQEBB (64 bytes).
     ReservePreparedWrites(1U);
-    const bool needCqe = forceCqe || wqebbSinceCqe_ + 1U > cqeIntervalLimit_;
+    const bool drainNow = sqPendingWqebb_ + 1U + HCOMM_MAX_WRITE_WQEBB > HCOMM_SQ_CAPACITY;
+    const bool needCqe = forceCqe || drainNow;
     if (needCqe) {
         ReservePreparedCqe();
         hcomm_.WriteNbi<cqeConfig>(activeBatchHandle_.handle, dst, src, len);
         ++preparedCqeCount_;
-        wqebbSinceCqe_ = 0U;
     } else {
         hcomm_.WriteNbi<config>(activeBatchHandle_.handle, dst, src, len);
-        ++wqebbSinceCqe_;
     }
+    ++sqPendingWqebb_;
     ++preparedWriteCount_;
+    if (drainNow) {
+        FlushPreparedWrites(true);
+        hcomm_.Drain(activeBatchHandle_.handle);
+        sqPendingWqebb_ = 0U;
+    }
 }
 
 template <TemplateMoeEpCombineTypeClass>
@@ -478,9 +475,11 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::ConsumeBatchA
         uint32_t token = 0U;
         while (token < chunk.count) {
             ReservePreparedWrites(kTokenWqebbCount);
-            const uint32_t batchCap = (batchCapacity_ - preparedWriteCount_) / kTokenWqebbCount;
+            const uint32_t batchCap = (HCOMM_BATCH_CAPACITY - preparedWriteCount_) / kTokenWqebbCount;
+            // Leave room for one CQE-bearing request before the SQ is exhausted.
+            const uint32_t remainingSq = HCOMM_SQ_CAPACITY - sqPendingWqebb_;
             const uint32_t sqCap =
-                wqebbSinceCqe_ < cqeIntervalLimit_ ? (cqeIntervalLimit_ - wqebbSinceCqe_) / kTokenWqebbCount : 0U;
+                remainingSq > HCOMM_MAX_WRITE_WQEBB ? (remainingSq - HCOMM_MAX_WRITE_WQEBB) / kTokenWqebbCount : 0U;
             uint32_t run = chunk.count - token;
             run = run < batchCap ? run : batchCap;
             run = run < sqCap ? run : sqCap;
@@ -492,7 +491,7 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::ConsumeBatchA
                 }
                 const uint32_t used = run * kTokenWqebbCount;
                 preparedWriteCount_ += used;
-                wqebbSinceCqe_ += used;
+                sqPendingWqebb_ += used;
             } else {
                 ReservePreparedCqe();
                 EmitTokenWrite<DEFAULT_CQE_WQE_CONFIG>(regionOff, token, addrUb, remoteDataBase, xBase, weightBase,
@@ -500,7 +499,9 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::ConsumeBatchA
                 ++token;
                 preparedWriteCount_ += kTokenWqebbCount;
                 ++preparedCqeCount_;
-                wqebbSinceCqe_ = 0U;
+                FlushPreparedWrites(true);
+                hcomm_.Drain(activeBatchHandle_.handle);
+                sqPendingWqebb_ = 0U;
             }
         }
     }

@@ -86,6 +86,8 @@ constexpr uint32_t HCOMM_WQE_BYTES = 64U;
 constexpr uint32_t HCOMM_MAX_WRITE_WQEBB =
     (HCOMM_SQE_BYTES + SGE_PER_SQE * HCOMM_SGE_BYTES + HCOMM_WQE_BYTES - 1U) / HCOMM_WQE_BYTES;
 constexpr uint32_t HCOMM_BATCH_WQEBB_CAPACITY = HCOMM_BATCH_CAPACITY * HCOMM_MAX_WRITE_WQEBB;
+// SQ capacity in WQEBBs, matching the original Combine template.
+constexpr uint32_t HCOMM_SQ_CAPACITY = 32768U;
 constexpr uint32_t HCOMM_COUNT_WQEBB = 2U; // Single-SGE WriteWithNotify includes a notify extension.
 constexpr struct UrmaWqeEntry DATA_CFG = {.odr = 5, .fence = 1, .se = 0, .cqe = 0, .inlineEn = 0};
 constexpr struct UrmaWqeEntry DATA_CQE_CFG = {.odr = 5, .fence = 1, .se = 0, .cqe = 1, .inlineEn = 0};
@@ -249,10 +251,8 @@ private:
     uint32_t hcommBatchBufferBytes_{0};
     uint32_t pendingWqebb_{0};
     uint32_t preparedCqeCount_{0};
-    uint32_t batchCapacity_{HCOMM_BATCH_WQEBB_CAPACITY};
-    uint32_t cqCapacity_{0};
-    uint32_t cqeIntervalLimit_{0};
-    uint32_t wqebbSinceCqe_{0};
+    uint32_t budgetJettyIndex_{Mc2Kernel::MOE_SHARED_JETTY_NUM};
+    uint32_t sqPendingWqebb_{0};
     uint32_t tokenSize_{0};
     uint32_t kAlignSize_{0};
     uint32_t axisKAlign_{0};
@@ -772,14 +772,18 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::SendCountTo
     uint32_t peerIndex = peer < epRankId_ ? peer : peer - 1;
     auto& handle = hcomm_.GetHandleRef(payloadBatch_, peerIndex, dst);
     ReserveBatchSpace(HCOMM_COUNT_WQEBB);
-    if (wqebbSinceCqe_ + HCOMM_COUNT_WQEBB > cqeIntervalLimit_) {
+    if (sqPendingWqebb_ + HCOMM_COUNT_WQEBB + HCOMM_MAX_WRITE_WQEBB > HCOMM_SQ_CAPACITY) {
         ReserveBatchCqe();
         hcomm_.WriteWithNotifyNbi<DATA_CQE_CFG>(handle, dst, src, moeNumPerRankSize_, notifyAddr, notifyVal);
         ++preparedCqeCount_;
-        wqebbSinceCqe_ = 0U;
+        pendingWqebb_ += HCOMM_COUNT_WQEBB;
+        CommitBatch(true);
+        hcomm_.Drain(handle);
+        sqPendingWqebb_ = 0U;
+        return;
     } else {
         hcomm_.WriteWithNotifyNbi<DATA_CFG>(handle, dst, src, moeNumPerRankSize_, notifyAddr, notifyVal);
-        wqebbSinceCqe_ += HCOMM_COUNT_WQEBB;
+        sqPendingWqebb_ += HCOMM_COUNT_WQEBB;
     }
     pendingWqebb_ += HCOMM_COUNT_WQEBB;
     CommitBatch(true);
@@ -1023,9 +1027,11 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::WriteTokenP
     const uint32_t fullTokens = chunk.count / SLOT_NUM_PER_SQE * SLOT_NUM_PER_SQE;
     while (offset < fullTokens) {
         ReserveBatchSpace(HCOMM_MAX_WRITE_WQEBB);
-        const uint32_t batchCap = (batchCapacity_ - pendingWqebb_) / HCOMM_MAX_WRITE_WQEBB;
+        const uint32_t batchCap = (HCOMM_BATCH_WQEBB_CAPACITY - pendingWqebb_) / HCOMM_MAX_WRITE_WQEBB;
+        // Leave room for one CQE-bearing request before the SQ is exhausted.
+        const uint32_t remainingSq = HCOMM_SQ_CAPACITY - sqPendingWqebb_;
         const uint32_t sqCap =
-            wqebbSinceCqe_ < cqeIntervalLimit_ ? (cqeIntervalLimit_ - wqebbSinceCqe_) / HCOMM_MAX_WRITE_WQEBB : 0U;
+            remainingSq > HCOMM_MAX_WRITE_WQEBB ? (remainingSq - HCOMM_MAX_WRITE_WQEBB) / HCOMM_MAX_WRITE_WQEBB : 0U;
         uint32_t run = (fullTokens - offset) / SLOT_NUM_PER_SQE;
         run = run < batchCap ? run : batchCap;
         run = run < sqCap ? run : sqCap;
@@ -1039,7 +1045,7 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::WriteTokenP
             }
             const uint32_t used = run * HCOMM_MAX_WRITE_WQEBB;
             pendingWqebb_ += used;
-            wqebbSinceCqe_ += used;
+            sqPendingWqebb_ += used;
             CommitBatch(false);
         } else {
             // Retain the original CQE boundary handling.
@@ -1150,20 +1156,17 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::SendTokenBy
 template <TemplateMoeEpDispatchTypeClass>
 __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::InitSqBudget()
 {
-    const auto& handle = payloadBatch_.handle;
-    const uint32_t sqDepth = handle.sqContext.contextInfo.ubJfs.sqDepth;
-    cqCapacity_ = handle.cqContext.contextInfo.ubJfc.cqDepth;
-    wqebbSinceCqe_ = handle.cursor.sqHead - handle.cursor.sqTail;
-    // Leave one complete payload batch for a CQE to become visible before BatchCommit needs to poll it.
-    cqeIntervalLimit_ = sqDepth - HCOMM_BATCH_WQEBB_CAPACITY - HCOMM_MAX_WRITE_WQEBB;
-    const uint32_t available = sqDepth - wqebbSinceCqe_;
-    batchCapacity_ = available < HCOMM_BATCH_WQEBB_CAPACITY ? available : HCOMM_BATCH_WQEBB_CAPACITY;
+    // Keep count-phase usage when the same Jetty is reopened for payload sends.
+    if (budgetJettyIndex_ != jettyIndex_) {
+        sqPendingWqebb_ = 0U;
+        budgetJettyIndex_ = jettyIndex_;
+    }
 }
 
 template <TemplateMoeEpDispatchTypeClass>
 __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::ReserveBatchSpace(uint32_t wqebbCount)
 {
-    if (pendingWqebb_ + wqebbCount > batchCapacity_) {
+    if (pendingWqebb_ + wqebbCount > HCOMM_BATCH_WQEBB_CAPACITY) {
         CommitBatch(true);
     }
 }
@@ -1172,7 +1175,7 @@ template <TemplateMoeEpDispatchTypeClass>
 __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::ReserveBatchCqe()
 {
     // Older CQEs can be polled by BatchCommit; the current batch must fit in the CQ by itself.
-    if (preparedCqeCount_ == cqCapacity_) {
+    if (preparedCqeCount_ == Mc2Kernel::MOE_SHARED_JETTY_CQ_DEPTH) {
         CommitBatch(true);
     }
 }
@@ -1180,11 +1183,10 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::ReserveBatc
 template <TemplateMoeEpDispatchTypeClass>
 __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::CommitBatch(bool force)
 {
-    if (pendingWqebb_ != 0U && (force || pendingWqebb_ >= batchCapacity_)) {
+    if (pendingWqebb_ != 0U && (force || pendingWqebb_ >= HCOMM_BATCH_WQEBB_CAPACITY)) {
         hcomm_.BatchCommit(payloadBatch_);
         pendingWqebb_ = 0U;
         preparedCqeCount_ = 0U;
-        batchCapacity_ = HCOMM_BATCH_WQEBB_CAPACITY;
     }
 }
 
@@ -1194,14 +1196,18 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::WritePayloa
 {
     uint32_t wqebbCount = Ceil(HCOMM_SQE_BYTES + sgeCount * HCOMM_SGE_BYTES, HCOMM_WQE_BYTES);
     ReserveBatchSpace(wqebbCount);
-    if (wqebbSinceCqe_ + wqebbCount > cqeIntervalLimit_) {
+    if (sqPendingWqebb_ + wqebbCount + HCOMM_MAX_WRITE_WQEBB > HCOMM_SQ_CAPACITY) {
         ReserveBatchCqe();
         hcomm_.WriteNbi<DATA_CQE_CFG>(payloadBatch_.handle, dst, localDescs, sgeCount);
         ++preparedCqeCount_;
-        wqebbSinceCqe_ = 0U;
+        pendingWqebb_ += wqebbCount;
+        CommitBatch(true);
+        hcomm_.Drain(payloadBatch_.handle);
+        sqPendingWqebb_ = 0U;
+        return;
     } else {
         hcomm_.WriteNbi<DATA_CFG>(payloadBatch_.handle, dst, localDescs, sgeCount);
-        wqebbSinceCqe_ += wqebbCount;
+        sqPendingWqebb_ += wqebbCount;
     }
     pendingWqebb_ += wqebbCount;
     CommitBatch(false);
@@ -1225,17 +1231,21 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::SendComplet
     }
     constexpr uint32_t flagWqebb = (HCOMM_SQE_BYTES + HCOMM_SGE_BYTES) / HCOMM_WQE_BYTES;
     ReserveBatchSpace(flagWqebb);
-    if (requestCqe || wqebbSinceCqe_ + flagWqebb > cqeIntervalLimit_) {
+    const bool drainNow = sqPendingWqebb_ + flagWqebb + HCOMM_MAX_WRITE_WQEBB > HCOMM_SQ_CAPACITY;
+    if (requestCqe || drainNow) {
         ReserveBatchCqe();
         hcomm_.WriteNbi<NOTIFY_CQE_CFG>(payloadBatch_.handle, notifyAddr, completionFlagSourceWinAddr_, WIN_ADDR_ALIGN);
         ++preparedCqeCount_;
-        wqebbSinceCqe_ = 0U;
     } else {
         hcomm_.WriteNbi<NOTIFY_CFG>(payloadBatch_.handle, notifyAddr, completionFlagSourceWinAddr_, WIN_ADDR_ALIGN);
-        wqebbSinceCqe_ += flagWqebb;
     }
+    sqPendingWqebb_ += flagWqebb;
     pendingWqebb_ += flagWqebb;
-    CommitBatch(false);
+    CommitBatch(drainNow);
+    if (drainNow) {
+        hcomm_.Drain(payloadBatch_.handle);
+        sqPendingWqebb_ = 0U;
+    }
 }
 
 template <TemplateMoeEpDispatchTypeClass>
