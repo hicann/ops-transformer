@@ -150,37 +150,7 @@ void FlashAttnTilingBase::CalcWorkspaceSize()
     size_t sysWorkspaceSize = platformInfo_.defaultSysWorkspaceSize;
     uint32_t mSize = sOuterFactor_ * platformInfo_.cvRatio;
     uint32_t dSize = faInfo_->vHeadDim;
-    uint32_t dVBasicBlock = 0;
-    if (dSize <= arch35FA::DSIZE_64) {
-        dVBasicBlock = arch35FA::DSIZE_64;
-    } else if (dSize <= arch35FA::DSIZE_128) {
-        dVBasicBlock = arch35FA::DSIZE_128;
-    } else if (dSize <= arch35FA::DSIZE_256) {
-        dVBasicBlock = arch35FA::DSIZE_256;
-    } else if (dSize <= arch35FA::DSIZE_512) {
-        dVBasicBlock = arch35FA::DSIZE_512;
-    }
-
     workspaceSize_ = sysWorkspaceSize;
-
-    int64_t bmm2Bytes = 0;
-    int64_t vec2Bytes = 0;
-    int64_t bmm2ResBlockSize = dVBasicBlock;
-    if (dVBasicBlock > arch35FA::DSIZE_256) {
-        bmm2ResBlockSize = arch35FA::DSIZE_512;
-    }
-    if ((!dnFlag_ && dSize > arch35FA::DSIZE_128) || (dnFlag_ && dSize > arch35FA::DSIZE_192)) {
-        bmm2Bytes = mSize * bmm2ResBlockSize * sizeof(float);
-        if (dVBasicBlock > arch35FA::DSIZE_256) {
-            vec2Bytes = mSize * dVBasicBlock * sizeof(float);
-        }
-    }
-    workspaceSize_ += (bmm2Bytes + vec2Bytes) * 3 * platformInfo_.coreNum; // 3: perload 2次 需要2+1
-
-    if (faInfo_->pageAttentionFlag) {
-        // 2 bmm, db, ensure alignment of each structure 64B, dcci cacheline needs
-        workspaceSize_ += static_cast<uint64_t>(platformInfo_.coreNum) * 2 * 2 * 64;
-    }
 
     if (flashDecodeFlag_) {
         uint32_t faTmpAttenGmSize = platformInfo_.coreNum * 2 * mSize * dSize; // 每个核最多有2次写到workspace
