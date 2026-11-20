@@ -77,7 +77,8 @@ TILING_DATA_FIELD_DEF(uint64_t, workSpaceSize)
 TILING_DATA_FIELD_DEF(float, scaleValue)
 TILING_DATA_FIELD_DEF(uint64_t, pseQ)
 TILING_DATA_FIELD_DEF(uint64_t, pseKv)
-TILING_DATA_FIELD_DEF(uint32_t, padding3)
+TILING_DATA_FIELD_DEF(uint32_t, pseShiftByBatch)
+TILING_DATA_FIELD_DEF(uint32_t, pseShiftGlobal)
 TILING_DATA_FIELD_DEF(int64_t, preToken)
 TILING_DATA_FIELD_DEF(int64_t, nextToken)
 TILING_DATA_FIELD_DEF(uint32_t, sparseMode)
@@ -215,6 +216,8 @@ struct FAInferContext {
     int64_t maxKvSeqlen = 0;
     int64_t pseQ = 0;
     int64_t pseKv = 0;
+    uint32_t pseShiftByBatch = 0;
+    uint32_t pseShiftGlobal = 0;
     int64_t preToken = 0;
     int64_t nextToken = 0;
     int32_t sparseMode = 0;
@@ -349,6 +352,8 @@ void FAInferTiling::FillBasicTilingData(FAInferTilingData& faTilingData)
     faTilingData.set_nextToken(static_cast<int64_t>(faInfo_.nextToken));
     faTilingData.set_pseQ(faInfo_.pseQ);
     faTilingData.set_pseKv(faInfo_.pseKv);
+    faTilingData.set_pseShiftByBatch(faInfo_.pseShiftByBatch);
+    faTilingData.set_pseShiftGlobal(faInfo_.pseShiftGlobal);
     faTilingData.keyStrides.set_bnStride(faInfo_.keyBnStride);
     faTilingData.valueStrides.set_bnStride(faInfo_.valueBnStride);
 }

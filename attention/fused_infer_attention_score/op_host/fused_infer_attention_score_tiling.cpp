@@ -1562,6 +1562,36 @@ static void SetMaskTypeForFAI(gert::TilingContext* context, FAInferContext& faIn
         faInfo.maskType = MaskType::FULL_MASK;
         faInfo.pseQ = pseShift->GetStorageShape().GetDim(DIM_2);
         faInfo.pseKv = pseShift->GetStorageShape().GetDim(DIM_3);
+        faInfo.pseShiftByBatch = (pseShift->GetStorageShape().GetDim(DIM_0) == 1) ? 0 : 1;
+        // [1,N,S1,S2] 广播表存在两种语义：按单个序列广播（S1/S2 为序列内局部长度，使用局部偏移）或按 TND
+        // 累计长度编址的全局表（S1/S2 覆盖 batch 累计前缀，需叠加累计前缀偏移）。仅当 S1/S2 覆盖所需累计
+        // 长度时才启用累计前缀，否则对单序列广播表保持局部偏移，避免 batch>0 时越界读取 pse 表。
+        faInfo.pseShiftGlobal = 0;
+        if (faInfo.pseShiftByBatch == 0) {
+            auto actualQSeq = context->GetOptionalInputTensor(ACTUAL_SEQ_Q_INDEX);
+            if (actualQSeq != nullptr) {
+                int64_t batch = actualQSeq->GetShapeSize();
+                const int64_t* actualSeqQTnd = actualQSeq->GetData<int64_t>();
+                if (actualSeqQTnd != nullptr && batch > 0) {
+                    int64_t totalQ = actualSeqQTnd[batch - 1];
+                    bool globalQ = faInfo.pseQ >= totalQ;
+                    if (faInfo.pagedCacheFlag) {
+                        // paged 场景 KV 无 TND 累计前缀，仅 Q 维需要覆盖累计长度
+                        faInfo.pseShiftGlobal = globalQ ? 1 : 0;
+                    } else {
+                        auto actualKvSeq = context->GetOptionalInputTensor(ACTUAL_SEQ_KV_INDEX);
+                        int64_t totalKv = 0;
+                        if (actualKvSeq != nullptr) {
+                            const int64_t* actualSeqKvTnd = actualKvSeq->GetData<int64_t>();
+                            if (actualSeqKvTnd != nullptr) {
+                                totalKv = actualSeqKvTnd[batch - 1];
+                            }
+                        }
+                        faInfo.pseShiftGlobal = (globalQ && faInfo.pseKv >= totalKv) ? 1 : 0;
+                    }
+                }
+            }
+        }
     }
 }
 

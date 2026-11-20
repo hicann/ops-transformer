@@ -97,8 +97,8 @@ __aicore__ inline void CopyFullGmToUb(AscendC::GlobalTensor<ElementFull> gFull, 
             AscendC::DataCopyPadExtParams<ElementFull>(false, 0, 0, 0));
         AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID3);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID3);
-        UpCastMask<float, ElementFull>(fullUbTensor32[innerUbRowOffset], fullUbTensor16[innerUbRowOffset],
-                                       rowNumCurLoop, columnNumRound);
+        UpCastMask<float, ElementFull>(fullUbTensor32[innerUbRowOffset], fullUbTensor16[innerUbRowOffset], proTokenNum,
+                                       columnNumRound);
         innerUbRowOffset += proTokenNum * columnNumRound;
     }
     for (uint32_t headIdx = 0; headIdx < integralHeadNum; headIdx++) {
@@ -120,7 +120,7 @@ __aicore__ inline void CopyFullGmToUb(AscendC::GlobalTensor<ElementFull> gFull, 
         AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID3);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID3);
         UpCastMask<float, ElementFull>(fullUbTensor32[innerUbRowOffset], fullUbTensor16[innerUbRowOffset],
-                                       rowNumCurLoop, columnNumRound);
+                                       tokenNumPerHead, columnNumRound);
         innerUbRowOffset += tokenNumPerHead * columnNumRound;
     }
     if (epiTokenNum != 0) {
@@ -136,8 +136,8 @@ __aicore__ inline void CopyFullGmToUb(AscendC::GlobalTensor<ElementFull> gFull, 
             AscendC::DataCopyPadExtParams<ElementFull>(false, 0, 0, 0));
         AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID3);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID3);
-        UpCastMask<float, ElementFull>(fullUbTensor32[innerUbRowOffset], fullUbTensor16[innerUbRowOffset],
-                                       rowNumCurLoop, columnNumRound);
+        UpCastMask<float, ElementFull>(fullUbTensor32[innerUbRowOffset], fullUbTensor16[innerUbRowOffset], epiTokenNum,
+                                       columnNumRound);
     }
 }
 

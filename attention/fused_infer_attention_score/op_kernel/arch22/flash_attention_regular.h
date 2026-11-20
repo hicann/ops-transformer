@@ -106,6 +106,8 @@ public:
         nextToken = fATilingData->nextToken;
         pseQ = fATilingData->pseQ;
         pseKv = fATilingData->pseKv;
+        pseShiftByBatch = fATilingData->pseShiftByBatch;
+        pseShiftGlobal = fATilingData->pseShiftGlobal;
         keyBnStride = fATilingData->keyStrides.bnStride;
         valueBnStride = fATilingData->valueStrides.bnStride;
         uint64_t Lsesize = 0;
@@ -735,12 +737,16 @@ public:
                         }
                     }
                 } else if constexpr (MASK_TYPE == FaiKernel::MaskType::FULL_MASK) {
-                    uint32_t rowOffer = qSBlockIdx * curQSBlockTile;
+                    // pseShift 为按 TND 累计长度编址的全局表 [1,N,S1,S2]（pseShiftGlobal==1）时，行/列偏移需叠加
+                    // 本 batch 的累计前缀；否则（单序列广播表 [1,N,S1,S2] 或 per-batch [B,N,S1,S2]）用局部偏移。
+                    uint32_t rowOffer = qSBlockIdx * curQSBlockTile + (pseShiftGlobal ? prevQSeqlenSum : 0U);
+                    uint32_t pseKvSStartIdx = kvSStartIdx + (pseShiftGlobal ? prevKvSeqlenSum : 0U);
                     if constexpr (!IS_FD) {
                         epilogueOnlineSoftmax(gP[gmOffsetP], gS[gmOffsetS], gSink[gmOffsetSink], gPseShift, layOutP,
                                               layOutS, layOutFullMask, actualBlockShapeQK, (stackSeqCount == 0),
-                                              qSBlockSize, qNBlockSize, curStackTileMod, qkReady, rowOffer, kvSStartIdx,
-                                              kvSEndIdx, qNStartIdx, BIdx, qHeads, pseQ, pseKv, isLastStackTile);
+                                              qSBlockSize, qNBlockSize, curStackTileMod, qkReady, rowOffer,
+                                              pseKvSStartIdx, kvSEndIdx, qNStartIdx, (pseShiftByBatch ? BIdx : 0U),
+                                              qHeads, pseQ, pseKv, isLastStackTile);
                     }
                 } else {
                     Arch::CrossCoreWaitFlag(qkReady);
@@ -840,6 +846,8 @@ private:
     int64_t nextToken;
     int64_t pseQ;
     int64_t pseKv;
+    uint32_t pseShiftByBatch;
+    uint32_t pseShiftGlobal;
     uint32_t totalQTokens;
 
     uint64_t strideQ;
