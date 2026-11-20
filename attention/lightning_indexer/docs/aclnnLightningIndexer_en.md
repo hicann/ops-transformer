@@ -350,7 +350,12 @@ aclnnStatus aclnnLightningIndexer(
             <tr>
                 <td>ACLNN_ERR_PARAM_INVALID</td>
                 <td>161002</td>
-                <td>The data types and data formats of query, key, weights, actualSeqLengthsQueryOptional, actualSeqLengthsKeyOptional, layoutQueryOptional, layoutKeyOptional, sparseCount, sparseMode, returnValues, sparseIndicesOut, and sparseValuesOut are out of the supported range.</td>
+                <td>The data types and data formats of query, key, weights, actualSeqLengthsQueryOptional, actualSeqLengthsKeyOptional, layoutKeyOptional, returnValues, sparseIndicesOut, and sparseValuesOut are out of the supported range.</td>
+            </tr>
+            <tr>
+                <td>ACLNN_ERR_INNER_TILING_ERROR</td>
+                <td>561002</td>
+                <td>The values of sparseCount, sparseMode, and layoutQueryOptional are out of the supported range.</td>
             </tr>
         </tbody>
     </table>

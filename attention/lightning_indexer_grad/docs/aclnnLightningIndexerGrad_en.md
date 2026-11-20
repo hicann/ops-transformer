@@ -322,15 +322,21 @@ aclnnStatus aclnnLightningIndexerGrad(
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td>The data types or data formats of query, key, dy, and weights are not within the supported range.</td>
+      <td>The data types of query, key, dy, and weights are not within the supported range.</td>
     </tr>
     <tr>
-      <td rowspan="2">ACLNN_ERR_INNER_NULLPTR</td>
-      <td rowspan="2">561103</td>
+      <td rowspan="4">ACLNN_ERR_INNER_NULLPTR</td>
+      <td rowspan="4">561103</td>
+      <td>The data type of sparseIndices is not within the supported range.</td>
+    </tr>
+    <tr>
       <td>The input type of input_layout is not within the supported range.</td>
     </tr>
     <tr>
-      <td>The data type of sparseIndices is not within the supported range.</td>
+      <td>The dimension of query is not within the supported range.</td>
+    </tr>
+    <tr>
+      <td>The shape of dqOut does not meet the constraints.</td>
     </tr>
   </tbody>
   </table>

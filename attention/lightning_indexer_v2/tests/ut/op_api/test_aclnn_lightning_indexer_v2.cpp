@@ -68,7 +68,7 @@ TEST_F(lightning_indexer_v2_opapi_ut, lightning_indexer_v2_aclnn_0)
         nullptr, key.get(), weights.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 4,
         -1, layoutQuery, layoutKey, 3, 1, 0, sparseIndicesOut.get(), sparseValuesOut.get(), &workspaceSize, &executor);
 
-    EXPECT_NE(aclRet, ACL_SUCCESS);
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
     EXPECT_EQ(executor, nullptr);
 }
 
@@ -92,11 +92,11 @@ TEST_F(lightning_indexer_v2_opapi_ut, lightning_indexer_v2_aclnn_1)
         query.get(), key.get(), weights.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
         4, -1, layoutQuery, layoutKey, 3, 1, 0, sparseIndicesOut.get(), nullptr, &workspaceSize, &executor);
 
-    EXPECT_NE(aclRet, ACL_SUCCESS);
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
     EXPECT_EQ(executor, nullptr);
 }
 
-// V2 兼容接口：必选输入 k 为空（转发 inner 后由 inner 校验拒绝）
+// V2 兼容接口：必选输入 k 为空
 TEST_F(lightning_indexer_v2_opapi_ut, lightning_indexer_v2_aclnn_2)
 {
     char layoutQuery[] = "BSND";
@@ -116,7 +116,7 @@ TEST_F(lightning_indexer_v2_opapi_ut, lightning_indexer_v2_aclnn_2)
         query.get(), nullptr, weights.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 4,
         -1, layoutQuery, layoutKey, 3, 1, 0, sparseIndicesOut.get(), sparseValuesOut.get(), &workspaceSize, &executor);
 
-    EXPECT_NE(aclRet, ACL_SUCCESS);
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
     EXPECT_EQ(executor, nullptr);
 }
 
@@ -125,6 +125,54 @@ TEST_F(lightning_indexer_v2_opapi_ut, lightning_indexer_v2_aclnn_3)
 {
     aclnnStatus aclRet = aclnnLightningIndexerV2(nullptr, 0, nullptr, nullptr);
     EXPECT_EQ(aclRet, ACL_SUCCESS);
+}
+
+// V2 兼容接口：必选输入 w 为空
+TEST_F(lightning_indexer_v2_opapi_ut, lightning_indexer_v2_aclnn_4)
+{
+    char layoutQuery[] = "BSND";
+    char layoutKey[] = "BSND";
+    auto query = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1, 8, 8, 128}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto key = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1, 64, 1, 128}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseIndicesOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1, 8, 1, 4}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseValuesOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1, 8, 1, 4}, ACL_FLOAT, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+
+    aclnnStatus aclRet = aclnnLightningIndexerV2GetWorkspaceSize(
+        query.get(), key.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 4, -1,
+        layoutQuery, layoutKey, 3, 1, 0, sparseIndicesOut.get(), sparseValuesOut.get(), &workspaceSize, &executor);
+
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
+    EXPECT_EQ(executor, nullptr);
+}
+
+// V2 兼容接口：必选输出 sparseIndices 为空
+TEST_F(lightning_indexer_v2_opapi_ut, lightning_indexer_v2_aclnn_5)
+{
+    char layoutQuery[] = "BSND";
+    char layoutKey[] = "BSND";
+    auto query = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1, 8, 8, 128}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto key = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1, 64, 1, 128}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto weights = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1, 8, 8}, ACL_FLOAT, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseValuesOut = unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1, 8, 1, 4}, ACL_FLOAT, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+
+    aclnnStatus aclRet = aclnnLightningIndexerV2GetWorkspaceSize(
+        query.get(), key.get(), weights.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        4, -1, layoutQuery, layoutKey, 3, 1, 0, nullptr, sparseValuesOut.get(), &workspaceSize, &executor);
+
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
+    EXPECT_EQ(executor, nullptr);
 }
 
 // V3 candidate 接口：必选输入 q 为空

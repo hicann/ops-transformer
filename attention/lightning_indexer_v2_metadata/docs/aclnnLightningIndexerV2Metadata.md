@@ -315,7 +315,7 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
       <tr>
         <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
         <td rowspan="1">161002</td>
-        <td>参数cuSeqlensQOptional、cuSeqlensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional、numHeadsQ、numHeadsK、headDim、topk、batchSize、maxSeqlenQ、maxSeqlenK、layoutQOptional、layoutKOptional、maskMode、cmpRatio的规格不在支持范围内。</td>
+        <td>参数cuSeqlensQOptional、cuSeqlensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional、numHeadsQ、numHeadsK、headDim、topk、batchSize、maxSeqlenQ、maxSeqlenK、layoutQOptional、layoutKOptional、maskMode、cmpRatio的规格不在支持范围内，或参数metadata为空指针。</td>
       </tr>
     </tbody>
     </table>

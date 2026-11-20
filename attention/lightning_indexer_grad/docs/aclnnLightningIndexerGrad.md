@@ -320,15 +320,21 @@ aclnnStatus aclnnLightningIndexerGrad(
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td>query、key、dy、weights的数据类型和数据格式不在支持的范围内。</td>
+      <td>query、key、dy、weights的数据类型不在支持的范围内。</td>
     </tr>
     <tr>
-      <td rowspan="2">ACLNN_ERR_INNER_NULLPTR</td>
-      <td rowspan="2">561103</td>
+      <td rowspan="4">ACLNN_ERR_INNER_NULLPTR</td>
+      <td rowspan="4">561103</td>
+      <td>sparseIndices的数据类型不在支持的范围内。</td>
+    </tr>
+    <tr>
       <td>input_layout输入的类型不在支持的范围内。</td>
     </tr>
     <tr>
-      <td>sparseIndices的数据类型不在支持的范围内。</td>
+      <td>query的维度不在支持的范围内。</td>
+    </tr>
+    <tr>
+      <td>dqOut的shape不满足约束。</td>
     </tr>
   </tbody>
   </table>

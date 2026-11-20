@@ -107,27 +107,27 @@ aclnnStatus aclnnLightningIndexerV2GetWorkspaceSize(
 {
     if (q == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "q pointer is null, cannot get data type!");
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_NULLPTR;
     }
     if (k == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "k pointer is null, cannot get data type!");
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_NULLPTR;
     }
     if (w == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "w pointer is null, cannot get data type!");
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_NULLPTR;
     }
     if (sparseIndices == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "sparseIndices cannot be nullptr.");
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_NULLPTR;
     }
     if (sparseValues == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "sparseValues cannot be nullptr.");
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_NULLPTR;
     }
     if (workspaceSize == nullptr || executor == nullptr) {
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "workspaceSize or executor cannot be nullptr.");
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_NULLPTR;
     }
 
     LightningIndexerV2CandidateOutputHolder candidateOutputHolder;

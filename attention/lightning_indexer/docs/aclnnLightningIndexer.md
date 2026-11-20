@@ -360,7 +360,12 @@ aclnnStatus aclnnLightningIndexer(
             <tr>
                 <td>ACLNN_ERR_PARAM_INVALID</td>
                 <td>161002</td>
-                <td>query、key、weights、actualSeqLengthsQueryOptional、actualSeqLengthsKeyOptional、layoutQueryOptional、layoutKeyOptional、sparseCount、sparseMode、returnValues、sparseIndicesOut、sparseValuesOut的数据类型和数据格式不在支持的范围内。</td>
+                <td>query、key、weights、actualSeqLengthsQueryOptional、actualSeqLengthsKeyOptional、layoutKeyOptional、returnValues、sparseIndicesOut、sparseValuesOut的数据类型和数据格式不在支持的范围内。</td>
+            </tr>
+            <tr>
+                <td>ACLNN_ERR_INNER_TILING_ERROR</td>
+                <td>561002</td>
+                <td>sparseCount、sparseMode、layoutQueryOptional的取值不在支持的范围内。</td>
             </tr>
         </tbody>
     </table>

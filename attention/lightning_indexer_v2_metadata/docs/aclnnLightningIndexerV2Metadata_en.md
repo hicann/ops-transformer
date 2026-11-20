@@ -317,7 +317,7 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
       <tr>
         <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
         <td rowspan="1">161002</td>
-        <td>The specifications of the cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional, cmpResidualKOptional, numHeadsQ, numHeadsK, headDim, topk, batchSize, maxSeqlenQ, maxSeqlenK, layoutQOptional, layoutKOptional, maskMode, or cmpRatio parameter are not within the supported range.</td>
+        <td>The specifications of the cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional, cmpResidualKOptional, numHeadsQ, numHeadsK, headDim, topk, batchSize, maxSeqlenQ, maxSeqlenK, layoutQOptional, layoutKOptional, maskMode, or cmpRatio parameter are not within the supported range, or the metadata parameter is a null pointer.</td>
       </tr>
     </tbody>
     </table>
