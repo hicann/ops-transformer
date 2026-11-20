@@ -280,7 +280,9 @@ bool CheckDimSizes(const char* opName, const TensorContextInfo& tensorInfo, uint
         return false;
     }
     OP_CHECK_IF(tDim > std::numeric_limits<int64_t>::max() / dDim,
-                OP_LOGE(opName, "T * D exceeds the signed 64-bit kernel GM offset range, T=%ld, D=%ld.", tDim, dDim),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    opName, "partial_block T, partial_block D", std::to_string(tDim) + ", " + std::to_string(dDim),
+                    "the product of the T and D dimensions of partial_block must be within the int64 range"),
                 return false);
 
     const gert::Shape& logitMaxShape = tensorInfo.inputShapes[INPUT_LOGIT_MAX]->GetOriginShape();
