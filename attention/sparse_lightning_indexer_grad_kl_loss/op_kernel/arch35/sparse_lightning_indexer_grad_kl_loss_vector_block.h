@@ -662,7 +662,12 @@ __aicore__ inline void SligKlLossBlockVec<TEMPLATE_ARGS>::ProcessVectorSink(SLIG
         float peerPsink = psinkSyncGm.GetValue(1 - constInfo.subBlockIdx);
         float totalPsink = myPsink + peerPsink;
         float gSize = static_cast<float>(constInfo.gSizeQuery);
-        runInfo.pScaler = 1.0f / (gSize - totalPsink);
+        float gSubSink = static_cast<float>(gSize - totalPsink);
+        // FP32 rounding can make the real-token mass zero when sink dominates.
+        if (gSubSink == 0.0f) {
+            gSubSink = 1e-30F;
+        }
+        runInfo.pScaler = 1.0f / gSubSink;
         this->sinksInQue.template FreeTensor(sinkTensor);
         this->maxInQue.template FreeTensor(maxTensor);
         this->sumInQue.template FreeTensor(sumTensor);
