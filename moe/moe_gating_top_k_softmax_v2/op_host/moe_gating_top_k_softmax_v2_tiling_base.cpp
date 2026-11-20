@@ -28,6 +28,33 @@ static const int32_t SOFTMAX_RESULT_INDEX = 2;
 static const int32_t MAX_K = 1024;
 static const uint32_t MAX_INT32 = 2147483647;
 
+// 本算子的aclnn适配层为自动生成, 不会对出参做Contiguous/ViewCopy: 非连续出参会按连续布局写入
+// (数据错位 + 越界写)。这里直接拒绝非连续出参。size为1的维度不参与寻址, 按torch连续性语义跳过。
+static ge::graphStatus CheckOutContiguous(gert::TilingContext* context, const size_t outIndex, const char* tag)
+{
+    auto* outStrides = context->GetOutputStride(outIndex);
+    if (outStrides == nullptr) {
+        return ge::GRAPH_SUCCESS;
+    }
+    const auto& outShape = context->GetOutputShape(outIndex)->GetStorageShape();
+    if (outStrides->GetDimNum() != outShape.GetDimNum()) {
+        return ge::GRAPH_SUCCESS;
+    }
+    int64_t expectedStride = 1;
+    for (size_t i = outShape.GetDimNum(); i > 0; --i) {
+        const size_t dim = i - 1;
+        const int64_t actualStride = outStrides->GetStride(dim);
+        if (outShape.GetDim(dim) != 1 && actualStride != expectedStride) {
+            OP_LOGE_FOR_INVALID_STRIDE(context->GetNodeName(),
+                                       (std::string(tag) + " stride[" + std::to_string(dim) + "]").c_str(),
+                                       std::to_string(actualStride).c_str(), std::to_string(expectedStride).c_str());
+            return ge::GRAPH_PARAM_INVALID;
+        }
+        expectedStride *= outShape.GetDim(dim);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus MoeGatingTopKSoftmaxV2BaseTiling::GetPlatformInfo()
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context_->GetPlatformInfo());
@@ -162,6 +189,10 @@ ge::graphStatus MoeGatingTopKSoftmaxV2BaseTiling::CheckOptionalAttr(gert::Shape&
         if (ret != ge::SUCCESS) {
             return ret;
         }
+        ret = CheckOutContiguous(context_, SOFTMAX_RESULT_INDEX, "softmaxResult");
+        if (ret != ge::SUCCESS) {
+            return ret;
+        }
     }
 
     return ge::SUCCESS;
@@ -235,6 +266,10 @@ ge::graphStatus MoeGatingTopKSoftmaxV2BaseTiling::GetShapeAttrsInfo()
     if (ret != ge::SUCCESS) {
         return ret;
     }
+    ret = CheckOutContiguous(context_, OUT_INDEX, "y");
+    if (ret != ge::SUCCESS) {
+        return ret;
+    }
 
     auto expertIdxDesc = context_->GetOutputDesc(INDICES_INDEX);
     OP_CHECK_IF(expertIdxDesc == nullptr,
@@ -249,6 +284,10 @@ ge::graphStatus MoeGatingTopKSoftmaxV2BaseTiling::GetShapeAttrsInfo()
                                           Ops::Base::ToString(expertIdxDtype).c_str(), "INT32"),
                 return ge::GRAPH_FAILED);
     ret = CheckOutShape(context_->GetOutputShape(INDICES_INDEX)->GetStorageShape(), gatingShape, false, "expertIdx");
+    if (ret != ge::SUCCESS) {
+        return ret;
+    }
+    ret = CheckOutContiguous(context_, INDICES_INDEX, "expertIdx");
     if (ret != ge::SUCCESS) {
         return ret;
     }

@@ -131,7 +131,7 @@ aclnnStatus aclnnMoeGatingTopKSoftmax(
     <td>要求与输入x一致。</td>
     <td>ND</td>
     <td>2-3</td>
-    <td>x</td>
+    <td>×</td>
   </tr>
   <tr>
     <td>expertIdxOut</td>
@@ -141,7 +141,7 @@ aclnnStatus aclnnMoeGatingTopKSoftmax(
     <td>INT32</td>
     <td>ND</td>
     <td>2-3</td>
-    <td>x</td>
+    <td>×</td>
   </tr>
   <tr>
     <td>rowIdxOut</td>
@@ -151,7 +151,7 @@ aclnnStatus aclnnMoeGatingTopKSoftmax(
     <td>INT32</td>
     <td>ND</td>
     <td>2-3</td>
-    <td>x</td>
+    <td>×</td>
   </tr>
   <tr>
     <td>workspaceSize</td>
@@ -205,8 +205,8 @@ aclnnStatus aclnnMoeGatingTopKSoftmax(
     <td>输入和输出的数据类型和数据格式不在支持的范围之内。</td>
     </tr>
     <tr>
-    <td rowspan="4"> ACLNN_ERR_INNER_TILING_ERROR </td>
-    <td rowspan="4"> 561002 </td>
+    <td rowspan="6"> ACLNN_ERR_INNER_TILING_ERROR </td>
+    <td rowspan="6"> 561002 </td>
     <td>多个输入Tensor之间的shape信息不匹配。</td>
     </tr>
     <tr>
@@ -217,6 +217,12 @@ aclnnStatus aclnnMoeGatingTopKSoftmax(
     </tr>
     <tr>
     <td>k的值大于1024。</td>
+    </tr>
+    <tr>
+    <td>yOut、expertIdxOut或rowIdxOut是非连续Tensor。</td>
+    </tr>
+    <tr>
+    <td>yOut、expertIdxOut或rowIdxOut的-1轴大小与k值不一致。</td>
     </tr>
   </tbody></table>
 

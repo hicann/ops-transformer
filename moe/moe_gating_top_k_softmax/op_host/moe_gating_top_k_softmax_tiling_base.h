@@ -132,7 +132,12 @@ public:
 protected:
     ge::graphStatus GetPlatformInfo() override;
     ge::graphStatus GetShapeAttrsInfo() override;
-    ge::graphStatus CheckOutShape(const gert::Shape&, gert::Shape&);
+    ge::graphStatus CheckOutShape(const gert::Shape&, const gert::Shape&);
+    ge::graphStatus CheckInShape(const gert::Shape& gatingShape);
+    ge::graphStatus CheckFinishedInput(const gert::Shape& gatingShape);
+    ge::graphStatus CheckOutParam(const int32_t outIndex, const gert::Shape& gatingShape, const char* tag);
+    ge::graphStatus CheckKAttr();
+    ge::graphStatus CheckOutLastDimEqualK(const int32_t outIndex, const char* tag);
 
 protected:
     int coreNum;

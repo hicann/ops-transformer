@@ -125,9 +125,9 @@ TEST_F(MoeGatingTopKSoftmaxTiling, moe_gating_top_k_softmax_tiling_005)
                                                   {{{1, 256, 16}, {1, 256, 16}}, ge::DT_BF16, ge::FORMAT_ND},
                                               },
                                               {
-                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
                                               },
                                               {
                                                   {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
@@ -230,6 +230,28 @@ TEST_F(MoeGatingTopKSoftmaxTiling, moe_gating_top_k_softmax_tiling_009)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData, expectWorkspaces, 70);
 }
 
+TEST_F(MoeGatingTopKSoftmaxTiling, moe_gating_top_k_softmax_tiling_fail_out_lastdim_not_k)
+{
+    optiling::MoeGatingTopKSoftmaxCompileInfo compileInfo = {40, 196608};
+    gert::TilingContextPara tilingContextPara("MoeGatingTopKSoftmax",
+                                              {
+                                                  {{{1, 24, 16}, {1, 24, 16}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  {{{1, 24, 1}, {1, 24, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 2}, {1, 24, 2}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 24, 2}, {1, 24, 2}}, ge::DT_INT32, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+                                              },
+                                              &compileInfo);
+    uint64_t expectTilingKey = 0;
+    string expectTilingData = "0 0 0 0 ";
+    std::vector<size_t> expectWorkspaces = {0};
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData, expectWorkspaces, 70);
+}
+
 TEST_F(MoeGatingTopKSoftmaxTiling, moe_gating_top_k_softmax_tiling_010)
 {
     optiling::MoeGatingTopKSoftmaxCompileInfo compileInfo = {40, 196608};
@@ -238,9 +260,9 @@ TEST_F(MoeGatingTopKSoftmaxTiling, moe_gating_top_k_softmax_tiling_010)
                                                   {{{1, 24, 8}, {1, 24, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                  {{{1, 24, 8}, {1, 24, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                  {{{1, 24, 8}, {1, 24, 8}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                  {{{1, 24, 8}, {1, 24, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 24, 4}, {1, 24, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 24, 4}, {1, 24, 4}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 24, 4}, {1, 24, 4}}, ge::DT_INT32, ge::FORMAT_ND},
                                               },
                                               {
                                                   {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
@@ -261,9 +283,9 @@ TEST_F(MoeGatingTopKSoftmaxTiling, moe_gating_top_k_softmax_tiling_011)
                                                   {{{1, 256, 8}, {1, 256, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 4}, {1, 256, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 256, 4}, {1, 256, 4}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 4}, {1, 256, 4}}, ge::DT_INT32, ge::FORMAT_ND},
                                               },
                                               {
                                                   {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
@@ -284,9 +306,9 @@ TEST_F(MoeGatingTopKSoftmaxTiling, moe_gating_top_k_softmax_tiling_012)
                                                   {{{1, 256, 8}, {1, 256, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 4}, {1, 256, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 256, 4}, {1, 256, 4}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 4}, {1, 256, 4}}, ge::DT_INT32, ge::FORMAT_ND},
                                               },
                                               {
                                                   {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
@@ -307,9 +329,9 @@ TEST_F(MoeGatingTopKSoftmaxTiling, moe_gating_top_k_softmax_tiling_013)
                                                   {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT16, ge::FORMAT_ND},
                                               },
                                               {
-                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                  {{{1, 256, 16}, {1, 256, 16}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
                                               },
                                               {
                                                   {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
@@ -330,9 +352,9 @@ TEST_F(MoeGatingTopKSoftmaxTiling, moe_gating_top_k_softmax_tiling_014)
                                                   {{{1, 256, 256}, {1, 256, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                               },
                                               {
-                                                  {{{1, 256, 256}, {1, 256, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
-                                                  {{{1, 256, 256}, {1, 256, 256}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                  {{{1, 256, 256}, {1, 256, 256}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
                                               },
                                               {
                                                   {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
@@ -353,9 +375,9 @@ TEST_F(MoeGatingTopKSoftmaxTiling, moe_gating_top_k_softmax_tiling_015)
                                                   {{{1, 256, 256}, {1, 256, 256}}, ge::DT_FLOAT16, ge::FORMAT_ND},
                                               },
                                               {
-                                                  {{{1, 256, 256}, {1, 256, 256}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-                                                  {{{1, 256, 256}, {1, 256, 256}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                  {{{1, 256, 256}, {1, 256, 256}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
                                               },
                                               {
                                                   {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
@@ -376,9 +398,9 @@ TEST_F(MoeGatingTopKSoftmaxTiling, moe_gating_top_k_softmax_tiling_016)
                                                   {{{1, 256, 256}, {1, 256, 256}}, ge::DT_BF16, ge::FORMAT_ND},
                                               },
                                               {
-                                                  {{{1, 256, 256}, {1, 256, 256}}, ge::DT_BF16, ge::FORMAT_ND},
-                                                  {{{1, 256, 256}, {1, 256, 256}}, ge::DT_INT32, ge::FORMAT_ND},
-                                                  {{{1, 256, 256}, {1, 256, 256}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_BF16, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+                                                  {{{1, 256, 8}, {1, 256, 8}}, ge::DT_INT32, ge::FORMAT_ND},
                                               },
                                               {
                                                   {"k", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
