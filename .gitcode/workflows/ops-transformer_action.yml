@@ -686,8 +686,6 @@ stages:
               set -e
               export repo_name=${{env.repo_name}}
               export pr_id=${{ env.MERGE_ID }}
-              export AK=${{secrets.AK}}
-              export SK=${{secrets.SK}}
               export obs_smoke_path=${{ env.obs_smoke_path }}
               export obs_path=${{ env.obs_path }}
               export WORKSPACE=${{ steps.process_checkout.outputs.path }}
