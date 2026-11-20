@@ -794,9 +794,16 @@ __aicore__ inline void FlashAttentionScoreGradKernelDeter<CubeBlockType, VecBloc
                 ++innerMm12LoopIdx;
             }
             if ASCEND_IS_AIV {
-                this->vecBlock.WriteOffsetToGM(this->constInfo, runInfos[runId].queryGmOffset,
-                                               runInfos[runId].keyGmOffset, runInfos[runId].valueGmOffset, reduceRound,
-                                               remainLoopNum);
+                if constexpr (IS_ROPE) {
+                    // Gradient workspace offsets include both normal and RoPE dimensions.
+                    this->vecBlock.WriteOffsetToGM(this->constInfo, runInfos[runId].dqGmOffset,
+                                                   runInfos[runId].dkGmOffset, runInfos[runId].valueGmOffset,
+                                                   reduceRound, remainLoopNum);
+                } else {
+                    this->vecBlock.WriteOffsetToGM(this->constInfo, runInfos[runId].queryGmOffset,
+                                                   runInfos[runId].keyGmOffset, runInfos[runId].valueGmOffset,
+                                                   reduceRound, remainLoopNum);
+                }
             }
             if ASCEND_IS_AIC {
                 runInfos[runId].nextS2IdxNoChange = nextValidIdx != -1 && runInfos[nextRunId].isS2IdxNoChange;

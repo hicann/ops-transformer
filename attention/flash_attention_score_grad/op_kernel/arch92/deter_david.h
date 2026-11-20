@@ -1246,6 +1246,8 @@ __aicore__ inline void GetSeqQlenKvlenByBidx(const __gm__ uint8_t* actualSeqQlen
 
 __aicore__ inline void CalVirtualIndex(int64_t flag, int64_t& m, int64_t& n)
 {
+    // Match the host's left-up causal prefix: columns beyond m contain no valid blocks.
+    n = Min(m, n);
     if (flag == 0) {
         m = NUM_TWO * m - n + 1;
     } else if (flag == 1) {
@@ -1271,6 +1273,17 @@ __aicore__ inline void UpdateMNPQ(int64_t actualCalcS1Token, int64_t actualCalcS
 
     int64_t m = coordinateInfo.s1Outer;
     int64_t n = coordinateInfo.s2Outer;
+    if (m == 0 || n == 0) {
+        actualM = 0;
+        actualN = 0;
+        coordinateInfo.m = 0;
+        coordinateInfo.n = 0;
+        coordinateInfo.p = 0;
+        coordinateInfo.q = 0;
+        coordinateInfo.mOffset = 0;
+        coordinateInfo.nOffset = 0;
+        return;
+    }
     int64_t p = Ceil<int64_t>(actualCalcS1Token, CUBE_BASEM) + 1;
     int64_t q = Ceil<int64_t>(actualCalcS2Token, CUBE_BASEN) + 1;
     p = p > m ? m : p;
@@ -1681,6 +1694,7 @@ __aicore__ inline void CalTNDGQACausalIndex(const __gm__ uint8_t* actualSeqQlenA
             return;
         }
         int64_t m{coordinateInfo.s1Outer}, n{coordinateInfo.s2Outer}, x{coordinateInfo.s1Idx}, y{coordinateInfo.s2Idx};
+        n = Min(m, n);
         int64_t x_new;
         if (x >= y + m - n + 1) {
             x_new = x - (m - n + 1);
@@ -1702,6 +1716,7 @@ __aicore__ inline void CalTNDGQACausalIndex(const __gm__ uint8_t* actualSeqQlenA
         }
         int64_t x_new;
         int64_t m{coordinateInfo.s1Outer}, n{coordinateInfo.s2Outer}, x{coordinateInfo.s1Idx}, y{coordinateInfo.s2Idx};
+        n = Min(m, n);
         if (x >= y + m - n + 1) {
             x_new = x - (m - n + 1);
         } else {
@@ -1720,7 +1735,7 @@ __aicore__ inline void CalTNDGQACausalIndex(const __gm__ uint8_t* actualSeqQlenA
         if (coordinateInfo.batchId < 0) {
             return;
         }
-        coordinateInfo.s1Idx += coordinateInfo.s2Outer / NUM_TWO;
+        coordinateInfo.s1Idx += Min(coordinateInfo.s1Outer, coordinateInfo.s2Outer) / NUM_TWO;
 
         coordinateInfo.n2Idx = N2;
         coordinateInfo.s1Idx = coordinateInfo.s1Idx;
@@ -1929,7 +1944,8 @@ __aicore__ inline void CalTNDBandIndex(const __gm__ uint8_t* actualSeqQlenAddr,
         batch_id = (Ceil<int64_t>(batch_id, N12) - 1) * N1 + N11 * k + batch_id2;
 
         if (p + q <= m) {
-            if (n >= m) {
+            // UpdateMNPQ compresses rows when m == n; restore the same axis here.
+            if (n > m) {
                 if (y - q + 1 <= x && x <= p + y - 1) {
                     coordinateInfo.batchId = batch_id;
                 } else {

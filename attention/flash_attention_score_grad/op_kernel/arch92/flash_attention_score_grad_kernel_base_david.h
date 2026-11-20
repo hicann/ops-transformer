@@ -1138,10 +1138,9 @@ __aicore__ inline int64_t FlashAttentionScoreGradKernelBase<ChildClass, CubeBloc
                 return nextValidBlockInnerIdx;
             } else {
                 nextValidBlockInnerIdx = blockInnerIdx;
-                while (!IsValid(runInfo, taskId, nextValidBlockInnerIdx)) {
-                    if (nextValidBlockInnerIdx >= tilingData->s1s2BNGS1S2BlockNumList.blockEnds[cBlockIdx]) {
-                        return -1;
-                    }
+                // IsValid reads prefixN for this block's batch, so never pass the exclusive end.
+                while (nextValidBlockInnerIdx < tilingData->s1s2BNGS1S2BlockNumList.blockEnds[cBlockIdx] &&
+                       !IsValid(runInfo, taskId, nextValidBlockInnerIdx)) {
                     nextValidBlockInnerIdx++;
                 }
                 if (nextValidBlockInnerIdx >= tilingData->s1s2BNGS1S2BlockNumList.blockEnds[cBlockIdx]) {
@@ -1151,10 +1150,9 @@ __aicore__ inline int64_t FlashAttentionScoreGradKernelBase<ChildClass, CubeBloc
             }
         } else {
             nextValidBlockInnerIdx = blockInnerIdx;
-            while (!IsValid(runInfo, taskId, nextValidBlockInnerIdx)) {
-                if (nextValidBlockInnerIdx >= tilingData->s1s2BNGS1S2BlockNumList.blockEnds[cBlockIdx]) {
-                    return -1;
-                }
+            // Check the range before IsValid accesses per-batch inputs.
+            while (nextValidBlockInnerIdx < tilingData->s1s2BNGS1S2BlockNumList.blockEnds[cBlockIdx] &&
+                   !IsValid(runInfo, taskId, nextValidBlockInnerIdx)) {
                 nextValidBlockInnerIdx++;
             }
             if (nextValidBlockInnerIdx >= tilingData->s1s2BNGS1S2BlockNumList.blockEnds[cBlockIdx]) {

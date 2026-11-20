@@ -144,6 +144,170 @@ static gert::TilingContextPara MakeMlaRopeTilingContext(
                                    compileInfo, "Ascend960DT", A6SocInfo, 4096);
 }
 
+namespace {
+struct DavidLayoutCase {
+    std::string name;
+    std::string layout;
+    ge::DataType dtype;
+    int32_t deterministic;
+    bool rope;
+    int64_t sparseMode;
+    float keepProb;
+};
+
+std::vector<DavidLayoutCase> MakeDavidLayoutCases()
+{
+    std::vector<DavidLayoutCase> cases;
+    for (const std::string layout : {"BSH", "SBH", "BSND", "BNSD", "TND"}) {
+        for (const auto dtype : {ge::DT_FLOAT16, ge::DT_BF16}) {
+            for (const int32_t deterministic : {0, 1}) {
+                const std::string name =
+                    layout + (dtype == ge::DT_FLOAT16 ? "_Fp16" : "_Bf16") + (deterministic ? "_Deter" : "_NonDeter");
+                cases.push_back({name + "_RopeDense", layout, dtype, deterministic, true, 0, 1.0f});
+                cases.push_back({name + "_RopeDropout", layout, dtype, deterministic, true, 0, 0.7f});
+                cases.push_back({name + "_RopeBand", layout, dtype, deterministic, true, 4, 1.0f});
+                cases.push_back({name + "_UnequalD", layout, dtype, deterministic, false, 0, 1.0f});
+                // Mode 5 accepts padded layouts only. Include zero and full prefix boundaries.
+                if (layout != "TND") {
+                    cases.push_back({name + "_RopePrefix", layout, dtype, deterministic, true, 5, 1.0f});
+                }
+            }
+        }
+    }
+    return cases;
+}
+
+gert::StorageShape MakeDavidLayoutShape(const std::string& layout, int64_t sequence, int64_t heads, int64_t dim,
+                                        int64_t tokens)
+{
+    constexpr int64_t batch = 3;
+    if (layout == "BSH") {
+        return {{batch, sequence, heads * dim}, {batch, sequence, heads * dim}};
+    }
+    if (layout == "SBH") {
+        return {{sequence, batch, heads * dim}, {sequence, batch, heads * dim}};
+    }
+    if (layout == "BNSD") {
+        return {{batch, heads, sequence, dim}, {batch, heads, sequence, dim}};
+    }
+    if (layout == "TND") {
+        return {{tokens, heads, dim}, {tokens, heads, dim}};
+    }
+    return {{batch, sequence, heads, dim}, {batch, sequence, heads, dim}};
+}
+
+// Backing arrays belong to the test body and outlive ExecuteTiling.
+gert::TilingContextPara MakeDavidLayoutContext(
+    Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo* compileInfo, const DavidLayoutCase& param,
+    int64_t* qLengths, int64_t* kvLengths, int64_t* prefix)
+{
+    auto context = MakeMlaRopeTilingContext(compileInfo, 128, 128);
+    context.deterministicInfo_ = param.deterministic;
+    context.tilingDataSize_ = 262144;
+    const int64_t qkDim = param.rope ? 128 : 192;
+    const auto q = MakeDavidLayoutShape(param.layout, 515, 6, qkDim, qLengths[2]);
+    const auto k = MakeDavidLayoutShape(param.layout, 385, 2, qkDim, kvLengths[2]);
+    const auto v = MakeDavidLayoutShape(param.layout, 385, 2, 128, kvLengths[2]);
+    const auto dy = MakeDavidLayoutShape(param.layout, 515, 6, 128, qLengths[2]);
+    context.inputTensorDesc_[0] = {q, param.dtype, ge::FORMAT_ND};
+    context.inputTensorDesc_[1] = {k, param.dtype, ge::FORMAT_ND};
+    context.inputTensorDesc_[2] = {v, param.dtype, ge::FORMAT_ND};
+    context.inputTensorDesc_[3] = {dy, param.dtype, ge::FORMAT_ND};
+    context.inputTensorDesc_[11] = {dy, param.dtype, ge::FORMAT_ND};
+    context.outputTensorDesc_[0] = {q, param.dtype, ge::FORMAT_ND};
+    context.outputTensorDesc_[1] = {k, param.dtype, ge::FORMAT_ND};
+    context.outputTensorDesc_[2] = {v, param.dtype, ge::FORMAT_ND};
+    for (const size_t index : {8, 9}) {
+        context.inputTensorDesc_[index] = {{{3, 6, 515, 8}, {3, 6, 515, 8}}, ge::DT_FLOAT, ge::FORMAT_ND};
+    }
+    if (param.rope) {
+        const auto qr = MakeDavidLayoutShape(param.layout, 515, 6, 64, qLengths[2]);
+        const auto kr = MakeDavidLayoutShape(param.layout, 385, 2, 64, kvLengths[2]);
+        context.inputTensorDesc_[22] = {qr, param.dtype, ge::FORMAT_ND};
+        context.inputTensorDesc_[23] = {kr, param.dtype, ge::FORMAT_ND};
+        context.outputTensorDesc_[4] = {qr, param.dtype, ge::FORMAT_ND};
+        context.outputTensorDesc_[5] = {kr, param.dtype, ge::FORMAT_ND};
+    } else {
+        for (const size_t index : {22, 23}) {
+            context.inputTensorDesc_[index] = {{{}, {}}, param.dtype, ge::FORMAT_ND};
+        }
+        for (const size_t index : {4, 5}) {
+            context.outputTensorDesc_[index] = {{{}, {}}, param.dtype, ge::FORMAT_ND};
+        }
+    }
+    context.attrs_[1].attr_ = Ops::Transformer::AnyValue::CreateFrom<float>(param.keepProb);
+    context.attrs_[4].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(6);
+    context.attrs_[5].attr_ = Ops::Transformer::AnyValue::CreateFrom<std::string>(param.layout);
+    context.attrs_[7].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.sparseMode);
+    if (param.layout == "TND") {
+        context.inputTensorDesc_[13] = {{{3}, {3}}, ge::DT_INT64, ge::FORMAT_ND, true, qLengths};
+        context.inputTensorDesc_[14] = {{{3}, {3}}, ge::DT_INT64, ge::FORMAT_ND, true, kvLengths};
+        context.attrs_[12].attr_ = Ops::Transformer::AnyValue::CreateFrom<std::string>("same_as_input");
+        for (const size_t index : {8, 9}) {
+            context.inputTensorDesc_[index] = {{{qLengths[2], 6, 8}, {qLengths[2], 6, 8}}, ge::DT_FLOAT, ge::FORMAT_ND};
+        }
+    }
+    if (param.sparseMode == 4) {
+        context.inputTensorDesc_[7] = {{{2048, 2048}, {2048, 2048}}, ge::DT_BOOL, ge::FORMAT_ND};
+        context.attrs_[2].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(256);
+        context.attrs_[3].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(128);
+    } else if (param.sparseMode == 5) {
+        context.inputTensorDesc_[7] = {{{3, 6, 515, 385}, {3, 6, 515, 385}}, ge::DT_UINT8, ge::FORMAT_ND};
+        context.inputTensorDesc_[12] = {{{3}, {3}}, ge::DT_INT64, ge::FORMAT_ND, true, prefix};
+    }
+    return context;
+}
+} // namespace
+
+class FlashAttentionScoreGradTiling9201Layout : public testing::TestWithParam<DavidLayoutCase> {};
+
+TEST_P(FlashAttentionScoreGradTiling9201Layout, SuccessfulTilingPreservesDimensionsAndFeatures)
+{
+    const auto& param = GetParam();
+    SCOPED_TRACE(param.name);
+    auto compileInfo = MakeA6CompileInfo();
+    // Non-uniform TND lengths with an empty middle batch and non-aligned tails.
+    int64_t qLengths[] = {257, 257, 772};
+    int64_t kvLengths[] = {129, 129, 514};
+    int64_t prefix[] = {0, 129, 385};
+    const auto context = MakeDavidLayoutContext(&compileInfo, param, qLengths, kvLengths, prefix);
+    TilingInfo info;
+    ASSERT_TRUE(ExecuteTiling(context, info));
+    ASSERT_NE(info.tilingData, nullptr);
+    ASSERT_GT(info.blockNum, 0U);
+    ASSERT_FALSE(info.workspaceSizes.empty());
+    EXPECT_GT(info.workspaceSizes[0], 0);
+
+    // Base parameters are the first member of both old/new deterministic tiling structures.
+    using BaseParams = optiling::fag::FlashAttentionScoreGradS1S2BNGS1S2BaseParamsDavid;
+    ASSERT_GE(info.tilingDataSize, sizeof(BaseParams));
+    BaseParams base;
+    std::memcpy(&base, info.tilingData.get(), sizeof(base));
+    EXPECT_EQ(base.get_b(), 3);
+    EXPECT_EQ(base.get_n2(), 2);
+    EXPECT_EQ(base.get_g(), 3);
+    EXPECT_EQ(base.get_s1(), 515);
+    EXPECT_EQ(base.get_s2(), 385);
+    EXPECT_EQ(base.get_d(), 192);
+    EXPECT_EQ(base.get_d1(), 128);
+    EXPECT_FLOAT_EQ(base.get_keepProb(), param.keepProb);
+    EXPECT_EQ(base.get_dropMaskOuter(), 0); // Dropout uses the internal generator.
+    EXPECT_EQ(base.get_tndMaxSumLayout(), param.layout == "TND" ? 1 : 0);
+    EXPECT_EQ(base.get_attenMaskOptional(), param.sparseMode != 0 ? 1 : 0);
+    // Bit positions follow flash_attention_score_grad_template_tiling_key_david.h.
+    const auto key = static_cast<uint64_t>(info.tilingKey);
+    EXPECT_EQ((key >> 7) & 1ULL, param.layout == "TND" ? 1ULL : 0ULL);
+    EXPECT_EQ((key >> 8) & 1ULL, param.keepProb < 1.0f ? 1ULL : 0ULL);
+    EXPECT_EQ((key >> 10) & 1ULL, param.sparseMode != 0 ? 1ULL : 0ULL);
+    EXPECT_EQ((key >> 47) & 1ULL, 1ULL); // Q/K workspace D=192, value D=128.
+    EXPECT_EQ((key >> 52) & 1ULL, param.rope ? 1ULL : 0ULL);
+    EXPECT_EQ((key >> 53) & 1ULL, 1ULL); // Verify arch92 dispatch.
+}
+
+INSTANTIATE_TEST_SUITE_P(ValidLayouts, FlashAttentionScoreGradTiling9201Layout,
+                         testing::ValuesIn(MakeDavidLayoutCases()),
+                         [](const testing::TestParamInfo<DavidLayoutCase>& info) { return info.param.name; });
+
 TEST_F(FlashAttentionScoreGradTiling9201, FlashAttentionScoreGrad_960_tiling_0)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {

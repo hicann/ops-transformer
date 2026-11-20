@@ -1172,8 +1172,8 @@ bool FlashAttentionScoreGradTilingUs1s2Bs2David::CheckExceedL2Cache()
     bool isExceed = false;
     while (calcNum < fBaseParams.maxValidBBLen) {
         for (uint16_t cBlockIdx = 0; cBlockIdx < fBaseParams.blockOuter; cBlockIdx++) {
-            while (!IsValid(fBaseParams.blockStarts[cBlockIdx] + loopIdx[cBlockIdx]) &&
-                   (fBaseParams.blockStarts[cBlockIdx] + loopIdx[cBlockIdx] < fBaseParams.blockEnds[cBlockIdx])) {
+            while ((fBaseParams.blockStarts[cBlockIdx] + loopIdx[cBlockIdx] < fBaseParams.blockEnds[cBlockIdx]) &&
+                   !IsValid(fBaseParams.blockStarts[cBlockIdx] + loopIdx[cBlockIdx])) {
                 loopIdx[cBlockIdx]++;
             }
             if (fBaseParams.blockStarts[cBlockIdx] + loopIdx[cBlockIdx] >= fBaseParams.blockEnds[cBlockIdx]) {
@@ -1571,8 +1571,8 @@ void FlashAttentionScoreGradTilingUs1s2Bs2David::GetIsDeterArr()
     std::fill(std::begin(loopIdx), std::end(loopIdx), (int64_t)0);
     while (calcNum < fBaseParams.maxValidBBLen) {
         for (uint16_t cBlockIdx = 0; cBlockIdx < fBaseParams.blockOuter; cBlockIdx++) {
-            while (!IsValid(fBaseParams.blockStarts[cBlockIdx] + loopIdx[cBlockIdx]) &&
-                   (fBaseParams.blockStarts[cBlockIdx] + loopIdx[cBlockIdx] < fBaseParams.blockEnds[cBlockIdx])) {
+            while ((fBaseParams.blockStarts[cBlockIdx] + loopIdx[cBlockIdx] < fBaseParams.blockEnds[cBlockIdx]) &&
+                   !IsValid(fBaseParams.blockStarts[cBlockIdx] + loopIdx[cBlockIdx])) {
                 loopIdx[cBlockIdx]++;
             }
             if (fBaseParams.blockStarts[cBlockIdx] + loopIdx[cBlockIdx] >= fBaseParams.blockEnds[cBlockIdx]) {
@@ -3365,7 +3365,7 @@ void FlashAttentionScoreGradTilingUs1s2Bs2David::CalcleCausalDeterParam()
         m -= skipM;
     } else if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::NO_MASK) ||
                (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::LEFT_UP_CAUSAL) && n > m)) {
-        n = CeilDivideBy(fBaseParams.s1, fBaseParams.s2Inner * fBaseParams.s2CvRatio);
+        n = std::min(n, CeilDivideBy(fBaseParams.s1, fBaseParams.s2Inner * fBaseParams.s2CvRatio));
     } else if (fBaseParams.sparseMode == static_cast<uint32_t>(SparseMode::RIGHT_DOWN_CAUSAL) && m < n) {
         fBaseParams.deterSparseType = static_cast<uint32_t>(DeterSparseType::DETER_BAND);
         return;
@@ -3810,6 +3810,19 @@ void FlashAttentionScoreGradTilingUs1s2Bs2David::CalcleTNDBandDeterPrefix(DeterP
             deterPrefixData.deterPrefixAlign.back() +
             fBaseParams.actualSeqQlen[i] *
                 AlignTo(fBaseParams.actualSeqKvlen[i], static_cast<int64_t>(ConstAxisTemplateNum::NUM16)));
+
+        // Keep a prefix entry for empty batches without assigning them any work.
+        if (m == 0 || n == 0) {
+            deterPrefixData.prefix1.push_back(deterPrefixData.prefix1.back());
+            deterPrefixData.mNewList.push_back(0);
+            deterPrefixData.nNewList.push_back(0);
+            deterPrefixData.pNewList.push_back(0);
+            deterPrefixData.qNewList.push_back(0);
+            if (N11 > 0 && fBaseParams.g == 1) {
+                deterPrefixData.prefix0.push_back(deterPrefixData.prefix0.back());
+            }
+            continue;
+        }
 
         int64_t actualCalcS1Token, actualCalcS2Token;
         CalcleActualToken(i, actualCalcS1Token, actualCalcS2Token);
