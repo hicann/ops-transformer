@@ -102,7 +102,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLse(
       <td>queryIndex（aclTensor*）</td>
       <td>输入</td>
       <td>lightningIndexer结构的输入queryIndex。</td>
-      <td><ul><li>B：支持泛化且与queryIndex的B保持一致。</li><li>Nidx1：64、32、16、8。</li><li>D：128。</li><li>T1：多个Batch的S1累加。</li></ul></td>
+      <td><ul><li>B：支持泛化。</li><li>Nidx1：64、32、16、8。</li><li>D：128。</li><li>T1：多个Batch的S1累加。</li></ul></td>
       <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
       <td>(B,S1,Nidx1,D);(T1,Nidx1,D)</td>
@@ -261,7 +261,7 @@ aclnnStatus aclnnDenseLightningIndexerSoftmaxLse(
      <tr>
       <td>ACLNN_ERR_INNER_TILING_ERROR</td>
       <td>561002</td>
-      <td>多个输入Tensor之间的shape信息不匹配（详见参数说明）。</td>
+      <td>多个输入Tensor之间的shape信息不匹配、layout取值不在支持范围内（仅支持BSND/TND，详见参数说明）。</td>
      </tr>
      </tbody>
     </table>

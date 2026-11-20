@@ -276,9 +276,11 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::GetQueryKeyAndOutLayout()
 
     std::string layout(opParamInfo_.layOut);
     auto it = layoutMap.find(layout);
-    if (it != layoutMap.end()) {
-        layout_ = it->second;
-    }
+    OP_CHECK_IF(it == layoutMap.end(),
+                OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(opName_, "layout", opParamInfo_.layOut,
+                                                       "Supported layouts are TND and BSND."),
+                return ge::GRAPH_FAILED);
+    layout_ = it->second;
     return ge::GRAPH_SUCCESS;
 }
 
@@ -501,6 +503,62 @@ ge::graphStatus DenseLISoftmaxLseInfoParser::CheckSeqLenRelation()
                         (std::string("S1=") + std::to_string(s1Size_) + ",S2=" + std::to_string(s2Size_)).c_str(),
                         "When layout is BSND, the query sequence length must not exceed the key sequence length."),
                     return ge::GRAPH_FAILED);
+
+        // BSND: actualSeqLengths为可选的逐batch有效长度, 提供时校验元素个数/值域/逐batch query<=key,
+        // 防止kernel侧actS2Size-actS1Size下溢导致的越界访问(设备异常507015)
+        const gert::Tensor* querySeqTensor = opParamInfo_.actualSeqLengthsQ.tensor;
+        const gert::Tensor* keySeqTensor = opParamInfo_.actualSeqLengths.tensor;
+        if (querySeqTensor == nullptr && keySeqTensor == nullptr) {
+            return ge::GRAPH_SUCCESS;
+        }
+        const int64_t* querySeqData = querySeqTensor == nullptr ? nullptr : querySeqTensor->GetData<int64_t>();
+        const int64_t* keySeqData = keySeqTensor == nullptr ? nullptr : keySeqTensor->GetData<int64_t>();
+        OP_CHECK_IF(querySeqTensor != nullptr && querySeqData == nullptr,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "actual_seq_lengths_query",
+                                                             "The sequence-length tensor data must not be nullptr."),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(keySeqTensor != nullptr && keySeqData == nullptr,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "actual_seq_lengths_key",
+                                                             "The sequence-length tensor data must not be nullptr."),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(querySeqTensor != nullptr && querySeqTensor->GetShapeSize() != static_cast<int64_t>(bSize_),
+                    OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                        opName_, "actual_seq_lengths_query", std::to_string(querySeqTensor->GetShapeSize()).c_str(),
+                        "When layout is BSND, the element count of the sequence-length array must equal the batch "
+                        "size."),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(keySeqTensor != nullptr && keySeqTensor->GetShapeSize() != static_cast<int64_t>(bSize_),
+                    OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                        opName_, "actual_seq_lengths_key", std::to_string(keySeqTensor->GetShapeSize()).c_str(),
+                        "When layout is BSND, the element count of the sequence-length array must equal the batch "
+                        "size."),
+                    return ge::GRAPH_FAILED);
+        for (uint32_t i = 0; i < bSize_; ++i) {
+            const int64_t batchQueryLen = querySeqData == nullptr ? static_cast<int64_t>(s1Size_) : querySeqData[i];
+            const int64_t batchKeyLen = keySeqData == nullptr ? static_cast<int64_t>(s2Size_) : keySeqData[i];
+            OP_CHECK_IF(querySeqData != nullptr && (batchQueryLen < 0 || batchQueryLen > static_cast<int64_t>(s1Size_)),
+                        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                            opName_, "actual_seq_lengths_query", std::to_string(batchQueryLen).c_str(),
+                            (std::string("At index ") + std::to_string(i) +
+                             ", the sequence length must be in range [0, S1=" + std::to_string(s1Size_) + "].")
+                                .c_str()),
+                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(keySeqData != nullptr && (batchKeyLen < 0 || batchKeyLen > static_cast<int64_t>(s2Size_)),
+                        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                            opName_, "actual_seq_lengths_key", std::to_string(batchKeyLen).c_str(),
+                            (std::string("At index ") + std::to_string(i) +
+                             ", the sequence length must be in range [0, S2=" + std::to_string(s2Size_) + "].")
+                                .c_str()),
+                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(batchQueryLen > batchKeyLen,
+                        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                            opName_, "actual_seq_lengths_query,actual_seq_lengths_key",
+                            (std::to_string(batchQueryLen) + "," + std::to_string(batchKeyLen)).c_str(),
+                            (std::string("At index ") + std::to_string(i) +
+                             ", the query sequence length must be less than or equal to the key sequence length.")
+                                .c_str()),
+                        return ge::GRAPH_FAILED);
+        }
         return ge::GRAPH_SUCCESS;
     }
 
