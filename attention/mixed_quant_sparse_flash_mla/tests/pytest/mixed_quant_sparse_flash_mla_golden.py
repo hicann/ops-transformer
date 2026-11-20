@@ -11,6 +11,7 @@
 # -----------------------------------------------------------------------------------------------------------
 
 import os
+import logging
 import torch
 import random
 import numpy as np
@@ -2571,6 +2572,576 @@ def save_test_case(input_data, output_dir):
     return input_filepath
 
 
+def _qm4_option(params, name, default=None):
+    # Keep saved-case attributes readable after the option rename.
+    keys = (f"quant_mode4_{name}", f"mode4_{name}", f"dsl_{name}")
+    supplied = [params[key] for key in keys if key in params]
+    if not supplied:
+        return default
+    if any(value != supplied[0] for value in supplied[1:]):
+        raise ValueError(f"conflicting saved-case alias for {keys[0]}")
+    return supplied[0]
+
+
+def gen_qm4_kv(
+    shape,
+    fp4,
+    generator=None,
+    *,
+    data_range=None,
+    scale_range=(0.125, 0.5),
+    return_logical=True,
+):
+    """Generate packed KV and its reference using quant_mode=4 pytest sampling."""
+    if shape[-1] != 512:
+        raise ValueError("MQSMLA quant_mode=4 KV requires logical D=512")
+    group = 16 if fp4 else 32
+    for name, bounds in (("data", data_range), ("scale", scale_range)):
+        if bounds is None and name == "data":
+            continue
+        if (
+            not isinstance(bounds, (list, tuple))
+            or len(bounds) != 2
+            or not all(math.isfinite(v) for v in bounds)
+            or bounds[0] > bounds[1]
+        ):
+            raise ValueError(f"invalid MQSMLA quant_mode=4 {name} range")
+    limit = 6 if fp4 else 448
+    if data_range is not None and (data_range[0] < -limit or data_range[1] > limit):
+        raise ValueError(
+            "MQSMLA quant_mode=4 data range exceeds the quantized encoding"
+        )
+    if scale_range[0] <= 0:
+        raise ValueError("MQSMLA quant_mode=4 scale range must be positive")
+    scales = (
+        scale_range[0]
+        + torch.rand((*shape[:-1], 512 // group), generator=generator)
+        * (scale_range[1] - scale_range[0])
+    ).bfloat16()
+    if not torch.isfinite(scales).all() or torch.any(scales <= 0):
+        raise ValueError("scale range is not representable as positive BF16")
+    if data_range is None:
+        if fp4:
+            codes = torch.randint(0, 16, shape, generator=generator, dtype=torch.uint8)
+        else:
+            values = (torch.randn(shape, generator=generator) * 2).to(
+                torch.float8_e4m3fn
+            )
+    else:
+        values = torch.empty(shape).uniform_(*data_range, generator=generator)
+        if fp4:
+            levels = torch.tensor([0, 0.5, 1, 1.5, 2, 3, 4, 6])
+            codes = torch.bucketize(values.abs(), (levels[:-1] + levels[1:]) / 2).to(
+                torch.uint8
+            )
+            codes |= (values < 0).to(torch.uint8) << 3
+        else:
+            values = values.to(torch.float8_e4m3fn)
+    if fp4:
+        encoded = codes[..., 0::2] | (codes[..., 1::2] << 4)
+    else:
+        encoded = values.view(torch.uint8)
+
+    logical = None
+    if return_logical:
+        if fp4:
+            values = torch.tensor(
+                [0, 0.5, 1, 1.5, 2, 3, 4, 6, 0, -0.5, -1, -1.5, -2, -3, -4, -6]
+            )[codes.long()]
+        else:
+            values = values.float()
+        logical = (values * scales.float().repeat_interleave(group, dim=-1)).bfloat16()
+    return torch.cat((encoded, scales.view(torch.uint8)), dim=-1), logical
+
+
+def _qm4_pack_kv(tensor, side, params, generator):
+    if side + "_kv_values" in params:
+        _qm4_fill(tensor, side + "_kv", params, None)
+        return
+    # UINT8 only carries the encoded payload and inline scales. Random carrier
+    # bytes (including input_ranges) must not replace pytest's quantization.
+    packed, _ = gen_qm4_kv(
+        (*tensor.shape[:-1], 512),
+        side == "cmp",
+        generator,
+        data_range=_qm4_option(params, f"{side}_data_range"),
+        scale_range=_qm4_option(params, f"{side}_scale_range", (0.125, 0.5)),
+        return_logical=False,
+    )
+    tensor.copy_(packed)
+
+
+def _qm4_fill(tensor, name, params, default):
+    key = name + "_values"
+    if tensor is None:
+        if key in params:
+            raise ValueError(f"{key} requires a declared {name} tensor")
+        return
+    value = params[key] if key in params else default
+    source = torch.as_tensor(value)
+    if source.numel() != tensor.numel():
+        raise ValueError(
+            f"{name} values do not match declared shape {tuple(tensor.shape)}: "
+            f"expected {tensor.numel()} elements, got {source.numel()}"
+        )
+    if tensor.dtype in (torch.int32, torch.uint8) and (
+        source.dtype == torch.bool or torch.any(source != source.to(torch.int64))
+    ):
+        raise ValueError(f"{name} requires integral values")
+    if tensor.dtype == torch.uint8 and torch.any((source < 0) | (source > 255)):
+        raise ValueError(f"{name} byte values must be in [0, 255]")
+    if tensor.dtype == torch.int32 and torch.any(
+        (source < torch.iinfo(torch.int32).min)
+        | (source > torch.iinfo(torch.int32).max)
+    ):
+        raise ValueError(f"{name} values are outside int32")
+    tensor.copy_(source.reshape(tensor.shape).to(tensor.dtype))
+
+
+def _qm4_prefix(tensor, total, batch, name, params):
+    if tensor is None:
+        raise ValueError(f"TND requires {name}")
+    if name + "_values" not in params and total % batch:
+        raise ValueError(f"nonuniform TND needs explicit {name}_values")
+    _qm4_fill(tensor, name, params, torch.arange(batch + 1) * (total // batch))
+    values = tensor.tolist()
+    if (
+        values[0] != 0
+        or values[-1] != total
+        or any(a > b for a, b in zip(values, values[1:]))
+    ):
+        raise ValueError(f"{name} must span the declared tensor")
+    return values
+
+
+def _prepare_qm4_inputs(q, tensors, params, generator):
+    """Prepare packed KV and index tensors without changing TTK-generated Q/sinks."""
+    preserve_generated = _qm4_option(params, "preserve_generated_inputs", False)
+    if not isinstance(preserve_generated, bool):
+        raise ValueError("quant_mode4_preserve_generated_inputs must be True or False")
+    if all(
+        params.get(name) is not None
+        for name in ("batch_axis", "batch_slice_info", "batch_seed")
+    ):
+        raise NotImplementedError(
+            "MQSMLA quant_mode=4 batch-relation input generation is not yet adapted"
+        )
+    lq, lk = params["layout_q"], params["layout_kv"]
+    if (lq, lk) not in (
+        ("TND", "TND"),
+        ("BSND", "BSND"),
+        ("TND", "PA_BBND"),
+        ("BSND", "PA_BBND"),
+    ):
+        raise ValueError("unsupported MQSMLA quant_mode=4 metadata layout combination")
+    if q.dtype != torch.bfloat16 or q.shape[-1] != 512 or not 1 <= q.shape[-2] <= 64:
+        raise ValueError("MQSMLA quant_mode=4 q requires BF16, D=512 and N1 in 1..64")
+    if q.ndim != (3 if lq == "TND" else 4):
+        raise ValueError("q rank disagrees with layout_q")
+    cuq = tensors["cu_seqlens_q"]
+    batch = q.shape[0] if lq == "BSND" else cuq.numel() - 1 if cuq is not None else 0
+    if batch <= 0:
+        raise ValueError("TND requires cu_seqlens_q[B+1]")
+    for name, tensor in tensors.items():
+        if tensor is None or name in ("ori_kv", "cmp_kv"):
+            continue
+        if tensor.dtype != torch.int32:
+            raise ValueError(f"{name} must be int32")
+        if name.startswith("cu_seqlens_") and tuple(tensor.shape) != (batch + 1,):
+            raise ValueError(f"{name} must have shape [B+1]")
+        if name.startswith("seqused_") and tuple(tensor.shape) != (batch,):
+            raise ValueError(f"{name} must have shape [B]")
+        if name.endswith("_topk_length") and tuple(tensor.shape) != (*q.shape[:-2], 1):
+            raise ValueError(f"{name} shape disagrees with q")
+    spans = (
+        _qm4_prefix(cuq, q.shape[0], batch, "cu_seqlens_q", params)
+        if lq == "TND"
+        else [i * q.shape[1] for i in range(batch + 1)]
+    )
+    if lq == "BSND":
+        _qm4_fill(cuq, "cu_seqlens_q", params, spans)
+    _qm4_fill(
+        tensors["seqused_q"],
+        "seqused_q",
+        params,
+        [b - a for a, b in zip(spans, spans[1:])],
+    )
+    query_lengths = (
+        [b - a for a, b in zip(spans, spans[1:])]
+        if tensors["seqused_q"] is None
+        else tensors["seqused_q"].tolist()
+    )
+    if any(
+        not 0 <= length <= end - begin
+        for length, begin, end in zip(query_lengths, spans, spans[1:])
+    ):
+        raise ValueError("seqused_q must fit the physical query spans")
+    if tensors["ori_kv"] is None:
+        raise ValueError("MQSMLA quant_mode=4 requires ori_kv")
+    if tensors["cmp_residual_kv"] is not None:
+        raise ValueError("MQSMLA quant_mode=4 does not support cmp_residual_kv")
+    for side, width in (("ori", 544), ("cmp", 320)):
+        kv = tensors[side + "_kv"]
+        indices = tensors[side + "_sparse_indices"]
+        table = tensors[side + "_block_table"]
+        cu = tensors["cu_seqlens_" + side + "_kv"]
+        used = tensors["seqused_" + side + "_kv"]
+        topk = tensors[side + "_topk_length"]
+        if kv is None:
+            if any(x is not None for x in (indices, table, cu, used, topk)):
+                raise ValueError("absent CMP KV must have absent auxiliary tensors")
+            for name in (
+                side + "_kv",
+                side + "_sparse_indices",
+                side + "_block_table",
+                "cu_seqlens_" + side + "_kv",
+                "seqused_" + side + "_kv",
+                side + "_topk_length",
+            ):
+                _qm4_fill(None, name, params, None)
+            continue
+        if kv.dtype != torch.uint8 or tuple(kv.shape[-2:]) != (1, width):
+            raise ValueError(f"{side}_kv requires packed uint8 rows of width {width}")
+        if indices is None or tuple(indices.shape[:-1]) != (*q.shape[:-2], 1):
+            raise ValueError(f"{side}_sparse_indices shape disagrees with q")
+        if lk == "PA_BBND":
+            if (
+                kv.ndim != 4
+                or table is None
+                or table.ndim != 2
+                or table.shape[0] != batch
+            ):
+                raise ValueError(
+                    "PA requires KV[blocks,block_size,1,width] and table[B,pages]"
+                )
+            if used is not None and "seqused_" + side + "_kv_values" not in params:
+                raise ValueError(
+                    f"PA requires seqused_{side}_kv_values in attributes; "
+                    "the page pool does not encode active sequence lengths"
+                )
+            capacity = [table.shape[1] * kv.shape[1]] * batch
+            if (
+                table.numel() > kv.shape[0]
+                and side + "_block_table_values" not in params
+            ):
+                logging.warning(
+                    "MQSMLA quant_mode=4 %s page pool is shared between logical pages",
+                    side,
+                )
+            if not preserve_generated or side + "_block_table_values" in params:
+                _qm4_fill(
+                    table,
+                    side + "_block_table",
+                    params,
+                    torch.arange(table.numel()) % kv.shape[0],
+                )
+        elif lk == "TND":
+            if kv.ndim != 3:
+                raise ValueError("TND KV must have rank 3")
+            ends = _qm4_prefix(
+                cu, kv.shape[0], batch, "cu_seqlens_" + side + "_kv", params
+            )
+            capacity = [b - a for a, b in zip(ends, ends[1:])]
+        else:
+            if kv.ndim != 4 or kv.shape[0] != batch:
+                raise ValueError("BSND KV batch disagrees with q")
+            capacity = [kv.shape[1]] * batch
+        if lk != "TND" and cu is not None:
+            raise ValueError("KV prefixes are only supported for TND KV")
+        if lk != "PA_BBND" and table is not None:
+            raise ValueError("block tables are only supported for PA KV")
+        _qm4_fill(used, "seqused_" + side + "_kv", params, capacity)
+        lengths = capacity if used is None else used.tolist()
+        if len(lengths) != batch or any(
+            not 0 <= x <= c for x, c in zip(lengths, capacity)
+        ):
+            raise ValueError("KV active lengths exceed declared capacity")
+        k = indices.shape[-1]
+        mode = params.get(side + "_topk_value_mode")
+        if mode not in (None, "fullK"):
+            raise ValueError(f"unsupported {side}_topk_value_mode={mode!r}")
+        if preserve_generated and mode is not None:
+            raise ValueError(
+                "raw generated inputs cannot be combined with fullK rewriting"
+            )
+        default_topk = torch.full(indices.shape[:-1], k, dtype=torch.int32)
+        if mode == "fullK":
+            if topk is None:
+                raise ValueError(f"fullK requires a declared {side}_topk_length tensor")
+            default_topk.zero_()
+            flat_topk = default_topk.reshape(-1)
+            # CMP lengths already describe the compressed pool; do not divide again.
+            for b, begin in enumerate(spans[:-1]):
+                flat_topk[begin : begin + query_lengths[b]] = min(lengths[b], k)
+        _qm4_fill(topk, side + "_topk_length", params, default_topk)
+        if topk is not None and torch.any((topk < 0) | (topk > k)):
+            raise ValueError("TopK length is outside the sparse-index width")
+        _qm4_pack_kv(kv, side, params, generator)
+        if side + "_sparse_indices_values" in params:
+            _qm4_fill(indices, side + "_sparse_indices", params, None)
+        elif not preserve_generated:
+            flat = indices.reshape(-1, k)
+            for b, (begin, end) in enumerate(zip(spans, spans[1:])):
+                if mode == "fullK":
+                    flat[begin:end].fill_(-1)
+                    for row in range(begin, begin + query_lengths[b]):
+                        count = int(topk.reshape(-1)[row])
+                        if count > lengths[b]:
+                            raise ValueError("fullK length exceeds available KV tokens")
+                        flat[row, :count] = torch.randperm(
+                            lengths[b], generator=generator
+                        )[:count].to(torch.int32)
+                elif lengths[b] == 0:
+                    flat[begin:end].fill_(-1)
+                else:
+                    flat[begin:end].copy_(
+                        torch.randint(
+                            lengths[b],
+                            (end - begin, k),
+                            generator=generator,
+                            dtype=torch.int32,
+                        )
+                    )
+            if topk is not None:
+                indices.masked_fill_(torch.arange(k) >= topk.unsqueeze(-1), -1)
+
+
+def _qm4_decode_rows(rows, fp4):
+    data_bytes, group, width = (256, 16, 320) if fp4 else (512, 32, 544)
+    if rows.dtype != torch.uint8 or rows.shape[-1] != width:
+        raise ValueError("invalid packed MQSMLA quant_mode=4 KV row")
+    data = rows[..., :data_bytes].contiguous()
+    scales = rows[..., data_bytes:].contiguous().view(torch.bfloat16).float()
+    if fp4:
+        codes = torch.stack((data & 15, data >> 4), dim=-1).flatten(-2).long()
+        values = torch.tensor(
+            [0, 0.5, 1, 1.5, 2, 3, 4, 6, 0, -0.5, -1, -1.5, -2, -3, -4, -6]
+        )[codes]
+    else:
+        values = data.view(torch.float8_e4m3fn).float()
+    return (values * scales.repeat_interleave(group, dim=-1)).bfloat16()
+
+
+def _qm4_query_spans(q, layout, prefix, used):
+    if layout == "BSND":
+        spans = [i * q.shape[1] for i in range(q.shape[0] + 1)]
+    else:
+        if prefix is None or prefix.ndim != 1 or prefix.dtype != torch.int32:
+            raise ValueError("TND requires int32 cu_seqlens_q[B+1]")
+        spans = prefix.tolist()
+        if len(spans) < 2 or spans[0] != 0 or spans[-1] != q.shape[0]:
+            raise ValueError("cu_seqlens_q must span q")
+    capacity = [b - a for a, b in zip(spans, spans[1:])]
+    active = capacity if used is None else used.tolist()
+    if len(active) != len(capacity) or any(
+        not 0 <= n <= c for n, c in zip(active, capacity)
+    ):
+        raise ValueError("seqused_q must fit the physical query spans")
+    return spans, active
+
+
+def _qm4_gather(side, tensors, batch, row, rows, layout, logical_kv=None):
+    pool = tensors.get(side + "_kv")
+    if pool is None:
+        if side == "ori" and tensors.get("cmp_kv") is None:
+            raise ValueError("MQSMLA quant_mode=4 requires ori_kv or cmp_kv")
+        return torch.empty((0, 512), dtype=torch.bfloat16)
+    indices = tensors.get(side + "_sparse_indices")
+    if indices is None or indices.numel() != rows * indices.shape[-1]:
+        raise ValueError(f"{side} indices must have one KV head per query")
+    width = indices.shape[-1]
+    lengths = tensors.get(side + "_topk_length")
+    count = width if lengths is None else int(lengths.reshape(rows)[row])
+    if not 0 <= count <= width:
+        raise ValueError("TopK length is outside the sparse-index width")
+    logical = indices.reshape(rows, width)[row, :count].long()
+    table = tensors.get(side + "_block_table")
+    prefix = tensors.get("cu_seqlens_" + side + "_kv")
+    if layout == "PA_BBND":
+        if table is None:
+            raise ValueError("PA KV requires a block table")
+        capacity = table.shape[1] * pool.shape[1]
+    elif layout == "BSND":
+        capacity = pool.shape[1]
+    else:
+        if prefix is None:
+            raise ValueError("TND KV requires physical prefix sums")
+        capacity = int(prefix[batch + 1]) - int(prefix[batch])
+    used = tensors.get("seqused_" + side + "_kv")
+    limit = capacity if used is None else int(used[batch])
+    if (
+        not 0 <= limit <= capacity
+        or torch.any(logical < 0)
+        or torch.any(logical >= limit)
+    ):
+        raise ValueError(f"active {side} sparse index is outside its sequence")
+    if logical_kv is not None:
+        # Pytest keeps logical rows independently of physical page placement.
+        return logical_kv[side][batch, logical]
+    if layout == "PA_BBND":
+        pages = table[batch, logical // pool.shape[1]].long()
+        if torch.any(pages < 0) or torch.any(pages >= pool.shape[0]):
+            raise ValueError("block table contains an invalid physical page")
+        packed = pool[pages, logical % pool.shape[1], 0]
+    elif layout == "BSND":
+        packed = pool[batch, logical, 0]
+    else:
+        packed = pool[int(prefix[batch]) + logical, 0]
+    return _qm4_decode_rows(packed, side == "cmp")
+
+
+def _qm4_attention_row(query, sides, sink, scale, return_softmax_lse):
+    # Match pytest's independent 128-token ORI/CMP tails and BF16 PV weights.
+    row_max = sink.clone()
+    row_sum = torch.ones_like(sink)
+    accumulator = torch.zeros_like(query, dtype=torch.float32)
+    for values in sides:
+        for start in range(0, len(values), 128):
+            tile = values[start : start + 128].float()
+            scores = query.float() @ tile.T * scale
+            new_max = torch.maximum(row_max, scores.max(dim=1).values)
+            correction = torch.exp(row_max - new_max)
+            weights = torch.exp(scores - new_max[:, None])
+            row_sum = row_sum * correction + weights.sum(dim=1)
+            accumulator = (
+                accumulator * correction[:, None] + weights.bfloat16().float() @ tile
+            )
+            row_max = new_max
+    output = (accumulator / row_sum[:, None]).bfloat16()
+    if not return_softmax_lse:
+        return output, None
+    logits = query.double() @ torch.cat(sides).double().T * scale
+    lse = torch.logsumexp(
+        torch.cat((logits, sink.double()[:, None]), dim=1), dim=1
+    ).float()
+    return output, lse
+
+
+def _qm4_golden(
+    q,
+    *,
+    return_softmax_lse=False,
+    layout_q="BSND",
+    layout_kv="BSND",
+    logical_kv=None,
+    **kwargs,
+):
+    """Evaluate actual packed inputs, also usable in a fresh replay process."""
+    if q.device.type != "cpu":
+        raise ValueError(
+            "MQSMLA quant_mode=4 golden is CPU-only; use --golden-mode Enable"
+        )
+    if (layout_q, layout_kv) not in (
+        ("TND", "TND"),
+        ("BSND", "BSND"),
+        ("TND", "PA_BBND"),
+        ("BSND", "PA_BBND"),
+    ):
+        raise ValueError("unsupported MQSMLA quant_mode=4 metadata layout combination")
+    if (
+        q.ndim != (3 if layout_q == "TND" else 4)
+        or q.shape[-1] != 512
+        or not 1 <= q.shape[-2] <= 64
+    ):
+        raise ValueError(
+            "MQSMLA quant_mode=4 q requires trailing dimensions [N1,512], N1 in 1..64"
+        )
+    for name, default, allowed in (
+        ("rope_head_dim", None, (None, 64)),
+        ("ori_mask_mode", 0, (None, 0)),
+        ("cmp_mask_mode", 0, (None, 0)),
+        ("ori_win_left", -1, (None, -1)),
+        ("ori_win_right", -1, (None, -1)),
+        ("topk_value_mode", 1, (1,)),
+        ("key_dtype", None, (None,)),
+        ("value_dtype", None, (None,)),
+    ):
+        if kwargs.get(name, default) not in allowed:
+            raise ValueError(
+                f"MQSMLA quant_mode=4 does not support {name}={kwargs.get(name)!r}"
+            )
+    if kwargs.get("cmp_residual_kv") is not None:
+        raise ValueError("MQSMLA quant_mode=4 does not support cmp_residual_kv")
+    spans, active = _qm4_query_spans(
+        q, layout_q, kwargs.get("cu_seqlens_q"), kwargs.get("seqused_q")
+    )
+    heads = q.shape[-2]
+    query = q.reshape(-1, heads, 512)
+    sink = kwargs.get("sinks")
+    if sink is None:
+        sink = torch.full((heads,), -float("inf"))
+    elif tuple(sink.shape) != (heads,):
+        raise ValueError("MQSMLA quant_mode=4 sinks must have shape [N1]")
+    sink = sink.float()
+    scale = kwargs.get("softmax_scale")
+    scale = 512**-0.5 if scale is None else float(scale)
+    output = torch.zeros(query.shape, dtype=torch.bfloat16)
+    lse = (
+        torch.empty((query.shape[0], heads), dtype=torch.float32)
+        if return_softmax_lse
+        else None
+    )
+    for batch, (begin, end) in enumerate(zip(spans, spans[1:])):
+        for row in range(begin, end):
+            if row - begin >= active[batch]:
+                if lse is not None:
+                    lse[row] = 0 if layout_q == "TND" else sink
+                continue
+            sides = [
+                _qm4_gather(
+                    side, kwargs, batch, row, query.shape[0], layout_kv, logical_kv
+                )
+                for side in ("ori", "cmp")
+            ]
+            output[row], row_lse = _qm4_attention_row(
+                query[row], sides, sink, scale, return_softmax_lse
+            )
+            if lse is not None:
+                lse[row] = row_lse
+    if torch.isnan(output).any() or (lse is not None and torch.isnan(lse).any()):
+        raise ValueError("MQSMLA quant_mode=4 reference produced NaN")
+    lse_shape = (
+        (1, q.shape[0], heads)
+        if layout_q == "TND"
+        else (q.shape[0], 1, q.shape[1], heads)
+    )
+    softmax_lse = lse.reshape(lse_shape) if return_softmax_lse else None
+    return output.reshape(q.shape), softmax_lse
+
+
+def restore_qm4_data(op_input, params, *, logical_kv=None):
+    """Build reference state from final inputs without generating random data."""
+    return {
+        "params": dict(params, quant_mode=4),
+        "op_input": op_input,
+        "golden_state": {"logical_kv": logical_kv},
+        "cpu_output": None,
+        "cpu_lse": None,
+    }
+
+
+def _gen_qm4_data(params, generate_golden):
+    if params.get("op_input") is None:
+        raise ValueError("MQSMLA quant_mode=4 requires op_input")
+    params = dict(params)
+    op_input = params.pop("op_input")
+    q = op_input["q"]
+    for name in ("q", "sinks"):
+        if name + "_values" in params:
+            _qm4_fill(op_input.get(name), name, params, None)
+    tensors = {
+        name: value
+        for name, value in op_input.items()
+        if name not in ("q", "sinks", "metadata")
+    }
+    generator = torch.Generator().manual_seed(params.get("seed", 42))
+    _prepare_qm4_inputs(q, tensors, params, generator)
+    data = restore_qm4_data(op_input, params)
+    if generate_golden:
+        generate_cpu_golden(data)
+    return data
+
+
 def gen_data(params, generate_golden=True):
     """
     生成input param及cpuout
@@ -2583,6 +3154,9 @@ def gen_data(params, generate_golden=True):
         from check_valid_param import check_valid_param
 
         check_valid_param(params)
+    if params.get("quant_mode") == 4:
+        return _gen_qm4_data(params, generate_golden)
+
     Testcase_Name = params["Testcase_Name"]
     layout_q = params["layout_q"]
     layout_kv = params["layout_kv"]
@@ -3137,6 +3711,15 @@ def gen_data(params, generate_golden=True):
 def generate_cpu_golden(input_data):
     """Calculate MQSMLA CPU Golden from input-stage state without new random data."""
     state = input_data["golden_state"]
+    if input_data.get("params", {}).get("quant_mode") == 4:
+        arguments = dict(input_data["params"])
+        arguments.update(input_data["op_input"])
+        cpu_output, cpu_lse = _qm4_golden(
+            **arguments, logical_kv=state.get("logical_kv")
+        )
+        input_data["cpu_output"] = cpu_output
+        input_data["cpu_lse"] = cpu_lse
+        return cpu_output, cpu_lse
     if state["ori_kv_type"] == torch.int8:
         op = input_data["op_input"]
         for name in (

@@ -114,7 +114,16 @@ class PytestResultComparator:
             zip(outputs[:half], outputs[half:])
         ):
             if golden is None:
-                results.append({"pass": True, "precision": "SUPPRESSED"})
+                if output_index == 1:
+                    results.append({"pass": True, "precision": "SUPPRESSED"})
+                else:
+                    results.append(
+                        {
+                            "pass": False,
+                            "precision": "NO_GOLDEN",
+                            "error_info": f"required golden output[{output_index}] is None",
+                        }
+                    )
                 continue
             if npu_output is None:
                 results.append(
@@ -125,9 +134,18 @@ class PytestResultComparator:
                     }
                 )
                 continue
-            result = module.check_result(
-                self.to_torch(golden), self.to_torch(npu_output)
-            )
+            expected = self.to_torch(golden)
+            actual = self.to_torch(npu_output)
+            if torch.isnan(expected).any() or torch.isnan(actual).any():
+                results.append(
+                    {
+                        "pass": False,
+                        "precision": "NAN",
+                        "error_info": f"output[{output_index}] contains NaN",
+                    }
+                )
+                continue
+            result = module.check_result(expected, actual)
             results.append(self.normalize_result(result, output_index))
         return results
 

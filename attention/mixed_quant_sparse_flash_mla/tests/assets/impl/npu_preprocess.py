@@ -280,6 +280,80 @@ def run_metadata(arguments, metadata):
     )
 
 
+def run_qm4_metadata(q, ori_kv, cmp_kv, metadata, kwargs):
+    """quant_mode=4 shares the quant_mode=1 scheduler ABI, not its dispatch."""
+    if metadata is not None:
+        return None
+    dtypes = kwargs.get("tensor_dtypes") or ()
+    if len(dtypes) <= METADATA_INDEX or dtypes[METADATA_INDEX] is None:
+        return None
+    if str(dtypes[METADATA_INDEX]).removeprefix("torch.") != "int32":
+        raise ValueError("MQSMLA quant_mode=4 dynamic metadata must declare int32")
+    import cann_ops_transformer  # noqa: F401
+
+    layout_q, layout_kv = (
+        kwargs.get("layout_q", "BSND"),
+        kwargs.get("layout_kv", "BSND"),
+    )
+    arguments = {
+        name: kwargs.get(name)
+        for name in (
+            "cu_seqlens_q",
+            "cu_seqlens_ori_kv",
+            "cu_seqlens_cmp_kv",
+            "seqused_q",
+            "seqused_ori_kv",
+            "seqused_cmp_kv",
+        )
+    }
+    arguments.update(
+        layout_q=layout_q,
+        layout_kv=layout_kv,
+        batch_size=q.shape[0]
+        if layout_q == "BSND"
+        else kwargs["cu_seqlens_q"].numel() - 1,
+        max_seqlen_q=q.shape[1] if layout_q == "BSND" else 0,
+        rope_head_dim=64
+        if kwargs.get("rope_head_dim") is None
+        else kwargs["rope_head_dim"],
+        cmp_ratio=kwargs.get("cmp_ratio", 1),
+        ori_mask_mode=kwargs.get("ori_mask_mode", 0),
+        cmp_mask_mode=kwargs.get("cmp_mask_mode", 0),
+        ori_win_left=kwargs.get("ori_win_left", -1),
+        ori_win_right=kwargs.get("ori_win_right", -1),
+        has_ori_kv=ori_kv is not None,
+        has_cmp_kv=cmp_kv is not None,
+    )
+    for side, kv in (("ori", ori_kv), ("cmp", cmp_kv)):
+        if kv is None:
+            continue
+        indices = kwargs.get(side + "_sparse_indices")
+        if indices is None:
+            raise ValueError(f"MQSMLA quant_mode=4 requires {side}_sparse_indices")
+        topk = indices.shape[-1]
+        lengths = kwargs.get(side + "_topk_length")
+        if lengths is None:
+            lengths = torch.full(
+                indices.shape[:-1], topk, dtype=torch.int32, device=q.device
+            )
+        arguments[side + "_topk"] = topk
+        arguments[side + "_topk_length"] = lengths
+        if layout_kv == "BSND":
+            arguments["max_seqlen_" + side + "_kv"] = kv.shape[1]
+    generated = torch.ops.cann_ops_transformer.mixed_quant_sparse_flash_mla_metadata(
+        q.shape[-2], 1, q.shape[-1], 1, **arguments
+    )
+    if (
+        generated.dtype != torch.int32
+        or tuple(generated.shape) != (2048,)
+        or generated.device != q.device
+    ):
+        raise ValueError(
+            "MQSMLA quant_mode=4 requires metadata ABI int32[2048]; update the operator package"
+        )
+    return {"metadata": generated}
+
+
 def run(
     q,
     quant_mode,
@@ -291,6 +365,8 @@ def run(
     **kwargs,
 ):
     """Generate metadata dynamically, or fill an existing static placeholder."""
+    if quant_mode == 4:
+        return run_qm4_metadata(q, ori_kv, cmp_kv, metadata, kwargs)
     testcase_name = kwargs.get("testcase_name")
     is_error_case = expect_error(kwargs)
     if quant_mode is None:

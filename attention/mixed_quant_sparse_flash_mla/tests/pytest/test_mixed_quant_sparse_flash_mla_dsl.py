@@ -17,6 +17,12 @@ import numpy as np
 import pytest
 import torch
 
+from mixed_quant_sparse_flash_mla_golden import (
+    gen_qm4_kv,
+    generate_cpu_golden,
+    restore_qm4_data,
+)
+
 OPS = import_module(os.environ.get("MQSMLA_PACKAGE", "cann_ops_transformer"))
 
 
@@ -99,7 +105,7 @@ def _selected_cases():
     return names
 
 
-def _make_kv(batch, tokens, block_size, fp4, generator):
+def _make_qm4_kv(batch, tokens, block_size, fp4, generator):
     """Encode logical KV, then shuffle physical pages independently of the golden.
 
     Features are nope[448], rope[64], followed by BF16 group scales.
@@ -107,24 +113,7 @@ def _make_kv(batch, tokens, block_size, fp4, generator):
     dequantized logical rows, so it never shares the kernel's page addressing.
     """
     pages = (tokens + block_size - 1) // block_size
-    shape = (batch, pages * block_size, D)
-    group = 16 if fp4 else 32
-    scales = (
-        0.125 + torch.rand((*shape[:-1], D // group), generator=generator) * 0.375
-    ).bfloat16()
-    if fp4:
-        codes = torch.randint(0, 16, shape, generator=generator, dtype=torch.uint8)
-        lut = torch.tensor(
-            [0, 0.5, 1, 1.5, 2, 3, 4, 6, 0, -0.5, -1, -1.5, -2, -3, -4, -6]
-        )
-        values = lut[codes.long()]
-        encoded = codes[..., 0::2] | (codes[..., 1::2] << 4)
-    else:
-        values = (torch.randn(shape, generator=generator) * 2).to(torch.float8_e4m3fn)
-        encoded = values.view(torch.uint8)
-        values = values.float()
-    logical = (values * scales.float().repeat_interleave(group, dim=-1)).bfloat16()
-    packed = torch.cat((encoded, scales.view(torch.uint8)), dim=-1)
+    packed, logical = gen_qm4_kv((batch, pages * block_size, D), fp4, generator)
     table = (
         torch.randperm(batch * pages, generator=generator).reshape(batch, pages).int()
     )
@@ -139,8 +128,9 @@ def _make_kv(batch, tokens, block_size, fp4, generator):
 
 
 def gen_data(params):
-    """Generate a bounded deterministic case without files or external test code."""
+    """Build a deterministic pytest case and calculate its CPU reference."""
     p = dict(params)
+    p.pop("quant_mode", None)
     heads = p.get("heads", N1)
     generator = torch.Generator().manual_seed(p.get("seed", 42))
     spans = p["q_lengths"]
@@ -173,7 +163,7 @@ def gen_data(params):
         if side == "ori" and not has_ori:
             continue
         width = p[f"k_{side}"]
-        pa, logical[side] = _make_kv(
+        pa, logical[side] = _make_qm4_kv(
             batch, p[f"s_{side}"], p[f"block_size_{side}"], fp4, generator
         )
         case["pa" if side == "ori" else "pa_cmp"] = pa
@@ -217,42 +207,33 @@ def gen_data(params):
         indices[torch.arange(width)[None, :] >= lengths[:, None]] = -1
         case[f"idx_{side}"] = indices
         case[f"len_{side}"] = lengths
-    output = torch.zeros_like(q)
-    lse = torch.empty((1, rows, heads), dtype=torch.float32)
-    for b in range(batch):
-        for row in range(int(cu[b]), int(cu[b + 1])):
-            sides = [
-                logical[side][
-                    b, case[f"idx_{side}"][row, : int(case[f"len_{side}"][row])].long()
-                ]
-                for side in logical
-            ]
-            # Dense FP64 logsumexp independently checks LSE and sink semantics.
-            kv = torch.cat(sides).double()
-            logits = q[row].double() @ kv.T * case["scale"]
-            all_logits = torch.cat((logits, sinks.double()[:, None]), dim=1)
-            lse[0, row] = torch.logsumexp(all_logits, dim=1).float()
-            # Match sparse_flash_mla's CPU reference arithmetic: online softmax
-            # over 128-token tiles, BF16 probabilities for PV, FP32 accumulation.
-            # Each side starts a new tile sequence, including its own tail.
-            row_max = sinks.clone()
-            row_sum = torch.ones(heads)
-            accumulator = torch.zeros(heads, D)
-            for values in sides:
-                for start in range(0, len(values), 128):
-                    tile = values[start : start + 128].float()
-                    scores = q[row].float() @ tile.T * case["scale"]
-                    new_max = torch.maximum(row_max, scores.max(dim=1).values)
-                    correction = torch.exp(row_max - new_max)
-                    weights = torch.exp(scores - new_max[:, None])
-                    row_sum = row_sum * correction + weights.sum(dim=1)
-                    accumulator = (
-                        accumulator * correction[:, None]
-                        + weights.bfloat16().float() @ tile
-                    )
-                    row_max = new_max
-            output[row] = (accumulator / row_sum[:, None]).bfloat16()
-    return p, case, output.reshape(-1, D), lse
+    op_input = {
+        "q": q,
+        "sinks": None if p.get("omit_sinks") else sinks,
+        "cu_seqlens_q": cu,
+        "seqused_q": case["seqused_q"],
+    }
+    for side in ("ori", "cmp"):
+        if not (has_ori if side == "ori" else has_cmp):
+            continue
+        pa = case["pa" if side == "ori" else "pa_cmp"]
+        op_input[side + "_kv"] = pa["phys"]["row"].unsqueeze(2)
+        op_input[side + "_block_table"] = pa["block_table"]
+        op_input[side + "_sparse_indices"] = case["idx_" + side].unsqueeze(1)
+        op_input[side + "_topk_length"] = case["len_" + side].unsqueeze(1)
+    data = restore_qm4_data(
+        op_input,
+        dict(
+            p,
+            layout_q="TND",
+            layout_kv="PA_BBND",
+            softmax_scale=case["scale"],
+            return_softmax_lse=True,
+        ),
+        logical_kv=logical,
+    )
+    expected, expected_lse = generate_cpu_golden(data)
+    return p, case, expected.reshape(-1, D), expected_lse
 
 
 def check_result(expect, npu_result, chunk_elements=1 << 20):

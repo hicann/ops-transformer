@@ -16,7 +16,6 @@ import importlib.util
 import sys
 from pathlib import Path
 
-
 PYTEST_MODULE_NAME = "mqsmla_pytest_golden"
 PYTEST_MODULE_FILE = "mixed_quant_sparse_flash_mla_golden.py"
 
@@ -28,6 +27,8 @@ class CaseDataStore:
         self.case_data = {}
 
     def put(self, testcase_name, data):
+        # Input-only runs have no Golden consumer to release the previous case.
+        self.case_data.clear()
         if testcase_name is not None:
             self.case_data[str(testcase_name)] = data
 
@@ -78,14 +79,16 @@ def get_case_data(testcase_name):
 
 
 def materialize_golden(data):
-    if int(data.get("params", {}).get("quant_mode", 0)) == 3:
-        raise NotImplementedError(
-            "MQ mode3 supports CPU input generation only; "
-            "the pytest CPU Golden currently supports modes 1/2."
-        )
-    if data.get("cpu_output") is None:
-        load_pytest_golden().generate_cpu_golden(data)
-    CASE_DATA.discard(data)
+    try:
+        if int(data.get("params", {}).get("quant_mode", 0)) == 3:
+            raise NotImplementedError(
+                "MQ mode3 supports CPU input generation only; "
+                "the pytest CPU Golden currently supports modes 1/2."
+            )
+        if data.get("cpu_output") is None:
+            load_pytest_golden().generate_cpu_golden(data)
+    finally:
+        CASE_DATA.discard(data)
     return data
 
 
@@ -106,6 +109,15 @@ def cpu_mixed_quant_sparse_flash_mla(
     testcase_name=None,
     **kwargs,
 ):
+    if quant_mode == 4:
+        data = get_case_data(testcase_name)
+        if data is None:
+            # Replay restores encoded inputs, not input-stage random state.
+            data = load_pytest_golden().restore_qm4_data(
+                dict(kwargs, q=q), {"return_softmax_lse": return_softmax_lse}
+            )
+        data = materialize_golden(data)
+        return data["cpu_output"], data.get("cpu_lse") if return_softmax_lse else None
     del q, quant_mode, kwargs
     data = activate_case_data(testcase_name)
     softmax_lse = data.get("cpu_lse") if bool(return_softmax_lse) else None

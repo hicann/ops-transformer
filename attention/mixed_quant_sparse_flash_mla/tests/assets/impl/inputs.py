@@ -316,6 +316,11 @@ class MixedQuantSparseFlashMlaInputAdapter:
         dst.copy_(src_cpu.to(dtype=dst.dtype, device=dst.device))
 
     def generate_case(self, params, batch_random=None):
+        if params.get("quant_mode") == 4:
+            pytest_golden = self.load_pytest_module(
+                "golden", "mixed_quant_sparse_flash_mla_golden.py"
+            )
+            return pytest_golden.gen_data(params, generate_golden=False)
         pytest_utils = self.load_pytest_module("utils", "utils.py")
         pytest_check = self.load_pytest_module("check", "check_valid_param.py")
         pytest_golden = self.load_pytest_module(
@@ -408,6 +413,50 @@ def generate_mixed_quant_sparse_flash_mla_inputs(
 ):
     """Populate pytest-derived inputs and leave metadata for npu_preprocess."""
     if expect_error(kwargs):
+        return None
+
+    if quant_mode == 4:
+        params = dict(
+            kwargs,
+            quant_mode=quant_mode,
+            rope_head_dim=rope_head_dim,
+            softmax_scale=softmax_scale,
+            cmp_ratio=cmp_ratio,
+            ori_mask_mode=ori_mask_mode,
+            cmp_mask_mode=cmp_mask_mode,
+            ori_win_left=ori_win_left,
+            ori_win_right=ori_win_right,
+            layout_q=layout_q,
+            layout_kv=layout_kv,
+            topk_value_mode=topk_value_mode,
+            return_softmax_lse=return_softmax_lse,
+            key_dtype=key_dtype,
+            value_dtype=value_dtype,
+            op_input={
+                "q": q,
+                "ori_kv": ori_kv,
+                "cmp_kv": cmp_kv,
+                "ori_sparse_indices": ori_sparse_indices,
+                "cmp_sparse_indices": cmp_sparse_indices,
+                "ori_block_table": ori_block_table,
+                "cmp_block_table": cmp_block_table,
+                "cu_seqlens_q": cu_seqlens_q,
+                "cu_seqlens_ori_kv": cu_seqlens_ori_kv,
+                "cu_seqlens_cmp_kv": cu_seqlens_cmp_kv,
+                "seqused_q": seqused_q,
+                "seqused_ori_kv": seqused_ori_kv,
+                "seqused_cmp_kv": seqused_cmp_kv,
+                "cmp_residual_kv": cmp_residual_kv,
+                "ori_topk_length": ori_topk_length,
+                "cmp_topk_length": cmp_topk_length,
+                "sinks": sinks,
+                "metadata": metadata,
+            },
+        )
+        data = INPUT_ADAPTER.generate_case(params)
+        INPUT_ADAPTER.load_golden_store().CASE_DATA.put(
+            kwargs.get("testcase_name"), data
+        )
         return None
 
     params = dict(kwargs)
@@ -573,6 +622,10 @@ def generate_aclnn_mixed_quant_sparse_flash_mla_inputs(
     **kwargs,
 ):
     """Map the ACLNN C signature to the canonical pytest input adapter."""
+    if quant_mode == 4:
+        raise NotImplementedError(
+            "MQSMLA quant_mode=4 is dispatched by the Torch API, not aclnnMixedQuantSparseFlashMla"
+        )
     del attn_out, softmax_lse_out
     return generate_mixed_quant_sparse_flash_mla_inputs(
         q,

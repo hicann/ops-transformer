@@ -44,11 +44,13 @@ def load_impl_module(stem):
 npu_preprocess_module = load_impl_module("npu_preprocess")
 golden_module = load_impl_module("golden")
 inputs_module = load_impl_module("inputs")
+describe_module = load_impl_module("describe")
 metadata_inputs_module = load_impl_module("metadata_inputs")
 compare_module = load_impl_module("compare")
 
 
 class MixedQuantSparseFlashMlaSpec:
+    describe = describe_module.describe_mixed_quant_sparse_flash_mla
     golden = golden_module.cpu_mixed_quant_sparse_flash_mla
     customize_inputs = inputs_module.generate_mixed_quant_sparse_flash_mla_inputs
     npu_preprocess = npu_preprocess_module.run
@@ -61,6 +63,7 @@ class MixedQuantSparseFlashMlaSpec:
 
 
 class AclnnMixedQuantSparseFlashMlaSpec(MixedQuantSparseFlashMlaSpec):
+    describe = None
     golden = golden_module.cpu_aclnn_mixed_quant_sparse_flash_mla
     customize_inputs = inputs_module.generate_aclnn_mixed_quant_sparse_flash_mla_inputs
     npu_preprocess = npu_preprocess_module.run_aclnn
