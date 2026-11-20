@@ -33,6 +33,19 @@ constexpr uint32_t WEIGHT_L2_PREFETCH_CHUNK_BYTES = 16U * 1024U;
 // BS 门限：超过此值不发射（大 BS 冷读已被深流水掩盖）
 constexpr int64_t WEIGHT_L2_PREFETCH_MAX_BS = 512;
 
+// Rank-local expert IDs, matching GMM1 groupIdx. Default {0, 0} is empty.
+// Ranges cannot contain unissued holes; noncontiguous prefetching would require
+// a different representation.
+struct W1PrefetchRange {
+    uint32_t firstExpert{0U};
+    uint32_t lastExpert{0U};
+
+    __aicore__ inline bool Contains(uint32_t expertIdx) const
+    {
+        return firstExpert <= expertIdx && expertIdx < lastExpert;
+    }
+};
+
 // 预取每专家字节数（K*N element；int4 两 element 共 1 字节，其余每 element 2 字节）。
 template <class ElementB>
 __aicore__ inline uint64_t WeightL2PrefetchBytesPerExpert(int64_t k, int64_t n)
@@ -52,19 +65,19 @@ __aicore__ inline uint64_t WeightL2PrefetchBytesPerExpert(int64_t k, int64_t n)
  * (GetBlockIdx(), GetBlockNum()) 交错认领精确覆盖；每专家权重超门槛（CHUNKS x coreNum
  * x CHUNK，见常量注释）时整体跳过——部分覆盖无收益。
  */
-__aicore__ inline void WeightL2PrefetchAicRange(GM_ADDR weightList, bool isPerExpertWeightTensor,
-                                                uint64_t bytesPerExpert, uint32_t firstExpert, uint32_t lastExpert,
-                                                AscendC::LocalTensor<uint8_t> l1Scratch)
+__aicore__ inline W1PrefetchRange WeightL2PrefetchAicRange(GM_ADDR weightList, bool isPerExpertWeightTensor,
+                                                           uint64_t bytesPerExpert, uint32_t firstExpert,
+                                                           uint32_t lastExpert, AscendC::LocalTensor<uint8_t> l1Scratch)
 {
     if (bytesPerExpert == 0U || firstExpert >= lastExpert) {
-        return;
+        return {};
     }
     uint32_t coreIdx = AscendC::GetBlockIdx();
     uint32_t coreNum = AscendC::GetBlockNum();
     uint64_t capBytes =
         static_cast<uint64_t>(WEIGHT_L2_PREFETCH_COLDSTART_CHUNKS) * coreNum * WEIGHT_L2_PREFETCH_CHUNK_BYTES;
     if (bytesPerExpert > capBytes) {
-        return;
+        return {};
     }
     uint64_t limit = bytesPerExpert;
     l1Scratch.SetSize(WEIGHT_L2_PREFETCH_CHUNK_BYTES);
@@ -85,16 +98,19 @@ __aicore__ inline void WeightL2PrefetchAicRange(GM_ADDR weightList, bool isPerEx
             AscendC::DataCopy(l1Scratch, weightGm, chunkBytes);
         }
     }
+    // All AICs return the rank-wide issued range, even without a local fragment.
+    // Issued does not imply copy completion or continued L2 residency.
+    return {firstExpert, lastExpert};
 }
 
 // W1 冷启动：覆盖前 EXPERTS 个专家的 W1，由调用方在 flag0 后发射（g0-pull 窗排空）。
-__aicore__ inline void WeightL2PrefetchAicColdStartW1(GM_ADDR weightList, bool isPerExpertWeightTensor,
-                                                      uint64_t bytesPerExpert, uint32_t expertPerRank,
-                                                      AscendC::LocalTensor<uint8_t> l1Scratch)
+__aicore__ inline W1PrefetchRange WeightL2PrefetchAicColdStartW1(GM_ADDR weightList, bool isPerExpertWeightTensor,
+                                                                 uint64_t bytesPerExpert, uint32_t expertPerRank,
+                                                                 AscendC::LocalTensor<uint8_t> l1Scratch)
 {
     uint32_t expertCount =
         expertPerRank < WEIGHT_L2_PREFETCH_COLDSTART_EXPERTS ? expertPerRank : WEIGHT_L2_PREFETCH_COLDSTART_EXPERTS;
-    WeightL2PrefetchAicRange(weightList, isPerExpertWeightTensor, bytesPerExpert, 0U, expertCount, l1Scratch);
+    return WeightL2PrefetchAicRange(weightList, isPerExpertWeightTensor, bytesPerExpert, 0U, expertCount, l1Scratch);
 }
 
 #endif // MEGA_MOE_WEIGHT_L2_PREFETCH_HPP
