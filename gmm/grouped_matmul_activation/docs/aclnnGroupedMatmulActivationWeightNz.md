@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-融合分组矩阵乘（Grouped Matrix Multiplication，GMM）、MX反量化和Swish门控线性单元（Swish-Gated Linear Unit，SwiGLU）激活，用于混合专家网络的专家前向计算，直接输出BF16结果，不产生输出scale。
+融合分组矩阵乘（Grouped Matrix Multiplication，GMM）、MX反量化和Swish门控线性单元（Swish-Gated Linear Unit，SwiGLU）激活，用于混合专家网络的专家前向计算，直接输出BF16结果，不产生输出缩放因子。
 
 计算公式如下，对`groupList`指定的每个专家执行MX分组矩阵乘：
 

@@ -331,7 +331,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
             </ul></td>
         <td>Q_S=1：FLOAT16、BFLOAT16、FLOAT32<br>Q_S&gt;1：FLOAT16</td>
         <td>ND</td>
-        <td>见<a href="#AntiQuant">伪量化参数</a></td>
+        <td>见<a href="#AntiQuant">伪量化参数约束</a></td>
         <td>×</td>
     </tr>
     <tr>
@@ -350,7 +350,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         <td>可选输入</td>
         <td>表示PagedAttention中KV存储使用的block映射表</td>
         <td><ul><li>不支持空Tensor。</li>
-                <li>约束请见<a href="#PagedAttention">PagedAttention</a>。</li></ul></td>
+                <li>约束请见<a href="#PagedAttention">PagedAttention约束说明</a>。</li></ul></td>
         <td>INT32</td>
         <td>ND</td>
         <td>第一维长度需等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为不同batch中最大actualSeqLengthsKv对应的block数量）</td>
@@ -405,7 +405,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         </td>
         <td>FLOAT16、BFLOAT16、FLOAT32</td>
         <td>ND</td>
-        <td>见<a href="#AntiQuant">伪量化参数</a>和<a href="#MLA">MLA场景全量化参数</a></td>
+        <td>见<a href="#AntiQuant">伪量化参数约束</a>和<a href="#MLA">MLA场景全量化参数约束</a></td>
         <td>×</td>
     </tr>
     <tr>
@@ -421,7 +421,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         </td>
         <td>与keyAntiquantScaleOptional保持一致</td>
         <td>ND</td>
-        <td>见<a href="#AntiQuant">伪量化参数</a></td>
+        <td>见<a href="#AntiQuant">伪量化参数约束</a></td>
         <td>×</td>
     </tr>
     <tr>
@@ -437,7 +437,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         </td>
         <td>FLOAT16、BFLOAT16、FLOAT32</td>
         <td>ND</td>
-        <td>见<a href="#AntiQuant">伪量化参数</a>和<a href="#MLA">MLA场景全量化参数</a></td>
+        <td>见<a href="#AntiQuant">伪量化参数约束</a>和<a href="#MLA">MLA场景全量化参数约束</a></td>
         <td>×</td>
     </tr>
     <tr>
@@ -453,7 +453,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         </td>
         <td>与valueAntiquantScaleOptional保持一致</td>
         <td>ND</td>
-        <td>见<a href="#AntiQuant">伪量化参数</a></td>
+        <td>见<a href="#AntiQuant">伪量化参数约束</a></td>
         <td>×</td>
     </tr>
     <tr>
@@ -568,7 +568,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         </td>
         <td>FLOAT32</td>
         <td>ND</td>
-        <td>见<a href="#AntiQuant">伪量化参数</a></td>
+        <td>见<a href="#AntiQuant">伪量化参数约束</a></td>
         <td>×</td>
     </tr>
     <tr>
@@ -663,7 +663,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         <td>表示sparse的模式</td>
         <td>
         <ul>
-            <li>input_layout=BSH、BSND、BNSD并且Q_S=1、QK_D=V_D、query_rope和key_rope不传的场景，该参数无效。</li>
+            <li>inputLayout=BSH、BSND、BNSD并且Q_S=1、QK_D=V_D、queryRope和keyRope不传的场景，该参数无效。</li>
             <li>参数描述见<a href="#Mask">Mask</a>。</li>
             <li>inputLayout为TND、TND_NTD、NTD_TND时，综合约束请见 <a href="#TND">TND、TND_NTD、NTD_TND场景下query、key、value输入的综合限制</a>。</li>
         </ul>
@@ -688,7 +688,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         <td>blockSize</td>
         <td>可选输入</td>
         <td>PagedAttention中KV存储每个block中最大的token个数</td>
-        <td>约束请见<a href="#PagedAttention">PagedAttention</a>。</td>
+        <td>约束请见<a href="#PagedAttention">PagedAttention约束说明</a>。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -700,7 +700,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         <td>key/value伪量化的模式</td>
         <td>
         <ul>
-            <li>quantMode见<a href="#AntiQuant">伪量化参数</a>。</li>
+            <li>quantMode见<a href="#AntiQuant">伪量化参数约束</a>。</li>
             <li>综合约束请见<a href="#约束说明">约束说明</a>。</li>
         </ul>
         </td>
@@ -726,7 +726,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         <td>
         <ul>
             <li>除了keyAntiquantMode为0并且valueAntiquantMode为1的场景外，需要与valueAntiquantMode一致。</li>
-            <li>quantMode见<a href="#AntiQuant">伪量化参数</a>。</li>
+            <li>quantMode见<a href="#AntiQuant">伪量化参数约束</a>。</li>
             <li>综合约束请见<a href="#约束说明">约束说明</a>。</li>
         </ul>
         </td>
@@ -742,7 +742,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         <td>
         <ul>
             <li>除了keyAntiquantMode为0并且valueAntiquantMode为1的场景外，需要与keyAntiquantMode一致。</li>
-            <li>quantMode见<a href="#AntiQuant">伪量化参数</a>。</li>
+            <li>quantMode见<a href="#AntiQuant">伪量化参数约束</a>。</li>
             <li>综合约束请见<a href="#约束说明">约束说明</a>。</li>
         </ul>
         </td>
@@ -983,7 +983,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
 
 <summary><a id="PagedAttention"></a>PagedAttention</summary>
 
-- PagedAttention的开启必要条件是blocktable存在且有效，同时key、value是按照blocktable中的索引在一片连续内存中排布，在该场景下key、value的inputLayout参数无效。
+- PagedAttention的开启必要条件是blocktable存在且有效，同时key、value是按照blocktable中的索引在一片连续内存中排布，在该场景下key、value的inputLayout参数无效
 
 <!-- npu="910b" id7 -->
 - <term>Atlas A2系列产品</term>：
@@ -1100,7 +1100,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
             <td rowspan="4">Q_S>1</td>
             <td>0</td>
             <td>代表开启高精度模式，且不做行无效修正。</td>
-            <td rowspan="4"> sparse_mode为0或1，并传入用户自定义Mask的情况下，建议开启行无效（即InnerPrecise配置2或3）</td>
+            <td rowspan="4"> sparseMode为0或1，并传入用户自定义Mask的情况下，建议开启行无效（即innerPrecise配置2或3）</td>
         </tr>
         <tr>
             <td>1</td>
@@ -1108,7 +1108,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
         </tr>
         <tr>
             <td>2</td>
-            <td>代表开启高精度模式，且做行无效修正</td>
+            <td>代表开启高精度模式，且做行无效修正。</td>
         </tr>
         <tr>
             <td>3</td>
@@ -1605,7 +1605,7 @@ BFLOAT16和INT8不区分高精度和高性能，行无效修正对FLOAT16、BFLO
                     <li>BFLOAT16：仅支持0</li>
                     </ul>
                 </li>
-                <li>Page Attention：支持BnBsH格式（H≤65535，blockSize支持<=128 16对齐）</li>
+                <li>PagedAttention：支持BnBsH格式（H≤65535，blockSize支持<=128 16对齐）</li>
                 </ul>
             </li>
             </ul>

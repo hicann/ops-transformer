@@ -128,7 +128,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(
         <tr>
           <td>x1ScaleOptional</td>
           <td>输入</td>
-          <td>MatMul计算后的pertoken去量化系数，即计算公式中的x1ScaleOptional。</td>
+          <td>MatMul计算后的pertoken反量化系数，即计算公式中的x1ScaleOptional。</td>
           <td><ul><li>pertoken场景下，x1为(b, m, k)时shape为(b*m)，x1为(m, k)时shape为(m)。</li><li>perblock场景下，x1为(b, m, k)时shape为[b, ceilDiv(m, 128), ceilDiv(k, 128)]，x1为(m, k)时shape为[ceilDiv(m, 128), ceilDiv(k, 128)]。</li><li>数据类型为FLOAT8_E8M0时，shape为[m, ceilDiv(k, 64), 2]，x1为FLOAT4_E2M1时，必须保证ceilDiv(k, 32)为偶数。</li></ul></td>
           <td>FLOAT32、FLOAT8_E8M0</td>
           <td>ND</td>
@@ -138,7 +138,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(
         <tr>
           <td>x2Scale</td>
           <td>输入</td>
-          <td>MatMul计算后的去量化系数，即计算公式中的x2Scale。</td>
+          <td>MatMul计算后的反量化系数，即计算公式中的x2Scale。</td>
           <td><ul><li>shape在pertensor场景为(1)，perchannel场景为(n)/(1, n)。</li><li>输入为int8且输出为BFLOAT16时，直接将BFLOAT16类型的x2Scale传入本接口。</li><li>输出为FLOAT16且输入为INT8时，x1ScaleOptional不为空，可直接将FLOAT32类型的x2Scale传入本接口，如果x1ScaleOptional为空，则需提前调用TransQuantParamV2算子的aclnn接口来将x2Scale转成INT64/UINT64数据类型。</li><li>数据类型为FLOAT8_E8M0时，仅支持转置，shape为[n, ceilDiv(k, 64), 2]。</li> <li>x2为FLOAT4_E2M1时，必须保证ceilDiv(k, 32)为偶数。</li><li>perblock场景下，x2的shape为[ceilDiv(k, 128), ceilDiv(n, 128)]，x2转置时，x2Scale的shape为[ceilDiv(n, 128), ceilDiv(k, 128)]。</li><li>数据类型为FLOAT8_E8M0时，ceilDiv(k, 64)轴不支持为1。</li></ul></td>
           <td>INT64、UINT64、FLOAT32、BFLOAT16、FLOAT8_E8M0</td>
           <td>ND</td>
@@ -368,7 +368,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(
   - <term>Atlas A2系列产品</term>：`aclnnQuantMatmulAllReduceV5`默认非确定性实现，支持通过配置`HCCL_DETERMINISTIC`环境变量为true开启确定性计算。
   <!-- end id9 -->
   <!-- npu="950" id10 -->
-  - Ascend 950PR&950DT系列产品：`aclnnQuantMatmulAllReduceV5`默认确定性实现。
+  - <term>Ascend 950PR&950DT系列产品</term>：`aclnnQuantMatmulAllReduceV5`默认确定性实现。
   <!-- end id10 -->
 
 - 增量场景不使能MC2，全量场景使能MC2。
@@ -388,7 +388,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV5(
     <!-- end id12 -->
 
 - 一个模型中的通算融合MC2算子，仅支持相同通信域。
-- INT8和FP8低bit通信仅在通信bound的情况下存在性能收益，计算bound的情况不建议使能INT8或FP8低bit通信，即不建议输入commQuantScale1和commQuantScale2，且commQuantMode输入0。（注：INT8低bit通信指输入为int8且使能commQuantScale1Optional、commQuantScale2Optional；FP8低bit通信指输入为FLOAT8_E4M3FN/FLOAT8_E5M2且使能commQuantMode=1。）
+- INT8和FP8低比特通信仅在通信bound的情况下存在性能收益，计算bound的情况不建议使能INT8或FP8低比特通信，即不建议输入commQuantScale1和commQuantScale2，且commQuantMode输入0。（注：INT8低比特通信指输入为int8且使能commQuantScale1Optional、commQuantScale2Optional；FP8低比特通信指输入为FLOAT8_E4M3FN/FLOAT8_E5M2且使能commQuantMode=1。）
 - 空tensor支持度：
   - 不支持空tensor。
 - groupSize相关约束：

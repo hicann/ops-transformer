@@ -425,7 +425,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
         <tr>
             <td>metadataOptional（aclTensor*）</td>
             <td>输入</td>
-            <td>表示tiling下沉的aicpu算子输出结果。</td>
+            <td>表示Tiling下沉的AI CPU算子输出结果。</td>
             <td>
             -
             </td>

@@ -450,7 +450,7 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
   - <term>Ascend 950PR&950DT系列产品</term>：仅支持x2为非连续tensor，其它非连续tensor均不支持。
   <!-- end id12 -->
 
-* 传入的x1、x2、x1Scale、x2Scale与output均不为空指针，且
+* 传入的x1、x2、x1Scale、x2Scale与output均不为空指针。
 
   <!-- npu="910b" id13 -->
   - <term>Atlas A2系列产品</term>：biasOptional不支持传入空指针。
@@ -505,7 +505,7 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
       * 输入输出支持的数据类型组合有：
         * K-C量化：
 
-          | x1 | x2 | biasOptional | output | x1QuantMode | x2QuantMode | x1ScaleOptional | x2Scale |
+          | x1 | x2 | biasOptional | output | x1QuantMode | x2QuantMode | x1Scale | x2Scale |
           | :------: | :------: | :------: | :------: | :------: | :------: | :------: | :------: |
           | FLOAT8_E4M3FN | FLOAT8_E4M3FN | FLOAT32 | FLOAT16 | 3 | 2 | FLOAT32 | FLOAT32 |
           | FLOAT8_E4M3FN | FLOAT8_E4M3FN | FLOAT32 | BFLOAT16 | 3 | 2 | FLOAT32 | FLOAT32 |
@@ -522,7 +522,7 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
 
         * mx量化：
 
-          | x1 | x2 | biasOptional | output | x1QuantMode | x2QuantMode | x1ScaleOptional | x2Scale |
+          | x1 | x2 | biasOptional | output | x1QuantMode | x2QuantMode | x1Scale | x2Scale |
           | :------: | :------: | :------: | :------: | :------: | :------: | :------: | :------: |
           | FLOAT8_E4M3FN | FLOAT8_E4M3FN | FLOAT32 | FLOAT16 | 6 | 6 | FLOAT8_E8M0 | FLOAT8_E8M0 |
           | FLOAT8_E4M3FN | FLOAT8_E4M3FN | FLOAT32 | BFLOAT16 | 6 | 6 | FLOAT8_E8M0 | FLOAT8_E8M0 |

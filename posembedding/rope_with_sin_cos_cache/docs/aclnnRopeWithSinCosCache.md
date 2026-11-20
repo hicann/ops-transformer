@@ -297,7 +297,7 @@ aclnnStatus aclnnRopeWithSinCosCache(
         <td>cosSinCache</td>
         <td>输入</td>
         <td>表示参与计算的位置编码张量。</td>
-        <td><ul><li>不支持空tensor。</li><li>要求是一个2D的Tensor，shape为(maxSeqLen, rotaryDim)，maxSeqLen表示模型处理的序列的最大长度，rotaryDim表示旋转位置嵌入的维度大小。</li></ul></td>
+        <td><ul><li>不支持空tensor。</li><li>要求是一个2D的Tensor，shape为(maxSeqLen, rotaryDim)，maxSeqLen表示模型处理的序列的最大长度，rotaryDim表示旋转位置编码的维度大小。</li></ul></td>
         <td>BFLOAT16、FLOAT16、FLOAT32</td>
         <td>ND</td>
         <td>2</td>

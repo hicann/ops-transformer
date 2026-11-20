@@ -198,7 +198,7 @@ aclnnStatus aclnnScatterPaCache(
       <td class="tg-0pky">-</td>
     </tr>
     <tr>
-      <td class="tg-0lax">workspaceSize（uint64_t*）</td>
+      <td class="tg-0lax">workspaceSize(uint64_t*)</td>
       <td class="tg-0lax">输出</td>
       <td class="tg-0lax">返回需要在Device侧申请的workspace大小。</td>
       <td class="tg-0lax">-</td>

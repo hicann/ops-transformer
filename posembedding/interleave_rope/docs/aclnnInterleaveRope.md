@@ -132,7 +132,7 @@ aclnnStatus aclnnInterleaveRope(
       <td>与x一致</td>
       <td>ND</td>
       <td>4</td>
-      <td>x</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>workspaceSize</td>

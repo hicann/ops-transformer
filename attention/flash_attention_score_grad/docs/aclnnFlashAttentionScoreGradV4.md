@@ -82,7 +82,7 @@
   $$
 
     **说明：**
-    query、keyIn、value数据排布格式支持从多种维度解读，其中T (Total S Length)表示所有batch对应的S的总长、B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、d（Head-Dim）表示隐藏层最小的单元尺寸，且满足d=H/N。
+    query、keyIn、value数据排布格式支持从多种维度解读，其中T（Total S Length）表示所有batch对应的S的总长、B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、d（Head-Dim）表示隐藏层最小的单元尺寸，且满足d=H/N。
 
 ## 函数原型
 
@@ -738,7 +738,7 @@ aclnnStatus aclnnFlashAttentionScoreGradV4(
 - 支持输入query/dy的N和key/value的N不相等，但必须成比例关系，即Nq/Nkv必须是非0整数，Nq取值范围1~256。
 - 关于数据shape的约束，以inputLayout的TND为例，其中：
 
-    - B：取值范围为1\~2K。带prefixOptional的时候B最大支持1K。
+    - B：取值范围为1\~2k。带prefixOptional的时候B最大支持1k。
     - N：取值范围为1\~256。
     - S：取值范围为1\~1M。
     - D：取值范围为1\~768。
@@ -759,8 +759,8 @@ aclnnStatus aclnnFlashAttentionScoreGradV4(
     - keepProbOptional小于1.0时，若dropMaskOptional非nullptr，则使用输入的dropMask；否则使用seed和offset生成的dropMask。
 <!-- end id8 -->
 - TND格式下，支持尾部部分Batch不参与计算，此时actual_seq_q_len和actual_seq_kv_len尾部传入对应个数的0即可。假设真实S长度为[2, 3, 4, 5, 6]，若希望最后两个Batch不参与计算，则传入的actual_seq_q_len为[2, 3, 4, 0, 0]。此时若需要传入prefixOptional，其尾部也需要传入同等数量的0，例如[1, 1, 1, 0, 0]。
-- sinkInOptional不为None时，query与key等输入tensor仅支持float16和bfloat16两种类型，sinkInOptional维度为1，长度需要与query的headnum相同。
-- softmaxSum、softmaxMax数据排布为TND时，softmaxInLayout需要为"same_as_input"。
+- sinkInOptional不为None时，query与key等输入tensor仅支持float16和bfloat16两种类型，sinkInOptional维度为1，长度需要与query的headNum相同。
+- softmaxSum、softmaxMax数据排布为NTD时，softmaxInLayout需要为"same_as_input"。
 
 ## 调用示例
 

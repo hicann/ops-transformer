@@ -379,7 +379,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
     <td>dynamicScalesOut</td>
     <td>输出</td>
     <td>缩放参数。</td>
-    <td>要求为1D或2D Tensor。quantMode取值为2、3、4时有输出；quantMode取值为0且`x`的数据类型为`HIFLOAT8`、`FLOAT8_E5M2`、`FLOAT8_E4M3FN`、`FLOAT4_E2M1`、`FLOAT4_E1M2`、`INT32`时也有输出。</td>
+    <td>要求为1D或2D Tensor。quantMode取值为2、3、4时有输出；quantMode取值为0且<code>x</code>的数据类型为<code>HIFLOAT8</code>、<code>FLOAT8_E5M2</code>、<code>FLOAT8_E4M3FN</code>、<code>FLOAT4_E2M1</code>、<code>FLOAT4_E1M2</code>、<code>INT32</code>时也有输出。</td>
     <td>FLOAT32、FLOAT8_E8M0</td>
     <td>-</td>
     <td>-</td>
@@ -419,6 +419,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
     <td>tpRecvCountsOut</td>
     <td>输出</td>
     <td>从TP通信域各卡接收的token数（预留输出，当前版本不支持，传空指针即可）。</td>
+    <td>-</td>
     <td>INT32</td>
     <td>ND</td>
     <td>-</td>
@@ -496,7 +497,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
     <!-- end id10 -->
     <!-- npu="950" id11 -->
     - <term>Ascend 950DT系列产品</term>：
-        - `dynamicScalesOut`quantMode取值为2、3、4时有输出；quantMode取值为0且`x`的数据类型为`HIFLOAT8`、`FLOAT8_E5M2`、`FLOAT8_E4M3FN`、`FLOAT4_E2M1`、`FLOAT4_E1M2`时也有输出。
+        - `dynamicScalesOut`quantMode取值为2、3、4时有输出；quantMode取值为0且<code>x</code>的数据类型为<code>HIFLOAT8</code>、`FLOAT8_E5M2`、`FLOAT8_E4M3FN`、`FLOAT4_E2M1`、`FLOAT4_E1M2`时也有输出。
         - `commAlg`当前版本不支持，传空指针即可。
         - `xActiveMaskOptional`要求为1D或2D Tensor（1D时shape为(BS, )，2D时shape为(BS, K)）；1D时true需排在false前（例：{true, false, true}非法），2D时token对应K个值全为false则不参与通信。
         - `expertScalesOptional`可传有效Tensor或空指针。传有效Tensor时使能expertScales专家权重功能，有效Tensor为2D Tensor，shape为(BS, K)；传空指针时不使能expertScales专家权重功能。不支持空Tensor。
@@ -670,7 +671,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
       - `quantMode`取值为2时，表示pertoken动态量化场景，`expandXOut`的数据类型支持`INT8`。
           - 输入`scalesOptional`可传入空指针。
           - 若输入`scalesOptional`传入有效数据时，其shape为(`moeExpertNum`, `H`)。
-          - 输出`dynamicScalesOut`shape为`(A, )`
+          - 输出`dynamicScalesOut`shape为`(A, )`。
   <!-- end id13 -->
   <!-- npu="A3" id14 -->
   - <term>Atlas A3系列产品</term>：
@@ -679,7 +680,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
           - 输入`scalesOptional`可传入空指针。
           - 若输入`scalesOptional`传入有效数据且存在共享专家卡时，其shape为(`sharedExpertNum` + `moeExpertNum`, `H`)。
           - 若输入`scalesOptional`传入有效数据且不存在共享专家卡时，其shape为(`moeExpertNum`, `H`)。
-          - 输出`dynamicScalesOut`shape为`(A, )`
+          - 输出`dynamicScalesOut`shape为`(A, )`。
   <!-- end id14 -->
   <!-- npu="950" id15 -->
   - <term>Ascend 950DT系列产品</term>：
@@ -700,12 +701,12 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
           - 输入`scalesOptional`可传入空指针。
           - 若输入`scalesOptional`传入有效数据且存在共享专家卡时，其shape为(`sharedExpertNum` + `moeExpertNum`, `H`)。
           - 若输入`scalesOptional`传入有效数据且不存在共享专家卡时，其shape为(`moeExpertNum`, `H`)。
-          - 输出`dynamicScalesOut`shape为`(A, )`
+          - 输出`dynamicScalesOut`shape为`(A, )`。
       - `quantMode`取值为3时，表示pergroup动态量化场景，expandXOut的数据类型支持`FLOAT8_E4M3FN`、`FLOAT8_E5M2`。
           - 输入`scalesOptional`可传入空指针。
           - 若输入`scalesOptional`传入有效数据且存在共享专家卡时，其shape为(`sharedExpertNum` + `moeExpertNum`, `H`)。
           - 若输入`scalesOptional`传入有效数据且不存在共享专家卡时，其shape为(`moeExpertNum`, `H`)。
-          - 输出`dynamicScalesOut`shape为`(A, Ceil(H, 128))`，其中`Ceil(H, 128) = (H + 128 - 1) / 128`
+          - 输出`dynamicScalesOut`shape为`(A, Ceil(H, 128))`，其中`Ceil(H, 128) = (H + 128 - 1) / 128`。
       - `quantMode`取值为4时，表示mx量化场景，`expandXOut`的数据类型支持`FLOAT8_E4M3FN`、`FLOAT8_E5M2`、`FLOAT4_E2M1`、`FLOAT4_E1M2`，输入`scalesOptional`必须传入空指针。输出`dynamicScalesOut`shape为`(A, CeilAlign(Ceil(H, 32), 2))`，其中`Ceil(H, 32) = (H + 32 - 1) / 32`，`CeilAlign(N, 2) = ((N + 1) / 2) * 2`，除法向下取整。当`expandXOut`的数据类型为`FLOAT4_E2M1`或`FLOAT4_E1M2`时，H必须为偶数。
 
   <!-- end id15 -->
@@ -716,7 +717,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
 
           <!-- npu="910b" id16 -->
           - <term>Atlas A2系列产品</term>：
-              - commAlg为""或nullptr：依HCCL环境变量选择“fullmesh”或“hierarchy”公式。
+              - commAlg为""或nullptr：依HCCL环境变量选择"fullmesh"或"hierarchy"公式。
               - commAlg为"fullmesh"：当`x`的数据类型为`INT32`时，设置大小要求(≥ 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* (H \* sizeof(int32) + 32Byte) + 2MB))；其他数据类型设置大小要求(≥ 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* H \* sizeof(uint16) + 2MB))。
               - commAlg为"hierarchy"：设置大小要求(≥ (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8  (`K`))) \* 1Byte + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512)。
           <!-- end id16 -->

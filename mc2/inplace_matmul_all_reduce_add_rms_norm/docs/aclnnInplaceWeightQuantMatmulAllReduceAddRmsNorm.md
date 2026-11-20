@@ -118,7 +118,7 @@ aclnnStatus aclnnInplaceWeightQuantMatmulAllReduceAddRmsNorm(
           <td>x2</td>
           <td>输入</td>
           <td>MatMul计算的右矩阵，即计算公式中的x2。</td>
-          <td><ul><li>支持空Tensor。</li><li>当前版本仅支持两维输入，支持转置/不转置场景。</li><li>支持转置场景下的非连续的Tensor。</li></ul></td>
+          <td><ul><li>支持空Tensor。</li><li>当前版本仅支持二维输入，支持转置/不转置场景。</li><li>支持转置场景下的非连续的Tensor。</li></ul></td>
           <td>INT8、INT4</td>
           <td>ND</td>
           <td>2</td>
@@ -138,7 +138,7 @@ aclnnStatus aclnnInplaceWeightQuantMatmulAllReduceAddRmsNorm(
           <td>antiquantScale</td>
           <td>输入</td>
           <td>即计算公式中的antiquantScale。</td>
-          <td>pertensor场景shape为(1)；PerChannel场景shape为(n)/(1,n)，n为x2最后一维的大小；pergroup场景shape为(ceil(k,antiquantGroupSize),n)。</td>
+          <td>pertensor场景shape为(1)；perchannel场景shape为(n)/(1,n)，n为x2最后一维的大小；pergroup场景shape为(ceil(k,antiquantGroupSize),n)。</td>
           <td>BFLOAT16、FLOAT16</td>
           <td>ND</td>
           <td>1-2</td>
@@ -147,7 +147,7 @@ aclnnStatus aclnnInplaceWeightQuantMatmulAllReduceAddRmsNorm(
         <tr>
           <td>antiquantOffset</td>
           <td>输入</td>
-          <td>对x2进行伪量化计算的offset参数，即计算公式中的antiquantOffset。</td>
+          <td>对x2进行反量化计算的offset参数，即计算公式中的antiquantOffset。</td>
           <td>可选，可为空，非空时shape与antiquantScale一致。</td>
           <td>BFLOAT16、FLOAT16</td>
           <td>ND</td>
@@ -347,7 +347,7 @@ aclnnStatus aclnnInplaceWeightQuantMatmulAllReduceAddRmsNorm(
 - 确定性计算：
   - aclnnInplaceWeightQuantMatmulAllReduceAddRmsNorm默认非确定性实现，支持通过配置`HCCL_DETERMINISTIC`环境变量为true开启确定性计算
 
-- 使用场景同融合算子aclnnWeightQuantMatmulAllReduce一致：增量场景不开启MC2，全量场景开启MC2
+- 使用场景同融合算子aclnnWeightQuantMatmulAllReduce一致：增量场景不开启MC2，全量场景开启MC2。
 - 输入x1可为二维或者三维，其shape为(b, s, k)或者(s, k)。x2必须是二维，其shape为(k, n)，轴满足mm算子入参要求，k轴相等，b\*s、s的范围为[1, 2147483647]，k、n的范围为[1, 65535]。bias若非空，bias为一维，其shape为(n)。
 - 输入residual必须是三维，其shape为(b, s, n)，当x1为二维时，residual的(b*s)等于x1的s。输入gamma必须是一维，其shape为(n)。
 - antiquantScale满足pertensor场景shape为(1)，perchannel场景shape为(1,n)/(n)，pergroup场景shape为(ceil(k,antiquantGroupSize),n)。antiquantOffset若非空，shape与antiquantScale一致。

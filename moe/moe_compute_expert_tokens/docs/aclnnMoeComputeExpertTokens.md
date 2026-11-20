@@ -176,7 +176,7 @@ aclnnStatus aclnnMoeComputeExpertTokens(
 
 ## aclnnMoeComputeExpertTokens
 
-- **参数说明**
+- **参数说明：**
 
   <table style="undefined;table-layout: fixed; width: 1148px"><colgroup>
   <col style="width: 170px">

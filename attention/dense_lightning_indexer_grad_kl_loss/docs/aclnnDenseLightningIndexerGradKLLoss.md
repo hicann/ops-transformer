@@ -597,7 +597,7 @@ aclnnStatus aclnnDenseLightningIndexerGradKLLoss(
       <tr>
        <td>D</td>
        <td>128</td>
-       <td>query与query_index的D相同。</td>
+       <td>query与queryIndex的D相同。</td>
       </tr>
       <tr>
        <td>Drope</td>
@@ -631,7 +631,7 @@ aclnnStatus aclnnDenseLightningIndexerGradKLLoss(
       </tr>
       <tr>
        <td>queryIndex</td>
-       <td>Nidx1 = 64/32/16/8;  D = 128 ; S1 = 64k/128k</td>
+       <td>Nidx1=64/32/16/8; D=128; S1=64k/128k</td>
       </tr>
       <tr>
        <td>keyIndex</td>

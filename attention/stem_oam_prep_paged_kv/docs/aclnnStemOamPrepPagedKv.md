@@ -252,7 +252,7 @@ aclnnStatus aclnnStemOamPrepPagedKv(
     <tr>
       <td class="tg-0lax">kFlat（aclTensor*）</td>
       <td class="tg-0lax">输出</td>
-      <td class="tg-0lax">K group sum + anti-diag flip结果。</td>
+      <td class="tg-0lax">K group sum + anti-diagonal flip结果。</td>
       <td class="tg-0lax">不支持空Tensor。<br>shape为[batch, H_kv, max_Kb, kflat_dim]，其中kflat_dim=stemStride*D, <br>max_Kb依赖kvSeqLens输入计算获得。</td>
       <td class="tg-0lax">BFLOAT16</td>
       <td class="tg-0lax">ND</td>

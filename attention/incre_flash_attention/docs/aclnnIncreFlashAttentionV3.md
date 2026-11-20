@@ -235,7 +235,7 @@ aclnnStatus aclnnIncreFlashAttentionV3(
         <td>伪量化因子。</td>
         <td><ul><li>支持空Tensor。</li><li>支持per-channel（list），由shape决定，BNSD场景下shape为(2, N, 1, D)，BSH场景下shape为(2, H)，BSND场景下shape为(2, N, D)。</li></ul></td>
         <td>FLOAT16、BFLOAT16</td>
-        <td>-</td>
+        <td>ND</td>
         <td><ul><li>(2, N, 1, D)</li><li>(2, H)</li><li>(2, N, D)</li><li>(2)</li></ul></td>
         <td>×</td>
       </tr>
@@ -440,7 +440,7 @@ aclnnStatus aclnnIncreFlashAttentionV3(
   - 支持B轴小于等于65536，N轴小于等于256，D轴小于等于512。
   - query数据类型支持FLOAT16、BFLOAT16，attentionOut、key和value数据类型支持FLOAT16、INT8、BFLOAT16。
   - dequantScale1、dequantScale2数据类型支持UINT64、FLOAT32。
-  - quantScale1、quantScale2和quantOffset2数据类型支持FLOAT32
+  - quantScale1、quantScale2和quantOffset2数据类型支持FLOAT32。
   - numKeyValueHeads数据类型支持INT64。
 <!-- end id6 -->
 - <term>Atlas推理系列产品</term>：
@@ -464,7 +464,7 @@ aclnnStatus aclnnIncreFlashAttentionV3(
 
 - page attention场景：
   - page attention的开启必要条件是blockTable存在且有效，同时key、value是按照blockTable中的索引在一片连续内存中排布，支持key、value dtype为FLOAT16/BFLOAT16/INT8，在该场景下key、value的inputLayout参数无效。
-  - blockSize是用户自定义的参数，该参数的取值会影响page attention的性能，在开启page attention场景下，blockSize需要传入非0值，且blocksize最大不超过512。key、value输入类型为FLOAT16/BFLOAT16时需要16对齐，key、value输入类型为INT8时需要32对齐，推荐使用128。通常情况下，page attention可以提高吞吐量，但会带来性能上的下降。
+  - blockSize是用户自定义的参数，该参数的取值会影响page attention的性能，在开启page attention场景下，blockSize需要传入非0值，且blockSize最大不超过512。key、value输入类型为FLOAT16/BFLOAT16时需要16对齐，key、value输入类型为INT8时需要32对齐，推荐使用128。通常情况下，page attention可以提高吞吐量，但会带来性能上的下降。
   - page attention场景下，当query的inputLayout为BNSD时，kv cache排布支持（blocknum, blocksize, H）和（blocknum, KV_N, blocksize, D）两种格式，当query的inputLayout为BSH、BSND时，kv cache排布只支持（blocknum, blocksize, H）一种格式。blocknum不能小于根据actualSeqLengthsKv和blockSize计算的每个batch的block数量之和。且key和value的shape需保证一致。
   - page attention场景下，kv cache排布为（blocknum, KV_N, blocksize, D）时性能通常优于kv cache排布为（blocknum, blocksize, H）时的性能，建议优先选择（blocknum, KV_N, blocksize, D）格式。
   - page attention开启场景下，当输入kv cache排布格式为（blocknum, blocksize, H），且numKeyValueHeads * headDim超过64k时，受硬件指令约束，会被拦截报错。可通过开启GQA（减小numKeyValueHeads）或调整kv cache排布格式为（blocknum, numKeyValueHeads, blocksize, D）解决。

@@ -505,7 +505,7 @@ aclnnStatus aclnnMoeGatingTopKV2(
 
 ## 约束说明
 
-- 确定性计算：
+* 确定性计算：
   - aclnnMoeGatingTopKV2默认确定性实现。
 
 * 输入shape限制：

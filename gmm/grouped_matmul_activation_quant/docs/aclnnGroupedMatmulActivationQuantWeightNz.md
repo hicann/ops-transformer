@@ -67,7 +67,7 @@
 
       - 1.根据groupList[i]确定当前分组的token范围，$i \in [0, Len(groupList))$。
 
-      - 2.根据分组确定的入参进行GroupedMatmul和反量化计算，中间GroupedMatmul结果默认为FLOAT32类型：
+      - 2.根据分组确定的入参进行GroupedMatmul和反量化计算，中间GroupedMatmul结果默认为FP32类型：
 
         $C_i = (X_i \cdot weight_i) \odot xScale_{i\ Broadcast} \odot weightScale_{i\ Broadcast}$
 

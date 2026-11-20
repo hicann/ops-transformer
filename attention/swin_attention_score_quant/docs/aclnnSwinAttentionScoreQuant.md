@@ -66,7 +66,7 @@ aclnnStatus aclnnSwinAttentionScoreQuant(
 
 ## aclnnSwinAttentionScoreQuantGetWorkspaceSize
 
-* **参数说明**：
+* **参数说明：**
 
     <table style="undefined;table-layout: fixed; width: 1550px">
         <colgroup>
@@ -273,7 +273,7 @@ aclnnStatus aclnnSwinAttentionScoreQuant(
     </tr>
     </tbody></table>
 
-* **返回值**：
+* **返回值：**
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
@@ -306,7 +306,7 @@ aclnnStatus aclnnSwinAttentionScoreQuant(
 
 ## aclnnSwinAttentionScoreQuant
 
-* **参数说明**
+- **参数说明：**
 
     <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
     <col style="width: 168px">
@@ -343,7 +343,7 @@ aclnnStatus aclnnSwinAttentionScoreQuant(
     </tbody>
     </table>
 
-* **返回值**
+- **返回值：**
 
   返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 

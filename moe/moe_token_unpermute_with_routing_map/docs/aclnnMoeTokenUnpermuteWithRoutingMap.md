@@ -169,7 +169,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMap(
     <tr>
       <td>sortedIndices（aclTensor*）</td>
       <td>输入</td>
-      <td>表示输入输出梯度的映射关系。</td>
+      <td>表示输入输出token的映射关系。</td>
       <td>paddedMode为false时要求索引取值范围[0，tokens_num * topK_num - 1]。<br>paddedMode为true时索引取值范围[0，tokens_num - 1]。</td>
       <td>INT32</td>
       <td>ND</td>

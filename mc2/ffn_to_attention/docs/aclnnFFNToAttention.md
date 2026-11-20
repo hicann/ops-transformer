@@ -293,7 +293,7 @@ aclnnStatus aclnnFFNToAttention(
 ## 约束说明
 
 - **确定性约束**：
-  - aclnnFFNToAttention默认确定性实现
+  - aclnnFFNToAttention默认确定性实现。
 
 - **参数一致性约束**：
   - 所有卡的`group`、`worldSize`、`tokenInfoTableShape`、`tokenDataShape`参数及`HCCL_BUFFSIZE`取值需保持一致。

@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-  - **接口功能**：实现分组矩阵乘计算，每组矩阵乘的维度大小可以不同。基本功能为矩阵乘，如$y_i[m_i,n_i]=x_i[m_i,k_i] \times weight_i[k_i,n_i], i=1...g$，其中g为分组个数，$m_i/k_i/n_i$为对应shape。输入输出数据类型均为aclTensorList，对应的功能为：
+  - **接口功能**：实现分组矩阵乘计算，每组矩阵乘的维度大小可以不同。基本功能为矩阵乘，如$y_i[m_i,n_i]=x_i[m_i,k_i] \times weight_i[k_i,n_i], i=1...g$，其中g为分组个数，$m_i/k_i/n_i$为对应shape。输入输出参数均为aclTensorList，对应的功能为：
 
       - k轴分组：$k_i$各不相同，但$m_i/n_i$每组相同，此时$x_i/weight_i$可以在$k_i$上拼接。
       - m轴分组：$k_i$各组相同，$weight_i/y_i$可以在$n_i$上拼接。
@@ -569,8 +569,8 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
 
       - 对称量化场景：
 
-        - 输出out的dtype为BFLOAT16或FLOAT16
-        - offsetOptional为空
+        - 输出out的dtype为BFLOAT16或FLOAT16。
+        - offsetOptional为空。
         - 仅支持count模式（算子不会检查groupListType的值），k要求为quantGroupSize的整数倍，且要求k <= 18432。其中quantGroupSize为k方向上pergroup量化长度，当前支持quantGroupSize=256。
         - scale为pergroup与perchannel离线融合后的结果，shape要求为$[E, quantGroupNum, N]$，其中$quantGroupNum=k \div quantGroupSize$。
         - Bias为计算过程中离线计算的辅助结果，值要求为$8\times weight \times scale$，并在第1维累加，shape要求为$[E, N]$。
@@ -625,9 +625,9 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
       - 非量化在x、weight、out数据类型为BFLOAT16/FLOAT16时：不分组/M轴分组场景下支持传入0/1。其余场景仅支持0。
   - 当前支持非量化场景、伪量化场景与全量化场景
   - 非量化场景支持的数据类型为：
-    - 输入weight矩阵的n轴与k轴需要满足32 Byte对齐
-    - 以下入参为空：scaleOptional、offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、perTokenScaleOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional
-    - 不为空的参数支持的数据类型组合要满足下表
+    - 输入weight矩阵的n轴与k轴需要满足32字节对齐。
+    - 以下入参为空：scaleOptional、offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、perTokenScaleOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional。
+    - 不为空的参数支持的数据类型组合要满足下表。
 
       |groupType| x       | weight  | biasOptional | out     |
       |:-------:|:-------:|:-------:| :------      |:------ |
@@ -639,7 +639,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
 
     **S8S4场景：**
 
-    - 以下入参为空：antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional
+    - 以下入参为空：antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional。
     - 不为空的参数支持的数据类型组合要满足下表：
 
     | groupType | x | weight | biasOptional | scaleOptional | offsetOptional | perTokenScaleOptional | groupListOptional | out |
@@ -682,8 +682,8 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
       - 例如，传入`[0, 1]`表示不指定预期token数，并开启weight特殊格式。详见[S8S4场景约束](#ascend950-weightnz-s8s4场景约束)。
 
     **其他伪量化场景：**
-    - 以下入参为空：offsetOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional
-    - 不为空的参数支持的数据类型组合要满足下表
+    - 以下入参为空：offsetOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional。
+    - 不为空的参数支持的数据类型组合要满足下表。
 
       |groupType| x       |perTokenScaleOptional| weight  |antiquantScaleOptional|scaleOptional|antiquantOffsetOptional| biasOptional | out     | perTokenScaleOptional Shape | weight Shape | antiquantScaleOptional Shape| scaleOptional shape|bias shape|
       |:-------:|:-------:|:-------------------:|:-------:|:--------------------:|:-----------:|:---------------------:|:------------:|:-------:|:---------------------------:|:------------:|:---------------------------:|:------------------:|:--------:|
@@ -713,7 +713,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
       - 当x为FLOAT8_E4M3FN，weight为FLOAT4_E2M1/FLOAT4_E1M2，weight shape为(N, K)的场景，属于单多单场景，weight支持多tensor(个数大于等于1)，antiquantScaleOptional、antiquantOffsetOptional、biasOptional的tensor个数和weight一致。
 
   - 静态量化场景支持的输入类型与shape为：
-    - 以下入参为空：offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、perTokenScaleOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional
+    - 以下入参为空：offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、perTokenScaleOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional。
     - 不为空的参数支持的数据类型组合要满足下表：
 
       |groupType| x       | weight  | biasOptional | scaleOptional | out     |
@@ -730,7 +730,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
       |0|weight单tensor|perchannel场景：每个tensor 2维， shape为（g, N）；pertensor场景：每个tensor 2维或1维，shape为（g, 1）或（g,）|
 
   - 动态量化（K-T && K-C量化）场景支持的输入类型与shape为：
-    - 以下入参为空：offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional
+    - 以下入参为空：offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional。
     - 不为空的参数支持的数据类型组合要满足下表：
 
       |groupType| x       | weight  | biasOptional | scaleOptional | perTokenScaleOptional |out     |
@@ -739,7 +739,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
       |0|INT8  |INT8| INT32/FLOAT16/FLOAT32/null     |FLOAT32    | FLOAT32   | FLOAT16 |
       |0|INT4  |INT4| null     |UINT64    | FLOAT32/null   | FLOAT16/BFLOAT16 |
 
-    - scaleOptional要满足下表（其中g为matmul组数即分组数）
+    - scaleOptional要满足下表（其中g为matmul组数即分组数）。
 
       | groupType | 使用场景 | shape限制 |
       |:---------:|:---------:| :------ |
@@ -752,14 +752,14 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
       |0|x单tensor|pertoken场景：每个tensor 1维，shape为（M,）|
 
   - K-G（pertoken-pergroup）量化场景支持的输入类型与shape为：
-    - 以下入参为空：biasOptional、offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional
+    - 以下入参为空：biasOptional、offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional。
     - 不为空的参数支持的数据类型组合要满足下表：
 
       |groupType| x       | weight  | scaleOptional | perTokenScaleOptional |out     |
       |:-------:|:-------:|:-------:| :------      |:-------    | :------   |
       |0|INT4  |INT4     |UINT64    | FLOAT32/null   | FLOAT16/BFLOAT16 |
 
-    - scaleOptional要满足下表（其中g为matmul组数即分组数）
+    - scaleOptional要满足下表（其中g为matmul组数即分组数）。
 
       | groupType | 使用场景 | shape限制 |
       |:---------:|:---------:| :------ |
@@ -776,7 +776,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
       - 全量化的int4的weight支持NZ转置输入，即输入为[E,N,K]，但view shape为[E,K,N]以保证算子识别转置状态，转置输入下，$k/G$要求按照64对齐，K按照64对齐，N按照16对齐。
 
   - 动态量化（mx量化）场景支持的输入类型与shape为：
-    - 以下入参为空：offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional
+    - 以下入参为空：offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional、activationQuantScaleOptional、activationQuantOffsetOptional、activationFeatureOutOptional。
     - 不为空的参数支持的数据类型组合要满足下表：
 
         |groupType| x       | weight  | biasOptional | scaleOptional |  perTokenScaleOptional |out     |
@@ -830,7 +830,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
 <!-- npu="950" id12 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
 
-  MX_A8W4场景下，先调用`aclnnWeightQuantPreprocess`同步预处理weight和weightScale，再将预处理输出直接作为weight和antiquantScaleOptional调用本接口完成分组矩阵乘。
+  MxA8W4场景下，先调用`aclnnWeightQuantPreprocess`同步预处理weight和weightScale，再将预处理输出直接作为weight和antiquantScaleOptional调用本接口完成分组矩阵乘。
 
   ```cpp
   #include <algorithm>

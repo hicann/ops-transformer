@@ -100,7 +100,7 @@ aclnnStatus aclnnAttentionToFFN(
         <td>sessionId</td>
         <td>输入</td>
         <td>表示当前Attention Worker节点的Id。</td>
-        <td>shape为(X, )，取值范围为[0, attentionWorkerNum)。</td>
+        <td>shape为(X, )，取值范围为[0, AttentionWorkerNum)。</td>
         <td>INT32</td>
         <td>ND</td>
         <td>1</td>
@@ -388,7 +388,7 @@ aclnnStatus aclnnAttentionToFFN(
   | moeExpertRankNum | 表示部署MoE专家的FFN节点数量，取值范围 <code>0 < moeExpertRankNum < FFNWorkerNum</code>。                   |
   | sharedExpertRankNum | 表示部署共享专家的FFN节点数量，取值范围 <code>0 < sharedExpertRankNum ≤ FFNWorkerNum</code>。                 |
   | FFNWorkerNum | 表示FFN节点的数量，取值范围为 <code>0 < FFNWorkerNum < worldSize</code>，且满足<code>FFNWorkerNum = moeExpertRankNum + sharedExpertRankNum</code>。                   |
-  | AttentionWorkerNum | 表示Attention节点的数量，取值范围 <code>0 < AttentionWorkerNum < worldSize</code>。
+  | AttentionWorkerNum | 表示Attention节点的数量，取值范围 <code>0 < AttentionWorkerNum < worldSize</code>。 |
 
 - **环境变量约束**：
   - **HCCL_BUFFSIZE**：调用本接口前需检查HCCL_BUFFSIZE环境变量取值是否合理，该环境变量表示单个通信域占用内存大小，单位MB，不配置时默认为200MB。

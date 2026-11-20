@@ -282,7 +282,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
         <td>inputLayout</td>
         <td>输入</td>
         <td>标识输入query、key、value的数据排布格式。</td>
-        <td><ul><li>不特意指定时建议传入"BSH"。</li></ul>
+        <td><ul><li>不特意指定时建议传入“BSH”。</li></ul>
             <ul><li>综合约束请见<a href="#约束说明">约束说明</a></li></ul></td>
         <td>STRING</td>
         <td>-</td>
@@ -505,10 +505,10 @@ aclnnStatus aclnnPromptFlashAttentionV2(
   - 输入数据类型限制：
 
     <!-- npu="910b" id7 -->
-    - <term>Atlas A2系列产品</term>：数据类型支持FLOAT16、BFLOAT16、INT8
+    - <term>Atlas A2系列产品</term>：数据类型支持FLOAT16、BFLOAT16、INT8。
     <!-- end id7 -->
     <!-- npu="310p" id19 -->
-    - <term>Atlas推理系列产品</term>：数据类型仅支持FLOAT16
+    - <term>Atlas推理系列产品</term>：数据类型仅支持FLOAT16。
     <!-- end id19 -->
 
 - pseShift功能使用限制如下：
@@ -517,10 +517,10 @@ aclnnStatus aclnnPromptFlashAttentionV2(
   - 输入数据类型限制：
 
     <!-- npu="910b" id8 -->
-    - <term>Atlas A2系列产品</term>：数据类型支持FLOAT16、BFLOAT16
+    - <term>Atlas A2系列产品</term>：数据类型支持FLOAT16、BFLOAT16。
     <!-- end id8 -->
     <!-- npu="310p" id20 -->
-    - <term>Atlas推理系列产品</term>：仅支持nullptr
+    - <term>Atlas推理系列产品</term>：仅支持nullptr。
     <!-- end id20 -->
 
 - attenMask功能使用限制如下：
@@ -608,7 +608,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
 - inputLayout输入，功能使用限制如下：
 
   - 输入数据类型限制：
-    - 当前支持BSH、BSND、BNSD、BNSD_BSND（输入为BNSD时，输出格式为BSND）。用户不特意指定时建议传入"BSH"。
+    - 当前支持BSH、BSND、BNSD、BNSD_BSND（输入为BNSD时，输出格式为BSND）。用户不特意指定时建议传入“BSH”。
     - 说明：query、key、value数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
 
 - numKeyValueHeads输入，功能使用限制如下：
@@ -627,7 +627,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
 
   <!-- npu="910b" id17 -->
   - <term>Atlas A2系列产品</term>：
-    - sparseMode为0时，代表defaultMask模式，如果attenmask未传入则不做mask操作，忽略preTokens和nextTokens（内部赋值为INT_MAX）；如果传入，则需要传入完整的attenmask矩阵（S1 * S2），表示preTokens和nextTokens之间的部分需要计算。
+    - sparseMode为0时，代表defaultMask模式，如果attenMask未传入则不做mask操作，忽略preTokens和nextTokens（内部赋值为INT_MAX）；如果传入，则需要传入完整的attenmask矩阵（S1 * S2），表示preTokens和nextTokens之间的部分需要计算。
     - sparseMode为1时，代表allMask，必须传入完整的attenmask矩阵（S1 * S2）。
     - sparseMode为2时，代表leftUpCausal模式的mask，需要传入优化后的attenmask矩阵（2048*2048）。
     - sparseMode为3时，代表rightDownCausal模式的mask，对应以右顶点为划分的下三角场景，需要传入优化后的attenmask矩阵（2048*2048）。
@@ -636,7 +636,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
 
   <!-- end id17 -->
   <!-- npu="310p" id29 -->
-  - <term>Atlas推理系列产品</term>：仅支持取值0
+  - <term>Atlas推理系列产品</term>：仅支持取值0。
   <!-- end id29 -->
 
 - attentionOut输出，功能使用限制如下：
@@ -656,14 +656,14 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     - 输入为INT8，输出为INT8的场景：入参deqScale1、quantScale1、deqScale2、quantScale2需要同时存在，quantOffset2可选，不传时默认为0。
     - 输入为INT8，输出为FLOAT16的场景：入参deqScale1、quantScale1、deqScale2需要同时存在，若存在入参quantOffset2或quantScale2（即不为nullptr），则报错并返回。
     - 输入为FLOAT16或BFLOAT16，输出为INT8的场景：入参quantScale2需存在，quantOffset2可选，不传时默认为0，若存在入参deqScale1或quantScale1或deqScale2（即不为nullptr），则报错并返回。
-    - 入参quantScale2和quantOffset2支持per-tensor/per-channel两种格式和FLOAT32/BFLOAT16两种数据类型。若传入quantOffset2，需保证其类型和shape信息与quantScale2一致。当输入为BFLOAT16时，同时支持FLOAT32和BFLOAT16，否则仅支持FLOAT32。per-channel格式，当输出layout为BSH时，要求quantScale2所有维度的乘积等于H；其他layout要求乘积等于N*D。（建议输出layout为BSH时，quantScale2 shape传入[1,1,H]或[H]；输出为BNSD时，建议传入[1,N,1,D]或[N,D]；输出为BSND时，建议传入[1,1,N,D]或[N,D]）
+    - 入参quantScale2和quantOffset2支持per-tensor/per-channel两种格式和FLOAT32/BFLOAT16两种数据类型。若传入quantOffset2，需保证其类型和shape信息与quantScale2一致。当输入为BFLOAT16时，同时支持FLOAT32和BFLOAT16，否则仅支持FLOAT32。per-channel格式，当输出layout为BSH时，要求quantScale2所有维度的乘积等于H；其他layout要求乘积等于N*D。（建议输出layout为BSH时，quantScale2 shape传入[1,1,H]或[H]；输出为BNSD时，建议传入[1,N,1,D]或[N,D]；输出为BSND时，建议传入[1,1,N,D]或[N,D]）。
     - 输出为int8，quantScale2和quantOffset2为per-channel时，暂不支持左padding、Ring Attention或者D非32Byte对齐的场景。
     - 输出为int8时，暂不支持sparse为band且preTokens/nextTokens为负数。
   - 当输出为INT8，入参quantOffset2传入非空指针和非空Tensor值，并且sparseMode、preTokens和nextTokens满足以下条件，矩阵会存在某几行不参与计算的情况，导致计算结果误差，该场景会拦截（解决方案：如果希望该场景不被拦截，需要在PFA接口外部做后量化操作，不在PFA接口内部开启）：
-    - sparseMode = 0，attenMask如果非空指针，每个batch actualSeqLengths - actualSeqLengthsKV - preTokens > 0或nextTokens < 0时，满足拦截条件。
+    - sparseMode = 0，attenMask如果非空指针，每个batch actualSeqLengths - actualSeqLengthsKv - preTokens > 0或nextTokens < 0时，满足拦截条件。
     - sparseMode = 1或2，不会出现满足拦截条件的情况。
-    - sparseMode = 3，每个batch actualSeqLengthsKV - actualSeqLengths < 0，满足拦截条件。
-    - sparseMode = 4，preTokens < 0或每个batch nextTokens + actualSeqLengthsKV - actualSeqLengths < 0时，满足拦截条件。
+    - sparseMode = 3，每个batch actualSeqLengthsKv - actualSeqLengths < 0，满足拦截条件。
+    - sparseMode = 4，preTokens < 0或每个batch nextTokens + actualSeqLengthsKv - actualSeqLengths < 0时，满足拦截条件。
 
 ## 调用示例
 

@@ -235,7 +235,7 @@ aclnnStatus aclnnLightningIndexerV3(
     <td>-</td>
     </tr>
     <tr>
-    <td>layoutQ（char*）</td>
+    <td>layoutQOptional（char*）</td>
     <td>输入</td>
     <td>用于标识输入q的数据排布格式。</td>
     <td><ul><li>当前支持BSND、TND。</li><li>建议值是BSND。</li></ul></td>
@@ -245,7 +245,7 @@ aclnnStatus aclnnLightningIndexerV3(
     <td>-</td>
     </tr>
     <tr>
-    <td>layoutK（char*）</td>
+    <td>layoutKOptional（char*）</td>
     <td>输入</td>
     <td>用于标识输入k的数据排布格式。</td>
     <td><ul><li>当前支持PA_BBND、BSND、TND。</li><li>建议值是BSND。</li></ul></td>
@@ -258,7 +258,7 @@ aclnnStatus aclnnLightningIndexerV3(
     <td>maskMode（int64_t）</td>
     <td>输入</td>
     <td>表示mask的模式。</td>
-    <td><ul><li>mask_mode为0时，代表defaultMask模式。</li><li>mask_mode为3时，代表rightDownCausal模式的mask，对应以右顶点为划分的下三角场景。</li><li>建议值是0。</li></ul></td>
+    <td><ul><li>maskMode为0时，代表defaultMask模式。</li><li>maskMode为3时，代表rightDownCausal模式的mask，对应以右顶点为划分的下三角场景。</li><li>建议值是0。</li></ul></td>
     <td>INT64</td>
     <td>-</td>
     <td>-</td>
@@ -463,7 +463,7 @@ aclnnStatus aclnnLightningIndexerV3(
   - 支持本接口，且支持开启candidate（两级TopK候选源）模式。
   - topk取值范围当前仅支持[1, 2048]，以及3072、4096、5120、6144、7168、8192。
   - 当前不支持sequsedQOptional、outputIdxOffsetOptional、maxSeqlenQ功能，不建议传入这些参数。
-  - 当layoutKOptional为PA_BBND时，必须传入sequsedKOptional；当layoutK为BSND或TND时，sequsedKOptional可选传入。
+  - 当layoutKOptional为PA_BBND时，必须传入sequsedKOptional；当layoutKOptional为BSND或TND时，sequsedKOptional可选传入。
   - 两级TopK候选源（source）模式仅在本系列产品上支持开启：candidateTopkBlocks传入非-1即开启；开启时topk仅支持[1, 2048]、returnValue已放开（值域{0,1}，rv=1时sparseValues输出位置级topk真实分数，shape与sparseIndices相同），且必须传入实际的candidateBlockIndices输出tensor（shape为[B, S1, N2, candidateTopkBlocks]或[T1, N2, candidateTopkBlocks]）。
 <!-- end id7 -->
 <!-- npu="950" id8 -->

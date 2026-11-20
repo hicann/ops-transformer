@@ -25,7 +25,7 @@
 
 - **算子功能**：NSA中compress attention以及select topk索引计算。论文：[Native Sparse Attention](https://arxiv.org/pdf/2502.11089)。
 
-- **计算公式**：压缩block大小：$l$，select block大小：$l'$，压缩stride大小：$d$
+- **计算公式**：压缩block大小：$l$，select block大小：$l'$，压缩stride大小：$d$。
 
 $$
 P_{cmp} = Softmax(query*key^T) \\
@@ -261,7 +261,7 @@ aclnnStatus aclnnNsaCompressAttention(
         <td>compressBlockSize</td>
         <td>输入</td>
         <td>对应公式中的l。</td>
-        <td>压缩滑窗大小。</td>
+        <td>压缩块大小。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -446,22 +446,22 @@ aclnnStatus aclnnNsaCompressAttention(
 - 确定性计算：
   - aclnnNsaCompressAttention默认确定性实现。
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
-- compressBlockSize、compressStride、selectBlockSize必须是16的整数倍，并且满足：compressBlockSize>=compressStride && selectBlockSize>=compressBlockSize && selectBlockSize%compressStride==0
-- compressBlockSize：16对齐，支持到128
-- compressStride：16对齐，支持到64
-- selectBlockSize：16对齐，支持到128
-- selectBlockCount：支持[1~32] && selectBlockCount <= min(SelSkv)
+- compressBlockSize、compressStride、selectBlockSize必须是16的整数倍，并且满足：compressBlockSize>=compressStride && selectBlockSize>=compressBlockSize && selectBlockSize%compressStride==0。
+- compressBlockSize：16对齐，支持到128。
+- compressStride：16对齐，支持到64。
+- selectBlockSize：16对齐，支持到128。
+- selectBlockCount：支持[1~32] && selectBlockCount <= min(SelSkv)。
 - actualSeqQLenOptional, actualCmpSeqKvLenOptional, actualSelSeqKvLenOptional需要是前缀和模式；且TND格式下必须传入。
-- 由于UB限制，CmpSkv需要满足以下约束：CmpSkv <= 14000
-- SelSkv = CeilDiv(CmpSkv, selectBlockSize // compressStride)
-- layoutOptional目前仅支持TND。
+- 由于UB限制，CmpSkv需要满足以下约束：CmpSkv <= 14000。
+- SelSkv = CeilDiv(CmpSkv, selectBlockSize // compressStride)。
+- inputLayout目前仅支持TND。
 - 输入query、key、value的数据类型必须一致。
 - 输入query、key、value的batchSize必须相等。
-- 输入query、key、value的headDim必须满足：qD == kD && kD >= vD
+- 输入query、key、value的headDim必须满足：qD == kD && kD >= vD。
 - 输入query、key、value的headDim取值范围为(0, 768]。aclnnNsaCompressAttentionVarLenScore遵循同一约束。
 - 输入query、key、value的inputLayout必须一致。
-- 输入query的headNum为N1，输入key和value的headNum为N2，则N1 >= N2 && N1 % N2 == 0
-- 设G = N1 / N2，G需要满足以下约束：G < 128 && 128 % G == 0
+- 输入query的headNum为N1，输入key和value的headNum为N2，则N1 >= N2 && N1 % N2 == 0。
+- 设G = N1 / N2，G需要满足以下约束：G < 128 && 128 % G == 0。
 - attenMask和topkMask的使用需符合论文描述。
 
 ## 调用示例

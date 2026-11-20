@@ -245,7 +245,7 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
       <td>cmpRatio（int64_t）</td>
       <td>输入</td>
       <td>表示k的压缩率。</td>
-      <td><ul><li>取值范围[1，128]。</li><li>建议值1，表示无压缩。</li></ul></td>
+      <td><ul><li>取值范围[1, 128]。</li><li>建议值1，表示无压缩。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -445,51 +445,51 @@ aclnnStatus aclnnSparseLightningIndexerKLLossGradMetadata(
 
   <!-- npu="950" id13 -->
   - Ascend 950PR&950DT系列产品约束：
-      - Batch取值规则
-        - layoutQOptional为BSND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过batch_size获取batch数。
+      - Batch取值规则：
+        - layoutQOptional为BSND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过batchSize获取batch数。
         - layoutQOptional为TND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过cuSeqlensQOptional的shape推导batch。
-      - q Seqlen取值规则
+      - q Seqlen取值规则：
         - layoutQOptional为BSND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过maxSeqlenQ获取seqlen。
         - layoutQOptional为TND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过cuSeqlensQOptional中的元素获取seqlen。
   <!-- end id13 -->
   <!-- npu="A3" id14 -->
   - Atlas A3系列产品约束：
-    - Batch取值规则
+    - Batch取值规则：
       - 如果batchSize大于0，优先使用batchSize。
       - 如果batchSize为0，优先通过sequsedQOptional的shape推导batch。
       - 如果batchSize为0且未传入sequsedQOptional，layoutQOptional为TND时通过cuSeqlensQOptional的shape推导batch，BSND时则报错。
       - 推导出的batch必须大于0。
-    - Seqlen取值规则
+    - Seqlen取值规则：
       - 传入sequsedQOptional、sequsedKOptional时，分别使用其对应元素作为实际q/k有效长度，取值不得超过对应batch的分配长度。
       - 未传入对应seqused参数时，TND场景通过对应cuSeqlens相邻元素之差获取实际长度，BSND场景通过maxSeqlenQ和maxSeqlenK获取实际长度。
-    - layout约束
+    - layout约束：
       - layoutQOptional必须为BSND或TND。
       - layoutKOptional支持BSND和TND，建议与layoutQOptional保持一致。
-    - head约束
+    - head约束：
       - numHeadsQ、numHeadsK和headDim必须为正数。
       - numHeadsQ必须能被numHeadsK整除。
-    - sparse约束
+    - sparse约束：
       - topk必须为正数。
       - cmpRatio取值范围为[0, 128]。
       - maskMode当前仅支持0和3。
   <!-- end id14 -->
   <!-- npu="910b" id15 -->
   - Atlas A2系列产品约束：
-    - Batch取值规则
+    - Batch取值规则：
       - 如果batchSize大于0，优先使用batchSize。
       - 如果batchSize为0，优先通过sequsedQOptional的shape推导batch。
       - 如果batchSize为0且未传入sequsedQOptional，layoutQOptional为TND时通过cuSeqlensQOptional的shape推导batch，BSND时则报错。
       - 推导出的batch必须大于0。
-    - Seqlen取值规则
+    - Seqlen取值规则：
       - 传入sequsedQOptional、sequsedKOptional时，分别使用其对应元素作为实际q/k有效长度，取值不得超过对应batch的分配长度。
       - 未传入对应seqused参数时，TND场景通过对应cuSeqlens相邻元素之差获取实际长度，BSND场景通过maxSeqlenQ和maxSeqlenK获取实际长度。
-    - layout约束
+    - layout约束：
       - layoutQOptional必须为BSND或TND。
       - layoutKOptional支持BSND和TND，建议与layoutQOptional保持一致。
-    - head约束
+    - head约束：
       - numHeadsQ、numHeadsK和headDim必须为正数。
       - numHeadsQ必须能被numHeadsK整除。
-    - sparse约束
+    - sparse约束：
       - topk必须为正数。
       - cmpRatio取值范围为[0, 128]。
       - maskMode当前仅支持0和3。

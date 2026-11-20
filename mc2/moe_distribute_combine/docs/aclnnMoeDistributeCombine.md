@@ -627,7 +627,7 @@ aclnnStatus aclnnMoeDistributeCombine(
 
         1. 按照下方指导创建rank_table_m2.json文件并修改。
 
-        2. 将项目拷贝到两台服务器中，并根据机器的device ip配置rank_table_m2.json文件内容。注意两机rank_table_m2.json文件保持一致。
+        2. 将项目拷贝到两台服务器中，并根据机器的Device IP配置rank_table_m2.json文件内容。注意两机rank_table_m2.json文件保持一致。
 
         3. 安装CANN包，并参考下方指导编译运行。
 

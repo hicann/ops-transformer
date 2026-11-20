@@ -171,7 +171,7 @@ aclnnStatus aclnnMoeInitRoutingV2Grad(
   - E: expert num，即专家数
   - C: expert capacity，表示专家处理token数量的能力阈值
 
-- **返回值**
+- **返回值：**
 
   返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 

@@ -169,7 +169,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
     <tr>
     <td>tpSendCountsOptional</td>
     <td>输入</td>
-    <td>对应`aclnnMoeDistributeDispatchV2`中的`tpRecvCounts`输出</td>
+    <td>对应<code>aclnnMoeDistributeDispatchV2</code>中的<code>tpRecvCounts</code>输出。</td>
     <td>预留参数，TP域通信不再支持，传空指针即可。</td>
     <td>INT32</td>
     <td>ND</td>
@@ -629,7 +629,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
 
     <!-- npu="910b" id11 -->
     - <term>Atlas A2系列产品</term>：
-      - commAlg为""或nullptr：依HCCL环境变量选择“fullmesh”或“hierarchy”公式。
+      - commAlg为""或nullptr：依HCCL环境变量选择"fullmesh"或"hierarchy"公式。
       - commAlg为"fullmesh"：设置大小要求(≥ 2 \* (BS \* epWorldSize \* min(localExpertNum, K) \* H \* sizeof(uint16) + 2MB))。
       - commAlg为"hierarchy"：设置大小要求(≥ (`moeExpertNum` + `epWorldSize` / 4) \* Align512(`maxBS` \* (`H` \* 2 + 16 \* Align8(`K`))) \* 1B + 8MB，其中Align8(x) = ((x + 8 - 1) / 8) \* 8，Align512(x) = ((x + 512 - 1) / 512) \* 512。
     <!-- end id11 -->
@@ -653,7 +653,7 @@ aclnnStatus aclnnMoeDistributeCombineV2(
     - <term>Atlas A2系列产品</term>：该环境变量不再推荐使用，建议通过`commAlg`配置为"hierarchy"。
     <!-- end id14 -->
     <!-- npu="950,A3" id15 -->
-    - <term>Atlas A3系列产品</term>、Ascend 950DT系列产品：不支持该环境变量。
+    - <term>Atlas A3系列产品</term>、<term>Ascend 950DT系列产品</term>：不支持该环境变量。
 
     <!-- end id15 -->
 

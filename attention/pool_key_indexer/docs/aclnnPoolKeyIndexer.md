@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：`pool_key_indexer`将多个连续token打包成一个pool（池），以pool为单位计算注意力相关性分数并选取top-k位置，从而在保持稀疏注意力优势的同时减少索引开销。该算子适用于基于key pool的稀疏注意力场景下的稀疏索引选择。支持FLOAT16、BFLOAT16浮点输入，并支持配合反量化系数的FLOAT8_E4M3FN量化输入（FP8 per-token-head或mxFP8量化模式）与INT8量化输入。
+- 接口功能：`aclnnPoolKeyIndexer`将多个连续token打包成一个pool（池），以pool为单位计算注意力相关性分数并选取top-k位置，从而在保持稀疏注意力优势的同时减少索引开销。该算子适用于基于key pool的稀疏注意力场景下的稀疏索引选择。支持FLOAT16、BFLOAT16浮点输入，并支持配合反量化系数的FLOAT8_E4M3FN量化输入（FP8 per-token-head或mxFP8量化模式）与INT8量化输入。
 
 - 计算公式：
 
@@ -207,7 +207,7 @@ aclnnStatus aclnnPoolKeyIndexer(
       <td>公式中的输入K<sub>pool</sub>。</td>
       <td>
           <ul>
-                <li>支持“0池”空张量（纯尾块模式：BSND S2=0、TND T2=0、PA block_num=0）；此时各batch有效key全部由poolTailK表达，尾token按因果可见性写入sparseIndices。</li>
+                <li>支持“0池”空tensor（纯尾块模式：BSND S2=0、TND T2=0、PA block_num=0）；此时各batch有效key全部由poolTailK表达，尾token按因果可见性写入sparseIndices。</li>
                 <li>block_num为PageAttention时block总数，block_size为一个block的pool数（块内每行为一个pool的key，行距为headDim，不做token展开）。</li>
                 <li>数据类型需与query保持一致。</li>
                 <li>数据布局需与query保持一致，PageAttention场景（layoutKeyOptional为PA_BBND）除外。</li>

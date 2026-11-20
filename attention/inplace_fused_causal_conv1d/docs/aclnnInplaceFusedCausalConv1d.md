@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：对序列执行因果一维卷积，沿序列维度使用缓存数据（长度为卷积核宽减1）对各序列头部进行padding，确保输出依赖当前及历史输入；卷积完成后，将当前序列部分数据更新到缓存；在因果一维卷积输出的基础上，将原始输入加到输出上以实现残差连接。支持APC（Automatic Prefix Caching）、MTP（Multi-Token Prediction，多令牌预测，可用于投机解码）、残差连接、原地更新等特性。相较于标准causal_conv1d算子，本算子新增APC缓存复用、PD混部、残差连接可选等功能。<br>
+- 接口功能：对序列执行因果一维卷积，沿序列维度使用缓存数据（长度为卷积核宽减1）对各序列头部进行padding，确保输出依赖当前及历史输入；卷积完成后，将当前序列部分数据更新到缓存；在因果一维卷积输出的基础上，将原始输入加到输出上以实现残差连接。支持APC（Automatic Prefix Caching）、MTP（Multi-Token Prediction，多Token预测，可用于投机解码）、残差连接、原地更新等特性。相较于标准causal_conv1d算子，本算子新增APC缓存复用、PD混部、残差连接可选等功能。<br>
 
 - 支持以下场景：
   - 场景一（prefill场景）：
@@ -126,7 +126,7 @@
 
 - 计算公式：
 
-  计算公式：K是卷积核宽度，L是当前batch的序列长度，dim是特征维度，batchId是当前处理的变长序列索引，C是convStates缓存空间长度（convStates.size(1)），B是APC块大小（bSize）。对输入x中的每一个batch进行以下操作：
+  K是卷积核宽度，L是当前batch的序列长度，dim是特征维度，batchId是当前处理的变长序列索引，C是convStates缓存空间长度（convStates.size(1)），B是APC块大小（bSize）。对输入x中的每一个batch进行以下操作：
   1. 缓存读取
 
       缓存行索引：
@@ -409,7 +409,7 @@ aclnnStatus aclnnInplaceFusedCausalConv1d(
       <td>numAcceptedTokens（aclTensor*）</td>
       <td>可选输入</td>
       <td>公式中的numAcceptedTokens，表示每个batch的投机数。</td>
-      <td><ul><li>prefill对应的元素值为0，decode时，1<=numAcceptedTokens中的值<=seqlen -1，seqlen表示该batch的序列长度。</li><li>shape为[batch,]。</li></ul></td>
+      <td><ul><li>prefill对应的元素值为0，decode时，1<=numAcceptedTokens中的值<=seqLen -1，seqLen表示该batch的序列长度。</li><li>shape为[batch,]。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1</td>
@@ -674,11 +674,11 @@ aclnnStatus aclnnInplaceFusedCausalConv1d(
   - queryStartLoc是累计偏移量，取值范围[0, cuSeqLen]，长度为batch+1，queryStartLoc[i]表示第i个序列的起始偏移，queryStartLoc[batch]表示最后一个序列的结束位置。
   - blockSize为0或者大于等于2，APC开启时不为0。
   - blockIdxFirstScheduledToken、blockIdxLastScheduledToken、initialStateIdx、numComputedTokens和cacheIndices均存在时表示APC开启，且满足以下条件（i为batch的索引）：
-    - cacheIndices为2维
-    - initialStateIdx[i] <= blockIdxFirstScheduledToken[i]+1
-    - initialStateIdx[i] <= blockIdxLastScheduledToken[i]
-    - blockIdxFirstScheduledToken[i] <= blockIdxLastScheduledToken[i]
-    - blockIdxLastScheduledToken[i] < maxNumBlocks
+    - cacheIndices为2维。
+    - initialStateIdx[i] <= blockIdxFirstScheduledToken[i]+1。
+    - initialStateIdx[i] <= blockIdxLastScheduledToken[i]。
+    - blockIdxFirstScheduledToken[i] <= blockIdxLastScheduledToken[i]。
+    - blockIdxLastScheduledToken[i] < maxNumBlocks。
   - numAcceptedTokens分为None和非None，非None情况下长度为batch，prefill对应的元素值为0，decode对应的元素值大于0且小于等于当前batch的seqLen-1。
   - numComputedTokens中每个元素取值大于等于0。
   - cacheIndices的取值范围为[0, convStates.dim[0]-1]，且值均不能相等（除非等于padSlotId）。

@@ -298,7 +298,7 @@ aclnnStatus aclnnAllGatherMatmul(
 - x1/x2支持的空Tensor场景，m和n可以为空，k不可为空，且需要满足以下条件：
     - m为空，k不为空，n不为空。
     - m不为空，k不为空，n为空。
-    - m为空，k不为空，n为空。
+    - m为空，k不为空，n为空；
 - 输出为2维，其shape为(m*rank_size, n)，rank_size为卡数。
 
 <!-- npu="910b" id9 -->

@@ -504,7 +504,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGrad(
 - 确定性计算：
   - aclnnFlashAttentionUnpaddingScoreGrad默认非确定性实现，支持通过aclrtSetSysParamOpt开启确定性。
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
-- 输入query、key、value、dy的B：batchsize必须相等；inputLayout必须一致。
+- 输入query、keyIn、value、dy的B：batchsize必须相等；inputLayout必须一致。
 - 输入query、key、value的D：Head-Dim必须满足(qD == kD && kD >= vD)。
 - 输入query、key、value、pseShiftOptional的数据类型必须一致。
 - 输入key/value的shape除D外必须一致，在query/key/value的D大小相同的情况下，query/dy的shape必须一致。
@@ -513,7 +513,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGrad(
     - T：取值范围为1\~1M。
     - N：取值范围为1\~256。
     - D：取值范围为1\~768。
-    - KeepProb：取值范围为(0, 1]。
+    - keepProb：取值范围为(0, 1]。
 - query、key、value数据排布格式仅支持TND，T是B和S合轴紧密排列的数据（每个batch的SeqLenQ和SeqLenKV），其中B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸，且满足D=H/N。
 - TND格式下，支持尾部部分Batch不参与计算，此时actual_seq_qlen和actual_seq_kv_len尾部传入对应个数个0即可。假设真实的S长度为[2, 3, 4, 5, 6]，此时后两个Batch不参与计算，则传入的actual_seq_qlen为[2, 5, 9, 0, 0]。
 - pseShiftOptional：如果Sq大于1024且每个batch的Sq与Skv等长且是sparseMode为0、2、3的下三角掩码场景，可开启alibi位置编码压缩，此时只需要输入原始PSE最后1024行进行内存优化，即alibi_compress = ori_pse[:, :, -1024:, :]，具体如下：
@@ -529,7 +529,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGrad(
   - sparse不同模式的详细说明请参见[sparse模式说明](../../../docs/zh/context/sparse_mode_introduction.md)。
 - 部分场景下，如果计算量过大可能会导致算子执行超时（AI Core error类型报错，errorStr为：timeout or trap error），此时建议做轴切分处理，注：这里的计算量会受B、S、N、D等参数的影响，值越大计算量越大。
 - prefixOptional稀疏计算仅支持压缩场景，sparseMode=6，当Sq > Skv时，prefix的N值取值范围\[0, Skv\]，当Sq <= Skv时，prefix的N值取值范围\[Skv-Sq, Skv\]。
-- actualSeqQLenOptional输入支持某个Batch上的S长度为0，此时不支持可选输入pseShiftOptional。actualSeqQLenOptional的长度取值范围为1\~2K。当存在prefixOptional输入的时候，其长度最大支持1K。
+- actualSeqQLenOptional输入支持某个Batch上的S长度为0，此时不支持可选输入pseShiftOptional。actualSeqQLenOptional的长度取值范围为1\~2k。当存在prefixOptional输入的时候，其长度最大支持1k。
 - 关于softmaxMax与softmaxSum参数的约束：输入格式固定为\[B, N, S, 8\]，TND的输入格式除外，此时为\[T, N, 8\]，注：T=B*S。
 - headNum的取值必须和传入的Query中的N值保持一致。
 

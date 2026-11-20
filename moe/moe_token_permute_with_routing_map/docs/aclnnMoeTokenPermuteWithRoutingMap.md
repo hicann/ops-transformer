@@ -283,7 +283,7 @@ aclnnStatus aclnnMoeTokenPermuteWithRoutingMap(
         <td>输入和输出的数据类型不在支持的范围内。</td>
       </tr>
       <tr>
-        <td>输入输出的shape不符合要求（permuteTokensOut第1维、sortedIndicesOut的维数和长度不符合要求的情况除外）。</td>
+        <td>输入输出的shape不符合要求。（permuteTokensOut第1维、sortedIndicesOut的维数和长度不符合要求的情况除外）。</td>
       </tr>
       <tr>
         <td>numOutTokens < 0或numOutTokens > tokens_num * experts_num</td>

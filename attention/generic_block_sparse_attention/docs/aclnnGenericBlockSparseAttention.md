@@ -228,7 +228,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>FLOAT32</td>
       <td>ND</td>
       <td>INT8：[1]；A8C8见量化契约</td>
-      <td>x</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>cuSeqLengthsQOptional</td>
@@ -320,7 +320,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>layoutQ</td>
       <td>输入</td>
       <td>代表输入query的数据排布格式。</td>
-      <td>目标支持"TND""BNSD""BSND"，详见<a href="#layout对应关系说明">layout对应关系说明</a>。支持"TND"、"BSND"和"BNSD"，适用范围见<a href="#产品差异约束">产品差异约束</a>。</td>
+      <td>当前支持"TND""BNSD""BSND"，详见<a href="#layout对应关系说明">layout对应关系说明</a>。支持"TND"、"BSND"和"BNSD"，适用范围见<a href="#产品差异约束">产品差异约束</a>。</td>
       <td>String</td>
       <td>-</td>
       <td>-</td>
@@ -330,7 +330,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>layoutKv</td>
       <td>输入</td>
       <td>代表输入key、value的数据排布格式。</td>
-      <td>目标支持"TND""BNSD""BSND""PA_BBND""PA_BNBD"，详见<a href="#layout对应关系说明">layout对应关系说明</a>。当前支持"PA_BBND"、"PA_BNBD"、"TND"、"BSND"和"BNSD"，适用范围见<a href="#产品差异约束">产品差异约束</a>。</td>
+      <td>当前支持"TND""BNSD""BSND""PA_BBND""PA_BNBD"，详见<a href="#layout对应关系说明">layout对应关系说明</a>。当前支持"PA_BBND"、"PA_BNBD"、"TND"、"BSND"和"BNSD"，适用范围见<a href="#产品差异约束">产品差异约束</a>。</td>
       <td>String</td>
       <td>-</td>
       <td>-</td>
@@ -477,7 +477,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>输出</td>
       <td>Softmax计算的log-sum-exp中间结果。</td>
       <td>Softmax的log-sum-exp结果。非量化（quantType=0）、A4C4（quantType=4）、<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8（quantType=7），以及<term>Ascend 950PR&950DT系列产品</term>高精 FP8（含常规和 Union，quantType=5、softmaxPrecision=0、D=128）、A8C8（quantType=6）和 A8C4（quantType=8）支持输出。returnSoftmaxlse=1时必传FLOAT32 Tensor，shape为TND：[Tq,qHeadNum,1]，BSND/BNSD：[B,qHeadNum,Sq,1]；returnSoftmaxlse=0时传入nullptr。<term>Ascend 950PR&950DT系列产品</term>常规低精 FP8（quantType=5、softmaxPrecision=1）不支持输出 LSE。</td>
-      <td>FLOAT</td>
+      <td>FLOAT32</td>
       <td>ND</td>
       <td>3或4</td>
       <td>√</td>
@@ -878,7 +878,7 @@ INT8使用FP32 Softmax（`softmaxPrecision=0`）。PV结果乘V scale并除以P 
     </tr>
     <tr>
       <td>1</td>
-      <td rowspan="2">FLOAT8_E4M3</td>
+      <td rowspan="2">FLOAT8_E4M3FN</td>
       <td rowspan="3">对称</td>
       <td>静态</td>
       <td>perGroup，QKV均沿S维度分组，group大小和稀疏块尺寸必须相同；<br>特别地，当KV为paged cache时，blockSize需要为blockShapeY的整数倍</td>
@@ -941,7 +941,7 @@ INT8使用FP32 Softmax（`softmaxPrecision=0`）。PV结果乘V scale并除以P 
           <li>PA_BNBD: [batch, kvHeadNum, ceilDiv(blockSize, 64), headDim, 2]。</li>
         </ul>
       </td>
-      <td rowspan="2">FLOAT8_E4M3</td>
+      <td rowspan="2">FLOAT8_E4M3FN</td>
     </tr>
     <tr>
       <td>3</td>
@@ -989,7 +989,7 @@ A8C8（quantType=6）的Q/K/V输入均为8位FLOAT8_E4M3FN，输出为FLOAT16或
 | pQuantScaleOptional（可选） | FLOAT32 | [1]，缺省16.0 |
 
 - E8M0字节e表示`2**(e-127)`；scale必须有限，不能使用NaN编码255。Q/K最后一维分别存放连续两个32元素组的scale；D不整除64时最后一对向上补齐，超出D的组不参与计算，仍须使用有限编码。Q/K的其余scale轴严格跟随各自数据布局。
-- V scale使用[B,N2,D,2]，与TND/`BSND`/BNSD数据布局无关，最后两个byte必须相同；B与数据或cu前缀定义的batch一致。分页KV的V scale为`PA_BBND` `[Np,2,N2,D,2]` 或`PA_BNBD` `[Np,N2,2,D,2]`；Np为物理页数。调用方须保证同一逻辑序列/head/channel在所有页和64-token组上的scale一致。
+- V scale使用[B,N2,D,2]，与TND/`BSND`/BNSD数据布局无关，最后两个字节必须相同；B与数据或cu前缀定义的batch一致。分页KV的V scale为`PA_BBND` `[Np,2,N2,D,2]` 或`PA_BNBD` `[Np,N2,2,D,2]`；Np为物理页数。调用方须保证同一逻辑序列/head/channel在所有页和64-token组上的scale一致。
 - `pQuantScaleOptional`为有限正数alpha，`Pq=cast_fp8(P*alpha)`，PV输出按`1/alpha`还原。P是online-softmax产生的未归一化指数值，保持原有在线归一化流程。
 - 仅支持<term>Ascend 950PR&950DT系列产品</term>。Q布局为`TND/BSND/BNSD`，KV为同布局非分页输入或`PA_BBND/PA_BNBD`（页大小128）；`D=192/256`、`Nq/Nkv=1～64`、`blockShape=[1,Y]`（Y=4/8/16/32/64/128），输出为FP16/BF16。
 - 要求`B>0`、KV物理容量大于0、`maskType=0/1`、`residualBlockMode=0/1`、`softmaxPrecision=0`；`1≤topK≤INT32_MAX`且不小于实际count。Metadata与主算子均须使用`quantType=6`。
@@ -1009,7 +1009,7 @@ A8C8（quantType=6）的Q/K/V输入均为8位FLOAT8_E4M3FN，输出为FLOAT16或
     <tr>
         <th>maskType</th>
         <th>含义</th>
-        <th>attentionMaskOptional</th>
+        <th>attenMaskOptional</th>
         <th>winLeft/winRight</th>
     </tr>
   </thead>

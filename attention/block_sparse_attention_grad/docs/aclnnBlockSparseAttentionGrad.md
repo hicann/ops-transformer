@@ -50,7 +50,7 @@
   $$
 
   $$
-  P = SoftMax(S)
+  P = Softmax(S)
   $$
 
   $$
@@ -142,7 +142,7 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
 
 ## aclnnBlockSparseAttentionGradGetWorkspaceSize
 
-## 参数说明
+### 参数说明
 
 <table style="undefined;table-layout: fixed; width: 1550px">
 <colgroup>
@@ -497,11 +497,11 @@ aclnnStatus aclnnBlockSparseAttentionGrad(
 
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
 - actualSeqLengthsOptional在qInputLayout为“TND”时必选；actualSeqLengthsKvOptional在kvInputLayout为“TND”时必选。
-- softmaxLse的layout需要与query的layout保持一致。如果query的layout为"BSND"时，softmaxLse的layout应传入"BNS1"。
+- softmaxLse的layout需要与query的layout保持一致。如果query的layout为“BSND”时，softmaxLse的layout应传入“BNS1”。
 - Ascend 950 产品要求 HeadDim 等于 128。
 - blockShapeOptional中的blockShapeX和blockShapeY分别表示Q方向和KV方向的稀疏粒度。两者均须大于 0，可以配置为不同值。Ascend 950 要求两者均为 16 的整数倍。BlockSparseMask的Q块数和KV块数应分别按照对应方向的稀疏粒度计算。
 - 根据算子支持的输入 Layout，query 张量 Shape 中对应的 head 维度大小记为 N1，key 和 value 张量 Shape 中对应的 head 维度大小记为 N2。必须满足N1 % N2 == 0。支持MQA、MHA、GQA场景。
-- actualSeqLengthsOptional与actualSeqLengthsKvOptional相关约束：当qInputLayout或kvInputLayout 为非"TND"时，会忽略这两个入参。
+- actualSeqLengthsOptional与actualSeqLengthsKvOptional相关约束：当qInputLayout或kvInputLayout 为非“TND”时，会忽略这两个入参。
 
 ## 调用示例
 

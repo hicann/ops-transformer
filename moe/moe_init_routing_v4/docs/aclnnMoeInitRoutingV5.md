@@ -352,8 +352,8 @@ aclnnStatus aclnnMoeInitRoutingV5(
       <td>输入</td>
       <td>表示不同量化场景</td>
       <td>取值为0、1、-1、2、3、4、5、6、7、8、9、11、12、13、14、15、16、17
-        <br>0：表示静态quant场景。
-        <br>1：表示动态quant场景，expandedXOut量化到INT8。
+        <br>0：表示静态量化场景。
+        <br>1：表示动态量化场景，expandedXOut量化到INT8。
         <br>-1：表示非量化场景。
         <br>2：表示MXFP8量化场景，expandedXOut量化到FLOAT8_E5M2。
         <br>3：表示MXFP8量化场景，expandedXOut量化到FLOAT8_E4M3FN。

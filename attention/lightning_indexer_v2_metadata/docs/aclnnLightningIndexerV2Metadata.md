@@ -374,23 +374,23 @@ aclnnStatus aclnnLightningIndexerV2Metadata(
   - 参数cmpResidualKOptional需满足cmpResidualKOptional[i] < cmpRatio。
   - maxSeqlenQ：layoutQOptional=BSND时必须传入S1；layoutQOptional=TND时可传-1，序列长度由cuSeqlensQOptional推导。
   - maxSeqlenK：layoutKOptional=BSND时必须传入S2；layoutKOptional=TND时可传-1，序列长度由cuSeqlensKOptional推导；layoutKOptional=PA_BBND时必须传入sequsedKOptional，maxSeqlenK可传-1，序列长度由sequsedKOptional给出。
-  - layoutQOptional=BSND场景
+  - layoutQOptional=BSND场景：
     - maxSeqlenQ必须传入S1的值。
-  - layoutKOptional=BSND场景
+  - layoutKOptional=BSND场景：
     - maxSeqlenK必须传入S2的值。
-  - layoutQOptional=TND场景
+  - layoutQOptional=TND场景：
     - cuSeqlensQOptional必须传入。
-  - layoutKOptional=TND场景
+  - layoutKOptional=TND场景：
     - cuSeqlensKOptional必须传入。
-  - layoutKOptional=PA_BBND场景
+  - layoutKOptional=PA_BBND场景：
     - sequsedKOptional必须传入。
-  - Batch取值规则
+  - Batch取值规则：
     - layoutQOptional为BSND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过batchSize获取batch数。
     - layoutQOptional为TND时，优先通过sequsedQOptional的shape推导batch，sequsedQOptional未传入则通过cuSeqlensQOptional的shape推导batch。
-  - q Seqlen取值规则
+  - q Seqlen取值规则：
     - layoutQOptional为BSND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过maxSeqlenQ获取seqlen。
     - layoutQOptional为TND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过cuSeqlensQOptional中相邻元素的差值获取seqlen。
-  - k Seqlen取值规则
+  - k Seqlen取值规则：
     - layoutKOptional为BSND时，优先通过sequsedKOptional中的元素获取seqlen，sequsedKOptional未传入则通过maxSeqlenK获取seqlen。
     - layoutKOptional为TND时，优先通过sequsedKOptional中的元素获取seqlen，sequsedKOptional未传入则通过cuSeqlensKOptional中相邻元素的差值获取seqlen。
     - layoutKOptional为PA_BBND时，sequsedKOptional必须传入，seqlen由sequsedKOptional中的元素获取。

@@ -192,7 +192,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
     <tr>
     <td>commMode(char*)</td>
     <td>输入</td>
-    <td>指定当前通信类型。</td>
+    <td>指定当前使用的通信引擎。</td>
     <td><term>Atlas A2系列产品</term>仅支持"aiv"；<term>Atlas A3系列产品</term>支持"ai_cpu"和"aiv"；<term>Ascend 950DT系列产品</term>支持"ai_cpu"和"ccu"。</td>
     <td>STRING</td>
     <td>-</td>
@@ -200,7 +200,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
     <td>-</td>
     </tr>
     <tr>
-    <td>epWorldSize（int64_t）</td>
+    <td>epWorldSize(int64_t)</td>
     <td>输入</td>
     <td>EP通信域size；传入-1时使用group通信域的实际大小，显式指定时必须与该大小一致，实际大小仍须满足产品约束。</td>
     <td>支持2、4、8、16、32、64、128、256。</td>
@@ -295,7 +295,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
 
     返回aclnnStatus状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-    第一阶段接口完成入参校验，出现以下场景报错：
+    第一段接口完成入参校验，出现以下场景报错：
 
     <table style="undefined;table-layout: fixed; width: 1149px"><colgroup>
     <col style="width: 282px">
@@ -410,7 +410,7 @@ aclnnStatus aclnnGroupedMatMulAlltoAllvV2(
 - <term>Atlas A2系列产品</term>：
   - A和BSK均需在[1, 5000000]范围内；N1不超过32768。
   - `sendCounts`和`recvCounts`均为INT64直接计数数组，按`[rank][localExpert]`顺序展平，长度均须等于e * epWorldSize。元素为非负数，分别不超过A和BSK，累加和分别等于A和BSK。
-  - 通信域内各卡的`HCCL_BUFFSIZE`需按最大发送量设置，满足`HCCL_BUFFSIZE >= max(200, ceil(A * N1 * 2 / 1048576) + 21)`，单位为MiB。FLOAT16和BFLOAT16每个元素均占2 Byte，21 MiB为控制区预留空间。
+  - 通信域内各卡的`HCCL_BUFFSIZE`需按最大发送量设置，满足`HCCL_BUFFSIZE >= max(200, ceil(A * N1 * 2 / 1048576) + 21)`，单位为MB。FLOAT16和BFLOAT16每个元素均占2 Byte，21 MB为控制区预留空间。
 
 <!-- end id13 -->
 

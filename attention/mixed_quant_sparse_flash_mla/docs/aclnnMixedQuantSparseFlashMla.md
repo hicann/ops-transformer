@@ -26,9 +26,9 @@
 - 接口功能：
 
   `aclnnMixedQuantSparseFlashMla`算子旨在完成量化和稀疏场景下的MLA（Multi-head Latent Attention）注意力计算。该接口支持以下三类计算模式：
-  - **SWA（Sliding Window Attention）**：仅传入`oriKvOptional`，对原始KV做滑动窗口注意力。
-  - **CSA（Compressed Sparse Attention）**：同时传入`oriKvOptional`、`cmpKvOptional`和`cmpSparseIndicesOptional`，对原始KV窗口和topK选择出的压缩KV共同做注意力。
-  - **HCA（Heavily Compressed Attention）**：同时传入`oriKvOptional`和`cmpKvOptional`，对原始KV窗口和连续压缩KV段共同做注意力。
+  - **SWA（Sliding Window Attention）**：仅传入oriKvOptional，对原始KV做滑动窗口注意力。
+  - **CSA（Compressed Sparse Attention）**：同时传入oriKvOptional、cmpKvOptional和cmpSparseIndicesOptional，对原始KV窗口和topK选择出的压缩KV共同做注意力。
+  - **HCA（Heavily Compressed Attention）**：同时传入oriKvOptional和cmpKvOptional，对原始KV窗口和连续压缩KV段共同做注意力。
 
   <!-- npu="A3,910b" id10 -->
   <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持TurboQuant TQ4，通过原有量化模式参数`quantMode=3`启用，仅支持CSA路径。DeepSeek V4框架当前仅对C4压缩KV启用此能力。
@@ -41,7 +41,7 @@
   <!-- end id11 -->
 
   <!-- npu="A3,910b" id12 -->
-  TurboQuant TQ4的KV数据类型、存储布局及码本约定详见`quantMode`参数说明。相对512维BFLOAT16的1024字节，单个被量化token的有效载荷减少约74.8%（约3.97倍压缩）。整个KV cache的收益还需计入未量化部分、物理页步长和对齐开销，不能直接按此倍率估算。
+  TurboQuant TQ4的KV数据类型、存储布局及码本约定详见quantMode参数说明。相对512维BFLOAT16的1KB，单个被量化token的有效载荷减少约74.8%（约3.97倍压缩）。整个KV cache的收益还需计入未量化部分、物理页步长和对齐开销，不能直接按此倍率估算。
   <!-- end id12 -->
 
   `aclnnMixedQuantSparseFlashMlaMetadata`是`aclnnMixedQuantSparseFlashMla`的分核信息，在主算子执行前生成。当前版本主算子必须传入该metadata。典型调用流程如下：
@@ -49,7 +49,7 @@
   **该算子不建议单独使用，建议与aclnnMixedQuantSparseFlashMlaMetadata算子配合使用，形成完整的工作流。**
 
   1. 根据调用场景准备对应输入。
-  2. 调用`aclnnMixedQuantSparseFlashMlaMetadata`生成`metaData`，作为`aclnnMixedQuantSparseFlashMla`的`metadataOptional`入参。
+  2. 调用`aclnnMixedQuantSparseFlashMlaMetadata`生成`metaData`，作为`aclnnMixedQuantSparseFlashMla`的metadataOptional入参。
   3. 调用`aclnnMixedQuantSparseFlashMla`，生成计算结果。
 
 - 计算公式：
@@ -207,7 +207,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>oriKvOptional（aclTensor*）</td>
       <td>输入</td>
       <td>原始KV输入张量，Key与Value共享同一份数据。</td>
-      <td>必须传入。quantMode=1/2保持原量化KV布局：模式1依次拼接rope（64，bfloat16）、nope（448，FLOAT8_E4M3FN）、scale（7，bfloat16）、pad（18B）；模式2依次拼接nope（448，FLOAT8_E4M3FN）、rope（64，bfloat16）、scale（7，FLOAT8_E8M0）、pad（1B）。quantMode=3使用与q相同的FLOAT16或BFLOAT16原始KV，kvD=512。</td>
+      <td>必须传入。quantMode=1/2保持原量化KV布局：模式1依次拼接rope（64，bfloat16）、nope（448，FLOAT8_E4M3FN）、scale（7，bfloat16）、pad（18字节）；模式2依次拼接nope（448，FLOAT8_E4M3FN）、rope（64，bfloat16）、scale（7，FLOAT8_E8M0）、pad（1字节）。quantMode=3使用与q相同的FLOAT16或BFLOAT16原始KV，kvD=512。</td>
       <td>FLOAT8_E4M3FN、FLOAT16、BFLOAT16、INT8</td>
       <td>ND</td>
       <td>
@@ -1042,7 +1042,7 @@ metadataOptional校验：
                     <li>dtype支持INT32</li>
                     <li>shape为(b,)</li>
                     <li>取值仅支持非负整数</li>
-                    <li>sequsedOriKvOptional中的值需小于等于kvS</li>
+                    <li>sequsedOriKvOptional中的值需小于等于oriKvS</li>
                 </ul>
             </td>
             <td >
@@ -1062,7 +1062,7 @@ metadataOptional校验：
                     <li>dtype支持INT32</li>
                     <li>shape为(b,)</li>
                     <li>取值仅支持非负整数</li>
-                    <li>sequsedCmpKvOptional中的值需小于等于kvS</li>
+                    <li>sequsedCmpKvOptional中的值需小于等于cmpKvS</li>
                 </ul>
             </td>
             <td >
@@ -1480,17 +1480,17 @@ metadataOptional校验：
 
 | 参数 | `quantMode=3`约束 |
 | --- | --- |
-| `quantMode` | 3 |
+| quantMode | 3 |
 | `q`、`attnOut` | FLOAT16或BFLOAT16，类型和shape一致；TND布局，shape为`(qT, qN, 512)`；`qN`为4到128的4的倍数，`qT`允许为0 |
-| `oriKvOptional` | 必传；数据类型、布局和shape详见`quantMode`描述 |
-| `cmpKvOptional` | 必传；数据类型、布局和shape详见`quantMode`描述 |
+| oriKvOptional | 必传；数据类型、布局和shape详见quantMode描述 |
+| cmpKvOptional | 必传；数据类型、布局和shape详见quantMode描述 |
 | `layoutQOptional`、`layoutKvOptional` | 分别为TND、PA_BBND；两路KV的blockSize均为16到1024的16的倍数，0轴stride必须覆盖一个完整物理块 |
-| `cmpSparseIndicesOptional` | 必传INT32，shape为`(qT, 1, 512)`或`(qT, 1, 1024)`；无效位置填-1 |
+| cmpSparseIndicesOptional | 必传INT32，shape为`(qT, 1, 512)`或`(qT, 1, 1024)`；无效位置填-1 |
 | `oriBlockTableOptional`、`cmpBlockTableOptional`、`cuSeqlensQOptional`、`sequsedOriKvOptional` | 均必传，沿用原有INT32类型和参数含义 |
 | `oriSparseIndicesOptional`、`oriTopkLengthOptional`、`cmpTopkLengthOptional`、`cuSeqlensOriKvOptional`、`cuSeqlensCmpKvOptional`、`sequsedQOptional`、`sequsedCmpKvOptional`、`cmpResidualKvOptional` | 不支持传入，保留原有可选参数位置 |
 | `oriMaskMode`、`cmpMaskMode`、`oriWinLeft`、`oriWinRight` | 分别为4、3、非负值、0 |
 | `cmpRatio`、`ropeHeadDim`、`topkValueMode` | 分别支持4或128、64、1；算子的压缩倍率支持范围不代表框架会量化全部压缩KV |
-| `metadataOptional` | 必传，由前置Metadata接口以相同`quantMode=3`及相同输入属性生成，INT32、shape为`(2048,)` |
+| metadataOptional | 必传，由前置Metadata接口以相同`quantMode=3`及相同输入属性生成，INT32、shape为`(2048,)` |
 
 `sinksOptional`和Softmax LSE继续使用原有参数及返回形式。
 <!-- end id13 -->

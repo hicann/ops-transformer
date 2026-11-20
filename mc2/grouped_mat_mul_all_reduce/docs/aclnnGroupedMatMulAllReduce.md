@@ -318,8 +318,8 @@ aclnnStatus aclnnGroupedMatMulAllReduce(
   - aclnnGroupedMatMulAllReduce默认确定性实现。
 
 - 数据类型组合约束：x、weight、bias支持的数据类型组合为：
-  -“x-FLOAT16、weight-FLOAT16、bias-FLOAT16”
-  -“x-BFLOAT16、weight-BFLOAT16、bias-FLOAT32”
+  - “x-FLOAT16、weight-FLOAT16、bias-FLOAT16”
+  - “x-BFLOAT16、weight-BFLOAT16、bias-FLOAT32”
 - 维度约束：
   - 当splitItem为0时，x支持2-6维，y支持2-6维。
   - 当splitItem为1/2/3时，x支持2维，y支持2维。

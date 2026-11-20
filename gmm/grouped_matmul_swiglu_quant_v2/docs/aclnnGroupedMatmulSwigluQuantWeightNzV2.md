@@ -85,7 +85,7 @@
 
           $S_{i}=Swish(C_{i,act})\odot gate_{i}$  &nbsp;&nbsp;其中$Swish(x)=\frac{x}{1+e^{-x}}$
 
-        - 3.量化输出结果
+        - 3.量化输出结果。
 
           $Q\_scale_{i} = \frac{max(|S_{i}|)}{127}$
 
@@ -131,7 +131,7 @@
           - 3.1.将左矩阵$\mathbb{Z_8}$，转变为高低位两部分的$\mathbb{Z_4}$
             $X\_high\_4bits_{i} = \lfloor \frac{X_{i}}{16} \rfloor$
             $X\_low\_4bits_{i} = X_{i} \& 0x0f - 8$
-          - 3.2.做矩阵乘时，开启per-channel或per-group量化
+          - 3.2.做矩阵乘时，开启per-channel或per-group量化。
             per-channel：
 
             $C\_high_{i} = (X\_high\_4bits_{i} \cdot W_{i}) \odot w\_scale_{i}$
@@ -144,7 +144,7 @@
 
             $C\_low_{i} = \\ Σ_{k=0}^{K-1}((X\_low\_4bits_{i}[:, k * num\_per\_group : (k+1) * num\_per\_group] \cdot W_{i}[k *   num\_per\_group : (k+1) * num\_per\_group, :]) \odot w\_scale_{i}[k, :] )$
 
-          - 3.3.将高低位的矩阵乘结果还原为整体的结果
+          - 3.3.将高低位的矩阵乘结果还原为整体的结果。
 
             $C_{i} = (C\_high_{i} * 16 + C\_low_{i} + weightAssistMatrix_{i}) \odot x\_scale_{i}$
 
@@ -152,7 +152,7 @@
 
             $S_{i}=Swish(C_{i,act})\odot gate_{i}$  &nbsp;&nbsp;其中$Swish(x)=\frac{x}{1+e^{-x}}$
 
-        - 3.量化输出结果
+        - 3.量化输出结果。
 
           $Q\_scale_{i} = \frac{max(|S_{i}|)}{127}$
 
@@ -198,7 +198,7 @@
 
           $S_{i} = S_{i} \odot smoothScale_{i\ Broadcast}$
 
-        - 3.量化输出结果
+        - 3.量化输出结果。
 
           $Q\_scale_{i} = \frac{max(|S_{i}|)}{127}$
 
@@ -237,7 +237,7 @@
              $S_{i}=Swish(C_{i,act})\odot gate_{i}$，其中$Swish(x)=\frac{x}{1+e^{-x}}$
 
              其中，$xScale_{i}$代表的是对应token的量化因子。
-           - 3.量化输出结果
+           - 3.量化输出结果。
 
              $Q\_scale_{i} = \frac{max(|S_{i}|)}{max(type)}$
 
@@ -272,7 +272,7 @@
 
           $S_{i}=Swish(C_{i,act})\odot gate_{i}$，其中$Swish(x)=\frac{x}{1+e^{-x}}$
 
-        - 3.量化输出结果
+        - 3.量化输出结果。
 
           $shared\_exp = \left\lfloor \log_2(max_i(|S_i|)) \right\rceil - emax$
 
@@ -550,19 +550,19 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
     <!-- npu="A3,910b" id9 -->
     - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
       - <strong>weight强制视为FRACTAL_NZ格式。</strong>
-      - 上表数据类型列中的角标“1”代表该系列不支持的数据类型
+      - 上表数据类型列中的角标“1”代表该系列不支持的数据类型。
       - weight在A4W4下支持转置，其他输入仅支持非转置，INT32为A8W4和A4W4场景下的适配用途，实际1个INT32会被解释为8个INT4数据，A8W8场景不支持ND数据格式。
       - 支持dequantMode参数：A8W4场景和A4W4场景支持取值0和1；A8W8场景下该参数不参与校验，传入非0取值会被忽略且不报错，固定按激活矩阵per-token、权重矩阵per-channel的反量化方式计算，建议传0。
       - A8W4和A4W4场景不支持dequantDtype和quantMode参数；A8W8场景下dequantDtype不参与校验，传入任意取值会被忽略且不报错，建议传28（表示UNDEFINED）。
       - A8W8场景下bias不参与校验，传入非空指针时会被忽略且不报错，偏移值不参与计算，需传空指针；A8W8场景下weightScale的数据格式不参与校验，算子内部按ND线性布局读取数据，需传入ND格式。
       - x和weight不支持空Tensor。
-      - weight NZ转置输入时，仅支持单Tensor模式
+      - weight NZ转置输入时，仅支持单Tensor模式。
       - weight、weightScale和weightAssistMatrix支持单Tensor场景（tensorlist长度为1）和多Tensor场景（tensorlist长度大于1）。
     <!-- end id9 -->
     <!-- npu="950" id10 -->
     - <term>Ascend 950PR&950DT系列产品</term>：
       - <strong>weight强制视为FRACTAL_NZ格式。</strong>
-      - 上表数据类型列中的角标“2”代表该系列不支持的数据类型
+      - 上表数据类型列中的角标“2”代表该系列不支持的数据类型。
       - 支持dequantMode参数：A8W8 Pertoken量化场景支持取值0，MX量化场景支持取值2。
       - 支持dequantDtype参数：A8W8 Pertoken量化场景支持取值0、1、27，MX量化场景支持取值0。
       - 支持quantMode参数：A8W8 Pertoken量化场景支持取值0，MX量化场景支持取值2。
