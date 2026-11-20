@@ -12,6 +12,7 @@
  * \file rope_regbase_tiling_a_and_b.cc
  * \brief
  */
+#include <string>
 #include "rotary_position_embedding_tiling.h"
 #include "log/log.h"
 
@@ -100,10 +101,12 @@ ge::graphStatus RopeRegBaseTilingClassAAndB::ComputeUbFactor()
     // b1sd：2 * 4 * b * dAlign
     int64_t dSize = Ops::Base::CeilAlign(d_ * GetSizeByDataType(dtype_) / dSplitCoef_, this->blockSize_) * dSplitCoef_;
     int64_t numOfDAvailable = Ops::Base::FloorDiv(static_cast<int64_t>(aicoreParams_.ubSize), DOUBLE_BUFFER * dSize);
-    OP_CHECK_IF(numOfDAvailable < UB_FACTOR,
-                OP_LOGE(context_, "D is too big to load in ub, ubSize is %ld bytes, loading requires %ld bytes.",
-                        static_cast<int64_t>(aicoreParams_.ubSize), UB_FACTOR * dSize * (ubFactorB_ + 1)),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        numOfDAvailable < UB_FACTOR,
+        OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(),
+                               "D is too big to load in ub, ubSize is %ld bytes, loading requires %ld bytes.",
+                               static_cast<int64_t>(aicoreParams_.ubSize), UB_FACTOR * dSize * (ubFactorB_ + 1)),
+        return ge::GRAPH_FAILED);
     if (layout_ == RopeLayout::NO_BROADCAST) {
         numOfDAvailable /= UB_FACTOR;
         ubFactorB_ = std::min(blockFactorB_, numOfDAvailable);
@@ -157,12 +160,17 @@ void RopeRegBaseTilingClassAAndB::SetTilingData()
 
 ge::graphStatus RopeRegBaseTilingClassAAndB::DoOpTiling()
 {
-    OP_CHECK_IF(MergeDim() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "failed to merge dim."),
+    std::string mergedShapeMsg =
+        "(B, S, N) = (" + std::to_string(b_) + ", " + std::to_string(s_) + ", " + std::to_string(n_) + ")";
+    OP_CHECK_IF(MergeDim() != ge::GRAPH_SUCCESS,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", mergedShapeMsg.c_str(),
+                                                      "The B, S and N dims of input x must be mergeable into one axis"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(SplitCore() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "failed to split core."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(SplitCore() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "failed to split core."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(ComputeUbFactor() != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "failed to compute ub factor."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "failed to compute ub factor."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

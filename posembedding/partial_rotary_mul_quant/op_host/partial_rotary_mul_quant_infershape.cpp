@@ -15,6 +15,7 @@
 #ifndef OPS_OP_PROTO_INC_PARTIAL_ROTARY_MUL_QUANT_OPS_H_
 #define OPS_OP_PROTO_INC_PARTIAL_ROTARY_MUL_QUANT_OPS_H_
 
+#include <string>
 #include "common/include/op_host/op_const_def_transformer.h"
 #include "util/shape_util.h"
 #include "util/math_util.h"
@@ -56,14 +57,20 @@ static ge::graphStatus InferShape4PartialRotaryMulQuant(gert::InferShapeContext*
     OP_CHECK_NULL_WITH_CONTEXT(context, yShape);
 
     auto scaleShape = context->GetOutputShape(INDEX_OUTPUT_Y_SCALE);
-    OP_CHECK_NULL_WITH_CONTEXT(context, scaleShape);
+    OP_CHECK_IF(scaleShape == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "y_scale",
+                                                         "The output shape of y_scale is required"),
+                return ge::GRAPH_FAILED);
 
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
     const int64_t* yDtype = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_Y_DTYPE);
     int64_t outputType = yDtype == nullptr ? 0 : *yDtype;
-    OP_CHECK_IF(outputType != 0 && outputType != 1, OP_LOGE(context->GetNodeName(), "y_dtype must be 0 or 1"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        outputType != 0 && outputType != 1,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "y_dtype", std::to_string(outputType).c_str(),
+                                              "The value of attribute y_dtype must be 0 (HiFloat8) or 1 (HiFloat4)"),
+        return ge::GRAPH_FAILED);
     if (outputType == 0) {
         *yShape = *xShape;
         scaleShape->SetDimNum(1);
@@ -102,8 +109,11 @@ static ge::graphStatus InferDtype4PartialRotaryMulQuant(gert::InferDataTypeConte
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
     const int64_t* yDtype = attrs->GetAttrPointer<int64_t>(INDEX_ATTR_Y_DTYPE);
     int64_t outputType = yDtype == nullptr ? 0 : *yDtype;
-    OP_CHECK_IF(outputType != 0 && outputType != 1, OP_LOGE(context->GetNodeName(), "y_dtype must be 0 or 1"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        outputType != 0 && outputType != 1,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "y_dtype", std::to_string(outputType).c_str(),
+                                              "The value of attribute y_dtype must be 0 (HiFloat8) or 1 (HiFloat4)"),
+        return ge::GRAPH_FAILED);
     context->SetOutputDataType(INDEX_OUTPUT_Y, outputType == 0 ? ge::DT_HIFLOAT8 : Ops::Transformer::DT_HIFLOAT4);
     context->SetOutputDataType(INDEX_OUTPUT_Y_SCALE,
                                outputType == 0 ? ge::DT_FLOAT : Ops::Transformer::DT_HIFLOAT4_SCALE);

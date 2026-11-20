@@ -135,14 +135,30 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckShapeAllPositive(
         // No-op: empty slice or empty dy/cos/sin, nothing to compute -> positive-shape checks skipped.
         return ge::GRAPH_SUCCESS;
     }
-    OP_CHECK_IF(CheckInPutShapeAllPositive(DY_INPUT_INDEX) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "the dy input has non positive shape."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckInPutShapeAllPositive(COS_INDEX) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "the cos input has non positive shape."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckInPutShapeAllPositive(SIN_INDEX) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "the sin input has non positive shape."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        CheckInPutShapeAllPositive(DY_INPUT_INDEX) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context_->GetNodeName(), "dy", ToString(context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape()).c_str(),
+            "All dimensions of input dy must be positive"),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        CheckInPutShapeAllPositive(COS_INDEX) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "cos",
+                                              ToString(context_->GetInputShape(COS_INDEX)->GetStorageShape()).c_str(),
+                                              "All dimensions of input cos must be positive"),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        CheckInPutShapeAllPositive(SIN_INDEX) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "sin",
+                                              ToString(context_->GetInputShape(SIN_INDEX)->GetStorageShape()).c_str(),
+                                              "All dimensions of input sin must be positive"),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckOutPutShapeAllPositive(DY_OUTPUT_INDEX) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "the dy output has non positive shape."), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "dy",
+                    ToString(context_->GetOutputShape(DY_OUTPUT_INDEX)->GetStorageShape()).c_str(),
+                    "All dimensions of output dy must be positive"),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -239,9 +255,9 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckShape()
     // valid no-op inputs (cos==sin, dy==out, cosD<=dyD all hold for empty shapes too).
     auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
     auto& dyInputShape = context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape();
-    OP_CHECK_IF(CheckShapeDim() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check shape dim fail."),
+    OP_CHECK_IF(CheckShapeDim() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check shape dim fail."),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShapeLimit() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "CheckShapeLimit fail."),
+    OP_CHECK_IF(CheckShapeLimit() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "CheckShapeLimit fail."),
                 return ge::GRAPH_FAILED);
     int64_t dyLastDim = dyInputShape.GetDim(DIM_3);
     int64_t cosLastDim = cosShape.GetDim(DIM_3);
@@ -302,10 +318,10 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckDtypeCosGroup()
 
 ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckDtype()
 {
-    OP_CHECK_IF(CheckDtypeDyGroup() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check dy group dtype fail."),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckDtypeCosGroup() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check cos group dtype fail."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckDtypeDyGroup() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_, "check dy group dtype fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckDtypeCosGroup() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_, "check cos group dtype fail."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -425,25 +441,34 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckAttr()
     }
 
     OP_CHECK_IF(CheckRotaryModeShapeRelation(sliceLength_) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "check rotary mode shape relation fail."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_, "check rotary mode shape relation fail."), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::CheckParam()
 {
-    OP_CHECK_IF(CheckNullptr() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check nullptr fail."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckDtype() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check dtype fail."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckAttr() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check attr fail."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShape() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check shape fail."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShapeAllPositive() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check shape positive fail."),
+    OP_CHECK_IF(CheckNullptr() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check nullptr fail."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckDtype() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check dtype fail."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckAttr() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check attr fail."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckShape() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check shape fail."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckShapeAllPositive() != ge::GRAPH_SUCCESS,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "dy, cos, sin",
+                    ToString(context_->GetInputShape(DY_INPUT_INDEX)->GetStorageShape()).c_str(),
+                    "All dimensions of inputs dy, cos and sin and output dy must be positive"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::GetShapeAttrsInfo()
 {
-    OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check param fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check param fail."),
+                return ge::GRAPH_FAILED);
     if (isNoOp_) {
         // No-op: kernel returns at TILING_KEY_EMPTY and ignores the tiling data. Set a
         // valid layout so the template dispatch (TilingRegistry) selects a capable class
@@ -458,7 +483,7 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTiling::GetShapeAttrsInfo()
     dyShape_ = dyInputShape;
     cosShape_ = cosInputShape;
     OP_CHECK_IF(JudgeLayoutByShape(dyInputShape, cosInputShape) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "JudgeLayoutByShape fail."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_, "JudgeLayoutByShape fail."), return ge::GRAPH_FAILED);
     d_ = dyInputShape.GetDim(DIM_3);
     if (layout_ == InplacePartialRotaryMulGradLayout::BSND) {
         b_ = dyShape_.GetDim(DIM_0);

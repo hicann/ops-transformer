@@ -12,6 +12,7 @@
  * \file mhc_pre_sinkhorn_backward_arch22_tiling.cpp
  * \brief MhcPreSinkhornBackward operator tiling implementation
  */
+#include <string>
 #include "register/op_def_registry.h"
 #include "tiling/tiling_api.h"
 #include "tiling/platform/platform_ascendc.h"
@@ -78,8 +79,9 @@ ge::graphStatus ShapeVerify(gert::TilingContext* context, int64_t batchSize, int
                 return ge::GRAPH_FAILED);
     auto gradHinShape = gradHinShapePtr->GetStorageShape();
     OP_CHECK_IF(gradHinShape.GetDimNum() != 3,
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify failed, gradHin must be 3D, but got %lu dims",
-                                            gradHinShape.GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "grad_hin",
+                                                         (std::to_string(gradHinShape.GetDimNum()) + " dims").c_str(),
+                                                         "The shape dim of input grad_hin must be 3"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         gradHinShape.GetDim(0) != batchSize || gradHinShape.GetDim(1) != seqLength || gradHinShape.GetDim(2) != c,
@@ -94,8 +96,9 @@ ge::graphStatus ShapeVerify(gert::TilingContext* context, int64_t batchSize, int
                 return ge::GRAPH_FAILED);
     auto gradHPostShape = gradHPostShapePtr->GetStorageShape();
     OP_CHECK_IF(gradHPostShape.GetDimNum() != 3,
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify failed, gradHPost must be 3D, but got %lu dims",
-                                            gradHPostShape.GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "grad_h_post",
+                                                         (std::to_string(gradHPostShape.GetDimNum()) + " dims").c_str(),
+                                                         "The shape dim of input grad_h_post must be 3"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         gradHPostShape.GetDim(0) != batchSize || gradHPostShape.GetDim(1) != seqLength || gradHPostShape.GetDim(2) != n,
@@ -111,26 +114,34 @@ ge::graphStatus ShapeVerify(gert::TilingContext* context, int64_t batchSize, int
     auto gradHResShape = gradHResShapePtr->GetStorageShape();
     auto gradHResDimNum = gradHResShape.GetDimNum();
     OP_CHECK_IF((gradHResDimNum != 3 && gradHResDimNum != 4),
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify failed, gradHRes must be 3D or 4D, but got %lu dims",
-                                            gradHResDimNum),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "grad_h_res",
+                                                         (std::to_string(gradHResDimNum) + " dims").c_str(),
+                                                         "The shape dim of input grad_h_res must be 3 or 4"),
                 return ge::GRAPH_FAILED);
     if (gradHResDimNum == 3) {
-        OP_CHECK_IF(
-            gradHResShape.GetDim(0) != batchSize || gradHResShape.GetDim(1) != seqLength ||
-                gradHResShape.GetDim(2) != n * n,
-            OPS_REPORT_VECTOR_INNER_ERR(
-                opName, "ShapeVerify gradHRes failed, expected (B=%ld, S=%ld, N*N=%ld), but got (%ld, %ld, %ld)",
-                batchSize, seqLength, n * n, gradHResShape.GetDim(0), gradHResShape.GetDim(1), gradHResShape.GetDim(2)),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(gradHResShape.GetDim(0) != batchSize || gradHResShape.GetDim(1) != seqLength ||
+                        gradHResShape.GetDim(2) != n * n,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName, "grad_h_res",
+                        ("(" + std::to_string(gradHResShape.GetDim(0)) + ", " +
+                         std::to_string(gradHResShape.GetDim(1)) + ", " + std::to_string(gradHResShape.GetDim(2)) + ")")
+                            .c_str(),
+                        ("The shape of input grad_h_res must be (B=" + std::to_string(batchSize) +
+                         ", S=" + std::to_string(seqLength) + ", N*N=" + std::to_string(n * n) + ")")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
     } else {
         OP_CHECK_IF(
             gradHResShape.GetDim(0) != batchSize || gradHResShape.GetDim(1) != seqLength ||
                 gradHResShape.GetDim(2) != n || gradHResShape.GetDim(3) != n,
-            OPS_REPORT_VECTOR_INNER_ERR(opName,
-                                        "ShapeVerify gradHRes failed, expected (B=%ld, S=%ld, N=%ld, N=%ld), "
-                                        "but got (%ld, %ld, %ld, %ld)",
-                                        batchSize, seqLength, n, n, gradHResShape.GetDim(0), gradHResShape.GetDim(1),
-                                        gradHResShape.GetDim(2), gradHResShape.GetDim(3)),
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                opName, "grad_h_res",
+                ("(" + std::to_string(gradHResShape.GetDim(0)) + ", " + std::to_string(gradHResShape.GetDim(1)) + ", " +
+                 std::to_string(gradHResShape.GetDim(2)) + ", " + std::to_string(gradHResShape.GetDim(3)) + ")")
+                    .c_str(),
+                ("The shape of input grad_h_res must be (B=" + std::to_string(batchSize) +
+                 ", S=" + std::to_string(seqLength) + ", N=" + std::to_string(n) + ", N=" + std::to_string(n) + ")")
+                    .c_str()),
             return ge::GRAPH_FAILED);
     }
 
@@ -139,8 +150,9 @@ ge::graphStatus ShapeVerify(gert::TilingContext* context, int64_t batchSize, int
                 return ge::GRAPH_FAILED);
     auto phiShape = phiShapePtr->GetStorageShape();
     OP_CHECK_IF(phiShape.GetDimNum() != 2,
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify failed, phi must be 2D, but got %lu dims",
-                                            phiShape.GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "phi",
+                                                         (std::to_string(phiShape.GetDimNum()) + " dims").c_str(),
+                                                         "The shape dim of input phi must be 2"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(phiShape.GetDim(0) != n * n + 2 * n || phiShape.GetDim(1) != n * c,
                 OPS_REPORT_VECTOR_INNER_ERR(
@@ -176,8 +188,9 @@ ge::graphStatus ShapeVerify(gert::TilingContext* context, int64_t batchSize, int
                 return ge::GRAPH_FAILED);
     auto hPreShape = hPreShapePtr->GetStorageShape();
     OP_CHECK_IF(hPreShape.GetDimNum() != 3,
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify failed, hPre must be 3D, but got %lu dims",
-                                            hPreShape.GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "h_pre",
+                                                         (std::to_string(hPreShape.GetDimNum()) + " dims").c_str(),
+                                                         "The shape dim of input h_pre must be 3"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(hPreShape.GetDim(0) != batchSize || hPreShape.GetDim(1) != seqLength || hPreShape.GetDim(2) != n,
                 OPS_REPORT_VECTOR_INNER_ERR(
@@ -191,8 +204,9 @@ ge::graphStatus ShapeVerify(gert::TilingContext* context, int64_t batchSize, int
                 return ge::GRAPH_FAILED);
     auto hcBeforeNormShape = hcBeforeNormShapePtr->GetStorageShape();
     OP_CHECK_IF(hcBeforeNormShape.GetDimNum() != 3,
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify failed, hcBeforeNorm must be 3D, but got %lu dims",
-                                            hcBeforeNormShape.GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    opName, "hc_before_norm", (std::to_string(hcBeforeNormShape.GetDimNum()) + " dims").c_str(),
+                    "The shape dim of input hc_before_norm must be 3"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         hcBeforeNormShape.GetDim(0) != batchSize || hcBeforeNormShape.GetDim(1) != seqLength ||
@@ -209,8 +223,9 @@ ge::graphStatus ShapeVerify(gert::TilingContext* context, int64_t batchSize, int
                 return ge::GRAPH_FAILED);
     auto invRmsShape = invRmsShapePtr->GetStorageShape();
     OP_CHECK_IF(invRmsShape.GetDimNum() != 3,
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify failed, invRms must be 3D, but got %lu dims",
-                                            invRmsShape.GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "inv_rms",
+                                                         (std::to_string(invRmsShape.GetDimNum()) + " dims").c_str(),
+                                                         "The shape dim of input inv_rms must be 3"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(invRmsShape.GetDim(0) != batchSize || invRmsShape.GetDim(1) != seqLength || invRmsShape.GetDim(2) != 1,
                 OPS_REPORT_VECTOR_INNER_ERR(
@@ -224,8 +239,9 @@ ge::graphStatus ShapeVerify(gert::TilingContext* context, int64_t batchSize, int
                 return ge::GRAPH_FAILED);
     auto sumOutShape = sumOutShapePtr->GetStorageShape();
     OP_CHECK_IF(sumOutShape.GetDimNum() != 4,
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify failed, sumOut must be 4D, but got %lu dims",
-                                            sumOutShape.GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "sum_out",
+                                                         (std::to_string(sumOutShape.GetDimNum()) + " dims").c_str(),
+                                                         "The shape dim of input sum_out must be 4"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         sumOutShape.GetDim(1) != batchSize || sumOutShape.GetDim(2) != seqLength || sumOutShape.GetDim(3) != n,
@@ -234,11 +250,10 @@ ge::graphStatus ShapeVerify(gert::TilingContext* context, int64_t batchSize, int
             batchSize, seqLength, n, sumOutShape.GetDim(0), sumOutShape.GetDim(1), sumOutShape.GetDim(2),
             sumOutShape.GetDim(3)),
         return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        sumOutShape.GetDim(0) % 2 != 0,
-        OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify sumOut failed, dim0 must be even (2*iter_count), but got %ld",
-                                    sumOutShape.GetDim(0)),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(sumOutShape.GetDim(0) % 2 != 0,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, "sum_out", std::to_string(sumOutShape.GetDim(0)).c_str(),
+                                                      "The dim0 of input sum_out must be even (2*iter_count)"),
+                return ge::GRAPH_FAILED);
 
     auto normOutShapePtr = context->GetInputShape(NORM_OUT_IDX);
     OP_CHECK_IF(normOutShapePtr == nullptr,
@@ -246,8 +261,9 @@ ge::graphStatus ShapeVerify(gert::TilingContext* context, int64_t batchSize, int
                 return ge::GRAPH_FAILED);
     auto normOutShape = normOutShapePtr->GetStorageShape();
     OP_CHECK_IF(normOutShape.GetDimNum() != 5,
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify failed, normOut must be 5D, but got %lu dims",
-                                            normOutShape.GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "norm_out",
+                                                         (std::to_string(normOutShape.GetDimNum()) + " dims").c_str(),
+                                                         "The shape dim of input norm_out must be 5"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(normOutShape.GetDim(1) != batchSize || normOutShape.GetDim(2) != seqLength ||
                     normOutShape.GetDim(3) != n || normOutShape.GetDim(4) != n,
@@ -257,10 +273,14 @@ ge::graphStatus ShapeVerify(gert::TilingContext* context, int64_t batchSize, int
                                             batchSize, seqLength, n, n, normOutShape.GetDim(0), normOutShape.GetDim(1),
                                             normOutShape.GetDim(2), normOutShape.GetDim(3), normOutShape.GetDim(4)),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(normOutShape.GetDim(0) != sumOutShape.GetDim(0),
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify normOut dim0(%ld) must equal sumOut dim0(%ld)",
-                                            normOutShape.GetDim(0), sumOutShape.GetDim(0)),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        normOutShape.GetDim(0) != sumOutShape.GetDim(0),
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(opName, "norm_out, sum_out",
+                                               ("norm_out dim0=" + std::to_string(normOutShape.GetDim(0)) +
+                                                ", sum_out dim0=" + std::to_string(sumOutShape.GetDim(0)))
+                                                   .c_str(),
+                                               "The dim0 of input norm_out must equal the dim0 of input sum_out"),
+        return ge::GRAPH_FAILED);
 
     auto gradXShapePtr = context->GetOutputShape(GRAD_X_IDX);
     OP_CHECK_IF(gradXShapePtr == nullptr,
@@ -268,8 +288,9 @@ ge::graphStatus ShapeVerify(gert::TilingContext* context, int64_t batchSize, int
                 return ge::GRAPH_FAILED);
     auto gradXShape = gradXShapePtr->GetStorageShape();
     OP_CHECK_IF(gradXShape.GetDimNum() != 4,
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify failed, gradX must be 4D, but got %lu dims",
-                                            gradXShape.GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "grad_x",
+                                                         (std::to_string(gradXShape.GetDimNum()) + " dims").c_str(),
+                                                         "The shape dim of output grad_x must be 4"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         gradXShape.GetDim(0) != batchSize || gradXShape.GetDim(1) != seqLength || gradXShape.GetDim(2) != n ||
@@ -286,8 +307,9 @@ ge::graphStatus ShapeVerify(gert::TilingContext* context, int64_t batchSize, int
                 return ge::GRAPH_FAILED);
     auto gradPhiShape = gradPhiShapePtr->GetStorageShape();
     OP_CHECK_IF(gradPhiShape.GetDimNum() != 2,
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify failed, gradPhi must be 2D, but got %lu dims",
-                                            gradPhiShape.GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName, "grad_phi",
+                                                         (std::to_string(gradPhiShape.GetDimNum()) + " dims").c_str(),
+                                                         "The shape dim of output grad_phi must be 2"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(gradPhiShape.GetDim(0) != n * n + 2 * n || gradPhiShape.GetDim(1) != n * c,
                 OPS_REPORT_VECTOR_INNER_ERR(
@@ -352,8 +374,10 @@ ge::graphStatus ShapeVerify(gert::TilingContext* context, int64_t batchSize, int
             return ge::GRAPH_FAILED);
     }
 
-    OP_CHECK_IF(n != N_SIZE_4, OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify failed, N must be 4, but got %ld", n),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        n != N_SIZE_4,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, "n", std::to_string(n).c_str(), "The value of n must be 4"),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -657,9 +681,9 @@ ge::graphStatus TilingMhcPreSinkhornBackwardArch22(gert::TilingContext* context)
     auto xShape = xShapePtr->GetStorageShape();
     bool is3D = (xShape.GetDimNum() == 3);
     OP_CHECK_IF(!is3D && xShape.GetDimNum() != 4,
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                            "xShape verify failed, x must be 3D(TND) or 4D(BSND), but got %lu dims",
-                                            xShape.GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "x",
+                                                         (std::to_string(xShape.GetDimNum()) + " dims").c_str(),
+                                                         "The shape dim of input x must be 3 (TND) or 4 (BSND)"),
                 return ge::GRAPH_FAILED);
     auto attrsPtr = context->GetAttrs();
     if (attrsPtr == nullptr) {
@@ -699,7 +723,8 @@ ge::graphStatus TilingMhcPreSinkhornBackwardArch22(gert::TilingContext* context)
     }
 
     OP_CHECK_IF(n != N_SIZE_4,
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "n must be %ld, but got %ld", N_SIZE_4, n),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "n", std::to_string(n).c_str(),
+                                                      "The value of n must be 4"),
                 return ge::GRAPH_FAILED);
 
     int64_t c0 = 256; // must be VL
@@ -718,14 +743,15 @@ ge::graphStatus TilingMhcPreSinkhornBackwardArch22(gert::TilingContext* context)
     auto sumOutShape = sumOutPtr->GetStorageShape();
     int64_t skIterCount = sumOutShape.GetDim(0) / C_V_RATIO;
 
-    OP_CHECK_IF(
-        skIterCount != 20,
-        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "sk_iter_count must be 20, but got %ld", skIterCount),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(skIterCount != 20,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "sk_iter_count",
+                                                      std::to_string(skIterCount).c_str(),
+                                                      "The value of sk_iter_count must be 20"),
+                return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(c <= 0 || c >= 100000 || c % 128 != 0,
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(),
-                                            "c must be > 0, < 100000 and divisible by 128, but got %ld", c),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "c", std::to_string(c).c_str(),
+                                                      "The value of c must be > 0, < 100000 and divisible by 128"),
                 return ge::GRAPH_FAILED);
 
     int64_t mm1K = n * n + 2 * n;

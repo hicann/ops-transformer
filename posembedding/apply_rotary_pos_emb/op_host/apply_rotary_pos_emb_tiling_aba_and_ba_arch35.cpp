@@ -229,10 +229,11 @@ void ApplyRotaryPosEmbTilingABAAndBA::SetTilingData()
 
 ge::graphStatus ApplyRotaryPosEmbTilingABAAndBA::DoOpTiling()
 {
-    OP_CHECK_IF(SplitCore() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "failed to split core."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(SplitCore() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "failed to split core."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(ComputeUbFactor() != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "failed to compute ub factor."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "failed to compute ub factor."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

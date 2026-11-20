@@ -16,6 +16,7 @@
 #include <sstream>
 #include "kv_compress_epilog_tiling_arch35.h"
 #include "log/log.h"
+#include "util/shape_util.h"
 
 using namespace ge;
 
@@ -62,13 +63,25 @@ ge::graphStatus KvCompressEpilogTilingArch35::GetInputShapes()
     uint32_t xDims = xStorageShape.GetDimNum();
     uint32_t slotMappingDims = slotMappingShape.GetDimNum();
     OP_CHECK_IF(xDims - 1 != slotMappingDims,
-                OP_LOGE(context_->GetNodeName(), "slotMappingDims should equal xDims - 1"), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+                    context_->GetNodeName(), "slot_mapping, x",
+                    ("slot_mapping dim num is " + std::to_string(slotMappingDims) + " and x dim num is " +
+                     std::to_string(xDims))
+                        .c_str(),
+                    "The shape dim of input slot_mapping must equal the shape dim of input x minus 1"),
+                return ge::GRAPH_FAILED);
     int64_t bs = 1;
     for (uint32_t i = 0; i < slotMappingDims; i++) {
         int64_t temp = xStorageShape.GetDim(i);
-        OP_CHECK_IF(temp != slotMappingShape.GetDim(i),
-                    OP_LOGE(context_->GetNodeName(), "slotMappingShape should equal xStorageShape in dim %d", i),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            temp != slotMappingShape.GetDim(i),
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                context_->GetNodeName(), "slot_mapping, x",
+                ("shape " + Ops::Base::ToString(slotMappingShape) + " mismatches input x at dim " + std::to_string(i) +
+                 " (" + std::to_string(slotMappingShape.GetDim(i)) + " vs " + std::to_string(temp) + ")")
+                    .c_str(),
+                "The shape of input slot_mapping must equal the leading dims of input x"),
+            return ge::GRAPH_FAILED);
         bs *= temp;
     }
     d_ = xStorageShape.GetDim(xDims - 1);
@@ -94,23 +107,27 @@ ge::graphStatus KvCompressEpilogTilingArch35::GetAttributes()
         quantMode_ = *attrQuantMode;
     }
     // arch35 支持 quant_mode 0/1/2/3/4；其余取值（输入值）显式报错拦截
-    OP_CHECK_IF(quantMode_ != QUANT_MODE_GROUP_QUANT_BF16 && quantMode_ != QUANT_MODE_GROUP_QUANT_E8M0 &&
-                    quantMode_ != QUANT_MODE_HIF8_FP4 && quantMode_ != QUANT_MODE_MXFP8 &&
-                    quantMode_ != QUANT_MODE_MXFP4,
-                OP_LOGE(context_->GetNodeName(), "quantMode should be 0, 1, 2, 3 or 4"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        quantMode_ != QUANT_MODE_GROUP_QUANT_BF16 && quantMode_ != QUANT_MODE_GROUP_QUANT_E8M0 &&
+            quantMode_ != QUANT_MODE_HIF8_FP4 && quantMode_ != QUANT_MODE_MXFP8 && quantMode_ != QUANT_MODE_MXFP4,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "quant_mode", std::to_string(quantMode_).c_str(),
+                                              "The value of attribute quant_mode must be 0, 1, 2, 3 or 4"),
+        return ge::GRAPH_FAILED);
 
     // mode2(rope hifloat8 + nope FLOAT4_E2M1) 仅支持 16/32/64 的 per-group 量化粒度
     OP_CHECK_IF(quantMode_ == QUANT_MODE_HIF8_FP4 && quantGroupSize_ != FP4_GROUP_SIZE_16 &&
                     quantGroupSize_ != FP4_GROUP_SIZE_32 && quantGroupSize_ != FP4_GROUP_SIZE_64,
-                OP_LOGE(context_->GetNodeName(), "quant_group_size should be 16/32/64 when quant_mode==2, got %ld",
-                        quantGroupSize_),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context_->GetNodeName(), "quant_group_size", std::to_string(quantGroupSize_).c_str(),
+                    "The value of attribute quant_group_size must be 16, 32 or 64 when quant_mode is 2"),
                 return ge::GRAPH_FAILED);
 
     // mode3(MXFP8) 仅支持 group=32；mode4(MXFP4 packed) 支持 16/32
-    OP_CHECK_IF(
-        quantMode_ == QUANT_MODE_MXFP8 && quantGroupSize_ != MXFP_GROUP_SIZE_32,
-        OP_LOGE(context_->GetNodeName(), "quant_group_size must be 32 when quant_mode==3, got %ld", quantGroupSize_),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(quantMode_ == QUANT_MODE_MXFP8 && quantGroupSize_ != MXFP_GROUP_SIZE_32,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context_->GetNodeName(), "quant_group_size", std::to_string(quantGroupSize_).c_str(),
+                    "The value of attribute quant_group_size must be 32 when quant_mode is 3"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(quantMode_ == QUANT_MODE_MXFP4 && quantGroupSize_ != MXFP_GROUP_SIZE_16 &&
                     quantGroupSize_ != MXFP_GROUP_SIZE_32,
                 OP_LOGE(context_->GetNodeName(), "quant_group_size should be 16/32 when quant_mode==4, got %ld",
@@ -143,9 +160,11 @@ ge::graphStatus KvCompressEpilogTilingArch35::GetDtypeInfo()
     OP_CHECK_IF(xDesc == nullptr, OP_LOGE(context_->GetNodeName(), "get x desc nullptr"), return ge::GRAPH_FAILED);
     xDtype_ = xDesc->GetDataType();
 
-    OP_CHECK_IF(xDtype_ != ge::DT_BF16,
-                OP_LOGE(context_->GetNodeName(), "x dtype only support BF16, got %d", static_cast<int>(xDtype_)),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        xDtype_ != ge::DT_BF16,
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "x", Ops::Base::ToString(xDtype_).c_str(),
+                                              "The dtype of input x must be BFLOAT16"),
+        return ge::GRAPH_FAILED);
 
     auto slotMappingDesc = context_->GetInputDesc(SLOT_MAPPING_INDEX);
     OP_CHECK_IF(slotMappingDesc == nullptr, OP_LOGE(context_->GetNodeName(), "get slot_mapping desc nullptr"),
@@ -153,8 +172,9 @@ ge::graphStatus KvCompressEpilogTilingArch35::GetDtypeInfo()
     slotMappingDtype_ = slotMappingDesc->GetDataType();
 
     OP_CHECK_IF((slotMappingDtype_ != ge::DT_INT32 && slotMappingDtype_ != ge::DT_INT64),
-                OP_LOGE(context_->GetNodeName(), "slot_mapping dtype only support INT32/INT64, got %d",
-                        static_cast<int>(slotMappingDtype_)),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "slot_mapping",
+                                                      Ops::Base::ToString(slotMappingDtype_).c_str(),
+                                                      "The dtype of input slot_mapping must be INT32 or INT64"),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -162,7 +182,9 @@ ge::graphStatus KvCompressEpilogTilingArch35::GetDtypeInfo()
 
 ge::graphStatus KvCompressEpilogTilingArch35::ValidateShapes()
 {
-    OP_CHECK_IF(bs_ <= 0, OP_LOGE(context_->GetNodeName(), "input x first dimension must be positive, got %ld", bs_),
+    OP_CHECK_IF(bs_ <= 0,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", std::to_string(bs_).c_str(),
+                                                      "The first dimension of input x must be positive"),
                 return ge::GRAPH_FAILED);
 
     if (IsMxfpMode()) {
@@ -185,19 +207,25 @@ ge::graphStatus KvCompressEpilogTilingArch35::ValidateShapes()
     }
 
     OP_CHECK_IF(d_ <= SLICE_SIZE,
-                OP_LOGE(context_->GetNodeName(), "input x tail dimension must be greater than 64, got %ld", d_),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", std::to_string(d_).c_str(),
+                                                      "The last dim of input x must be greater than 64"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(d_ > D_LENGTH_FULL_LOAD,
-                OP_LOGE(context_->GetNodeName(), "input x tail dimension must be less than 8192, got %ld", d_),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", std::to_string(d_).c_str(),
+                                                      "The last dim of input x must be less than or equal to 8192"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(d_ % SLICE_SIZE != 0, OP_LOGE(context_->GetNodeName(), "d_ %% 64 should be 0 , got %ld", d_),
+    OP_CHECK_IF(d_ % SLICE_SIZE != 0,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", std::to_string(d_).c_str(),
+                                                      "The last dim of input x must be 64-aligned"),
                 return ge::GRAPH_FAILED);
 
     // mode2: nope 段长度(d-64)必须能被 per-group 量化粒度整除
     OP_CHECK_IF(
         quantMode_ == QUANT_MODE_HIF8_FP4 && (d_ - SLICE_SIZE) % quantGroupSize_ != 0,
-        OP_LOGE(context_->GetNodeName(),
-                "(d-64) %% quant_group_size should be 0 when quant_mode==2, got d=%ld group=%ld", d_, quantGroupSize_),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context_->GetNodeName(), "quant_group_size",
+            ("d is " + std::to_string(d_) + " and quant_group_size is " + std::to_string(quantGroupSize_)).c_str(),
+            "The value of attribute quant_group_size must divide (d - 64) when quant_mode is 2"),
         return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -225,10 +253,11 @@ ge::graphStatus KvCompressEpilogTilingArch35::ValidateDtypes()
     OP_CHECK_IF(kvCacheOutputDesc == nullptr, OP_LOGE(context_->GetNodeName(), "get output desc nullptr"),
                 return ge::GRAPH_FAILED);
     const ge::DataType outputDtype = kvCacheOutputDesc->GetDataType();
-    OP_CHECK_IF(
-        (outputDtype != ge::DT_UINT8),
-        OP_LOGE(context_->GetNodeName(), "cache dtype only support UINT8, got %d", static_cast<int>(outputDtype)),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((outputDtype != ge::DT_UINT8),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "cache",
+                                                      Ops::Base::ToString(outputDtype).c_str(),
+                                                      "The dtype of output cache must be UINT8"),
+                return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -271,13 +300,14 @@ ge::graphStatus KvCompressEpilogTilingArch35::GetKvCacheLayout()
     OP_CHECK_NULL_WITH_CONTEXT(context_, cacheShapePtr);
     const auto& cacheLogicalShape = cacheShapePtr->GetShape();
     OP_CHECK_IF(cacheLogicalShape.GetDimNum() != CACHE_VIEW_DIM_NUM,
-                OP_LOGE(context_->GetNodeName(), "cache must be 4D [blockNum, blockSize, 1, headDim], got dimNum=%zu",
-                        cacheLogicalShape.GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    context_->GetNodeName(), "cache", std::to_string(cacheLogicalShape.GetDimNum()).c_str(),
+                    "The shape dim of input cache must be exactly 4 with shape [blockNum, blockSize, 1, headDim]"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(cacheLogicalShape.GetDim(CACHE_ONE_DIM) != CACHE_ONE_DIM_VALUE,
-                OP_LOGE(context_->GetNodeName(),
-                        "cache dim2 (second-to-last) must be 1 (one compressed vector per token), got %ld",
-                        cacheLogicalShape.GetDim(CACHE_ONE_DIM)),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "cache", Ops::Base::ToString(cacheLogicalShape).c_str(),
+                    "The dim 2 (second-to-last) of input cache must be 1, i.e. one compressed vector per token"),
                 return ge::GRAPH_FAILED);
 
     const auto& cacheStorage = cacheShapePtr->GetStorageShape();
@@ -297,8 +327,14 @@ ge::graphStatus KvCompressEpilogTilingArch35::GetKvCacheLayout()
 
     int64_t contiguousBlockStride = kvCacheBlockSize_ * kvCacheRowStride_;
     OP_CHECK_IF(kvCacheBlockStride_ < contiguousBlockStride,
-                OP_LOGE(context_->GetNodeName(), "block_stride %ld must be >= blockSize*headDim %ld",
-                        kvCacheBlockStride_, contiguousBlockStride),
+                OP_LOGE_FOR_INVALID_STRIDE(context_->GetNodeName(), "cache",
+                                           ("block_stride is " + std::to_string(kvCacheBlockStride_) +
+                                            " with blockSize=" + std::to_string(kvCacheBlockSize_) +
+                                            " and headDim=" + std::to_string(kvCacheRowStride_))
+                                               .c_str(),
+                                           ("block_stride must be greater than or equal to blockSize * headDim = " +
+                                            std::to_string(contiguousBlockStride))
+                                               .c_str()),
                 return ge::GRAPH_FAILED);
 
     OP_LOGI(context_->GetNodeName(),
@@ -509,8 +545,13 @@ ge::graphStatus KvCompressEpilogTilingArch35::DoOpTiling()
     }
 
     OP_CHECK_IF(kvCacheCol_ > kvCacheRowStride_,
-                OP_LOGE(context_->GetNodeName(), "cache headDim(%ld) must be >= padded length kvCacheCol(%ld)",
-                        kvCacheRowStride_, kvCacheCol_),
+                OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                    context_->GetNodeName(), "cache",
+                    ("cache headDim (row stride) is " + std::to_string(kvCacheRowStride_) +
+                     " and the padded length kvCacheCol is " + std::to_string(kvCacheCol_))
+                        .c_str(),
+                    "The headDim (row stride) of input cache must be greater than or equal to the padded "
+                    "per-token length kvCacheCol"),
                 return ge::GRAPH_FAILED);
 
     int64_t rowOnceLoop = std::min(rowOfFormerBlock_, MIN_ROW_PER_CORE);
@@ -657,36 +698,36 @@ ge::graphStatus KvCompressEpilogTilingArch35::GetShapeAttrsInfo()
     OP_CHECK_IF(context_ == nullptr, OP_LOGE(context_->GetNodeName(), "context can not be nullptr"),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(GetInputShapes() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "GetInputShapes failed"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(GetInputShapes() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "GetInputShapes failed"), return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(GetAttributes() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "GetAttributes failed"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(GetAttributes() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "GetAttributes failed"), return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(GetDtypeInfo() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "GetDtypeInfo failed"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(GetDtypeInfo() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "GetDtypeInfo failed"), return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(ValidateShapes() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "ValidateShapes failed"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(ValidateShapes() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "ValidateShapes failed"), return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(ValidateDtypes() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "ValidateDtypes failed"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(ValidateDtypes() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "ValidateDtypes failed"), return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus KvCompressEpilogTilingArch35::RunTiling()
 {
-    OP_CHECK_IF(GetPlatformInfo() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "GetPlatformInfo failed"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(GetPlatformInfo() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "GetPlatformInfo failed"), return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(GetShapeAttrsInfo() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "GetShapeAttrsInfo failed"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(GetShapeAttrsInfo() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "GetShapeAttrsInfo failed"), return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(DoOpTiling() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CalcOpTiling failed"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(DoOpTiling() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "CalcOpTiling failed"), return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(PostTiling() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "PostTiling failed"),
+    OP_CHECK_IF(PostTiling() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "PostTiling failed"),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;

@@ -16,6 +16,7 @@
 #include "op_common/op_host/util/op_const_def.h"
 #include <sstream>
 #include "mhc_pre_sinkhorn_tiling.h"
+#include "util/shape_util.h"
 
 using namespace ge;
 namespace optiling {
@@ -397,49 +398,62 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::GetShapeAttrsInfoInner()
         hcMult_ = xShape->GetStorageShape().GetDim(2);
         d_ = xShape->GetStorageShape().GetDim(3);
     } else {
-        OP_LOGE(context_->GetNodeName(), "x dim num should be 3 or 4, but is %ld", static_cast<int64_t>(xDimNum));
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "x",
+                                                 std::to_string(static_cast<int64_t>(xDimNum)).c_str(),
+                                                 "The shape dim of input x must be 3 or 4");
         return ge::GRAPH_FAILED;
     }
 
     OP_CHECK_IF(d_ != C_VALID_VALUE_4096 && d_ != C_VALID_VALUE_7168,
-                OP_LOGE(context_->GetNodeName(),
-                        "On Ascend950, x last dim c only supports %ld or %ld, but is %ld. "
-                        "Please set x last dim c to 4096 or 7168.",
-                        C_VALID_VALUE_4096, C_VALID_VALUE_7168, d_),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", std::to_string(d_).c_str(),
+                                                      "The last dim c of input x on Ascend950 must be 4096 or 7168"),
                 return ge::GRAPH_FAILED);
 
     auto shapeHcFn = context_->GetInputShape(1);
     OP_CHECK_NULL_WITH_CONTEXT(context_, shapeHcFn);
     hcMix_ = shapeHcFn->GetStorageShape().GetDim(0);
     OP_CHECK_IF(shapeHcFn->GetStorageShape().GetDim(1) != d_ * hcMult_,
-                OP_LOGE(context_->GetNodeName(), "HcFn dim 1 should be equal with d_ * hcMult_  %ld, but is %ld",
-                        d_ * hcMult_, shapeHcFn->GetStorageShape().GetDim(1)),
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    context_->GetNodeName(), "phi, x", Ops::Base::ToString(shapeHcFn->GetStorageShape()).c_str(),
+                    ("The 1st dim of input phi must be equal to the last dim of input x times hc_mult, which is " +
+                     std::to_string(d_ * hcMult_))
+                        .c_str()),
                 return ge::GRAPH_FAILED);
 
     auto shapeHcScale = context_->GetInputShape(2);
     OP_CHECK_NULL_WITH_CONTEXT(context_, shapeHcScale);
     int64_t scaleFirstDim = shapeHcScale->GetStorageShape().GetDim(0);
     OP_CHECK_IF(scaleFirstDim != 3,
-                OP_LOGE(context_->GetNodeName(), "hc_scale size should be equal with 3, but is %ld", scaleFirstDim),
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context_->GetNodeName(), "alpha",
+                                                          std::to_string(scaleFirstDim).c_str(),
+                                                          "The size of input alpha must be 3"),
                 return ge::GRAPH_FAILED);
 
     auto shapeHcBase = context_->GetInputShape(3);
     OP_CHECK_NULL_WITH_CONTEXT(context_, shapeHcBase);
     int64_t baseFirstDim = shapeHcBase->GetStorageShape().GetDim(0);
-    OP_CHECK_IF(baseFirstDim != hcMix_,
-                OP_LOGE(context_->GetNodeName(), "hc_base size should be equal with mixhc, but is %ld", baseFirstDim),
+    OP_CHECK_IF(
+        baseFirstDim != hcMix_,
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            context_->GetNodeName(), "bias", std::to_string(baseFirstDim).c_str(),
+            ("The size of input bias must be equal to hc_mult * hc_mult + 2 * hc_mult = " + std::to_string(hcMix_))
+                .c_str()),
+        return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(GetAttr() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "get attr failed."),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(GetAttr() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "get attr failed."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        hcMult_ != HCMULT_VALUE,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "hc_mult", std::to_string(hcMult_).c_str(),
+                                              "The value of attribute hc_mult must be 4"),
+        return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(hcMult_ != HCMULT_VALUE,
-                OP_LOGE(context_->GetNodeName(), "hcMult should be %ld, but is %ld", HCMULT_VALUE, hcMult_),
-                return ge::GRAPH_FAILED);
-
-    OP_CHECK_IF(iterTimes_ != NUM_ITERS_VALUE,
-                OP_LOGE(context_->GetNodeName(), "numIters should be %ld, but is %ld", NUM_ITERS_VALUE, iterTimes_),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        iterTimes_ != NUM_ITERS_VALUE,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "num_iters", std::to_string(iterTimes_).c_str(),
+                                              "The value of attribute num_iters must be 20"),
+        return ge::GRAPH_FAILED);
 
     OP_LOGD(context_->GetNodeName(),
             "MhcPreSinkhorn regbase shape attrs: bs=%ld, hcMix=%ld, hcMult=%ld, d=%ld, iterTimes=%ld, "
@@ -476,16 +490,18 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcRegbaseCommonTiling(GradOutMode
     }
     CoreRowTiling coreRowTiling;
     OP_CHECK_IF(!CalcCoreRowTiling(bs_, prePostCoreNum, coreRowTiling),
-                OP_LOGE(context_->GetNodeName(), "Invalid row tiling input: bs=%ld, aivCoreNum=%lu", bs_, aivCoreNum_),
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "Invalid row tiling input: bs=%ld, aivCoreNum=%lu", bs_,
+                                       aivCoreNum_),
                 return ge::GRAPH_FAILED);
 
     const int64_t hcMultAlign = RoundUp(hcMult_, BLOCK_SIZE / sizeof(float));
     CvUbTiling ubTiling;
     OP_CHECK_IF(!CalcCvUbTiling(tilingData_.get_kL1Size(), tilingData_.get_mL1Size(), ubSize_, cvRatio_, isKSplit,
                                 hcMix_, hcMult_, hcMultAlign, ubTiling),
-                OP_LOGE(context_->GetNodeName(),
-                        "Invalid CV UB tiling: kL1Size=%ld, mL1Size=%ld, ubSize=%lu, cvRatio=%lu, isKSplit=%d",
-                        tilingData_.get_kL1Size(), tilingData_.get_mL1Size(), ubSize_, cvRatio_, isKSplit ? 1 : 0),
+                OP_LOGE_WITHOUT_REPORT(
+                    context_->GetNodeName(),
+                    "Invalid CV UB tiling: kL1Size=%ld, mL1Size=%ld, ubSize=%lu, cvRatio=%lu, isKSplit=%d",
+                    tilingData_.get_kL1Size(), tilingData_.get_mL1Size(), ubSize_, cvRatio_, isKSplit ? 1 : 0),
                 return ge::GRAPH_FAILED);
     const int64_t kUbSize = ubTiling.kUbSize;
     const int64_t mUbSize = ubTiling.mUbSize;
@@ -517,10 +533,10 @@ ge::graphStatus MhcPreSinkhornTilingRegbase::CalcRegbaseCommonTiling(GradOutMode
     const int64_t maxRowFactor = isKSplit ? coreRowTiling.rowOfFormerBlock : vectorMSize;
     RowAndDTiling rowAndDTiling;
     OP_CHECK_IF(!CalcRowAndDTiling(d_, maxRowFactor, fitsInUb, rowAndDTiling),
-                OP_LOGE(context_->GetNodeName(),
-                        "UB is insufficient for minimum tile: ubSize=%lu, availableUbSize=%ld, "
-                        "withGradOut=%d, isKSplit=%d",
-                        ubSize_, availableUbSize, withGradOut ? 1 : 0, isKSplit ? 1 : 0),
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(),
+                                       "UB is insufficient for minimum tile: ubSize=%lu, availableUbSize=%ld, "
+                                       "withGradOut=%d, isKSplit=%d",
+                                       ubSize_, availableUbSize, withGradOut ? 1 : 0, isKSplit ? 1 : 0),
                 return ge::GRAPH_FAILED);
     CompleteCoreRowTiling(coreRowTiling, rowAndDTiling.rowFactor);
 

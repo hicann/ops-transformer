@@ -110,16 +110,18 @@ ge::graphStatus ApplyRotaryPosEmbRegbaseTilingBaseClass::CheckNullptr()
 }
 
 ge::graphStatus ApplyRotaryPosEmbRegbaseTilingBaseClass::CheckShapeAllPositive(const int64_t& idx,
-                                                                               const gert::Shape& shape)
+                                                                               const gert::Shape& shape, bool report)
 {
     static const std::vector<std::string> inputNames = {"query", "key", "cos", "sin"};
     for (size_t i = 0; i < shape.GetDimNum(); i++) {
         if (shape.GetDim(i) <= 0) {
-            std::string reasonMsg =
-                "The shape of input " + inputNames[idx] + " can not be an invalid tensor with a negative dimension";
-            std::string shapeStr = ToString(shape);
-            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), inputNames[idx].c_str(), shapeStr.c_str(),
-                                                  reasonMsg.c_str());
+            if (report) {
+                std::string reasonMsg =
+                    "The shape of input " + inputNames[idx] + " can not be an invalid tensor with a negative dimension";
+                std::string shapeStr = ToString(shape);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), inputNames[idx].c_str(),
+                                                      shapeStr.c_str(), reasonMsg.c_str());
+            }
             return ge::GRAPH_FAILED;
         }
     }
@@ -128,19 +130,31 @@ ge::graphStatus ApplyRotaryPosEmbRegbaseTilingBaseClass::CheckShapeAllPositive(c
 
 ge::graphStatus ApplyRotaryPosEmbRegbaseTilingBaseClass::CheckShapeAllPositive()
 {
-    ge::graphStatus qRes = CheckShapeAllPositive(Q_INDEX, qShape_);
-    ge::graphStatus kRes = CheckShapeAllPositive(K_INDEX, kShape_);
-    // q, k有一个为空Tensor时，提示用 rotaryPositionEmbedding 算子
+    ge::graphStatus qRes = CheckShapeAllPositive(Q_INDEX, qShape_, false);
+    ge::graphStatus kRes = CheckShapeAllPositive(K_INDEX, kShape_, false);
+    std::string qkShapes = ToString(qShape_) + " and " + ToString(kShape_);
+    // If only one of q and k is an empty tensor, suggest using the rotaryPositionEmbedding operator.
     OP_CHECK_IF(qRes != kRes,
-                OP_LOGE(context_, "q or k has non positive shape, please use rotaryPositionEmbedding operator"),
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    context_->GetNodeName(), "query, key", qkShapes.c_str(),
+                    "Both query and key must have positive shapes, or both must be empty tensors; when only one is "
+                    "empty, use the rotaryPositionEmbedding operator"),
                 return ge::GRAPH_FAILED);
-    // q, k 都为空Tensor，处理空tensor
-    OP_CHECK_IF(qRes != ge::GRAPH_SUCCESS, OP_LOGE(context_, "query and key have non positive shape."),
+    // Both q and k are empty tensors; handle the empty-tensor case.
+    OP_CHECK_IF(qRes != ge::GRAPH_SUCCESS,
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    context_->GetNodeName(), "query, key", qkShapes.c_str(),
+                    "Both query and key have non-positive shapes; empty tensors must be handled by the "
+                    "rotaryPositionEmbedding operator"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShapeAllPositive(COS_INDEX, cosShape_) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "cos has non positive shape."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShapeAllPositive(SIN_INDEX, sinShape_) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "sin has non positive shape."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckShapeAllPositive(COS_INDEX, cosShape_, false) != ge::GRAPH_SUCCESS,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "cos", ToString(cosShape_).c_str(),
+                                                      "All dimensions of input cos must be positive"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckShapeAllPositive(SIN_INDEX, sinShape_, false) != ge::GRAPH_SUCCESS,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "sin", ToString(sinShape_).c_str(),
+                                                      "All dimensions of input sin must be positive"),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -263,7 +277,7 @@ ge::graphStatus ApplyRotaryPosEmbRegbaseTilingBaseClass::CheckShapeRelation()
         }
     }
     OP_CHECK_IF(CheckRotaryModeShapeRelation(qShape_.GetDim(dIdx)) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "D is invalid for rotary mode."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_, "D is invalid for rotary mode."), return ge::GRAPH_FAILED);
     return CheckShapeAllPositive();
 }
 
@@ -352,10 +366,12 @@ ge::graphStatus ApplyRotaryPosEmbRegbaseTilingBaseClass::CheckDtypeAndAttr()
 
 ge::graphStatus ApplyRotaryPosEmbRegbaseTilingBaseClass::CheckParam()
 {
-    OP_CHECK_IF(CheckNullptr() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check nullptr fail."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckDtypeAndAttr() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check dtype and attr fail."),
+    OP_CHECK_IF(CheckNullptr() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check nullptr fail."),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShape() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check shape fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckDtypeAndAttr() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_, "check dtype and attr fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckShape() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check shape fail."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -432,7 +448,8 @@ ge::graphStatus ApplyRotaryPosEmbRegbaseTilingBaseClass::GetShapeAttrsInfo()
     layout_ = static_cast<ApplyRotaryPosEmbLayout>(layoutValue);
     const char* rotaryMode = attrs->GetAttrPointer<char>(1);
     rotaryModeStr_ = (rotaryMode == nullptr) ? "half" : rotaryMode;
-    OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check param fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check param fail."),
+                return ge::GRAPH_FAILED);
     dtype_ = qDataType_;
     ConvertRotaryMode();
     SetBsnd();

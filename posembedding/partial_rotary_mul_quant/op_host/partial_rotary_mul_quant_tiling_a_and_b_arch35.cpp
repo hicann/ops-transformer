@@ -12,6 +12,7 @@
  * \file rope_regbase_tiling_a_and_b.cc
  * \brief
  */
+#include <string>
 #include "partial_rotary_mul_quant_tiling.h"
 #include "log/log.h"
 
@@ -132,12 +133,17 @@ void QuantRopeRegBaseTilingClassAAndB::SetTilingData()
 
 ge::graphStatus QuantRopeRegBaseTilingClassAAndB::DoOpTiling()
 {
-    OP_CHECK_IF(MergeDim() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "failed to merge dim."),
+    OP_CHECK_IF(MergeDim() != ge::GRAPH_SUCCESS,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "x",
+                    ("B=" + std::to_string(b_) + ", S=" + std::to_string(s_) + ", N=" + std::to_string(n_)).c_str(),
+                    "The shape of input x must be mergeable into a 2D [B*N*S, D] layout"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(SplitCore() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "failed to split core."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(SplitCore() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "failed to split core."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(ComputeUbFactor() != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "failed to compute ub factor."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "failed to compute ub factor."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

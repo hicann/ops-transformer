@@ -12,6 +12,7 @@
  * \file inplace_rope_regbase_tiling_a_and_b.cc
  * \brief
  */
+#include <string>
 #include "inplace_partial_rotary_mul_tiling.h"
 
 using namespace AscendC;
@@ -166,12 +167,17 @@ void InplacePartialRopeRegBaseTilingClassAAndB::SetTilingData()
 
 ge::graphStatus InplacePartialRopeRegBaseTilingClassAAndB::DoOpTiling()
 {
-    OP_CHECK_IF(MergeDim() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "failed to merge dim."),
+    std::string mergedShapeMsg =
+        "(B, S, N) = (" + std::to_string(b_) + ", " + std::to_string(s_) + ", " + std::to_string(n_) + ")";
+    OP_CHECK_IF(MergeDim() != ge::GRAPH_SUCCESS,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", mergedShapeMsg.c_str(),
+                                                      "The B, S and N dims of input x must be mergeable into one axis"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(SplitCore() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "failed to split core."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(SplitCore() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "failed to split core."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(ComputeUbFactor() != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "failed to compute ub factor."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "failed to compute ub factor."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

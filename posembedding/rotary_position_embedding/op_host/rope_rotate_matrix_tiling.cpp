@@ -340,11 +340,18 @@ ge::graphStatus RotateMatrixTiling::CheckMode()
     uint64_t rFirstDim = static_cast<uint64_t>(tilingData_.get_cosSinFirstDim());
     uint64_t rSecondDim = static_cast<uint64_t>(tilingData_.get_cosSinSecondDim());
     uint64_t rThirdDim = static_cast<uint64_t>(tilingData_.get_cosSinThirdDim());
+    std::string layoutMsg = "mode = " + std::to_string(modeValue) + ", x dims (" + std::to_string(xFirstDim) + ", " +
+                            std::to_string(xSecondDim) + ", " + std::to_string(xThirdDim) + ") and cos dims (" +
+                            std::to_string(rFirstDim) + ", " + std::to_string(rSecondDim) + ", " +
+                            std::to_string(rThirdDim) + ")";
     OP_CHECK_IF(
         (modeValue == MODE_ROTATE_INTERLEAVED) && !((rFirstDim == 1 && rSecondDim == 1 && xThirdDim == rThirdDim) ||
                                                     (rFirstDim == 1 && rThirdDim == 1 && xSecondDim == rSecondDim) ||
                                                     (rSecondDim == 1 && rThirdDim == 1 && xFirstDim == rFirstDim)),
-        OP_LOGE(context, "Layout format invalid for interleave mode."), return ge::GRAPH_FAILED);
+        OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(
+            context->GetNodeName(), "mode", layoutMsg.c_str(),
+            "The layout of input x and cos must be BSND, BNSD or SBND when the attribute mode is 1 (interleave)"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -476,7 +483,11 @@ ge::graphStatus RotateMatrixTiling::MatmulTilingProcess()
     }
     mm_.SetFixSplit(baseM, baseN, baseK);
     if (mm_.GetTiling(tilingData_.matmulTiling) == -1) {
-        OP_LOGE(context->GetNodeName(), "RotaryPositionEmbedding Get Tiling Failed!");
+        std::string tilingFailMsg = "RotaryPositionEmbedding Get Tiling Failed! N is " +
+                                    std::to_string(tilingData_.get_xThirdDim()) + ", D is " +
+                                    std::to_string(tilingData_.get_dLength()) + ", tiling mode is " +
+                                    std::to_string(tilingData_.get_tilingMode());
+        OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "%s", tilingFailMsg.c_str());
         return ge::GRAPH_FAILED;
     }
     OP_LOGD(context->GetNodeName(), "ROPE_tiling: baseM is %d, baseK is %d, baseN is %d.", baseM, baseK, baseN);
@@ -501,19 +512,19 @@ ge::graphStatus RotateMatrixTiling::DoRotateMatrixTiling()
 
     tilingData_.set_coreNum(coreNum);
     if (ge::GRAPH_SUCCESS != CheckShape()) {
-        OP_LOGE(context, "input shape does not meet the requirements.");
+        OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "input shape does not meet the requirements.");
         return ge::GRAPH_FAILED;
     }
 
     if (ge::GRAPH_SUCCESS != CheckDtype()) {
-        OP_LOGE(context, "input Dtype does not meet the requirements.");
+        OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "input Dtype does not meet the requirements.");
         return ge::GRAPH_FAILED;
     }
 
     GetDimLen();
 
     if (ge::GRAPH_SUCCESS != CheckMode()) {
-        OP_LOGE(context, "input mode and tiling mode do not meet the requirements.");
+        OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "input mode and tiling mode do not meet the requirements.");
         return ge::GRAPH_FAILED;
     }
     MatmulTilingProcess();
@@ -530,7 +541,7 @@ ge::graphStatus RopeRotateMatrixTilingClass::DoOpTiling()
 
     auto tilingRes = rotateTiling.DoRotateMatrixTiling();
     if (ge::GRAPH_SUCCESS != tilingRes) {
-        OP_LOGE(context_->GetNodeName(), "DoRotateMatrixTiling failed.");
+        OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "DoRotateMatrixTiling failed.");
         return tilingRes;
     }
 

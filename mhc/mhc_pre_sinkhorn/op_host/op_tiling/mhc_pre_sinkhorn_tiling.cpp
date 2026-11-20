@@ -20,6 +20,7 @@
 #include "mhc_pre_sinkhorn_tiling.h"
 #include "../../op_kernel/mhc_pre_sinkhorn_tiling_key.h"
 #include "op_host/tiling_util.h"
+#include "util/shape_util.h"
 
 using namespace ge;
 namespace optiling {
@@ -208,28 +209,39 @@ ge::graphStatus MhcPreSinkhornTiling::GetShapeAttrsInfoInner()
     auto shapePhi = context_->GetInputShape(1);
     hcMix_ = shapePhi->GetStorageShape().GetDim(0);
     OP_CHECK_IF(shapePhi->GetStorageShape().GetDim(1) != d_ * hcMult_,
-                OP_LOGE(context_->GetNodeName(), "Phi dim 1 should be equal with d_ * hcMult_  %ld, but is %ld",
-                        d_ * hcMult_, shapePhi->GetStorageShape().GetDim(1)),
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    context_->GetNodeName(), "phi, x", Ops::Base::ToString(shapePhi->GetStorageShape()).c_str(),
+                    ("The 1st dim of input phi must be equal to the last dim of input x times hc_mult, which is " +
+                     std::to_string(d_ * hcMult_))
+                        .c_str()),
                 return ge::GRAPH_FAILED);
 
     auto shapeAlpha = context_->GetInputShape(2);
     int64_t scaleFirstDim = shapeAlpha->GetStorageShape().GetDim(0);
     OP_CHECK_IF(scaleFirstDim != 3,
-                OP_LOGE(context_->GetNodeName(), "alpha size should be equal with 3, but is %ld", scaleFirstDim),
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context_->GetNodeName(), "alpha",
+                                                          std::to_string(scaleFirstDim).c_str(),
+                                                          "The size of input alpha must be 3"),
                 return ge::GRAPH_FAILED);
 
     auto shapeBias = context_->GetInputShape(3);
     int64_t baseFirstDim = shapeBias->GetStorageShape().GetDim(0);
-    OP_CHECK_IF(baseFirstDim != hcMix_,
-                OP_LOGE(context_->GetNodeName(), "bias size should be equal with mixhc, but is %ld", baseFirstDim),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        baseFirstDim != hcMix_,
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            context_->GetNodeName(), "bias", std::to_string(baseFirstDim).c_str(),
+            ("The size of input bias must be equal to hc_mult * hc_mult + 2 * hc_mult = " + std::to_string(hcMix_))
+                .c_str()),
+        return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(GetAttr() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "get attr failed."),
+    OP_CHECK_IF(GetAttr() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "get attr failed."),
                 return ge::GRAPH_FAILED);
     // hcMult only support 4
-    OP_CHECK_IF(hcMult_ != HCMULT_VALUE,
-                OP_LOGE(context_->GetNodeName(), "hcMult should be %ld, but is %ld", HCMULT_VALUE, hcMult_),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        hcMult_ != HCMULT_VALUE,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "hc_mult", std::to_string(hcMult_).c_str(),
+                                              "The value of attribute hc_mult must be 4"),
+        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1012,7 +1024,8 @@ ge::graphStatus MhcPreSinkhornTiling::PostTiling()
     context_->SetBlockDim(static_cast<uint64_t>(tilingData_.get_cubeCoreNum()));
     if (tilingKey_ == MPMD_TILING_KEY) {
         auto ret = context_->SetScheduleMode(1);
-        OP_CHECK_IF(ret != ge::GRAPH_SUCCESS, OP_LOGE(context_, "Failed to set schedule mode to 1 for MhcPreSinkhorn."),
+        OP_CHECK_IF(ret != ge::GRAPH_SUCCESS,
+                    OP_LOGE_WITHOUT_REPORT(context_, "Failed to set schedule mode to 1 for MhcPreSinkhorn."),
                     return ge::GRAPH_FAILED);
     }
     size_t* workspaces = context_->GetWorkspaceSizes(1);

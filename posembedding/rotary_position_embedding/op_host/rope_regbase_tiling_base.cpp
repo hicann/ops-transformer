@@ -54,7 +54,8 @@ ge::graphStatus RopeRegBaseTilingClass::GetPlatformInfo()
         npuArch_ = ascendcPlatform.GetCurNpuArch();
     } else {
         auto compileInfoPtr = reinterpret_cast<const RotaryPositionEmbeddingCompileInfo*>(context_->GetCompileInfo());
-        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile info is null"), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "compile info is null"),
+                    return ge::GRAPH_FAILED);
         aicoreParams_.numBlocks = compileInfoPtr->numBlocks;
         aicoreParams_.ubSize = compileInfoPtr->ubSize;
         npuArch_ = compileInfoPtr->npuArch;
@@ -108,12 +109,23 @@ bool RopeRegBaseTilingClass::IsRotaryPosEmbeddingMode(const int64_t mode) const
 
 ge::graphStatus RopeRegBaseTilingClass::CheckShapeAllPositive() const
 {
-    OP_CHECK_IF(CheckShapeAllPositive(X_INDEX) != ge::GRAPH_SUCCESS, OP_LOGE(context_, "x has non positive shape."),
+    OP_CHECK_IF(CheckShapeAllPositive(X_INDEX) != ge::GRAPH_SUCCESS,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "x", ToString(context_->GetInputShape(X_INDEX)->GetStorageShape()).c_str(),
+                    "All dimensions of input x must be positive"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShapeAllPositive(COS_INDEX) != ge::GRAPH_SUCCESS, OP_LOGE(context_, "cos has non positive shape."),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShapeAllPositive(SIN_INDEX) != ge::GRAPH_SUCCESS, OP_LOGE(context_, "sin has non positive shape."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        CheckShapeAllPositive(COS_INDEX) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "cos",
+                                              ToString(context_->GetInputShape(COS_INDEX)->GetStorageShape()).c_str(),
+                                              "All dimensions of input cos must be positive"),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        CheckShapeAllPositive(SIN_INDEX) != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "sin",
+                                              ToString(context_->GetInputShape(SIN_INDEX)->GetStorageShape()).c_str(),
+                                              "All dimensions of input sin must be positive"),
+        return ge::GRAPH_FAILED);
     auto yShape = context_->GetOutputShape(Y_INDEX)->GetStorageShape();
     for (size_t i = 0; i < yShape.GetDimNum(); i++) {
         if (yShape.GetDim(i) <= 0) {
@@ -227,7 +239,8 @@ ge::graphStatus RopeRegBaseTilingClass::CheckShape()
         return ge::GRAPH_FAILED;
     }
     OP_CHECK_IF(CheckRotaryModeShapeRelation(xLastDim) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "D is invalid for rotary mode."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "D is invalid for rotary mode."),
+                return ge::GRAPH_FAILED);
     return CheckShapeAllPositive();
 }
 
@@ -263,15 +276,18 @@ ge::graphStatus RopeRegBaseTilingClass::CheckDtypeAndAttr()
 ge::graphStatus RopeRegBaseTilingClass::CheckParam()
 {
     auto platformInfo = context_->GetPlatformInfo();
-    OP_CHECK_IF(platformInfo == nullptr, OP_LOGE(context_, "platform info is nullptr."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(platformInfo == nullptr, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "platform info is nullptr."),
+                return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     if (!Ops::Transformer::OpTiling::IsRegbaseSocVersion(context_)) {
         return ge::GRAPH_SUCCESS;
     }
-    OP_CHECK_IF(CheckNullptr() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check nullptr fail."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckDtypeAndAttr() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check dtype and attr fail."),
+    OP_CHECK_IF(CheckNullptr() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "check nullptr fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckDtypeAndAttr() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "check dtype and attr fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckShape() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "check shape fail."),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShape() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check shape fail."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -340,13 +356,14 @@ ge::graphStatus RopeRegBaseTilingClass::GetShapeAttrsInfo()
     }
     rotaryMode_ = static_cast<RotaryPosEmbeddingMode>(modeValue);
 
-    OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check param fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "check param fail."),
+                return ge::GRAPH_FAILED);
 
     dtype_ = context_->GetInputDesc(X_INDEX)->GetDataType();
     auto& xShape = context_->GetInputShape(X_INDEX)->GetStorageShape();
     auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
     OP_CHECK_IF(JudgeLayoutByShape(xShape, cosShape) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "JudgeLayoutByShape fail."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "JudgeLayoutByShape fail."), return ge::GRAPH_FAILED);
 
     d_ = isTndLayout_ ? xShape.GetDim(DIM_2) : xShape.GetDim(DIM_3);
     if (is3dBsdLayout_) {

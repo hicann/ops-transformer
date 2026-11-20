@@ -97,8 +97,9 @@ ge::graphStatus MhcPreSinkhornBackward960DeterminiticTiling::GetShapeAttrsInfo()
     auto xShape = xShapePtr->GetStorageShape();
     auto xDimNum = xShape.GetDimNum();
     OP_CHECK_IF(xDimNum != 3 && xDimNum != 4,
-                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(),
-                                            "xShape verify failed, x must be 3D or 4D, but got %lu dims", xDimNum),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "x",
+                                                         (std::to_string(xDimNum) + " dims").c_str(),
+                                                         "The shape dim of input x must be 3 or 4"),
                 return ge::GRAPH_FAILED);
     auto skSumShape = skSumPtr->GetStorageShape();
 
@@ -115,7 +116,9 @@ ge::graphStatus MhcPreSinkhornBackward960DeterminiticTiling::GetShapeAttrsInfo()
         n_ = xShape.GetDim(1);
         c_ = xShape.GetDim(2);
         OP_CHECK_IF(CheckShapeBase(bs_, 1, n_, c_, true) != ge::GRAPH_SUCCESS,
-                    OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "CheckShape3D failed"),
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                        context_->GetNodeName(), "x", (std::to_string(xDimNum) + " dims").c_str(),
+                        "The shape dim of input x must be 3 and its dims must satisfy the TND layout constraints"),
                     return ge::GRAPH_FAILED);
     } else {
         int64_t batchSize = xShape.GetDim(BATCH_SIZE_DIM_IDX);
@@ -130,7 +133,8 @@ ge::graphStatus MhcPreSinkhornBackward960DeterminiticTiling::GetShapeAttrsInfo()
 
     OP_CHECK_IF(
         n_ <= 0 || n_ > MAX_N,
-        OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "n must be > 0 and <= %ld, but got %ld", MAX_N, n_),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "n", std::to_string(n_).c_str(),
+                                              ("The value of n must be > 0 and <= " + std::to_string(MAX_N)).c_str()),
         return ge::GRAPH_FAILED);
     OP_CHECK_IF(skIterCount_ != EXPECTED_SK_ITER_COUNT,
                 OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(), "sk_iter_count must be %ld, but got %ld",

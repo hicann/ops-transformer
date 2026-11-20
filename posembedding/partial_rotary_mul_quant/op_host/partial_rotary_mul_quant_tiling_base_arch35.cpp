@@ -21,6 +21,7 @@
 #include "partial_rotary_mul_quant_tiling.h"
 #include "log/log.h"
 #include <cstring>
+#include "util/shape_util.h"
 
 namespace {
 constexpr int64_t X_INDEX = 0;
@@ -45,6 +46,7 @@ constexpr int32_t ATTR_IDX_SLICE = 5;
 constexpr int32_t HIFLOAT4_QUANT_GROUP = 64;
 constexpr int32_t WORKSPACE_SIZE = 16 * 1024 * 1024;
 const std::vector<ge::DataType> SUPPORT_DTYPE = {ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT16};
+
 } // namespace
 
 namespace optiling {
@@ -105,10 +107,12 @@ ge::graphStatus QuantRopeRegBaseTilingClass::CheckNullptr()
 ge::graphStatus QuantRopeRegBaseTilingClass::CheckShapeAllPositive(const int64_t idx) const
 {
     auto shape = context_->GetInputShape(idx)->GetStorageShape();
+    static const std::vector<std::string> inputNames = {"x", "cos", "sin"};
     for (size_t i = 0; i < shape.GetDimNum(); i++) {
         OP_CHECK_IF(shape.GetDim(i) <= 0,
-                    OP_LOGE(context_->GetNodeName(), "input %ld has non positive shape, dim %lu actual %ld .", idx, i,
-                            shape.GetDim(i)),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        context_->GetNodeName(), inputNames[idx].c_str(), Ops::Base::ToString(shape).c_str(),
+                        ("All dimensions of input " + inputNames[idx] + " must be positive").c_str()),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -129,17 +133,30 @@ bool QuantRopeRegBaseTilingClass::IsRotaryPosEmbeddingMode(const int32_t mode) c
 ge::graphStatus QuantRopeRegBaseTilingClass::CheckShapeAllPositive() const
 {
     OP_CHECK_IF(CheckShapeAllPositive(X_INDEX) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "x has non positive shape."), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "x",
+                    Ops::Base::ToString(context_->GetInputShape(X_INDEX)->GetStorageShape()).c_str(),
+                    "All dimensions of input x must be positive"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(!noRope_ && CheckShapeAllPositive(COS_INDEX) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "cos has non positive shape."), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "cos",
+                    Ops::Base::ToString(context_->GetInputShape(COS_INDEX)->GetStorageShape()).c_str(),
+                    "All dimensions of input cos must be positive"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(!noRope_ && CheckShapeAllPositive(SIN_INDEX) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "sin has non positive shape."), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "sin",
+                    Ops::Base::ToString(context_->GetInputShape(SIN_INDEX)->GetStorageShape()).c_str(),
+                    "All dimensions of input sin must be positive"),
+                return ge::GRAPH_FAILED);
     auto yShape = context_->GetOutputShape(Y_INDEX)->GetStorageShape();
     for (size_t i = 0; i < yShape.GetDimNum(); i++) {
-        OP_CHECK_IF(yShape.GetDim(i) <= 0,
-                    OP_LOGE(context_->GetNodeName(), "output has non positive shape, dim %lu actual %ld .", i,
-                            yShape.GetDim(i)),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            yShape.GetDim(i) <= 0,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "y", Ops::Base::ToString(yShape).c_str(),
+                                                  "All dimensions of output y must be positive"),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -200,11 +217,10 @@ ge::graphStatus QuantRopeRegBaseTilingClass::CheckShape()
         OP_LOGE(context_->GetNodeName(), "dim of y_scale output expect 5, actual %lu.", yScaleShape.GetDimNum()),
         return ge::GRAPH_FAILED);
     OP_CHECK_IF(cosShape != sinShape,
-                OP_LOGE(context_->GetNodeName(),
-                        "shape of cos and sin should be same, actual cos shape is (%ld, %ld, %ld, %ld), sin shape is "
-                        "(%ld, %ld, %ld, %ld). ",
-                        cosShape.GetDim(DIM_0), cosShape.GetDim(DIM_1), cosShape.GetDim(DIM_2), cosShape.GetDim(DIM_3),
-                        sinShape.GetDim(DIM_0), sinShape.GetDim(DIM_1), sinShape.GetDim(DIM_2), sinShape.GetDim(DIM_3)),
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    context_->GetNodeName(), "cos, sin",
+                    (Ops::Base::ToString(cosShape) + " and " + Ops::Base::ToString(sinShape)).c_str(),
+                    "The shapes of input cos and input sin must be the same"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(xShape != yShape,
                 OP_LOGE(context_->GetNodeName(),
@@ -214,7 +230,8 @@ ge::graphStatus QuantRopeRegBaseTilingClass::CheckShape()
                         yShape.GetDim(DIM_0), yShape.GetDim(DIM_1), yShape.GetDim(DIM_2), yShape.GetDim(DIM_3)),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckRotaryModeShapeRelation(xShape.GetDim(DIM_3)) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "D is invalid for rotary mode."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "D is invalid for rotary mode."),
+                return ge::GRAPH_FAILED);
     return CheckShapeAllPositive();
 }
 
@@ -222,8 +239,9 @@ ge::graphStatus QuantRopeRegBaseTilingClass::CheckDtypeAndAttr()
 {
     dtype_ = context_->GetInputDesc(X_INDEX)->GetDataType();
     OP_CHECK_IF(std::find(SUPPORT_DTYPE.begin(), SUPPORT_DTYPE.end(), dtype_) == SUPPORT_DTYPE.end(),
-                OP_LOGE(context_->GetNodeName(), "Only support F32, BF16, F16 datetype, actual %s.",
-                        ge::TypeUtils::DataTypeToSerialString(dtype_).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "x",
+                                                      ge::TypeUtils::DataTypeToSerialString(dtype_).c_str(),
+                                                      "The dtype of input x must be FLOAT32, BFLOAT16 or FLOAT16"),
                 return ge::GRAPH_FAILED);
     for (int64_t i = X_INDEX; i <= SIN_INDEX; i++) {
         auto type = context_->GetInputDesc(i)->GetDataType();
@@ -256,11 +274,11 @@ ge::graphStatus QuantRopeRegBaseTilingClass::CheckParam()
     if (!IsRegbaseSocVersion()) {
         return ge::GRAPH_SUCCESS;
     }
-    OP_CHECK_IF(CheckNullptr() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "check nullptr fail."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckNullptr() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "check nullptr fail."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckDtypeAndAttr() != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "check dtype and attr fail."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShape() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "check shape fail."),
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "check dtype and attr fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckShape() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "check shape fail."),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -325,14 +343,19 @@ ge::graphStatus QuantRopeRegBaseTilingClass::CheckHiF4Support()
         return ge::GRAPH_FAILED;
     }
     if (sliceEnd_ != d_) {
-        OP_LOGE(context_->GetNodeName(), "slice end should be equals with last dim of d, but get %ld", sliceEnd_);
+        std::string reason =
+            "The end of attribute partial_slice must equal the last dim D of input x, which is " + std::to_string(d_);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "partial_slice",
+                                              std::to_string(sliceEnd_).c_str(), reason.c_str());
         return ge::GRAPH_FAILED;
     }
     const gert::RuntimeAttrs* attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is null"), return ge::GRAPH_FAILED);
     int64_t yDtypeValue = yDtype_;
     if (yDtypeValue != 1) {
-        OP_LOGE(context_->GetNodeName(), "y_dtype only support 1(hifloat4), but get %ld", yDtypeValue);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context_->GetNodeName(), "y_dtype", std::to_string(yDtypeValue).c_str(),
+            "The value of attribute y_dtype must be 1 (HiFloat4) for HiFloat4 quantization");
         return ge::GRAPH_FAILED;
     }
     if (rotaryMode_ != RotaryPosEmbeddingMode::HALF && rotaryMode_ != RotaryPosEmbeddingMode::INTERLEAVE) {
@@ -342,7 +365,12 @@ ge::graphStatus QuantRopeRegBaseTilingClass::CheckHiF4Support()
     }
 
     if (layout_ != RopeLayout::NO_BROADCAST && layout_ != RopeLayout::BROADCAST_BSN && layout_ != RopeLayout::SBND) {
-        OP_LOGE(context_->GetNodeName(), "input shape only support x(BSND) and cos(BSND/111D/B11D/BS1D) now.");
+        const auto& hif4XShape = context_->GetInputShape(X_INDEX)->GetStorageShape();
+        const auto& hif4CosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context_->GetNodeName(), "x and cos",
+            (Ops::Base::ToString(hif4XShape) + " and " + Ops::Base::ToString(hif4CosShape)).c_str(),
+            "The shape of input x must be BSND and the shape of input cos must be BSND, 111D, B11D or BS1D");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -354,9 +382,11 @@ ge::graphStatus QuantRopeRegBaseTilingClass::GetShapeAttrsInfo()
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is null"), return ge::GRAPH_FAILED);
     const int64_t* yDtype = attrs->GetAttrPointer<int64_t>(ATTR_IDX_Y_DTYPE);
     yDtype_ = yDtype == nullptr ? 0 : *yDtype;
-    OP_CHECK_IF(yDtype_ != 0 && yDtype_ != 1,
-                OP_LOGE(context_->GetNodeName(), "y_dtype must be 0 (HiFloat8) or 1 (HiFloat4)"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        yDtype_ != 0 && yDtype_ != 1,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "y_dtype", std::to_string(yDtype_).c_str(),
+                                              "The value of attribute y_dtype must be 0 (HiFloat8) or 1 (HiFloat4)"),
+        return ge::GRAPH_FAILED);
     const int64_t* rotaryMode = attrs->GetAttrPointer<int64_t>(ATTR_IDX_ROTARY_MODE);
     int64_t modeValue = rotaryMode == nullptr ? 0 : *rotaryMode;
     OP_CHECK_IF(modeValue < 0 || modeValue > 3,
@@ -378,7 +408,7 @@ ge::graphStatus QuantRopeRegBaseTilingClass::GetShapeAttrsInfo()
     }
     noRope_ = yDtype_ == 0 && sliceStart_ == sliceEnd_;
 
-    OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "check param fail."),
+    OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "check param fail."),
                 return ge::GRAPH_FAILED);
 
     dtype_ = context_->GetInputDesc(X_INDEX)->GetDataType();
@@ -390,7 +420,7 @@ ge::graphStatus QuantRopeRegBaseTilingClass::GetShapeAttrsInfo()
         layout_ = RopeLayout::BROADCAST_BSN;
     }
     OP_CHECK_IF(!noRope_ && JudgeLayoutByShape(xShape, cosShape) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "JudgeLayoutByShape fail."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "JudgeLayoutByShape fail."), return ge::GRAPH_FAILED);
 
     d_ = xShape.GetDim(DIM_3);
     cosd_ = cosShape.GetDim(DIM_3);
@@ -423,11 +453,20 @@ ge::graphStatus QuantRopeRegBaseTilingClass::GetShapeAttrsInfo()
         sliceEnd_ = d_;
     }
     sliceLength_ = sliceEnd_ - sliceStart_;
-    OP_CHECK_IF(JudgeSliceInfo() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "JudgeSliceInfo fail."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(JudgeSliceInfo() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "JudgeSliceInfo fail."), return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF((yDtype_ == 0 ? CheckHiF8Support() : CheckHiF4Support()) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "quantization parameters are not supported"), return ge::GRAPH_FAILED);
+    if ((yDtype_ == 0 ? CheckHiF8Support() : CheckHiF4Support()) != ge::GRAPH_SUCCESS) {
+        std::string reason = "quantization parameters are not supported, y_dtype is " + std::to_string(yDtype_) +
+                             ", rotary_mode is " + std::to_string(static_cast<int32_t>(rotaryMode_)) +
+                             ", partial_slice is [" + std::to_string(sliceStart_) + ", " + std::to_string(sliceEnd_) +
+                             "]";
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1009", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{context_->GetNodeName(), ("Parameter y_dtype: " + reason).c_str()}));
+        OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "%s", reason.c_str());
+        return ge::GRAPH_FAILED;
+    }
 
     scaleAttr_ = 1.0f;
     return ge::GRAPH_SUCCESS;

@@ -158,8 +158,14 @@ ge::graphStatus TilingSplitN(gert::TilingContext* context, uint32_t numHeads, ui
         totalHeadNum1Size += headDimAlign * FP32_DTYPE_SIZE * BF16_TBUF_NUM;
     }
     uint32_t ubCalcNNum{1}, ubCalcNLoop{numHeads}, ubCalcNTail{0};
-    OP_CHECK_IF(bufferSize < totalHeadNum1Size, OP_LOGE(context, "The D dimension of the input shape is too large."),
-                return ge::GRAPH_FAILED);
+    std::string shapeMsg = "D=" + std::to_string(headDimAlign) +
+                           ", required UB bytes=" + std::to_string(totalHeadNum1Size) +
+                           ", available UB bytes=" + std::to_string(bufferSize);
+    OP_CHECK_IF(
+        bufferSize < totalHeadNum1Size,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "x", shapeMsg.c_str(),
+                                              "The D axis of input x must be small enough to fit in the UB buffer"),
+        return ge::GRAPH_FAILED);
     ubCalcNNum = GetDiv(bufferSize, totalHeadNum1Size);
     ubCalcNLoop = GetCeilInt(numHeads, ubCalcNNum);
     ubCalcNTail = GetDivRem(numHeads, ubCalcNNum) != 0 ? numHeads - (ubCalcNLoop - 1) * ubCalcNNum : 0;
@@ -185,7 +191,7 @@ ge::graphStatus TilingSplitB(gert::TilingContext* context, uint32_t batchSize, u
     uint32_t ubCalcBNum{1}, ubCalcBLoop{batchSize}, ubCalcBTail{0};
     if (ubSize < tBufferSize || bufferSize < totalBatch1Size) {
         OP_CHECK_IF(TilingSplitN(context, numHeads, headDimAlign, ubSize, dataDtype, tilingKey) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context, "TilingSplitN fail."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "TilingSplitN fail."), return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     }
 
@@ -242,13 +248,13 @@ ge::graphStatus TilingSplitS(gert::TilingContext* context, uint64_t coreNum, uin
     }
     if (tBufferSize >= ubSize) {
         OP_CHECK_IF(TilingSplitN(context, numHeads, headDimAlign, ubSize, dataDtype, tilingKey) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context, "TilingSplitN fail."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "TilingSplitN fail."), return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     }
     if (ubSize < tBufferSize || bufferSize < totalSeq1Size) {
         OP_CHECK_IF(
             TilingSplitB(context, batchSize, numHeads, headDimAlign, ubSize, dataDtype, tilingKey) != ge::GRAPH_SUCCESS,
-            OP_LOGE(context, "TilingSplitB fail."), return ge::GRAPH_FAILED);
+            OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "TilingSplitB fail."), return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     }
     context->SetTilingKey(tilingKey);
@@ -336,7 +342,10 @@ ge::graphStatus TilingSplit(gert::TilingContext* context, const gert::StorageSha
         seqLenOut = cosShape2;
         batchSizeOut = xShape0 * xShape1; // BNSD -> (BN)S1D -> BS1D
     } else {
-        OP_LOGE(context, "The shape of the input x, cos and sin is not supported.");
+        std::string shapeMsg = ToString(xShape->GetStorageShape()) + ", " + ToString(cosShape->GetStorageShape());
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            context->GetNodeName(), "x, cos and sin", shapeMsg.c_str(),
+            "The B, S and N dims of input cos and sin must be 1 or equal to the same dims of input x");
         return ge::GRAPH_FAILED;
     }
     tiling.ropeInterleavedParams.set_batchSize(batchSizeOut);
@@ -345,7 +354,7 @@ ge::graphStatus TilingSplit(gert::TilingContext* context, const gert::StorageSha
     tiling.ropeInterleavedParams.set_headDim(xHeadDim);
 
     OP_CHECK_IF(TilingSplitS(context, coreNum, ubSize, tilingKey) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context, "TilingSplitS fail."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "TilingSplitS fail."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -363,7 +372,7 @@ ge::graphStatus RopeInterLeavedTilingClass::DoOpTiling()
     OP_CHECK_NULL_WITH_CONTEXT(context_, sinShape);
 
     OP_CHECK_IF(CheckInputShape(context_, xShape, cosShape, sinShape) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "CheckInputShape fail."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "CheckInputShape fail."), return ge::GRAPH_FAILED);
 
     auto dataDtype = context_->GetInputDesc(INPUT_X_IDX)->GetDataType();
     // tilingKey / 100 % 10 : 0=split_s  1=split_bs  2=split_bsn
@@ -379,7 +388,7 @@ ge::graphStatus RopeInterLeavedTilingClass::DoOpTiling()
     }
 
     OP_CHECK_IF(TilingSplit(context_, xShape, cosShape, tilingKey) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "TilingSplit fail."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "TilingSplit fail."), return ge::GRAPH_FAILED);
 
     OP_LOGD(context_->GetNodeName(), "[tilingKey]: %ld", context_->GetTilingKey());
     tiling.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());

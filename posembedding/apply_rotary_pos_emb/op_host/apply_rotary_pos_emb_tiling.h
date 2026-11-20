@@ -220,7 +220,7 @@ private:
     ge::graphStatus CheckParam();
     ge::graphStatus CheckShapeRelation();
     ge::graphStatus CheckRotaryModeShapeRelation(const int64_t& d);
-    ge::graphStatus CheckShapeAllPositive(const int64_t& idx, const gert::Shape& shape);
+    ge::graphStatus CheckShapeAllPositive(const int64_t& idx, const gert::Shape& shape, bool report = true);
     ge::graphStatus CheckShapeAllPositive();
     void ConvertRotaryMode();
     void SetBsnd();

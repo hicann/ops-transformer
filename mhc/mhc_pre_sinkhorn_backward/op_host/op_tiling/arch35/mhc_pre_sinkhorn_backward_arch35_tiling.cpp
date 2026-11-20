@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include <string>
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -15,6 +16,7 @@
 #include "register/op_def_registry.h"
 #include "tiling/platform/platform_ascendc.h"
 #include "err/ops_err.h"
+#include "graph/utils/type_utils.h"
 #include "mhc_pre_sinkhorn_backward_arch35_tiling.h"
 
 namespace optiling {
@@ -85,6 +87,11 @@ uint64_t CeilAlignU64(uint64_t a, uint64_t b)
 {
     return b == 0U ? 0U : (a + b - 1U) / b * b;
 }
+
+constexpr const char* INPUT_TENSOR_NAMES[] = {
+    "grad_hin", "grad_h_post", "grad_h_res",     "x",       "phi",     "alpha",
+    "bias",     "h_pre",       "hc_before_norm", "inv_rms", "sum_out", "norm_out"};
+constexpr const char* OUTPUT_TENSOR_NAMES[] = {"grad_x", "grad_phi", "grad_alpha", "grad_bias"};
 } // namespace
 
 bool MhcPreSinkhornBackwardArch35Tiling::IsCapable()
@@ -133,14 +140,19 @@ bool MhcPreSinkhornBackwardArch35Tiling::CheckTensorShape(uint32_t index, const 
     const auto& shape = inputShape->GetOriginShape();
     if (shape.GetDimNum() != rank) {
         if (logError) {
-            OP_LOGE(context_->GetNodeName(), "%s must have %zu dimensions, got %zu", name, rank, shape.GetDimNum());
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                context_->GetNodeName(), name, std::to_string(shape.GetDimNum()).c_str(),
+                (std::string("The shape dim of ") + name + " must be " + std::to_string(rank)).c_str());
         }
         return false;
     }
     for (size_t i = 0; i < rank; ++i) {
         if (shape.GetDim(i) != dims[i]) {
             if (logError) {
-                OP_LOGE(context_->GetNodeName(), "%s dim[%zu] must be %ld, got %ld", name, i, dims[i], shape.GetDim(i));
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), name,
+                    ("dim[" + std::to_string(i) + "]=" + std::to_string(shape.GetDim(i))).c_str(),
+                    ("The dim[" + std::to_string(i) + "] of " + name + " must be " + std::to_string(dims[i])).c_str());
             }
             return false;
         }
@@ -161,14 +173,19 @@ bool MhcPreSinkhornBackwardArch35Tiling::CheckOutputShape(uint32_t index, const 
     const auto& shape = outputShape->GetOriginShape();
     if (shape.GetDimNum() != rank) {
         if (logError) {
-            OP_LOGE(context_->GetNodeName(), "%s must have %zu dimensions, got %zu", name, rank, shape.GetDimNum());
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                context_->GetNodeName(), name, std::to_string(shape.GetDimNum()).c_str(),
+                (std::string("The shape dim of ") + name + " must be " + std::to_string(rank)).c_str());
         }
         return false;
     }
     for (size_t i = 0; i < rank; ++i) {
         if (shape.GetDim(i) != dims[i]) {
             if (logError) {
-                OP_LOGE(context_->GetNodeName(), "%s dim[%zu] must be %ld, got %ld", name, i, dims[i], shape.GetDim(i));
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), name,
+                    ("dim[" + std::to_string(i) + "]=" + std::to_string(shape.GetDim(i))).c_str(),
+                    ("The dim[" + std::to_string(i) + "] of " + name + " must be " + std::to_string(dims[i])).c_str());
             }
             return false;
         }
@@ -182,7 +199,9 @@ ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::CheckDataTypes() const
     OP_CHECK_IF(xDesc == nullptr, OP_LOGE(context_->GetNodeName(), "x descriptor is null"), return ge::GRAPH_FAILED);
     ge::DataType xType = xDesc->GetDataType();
     OP_CHECK_IF(xType != ge::DT_BF16 && xType != ge::DT_FLOAT16,
-                OP_LOGE(context_->GetNodeName(), "x must be BF16 or FP16, got dtype %d", static_cast<int32_t>(xType)),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "x",
+                                                      ge::TypeUtils::DataTypeToSerialString(xType).c_str(),
+                                                      "The dtype of input x must be BF16 or FLOAT16"),
                 return ge::GRAPH_FAILED);
 
     for (uint32_t index = 0; index <= NORM_OUT; ++index) {
@@ -190,20 +209,28 @@ ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::CheckDataTypes() const
         OP_CHECK_IF(desc == nullptr, OP_LOGE(context_->GetNodeName(), "input %u descriptor is null", index),
                     return ge::GRAPH_FAILED);
         ge::DataType expected = index == 0 || index == INPUT_X ? xType : ge::DT_FLOAT;
-        OP_CHECK_IF(desc->GetDataType() != expected,
-                    OP_LOGE(context_->GetNodeName(), "input %u dtype must be %d, got %d", index,
-                            static_cast<int32_t>(expected), static_cast<int32_t>(desc->GetDataType())),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            desc->GetDataType() != expected,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), INPUT_TENSOR_NAMES[index],
+                                                  ge::TypeUtils::DataTypeToSerialString(desc->GetDataType()).c_str(),
+                                                  (std::string("The dtype of input ") + INPUT_TENSOR_NAMES[index] +
+                                                   " must be " + ge::TypeUtils::DataTypeToSerialString(expected))
+                                                      .c_str()),
+            return ge::GRAPH_FAILED);
     }
     for (uint32_t index = OUTPUT_GRAD_X; index <= OUTPUT_GRAD_BIAS; ++index) {
         auto desc = context_->GetOutputDesc(index);
         OP_CHECK_IF(desc == nullptr, OP_LOGE(context_->GetNodeName(), "output %u descriptor is null", index),
                     return ge::GRAPH_FAILED);
         ge::DataType expected = index == OUTPUT_GRAD_X ? xType : ge::DT_FLOAT;
-        OP_CHECK_IF(desc->GetDataType() != expected,
-                    OP_LOGE(context_->GetNodeName(), "output %u dtype must be %d, got %d", index,
-                            static_cast<int32_t>(expected), static_cast<int32_t>(desc->GetDataType())),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            desc->GetDataType() != expected,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), OUTPUT_TENSOR_NAMES[index],
+                                                  ge::TypeUtils::DataTypeToSerialString(desc->GetDataType()).c_str(),
+                                                  (std::string("The dtype of output ") + OUTPUT_TENSOR_NAMES[index] +
+                                                   " must be " + ge::TypeUtils::DataTypeToSerialString(expected))
+                                                      .c_str()),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -218,15 +245,19 @@ ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::GetShapeAttrsInfo()
     const auto& xShape = xShapeInfo->GetOriginShape();
     xRank_ = static_cast<int64_t>(xShape.GetDimNum());
     OP_CHECK_IF(xRank_ != 3 && xRank_ != 4,
-                OP_LOGE(context_->GetNodeName(), "x must be 3D [T,N,C] or 4D [B,S,N,C], got rank %ld", xRank_),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "x", std::to_string(xRank_).c_str(),
+                                                         "The shape dim of input x must be 3 or 4"),
                 return ge::GRAPH_FAILED);
 
     const int64_t batchRank = xRank_ - 2;
     int64_t batchDims[2] = {xShape.GetDim(0), xRank_ == 4 ? xShape.GetDim(1) : 1};
-    OP_CHECK_IF(batchDims[0] < 0 || batchDims[1] < 0,
-                OP_LOGE(context_->GetNodeName(), "batch dimensions must be non-negative, got %ld and %ld", batchDims[0],
-                        batchDims[1]),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        batchDims[0] < 0 || batchDims[1] < 0,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context_->GetNodeName(), "x",
+            ("batch dim0=" + std::to_string(batchDims[0]) + ", batch dim1=" + std::to_string(batchDims[1])).c_str(),
+            "The batch dimensions of input x must be non-negative"),
+        return ge::GRAPH_FAILED);
     N_ = static_cast<uint64_t>(xShape.GetDim(xRank_ - 2));
     D_ = static_cast<uint64_t>(xShape.GetDim(xRank_ - 1));
     totalLength_ = static_cast<uint64_t>(xRank_ == 4 ? batchDims[0] * batchDims[1] : batchDims[0]);
@@ -238,7 +269,7 @@ ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::GetShapeAttrsInfo()
                         MAX_C_VALUE, C_ALIGNMENT, D_),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckDataTypes() != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "MhcPreSinkhornBackward dtype validation failed"),
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "MhcPreSinkhornBackward dtype validation failed"),
                 return ge::GRAPH_FAILED);
 
     fusionSize_ = (2 * N_) + (N_ * N_);
@@ -298,7 +329,7 @@ ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::GetShapeAttrsInfo()
                     !CheckTensorShape(9, "inv_rms", invDims, dataRank) ||
                     !CheckTensorShape(SUM_OUT, "sum_out", sumDims, dataRank + 1) ||
                     !CheckTensorShape(NORM_OUT, "norm_out", normDims, dataRank + 2),
-                OP_LOGE(context_->GetNodeName(), "MhcPreSinkhornBackward input shape validation failed"),
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "MhcPreSinkhornBackward input shape validation failed"),
                 return ge::GRAPH_FAILED);
 
     int64_t gradXDims[4] = {batchDims[0], batchDims[1], n, d};
@@ -309,12 +340,13 @@ ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::GetShapeAttrsInfo()
         gradXDims[1] = n;
         gradXDims[2] = d;
     }
-    OP_CHECK_IF(!CheckOutputShape(OUTPUT_GRAD_X, "grad_x", gradXDims, xExpectedRank) ||
-                    !CheckOutputShape(OUTPUT_GRAD_PHI, "grad_phi", gradPhiDims, 2) ||
-                    !CheckOutputShape(OUTPUT_GRAD_ALPHA, "grad_alpha", gradAlphaDims, 1) ||
-                    !CheckOutputShape(OUTPUT_GRAD_BIAS, "grad_bias", gradBiasDims, 1),
-                OP_LOGE(context_->GetNodeName(), "MhcPreSinkhornBackward output shape validation failed"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        !CheckOutputShape(OUTPUT_GRAD_X, "grad_x", gradXDims, xExpectedRank) ||
+            !CheckOutputShape(OUTPUT_GRAD_PHI, "grad_phi", gradPhiDims, 2) ||
+            !CheckOutputShape(OUTPUT_GRAD_ALPHA, "grad_alpha", gradAlphaDims, 1) ||
+            !CheckOutputShape(OUTPUT_GRAD_BIAS, "grad_bias", gradBiasDims, 1),
+        OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "MhcPreSinkhornBackward output shape validation failed"),
+        return ge::GRAPH_FAILED);
 
     auto attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attributes are null"), return ge::GRAPH_FAILED);

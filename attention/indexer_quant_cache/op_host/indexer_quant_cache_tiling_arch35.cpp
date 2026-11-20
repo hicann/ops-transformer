@@ -18,6 +18,7 @@
 #include "indexer_quant_cache_contract.h"
 #include "log/log.h"
 #include "err/ops_err.h"
+#include "util/shape_util.h"
 #include "indexer_quant_cache_tiling_arch35.h"
 
 using namespace ge;
@@ -156,24 +157,32 @@ ge::graphStatus IndexerQuantCacheTiling::ValidateCache4D(size_t inputIdx, const 
     OP_CHECK_NULL_WITH_CONTEXT(context_, shapePtr);
     const auto& logical = shapePtr->GetShape();
     OP_CHECK_IF(logical.GetDimNum() != CACHE_VIEW_DIM_NUM,
-                OP_LOGE(context_->GetNodeName(), "%s must be 4D [blockNum, blockSize, 1, headDim], got dimNum=%zu",
-                        inputName, logical.GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    context_->GetNodeName(), inputName, std::to_string(logical.GetDimNum()).c_str(),
+                    "The shape dim of the input must be exactly 4 with shape [blockNum, blockSize, 1, headDim]"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        logical.GetDim(CACHE_ONE_DIM) != CACHE_ONE_DIM_VALUE,
-        OP_LOGE(context_->GetNodeName(), "%s dim2 (second-to-last) must be 1 (one quantized vector per token), got %ld",
-                inputName, logical.GetDim(CACHE_ONE_DIM)),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(logical.GetDim(CACHE_ONE_DIM) != CACHE_ONE_DIM_VALUE,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), inputName, Ops::Base::ToString(logical).c_str(),
+                    "The dim 2 (second-to-last) of the input must be 1, i.e. one quantized vector per token"),
+                return ge::GRAPH_FAILED);
     // 连续场景的行宽(headDim)取末维; 分页 view 下随后由 view stride 覆盖, 此处仅作连续默认值。
     const auto& storage = shapePtr->GetStorageShape();
     OP_CHECK_IF(storage.GetDimNum() == 0 || logical.GetDim(CACHE_HEAD_DIM) <= 0,
-                OP_LOGE(context_->GetNodeName(), "%s has invalid storage or headDim", inputName),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    context_->GetNodeName(), inputName,
+                    ("storage dim num is " + std::to_string(storage.GetDimNum()) + " and headDim is " +
+                     std::to_string(logical.GetDim(CACHE_HEAD_DIM)))
+                        .c_str(),
+                    "The input must have a non-empty storage shape and a positive last dim (headDim)"),
                 return ge::GRAPH_FAILED);
     const int64_t blocks = logical.GetDim(CACHE_BLOCKNUM_DIM);
     const int64_t slotsPerBlock = logical.GetDim(CACHE_BLOCKSIZE_DIM);
     OP_CHECK_IF(blocks <= 0 || slotsPerBlock <= 0 || blocks > std::numeric_limits<int64_t>::max() / slotsPerBlock,
-                OP_LOGE(context_->GetNodeName(),
-                        "%s block dimensions must be positive and their product must fit int64", inputName),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), inputName, Ops::Base::ToString(logical).c_str(),
+                    "The blockNum (dim 0) and blockSize (dim 1) of the input must be positive and their product "
+                    "must fit int64"),
                 return ge::GRAPH_FAILED);
     lastDim = logical.GetDim(CACHE_HEAD_DIM);
     return ge::GRAPH_SUCCESS;
@@ -189,17 +198,38 @@ ge::graphStatus IndexerQuantCacheTiling::GetShapeAttrsInfoInner()
     auto slotMappingShape = shapeSlotMapping->GetStorageShape();
     uint32_t xDims = xStorageShape.GetDimNum();
     uint32_t slotMappingDims = slotMappingShape.GetDimNum();
-    OP_CHECK_IF(xDims < 2, OP_LOGE(context_->GetNodeName(), "x rank must be at least 2"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(xDims < 2,
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "x", std::to_string(xDims).c_str(),
+                                                         "The shape dim of input x must be at least 2"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(xDims - 1 != slotMappingDims,
-                OP_LOGE(context_->GetNodeName(), "slotMappingDims should equal xDims - 1"), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+                    context_->GetNodeName(), "slot_mapping, x",
+                    ("slot_mapping dim num is " + std::to_string(slotMappingDims) + " and x dim num is " +
+                     std::to_string(xDims))
+                        .c_str(),
+                    "The shape dim of input slot_mapping must equal the shape dim of input x minus 1"),
+                return ge::GRAPH_FAILED);
     int64_t bs = 1;
     for (uint32_t i = 0; i < slotMappingDims; i++) {
         int64_t temp = xStorageShape.GetDim(i);
-        OP_CHECK_IF(temp != slotMappingShape.GetDim(i),
-                    OP_LOGE(context_->GetNodeName(), "slotMappingShape should equal xStorageShape in dim %u", i),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            temp != slotMappingShape.GetDim(i),
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                context_->GetNodeName(), "slot_mapping, x",
+                ("shape " + Ops::Base::ToString(slotMappingShape) + " mismatches input x at dim " + std::to_string(i) +
+                 " (" + std::to_string(slotMappingShape.GetDim(i)) + " vs " + std::to_string(temp) + ")")
+                    .c_str(),
+                "The shape of input slot_mapping must equal the leading dims of input x"),
+            return ge::GRAPH_FAILED);
         OP_CHECK_IF(temp <= 0 || bs > std::numeric_limits<int64_t>::max() / temp,
-                    OP_LOGE(context_->GetNodeName(), "x leading dimensions must be positive and fit int64"),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        context_->GetNodeName(), "x",
+                        ("dim " + std::to_string(i) + " is " + std::to_string(temp) + " with leading product " +
+                         std::to_string(bs))
+                            .c_str(),
+                        "All leading dims of input x (all dims except the last) must be positive and their product "
+                        "must fit int64"),
                     return ge::GRAPH_FAILED);
         bs *= temp;
     }
@@ -209,14 +239,16 @@ ge::graphStatus IndexerQuantCacheTiling::GetShapeAttrsInfoInner()
     // x 尾轴 d 必须 32 对齐: MX 模式每 32 个元素一个 scale, 且各量化分支按 32 元素块对齐处理,
     // 非 32 对齐会导致尾块读越界/scale 错位。
     OP_CHECK_IF(d_ <= 0 || d_ % BLOCK_SIZE != 0,
-                OP_LOGE(context_->GetNodeName(), "the last dim (d) of x should be 32-aligned, got %ld", d_),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", std::to_string(d_).c_str(),
+                                                      "The last dim (d) of input x must be positive and 32-aligned"),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(d_ > D_LENGTH_FULL_LOAD,
-                OP_LOGE(context_->GetNodeName(), "input x tail dimension must be less than 8192, got %ld", d_),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x", std::to_string(d_).c_str(),
+                                                      "The last dim (d) of input x must be less than or equal to 8192"),
                 return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(GetAttr() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "get attr failed."),
+    OP_CHECK_IF(GetAttr() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "get attr failed."),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(quantMode_ < 0 || quantMode_ > HIFP4_QUANT_MODE,
                 OP_LOGE(context_->GetNodeName(), "quant_mode should be in [0,4], got %ld", quantMode_),
@@ -389,15 +421,22 @@ ge::graphStatus IndexerQuantCacheTiling::CalcOpTiling()
     // cache 行宽必须能容纳每行写出的 cacheCol, 否则散写越界到下一行。
     // (cacheCol 与 cacheRowStride_ 单位一致: MX-FP4 皆为字节, 其余皆为元素/字节)
     OP_CHECK_IF(cacheRowStride_ < cacheCol,
-                OP_LOGE(context_->GetNodeName(),
-                        "cache headDim(row stride, in cache elements/bytes)=%ld must be >= per-token "
-                        "quantized-x length=%ld",
-                        cacheRowStride_, cacheCol),
+                OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                    context_->GetNodeName(), "cache, x",
+                    ("cache headDim (row stride) is " + std::to_string(cacheRowStride_) +
+                     " and the per-token quantized-x length is " + std::to_string(cacheCol))
+                        .c_str(),
+                    "The headDim (row stride) of input cache must be greater than or equal to the per-token "
+                    "quantized-x length"),
                 return ge::GRAPH_FAILED);
     // cache_scale 行宽必须能容纳每行写出的 scaleCol(mode2: scaleCol=1), 否则散写越界到下一行。
     OP_CHECK_IF(scaleRowStride_ < scaleCol_,
-                OP_LOGE(context_->GetNodeName(), "cache_scale last dim(row stride)=%ld must be >= scaleCol=%ld",
-                        scaleRowStride_, scaleCol_),
+                OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                    context_->GetNodeName(), "cache_scale, cache",
+                    ("last dim (row stride) is " + std::to_string(scaleRowStride_) + " and scaleCol is " +
+                     std::to_string(scaleCol_))
+                        .c_str(),
+                    "The last dim (row stride) of input cache_scale must be greater than or equal to scaleCol"),
                 return ge::GRAPH_FAILED);
 
     tilingData_.set_bs(bs_);

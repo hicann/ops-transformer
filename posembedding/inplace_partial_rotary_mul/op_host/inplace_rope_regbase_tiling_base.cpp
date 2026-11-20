@@ -245,10 +245,12 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::CheckParam()
     if (!IsRegbaseSocVersion()) {
         return ge::GRAPH_SUCCESS;
     }
-    OP_CHECK_IF(CheckNullptr() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check nullptr fail."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckDtypeAndAttr() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check dtype and attr fail."),
+    OP_CHECK_IF(CheckNullptr() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check nullptr fail."),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShape() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check shape fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckDtypeAndAttr() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_, "check dtype and attr fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckShape() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check shape fail."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -351,7 +353,8 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::GetShapeAttrsInfo()
                 return ge::GRAPH_FAILED);
     rotaryMode_ = static_cast<InplacePartialRotaryPosEmbeddingMode>(modeValue);
 
-    OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check param fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check param fail."),
+                return ge::GRAPH_FAILED);
 
     dtype_ = context_->GetInputDesc(X_INDEX)->GetDataType();
     auto& xShape = context_->GetInputShape(X_INDEX)->GetStorageShape();
@@ -374,15 +377,18 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClass::GetShapeAttrsInfo()
         sliceEnd_ = expertRangeList[1];
     }
     sliceLength_ = sliceEnd_ - sliceStart_;
-    OP_CHECK_IF(JudgeSliceInfo() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "JudgeSliceInfo fail."),
+    OP_CHECK_IF(JudgeSliceInfo() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "JudgeSliceInfo fail."),
                 return ge::GRAPH_FAILED);
     if (!IsNoOp()) {
         OP_CHECK_IF(CheckRotaryModeShapeRelation(d_) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_, "CheckRotaryModeShapeRelation fail."), return ge::GRAPH_FAILED);
-        OP_CHECK_IF(CheckShapeAllPositive() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "CheckShapeAllPositive fail."),
-                    return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_, "CheckRotaryModeShapeRelation fail."), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            CheckShapeAllPositive() != ge::GRAPH_SUCCESS,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "x, cos, sin", ToString(xShape).c_str(),
+                                                  "All dimensions of the inputs x, cos and sin must be positive"),
+            return ge::GRAPH_FAILED);
         OP_CHECK_IF(JudgeLayoutByShape(xShape, cosShape) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_, "JudgeLayoutByShape fail."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_, "JudgeLayoutByShape fail."), return ge::GRAPH_FAILED);
 
         if (layout_ == InplacePartialRopeLayout::BSND) {
             b_ = xShape.GetDim(DIM_0);

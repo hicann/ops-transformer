@@ -302,9 +302,17 @@ static bool SetLayoutTiling(const gert::TilingContext* context, const std::vecto
             cosDimB = cosShapePerDim[DIM_ONE];
             cosDimN = cosShapePerDim[DIM_TWO];
             break;
-        default:
-            OP_LOGE(context->GetNodeName(), "The layout only supports BSND, BNSD, SBND");
+        default: {
+            std::string layoutMsg =
+                "undefined for dy shape (" + std::to_string(xShapePerDim[DIM_ZERO]) + ", " +
+                std::to_string(xShapePerDim[DIM_ONE]) + ", " + std::to_string(xShapePerDim[DIM_TWO]) + ", " +
+                std::to_string(xShapePerDim[DIM_THREE]) + ") and cos shape (" +
+                std::to_string(cosShapePerDim[DIM_ZERO]) + ", " + std::to_string(cosShapePerDim[DIM_ONE]) + ", " +
+                std::to_string(cosShapePerDim[DIM_TWO]) + ", " + std::to_string(cosShapePerDim[DIM_THREE]) + ")";
+            OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(context->GetNodeName(), "layout", layoutMsg.c_str(),
+                                                   "The layout of input dy and cos must be BSND, BNSD or SBND");
             return false;
+        }
     }
 
     tiling.ropeHalfGradParams.set_layout(layout);
@@ -349,7 +357,8 @@ static bool RopeHalfGradInitShapeInfo(const gert::TilingContext* context)
     }
 
     OP_CHECK_IF(!SetLayoutTiling(context, xShapePerDim, cosShapePerDim),
-                OP_LOGE(context->GetNodeName(), "[SetLayoutTiling] SetLayoutTiling failed."), return false);
+                OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "[SetLayoutTiling] SetLayoutTiling failed."),
+                return false);
 
     return true;
 }
@@ -437,7 +446,7 @@ static bool RopeHalfGradInitSplitInfo(const gert::TilingContext* context)
     }
 
     OP_CHECK_IF(!RopeHalfGradSetTiling(context, availableUbSize, maxCoreNum),
-                OP_LOGE(context->GetNodeName(), "RopeHalfGradSetTiling failed."), return false);
+                OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "RopeHalfGradSetTiling failed."), return false);
 
     return true;
 }
@@ -479,8 +488,9 @@ static bool RopeHalfGradInitParamInfo(const gert::TilingContext* context)
         strideInner = GetCeilInt(dimB / cosDimB * dimN / cosDimN * dimD - dimD, dataEachBlock);
         stridePadInner = (dimB / cosDimB * dimN / cosDimN * dimD - dimD / CHUNK_SIZE) * dtypeSize;
     } else {
-        OP_LOGE(context->GetNodeName(), "The layout only supports BSND, BNSD, SBND, got layout = %lu.",
-                tiling.ropeHalfGradParams.get_layout());
+        std::string layoutMsg = "layout key " + std::to_string(tiling.ropeHalfGradParams.get_layout());
+        OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(context->GetNodeName(), "layout", layoutMsg.c_str(),
+                                               "The layout of input dy and cos must be BSND, BNSD or SBND");
         return false;
     }
 
@@ -539,16 +549,24 @@ ge::graphStatus RopeRotateHalfGradTlingClass::DoOpTiling()
     OP_LOGD("RopeHalfGradTiling tiling start");
 
     OP_CHECK_IF(RopeHalfGradShapeDimCheck(context_) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "RopeHalfGradShapeDimCheck not support."), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    context_->GetNodeName(), "dy", "shape dim check failed",
+                    "The shape dims of the inputs must satisfy the supported BSND, BNSD or SBND layouts"),
+                return ge::GRAPH_FAILED);
     OP_LOGD("RopeHalfGradTiling RopeHalfGradShapeDimCheck");
-    OP_CHECK_IF(!RopeHalfGradInitShapeInfo(context_),
-                OP_LOGE(context_->GetNodeName(), "RopeHalfGradInitShapeInfo not support."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        !RopeHalfGradInitShapeInfo(context_),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "dy, cos", "shape check failed",
+                                              "The shapes of the inputs must satisfy the supported broadcast layout"),
+        return ge::GRAPH_FAILED);
     OP_LOGD("RopeHalfGradTiling RopeHalfGradInitShapeInfo");
     OP_CHECK_IF(!RopeHalfGradInitSplitInfo(context_),
-                OP_LOGE(context_->GetNodeName(), "RopeHalfGradInitSplitInfo not support."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "RopeHalfGradInitSplitInfo not support."),
+                return ge::GRAPH_FAILED);
     OP_LOGD("RopeHalfGradTiling RopeHalfGradInitSplitInfo");
     OP_CHECK_IF(!RopeHalfGradInitParamInfo(context_),
-                OP_LOGE(context_->GetNodeName(), "RopeHalfGradInitParamInfo not support."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "RopeHalfGradInitParamInfo not support."),
+                return ge::GRAPH_FAILED);
     OP_LOGD("RopeHalfGradTiling RopeHalfGradInitParamInfo");
 
     RopeHalfGradPrintParam(context_);

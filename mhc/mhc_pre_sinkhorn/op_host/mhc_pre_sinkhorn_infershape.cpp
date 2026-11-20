@@ -15,6 +15,7 @@
 
 #include "log/log.h"
 #include "register/op_impl_registry.h"
+#include "util/shape_util.h"
 
 using namespace ge;
 
@@ -57,7 +58,8 @@ static ge::graphStatus InferShapeForMhcPreSinkhorn(gert::InferShapeContext* cont
 
     const size_t xDimNum = xShape->GetDimNum();
     OP_CHECK_IF((xDimNum != DIM_THREE) && (xDimNum != DIM_FOUR),
-                OP_LOGE(context->GetNodeName(), "x dim must be 3 or 4, but got %zu.", xDimNum),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "x", std::to_string(xDimNum).c_str(),
+                                                         "The shape dim of input x must be 3 or 4"),
                 return ge::GRAPH_FAILED);
 
     int64_t batch = 1;

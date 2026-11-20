@@ -644,7 +644,10 @@ ge::graphStatus RotateHalfTiling::CheckStrideSupport(const ge::DataType inputDty
         stride = (nSize - 1) * dLength * bytePerData / BYTE_OF_BLOCK;
     }
     OP_CHECK_IF(stride > UINT16_MAX,
-                OP_LOGE(context, "DataCopy Stride should be less than [%lu], but got [%lu].", UINT16_MAX, stride),
+                OP_LOGE_FOR_INVALID_STRIDE(
+                    context->GetNodeName(), "x", ("DataCopy stride is " + std::to_string(stride)).c_str(),
+                    ("DataCopy stride must be less than or equal to " + std::to_string(UINT16_MAX) + " (65535) blocks")
+                        .c_str()),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -708,7 +711,7 @@ ge::graphStatus RotateHalfTiling::DoRotateHalfTiling()
     tilingData_.set_gmLength(gmLength);
     auto shapeCheckRes = CheckShapeSupport(xShape, cosShape, sinShape, dLength);
     if (ge::GRAPH_SUCCESS != shapeCheckRes) {
-        OP_LOGE(context, "input shape does not meet the requirements.");
+        OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "input shape does not meet the requirements.");
         return shapeCheckRes;
     }
 
@@ -747,23 +750,37 @@ ge::graphStatus RotateHalfTiling::DoRotateHalfTiling()
                 OP_LOGE(context, "current soc only supports d = 32/64/96/128."), return ge::GRAPH_FAILED);
 
     ChooseTilingMode(xShape, cosShape);
+    std::string layoutMsg = "undefined for x shape " + ToString(xShape) + " and cos shape " + ToString(cosShape);
     OP_CHECK_IF(tilingData_.get_tilingMode() == TILING_MODE_UNKNOWN,
-                OP_LOGE(context, "unknown input layout, unable to calculate."), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(context->GetNodeName(), "layout", layoutMsg.c_str(),
+                                                       "The layout of input x and cos must be BSND, BNSD or SBND"),
+                return ge::GRAPH_FAILED);
 
     // block some layout=BNSD case, use small operators for higher performance
+    std::string bnsdMsg =
+        "BNSD for x shape " + ToString(xShape) + " and cos shape " + ToString(cosShape) +
+        ", B * N = " + std::to_string(tilingData_.get_broadcastFirstDim() * tilingData_.get_broadcastSecondDim()) +
+        ", D = " + std::to_string(dLength) +
+        (tilingData_.get_isAligned() == 1 ? ", D is aligned" : ", D is not aligned");
     OP_CHECK_IF(CheckBnsdBlockSkip(),
-                OP_LOGE(context, "when input is BNSD layout and  B * N is large or D is not aligned, "
-                                 "please do not use RotaryPositionEmbedding fusion operator."),
+                OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(
+                    context->GetNodeName(), "layout", bnsdMsg.c_str(),
+                    "The BNSD layout of input x and cos is not supported when B * N is large or D is not aligned, "
+                    "please do not use RotaryPositionEmbedding fusion operator"),
                 return ge::GRAPH_FAILED);
 
     tilingKey = GetTilingKey(tilingData_.get_tilingMode(), tilingDtype);
     CalcRotateHalfTiling(inputDtype, ubSize);
     OP_CHECK_IF(!tilingData_.get_tailAxesFLBoost() && tilingData_.get_storeSLines() <= 0,
-                OP_LOGE(context, "head_dim shape is too large to compute."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context->GetNodeName(),
+                                       "head_dim shape is too large to compute, D is %lu and the UB store lines is %ld",
+                                       dLength, tilingData_.get_storeSLines()),
+                return ge::GRAPH_FAILED);
 
     if (ascendcPlatform.GetCurNpuArch() == Ops::Base::DAV_2002) {
         OP_CHECK_IF(ge::GRAPH_SUCCESS != CheckStrideSupport(inputDtype),
-                    OP_LOGE(context, "Stride is too large to compute."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "Stride is too large to compute."),
+                    return ge::GRAPH_FAILED);
     }
 
     PrintTilingParams();
@@ -777,7 +794,7 @@ ge::graphStatus RopeRotateHalfTilingClass::DoOpTiling()
 
     auto tilingRes = rotateHalfTiling.DoRotateHalfTiling();
     if (ge::GRAPH_SUCCESS != tilingRes) {
-        OP_LOGE(context_->GetNodeName(), "DoRotateHalfTiling failed.");
+        OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "DoRotateHalfTiling failed.");
         return tilingRes;
     }
 

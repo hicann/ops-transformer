@@ -343,7 +343,10 @@ static ge::graphStatus TilingSplitS(gert::TilingContext* context, uint64_t coreN
 
     uint64_t reserveBufferSize = ONE_BLOCK;
     if (ubSize < reserveBufferSize) {
-        OP_LOGE(context->GetNodeName(), "Because the size of the shape D is too large, it exceeds the ub range!");
+        std::string shapeSizeMsg = "D = " + std::to_string(headDim) + ", ubSize = " + std::to_string(ubSize) + " bytes";
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            context->GetNodeName(), "dy", shapeSizeMsg.c_str(),
+            "The D axis of input dy is too large, its UB buffer requirement must not exceed the UB capacity");
         return ge::GRAPH_FAILED;
     }
 
@@ -393,7 +396,10 @@ ge::graphStatus TilingLayoutSplit(gert::TilingContext* context, const gert::Stor
         tiling.ropeInterleavedGradParams.set_headDim(xHeadDim);
         layout = LAYOUT_SBND;
     } else {
-        OP_LOGE(context->GetNodeName(), "The shape of the input x, cos and sin is not supported.");
+        std::string shapeMsg = ToString(xShape->GetStorageShape()) + " and " + ToString(cosShape->GetStorageShape());
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+            context->GetNodeName(), "dy, cos", shapeMsg.c_str(),
+            "The shapes of input dy and cos must form a supported BSND, BNSD or SBND broadcast layout");
         return ge::GRAPH_FAILED;
     }
     if (tiling.ropeInterleavedGradParams.get_batchSize() * tiling.ropeInterleavedGradParams.get_numHeads() >= MAX_BN) {
@@ -415,10 +421,11 @@ ge::graphStatus RopeInterLeavedGradTlingClass::DoOpTiling()
     const gert::StorageShape* sinShape = context_->GetInputShape(INPUT_SIN_IDX);
 
     OP_CHECK_IF(RopeCheckInputShape(context_, xShape, cosShape, sinShape) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "RopeCheckInputShape fail."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "RopeCheckInputShape fail."), return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(RopeCheckOptInputShape(context_) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "RopeCheckOptInputShape fail."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "RopeCheckOptInputShape fail."),
+                return ge::GRAPH_FAILED);
 
     tilingKey = BASE_TILING_KEY;
     auto dataDtype = context_->GetInputDesc(INPUT_GRAD_IDX)->GetDataType();
@@ -437,7 +444,7 @@ ge::graphStatus RopeInterLeavedGradTlingClass::DoOpTiling()
         return ge::GRAPH_FAILED;
     }
     OP_CHECK_IF(TilingLayoutSplit(context_, xShape, cosShape) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "TilingSplitS fail."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "TilingSplitS fail."), return ge::GRAPH_FAILED);
 
     context_->SetTilingKey(tilingKey);
     tiling.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());

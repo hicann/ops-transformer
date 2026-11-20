@@ -13,6 +13,7 @@
  * \brief
  */
 
+#include <string>
 #include "inplace_partial_rotary_mul_tiling.h"
 
 namespace optiling {
@@ -35,7 +36,9 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassAB::DoOpTiling()
     }
     int64_t typeSize = ge::GetSizeByDataType(dtype_);
     if (typeSize == 0) {
-        OP_LOGE(context_->GetNodeName(), "InplacePartialRopeRegBaseTilingClassAB DoOpTiling error, typeSize == 0");
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+            context_->GetNodeName(), "x", std::to_string(static_cast<int32_t>(dtype_)).c_str(),
+            "The element size of input x dtype must be greater than 0, the dtype is invalid");
         return ge::GRAPH_FAILED;
     }
     dAlign_ = CeilAlign(sliceLength_ / dSplitCoef_, blockSize_ / typeSize) * dSplitCoef_;
@@ -44,7 +47,9 @@ ge::graphStatus InplacePartialRopeRegBaseTilingClassAB::DoOpTiling()
     bool isMixedPrecision = (dtype_ == ge::DT_BF16 || dtype_ == ge::DT_FLOAT16) && cosDtype == ge::DT_FLOAT;
     int64_t cosTypeSize = ge::GetSizeByDataType(cosDtype);
     if (cosTypeSize == 0) {
-        OP_LOGE(context_->GetNodeName(), "InplacePartialRopeRegBaseTilingClassAB DoOpTiling error, cosTypeSize == 0");
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+            context_->GetNodeName(), "cos", std::to_string(static_cast<int32_t>(cosDtype)).c_str(),
+            "The element size of input cos dtype must be greater than 0, the dtype is invalid");
         return ge::GRAPH_FAILED;
     }
     int64_t dAlignCosSin = CeilAlign(sliceLength_ / dSplitCoef_, blockSize_ / cosTypeSize) * dSplitCoef_;

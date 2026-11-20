@@ -210,7 +210,7 @@ ge::graphStatus ApplyRotaryPosEmbTiling::GetInputParams(gert::TilingContext* con
 ge::graphStatus ApplyRotaryPosEmbTiling::CheckParams(gert::TilingContext* context, ApplyRotaryPosEmbParams& params)
 {
     OP_CHECK_IF(GetInputParams(context, params) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context->GetNodeName(), "GetInputParams failed"), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "GetInputParams failed"), return ge::GRAPH_FAILED);
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
     const int64_t* layoutAttr = attrs->GetAttrPointer<int64_t>(0);
@@ -443,8 +443,8 @@ ge::graphStatus ApplyRotaryPosEmbTiling::Compute(gert::TilingContext* context, A
         params.qcdHalfNum = params.lastDim / params.mask; // D 计算时的repeat次数（按列计算），至少会执行一次，不能为0
         return ge::GRAPH_SUCCESS;
     }
-    OP_CHECK_IF(ComputeAB(context, params) != ge::GRAPH_SUCCESS, OP_LOGE(context->GetNodeName(), "ComputeAB failed"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(ComputeAB(context, params) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "ComputeAB failed"), return ge::GRAPH_FAILED);
     OP_LOGD(context->GetNodeName(), "ApplyRotaryPosEmb compute end");
     return ge::GRAPH_SUCCESS;
 }
@@ -598,12 +598,12 @@ protected:
         ApplyRotaryPosEmbTiling tilingObject(context_);
         ApplyRotaryPosEmbTilingData tilingData;
         if (tilingObject.CheckParams(context_, params) != ge::GRAPH_SUCCESS) {
-            OP_LOGE(context_->GetNodeName(), "CheckParams return failed.");
+            OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "CheckParams return failed.");
             return ge::GRAPH_FAILED;
         }
 
         if (tilingObject.Compute(context_, params) != ge::GRAPH_SUCCESS) {
-            OP_LOGE(context_->GetNodeName(), "Compute return failed.");
+            OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "Compute return failed.");
             return ge::GRAPH_FAILED;
         }
 

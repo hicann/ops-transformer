@@ -12,6 +12,7 @@
  * \file inplace_partial_rotary_mul_grad_regbase_tiling_ab.cpp
  * \brief AB template tiling for InplacePartialRotaryMulGrad (SBND layout, BS+N blocking)
  */
+#include <string>
 #include "inplace_partial_rotary_mul_grad_regbase_tiling.h"
 namespace optiling {
 constexpr uint64_t TILING_KEY_AB = 204;
@@ -81,7 +82,9 @@ ge::graphStatus InplacePartialRotaryMulGradRegbaseTilingAb::DoOpTiling()
 
     if (bs <= coreNum / CONST_TWO) {
         if (blockNumBS_ == 0) {
-            OP_LOGE(context_->GetNodeName(), "blockNumBS_ == 0");
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "blockNumBS",
+                                                  std::to_string(blockNumBS_).c_str(),
+                                                  "The block number of the BS axis must be greater than 0");
             return ge::GRAPH_FAILED;
         }
         blockNumN_ = coreNum / blockNumBS_;

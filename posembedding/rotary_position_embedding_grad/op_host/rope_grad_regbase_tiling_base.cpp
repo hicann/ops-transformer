@@ -146,21 +146,21 @@ bool RopeGradRegBaseTilingClass::IsRotaryPosEmbeddingMode(const int64_t mode) co
 ge::graphStatus RopeGradRegBaseTilingClass::CheckShapeAllPositive() const
 {
     // 所有输入/输出均放行 0 维（空进空出）；"dy 非空仅 cos/sin 空"由广播约束/D 维校验天然拦截，无需在此拦截
-    OP_CHECK_IF(CheckInPutShapeAllPositive(DY_INDEX) != ge::GRAPH_SUCCESS, OP_LOGE(context_, "dy has negative shape."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckInPutShapeAllPositive(DY_INDEX) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_, "dy has negative shape."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckInPutShapeAllPositive(COS_INDEX) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "cos has negative shape."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_, "cos has negative shape."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(CheckInPutShapeAllPositive(SIN_INDEX) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "sin has negative shape."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckOutPutShapeAllPositive(DX_INDEX) != ge::GRAPH_SUCCESS, OP_LOGE(context_, "dx has negative shape."),
-                return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_, "sin has negative shape."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckOutPutShapeAllPositive(DX_INDEX) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_, "dx has negative shape."), return ge::GRAPH_FAILED);
     if (context_->GetInputShape(X_INDEX) != nullptr) {
         OP_CHECK_IF(CheckInPutShapeAllPositive(X_INDEX) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_, "x has negative shape."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_, "x has negative shape."), return ge::GRAPH_FAILED);
         OP_CHECK_IF(CheckOutPutShapeAllPositive(DCOS_INDEX) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_, "dcos has negative shape."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_, "dcos has negative shape."), return ge::GRAPH_FAILED);
         OP_CHECK_IF(CheckOutPutShapeAllPositive(DSIN_INDEX) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(context_, "dsin has negative shape."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_, "dsin has negative shape."), return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -325,9 +325,9 @@ ge::graphStatus RopeGradRegBaseTilingClass::CheckShape()
 {
     auto& cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
     auto& dyShape = context_->GetInputShape(DY_INDEX)->GetStorageShape();
-    OP_CHECK_IF(CheckShapeDim() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check shape dim fail."),
+    OP_CHECK_IF(CheckShapeDim() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check shape dim fail."),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShapeLimit() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "CheckShapeLimit fail."),
+    OP_CHECK_IF(CheckShapeLimit() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "CheckShapeLimit fail."),
                 return ge::GRAPH_FAILED);
     isTndLayout_ = (dyShape.GetDimNum() == DIM_NUM_TND);
     int64_t dyLastDim = isTndLayout_ ? dyShape.GetDim(DIM_2) : dyShape.GetDim(DIM_3);
@@ -340,7 +340,7 @@ ge::graphStatus RopeGradRegBaseTilingClass::CheckShape()
         return ge::GRAPH_FAILED;
     }
     OP_CHECK_IF(CheckRotaryModeShapeRelation(dyLastDim) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "D is invalid for rotary mode."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_, "D is invalid for rotary mode."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -392,12 +392,18 @@ ge::graphStatus RopeGradRegBaseTilingClass::CheckParam()
     if (!Ops::Transformer::OpTiling::IsRegbaseSocVersion(context_)) {
         return ge::GRAPH_SUCCESS;
     }
-    OP_CHECK_IF(CheckNullptr() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check nullptr fail."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckDtypeAndAttr() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check dtype and attr fail."),
+    OP_CHECK_IF(CheckNullptr() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check nullptr fail."),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShape() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check shape fail."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CheckShapeAllPositive() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check shape positive fail."),
+    OP_CHECK_IF(CheckDtypeAndAttr() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_, "check dtype and attr fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckShape() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check shape fail."),
                 return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        CheckShapeAllPositive() != ge::GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "dy, cos, sin, dx",
+                                              ToString(context_->GetInputShape(DY_INDEX)->GetStorageShape()).c_str(),
+                                              "All dimensions of the inputs and outputs must be positive"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -466,13 +472,14 @@ ge::graphStatus RopeGradRegBaseTilingClass::GetShapeAttrsInfo()
     }
     rotaryMode_ = static_cast<RotaryPosEmbeddingMode>(modeValue);
 
-    OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE(context_, "check param fail."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(CheckParam() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(context_, "check param fail."),
+                return ge::GRAPH_FAILED);
 
     dtype_ = context_->GetInputDesc(DY_INDEX)->GetDataType();
     dyShape_ = context_->GetInputShape(DY_INDEX)->GetStorageShape();
     cosShape_ = context_->GetInputShape(COS_INDEX)->GetStorageShape();
     OP_CHECK_IF(JudgeLayoutByShape(dyShape_, cosShape_) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_, "JudgeLayoutByShape fail."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_, "JudgeLayoutByShape fail."), return ge::GRAPH_FAILED);
 
     d_ = isTndLayout_ ? dyShape_.GetDim(DIM_2) : dyShape_.GetDim(DIM_3);
     if (is3dBsdLayout_) {
@@ -621,13 +628,15 @@ ge::graphStatus RopeGradRegBaseTilingClass::TilingReduce()
     Ops::Base::ReduceOpCompileInfo opInfo;
     if (compileInfo == nullptr) {
         OP_CHECK_IF((GetReduceOpCompileInfo(&opInfo) == ge::GRAPH_FAILED),
-                    OP_LOGE(context_->GetNodeName(), "GetReduceOpCompileInfo failed"), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "GetReduceOpCompileInfo failed"),
+                    return ge::GRAPH_FAILED);
     } else {
         opInfo = compileInfo->opInfo;
     }
     Ops::Base::ReduceOpInputParam opInput;
     OP_CHECK_IF((GetInputParam(opInput, 0, 1) == ge::GRAPH_FAILED),
-                OP_LOGE(context_->GetNodeName(), "ReduceOp get dy input param failed"), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "ReduceOp get dy input param failed"),
+                return ge::GRAPH_FAILED);
     ge::graphStatus status;
     if (ge::GetSizeByDataType(opInput.inputDtype) == sizeof(float)) {
         status = Ops::Base::Tiling4ReduceOp<
@@ -638,8 +647,8 @@ ge::graphStatus RopeGradRegBaseTilingClass::TilingReduce()
             RotaryPositionEmbeddingGrad::RotaryPositionEmbeddingGradDag<Ops::Base::half, float>::OpDag>(
             context_, opInput, key_, &opInfo, &tilingData_->reduceTiling);
     }
-    OP_CHECK_IF((status == ge::GRAPH_FAILED), OP_LOGE(context_->GetNodeName(), "ReduceOp Tiling failed."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF((status == ge::GRAPH_FAILED),
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "ReduceOp Tiling failed."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

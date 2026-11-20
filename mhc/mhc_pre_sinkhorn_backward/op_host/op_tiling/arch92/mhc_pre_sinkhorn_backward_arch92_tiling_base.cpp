@@ -51,25 +51,35 @@ ge::graphStatus VerifyShape(const char* opName, const char* tensorName, const ge
 {
     const gert::Shape& shape = shapePtr->GetStorageShape();
     size_t expectedDimNum = startDim + batchDimCount + suffixDims.size();
-    OP_CHECK_IF(shape.GetDimNum() != expectedDimNum,
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify failed, %s must be %luD, but got %lu dims", tensorName,
-                                            expectedDimNum, shape.GetDimNum()),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        shape.GetDimNum() != expectedDimNum,
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            opName, tensorName, (std::to_string(shape.GetDimNum()) + " dims").c_str(),
+            (std::string("The shape dim of ") + tensorName + " must be " + std::to_string(expectedDimNum)).c_str()),
+        return ge::GRAPH_FAILED);
 
     size_t dimIdx = startDim;
     for (size_t i = 0; i < batchDimCount; i++) {
         OP_CHECK_IF(shape.GetDim(dimIdx) != batchDims[i],
-                    OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify %s dim[%lu] failed: expected %ld, got %ld",
-                                                tensorName, dimIdx, batchDims[i], shape.GetDim(dimIdx)),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        opName, tensorName,
+                        ("dim[" + std::to_string(dimIdx) + "]=" + std::to_string(shape.GetDim(dimIdx))).c_str(),
+                        ("The dim[" + std::to_string(dimIdx) + "] of " + tensorName + " must be " +
+                         std::to_string(batchDims[i]))
+                            .c_str()),
                     return ge::GRAPH_FAILED);
         dimIdx++;
     }
 
     for (auto expected : suffixDims) {
-        OP_CHECK_IF(shape.GetDim(dimIdx) != expected,
-                    OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify %s dim[%lu] failed: expected %ld, got %ld",
-                                                tensorName, dimIdx, expected, shape.GetDim(dimIdx)),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            shape.GetDim(dimIdx) != expected,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                opName, tensorName,
+                ("dim[" + std::to_string(dimIdx) + "]=" + std::to_string(shape.GetDim(dimIdx))).c_str(),
+                ("The dim[" + std::to_string(dimIdx) + "] of " + tensorName + " must be " + std::to_string(expected))
+                    .c_str()),
+            return ge::GRAPH_FAILED);
         dimIdx++;
     }
 
@@ -165,8 +175,9 @@ ge::graphStatus MhcPreSinkhornBackward960Tiling::GetShapeAttrsInfo()
     }
     auto xShape = xShapePtr->GetStorageShape();
     OP_CHECK_IF(xShape.GetDimNum() != 4,
-                OPS_REPORT_VECTOR_INNER_ERR(context_->GetNodeName(),
-                                            "xShape verify failed, x must be 4D, but got %lu dims", xShape.GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "x",
+                                                         (std::to_string(xShape.GetDimNum()) + " dims").c_str(),
+                                                         "The shape dim of input x must be 4"),
                 return ge::GRAPH_FAILED);
     auto skSumShape = skSumPtr->GetStorageShape();
 
@@ -217,33 +228,33 @@ ge::graphStatus MhcPreSinkhornBackward960Tiling::CheckShapeBase(int64_t batchSiz
         batchDimCount = 2;
     }
 
-    auto gradHin = GetInputShapeChecked(context_, opName, "gradHin", GRAD_HIN_IDX);
+    auto gradHin = GetInputShapeChecked(context_, opName, "grad_hin", GRAD_HIN_IDX);
     if (!gradHin) {
         return ge::GRAPH_FAILED;
     }
-    if (VerifyShape(opName, "gradHin", gradHin, batchPrefix, batchDimCount, {c}) != ge::GRAPH_SUCCESS) {
+    if (VerifyShape(opName, "grad_hin", gradHin, batchPrefix, batchDimCount, {c}) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
-    auto gradHPost = GetInputShapeChecked(context_, opName, "gradHPost", GRAD_H_POST_IDX);
+    auto gradHPost = GetInputShapeChecked(context_, opName, "grad_h_post", GRAD_H_POST_IDX);
     if (!gradHPost) {
         return ge::GRAPH_FAILED;
     }
-    if (VerifyShape(opName, "gradHPost", gradHPost, batchPrefix, batchDimCount, {n}) != ge::GRAPH_SUCCESS) {
+    if (VerifyShape(opName, "grad_h_post", gradHPost, batchPrefix, batchDimCount, {n}) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
-    auto gradHRes = GetInputShapeChecked(context_, opName, "gradHRes", GRAD_H_RES_IDX);
+    auto gradHRes = GetInputShapeChecked(context_, opName, "grad_h_res", GRAD_H_RES_IDX);
     if (!gradHRes) {
         return ge::GRAPH_FAILED;
     }
     auto gradHResDimNum = gradHRes->GetStorageShape().GetDimNum();
     if (gradHResDimNum == batchDimCount + 1) {
-        if (VerifyShape(opName, "gradHRes", gradHRes, batchPrefix, batchDimCount, {n * n}) != ge::GRAPH_SUCCESS) {
+        if (VerifyShape(opName, "grad_h_res", gradHRes, batchPrefix, batchDimCount, {n * n}) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
     } else if (gradHResDimNum == batchDimCount + 2) {
-        if (VerifyShape(opName, "gradHRes", gradHRes, batchPrefix, batchDimCount, {n, n}) != ge::GRAPH_SUCCESS) {
+        if (VerifyShape(opName, "grad_h_res", gradHRes, batchPrefix, batchDimCount, {n, n}) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
     } else {
@@ -276,83 +287,88 @@ ge::graphStatus MhcPreSinkhornBackward960Tiling::CheckShapeBase(int64_t batchSiz
         return ge::GRAPH_FAILED;
     }
 
-    auto hPre = GetInputShapeChecked(context_, opName, "hPre", H_PRE_IDX);
+    auto hPre = GetInputShapeChecked(context_, opName, "h_pre", H_PRE_IDX);
     if (!hPre) {
         return ge::GRAPH_FAILED;
     }
-    if (VerifyShape(opName, "hPre", hPre, batchPrefix, batchDimCount, {n}) != ge::GRAPH_SUCCESS) {
+    if (VerifyShape(opName, "h_pre", hPre, batchPrefix, batchDimCount, {n}) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
-    auto hcBeforeNorm = GetInputShapeChecked(context_, opName, "hcBeforeNorm", HC_BEFORE_NORM_IDX);
+    auto hcBeforeNorm = GetInputShapeChecked(context_, opName, "hc_before_norm", HC_BEFORE_NORM_IDX);
     if (!hcBeforeNorm) {
         return ge::GRAPH_FAILED;
     }
-    if (VerifyShape(opName, "hcBeforeNorm", hcBeforeNorm, batchPrefix, batchDimCount, {hcMix}) != ge::GRAPH_SUCCESS) {
+    if (VerifyShape(opName, "hc_before_norm", hcBeforeNorm, batchPrefix, batchDimCount, {hcMix}) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
-    auto invRms = GetInputShapeChecked(context_, opName, "invRms", INV_RMS_IDX);
+    auto invRms = GetInputShapeChecked(context_, opName, "inv_rms", INV_RMS_IDX);
     if (!invRms) {
         return ge::GRAPH_FAILED;
     }
-    if (VerifyShape(opName, "invRms", invRms, batchPrefix, batchDimCount, {(int64_t)1}) != ge::GRAPH_SUCCESS) {
+    if (VerifyShape(opName, "inv_rms", invRms, batchPrefix, batchDimCount, {(int64_t)1}) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
-    auto sumOut = GetInputShapeChecked(context_, opName, "sumOut", SUM_OUT_IDX);
+    auto sumOut = GetInputShapeChecked(context_, opName, "sum_out", SUM_OUT_IDX);
     if (!sumOut) {
         return ge::GRAPH_FAILED;
     }
-    if (VerifyShape(opName, "sumOut", sumOut, batchPrefix, batchDimCount, {n}, 1) != ge::GRAPH_SUCCESS) {
+    if (VerifyShape(opName, "sum_out", sumOut, batchPrefix, batchDimCount, {n}, 1) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     OP_CHECK_IF(sumOut->GetStorageShape().GetDim(0) % ITER_COUNT_DIVISOR != 0,
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify sumOut failed, dim0 must be even, but got %ld",
-                                            sumOut->GetStorageShape().GetDim(0)),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, "sum_out",
+                                                      std::to_string(sumOut->GetStorageShape().GetDim(0)).c_str(),
+                                                      "The dim0 of input sum_out must be even (2*iter_count)"),
                 return ge::GRAPH_FAILED);
 
-    auto normOut = GetInputShapeChecked(context_, opName, "normOut", NORM_OUT_IDX);
+    auto normOut = GetInputShapeChecked(context_, opName, "norm_out", NORM_OUT_IDX);
     if (!normOut) {
         return ge::GRAPH_FAILED;
     }
-    if (VerifyShape(opName, "normOut", normOut, batchPrefix, batchDimCount, {n, n}, 1) != ge::GRAPH_SUCCESS) {
+    if (VerifyShape(opName, "norm_out", normOut, batchPrefix, batchDimCount, {n, n}, 1) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     OP_CHECK_IF(normOut->GetStorageShape().GetDim(0) != sumOut->GetStorageShape().GetDim(0),
-                OPS_REPORT_VECTOR_INNER_ERR(opName, "ShapeVerify normOut dim0(%ld) must equal sumOut dim0(%ld)",
-                                            normOut->GetStorageShape().GetDim(0), sumOut->GetStorageShape().GetDim(0)),
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                    opName, "norm_out, sum_out",
+                    ("norm_out dim0=" + std::to_string(normOut->GetStorageShape().GetDim(0)) +
+                     ", sum_out dim0=" + std::to_string(sumOut->GetStorageShape().GetDim(0)))
+                        .c_str(),
+                    "The dim0 of input norm_out must equal the dim0 of input sum_out"),
                 return ge::GRAPH_FAILED);
 
-    auto gradX = GetOutputShapeChecked(context_, opName, "gradX", GRAD_X_IDX);
+    auto gradX = GetOutputShapeChecked(context_, opName, "grad_x", GRAD_X_IDX);
     if (!gradX) {
         return ge::GRAPH_FAILED;
     }
-    if (VerifyShape(opName, "gradX", gradX, batchPrefix, batchDimCount, {n, c}) != ge::GRAPH_SUCCESS) {
+    if (VerifyShape(opName, "grad_x", gradX, batchPrefix, batchDimCount, {n, c}) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
-    auto gradPhi = GetOutputShapeChecked(context_, opName, "gradPhi", GRAD_PHI_IDX);
+    auto gradPhi = GetOutputShapeChecked(context_, opName, "grad_phi", GRAD_PHI_IDX);
     if (!gradPhi) {
         return ge::GRAPH_FAILED;
     }
-    if (VerifyShape(opName, "gradPhi", gradPhi, nullptr, 0, {hcMix, n * c}) != ge::GRAPH_SUCCESS) {
+    if (VerifyShape(opName, "grad_phi", gradPhi, nullptr, 0, {hcMix, n * c}) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
-    auto gradAlpha = GetOutputShapeChecked(context_, opName, "gradAlpha", GRAD_ALPHA_IDX);
+    auto gradAlpha = GetOutputShapeChecked(context_, opName, "grad_alpha", GRAD_ALPHA_IDX);
     if (!gradAlpha) {
         return ge::GRAPH_FAILED;
     }
-    if (VerifyShape(opName, "gradAlpha", gradAlpha, nullptr, 0, {(int64_t)ALPHA_SIZE_3}) != ge::GRAPH_SUCCESS) {
+    if (VerifyShape(opName, "grad_alpha", gradAlpha, nullptr, 0, {(int64_t)ALPHA_SIZE_3}) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
-    auto gradBias = GetOutputShapeChecked(context_, opName, "gradBias", GRAD_BIAS_IDX);
+    auto gradBias = GetOutputShapeChecked(context_, opName, "grad_bias", GRAD_BIAS_IDX);
     if (!gradBias) {
         return ge::GRAPH_FAILED;
     }
-    if (VerifyShape(opName, "gradBias", gradBias, nullptr, 0, {hcMix}) != ge::GRAPH_SUCCESS) {
+    if (VerifyShape(opName, "grad_bias", gradBias, nullptr, 0, {hcMix}) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
