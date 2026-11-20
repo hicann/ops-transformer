@@ -248,6 +248,26 @@ Ascend 950支持的算子分类和算子列表如下：
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/mla_prolog_v4/README.md">mla_prolog_v4</a></td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>AI Core</td>
+    <td>非量化输入的MLA前处理，支持Q和Cache量化。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/quant_mla_prolog/README.md">quant_mla_prolog</a></td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>AI Core</td>
+    <td>量化输入的MLA前处理。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/quant_lightning_indexer/README.md">quant_lightning_indexer</a></td>
     <td>✓</td>
     <td>✓</td>

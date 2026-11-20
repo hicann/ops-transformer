@@ -6668,8 +6668,8 @@ def validate_quant_scale_value(quant_scale_kv):
         )
     if quant_scale_kv is not None:
         scale = quant_scale_kv.detach().cpu().item()
-        if not math.isfinite(scale) or scale < 0:
-            raise ValueError("quant_scale_kv must be finite and non-negative")
+        if not math.isfinite(scale):
+            raise ValueError("quant_scale_kv must be finite")
 
 
 # NPU dispatcher delegates to the same single-launch implementation; cache_mode is

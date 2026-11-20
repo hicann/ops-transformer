@@ -84,6 +84,7 @@
 |[mhc_pre_sinkhorn](../../mhc/mhc_pre_sinkhorn/docs/torchapi_mhc_pre_sinkhorn.md)|基于一系列计算得到MHC架构中hidden层的$\mathbf{H}'_{\text{res}}$和$\mathbf{H}_{\text{post}}$投影矩阵以及Attention或MLP层的输入矩阵$\mathbf{h}_{\text{in}}$。对$\mathbf{H}'_{\text{res}}$矩阵执行Sinkhorn迭代归一化变换，最终得到双随机矩阵$\mathbf{H}_{\text{res}}$；支持输出中间计算结果，用于反向梯度计算。其中，该接口在Cube中的计算模式为HF32。|默认支持确定性计算|默认支持确定性计算|
 |[mixed_quant_sparse_flash_mla](../../attention/mixed_quant_sparse_flash_mla/docs/torchapi_mixed_quant_sparse_flash_mla.md)|量化场景下基于共享KV完成MixedQuantSparseFlashMla稀疏注意力计算。需与`mixed_quant_sparse_flash_mla_metadata`配套使用。|默认支持确定性计算|默认支持确定性计算|
 |[mla_prolog](../../attention/mla_prolog_v3/docs/torchapi_mla_prolog.md)|调用`MlaPrologV4WeightNz`完成MLA Decoder前向中Query/KV相关预处理。|默认支持确定性计算|默认支持确定性计算|
+|[mla_prolog_v2](../../attention/mla_prolog_v4/docs/torchapi_mla_prolog_v2.md)|非量化输入的MLA前处理，支持Q和Cache量化。|-|默认支持确定性计算|
 |[moe_finalize_routing](../../moe/moe_finalize_routing_v2/docs/torchapi_moe_finalize_routing.md)|将各专家FFN的输出结果按路由权重加权合并，还原为原始token序列。|默认支持确定性计算|默认支持确定性计算|
 |[moe_finalize_routing_grad](../../moe/moe_finalize_routing_v2_grad/docs/torchapi_moe_finalize_routing_grad.md)|`moe_finalize_routing`的反向接口，封装aclnnMoeFinalizeRoutingV2Grad。|默认支持确定性计算|默认支持确定性计算|
 |[moe_init_routing](../../moe/moe_init_routing_v4/docs/torchapi_moe_init_routing.md)|MoE的routing计算，根据moe_gating_top_k_softmax的计算结果做routing处理，支持非量化、静态量化和动态量化模式。|默认支持确定性计算|默认支持确定性计算|
@@ -100,6 +101,7 @@
 |[quant_flash_attn_grad](../../attention/quant_flash_attn_grad/docs/torchapi_quant_flash_attn_grad.md)| 调用`QuantFlashAttnGrad`算子完成HiF8量化场景下的全量化注意力计算，训练推理归一化。|-|默认支持确定性计算|
 |[quant_lightning_indexer](../../attention/quant_lightning_indexer_v2/docs/torchapi_quant_lightning_indexer.md)| 基于量化输入得到每个token对应的TopK位置，并支持输出候选逻辑块及每行有效候选数。|默认支持确定性计算。|默认支持确定性计算。|
 |[quant_lightning_indexer_metadata](../../attention/quant_lightning_indexer_v2/docs/torchapi_quant_lightning_indexer.md#quant_lightning_indexer_metadata)| 生成quant_lightning_indexer所需的任务划分信息，支持候选配置。|默认支持确定性计算。|默认支持确定性计算。|
+|[quant_mla_prolog](../../attention/quant_mla_prolog/docs/torchapi_quant_mla_prolog.md)|量化输入的MLA前处理。|-|默认支持确定性计算|
 |[quant_reduce_scatter](../../mc2/quant_reduce_scatter/docs/torchapi_quant_reduce_scatter.md)|实现quant + reduceScatter融合计算。|-|-|
 |[quant_sparse_flash_mla](../../attention/quant_sparse_flash_mla/docs/torchapi_quant_sparse_flash_mla.md)|调用`QuantSparseFlashMla`算子完成共享KV（Key和Value使用同一份输入）的稀疏注意力计算。|-|默认支持确定性计算|
 |[quant_sparse_lightning_indexer](../../attention/quant_sparse_lightning_indexer/docs/torchapi_quant_sparse_lightning_indexer.md)|`quant_lightning_indexer`候选模式（candidate consumer）的torch接口，消费第一级输出的块级候选索引，只在候选块范围内做token级TopK。需与`quant_lightning_indexer`配对使用。|默认支持确定性计算|默认支持确定性计算|

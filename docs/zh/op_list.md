@@ -548,6 +548,26 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/mla_prolog_v4/README.md">mla_prolog_v4</a></td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>AI Core</td>
+    <td>非量化输入的MLA前处理，支持Q和Cache量化。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
+    <td><a href="../../attention/quant_mla_prolog/README.md">quant_mla_prolog</a></td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>AI Core</td>
+    <td>量化输入的MLA前处理。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/msa_index_score/README.md">msa_index_score</a></td>
     <td>✓</td>
     <td>✓</td>

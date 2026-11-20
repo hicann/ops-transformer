@@ -13254,8 +13254,8 @@ def validate_quant_scale(quant_scale_kv):
         )
     value = float(quant_scale_kv.detach().cpu().item())
     require(
-        _math.isfinite(value) and value >= 0,
-        "quant_scale_kv must be finite and nonnegative",
+        _math.isfinite(value),
+        "quant_scale_kv must be finite",
     )
 
 
