@@ -274,9 +274,8 @@ struct QuantConfig {
     using QuantScaleType = typename std::conditional<(QuantMode >= E5M2_QUANT), fp8_e8m0_t, float>::type;
 
     static constexpr AxWMode AXW_MODE = ResolveAxWMode<WeightType, QuantOutType>();
-    using ActivationQuantOutType = QuantOutType;
-    static_assert(!Std::IsSame<ActivationQuantOutType, fp4x2_e2m1_t>::value || AXW_MODE == AxWMode::A4W4,
-                  "FP4 SwiGLU output requires A4W4");
+    using ActivationQuantOutType =
+        typename std::conditional<AXW_MODE == AxWMode::A4W4, fp8_e4m3fn_t, QuantOutType>::type;
 
     static constexpr uint32_t A_ELEMS_PER_BYTE = PackedElementTraits<QuantOutType>::ELEMENTS_PER_BYTE;
     static constexpr uint32_t B_ELEMS_PER_BYTE = PackedElementTraits<WeightType>::ELEMENTS_PER_BYTE;

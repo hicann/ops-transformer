@@ -10,7 +10,7 @@
 
 /*!
  * \file mega_moe_apt_arch92.cpp
- * \brief arch92 A8W8/A4W4 MTE 1C1V 核函数入口。
+ * \brief arch92 A8W8、原生 A8W4 及 A4W4 MTE 1C1V 核函数入口。
  */
 
 #if __has_include("version/asc_devkit_version.h") && __has_include("version/hcomm_version.h")
@@ -76,10 +76,7 @@ __global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds,
     ((ORIG_DTYPE_WEIGHT1 == DT_FLOAT8_E5M2) || (ORIG_DTYPE_WEIGHT1 == DT_FLOAT8_E4M3FN) || \
      (ORIG_DTYPE_WEIGHT1 == DT_FLOAT4_E2M1)) && \
     defined(ORIG_DTYPE_WEIGHT2) && (ORIG_DTYPE_WEIGHT2 == ORIG_DTYPE_WEIGHT1)
-    constexpr auto moeMode = MegaMoeImpl::QuantConfig<MoeWeightType, DispatchQuantOutType>::AXW_MODE;
-    constexpr auto sharedMode = MegaMoeImpl::QuantConfig<SharedWeightType, SharedQuantOutType>::AXW_MODE;
-    constexpr bool supportedModes = moeMode != MegaMoeImpl::AxWMode::A8W4 && sharedMode != MegaMoeImpl::AxWMode::A8W4;
-    if constexpr (CommModeType == TILINGKEY_TPL_MTE && supportedModes) {
+    if constexpr (CommModeType == TILINGKEY_TPL_MTE) {
         MegaMoeImpl::MegaMoeMteWave<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, MoeWeightType, FORMAT_WEIGHT1, FORMAT_WEIGHT2,
                                     SharedWeightType, FORMAT_SHARED_WEIGHT1, FORMAT_SHARED_WEIGHT2,
                                     DispatchQuantOutType, SharedQuantOutType>

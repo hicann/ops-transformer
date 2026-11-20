@@ -11,7 +11,7 @@
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <vector>
-#include "../../../../op_kernel/arch35_92/common/mega_moe_gm_layout.h"
+#include "../../../../op_kernel/arch92/common/mega_moe_layout_arch92.h"
 
 namespace MegaMoeUT {
 using namespace MegaMoeImpl;
@@ -48,7 +48,7 @@ TEST(MegaMoeWorkspace, LayoutsSupportConstantEvaluation)
             params.dedupMode = topology == TOPO_TYPE_MTE ? 3 : DEDUP_MODE_SERVER_COMBINE;
             params.ring = CalcCclStageRingConfig(params);
             const WorkspaceLayout arch35(params);
-            const WorkspaceLayout arch92(params, WorkspaceLayout::Arch92{GMM_MODE_A4W4_ND, GMM_MODE_A4W4_NZ});
+            const auto arch92 = LayoutArch92::MakeWorkspaceLayout(params, GMM_MODE_A4W4_ND, GMM_MODE_A4W4_NZ);
             CclCommLayoutParams comm{};
             comm.topoType = topology;
             comm.h = params.h;
@@ -203,7 +203,7 @@ TEST(MegaMoeWorkspace, SharedGmm1InputKeepsTopologyStorageContract)
     EXPECT_EQ(ubx.shared.gmm1Input.data.offsetBytes, -1);
     EXPECT_EQ(ubx.shared.gmm1Input.scale.offsetBytes, -1);
     // 本次仅调整 Arch35 Layered，Arch92 的连续输入布局保留。
-    WorkspaceLayout arch92(p, WorkspaceLayout::Arch92{GMM_MODE_A8W8_ND, GMM_MODE_A8W8_ND});
+    auto arch92 = LayoutArch92::MakeWorkspaceLayout(p, GMM_MODE_A8W8_ND, GMM_MODE_A8W8_ND);
     EXPECT_GT(arch92.shared.gmm1Input.data.sizeBytes, 0);
     EXPECT_GT(arch92.shared.gmm1Input.scale.sizeBytes, 0);
     p.topoType = TOPO_TYPE_MTE;
@@ -232,7 +232,7 @@ TEST(MegaMoeWorkspace, UrmaSharedCompletionCountersAreResetPerTokenGroup)
                               layout.reset.flags.offsetBytes + layout.reset.flags.sizeBytes);
                 }
                 // Arch92 的同步布局保持不变，不分配 Arch35 URMA 的完成计数。
-                WorkspaceLayout arch92(p, WorkspaceLayout::Arch92{GMM_MODE_A8W8_ND, GMM_MODE_A8W8_ND});
+                auto arch92 = LayoutArch92::MakeWorkspaceLayout(p, GMM_MODE_A8W8_ND, GMM_MODE_A8W8_ND);
                 EXPECT_EQ(arch92.urma.sync.sharedGmm2Tiles.offsetBytes, -1);
             }
         }
@@ -256,28 +256,50 @@ TEST(MegaMoeWorkspace, RingReuseAndServerCombineRetainCapacityBoundaries)
     EXPECT_GT(server.urma.serverCombine.tokenBitmaps.sizeBytes, 0);
 }
 
-TEST(MegaMoeWorkspace, Arch92KeepsFullRowsAndPackedActivation)
+TEST(MegaMoeWorkspace, Arch92KeepsFp4DispatchAndUsesFp8Activation)
 {
     auto p = MakeLayoutParams();
     p.reserveGmm1Output = false;
     p.sharedExpertNum = 1;
     p.ring = CalcCclStageRingConfig(p);
-    WorkspaceLayout layout(p, WorkspaceLayout::Arch92{GMM_MODE_A4W4_ND, GMM_MODE_A4W4_NZ});
+    auto layout = LayoutArch92::MakeWorkspaceLayout(p, GMM_MODE_A4W4_ND, GMM_MODE_A4W4_NZ);
     EXPECT_EQ(layout.routed.gmm1Input.data.sizeBytes, p.maxOutputSize * p.h / 2);
     EXPECT_EQ(layout.routed.gmm1Output.sizeBytes, p.maxOutputSize * p.hiddenDim * sizeof(uint16_t));
-    EXPECT_EQ(layout.routed.gmm2Input.data.sizeBytes, p.maxOutputSize * p.hiddenDim / 4);
-    EXPECT_EQ(layout.shared.gmm2Input.data.sizeBytes, 33280);
+    EXPECT_EQ(layout.routed.gmm2Input.data.sizeBytes, p.maxOutputSize * p.hiddenDim / 2);
+    EXPECT_EQ(layout.shared.gmm2Input.data.sizeBytes, 66048);
     EXPECT_EQ(layout.routing.recvPrefixBackup.offsetBytes, -1);
+}
+
+TEST(MegaMoeWorkspace, Arch92W4ModesKeepFp8Gmm2InputsForBothExpertGroups)
+{
+    for (uint8_t moeMode : {GMM_MODE_A8W8_ND, GMM_MODE_A8W4_NZ, GMM_MODE_A4W4_NZ}) {
+        for (uint8_t sharedMode : {GMM_MODE_A8W8_ND, GMM_MODE_A8W4_NZ, GMM_MODE_A4W4_NZ}) {
+            auto p = MakeLayoutParams();
+            p.sharedExpertNum = 2;
+            p.sharedInputIndependent = true;
+            const auto layout = LayoutArch92::MakeWorkspaceLayout(p, moeMode, sharedMode);
+            const auto fp8Bound = LayoutArch92::MakeWorkspaceLayout(p, GMM_MODE_A8W8_ND, GMM_MODE_A8W8_ND);
+            EXPECT_LE(layout.workspaceSize, fp8Bound.workspaceSize);
+            EXPECT_EQ(layout.routed.gmm2Input.data.sizeBytes, p.maxOutputSize * p.hiddenDim / 2);
+            EXPECT_EQ(layout.shared.gmm2Input.data.sizeBytes,
+                      MemoryLayoutDetail::CeilAlign(p.bs * p.sharedExpertNum * p.hiddenDim / 2,
+                                                    MemoryLayoutDetail::ALIGN_512));
+            EXPECT_LE(layout.routed.gmm2Input.data.offsetBytes + layout.routed.gmm2Input.data.sizeBytes,
+                      layout.routed.gmm2Input.scale.offsetBytes);
+            EXPECT_LE(layout.shared.gmm2Input.data.offsetBytes + layout.shared.gmm2Input.data.sizeBytes,
+                      layout.shared.gmm2Input.scale.offsetBytes);
+        }
+    }
 }
 
 TEST(MegaMoeWorkspace, Arch92UrmaKeepsOptionalGmmOutputAndFp8Activation)
 {
     auto p = MakeLayoutParams();
     p.topoType = TOPO_TYPE_URMA;
-    WorkspaceLayout fp8(p, WorkspaceLayout::Arch92{GMM_MODE_A8W8_ND, GMM_MODE_A8W8_ND});
+    auto fp8 = LayoutArch92::MakeWorkspaceLayout(p, GMM_MODE_A8W8_ND, GMM_MODE_A8W8_ND);
     EXPECT_EQ(fp8.routed.gmm1Output.offsetBytes, -1);
     EXPECT_GT(fp8.routing.recvPrefixBackup.sizeBytes, 0);
-    WorkspaceLayout fp4(p, WorkspaceLayout::Arch92{GMM_MODE_A4W4_ND, GMM_MODE_A8W8_ND});
+    auto fp4 = LayoutArch92::MakeWorkspaceLayout(p, GMM_MODE_A4W4_ND, GMM_MODE_A8W8_ND);
     EXPECT_EQ(fp4.routed.gmm2Input.data.sizeBytes, p.maxOutputSize * p.hiddenDim / 2);
 }
 
@@ -318,7 +340,7 @@ TEST(MegaMoeWorkspace, ActivationReaderCountersCoverUbAndPrefetchWriters)
     p.ring.activation = false;
     EXPECT_EQ(WorkspaceLayout(p).mte.sync.gmm2ConsumedRowTiles.sizeBytes, 0);
     p.ring = CalcCclStageRingConfig(p);
-    EXPECT_EQ(WorkspaceLayout(p, WorkspaceLayout::Arch92{GMM_MODE_A8W8_ND, GMM_MODE_A8W8_ND})
+    EXPECT_EQ(LayoutArch92::MakeWorkspaceLayout(p, GMM_MODE_A8W8_ND, GMM_MODE_A8W8_ND)
                   .mte.sync.gmm2ConsumedRowTiles.sizeBytes,
               0);
 }
@@ -392,7 +414,7 @@ TEST(MegaMoeWorkspace, RingOwnershipIsAbsentForFullRowsAndOtherArchitectures)
     bf16.dispatchInputStorage = {MemoryLayoutDetail::BF16_BITS};
     bf16.activationOutputStorage = {MemoryLayoutDetail::BF16_BITS};
     empty(WorkspaceLayout(bf16));
-    empty(WorkspaceLayout(p, WorkspaceLayout::Arch92{GMM_MODE_A4W4_ND, GMM_MODE_A4W4_NZ}));
+    empty(LayoutArch92::MakeWorkspaceLayout(p, GMM_MODE_A4W4_ND, GMM_MODE_A4W4_NZ));
     for (int64_t topology : {TOPO_TYPE_URMA, TOPO_TYPE_URMA_ROCE}) {
         p.topoType = topology;
         p.ring = CalcCclStageRingConfig(p);

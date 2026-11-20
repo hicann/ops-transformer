@@ -31,12 +31,21 @@
 #include "../common/mega_moe_mxfp8_utils.h"
 #include "../../../../common/op_kernel/mc2_kernel_utils.h"
 #include "../../../../common/op_kernel/quantize_functions.h"
+#ifdef MEGA_MOE_ARCH92_DEVICE
+#include "../../arch92/common/mega_moe_comm_packet.h"
+#endif
 
 namespace MegaMoeImpl {
 
 using namespace AscendC;
+#ifdef MEGA_MOE_ARCH92_DEVICE
+// 64 核 ready 扫描及 desc/weight 区之后再放 metadata，保留 A5 原布局。
+constexpr uint32_t META_INFO_TENSOR_ADDR = 202U * 1024U;
+constexpr int32_t MAX_AICORE_NUM = 64;
+#else
 constexpr uint32_t META_INFO_TENSOR_ADDR = 200U * 1024U;
 constexpr int32_t MAX_AICORE_NUM = 36;
+#endif
 
 struct QuantTokenBufferConfig {
     uint32_t quantTokenSizeBytes;
@@ -66,8 +75,26 @@ constexpr uint32_t WAVE_COMBINE_UB_BASE = 64U * 1024U;
 // The ready scan starts at 184 KiB, so adaptive row buffers must stay below it.
 constexpr uint32_t WAVE_COMBINE_UB_LIMIT = 184U * 1024U;
 constexpr uint32_t WAVE_COMBINE_META_INFO_TOKEN_CAPACITY = 1536U;
+#ifdef MEGA_MOE_ARCH92_DEVICE
+static_assert(META_INFO_TENSOR_ADDR + WAVE_COMBINE_META_INFO_TOKEN_CAPACITY * META_INFO_SIZE * sizeof(int32_t) <=
+                  ARCH92_FIXED_WORK_UB_BYTES,
+              "Combine metadata must not overlap persistent Dispatch tables");
+#endif
 
 namespace CombineImpl {
+
+template <typename Element>
+__aicore__ inline void SendCombineRow(__gm__ Element* dst, __ubuf__ Element* src, uint32_t count, const Params& params,
+                                      bool isRemote)
+{
+#ifdef MEGA_MOE_ARCH92_DEVICE
+    CommPacketArch92::SendCombineRow(dst, src, count, params, isRemote);
+#else
+    (void)params;
+    (void)isRemote;
+    CopyUbToGm(dst, src, static_cast<uint32_t>(count * sizeof(Element)));
+#endif
+}
 
 // Combine 发送路由：dispatch 阶段写入 metaInfo 的 (目标rank, 原token行, topk槽) 三元组。
 struct CombineTokenRoute {
@@ -116,15 +143,17 @@ __aicore__ inline void CombineTokens(uint32_t nLoc, uint32_t n, __ubuf__ int32_t
 template <typename Element>
 __aicore__ inline void SendCombineTokenRow(uint32_t rowElements, uint64_t gmRemoteBaseOffset,
                                            __ubuf__ int32_t* metaInfoTensor, __ubuf__ Element* rowTensor,
-                                           const Params& params)
+                                           const Params& params, uint32_t localRankId)
 {
     CombineTokenRoute route = LoadCombineTokenRoute(metaInfoTensor, 0U);
 
     __gm__ Element* gmRemoteD =
         reinterpret_cast<__gm__ Element*>(GetRankWinAddrWithOffset(route.dstRankId, gmRemoteBaseOffset));
-    uint64_t gmDstRowOffset = GetCombineDstRowIndex(route, params) * rowElements;
+    uint64_t gmDstRowOffset =
+        GetCombineDstRowIndex(route, params) *
+        static_cast<uint64_t>(params.communication.layout.combineRowStrideBytes / sizeof(Element));
 
-    CopyUbToGm(gmRemoteD + gmDstRowOffset, rowTensor, static_cast<uint32_t>(rowElements * sizeof(Element)));
+    SendCombineRow(gmRemoteD + gmDstRowOffset, rowTensor, rowElements, params, route.dstRankId != localRankId);
 }
 
 // 将一条量化 token 记录发送到 metadata 指定的 rank 和目标行。
@@ -285,8 +314,8 @@ __aicore__ inline void SendWaveCombineToken(uint8_t combineMode, const MoeStageC
     if (combineMode == COMBINE_NO_QUANT) {
         PipeNotify<PIPE_MTE2, PIPE_MTE3>(eventId);
         PipeWait<PIPE_MTE2, PIPE_MTE3>(eventId);
-        CombineImpl::SendCombineTokenRow<bfloat16_t>(common.tokenHiddenDim, gmRemoteBaseOffset, tokenMetaInfo, rowUb,
-                                                     params);
+        CombineImpl::SendCombineTokenRow(common.tokenHiddenDim, gmRemoteBaseOffset, tokenMetaInfo, rowUb, params,
+                                         common.rankId);
     } else {
         __ubuf__ bfloat16_t* quantUb =
             (scratch.rowBufferTensor + (slotElementOffset + bufferConfig.rowStrideBytes / sizeof(bfloat16_t)));
@@ -296,13 +325,11 @@ __aicore__ inline void SendWaveCombineToken(uint8_t combineMode, const MoeStageC
         PipeNotify<PIPE_V, PIPE_MTE3>(eventId);
         PipeWait<PIPE_V, PIPE_MTE3>(eventId);
         if (combineMode == MXFP8_E4M3_COMM_QUANT) {
-            CombineImpl::SendCombineTokenRow<fp8_e4m3fn_t>(bufferConfig.quantRowElements, gmRemoteBaseOffset,
-                                                           tokenMetaInfo,
-                                                           reinterpret_cast<__ubuf__ fp8_e4m3fn_t*>(quantUb), params);
+            CombineImpl::SendCombineTokenRow(bufferConfig.quantRowElements, gmRemoteBaseOffset, tokenMetaInfo,
+                                             reinterpret_cast<__ubuf__ fp8_e4m3fn_t*>(quantUb), params, common.rankId);
         } else {
-            CombineImpl::SendCombineTokenRow<fp8_e5m2_t>(bufferConfig.quantRowElements, gmRemoteBaseOffset,
-                                                         tokenMetaInfo, reinterpret_cast<__ubuf__ fp8_e5m2_t*>(quantUb),
-                                                         params);
+            CombineImpl::SendCombineTokenRow(bufferConfig.quantRowElements, gmRemoteBaseOffset, tokenMetaInfo,
+                                             reinterpret_cast<__ubuf__ fp8_e5m2_t*>(quantUb), params, common.rankId);
         }
     }
     PipeNotify<PIPE_MTE3, PIPE_MTE2>(eventId);

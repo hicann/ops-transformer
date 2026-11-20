@@ -57,4 +57,5 @@ else()
     set(MEGA_MOE_LAYOUT_INC_INSTALL_DIR ${ACLNN_INC_INSTALL_DIR}/aclnnop)
 endif()
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../op_kernel/arch35_92/common/mega_moe_gm_layout.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/../op_kernel/arch92/common/mega_moe_layout_arch92.h
         DESTINATION ${MEGA_MOE_LAYOUT_INC_INSTALL_DIR})

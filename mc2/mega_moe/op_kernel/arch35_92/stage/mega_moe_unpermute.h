@@ -80,12 +80,13 @@ __aicore__ inline void LoadTokenUnpermuteWeights(const MoeStageCommonConfig& com
 #if defined(MEGA_MOE_ARCH92_DEVICE)
 __aicore__ inline void LoadMoeExpertInput(uint8_t combineMode, const TokenUnpermuteConfig& context,
                                           const MoeStageCommonConfig& common, TokenUnpermuteScratch& scratch,
-                                          __gm__ bfloat16_t* expandedX, uint64_t expertInputIndex, TEventID event,
-                                          __ubuf__ bfloat16_t* dataInBf16, __ubuf__ float* dataInFp32)
+                                          __gm__ bfloat16_t* expandedX, uint64_t expertInputIndex,
+                                          uint32_t rowStrideElements, TEventID event, __ubuf__ bfloat16_t* dataInBf16,
+                                          __ubuf__ float* dataInFp32)
 {
     PipeWait<PIPE_V, PIPE_MTE2>(event);
     if (combineMode == COMBINE_NO_QUANT) {
-        CopyGmToUb(dataInBf16, (expandedX + (expertInputIndex * common.tokenHiddenDim)),
+        CopyGmToUb(dataInBf16, (expandedX + (expertInputIndex * rowStrideElements)),
                    (common.tokenHiddenDim) * sizeof(bfloat16_t));
         PipeNotify<PIPE_MTE2, PIPE_V>(event);
         PipeWait<PIPE_MTE2, PIPE_V>(event);
@@ -304,8 +305,9 @@ __aicore__ inline bool AccumulateMoeExpertsForToken(uint8_t combineMode, bool to
             dataInFp32 = scratch.dataResFp32Tensor + (inputBufferIdx + 1) * bufferConfig.fp32SlotElementCount;
         }
         uint64_t expertInputIndex = static_cast<uint64_t>(tokenIdx) * common.topK + expertIdx;
-        LoadMoeExpertInput(combineMode, context, common, scratch, expandedX, expertInputIndex, event, dataInBf16,
-                           dataInFp32);
+        const uint32_t rowStrideElements = params.communication.layout.combineRowStrideBytes / sizeof(bfloat16_t);
+        LoadMoeExpertInput(combineMode, context, common, scratch, expandedX, expertInputIndex, rowStrideElements, event,
+                           dataInBf16, dataInFp32);
         const bool applyWeight = (!topkWeightsPrefetch) && (!dedupCombineActive || sameRankCount == 1);
         {
             PipeNotify<PIPE_S, PIPE_V>(event);

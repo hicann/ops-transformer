@@ -379,18 +379,18 @@ static ge::graphStatus CheckAndResolveDispatchDtype(const gert::TilingContext* c
 
 /*
  * 由单个专家组的量化输出类型、权重类型和两个权重的 format 确定 GMM 实现路径。
- * A4W4 ND 是内部保留能力：weight1 为 ND，weight2 仍为 NZ_C0_32；算子原型不因此扩展支持范围。
+ * arch35 的 W4 使用 Prologue NZ_C0_32；arch92 的原生 W4 使用普通 NZ（FP4 C0=64）。
  */
 static uint8_t ResolveExpertGmmMode(ge::DataType quantOutDtype, ge::DataType weightDtype, ge::Format weightOneFormat,
-                                    ge::Format weightTwoFormat)
+                                    ge::Format weightTwoFormat, bool nativeW4 = false)
 {
     bool isNdFormat = weightOneFormat == ge::FORMAT_ND && weightTwoFormat == ge::FORMAT_ND;
     bool isNzFormat = weightOneFormat == ge::FORMAT_FRACTAL_NZ && weightTwoFormat == ge::FORMAT_FRACTAL_NZ;
-    bool isNzC032Format =
-        weightOneFormat == ge::FORMAT_FRACTAL_NZ_C0_32 && weightTwoFormat == ge::FORMAT_FRACTAL_NZ_C0_32;
-    bool isNdAndNzC032Format = weightOneFormat == ge::FORMAT_ND && weightTwoFormat == ge::FORMAT_FRACTAL_NZ_C0_32;
-    bool isNzAndNzC032Format =
-        weightOneFormat == ge::FORMAT_FRACTAL_NZ && weightTwoFormat == ge::FORMAT_FRACTAL_NZ_C0_32;
+    // arch35 的 Prologue 使用 C0=32；arch92 Cube 直接读取 FP4，使用普通 NZ 的 C0=64。
+    const ge::Format w4Format = nativeW4 ? ge::FORMAT_FRACTAL_NZ : ge::FORMAT_FRACTAL_NZ_C0_32;
+    bool isW4NzFormat = weightOneFormat == w4Format && weightTwoFormat == w4Format;
+    bool isNdAndW4NzFormat = weightOneFormat == ge::FORMAT_ND && weightTwoFormat == w4Format;
+    bool isNzAndW4NzFormat = weightOneFormat == ge::FORMAT_FRACTAL_NZ && weightTwoFormat == w4Format;
 
     if (quantOutDtype == ge::DT_BF16 && weightDtype == ge::DT_BF16 && isNdFormat) {
         return GMM_MODE_A16W16_ND;
@@ -407,13 +407,13 @@ static uint8_t ResolveExpertGmmMode(ge::DataType quantOutDtype, ge::DataType wei
     if (quantOutDtype == ge::DT_FLOAT8_E4M3FN && weightDtype == ge::DT_FLOAT8_E4M3FN && isNzFormat) {
         return GMM_MODE_A8W8_NZ;
     }
-    if (quantOutDtype == ge::DT_FLOAT8_E4M3FN && weightDtype == ge::DT_FLOAT4_E2M1 && isNzC032Format) {
+    if (quantOutDtype == ge::DT_FLOAT8_E4M3FN && weightDtype == ge::DT_FLOAT4_E2M1 && isW4NzFormat) {
         return GMM_MODE_A8W4_NZ;
     }
-    if (quantOutDtype == ge::DT_FLOAT4_E2M1 && weightDtype == ge::DT_FLOAT4_E2M1 && isNdAndNzC032Format) {
+    if (quantOutDtype == ge::DT_FLOAT4_E2M1 && weightDtype == ge::DT_FLOAT4_E2M1 && isNdAndW4NzFormat) {
         return GMM_MODE_A4W4_ND;
     }
-    if (quantOutDtype == ge::DT_FLOAT4_E2M1 && weightDtype == ge::DT_FLOAT4_E2M1 && isNzAndNzC032Format) {
+    if (quantOutDtype == ge::DT_FLOAT4_E2M1 && weightDtype == ge::DT_FLOAT4_E2M1 && isNzAndW4NzFormat) {
         return GMM_MODE_A4W4_NZ;
     }
     return std::numeric_limits<uint8_t>::max();
@@ -529,7 +529,7 @@ static ge::graphStatus CheckAndSetQuantOutDtypes(const gert::TilingContext* cont
  * 校验同一专家组的权重类型一致性，并由量化类型、权重类型及格式解析 GMM 模式。
  */
 static ge::graphStatus CheckAndSetExpertGmmMode(const gert::TilingContext* context, ExpertParams& expertParams,
-                                                const char* nodeName)
+                                                const char* nodeName, bool nativeW4 = false)
 {
     auto weightOneDesc = context->GetDynamicInputDesc(expertParams.inputs.weightOne, 0);
     auto weightTwoDesc = context->GetDynamicInputDesc(expertParams.inputs.weightTwo, 0);
@@ -552,7 +552,7 @@ static ge::graphStatus CheckAndSetExpertGmmMode(const gert::TilingContext* conte
     ge::Format weightOneFormat = weightOneDesc->GetStorageFormat();
     ge::Format weightTwoFormat = weightTwoDesc->GetStorageFormat();
     expertParams.gmmMode =
-        ResolveExpertGmmMode(expertParams.quantOutDtype, weightOneDtype, weightOneFormat, weightTwoFormat);
+        ResolveExpertGmmMode(expertParams.quantOutDtype, weightOneDtype, weightOneFormat, weightTwoFormat, nativeW4);
     // 结构化实际值进多参宏的 incorrect_values 槽（EZ0027），并逐项带标签：quant output dtype 由属性派生、
     // 不是 weight 张量的属性，靠标签说明归属，避免「两个参数名配四个裸值」的名值错配。
     const std::string actualConfig = "[quant output dtype=" + Ops::Base::ToString(expertParams.quantOutDtype) + ", " +
@@ -573,15 +573,16 @@ static ge::graphStatus CheckAndSetExpertGmmMode(const gert::TilingContext* conte
  * 解析 MoE 与共享专家的 GMM mode，并校验 mode 组合与通信拓扑的兼容性。
  */
 static ge::graphStatus CheckAndSetExpertGmmModes(const gert::TilingContext* context, MegaMoeExpertParams& params,
-                                                 int64_t topoType, MegaMoeTilingData* tilingData, const char* nodeName)
+                                                 int64_t topoType, MegaMoeTilingData* tilingData, const char* nodeName,
+                                                 bool nativeW4 = false)
 {
-    if (CheckAndSetExpertGmmMode(context, params.moe, nodeName) != ge::GRAPH_SUCCESS) {
+    if (CheckAndSetExpertGmmMode(context, params.moe, nodeName, nativeW4) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
     params.shared.gmmMode = params.moe.gmmMode;
     if (params.shared.expertCount > 0 &&
-        CheckAndSetExpertGmmMode(context, params.shared, nodeName) != ge::GRAPH_SUCCESS) {
+        CheckAndSetExpertGmmMode(context, params.shared, nodeName, nativeW4) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 

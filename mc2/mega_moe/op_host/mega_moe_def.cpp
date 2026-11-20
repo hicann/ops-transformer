@@ -21,9 +21,51 @@
 #define ENABLE_FORMAT_NZ_C0_32
 #endif
 
+#include <vector>
 #include "register/op_def_registry.h"
 
 namespace ops {
+static void DefineArch92WeightSignatures(OpAICoreConfig& config)
+{
+    struct WeightSignature {
+        ge::DataType dtype;
+        ge::Format weight1Format;
+        ge::Format weight2Format;
+    };
+    const WeightSignature signatures[] = {
+        {ge::DT_FLOAT8_E5M2, ge::FORMAT_ND, ge::FORMAT_ND},
+        {ge::DT_FLOAT8_E4M3FN, ge::FORMAT_ND, ge::FORMAT_ND},
+        {ge::DT_FLOAT8_E4M3FN, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ},
+        {ge::DT_FLOAT4_E2M1, ge::FORMAT_ND, ge::FORMAT_FRACTAL_NZ},
+        {ge::DT_FLOAT4_E2M1, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ},
+    };
+    std::vector<ge::DataType> moeDtypes;
+    std::vector<ge::DataType> sharedDtypes;
+    std::vector<ge::Format> moeWeight1Formats;
+    std::vector<ge::Format> moeWeight2Formats;
+    std::vector<ge::Format> sharedWeight1Formats;
+    std::vector<ge::Format> sharedWeight2Formats;
+    // W1/W2 按行配对；原生 FP4 使用普通 NZ，避免独立列表展开无效的 dtype/format 组合。
+    for (const auto& moe : signatures) {
+        for (const auto& shared : signatures) {
+            moeDtypes.push_back(moe.dtype);
+            sharedDtypes.push_back(shared.dtype);
+            moeWeight1Formats.push_back(moe.weight1Format);
+            moeWeight2Formats.push_back(moe.weight2Format);
+            sharedWeight1Formats.push_back(shared.weight1Format);
+            sharedWeight2Formats.push_back(shared.weight2Format);
+        }
+    }
+    auto defineWeight = [&](const char* name, const std::vector<ge::DataType>& dtypes,
+                            const std::vector<ge::Format>& formats) {
+        config.Input(name).ParamType(DYNAMIC).DataType(dtypes).Format(formats).IgnoreContiguous();
+    };
+    defineWeight("weight1", moeDtypes, moeWeight1Formats);
+    defineWeight("weight2", moeDtypes, moeWeight2Formats);
+    defineWeight("shared_weight1", sharedDtypes, sharedWeight1Formats);
+    defineWeight("shared_weight2", sharedDtypes, sharedWeight2Formats);
+}
+
 class MegaMoe : public OpDef {
 public:
     explicit MegaMoe(const char *name)
@@ -323,160 +365,7 @@ public:
             .ExtendCfgInfo("jitCompile.flag", "static_true")
             .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
             .ExtendCfgInfo("opFile.value", "mega_moe_apt_arch92");
-        // Arch92 单独声明四组权重签名，仅保留原有 MX 类型与格式组合。
-        // x 和路由权重等输入继续沿用公共声明，BF16 输入仍可用于内部 MX 量化。
-        aicore_config_arch92.Input("weight1")
-            .ParamType(DYNAMIC)
-            .DataType({
-                // MoE W8 与共享专家 W8 的组合
-                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E5M2,
-                ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-                ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-#ifdef ENABLE_FORMAT_NZ_C0_32
-                // MoE W8 与共享专家 W4 的组合
-                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E5M2,
-                ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-                ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-                // MoE W4 与共享专家 W8 的组合
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-                // MoE W4 与共享专家 W4 的组合
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-#endif
-            })
-            .Format({
-                // MoE W8 与共享专家 W8 的组合
-                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_ND,
-                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_ND,
-                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,
-#ifdef ENABLE_FORMAT_NZ_C0_32
-                // MoE W8 与共享专家 W4 的组合
-                ge::FORMAT_ND,                ge::FORMAT_ND,
-                ge::FORMAT_ND,                ge::FORMAT_ND,
-                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,
-                // MoE W4 与共享专家 W8 的组合
-                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,
-                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
-                // MoE W4 与共享专家 W4 的组合
-                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,
-                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
-#endif
-            });
-        aicore_config_arch92.Input("weight2")
-            .ParamType(DYNAMIC)
-            .DataType({
-                // MoE W8 与共享专家 W8 的组合
-                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E5M2,
-                ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-                ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-#ifdef ENABLE_FORMAT_NZ_C0_32
-                // MoE W8 与共享专家 W4 的组合
-                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E5M2,
-                ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-                ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-                // MoE W4 与共享专家 W8 的组合
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-                // MoE W4 与共享专家 W4 的组合
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-#endif
-            })
-            .Format({
-                // MoE W8 与共享专家 W8 的组合
-                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_ND,
-                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_ND,
-                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,
-#ifdef ENABLE_FORMAT_NZ_C0_32
-                // MoE W8 与共享专家 W4 的组合
-                ge::FORMAT_ND,                ge::FORMAT_ND,
-                ge::FORMAT_ND,                ge::FORMAT_ND,
-                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ,
-                // MoE W4 与共享专家 W8 的组合
-                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
-                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
-                // MoE W4 与共享专家 W4 的组合
-                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
-                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
-#endif
-            });
-        aicore_config_arch92.Input("shared_weight1")
-            .ParamType(DYNAMIC)
-            .DataType({
-                // MoE W8 与共享专家 W8 的组合
-                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-#ifdef ENABLE_FORMAT_NZ_C0_32
-                // MoE W8 与共享专家 W4 的组合
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-                // MoE W4 与共享专家 W8 的组合
-                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-                // MoE W4 与共享专家 W4 的组合
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-#endif
-            })
-            .Format({
-                // MoE W8 与共享专家 W8 的组合
-                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
-                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
-                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
-#ifdef ENABLE_FORMAT_NZ_C0_32
-                // MoE W8 与共享专家 W4 的组合
-                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ_C0_32,
-                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ_C0_32,
-                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ_C0_32,
-                // MoE W4 与共享专家 W8 的组合
-                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
-                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
-                // MoE W4 与共享专家 W4 的组合
-                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ_C0_32,
-                ge::FORMAT_FRACTAL_NZ,        ge::FORMAT_FRACTAL_NZ_C0_32,
-#endif
-            });
-        aicore_config_arch92.Input("shared_weight2")
-            .ParamType(DYNAMIC)
-            .DataType({
-                // MoE W8 与共享专家 W8 的组合
-                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-#ifdef ENABLE_FORMAT_NZ_C0_32
-                // MoE W8 与共享专家 W4 的组合
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-                // MoE W4 与共享专家 W8 的组合
-                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-                ge::DT_FLOAT8_E5M2,    ge::DT_FLOAT8_E4M3FN,  ge::DT_FLOAT8_E4M3FN,
-                // MoE W4 与共享专家 W4 的组合
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-                ge::DT_FLOAT4_E2M1,    ge::DT_FLOAT4_E2M1,
-#endif
-            })
-            .Format({
-                // MoE W8 与共享专家 W8 的组合
-                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
-                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
-                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
-#ifdef ENABLE_FORMAT_NZ_C0_32
-                // MoE W8 与共享专家 W4 的组合
-                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
-                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
-                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
-                // MoE W4 与共享专家 W8 的组合
-                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
-                ge::FORMAT_ND,                ge::FORMAT_ND,                ge::FORMAT_FRACTAL_NZ,
-                // MoE W4 与共享专家 W4 的组合
-                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
-                ge::FORMAT_FRACTAL_NZ_C0_32,  ge::FORMAT_FRACTAL_NZ_C0_32,
-#endif
-            });
+        DefineArch92WeightSignatures(aicore_config_arch92);
         this->AICore().AddConfig("ascend960dt", aicore_config_arch92);
 
         OpAICoreConfig aicore_config_arch22;

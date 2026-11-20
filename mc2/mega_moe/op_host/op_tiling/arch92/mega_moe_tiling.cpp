@@ -8,7 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-#include "../../../op_kernel/arch35_92/common/mega_moe_gm_layout.h"
+#include "../../../op_kernel/arch92/common/mega_moe_layout_arch92.h"
 #include "../arch35_92/mega_moe_tiling_check.h"
 #include "../arch35_92/mega_moe_tiling_print.h"
 
@@ -90,8 +90,8 @@ static ge::graphStatus CheckAndSetExpertExecutionParams(const gert::TilingContex
                         ge::GRAPH_SUCCESS,
                     OP_LOGE_WITHOUT_REPORT(nodeName, "expert quantization settings are invalid."),
                     return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(CheckAndSetExpertGmmModes(context, expertParams, tilingData->compute.topoType, tilingData,
-                                              nodeName) != ge::GRAPH_SUCCESS,
+    OP_TILING_CHECK(CheckAndSetExpertGmmModes(context, expertParams, tilingData->compute.topoType, tilingData, nodeName,
+                                              true) != ge::GRAPH_SUCCESS,
                     OP_LOGE_WITHOUT_REPORT(nodeName, "expert GMM modes are invalid."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(CheckAndSetTokenDimensions(context, tilingData, config, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE_WITHOUT_REPORT(nodeName, "token dimensions are invalid."), return ge::GRAPH_FAILED);
@@ -143,8 +143,8 @@ static ge::graphStatus CheckArchitectureCapability(gert::TilingContext* context,
                                                    const char* nodeName)
 {
     auto supportedGmmMode = [](uint8_t mode) {
-        return mode == GMM_MODE_A8W8_ND || mode == GMM_MODE_A8W8_NZ || mode == GMM_MODE_A4W4_ND ||
-               mode == GMM_MODE_A4W4_NZ;
+        return mode == GMM_MODE_A8W8_ND || mode == GMM_MODE_A8W8_NZ || mode == GMM_MODE_A8W4_NZ ||
+               mode == GMM_MODE_A4W4_ND || mode == GMM_MODE_A4W4_NZ;
     };
     bool moeSupported = supportedGmmMode(tilingData->moeGmmMode);
     bool sharedSupported = tilingData->compute.sharedExpertNum == 0U || supportedGmmMode(tilingData->sharedGmmMode);
@@ -156,7 +156,7 @@ static ge::graphStatus CheckArchitectureCapability(gert::TilingContext* context,
                             (tilingData->compute.sharedExpertNum == 0U ? std::string("absent") :
                                                                          std::to_string(tilingData->sharedGmmMode)) +
                             "]",
-                        "arch92 only supports A8W8/A4W4 GMM modes with topo_type=MTE(0)"),
+                        "arch92 only supports A8W8/A8W4/A4W4 GMM modes with topo_type=MTE(0)"),
                     return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -222,7 +222,7 @@ static uint64_t CalcHostFlagElementCount(const MegaMoeTilingData* tilingData)
                                                   static_cast<uint64_t>(INT_CACHELINE) * tilingData->compute.aicNum);
     // 去重附加计数与 A6 的 Workspace 分配、Kernel 清零范围保持一致。
     if (tilingData->compute.topoType == TOPO_TYPE_MTE &&
-        (tilingData->combineQuantMode != COMBINE_NO_QUANT || IsCombineDedupOn(tilingData->compute.dedupMode))) {
+        LayoutArch92::NeedsExpertGmm2Ready(tilingData->compute, tilingData->comm.combineRowAlignmentBytes != 0U)) {
         flagElementCount += moeExpertCount * tilingData->compute.aicNum * INT_CACHELINE;
     }
     if (tilingData->compute.topoType == TOPO_TYPE_MTE && tilingData->compute.dedupMode != 0) {
@@ -328,15 +328,9 @@ static void SetCclLayoutParams(MegaMoeTilingData* tilingData)
     compute.activationOutputDivisor = GetActivationOutputDivisor(tilingData->actMode);
     compute.combineQuant = tilingData->combineQuantMode != COMBINE_NO_QUANT;
     compute.topkWeightsPrefetch = tilingData->isTopkWeightsPrefetch;
-    compute.dispatchFp4 = IsA4W4GmmMode(tilingData->moeGmmMode);
     compute.reserveGmm1Output = true;
     compute.reserveCumsum = false;
-    compute.sharedInputElementsPerByte = IsA4W4GmmMode(tilingData->sharedGmmMode) ? 2U : 1U;
-    compute.dispatchInputStorage = {compute.dispatchFp4 ? MemoryLayoutDetail::FP4_BITS : MemoryLayoutDetail::FP8_BITS};
-    compute.activationOutputStorage = compute.dispatchInputStorage;
-    compute.sharedInputStorage = {IsA4W4GmmMode(tilingData->sharedGmmMode) ? MemoryLayoutDetail::FP4_BITS :
-                                                                             MemoryLayoutDetail::FP8_BITS};
-    compute.sharedActivationStorage = compute.sharedInputStorage;
+    LayoutArch92::SetTensorStorage(compute, tilingData->moeGmmMode, tilingData->sharedGmmMode);
     // Arch92 keeps its existing full-row workspace and execution policy.
     compute.ring = {};
 
@@ -354,6 +348,8 @@ static void SetCclLayoutParams(MegaMoeTilingData* tilingData)
         compute.topkWeightsPrefetch || IsCombineDedupOn(compute.dedupMode) || comm.serverCombineReduce;
     comm.isQuantCombine = compute.combineQuant;
     comm.topoType = compute.topoType;
+    comm.combineRowAlignmentBytes =
+        CommPacketArch92::GetCombineRowAlignmentBytes(comm.topoType == TOPO_TYPE_MTE, comm.isQuantCombine);
     comm.serverNum = compute.serverNum;
 }
 
@@ -410,6 +406,9 @@ static ge::graphStatus SetAdaptiveBufferConfigs(const gert::TilingContext* conte
     ge::DataType topKWeightsDataType = topKWeightsDesc->GetDataType();
     SetUnpermuteBufferConfigs(tilingData, topKWeightsDataType, availableUbBytes,
                               UnpermuteBufferPolicy::SEPARATE_DEQUANTIZATION);
+    const uint32_t rowAlignment = tilingData->comm.combineRowAlignmentBytes;
+    OP_LOGI(nodeName, "Arch92 Combine row alignment=%u bytes, packet mode=%u, RSW=off; local writes=NORMAL",
+            rowAlignment, rowAlignment != 0U ? CommPacketArch92::ROW_MODE : 0U);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -516,8 +515,9 @@ static ge::graphStatus CommitTilingResult(gert::TilingContext* context, const Me
                                         l1Size, tilingData->a8w4L1Layout, nodeName) != ge::GRAPH_SUCCESS,
                     OP_LOGE_WITHOUT_REPORT(nodeName, "calculate A8W4 L1 layout failed"), return ge::GRAPH_FAILED);
 
-    WorkspaceLayout workspaceLayout(tilingData->compute,
-                                    WorkspaceLayout::Arch92{tilingData->moeGmmMode, tilingData->sharedGmmMode});
+    const auto workspaceLayout =
+        LayoutArch92::MakeWorkspaceLayout(tilingData->compute, tilingData->moeGmmMode, tilingData->sharedGmmMode,
+                                          tilingData->comm.combineRowAlignmentBytes != 0U);
     // Preserve Arch92's existing FP8-sized admission bound for packed FP4 records.
     auto capacityComm = tilingData->comm;
     capacityComm.elemsPerByte = 1U;

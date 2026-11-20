@@ -70,6 +70,7 @@ struct BlockMmadSelector<true, C> {
 };
 
 // 汇总 GMM1/GMM2 在不同量化路径下共用的类型、shape 和 layout 配置。
+// IsA8W4 仅选择 arch35 Prologue；arch92 的原生混合位宽仍使用 false 通用接口。
 template <bool IsA8W4, typename ElementA, typename ElementB, typename ElementC, typename ElementMxScaleA,
           typename ElementMxScaleB, bool IsWeightNZ = false, bool IsShared = false, bool IsLayered = false,
           bool IsWaveFlagGrained = false>

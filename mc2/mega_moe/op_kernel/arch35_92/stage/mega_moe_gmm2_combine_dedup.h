@@ -304,7 +304,7 @@ __aicore__ inline void SendWaveCombineTokenDedupMerge(const MoeStageCommonConfig
         reinterpret_cast<__gm__ bfloat16_t*>(GetRankWinAddrWithOffset(route.dstRankId, gmRemoteBaseOffset));
     uint64_t gmDstRowOffset =
         (static_cast<uint64_t>(route.tokenIdx) * params.tilingData->compute.topK + static_cast<uint64_t>(minTopkIdx)) *
-        h;
+        static_cast<uint64_t>(params.communication.layout.combineRowStrideBytes / sizeof(bfloat16_t));
 
     const uint32_t mergeBuf = dedupScratch.mergeRowSequence & 1U;
     dedupScratch.mergeRowSequence++;
@@ -348,7 +348,7 @@ __aicore__ inline void SendWaveCombineTokenDedupMerge(const MoeStageCommonConfig
     }
     PipeNotify<PIPE_V, PIPE_MTE3>(mergeEvent);
     PipeWait<PIPE_V, PIPE_MTE3>(mergeEvent);
-    CopyUbToGm(gmRemoteD + gmDstRowOffset, mergeSendUb, h * static_cast<uint32_t>(sizeof(bfloat16_t)));
+    CombineImpl::SendCombineRow(gmRemoteD + gmDstRowOffset, mergeSendUb, h, params, route.dstRankId != common.rankId);
     PipeNotify<PIPE_MTE3, PIPE_V>(mergeEvent);
 }
 

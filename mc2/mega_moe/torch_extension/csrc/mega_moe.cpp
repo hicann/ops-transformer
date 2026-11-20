@@ -14,10 +14,10 @@
 #include <cstring>
 #include <limits>
 #include "aclnn_common.h"
-#if __has_include("aclnnop/mega_moe_gm_layout.h")
-#include "aclnnop/mega_moe_gm_layout.h"
+#if __has_include("aclnnop/mega_moe_layout_arch92.h")
+#include "aclnnop/mega_moe_layout_arch92.h"
 #else
-#include "../../op_kernel/arch35_92/common/mega_moe_gm_layout.h"
+#include "../../op_kernel/arch92/common/mega_moe_layout_arch92.h"
 #endif
 
 namespace op_api {
@@ -573,31 +573,23 @@ int64_t CalcTokenScaleBytesA5(int64_t hidden, int64_t numTopk, int64_t topkWeigh
     return tokenBytes;
 }
 
-int64_t CalcMteCclBufferSizeA5(int64_t epWorldSize, int64_t moeExpertNum, int64_t numMaxTokensPerRank, int64_t numTopk,
-                               int64_t hidden, int64_t topkWeightsType)
+int64_t CalcMteCclBufferSizeArch92(int64_t epWorldSize, int64_t moeExpertNum, int64_t numMaxTokensPerRank,
+                                   int64_t numTopk, int64_t hidden, int64_t topkWeightsType,
+                                   uint32_t combineRowAlignmentBytes = 0U)
 {
-    int64_t expertPerRank = moeExpertNum / epWorldSize;
-
-    constexpr int64_t maxInt16RouteItems = 1LL << 15;
-    bool useInt16RouteIndex =
-        numTopk > 0 && numMaxTokensPerRank >= 0 && numMaxTokensPerRank * numTopk <= maxInt16RouteItems;
-    int64_t routeIndexTypeBytes =
-        useInt16RouteIndex ? static_cast<int64_t>(sizeof(int16_t)) : static_cast<int64_t>(sizeof(int32_t));
-    int64_t routeIndexAlignSize = CeilAlign(numMaxTokensPerRank * routeIndexTypeBytes, ALIGN_32);
-    int64_t routeRecvSize = CeilAlign(expertPerRank * epWorldSize * routeIndexAlignSize, ALIGN_512);
-
-    // 与 kernel 的固定 MTE count 区容量保持一致。
-    int64_t expertCountRecvSize = PEERMEM_MTE_COUNT_REGION_SIZE;
-
-    int64_t tokenBytes = CalcTokenScaleBytesA5(hidden, numTopk, topkWeightsType);
-    int64_t dispatchRecordAreaSize = CeilAlign(numMaxTokensPerRank * tokenBytes, ALIGN_512);
-
-    int64_t combineSendSize = CeilAlign(numMaxTokensPerRank * numTopk * hidden * Y_DTYPE_SIZE, ALIGN_512);
-
-    int64_t totalBytes = EXCEPTION_DUMP_REGION_SIZE + PEERMEM_DATA_OFFSET + routeRecvSize + expertCountRecvSize +
-                         dispatchRecordAreaSize + combineSendSize;
-
-    return totalBytes;
+    MegaMoeImpl::CclCommLayoutParams comm{};
+    comm.numMaxTokensPerRank = numMaxTokensPerRank;
+    comm.topK = numTopk;
+    comm.h = hidden;
+    comm.moeExpertPerRank = moeExpertNum / epWorldSize;
+    comm.epWorldSize = epWorldSize;
+    comm.yDtypeSize = Y_DTYPE_SIZE;
+    comm.elemsPerByte = 1U; // 权重和输入类型未知时保留原 FP8 容量上界。
+    comm.topkWeightsPrefetch = topkWeightsType == 1;
+    comm.isQuantCombine = false; // 量化 Combine 仍保留原 BF16 容量上界。
+    comm.topoType = MegaMoeImpl::TOPO_TYPE_MTE;
+    comm.combineRowAlignmentBytes = combineRowAlignmentBytes;
+    return MegaMoeImpl::CalcCclComputeOffset(comm);
 }
 
 // 创建 SymmBuffer 时尚未传入具体权重列表，按 WorkspaceLayout 的分配顺序保守预留：
@@ -640,7 +632,8 @@ struct CclDataBudget {
           reserveCombineDedup(!isUrma && combineCommMode == 1),
           reserveServerCombine(isUrma && combineCommMode == 2),
           reserveDedup(!isUrma && (numTopk > 1 || reserveCombineDedup)),
-          needsGmm2Ready(combineQuantMode != 0 || reserveCombineDedup)
+          needsGmm2Ready(combineQuantMode != 0 || reserveCombineDedup ||
+                         (maxAicNum == ARCH92_MAX_AIC_NUM && MegaMoeImpl::CommPacketArch92::ROW_MODE != 0U))
     {
         uint64_t defaultMaxOutputSize =
             static_cast<uint64_t>(numMaxTokensPerRank) * epWorldSize * std::min(numTopk, expertPerRank);
@@ -1023,8 +1016,10 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
     if (isArch92) {
         // Arch92 沿用主线全量分配和 64 核容量上界，不接入 Arch35 的布局优化。
         const int64_t layoutTopkWeights = (topkWeightsType == 1 || combineCommMode == 1) ? 1 : 0;
-        const int64_t communicationBufferSize =
-            CalcMteCclBufferSizeA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden, layoutTopkWeights);
+        const uint32_t rowAlignment =
+            MegaMoeImpl::CommPacketArch92::GetCombineRowAlignmentBytes(serverNum == 0, combineQuantMode != 0);
+        const int64_t communicationBufferSize = CalcMteCclBufferSizeArch92(
+            epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden, layoutTopkWeights, rowAlignment);
         return CeilAlign(communicationBufferSize, ALIGN_512) +
                CalcCclDataSizeA5(epWorldSize, moeExpertNum, numMaxTokensPerRank, numTopk, hidden, intermediateHidden,
                                  maxRecvTokenNum, topkWeightsType, serverNum, combineQuantMode, combineCommMode,

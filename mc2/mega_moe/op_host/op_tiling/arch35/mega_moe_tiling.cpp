@@ -413,7 +413,7 @@ static void SetCclLayoutParams(MegaMoeTilingData* tilingData)
     }
     compute.ring = CalcCclStageRingConfig(compute);
 
-    auto& comm = tilingData->comm;
+    CclCommLayoutParams comm{};
     comm.numMaxTokensPerRank = compute.numMaxTokensPerRank;
     comm.topK = compute.topK;
     comm.h = compute.h;
@@ -428,6 +428,7 @@ static void SetCclLayoutParams(MegaMoeTilingData* tilingData)
     comm.topoType = compute.topoType;
     comm.serverNum = compute.serverNum;
     comm.dispatchStorage = compute.dispatchInputStorage;
+    tilingData->comm = comm;
 }
 
 /*
