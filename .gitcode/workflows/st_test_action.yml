@@ -1,0 +1,183 @@
+name: A5_smoke
+
+on:
+  workflow_call:
+    inputs:
+      run_package_name:
+        required: false
+        type: string
+        default: 'cann-ops-transformer-ascend950-custom_linux-x86_64.run'
+      # distest: mainline host+kernel repack package (with st_skip.flag)
+      # experimental: full package built with build.sh --experimental
+      package_flavor:
+        required: false
+        type: string
+        default: 'distest'
+      # mainline | experimental: which operators this invocation runs
+      op_scope:
+        required: false
+        type: string
+        default: 'mainline'
+      image_version:
+        required: false
+        type: string
+        default: 'swr.cn-north-4.myhuaweicloud.com/pre_smoke/ubuntu24.04_x86:pre_mindspore_A5_conda_v1.1003'
+
+jobs:
+  A5_smoke:
+    name: PreSmoke_A5
+    env:
+      run_package_name: ${{ inputs.run_package_name }}
+    steps:
+      -
+        name: Checkout
+        identifier: process_checkout
+        uses: checkout
+        with:
+          ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+          allow-unsafe-pr-checkout: true
+      -
+        name: oidc_auth
+        uses: huaweicloud-oidc-auth
+        with:
+          audience: ${{ secrets.audience }}
+          agency_urn: ${{ secrets.agency_urn }}
+          provider_urn: ${{ secrets.provider_urn }}
+          region: cn-north-4
+          duration: 3600
+      -
+        name: download
+        uses: obs-download
+        with:
+          endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
+          bucket: "ascend-ci"
+          key: |
+            ${{ env.obs_path }}/pr_filelist.txt
+          path: ${{ steps.process_checkout.outputs.path }}
+      -
+        name: download_compiled_package
+        if: ${{ inputs.package_flavor == 'distest' }}
+        uses: obs-download
+        with:
+          endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
+          bucket: "ascend-ci"
+          key: |
+            ${{ env.obs_path }}/${{ env.run_package_name }}
+            ${{ env.obs_path }}/st_skip.flag
+          path: ${{ steps.process_checkout.outputs.path }}
+      -
+        name: download_experimental_package
+        if: ${{ inputs.package_flavor == 'experimental' }}
+        uses: obs-download
+        with:
+          endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
+          bucket: "ascend-ci"
+          key: |
+            ${{ env.obs_path }}/${{ env.run_package_name }}
+          path: ${{ steps.process_checkout.outputs.path }}
+      -
+        name: check_950_package_content
+        identifier: check_950_pkg
+        run: |
+          pkg="${{ steps.process_checkout.outputs.path }}/${{ env.run_package_name }}"
+          flag="${{ steps.process_checkout.outputs.path }}/st_skip.flag"
+          skip="no"
+          if [[ -f "${flag}" ]]; then
+            skip=$(sed -n 's/^skip=//p' "${flag}" | head -1)
+          fi
+          if [[ -f "${pkg}" && $(stat -c%s "${pkg}") -gt 0 ]]; then
+            echo "need_st=yes" >> "$ATOMGIT_OUTPUT"
+          elif [[ "${skip}" == "yes" ]]; then
+            # 编译侧显式声明本次没有可测产物（空跑），属于正常跳过
+            echo "need_st=no" >> "$ATOMGIT_OUTPUT"
+            echo "Skip st_950: compile produced no testable artifact"
+            cat "${flag}"
+          else
+            # 门禁已判定需要 ST，但既没有可测包也没有跳过标记：产物异常，fail closed
+            echo "::error::JOB_st_gate decided st_950 is needed, but no package/flag was produced: ${pkg}"
+            exit 1
+          fi
+      -
+        name: install_run_package
+        if: ${{ steps.check_950_pkg.outputs.need_st == 'yes' }}
+        run: |
+          cd ${{ steps.process_checkout.outputs.path }}
+          echo "Installing compiled package: ${{ env.run_package_name }}"
+          chmod +x "${{ env.run_package_name }}"
+          source /usr/local/Ascend/cann/bin/setenv.bash 2>/dev/null || true
+          if bash "${{ env.run_package_name }}" --help 2>&1 | grep -q -- '--full'; then
+            full_arg="--full"
+          else
+            full_arg=""
+          fi
+          echo 'y' | bash "${{ env.run_package_name }}" $full_arg --quiet --force
+
+      -
+        name: install_torch_extension
+        if: ${{ steps.check_950_pkg.outputs.need_st == 'yes' }}
+        run: |
+          cd ${{ steps.process_checkout.outputs.path }}
+          source /usr/local/Ascend/cann/bin/setenv.bash 2>/dev/null || true
+          # custom vendor run package does not ship the cann_ops_transformer whl,
+          # so build and install it from source for assets-based e2e cases.
+          python3 -m pip install --quiet build || pip3 install --quiet build
+          if [[ "${{ inputs.package_flavor }}" == "experimental" ]]; then
+            bash build.sh --torch_extension_only --experimental
+          else
+            bash build.sh --torch_extension_only
+          fi
+          whl=$(ls torch_extension/dist/cann_ops_transformer-*.whl 2>/dev/null | head -1)
+          if [[ -z "${whl}" ]]; then
+            echo "ERROR: cann_ops_transformer whl not produced"
+            ls -l torch_extension/dist 2>/dev/null || true
+            exit 1
+          fi
+          echo "Installing ${whl}"
+          python3 -m pip install --no-deps --force-reinstall "${whl}"
+          python3 -c "import cann_ops_transformer; print('cann_ops_transformer import OK')"
+      -
+        name: run_st_test
+        identifier: st_test
+        if: ${{ steps.check_950_pkg.outputs.need_st == 'yes' }}
+        timeout-minutes: 30
+        env:
+          # 观察期：周更镜像里的 host tiling 与新编 kernel 版本尚未对齐，ST 失败只报告
+          # 不拦截；待 host/kernel 版本一致后删除该变量，恢复“失败即失败”。
+          CI_ONLINE_MODE: "1"
+          # 单条用例上限 10 分钟；全表总预算上限 25 分钟（脚本内按此收尾），
+          # step 超时 30 分钟，留 5 分钟给汇总和复现命令。
+          ST_CASE_TIMEOUT: "600"
+          ST_MAX_TOTAL_TIMEOUT: "1500"
+          # mainline / experimental package only contains its own operators
+          ST_OP_SCOPE: ${{ inputs.op_scope }}
+        run: |
+          export WORKSPACE=${{ steps.process_checkout.outputs.path }}
+          cd ${{ steps.process_checkout.outputs.path }}
+          source /usr/local/Ascend/cann/bin/setenv.bash 2>/dev/null || true
+          pip3 install psutil openpyxl en-dtypes
+          bash scripts/ci/ops_st_test.sh --pr_filelist=./pr_filelist.txt --soc_version=ascend950
+      -
+        name: package_st_results
+        if: ${{ always() && steps.check_950_pkg.outputs.need_st == 'yes' }}
+        run: |
+          cd ${{ steps.process_checkout.outputs.path }}
+          rm -f st_950_log.tar.gz
+          if [[ -d st ]]; then
+            tar -zcf st_950_log.tar.gz st
+          else
+            echo "WARN: st result dir not found, skip packaging"
+          fi
+      -
+        name: upload_results
+        if: ${{ always() && steps.check_950_pkg.outputs.need_st == 'yes' }}
+        uses: obs-upload
+        with:
+          endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
+          bucket: "ascend-ci"
+          artifact-path: |
+            ${{ steps.process_checkout.outputs.path }}/st_950_log.tar.gz
+          object-prefix: ${{ env.obs_path }}/st_results/cann
+    if: "${{ default() }}"
+    runs-on: ['self-hosted', 'npu=1','smoke=501']
+    container:
+      image: ${{ inputs.image_version }}

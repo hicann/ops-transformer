@@ -50,6 +50,58 @@ stages:
         runs-on: ["self-hosted", "arch=x64", "spec=small"]
         container:
           image: swr.cn-north-4.myhuaweicloud.com/ci_cann/ubuntu20.04.05_x86:k8s_v1.1006
+      # ============ ST gate: 进入 ST 之前先判定该 PR 是否需要跑 ST ============
+      JOB_st_gate:
+        permissions:
+          repository: read
+          id-token: write
+        name: ST_gate
+        if: env.TARGET_BRANCH == 'master'
+        runs-on: ["self-hosted", "arch=x64", "spec=small"]
+        container:
+          image: swr.cn-north-4.myhuaweicloud.com/ci_cann/ubuntu20.04.05_x86:k8s_v1.1006
+        steps:
+          - name: Checkout
+            identifier: process_checkout
+            uses: checkout
+            with:
+              ref: ${{ atomgit.event.pull_request.merge_commit_sha }}
+              allow-unsafe-pr-checkout: true
+          - name: oidc_auth
+            uses: huaweicloud-oidc-auth
+            with:
+              audience: ${{ secrets.audience }}
+              agency_urn: ${{ secrets.agency_urn }}
+              provider_urn: ${{ secrets.provider_urn }}
+              region: cn-north-4
+              duration: 3600
+          - name: download
+            uses: obs-download
+            with:
+              endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
+              bucket: "ascend-ci"
+              key: |
+                ${{ env.obs_path }}/pr_filelist.txt
+              path: ${{ steps.process_checkout.outputs.path }}
+          - name: check_pr_whitelist
+            identifier: check_whitelist
+            run: |
+              set -euo pipefail
+              cd ${{ steps.process_checkout.outputs.path }}
+              output="$(bash scripts/ci/ops_st_test.sh --ci_st_check --pr_filelist=./pr_filelist.txt)" || {
+                echo "::error::ST gate ci_st_check failed"
+                exit 1
+              }
+              for key in mainline experimental need_st; do
+                grep -q "^${key}=" <<<"${output}" || {
+                  echo "::error::ST gate missing output: ${key}"
+                  exit 1
+                }
+              done
+              while IFS= read -r line; do
+                [[ "${line}" == *=* ]] || continue
+                echo "${line}" >> "$ATOMGIT_OUTPUT"
+              done <<<"${output}"
       JOB_pre:
         permissions:
           repository: read
@@ -243,11 +295,12 @@ stages:
           repository: read
           id-token: write
         name: Compile_experimental_950_x86
+        if: env.TARGET_BRANCH == 'master' && jobs.JOB_st_gate.outputs.experimental == 'yes'
         uses: .gitcode/workflows/compile_action.yml
         with:
           task_name: 'Compile_Ascend_X86_experimental'
           ge_st_rt2: 'experimental_950'
-          image_version: ${{ jobs.JOB_image.outputs.Compile_Ascend_X86_experimental }}
+          image_version: ${{ jobs.JOB_image.outputs.Compile_Ascend_X86 }}
           arch: 'x64'
           package_name: 'cann-ops-transformer_experimental_950_linux-x86_64.run'
       JOB_arm_experimental_950_compile:
@@ -518,15 +571,30 @@ stages:
               if [ -f /home/jenkins/Ascend/cann/bin/setenv.bash ]; then
                   source /home/jenkins/Ascend/cann/bin/setenv.bash
               fi
-              # 空跑兼容: host/kernel 产物为空占位文件(0字节)时跳过 repack, touch 空的最终包
-              if [ ! -s build_out_distest/custom_host_ascend950.run ] || [ ! -s build_out_distest/kernel_ascend950.tar.gz ]; then
-                  echo "skip repackage: empty host/kernel artifacts (no compile scope)"
-                  touch build_out_distest/cann-ops-transformer-ascend950-custom_linux-x86_64.run
+              host_pkg="build_out_distest/custom_host_ascend950.run"
+              kernel_pkg="build_out_distest/kernel_ascend950.tar.gz"
+              final_pkg="build_out_distest/cann-ops-transformer-ascend950-custom_linux-x86_64.run"
+              skip_flag="build_out_distest/st_skip.flag"
+              host_bytes=$(stat -c%s "${host_pkg}" 2>/dev/null || echo 0)
+              kernel_bytes=$(stat -c%s "${kernel_pkg}" 2>/dev/null || echo 0)
+
+              # 空跑：host/kernel 任一侧没有产物时拼不出可测包，写显式跳过标记给 ST 消费。
+              # 不再只留 0 字节包，避免 ST 无法区分"正常跳过"和"产物异常"。
+              if [[ "${host_bytes}" -eq 0 || "${kernel_bytes}" -eq 0 ]]; then
+                  reason="both_empty"
+                  if [[ "${host_bytes}" -eq 0 && "${kernel_bytes}" -gt 0 ]]; then reason="host_empty"; fi
+                  if [[ "${host_bytes}" -gt 0 && "${kernel_bytes}" -eq 0 ]]; then reason="kernel_empty"; fi
+                  printf 'skip=yes\nreason=%s\nhost_bytes=%s\nkernel_bytes=%s\n' \
+                      "${reason}" "${host_bytes}" "${kernel_bytes}" > "${skip_flag}"
+                  echo "skip repackage: ${reason} (host=${host_bytes}B kernel=${kernel_bytes}B)"
+                  : > "${final_pkg}"
                   exit 0
               fi
+
+              printf 'skip=no\nhost_bytes=%s\nkernel_bytes=%s\n' "${host_bytes}" "${kernel_bytes}" > "${skip_flag}"
               mkdir -p kernel_pkg
-              tar -xzf build_out_distest/kernel_ascend950.tar.gz -C kernel_pkg
-              chmod +x build_out_distest/custom_host_ascend950.run
+              tar -xzf "${kernel_pkg}" -C kernel_pkg
+              chmod +x "${host_pkg}"
               bash scripts/ci/repack_custom_operator.sh \
                   --host-pkg "${WORKSPACE}/build_out_distest/custom_host_ascend950.run" \
                   --kernel-dir "${WORKSPACE}/kernel_pkg/ascend950" \
@@ -539,6 +607,13 @@ stages:
               endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
               bucket: "ascend-ci"
               artifact-path: ${{ steps.process_checkout.outputs.path }}/build_out_distest/cann-ops-transformer-ascend950-custom_linux-x86_64.run
+              object-prefix: ${{ env.obs_path }}/
+          - name: upload_st_skip_flag
+            uses: obs-upload
+            with:
+              endpoint: "https://obs.cn-north-4.myhuaweicloud.com"
+              bucket: "ascend-ci"
+              artifact-path: ${{ steps.process_checkout.outputs.path }}/build_out_distest/st_skip.flag
               object-prefix: ${{ env.obs_path }}/
     pre:
     - type: auto
@@ -628,6 +703,30 @@ stages:
         runs-on: ['self-hosted','npu=2','smoke=204']
         container:
           image: swr.cn-south-1.myhuaweicloud.com/pre_smoke/${{ jobs.JOB_image.outputs.PreSmoke_A900 }}
+      A5_smoke:
+        permissions:
+          repository: read
+          id-token: write
+        name: PreSmoke_A5
+        uses: .gitcode/workflows/st_test_action.yml
+        if: env.TARGET_BRANCH == 'master' && jobs.JOB_st_gate.outputs.mainline == 'yes'
+        with:
+          run_package_name: 'cann-ops-transformer-ascend950-custom_linux-x86_64.run'
+          package_flavor: 'distest'
+          op_scope: 'mainline'
+          image_version: swr.cn-north-4.myhuaweicloud.com/pre_smoke/${{ jobs.JOB_image.outputs.PreSmoke_A5 }}
+      A5_smoke_experimental:
+        permissions:
+          repository: read
+          id-token: write
+        name: PreSmoke_A5_experimental
+        uses: .gitcode/workflows/st_test_action.yml
+        if: env.TARGET_BRANCH == 'master' && jobs.JOB_st_gate.outputs.experimental == 'yes'
+        with:
+          run_package_name: 'cann-ops-transformer_experimental_950_linux-x86_64.run'
+          package_flavor: 'experimental'
+          op_scope: 'experimental'
+          image_version: swr.cn-north-4.myhuaweicloud.com/pre_smoke/${{ jobs.JOB_image.outputs.PreSmoke_A5 }}
       PreSmoke_harmony-infer-chs-transformer:
         permissions:
           repository: read

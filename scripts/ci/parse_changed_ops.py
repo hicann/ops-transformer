@@ -232,6 +232,38 @@ def filter_operators_by_def_and_soc(operators, op_to_def_files, soc):
     return filtered_operators, valid_def_files
 
 
+def add_experimental_metadata_companions(operators, ops_change_info, is_experimental):
+    """Add sibling <op>_metadata operators for experimental packages.
+
+    The experimental package build (build.sh --experimental --PR_PKG) uses this
+    parser instead of parse_compile_scope.py. Metadata operators are AICPU-only
+    and have no def.cpp, so they must be added after the def.cpp/SOC filter.
+    """
+    if is_experimental != "TRUE":
+        return operators
+
+    result = list(operators)
+    seen = set(result)
+    for op_name in operators:
+        file_list = ops_change_info.operator_file_map.get(op_name, [])
+        if not file_list:
+            continue
+        path_parts = file_list[0].lstrip("/").split("/")
+        domain, _ = _get_domain_and_op(path_parts, is_experimental)
+        if domain is None:
+            continue
+        metadata_name = f"{op_name}_metadata"
+        if metadata_name in seen or metadata_name in BlackList:
+            continue
+        if os.path.isdir(f"experimental/{domain}/{metadata_name}"):
+            result.append(metadata_name)
+            seen.add(metadata_name)
+            logging.info(
+                f"[INFO] Add experimental metadata companion '{metadata_name}' for '{op_name}'."
+            )
+    return result
+
+
 def get_change_ops_list(changed_file_info_from_ci, is_experimental, soc):
     ops_change_info = get_operator_info_from_ci(
         changed_file_info_from_ci, is_experimental
@@ -261,6 +293,10 @@ def get_change_ops_list(changed_file_info_from_ci, is_experimental, soc):
             logging.info(
                 "[INFO] No operators found for ascend910b, using default: nsa_compress_attention_infer"
             )
+
+    filtered_operators = add_experimental_metadata_companions(
+        filtered_operators, ops_change_info, is_experimental
+    )
 
     return ";".join(filtered_operators)
 
