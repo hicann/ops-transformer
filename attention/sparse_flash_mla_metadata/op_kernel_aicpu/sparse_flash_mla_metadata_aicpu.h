@@ -277,8 +277,6 @@ private:
     uint32_t GetS1Idx(uint32_t s1Size, uint32_t s1GIdx);
     uint32_t GetBsStride(uint32_t bIdx, uint32_t s1Idx);
     uint32_t GetOriTopkLength(uint32_t bsStride);
-    uint32_t GetOriTopkLength(uint32_t s1GIdx, const BatchCache& batchCache) const;
-    uint32_t ReadOriTopkLengthAtRow(uint32_t bIdx, uint32_t s1Idx) const;
     uint32_t GetCmpTopkLength(uint32_t bsStride);
     int64_t CalcOriPreTokenLeftUp(uint32_t s1Size, uint32_t s2Size);
     int64_t CalcOriNextTokenLeftUp(uint32_t s1Size, uint32_t s2Size);
@@ -380,7 +378,6 @@ private:
     bool isSplitG_ = false;
     bool isSparseOriKv_ = false;
     bool isSparseCmpKv_ = false;
-    bool hasOriTopkLength_ = false;
     uint32_t remainedBlockNum_ = 0U;
 
 private:

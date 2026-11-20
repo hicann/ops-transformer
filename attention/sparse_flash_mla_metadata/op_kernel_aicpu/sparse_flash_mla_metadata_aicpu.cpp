@@ -45,8 +45,6 @@ bool SparseFlashMlaMetadataCpuKernel::Prepare(CpuKernelContext& ctx)
     cmpResidualKv_ = ctx.Input(static_cast<uint32_t>(ParamId::cmpResidualKv));
     oriTopkLength_ = ctx.Input(static_cast<uint32_t>(ParamId::oriTopkLength));
     cmpTopkLength_ = ctx.Input(static_cast<uint32_t>(ParamId::cmpTopkLength));
-    hasOriTopkLength_ =
-        (oriTopkLength_ != nullptr && oriTopkLength_->GetData() != nullptr && oriTopkLength_->NumElements() > 0);
     // output
     metadata_ = ctx.Output(static_cast<uint32_t>(ParamId::metaData));
 
@@ -501,44 +499,6 @@ uint32_t SparseFlashMlaMetadataCpuKernel::GetOriTopkLength(uint32_t bsStride)
     return static_cast<uint32_t>(oriTopK_);
 }
 
-uint32_t SparseFlashMlaMetadataCpuKernel::ReadOriTopkLengthAtRow(uint32_t bIdx, uint32_t s1Idx) const
-{
-    if (!hasOriTopkLength_) {
-        return static_cast<uint32_t>(oriTopK_);
-    }
-    const int32_t* topkLenPtr = static_cast<const int32_t*>(oriTopkLength_->GetData());
-    if (layoutQ_ == "TND") {
-        uint32_t tIdx = s1Idx;
-        if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
-            const int32_t* cuPtr = static_cast<const int32_t*>(cuSeqlensQ_->GetData());
-            tIdx = static_cast<uint32_t>(cuPtr[bIdx]) + s1Idx;
-        } else {
-            tIdx = bIdx * static_cast<uint32_t>(maxSeqlenQ_) + s1Idx;
-        }
-        return static_cast<uint32_t>(topkLenPtr[tIdx * static_cast<uint32_t>(numHeadsKv_)]);
-    }
-    return static_cast<uint32_t>(topkLenPtr[(static_cast<uint64_t>(bIdx) * static_cast<uint64_t>(maxSeqlenQ_) + s1Idx) *
-                                            static_cast<uint64_t>(numHeadsKv_)]);
-}
-
-uint32_t SparseFlashMlaMetadataCpuKernel::GetOriTopkLength(uint32_t s1GIdx, const BatchCache& batchCache) const
-{
-    if (!hasOriTopkLength_) {
-        return static_cast<uint32_t>(oriTopK_);
-    }
-    int64_t s1GFirstToken = static_cast<int64_t>(s1GIdx) * static_cast<int64_t>(mBaseSize_);
-    int64_t s1GLastToken = std::min(s1GFirstToken + static_cast<int64_t>(mBaseSize_),
-                                    static_cast<int64_t>(batchCache.s1Size) * static_cast<int64_t>(groupSize_)) -
-                           1;
-    int64_t s1First = s1GFirstToken / static_cast<int64_t>(groupSize_);
-    int64_t s1Last = s1GLastToken / static_cast<int64_t>(groupSize_);
-    uint32_t maxLen = 0U;
-    for (int64_t s1Idx = s1First; s1Idx <= s1Last; ++s1Idx) {
-        maxLen = std::max(maxLen, ReadOriTopkLengthAtRow(batchCache.bIdx, static_cast<uint32_t>(s1Idx)));
-    }
-    return std::min(maxLen, static_cast<uint32_t>(oriTopK_));
-}
-
 uint32_t SparseFlashMlaMetadataCpuKernel::GetCmpTopkLength(uint32_t bsStride)
 {
     // 尝试使用 cmpTopkLength_
@@ -757,13 +717,6 @@ Range<int64_t> SparseFlashMlaMetadataCpuKernel::CalcS2TokenRange(uint32_t s1GIdx
         if (batchCache.s1Size == 0U || batchCache.oriS2Size == 0U) {
             return std::make_pair(0, 0);
         }
-        if (isSparseOriKv_ && !hasCmpKv_) {
-            uint32_t oriTopkSize = GetOriTopkLength(s1GIdx, batchCache);
-            if (oriTopkSize == 0U) {
-                return std::make_pair(0, 0);
-            }
-            return std::make_pair(0, static_cast<int64_t>(oriTopkSize) - 1);
-        }
     } else {
         if (batchCache.s1Size == 0U || batchCache.cmpRevertS2Size == 0U) {
             return std::make_pair(0, 0);
@@ -914,15 +867,12 @@ void SparseFlashMlaMetadataCpuKernel::CalcOriBlockRange(const Range<int64_t>& or
         oriS2FirstToken =
             Clip(oriS2FirstToken, static_cast<int64_t>(0), static_cast<int64_t>(batchCache.oriS2Size - 1U));
         oriS2LastToken = Clip(oriS2LastToken, static_cast<int64_t>(0), static_cast<int64_t>(batchCache.oriS2Size - 1U));
-        // oriS2LastToken 与 topk 取最小
+        uint32_t maskedS2Size = static_cast<uint32_t>(oriS2LastToken - oriS2FirstToken + 1);
+        // The mask range is already clipped to actual S2; sparse ORI also limits it by topk length.
         uint32_t s1Idx = GetS1Idx(batchCache.s1Size, s1GCache.s1GIdx);
         uint32_t bsStride = GetBsStride(s1GCache.bIdx, s1Idx);
-        uint32_t oriTopkSize =
-            isSparseOriKv_ ? GetOriTopkLength(s1GCache.s1GIdx, batchCache) :
-                             GetOriTopkLength(GetBsStride(s1GCache.bIdx, GetS1Idx(batchCache.s1Size, s1GCache.s1GIdx)));
-        s1GCache.actOriS2Size = isSparseOriKv_ ?
-                                    std::min(static_cast<uint32_t>(oriS2LastToken - oriS2FirstToken + 1), oriTopkSize) :
-                                    static_cast<uint32_t>(oriS2LastToken - oriS2FirstToken + 1);
+        uint32_t oriTopkSize = GetOriTopkLength(bsStride);
+        s1GCache.actOriS2Size = isSparseOriKv_ ? std::min(maskedS2Size, oriTopkSize) : maskedS2Size;
         s1GCache.oriS2End = s1GCache.actOriS2Size == 0 ? 0 : (s1GCache.actOriS2Size - 1U) / s2BaseSize_ + 1U;
         s1GCache.oriS2TailSize = s1GCache.actOriS2Size % s2BaseSize_;
     }
