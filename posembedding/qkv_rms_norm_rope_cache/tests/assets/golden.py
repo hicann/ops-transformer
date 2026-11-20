@@ -139,7 +139,8 @@ _ALIASES = {
     "epsilon": ("epsilon",),
     "cache_mode": ("cache_mode", "cacheModeOptional", "cacheMode"),
     "is_output_qkv": ("is_output_qkv", "isOutputQkv"),
-    "output_dtypes": ("output_dtypes",),
+    # 无 output_dtypes:KernelSpec.golden 的输出 dtype 由原始入参推导
+    # (见 _derive_out_dtypes),不再读取 TTK 下发的这项;aclnn / e2e 各自直读 kwargs。
 }
 
 
@@ -291,14 +292,20 @@ def _np_of(t, name):
     return t.to(dt).numpy()
 
 
-def _cast_outs(outs, kwargs):
+def _cast_outs(outs, kwargs, derived=None):
     """aclnn / e2e 通路:按 CSV 的 output_dtypes 把结果 cast 回算子输出 dtype。
 
     必须经 torch 转 —— np.ndarray.astype('bfloat16') 会静默回落到 'V2'(void 2 字节),
     让 bf16 输出在 TTK 侧的元素数差 2 倍,表现为莫名其妙的 shape mismatch。
     None(is_output_qkv=false 时不产出的槽位)原样透传,不参与 cast。
+
+    `derived`:TTK 不传 `output_dtypes` 时(实测 aclnn 通路 kwargs 只有
+    device/scalar_dtypes/short_soc_version/tensor_dtypes/tensor_formats/testcase_name/use_numpy)
+    由调用方按输入推导的输出 dtype 兜底;不兜底的话 `_compute` 的 fp64 结果会原样返回,
+    与算子按声明 dtype(如 bf16)的输出在 isclose 默认阈值下大面积判 fail。
+    None 槽位仍然原样透传。
     """
-    od = kwargs.get("output_dtypes") or []
+    od = kwargs.get("output_dtypes") or derived or []
     od = [d[0] if isinstance(d, (list, tuple)) else str(d) for d in od]
     return [
         o.to(_torch_dtype(od[i])) if (o is not None and i < len(od)) else o
@@ -651,21 +658,29 @@ class QkvRmsNormRopeCacheKernelSpec:
         return _prepare(inputs, for_npu=True, **kwargs)
 
     def golden(*inputs, **kwargs):
+        # ⚠️ 输出 dtype 的推导必须在 `_prepare` **之前**,并且只认【原始入参】:
+        # `_prepare` 里的 `_to_tensor` 会把 ml_dtypes 的 bf16 抬成 fp32,`_compute`
+        # 再把一切抬到 fp64 —— 在 prepared 上推导会一律得到 float32/float64,
+        # 与算子声明的 bf16 输出不对等。这里取位置参数的 0(qkv)/7(k_cache)/8(v_cache);
+        # 可选输入可能是 None、入参也可能被截断,故用 `get` 做 None/越界安全取值,
+        # `_derive_out_dtypes` 对 None 会回落到 qkv 的 dtype。
+        # 与 aclnn 通路同一套语义:**从原始入参推导 -> 计算 -> 结果 cast 回**,
+        # 不再使用 TTK 下发的 `output_dtypes`(golden 收的是 numpy 入参,
+        # 输出 dtype 应由入参决定)。
+        derived = _derive_out_dtypes(get(inputs, 0), get(inputs, 7), get(inputs, 8))
         tensors = _prepare(inputs, **kwargs)
         # k_cache/v_cache 缺省或零元素时推导不出 cache 布局(_scatter_pa_nz 会解引用 None),
         # 直接返回全 None 占位:让算子的拒绝成为可观察结果,而不是 golden 抛 AttributeError。
-        if _numel(tensors[7]) == 0 or _numel(tensors[8]) == 0:
+        if _numel(get(tensors, 7)) == 0 or _numel(get(tensors, 8)) == 0:
             return [None] * 6
         picked = _pick(kwargs)
         outs = _mask_unrequested_qkv(
             _compute(*tensors, **picked), picked.get("is_output_qkv", False)
         )
-        od = kwargs.get("output_dtypes") or []
-        od = [d[0] if isinstance(d, (list, tuple)) else str(d) for d in od]
-        # 注:None = is_output_qkv=false 时 3-5 按契约不产出(SUPPRESSED),不 cast。
+        # None = is_output_qkv=false 时 3-5 按契约不产出(SUPPRESSED),不 cast(不能变成数值);
+        # 其余槽位统一 cast 回上面推导出的 dtype,bf16 由 `_np_of` 走 ml_dtypes。
         return [
-            None if o is None else (_np_of(o, od[i]) if i < len(od) else o.numpy())
-            for i, o in enumerate(outs)
+            None if o is None else _np_of(o, derived[i]) for i, o in enumerate(outs)
         ]
 
     third_party = {"torch": _Compose}
@@ -825,6 +840,12 @@ class QkvRmsNormRopeCacheAclnnSpec:
             vOutBeforeQuant,
             **kwargs,
         )
+        # ⚠️ 输出 dtype 推导必须发生在**任何 dtype 抬升之前**:用 golden 的入参
+        # qkv/kCache/vCache,不要用 prepared —— _prepare 经 _to_tensor 把 bf16 抬成
+        # fp32、_compute 再抬到 fp64,在 prepared 上推会得到 float64/float32。
+        derived = None
+        if not kwargs.get("output_dtypes"):
+            derived = _derive_out_dtypes(qkv, kCache, vCache)
         prepared = _prepare(tensors, **kwargs)
         # 与 KernelSpec.golden 同一守卫:cache 缺省/零元素时 _scatter_pa_nz 无从推导,
         # 返回全 None 占位(aclnn 通路 6 路输出),让算子的拒绝成为可观察结果。
@@ -835,7 +856,7 @@ class QkvRmsNormRopeCacheAclnnSpec:
         outs = _mask_unrequested_qkv(
             _compute(*prepared, **picked), picked.get("is_output_qkv", False)
         )
-        return _cast_outs(outs, kwargs)
+        return _cast_outs(outs, kwargs, derived)
 
     third_party = {"torch": _Compose}
     tolerance = _TOL
