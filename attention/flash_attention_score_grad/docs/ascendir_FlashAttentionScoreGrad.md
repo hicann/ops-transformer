@@ -679,6 +679,7 @@ REG_OP(FlashAttentionScoreGrad)
 - sparse_mode=8时，当每个sequence的q、kv等长时支持可选输入pse_shift，针对全局做pse生成。支持q方向进行外切，需要外切前每个sequence的q、kv等长，外切后传入的actual_seq_qlen[0] - actual_seq_kvlen[0] + q_start_idx - kv_start_idx == 0（本功能属实验性功能）。
 - actual_seq_qlen输入支持某个Batch上的S长度为0，此时不支持可选输入pse_shift。
 - TND格式下，支持尾部部分Batch不参与计算，此时actual_seq_qlen和actual_seq_kvlen尾部传入对应个数的0即可。假设真实S长度为[2, 3, 4, 5, 6]，若希望最后两个Batch不参与计算，则传入的actual_seq_qlen为[2, 3, 4, 0, 0]。此时若需要传入prefix，其尾部也需要传入同等数量的0，例如[1, 1, 1, 0, 0]。
+- TND场景下，每个batch段内部仍按[N, Sq_i, Skv_i]生成，但存储与传参时统一flatten。若第i个batch段的真实query长度为Sq_i、真实key/value长度为Skv_i，则该段PSE元素个数为N *Sq_i* Skv_i，整段PSE总长度pseTotalLen为sum_i(N *Sq_i* Skv_i)。
 - sink不为None时，query与key等输入tensor仅支持float16和bfloat16两种类型。
 - pse_type为2或3的时候，当前只支持Sq和Skv等长。
 - sparse_mode约束如下:

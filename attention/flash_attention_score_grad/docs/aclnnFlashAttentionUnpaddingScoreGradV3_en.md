@@ -612,6 +612,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV3(
     - KeepProb: value range is 1.
 - The data layout format of query, key, and value only supports TND, where T is the tightly packed data of the B and S axes (SeqLenQ and SeqLenKV of each batch). B (Batch) indicates the input sample batch size, S (Seq-Length) indicates the input sample sequence length, H (Head-Size) indicates the hidden size, N (Head-Num) indicates the number of heads, and D (Head-Dim) indicates the smallest unit dimension of the hidden layer, satisfying D = H/N.
 - In TND format, some trailing batches can be excluded from computation. In this case, pass the corresponding number of 0s at the end of actual_seq_qlen and actual_seq_kv_len. For example, if the actual S length is [2, 3, 4, 5, 6] and the last two batches are excluded from computation, the passed actual_seq_qlen is [2, 5, 9, 0, 0].
+- In TND use cases, each batch segment is still generated as [N, Sq_i, Skv_i] internally, but is uniformly flattened for storage and parameter passing. If the actual query length of the i-th batch segment is Sq_i and the actual key/value length is Skv_i, the number of PSE elements in this segment is N *Sq_i* Skv_i, and the total length pseTotalLen of the entire PSE is sum_i(N *Sq_i* Skv_i).
 - Constraints on sparseMode are as follows:
   - When the shapes of all attenMaskOptional are smaller than 2048 and identical, it is recommended to use the default mode to reduce memory usage.
   - When configured as 1, 2, or 3, the user-configured preTokens and nextTokens do not take effect.

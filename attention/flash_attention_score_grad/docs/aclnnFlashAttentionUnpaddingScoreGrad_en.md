@@ -517,11 +517,11 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGrad(
     - D: ranges from 1 to 768.
     - KeepProb: value range: (0, 1].
 - The data layout format of query, key, and value only supports TND, where T is the tightly packed data of the B and S axes (SeqLenQ and SeqLenKV of each batch). B (Batch) indicates the input sample batch size, S (Seq-Length) indicates the input sample sequence length, H (Head-Size) indicates the hidden size, N (Head-Num) indicates the number of heads, and D (Head-Dim) indicates the smallest unit dimension of the hidden layer, satisfying D = H/N.
+- In TND use cases, each batch segment is still generated as [N, Sq_i, Skv_i] internally, but is uniformly flattened for storage and parameter passing. If the actual query length of the i-th batch segment is Sq_i and the actual key/value length is Skv_i, the number of PSE elements in this segment is N *Sq_i* Skv_i, and the total length pseTotalLen of the entire PSE is sum_i(N *Sq_i* Skv_i).
 - In TND format, some trailing batches can be not involved in calculation. In this case, simply pass the corresponding number of 0s at the end of actual_seq_qlen and actual_seq_kv_len. For example, if the actual S length is [2, 3, 4, 5, 6] and the last two batches are not involved in calculation, pass [2, 5, 9, 0, 0] as actual_seq_qlen.
 - pseShiftOptional: If Sq is greater than 1024, Sq and Skv of each batch are of equal length, and the mask is a lower-triangular mask with sparseMode 0, 2, or 3, alibi position encoding compression can be enabled. In this case, only the last 1024 rows of the original PSE need to be input for memory optimization, that is, alibi_compress = ori_pse[:, :, -1024:, :]. The details are as follows:
   - When the parameter differs for each batch, the shape is BNHSkv (H = 1024).
   - When the parameter is the same for each batch, the shape is 1NHSkv (H = 1024).
-  - In TND use cases, each batch segment is still generated in the [N, Sq_i, Skv_i] format internally, but is uniformly flattened for storage and parameter passing. If the actual query length of the i-th batch segment is Sq_i and the actual key/value length is Skv_i, the number of PSE elements in this segment is N *Sq_i* Skv_i, and the total PSE length pseTotalLen is sum_i(N *Sq_i* Skv_i).
   - If this parameter is not used, nullptr can be passed in.
 - Constraints on sparseMode are as follows:
   - When the shapes of all attenMaskOptional are smaller than 2048 and identical, it is recommended to use the default mode to reduce memory usage.

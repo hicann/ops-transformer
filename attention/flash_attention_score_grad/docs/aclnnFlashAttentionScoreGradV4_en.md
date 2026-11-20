@@ -760,6 +760,7 @@ aclnnStatus aclnnFlashAttentionScoreGradV4(
     - When keepProbOptional is less than 1.0, if dropMaskOptional is not nullptr, the input dropMask is used; otherwise, the dropMask generated from seed and offset is used.
 <!-- end id8 -->
 - In TND format, trailing batches that do not participate in computation are supported. In this case, pass the corresponding number of zeros at the end of actual_seq_q_len and actual_seq_kv_len. Assume the actual S length is [2, 3, 4, 5, 6]. If you want the last two batches to not participate in computation, pass actual_seq_q_len as [2, 3, 4, 0, 0]. In this case, if prefixOptional needs to be passed, its trailing part must also contain the same number of zeros, for example, [1, 1, 1, 0, 0].
+- In TND use cases, each batch segment is still generated as [N, Sq_i, Skv_i] internally, but is uniformly flattened for storage and parameter passing. If the actual query length of the i-th batch segment is Sq_i and the actual key/value length is Skv_i, the number of PSE elements in this segment is N *Sq_i* Skv_i, and the total length pseTotalLen of the entire PSE is sum_i(N *Sq_i* Skv_i).
 - When sinkInOptional is not None, input tensors such as query and key only support two data types: float16 and bfloat16. The dimension of sinkInOptional is 1, and its length must be the same as the headnum of query.
 - When the data layout of softmaxSum and softmaxMax is TND, softmaxInLayout must be "same_as_input".
 
