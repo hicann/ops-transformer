@@ -558,10 +558,11 @@ aclnnStatus aclnnQuantLightningIndexerV3(
 - headdim支持128。
 - block_size取值为16的倍数，最大支持1024。
 - 当传入的参数layoutQOptional为TND时，必须传入cuSeqlensQOptional，如果也传入sequsedQOptional，应保证由sequsedQOptional传入的各个batch的q长度不超过根据cuSeqlensQOptional计算出的各个batch的q序列长度。当某个batch由sequsedQOptional传入的q序列长度seqlen1小于由cuSeqlensQOptional计算出的q长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的q输出的sparseIndicesOut和sparseValuesOut全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。
-- **确定性说明：** aclnnQuantLightningIndexerV3默认确定性实现。
-- **Batch一致性说明：** <term>Atlas A3系列产品</term>默认支持Batch一致性。
+- 确定性说明： aclnnQuantLightningIndexerV3默认确定性实现。
+- Batch一致性说明： <term>Atlas A3系列产品</term>默认支持Batch一致性。
 
 - candidateTopkBlocks、candidateBlockSize只支持(-1, -1)或(2048, 8)，需与配套aclnnQuantLightningIndexerV3Metadata接口的配置保持一致。
+- candidate 开启时 g = N1/N2 允许 64 或 32（g=32 使用 4 行基本块的块级候选慢路径）；candidate 关闭时 g 仍要求 64（fast 模板的 24/32 除外）。
 - metadataOptional必须由配套aclnnQuantLightningIndexerV3Metadata接口生成，序列信息、head配置、topk、quantMode、布局、maskMode、cmpRatio及candidate参数必须与本接口一致。
 - candidateBlockLengthOut为每行实际有效候选块数，消费侧仅使用candidateBlockIndicesOut每行对应的有效前缀。
 

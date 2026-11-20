@@ -8,14 +8,171 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include <memory>
+#include <cstdint>
+#include <iostream>
 #include "gtest/gtest.h"
+#include "../../../op_api/aclnn_quant_lightning_indexer_v2.h"
+#include "../../../op_api/aclnn_quant_lightning_indexer_v3.h"
+#include "op_api_ut_common/tensor_desc.h"
+#include "opdev/platform.h"
 
-// quant_lightning_indexer_v2 无 aclnn 两段式接口（op_host 下无 op_api/aclnn 源文件），
-// 本文件为算子定义注册冒烟用例：opapi UT 存在时 libopapi_transformer_ut.so 会整包链接
-// 各算子 op_host 的 *_def.cpp（见 cmake/custom_build.cmake 中 ops_aclnn 归档），其静态初始化
-// 在库加载阶段完成 OpDef 注册。用例被执行即说明库加载与全部算子定义注册流程无崩溃、
-// 无重复注册冲突。
-TEST(quant_lightning_indexer_v2_opapi_ut, op_def_registration_smoke)
+using namespace std;
+using namespace op;
+
+namespace {
+void DestroyAclTensor(aclTensor* tensor)
+{
+    Release(tensor);
+}
+} // namespace
+
+class quant_lightning_indexer_v2_opapi_ut : public testing::Test {
+protected:
+    static void SetUpTestCase()
+    {
+        op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
+        cout << "quant_lightning_indexer_v2_opapi_ut SetUp" << endl;
+    }
+
+    static void TearDownTestCase()
+    {
+        cout << "quant_lightning_indexer_v2_opapi_ut TearDown" << endl;
+    }
+};
+
+// 手写 aclnn 接口注册冒烟：libopapi_transformer_ut.so 加载即完成 OpDef 注册与符号解析
+TEST_F(quant_lightning_indexer_v2_opapi_ut, op_def_registration_smoke)
 {
     SUCCEED();
+}
+
+// V2 兼容接口（签名冻结、无 candidate 参数）：必选输入 q 为空
+TEST_F(quant_lightning_indexer_v2_opapi_ut, quant_lightning_indexer_v2_aclnn_null_query)
+{
+    char layoutQuery[] = "BSND";
+    char layoutKey[] = "PA_BBND";
+    auto key = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 16, 1, 128}, ACL_INT8, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto weights = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseIndicesOut = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 1, 2048}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseValuesOut = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({0}, ACL_BF16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+
+    aclnnStatus aclRet = aclnnQuantLightningIndexerV2GetWorkspaceSize(
+        nullptr, key.get(), weights.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, 2048, 2, -1, layoutQuery, layoutKey, 0, 1, 0, sparseIndicesOut.get(), sparseValuesOut.get(),
+        &workspaceSize, &executor);
+
+    EXPECT_NE(aclRet, ACL_SUCCESS);
+    EXPECT_EQ(executor, nullptr);
+}
+
+// V2 兼容接口：第二段接口空执行器直通
+TEST_F(quant_lightning_indexer_v2_opapi_ut, quant_lightning_indexer_v2_aclnn_empty_executor)
+{
+    aclnnStatus aclRet = aclnnQuantLightningIndexerV2(nullptr, 0, nullptr, nullptr);
+    EXPECT_EQ(aclRet, ACL_SUCCESS);
+}
+
+// V3 candidate 接口：必选输入 q 为空
+TEST_F(quant_lightning_indexer_v2_opapi_ut, quant_lightning_indexer_v3_aclnn_null_query)
+{
+    char layoutQuery[] = "BSND";
+    char layoutKey[] = "PA_BBND";
+    auto key = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 16, 1, 128}, ACL_INT8, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto weights = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseIndicesOut = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 1, 2048}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseValuesOut = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({0}, ACL_BF16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+
+    aclnnStatus aclRet = aclnnQuantLightningIndexerV3GetWorkspaceSize(
+        nullptr, key.get(), weights.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, 2048, 2, -1, layoutQuery, layoutKey, 0, 1, 0, -1, -1, sparseIndicesOut.get(),
+        sparseValuesOut.get(), nullptr, nullptr, &workspaceSize, &executor);
+
+    EXPECT_NE(aclRet, ACL_SUCCESS);
+    EXPECT_EQ(executor, nullptr);
+}
+
+// V3 candidate 接口：candidate 参数对非法（-1, 8），第一段接口直接拒绝
+TEST_F(quant_lightning_indexer_v2_opapi_ut, quant_lightning_indexer_v3_aclnn_bad_candidate_pair_failed)
+{
+    char layoutQuery[] = "BSND";
+    char layoutKey[] = "PA_BBND";
+    auto query = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 64, 128}, ACL_INT8, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto key = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 16, 1, 128}, ACL_INT8, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto weights = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto qScale = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto kScale = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 16, 1}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseIndicesOut = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 1, 2048}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseValuesOut = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({0}, ACL_BF16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto candidateIndices = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 1, 2048}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto candidateLength = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({0}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+
+    aclnnStatus aclRet = aclnnQuantLightningIndexerV3GetWorkspaceSize(
+        query.get(), key.get(), weights.get(), qScale.get(), kScale.get(), nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, 2048, 2, -1, layoutQuery, layoutKey, 0, 1, 0, -1, 8, sparseIndicesOut.get(),
+        sparseValuesOut.get(), candidateIndices.get(), candidateLength.get(), &workspaceSize, &executor);
+
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
+    EXPECT_EQ(executor, nullptr);
+}
+
+// V3 candidate 接口：candidate 开启时 candidateBlockIndices 为空，由前置一致性校验拒绝
+TEST_F(quant_lightning_indexer_v2_opapi_ut, quant_lightning_indexer_v3_aclnn_missing_candidate_out)
+{
+    char layoutQuery[] = "BSND";
+    char layoutKey[] = "PA_BBND";
+    auto query = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 64, 128}, ACL_INT8, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto key = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 16, 1, 128}, ACL_INT8, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto weights = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto qScale = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto kScale = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 16, 1}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseIndicesOut = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 1, 2048}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseValuesOut = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({0}, ACL_BF16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+
+    aclnnStatus aclRet = aclnnQuantLightningIndexerV3GetWorkspaceSize(
+        query.get(), key.get(), weights.get(), qScale.get(), kScale.get(), nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, 2048, 2, -1, layoutQuery, layoutKey, 0, 1, 0, 2048, 8, sparseIndicesOut.get(),
+        sparseValuesOut.get(), nullptr, nullptr, &workspaceSize, &executor);
+
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
+    EXPECT_EQ(executor, nullptr);
+}
+
+// V3 candidate 接口：第二段接口空执行器直通
+TEST_F(quant_lightning_indexer_v2_opapi_ut, quant_lightning_indexer_v3_aclnn_empty_executor)
+{
+    aclnnStatus aclRet = aclnnQuantLightningIndexerV3(nullptr, 0, nullptr, nullptr);
+    EXPECT_EQ(aclRet, ACL_SUCCESS);
 }

@@ -52,7 +52,9 @@ TEST_F(QuantLightningIndexerV2Proto, QuantLightningIndexerV2_infershape_bsnd)
         // 输出Tensor
         {
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
-            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}   // sparse_values
+            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},  // sparse_values
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // candidate_block_indices
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}  // candidate_block_length
         },
         // 属性
         {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
@@ -64,7 +66,7 @@ TEST_F(QuantLightningIndexerV2Proto, QuantLightningIndexerV2_infershape_bsnd)
          {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
          {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {{1, 8, 1, 128}, {1, 8, 1, 128}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{1, 8, 1, 128}, {1, 8, 1, 128}, {0}, {0}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -90,7 +92,9 @@ TEST_F(QuantLightningIndexerV2Proto, QuantLightningIndexerV2_infershape_tnd)
         },
         {
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
-            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}   // sparse_values
+            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},  // sparse_values
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // candidate_block_indices
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}  // candidate_block_length
         },
         {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
          {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
@@ -101,7 +105,7 @@ TEST_F(QuantLightningIndexerV2Proto, QuantLightningIndexerV2_infershape_tnd)
          {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
          {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {{64, 1, 2048}, {0}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{64, 1, 2048}, {0}, {0}, {0}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -127,7 +131,9 @@ TEST_F(QuantLightningIndexerV2Proto, QuantLightningIndexerV2_infershape_tnd_pa)
         },
         {
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
-            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}   // sparse_values
+            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},  // sparse_values
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // candidate_block_indices
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}  // candidate_block_length
         },
         {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
          {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
@@ -138,7 +144,7 @@ TEST_F(QuantLightningIndexerV2Proto, QuantLightningIndexerV2_infershape_tnd_pa)
          {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
          {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}});
 
-    std::vector<std::vector<int64_t>> expectOutputShape = {{64, 1, 2048}, {64, 1, 2048}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{64, 1, 2048}, {64, 1, 2048}, {0}, {0}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -164,7 +170,9 @@ TEST_F(QuantLightningIndexerV2Proto, QuantLightningIndexerV2_infershape_layout_f
         },
         {
             {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // sparse_indices
-            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND}   // sparse_values
+            {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},  // sparse_values
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}, // candidate_block_indices
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}  // candidate_block_length
         },
         {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(128)},
          {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
@@ -193,9 +201,11 @@ TEST_F(QuantLightningIndexerV2Proto, QuantLightningIndexerV2_inferdtype)
         ge::DataType outputRef0 = ge::DT_INT32;
         auto context_holder =
             gert::InferDataTypeContextFaker()
-                .NodeIoNum(13, 2)
+                .NodeIoNum(13, 4)
                 .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
                 .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
+                .NodeOutputTd(3, ge::FORMAT_ND, ge::FORMAT_ND)
                 .InputDataTypes({&inputQ, &inputK, &inputW, &inputScale, &inputScale, &inputI32, &inputI32, &inputI32,
                                  &inputI32, &inputI32, &inputI32, &inputI32, &inputI32})
                 .NodeAttrs({{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
@@ -212,5 +222,85 @@ TEST_F(QuantLightningIndexerV2Proto, QuantLightningIndexerV2_inferdtype)
         ASSERT_NE(context, nullptr);
 
         EXPECT_EQ(context->GetOutputDataType(0), outputRef0);
+        EXPECT_EQ(context->GetOutputDataType(2), outputRef0);
+        EXPECT_EQ(context->GetOutputDataType(3), outputRef0);
     }
+}
+
+// candidate 开启（BSND）：candidate_block_indices 末维为 candidate_topk_blocks，
+// candidate_block_length 恒为 (0,)
+TEST_F(QuantLightningIndexerV2Proto, QuantLightningIndexerV2_infershape_candidate_bsnd)
+{
+    gert::InfershapeContextPara infershapeContextPara(
+        "QuantLightningIndexerV2",
+        {
+            {{{1, 8, 8, 128}, {1, 8, 8, 128}}, ge::DT_INT8, ge::FORMAT_ND},   // q
+            {{{1, 64, 1, 128}, {1, 64, 1, 128}}, ge::DT_INT8, ge::FORMAT_ND}, // k
+            {{{1, 8, 8}, {1, 8, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},          // w
+            {{{1, 8, 8}, {1, 8, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},          // q_descale
+            {{{1, 64, 1}, {1, 64, 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},        // k_descale
+            {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // cu_seqlens_q
+            {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // cu_seqlens_k
+            {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // seqused_q
+            {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // seqused_k
+            {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // cmp_residual_k
+            {{{1, 4}, {1, 4}}, ge::DT_INT32, ge::FORMAT_ND},                  // block_table
+            {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // output_idx_offset
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                   // metadata
+        },
+        {{{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"candidate_topk_blocks", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"candidate_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)}});
+
+    std::vector<std::vector<int64_t>> expectOutputShape = {{1, 8, 1, 2048}, {0}, {1, 8, 1, 2048}, {1, 8, 1}};
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
+}
+
+// candidate 参数对非法（-1, 8）：infershape 直接拒绝，只接受 (-1,-1) 或 (2048,8)
+TEST_F(QuantLightningIndexerV2Proto, QuantLightningIndexerV2_infershape_candidate_pair_failed)
+{
+    gert::InfershapeContextPara infershapeContextPara(
+        "QuantLightningIndexerV2",
+        {
+            {{{1, 8, 8, 128}, {1, 8, 8, 128}}, ge::DT_INT8, ge::FORMAT_ND},   // q
+            {{{1, 64, 1, 128}, {1, 64, 1, 128}}, ge::DT_INT8, ge::FORMAT_ND}, // k
+            {{{1, 8, 8}, {1, 8, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},          // w
+            {{{1, 8, 8}, {1, 8, 8}}, ge::DT_FLOAT16, ge::FORMAT_ND},          // q_descale
+            {{{1, 64, 1}, {1, 64, 1}}, ge::DT_FLOAT16, ge::FORMAT_ND},        // k_descale
+            {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // cu_seqlens_q
+            {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // cu_seqlens_k
+            {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // seqused_q
+            {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // seqused_k
+            {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // cmp_residual_k
+            {{{1, 4}, {1, 4}}, ge::DT_INT32, ge::FORMAT_ND},                  // block_table
+            {{{0}, {0}}, ge::DT_INT32, ge::FORMAT_ND, true},                  // output_idx_offset
+            {{{2048}, {2048}}, ge::DT_INT32, ge::FORMAT_ND}                   // metadata
+        },
+        {{{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2048)},
+         {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
+         {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"candidate_topk_blocks", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+         {"candidate_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)}});
+
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED, {});
 }

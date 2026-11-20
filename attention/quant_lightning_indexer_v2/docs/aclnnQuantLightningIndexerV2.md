@@ -561,8 +561,8 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 - 当`layoutKOptional`不为PA_BBND时，`layoutQOptional`和`layoutKOptional`必须一致。
 - 当`quantMode`为3/5时，`qDescale`和`kDescale`的维数分别比`q`和`k`多1，前缀维度保持一致，末两维为(D/64, 2)；D必须为64的倍数，每个scale对应D轴上连续32个逻辑元素。
 - 当传入的参数layoutQOptional为TND时，必须传入cuSeqlensQOptional，如果也传入sequsedQOptional，应保证由sequsedQOptional传入的各个batch的q长度不超过根据cuSeqlensQOptional计算出的各个batch的q序列长度。当某个batch由sequsedQOptional传入的q序列长度seqlen1小于由cuSeqlensQOptional计算出的q长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的q输出的sparseIndicesOut和sparseValuesOut全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。q N1为24或32场景暂不支持TND Padding功能，不应传入sequsedQOptional，传入时接口报错。
-- **确定性说明：** aclnnQuantLightningIndexerV2默认确定性实现。
-- **Batch一致性说明：** 默认支持Batch一致性：在输入样本及其计算参数保持不变、配套metadata按当前批次重新生成的条件下，同一样本的sparseIndicesOut及对应sparseValuesOut与所在批次的大小、位置无关。
+- 确定性说明： aclnnQuantLightningIndexerV2默认确定性实现。
+- Batch一致性说明： 默认支持Batch一致性：在输入样本及其计算参数保持不变、配套metadata按当前批次重新生成的条件下，同一样本的sparseIndicesOut及对应sparseValuesOut与所在批次的大小、位置无关。
 
 ## 调用示例
 

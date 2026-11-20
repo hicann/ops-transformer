@@ -35,6 +35,17 @@ using namespace QLIV2Kernel;
         op.Process(); \
     } while (0)
 
+// arch22: candidate（两级 TopK source 模式）需要把候选块输出透传给 kernel 主控类；
+// candidate 关闭时该指针为空，QLIV2Preload 内部按 candidateOn=false 走原单级 TopK 路径
+#define INVOKE_LI_CANDIDATE_OP_IMPL(templateClass, ...) \
+    do { \
+        templateClass<QLIV2Type<__VA_ARGS__>> op; \
+        op.Init(query, key, weights, queryScale, keyScale, cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, \
+                blockTable, outputIdxOffset, metadata, sparseIndices, sparseValues, candidateBlockIndices, \
+                candidateBlockLength, user, tiling_data, &tPipe); \
+        op.Process(); \
+    } while (0)
+
 // fast 模板不使用 TPipe
 #define INVOKE_LI_FAST_OP_IMPL(templateClass, ...) \
     do { \
@@ -103,14 +114,16 @@ __global__ __aicore__ void quant_lightning_indexer_v2(
 #endif
 
 #else
-    // fastUsedCoreNum != 0 表示 tiling 侧已判定走 fast 模板
+    // fastUsedCoreNum != 0 表示 tiling 侧已判定走 fast 模板；candidate 开启时
+    // host tiling 恒不选 fast，两条路径互斥
     if (tiling_data->fastUsedCoreNum != 0U) {
         INVOKE_LI_FAST_OP_IMPL(QLIV2FastKernel, int8_t, int8_t, float, uint16_t, int32_t, PAGE_ATTENTION,
                                LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T));
         return;
     }
     TPipe tPipe;
-    INVOKE_LI_NO_KFC_OP_IMPL(QLIV2Preload, int8_t, int8_t, float, uint16_t, int32_t, PAGE_ATTENTION,
-                             LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T));
+    // 910B 统一走 QLIV2Preload：candidate 参数在关闭态为空，行为与原单级 TopK 一致
+    INVOKE_LI_CANDIDATE_OP_IMPL(QLIV2Preload, int8_t, int8_t, float, uint16_t, int32_t, PAGE_ATTENTION,
+                                LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T));
 #endif
 }

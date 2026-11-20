@@ -401,3 +401,97 @@ TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_
                                  &compileInfo, "Ascend910B", 64, 262144, 16384);
     ExecuteTestCase(para, ge::GRAPH_FAILED, qliv2_ut::SKIP_TILING_KEY);
 }
+
+// ==================== candidate（两级 TopK source 模式） ====================
+// 开启态（BSND）：candidate_topk_blocks=2048 / candidate_block_size=8
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_candidate_bsnd_success)
+{
+    qliv2_ut::CaseParam p;
+    p.candidateTopkBlocks = 2048;
+    p.candidateBlockSize = 8;
+    p.candidateShape = {2, 39, 1, 2048};
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_SUCCESS);
+}
+
+// 开启态 + g=32 -> 成功（candidate 放行 32，典型块级候选形态 mBaseSize=4*g=128）
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_candidate_g32_success)
+{
+    qliv2_ut::CaseParam p;
+    p.qShape = {2, 39, 32, 128};
+    p.wShape = {2, 39, 32};
+    p.qScaleShape = {2, 39, 32};
+    p.candidateTopkBlocks = 2048;
+    p.candidateBlockSize = 8;
+    p.candidateShape = {2, 39, 1, 2048};
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_SUCCESS);
+}
+
+// 关闭态 + g=32 -> 失败（g 统一要求 64）
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_g32_candidate_off_failed)
+{
+    qliv2_ut::CaseParam p;
+    p.qShape = {2, 39, 32, 128};
+    p.wShape = {2, 39, 32};
+    p.qScaleShape = {2, 39, 32};
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+}
+
+// candidate_topk_blocks 仅支持 -1/2048 -> 1024 失败
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_candidate_blocks_failed)
+{
+    qliv2_ut::CaseParam p;
+    p.candidateTopkBlocks = 1024;
+    p.candidateBlockSize = 8;
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+}
+
+// candidate_block_size 仅支持 8 -> 16 失败
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_candidate_block_size_failed)
+{
+    qliv2_ut::CaseParam p;
+    p.candidateTopkBlocks = 2048;
+    p.candidateBlockSize = 16;
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+}
+
+// 关闭态参数对必须成对：(-1, 8) 失败（只接受 (-1,-1) 或 (2048,8)）
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_candidate_off_mixed_failed)
+{
+    qliv2_ut::CaseParam p;
+    p.candidateTopkBlocks = -1;
+    p.candidateBlockSize = 8;
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+}
+
+// 开启态参数对必须成对：(2048, -1) 失败
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_candidate_on_missing_size_failed)
+{
+    qliv2_ut::CaseParam p;
+    p.candidateTopkBlocks = 2048;
+    p.candidateBlockSize = -1;
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+}
+
+// TND 开启 candidate 但未传 cu_seqlens_q -> 失败
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_910b_tiling_candidate_tnd_no_cu_seq_failed)
+{
+    qliv2_ut::CaseParam p;
+    p.layoutQ = "TND";
+    p.qShape = {78, 64, 128};
+    p.wShape = {78, 64};
+    p.qScaleShape = {78, 64};
+    p.outShape = {78, 1, 2048};
+    p.candidateTopkBlocks = 2048;
+    p.candidateBlockSize = 8;
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+}
+
+// 非 arch22（Ascend950）开启 candidate -> 明确拒绝
+TEST_F(QuantLightningIndexerV2TilingArch22, QuantLightningIndexerV2_950_tiling_candidate_failed)
+{
+    qliv2_ut::CaseParam p;
+    p.soc = "Ascend950";
+    p.candidateTopkBlocks = 2048;
+    p.candidateBlockSize = 8;
+    qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
+}

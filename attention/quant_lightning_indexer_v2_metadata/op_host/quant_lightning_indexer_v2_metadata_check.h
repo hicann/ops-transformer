@@ -40,6 +40,9 @@ inline constexpr int64_t QLI_V2_CMP_RATIO_LOWER_BOUND = 1;
 inline constexpr int64_t QLI_V2_CMP_RATIO_UPPER_BOUND = 128;
 inline constexpr int64_t QLI_V2_NUM_HEADS_Q_LOWER_BOUND = 1;
 inline constexpr int64_t QLI_V2_NUM_HEADS_Q_UPPER_BOUND = 64;
+// candidate（两级 TopK source 模式）形态使用 q_head_num=32（g=32，mBaseSize=4*g），
+// A2/A3 上同时放行 64 与 32；fast 模板另支持 24/32
+inline constexpr int64_t QLI_V2_NUM_HEADS_Q_G32 = 32;
 // fast 模板专用取值
 inline constexpr int64_t QLI_V2_FAST_GSIZE_24 = 24;
 inline constexpr int64_t QLI_V2_FAST_GSIZE_32 = 32;
@@ -249,9 +252,10 @@ aclnnStatus CheckSingleParamQliV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t 
     } else { // 校验 A2/A3 参数
         // num_heads_q 校验
         CHECK_COND(numHeadsQ == QLI_V2_NUM_HEADS_Q_UPPER_BOUND || numHeadsQ == QLI_V2_FAST_GSIZE_24 ||
-                       numHeadsQ == QLI_V2_FAST_GSIZE_32,
+                       numHeadsQ == QLI_V2_NUM_HEADS_Q_G32,
                    ACLNN_ERR_PARAM_INVALID,
-                   "For Atlas A2/A3, num_heads_q should be 64, or 24/32 for the fast template, but got %lld",
+                   "For Atlas A2/A3, num_heads_q should be 64, 24/32 for the fast template, "
+                   "or 32 when candidate is on, but got %lld",
                    numHeadsQ);
         // topk 校验
         CHECK_COND(topk >= QLI_V2_TOPK_LOWER_BOUND && topk <= QLI_V2_A3_TOPK_UPPER_BOUND, ACLNN_ERR_PARAM_INVALID,

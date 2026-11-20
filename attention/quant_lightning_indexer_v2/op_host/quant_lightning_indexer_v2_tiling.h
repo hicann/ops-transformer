@@ -62,6 +62,8 @@ constexpr uint32_t OUTPUT_IDX_OFFSET_INDEX = 11;
 constexpr uint32_t METADATA_INDEX = 12;
 constexpr uint32_t SPARSE_INDICES_INDEX = 0;
 constexpr uint32_t SPARSE_VALUES_INDEX = 1;
+constexpr uint32_t CANDIDATE_BLOCK_INDICES_OUTPUT_INDEX = 2;
+constexpr uint32_t CANDIDATE_BLOCK_LENGTH_OUTPUT_INDEX = 3;
 // Attributes Index
 constexpr uint32_t ATTR_TOPK_INDEX = 0;
 constexpr uint32_t ATTR_QUANT_MODE_INDEX = 1;
@@ -71,6 +73,9 @@ constexpr uint32_t ATTR_KEY_LAYOUT_INDEX = 4;
 constexpr uint32_t ATTR_MASK_MODE_INDEX = 5;
 constexpr uint32_t ATTR_CMP_RATIO_INDEX = 6;
 constexpr uint32_t ATTR_RETURN_VALUE_INDEX = 7;
+// candidate（两级 TopK source 模式）属性索引
+constexpr uint32_t ATTR_CANDIDATE_TOPK_BLOCKS_INDEX = 8;
+constexpr uint32_t ATTR_CANDIDATE_BLOCK_SIZE_INDEX = 9;
 
 // Dim Index
 constexpr uint32_t DIM_IDX_ZERO = 0;
@@ -89,6 +94,8 @@ constexpr uint32_t G_SIZE_LIMIT = 64;
 constexpr uint32_t GSIZE_FAST_24 = 24;
 constexpr uint32_t GSIZE_FAST_32 = 32;
 constexpr uint32_t G_SIZE_LIMIT_32_950 = 32;
+// candidate 开启时额外放行 g=32（块级候选形态使用 4 行基本块，mBaseSize=4*g）
+constexpr uint32_t G_SIZE_LIMIT_CANDIDATE_32 = 32;
 constexpr uint32_t BLOCK_SIZE_LIMIT = 1024;
 constexpr uint32_t BLOCK_SIZE_FACTOR = 16;
 constexpr uint32_t SPARSE_MODE_LOWER = 3;
@@ -104,6 +111,12 @@ using lightning_indexer_v2_checker::MXFP4_PACK_NUM;
 using lightning_indexer_v2_checker::HIFLOAT4_PACK_NUM;
 constexpr uint32_t MX_SCALE_GROUP_SIZE = 32; // MX量化每32个D维元素对应1个E8M0 scale
 constexpr uint32_t HIFLOAT4_BLOCK_SIZE = 64; // HIFLOAT4每64个D维元素对应1个scale
+
+// ------------------candidate（两级 TopK source 模式）常量------------------
+constexpr int32_t CANDIDATE_TOPK_BLOCKS_OFF = -1;    // 关闭（默认，现网行为）
+constexpr int32_t CANDIDATE_TOPK_BLOCKS_FIX = 2048;  // 当前开启仅支持 2048
+constexpr int32_t CANDIDATE_BLOCK_SIZE_OFF = -1;     // 关闭态配套值（只接受 (-1,-1) 或 (2048,8)）
+constexpr uint32_t CANDIDATE_BLOCK_SIZE_DEFAULT = 8; // 开启态唯一合法值（32B 块内归约粒度）
 
 // -----------算子TilingData定义---------------
 BEGIN_TILING_DATA_DEF(QLIV2TilingData)
@@ -123,6 +136,10 @@ TILING_DATA_FIELD_DEF(int32_t, maxSeqlenQ)
 TILING_DATA_FIELD_DEF(uint32_t, keyStride0)
 TILING_DATA_FIELD_DEF(uint32_t, keyDequantScaleStride0)
 TILING_DATA_FIELD_DEF(uint32_t, quantMode)
+// ---- candidate（两级 TopK source 模式）----
+TILING_DATA_FIELD_DEF(int32_t, candidateTopkBlocks) // -1=关闭
+TILING_DATA_FIELD_DEF(uint32_t, candidateBlockSize) // 当前仅 8
+
 // fast 模板专用字段，追加在末尾以保持既有字段的二进制布局不变
 TILING_DATA_FIELD_DEF(uint32_t, fastUsedCoreNum)
 TILING_DATA_FIELD_DEF(uint64_t, fastWorkspaceGroupStride)
@@ -159,6 +176,8 @@ struct QLIV2ParaInfo {
     const int32_t* sparseCount = nullptr;
     const int64_t* cmpRatio = nullptr;
     const int32_t* returnValue = nullptr;
+    const int64_t* candidateTopkBlocks = nullptr;
+    const int64_t* candidateBlockSize = nullptr;
 };
 
 // -----------算子Tiling入参信息类---------------
@@ -196,6 +215,9 @@ public:
     std::vector<uint32_t> keyStridesVec;
     std::vector<uint32_t> keyDequantScaleStridesVec;
     int32_t maxSeqlenQ = -1;
+    // candidate（两级 TopK source 模式）
+    int32_t candidateTopkBlocks = CANDIDATE_TOPK_BLOCKS_OFF;
+    uint32_t candidateBlockSize = CANDIDATE_BLOCK_SIZE_DEFAULT;
     // DType
     ge::DataType inputQType = Ops::Transformer::DT_FLOAT16;
     ge::DataType inputKType = Ops::Transformer::DT_FLOAT16;

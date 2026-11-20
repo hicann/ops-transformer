@@ -329,6 +329,9 @@ private:
     std::string layoutK_ = "BSND";
     int32_t maskMode_ = 0;
     int32_t cmpRatio_ = 1;
+    // candidate（两级 TopK source 模式）开关：仅 V3 metadata L0 包装会下发该属性；
+    // V2 包装未注册该属性时保持 -1（关闭）
+    int64_t candidateTopkBlocks_ = -1;
     uint32_t attentionMode_ = 0;
 
     // fast 模板成员

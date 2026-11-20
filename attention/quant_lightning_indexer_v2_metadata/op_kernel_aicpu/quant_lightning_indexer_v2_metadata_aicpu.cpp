@@ -69,6 +69,8 @@ bool QuantLightningIndexerV2MetadataCpuKernel::Prepare(CpuKernelContext& ctx)
     GetAttrValueOpt(ctx, "layout_k", layoutK_);
     GetAttrValueOpt(ctx, "mask_mode", maskMode_);
     GetAttrValueOpt(ctx, "cmp_ratio", cmpRatio_);
+    // candidate 属性仅 V3 metadata 包装注册；V2 包装缺失时保持默认 -1
+    GetAttrValueOpt(ctx, "candidate_topk_blocks", candidateTopkBlocks_);
 
     return (ParamsCheck() && ParamsInit());
 }
@@ -491,16 +493,15 @@ void QuantLightningIndexerV2MetadataCpuKernel::CalcSplitInfo(SplitContext& split
             splitInfo.isKvSeqAllZero = false;
         }
     }
-    ValidSocVersion validSocVersion = ProcessSocVersion();
-    if (validSocVersion == ValidSocVersion::ASCEND950 || validSocVersion == ValidSocVersion::ASCEND960) {
-        if (maxS2Size_ < static_cast<uint32_t>(topk_)) {
-            supportFd_ = false;
-            return;
-        }
-        if (maxS2Size_ > fdToleranceRatio * s2BaseSize_) {
-            supportFd_ = true;
-            return;
-        }
+    // LD（跨核 S2 切分 + AIV 归约）不再按 SoC 版本限制：
+    // 所有支持的芯片统一按 S2 规模决定是否启用 supportFd_。
+    if (maxS2Size_ < static_cast<uint32_t>(topk_)) {
+        supportFd_ = false;
+        return;
+    }
+    if (maxS2Size_ > fdToleranceRatio * s2BaseSize_) {
+        supportFd_ = true;
+        return;
     }
 }
 
@@ -1088,7 +1089,8 @@ bool QuantLightningIndexerV2MetadataCpuKernel::IsFastTemplate()
     // 此处只判 gSize/sparse_mode/cmp_ratio；layout/dtype/return_value 等其余条件由
     // 主算子 host tiling（IsFastTemplateEligible）统一校验
     const int32_t gSize = (numHeadsK_ == 0) ? 0 : numHeadsQ_ / numHeadsK_;
-    return (maskMode_ == QLI_FAST_SPARSE_MODE_LOWER) && (cmpRatio_ == 1) &&
+    // candidate 开启时 g=32 走慢路径内核，metadata 必须用通用 BalanceSchedule
+    return (candidateTopkBlocks_ == -1) && (maskMode_ == QLI_FAST_SPARSE_MODE_LOWER) && (cmpRatio_ == 1) &&
            ((gSize == QLI_FAST_GSIZE_24) || (gSize == QLI_FAST_GSIZE_32));
 }
 

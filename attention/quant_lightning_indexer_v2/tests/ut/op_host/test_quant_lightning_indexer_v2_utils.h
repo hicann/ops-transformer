@@ -34,6 +34,9 @@ struct CaseParam {
     std::vector<int64_t> kScaleShape = {2, 16, 1};
     std::vector<int64_t> outShape = {2, 39, 1, 2048};
     std::vector<int64_t> valuesShape = {0};
+    // candidate（两级 TopK source 模式）：关闭态两个输出均为 (0,)
+    std::vector<int64_t> candidateShape = {0};
+    std::vector<int64_t> candidateLenShape = {0};
     std::vector<int64_t> cuSeqQ; // empty means not provided
     std::vector<int64_t> cuSeqK;
     std::vector<int64_t> sequsedQ;
@@ -66,6 +69,9 @@ struct CaseParam {
     int64_t maskMode = 0;
     int64_t cmpRatio = 1;
     int64_t returnValue = 0;
+    // candidate（两级 TopK source 模式）：只接受 (-1,-1) 关闭或 (2048,8) 开启
+    int64_t candidateTopkBlocks = -1;
+    int64_t candidateBlockSize = -1;
 };
 
 inline gert::StorageShape ToStorageShape(const std::vector<int64_t>& dims)
@@ -110,7 +116,8 @@ inline void RunTilingCase(const CaseParam& p, ge::graphStatus expect)
          Desc(p.kScaleShape, p.kScaleType), Desc(p.cuSeqQ, p.cuSeqQType), Desc(p.cuSeqK, p.cuSeqKType),
          Desc(p.sequsedQ, p.sequsedQType), Desc(p.sequsedK, p.sequsedKType), Desc(p.cmpResidual, p.cmpResidualType),
          Desc(p.blockTable, p.blockTableType), Desc(p.idxOffset, p.idxOffsetType), Desc(p.metadata, ge::DT_INT32)},
-        {Desc(p.outShape, p.outType), Desc(p.valuesShape, p.valuesType)},
+        {Desc(p.outShape, p.outType), Desc(p.valuesShape, p.valuesType), Desc(p.candidateShape, p.outType),
+         Desc(p.candidateLenShape, p.outType)},
         {{"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(p.topk)},
          {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(p.quantMode)},
          {"max_seqlen_q", Ops::Transformer::AnyValue::CreateFrom<int64_t>(p.maxSeqlenQ)},
@@ -118,7 +125,9 @@ inline void RunTilingCase(const CaseParam& p, ge::graphStatus expect)
          {"layout_k", Ops::Transformer::AnyValue::CreateFrom<std::string>(p.layoutK)},
          {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(p.maskMode)},
          {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(p.cmpRatio)},
-         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(p.returnValue)}},
+         {"return_value", Ops::Transformer::AnyValue::CreateFrom<int64_t>(p.returnValue)},
+         {"candidate_topk_blocks", Ops::Transformer::AnyValue::CreateFrom<int64_t>(p.candidateTopkBlocks)},
+         {"candidate_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(p.candidateBlockSize)}},
         &compileInfo, p.soc, p.coreNum, p.ubSize, p.l2Size);
     SetStride(para.inputTensorDesc_[1], p.kStride);
     SetStride(para.inputTensorDesc_[4], p.kScaleStride);

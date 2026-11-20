@@ -316,6 +316,8 @@ ge::graphStatus QLIV2InfoParser::GetAttrParaInfo()
     qliV2Params_.sparseMode = attrs->GetAttrPointer<int32_t>(ATTR_MASK_MODE_INDEX);
     qliV2Params_.cmpRatio = attrs->GetAttrPointer<int64_t>(ATTR_CMP_RATIO_INDEX);
     qliV2Params_.returnValue = attrs->GetAttrPointer<int32_t>(ATTR_RETURN_VALUE_INDEX);
+    qliV2Params_.candidateTopkBlocks = attrs->GetAttrPointer<int64_t>(ATTR_CANDIDATE_TOPK_BLOCKS_INDEX);
+    qliV2Params_.candidateBlockSize = attrs->GetAttrPointer<int64_t>(ATTR_CANDIDATE_BLOCK_SIZE_INDEX);
     auto keyStrides = context_->GetDynamicInputStride(KEY_INDEX, 0);
     auto keyDequantScaleStrides = context_->GetDynamicInputStride(KEY_DEQUANT_SCALE_INDEX, 0);
     if (keyStrides != nullptr && keyStrides->GetDimNum() > 0) {
@@ -461,6 +463,49 @@ ge::graphStatus QLIV2InfoParser::CheckAttrParaInfo()
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "max_seqlen_q", std::to_string(*qliV2Params_.maxSeqlenQ).c_str(),
                                               "Max_seqlen_q must >= -1"),
         return ge::GRAPH_FAILED);
+
+    // -------------------candidate（两级 TopK source 模式）校验-------------------
+    // 属性约定（与 PR14553 / experimental 分支一致）：只接受 (-1, -1) 关闭或 (2048, 8) 开启；
+    // 其余组合（含 (-1, 8)、(2048, -1)）一律报错。
+    const int64_t candBlocksAttr =
+        (qliV2Params_.candidateTopkBlocks != nullptr) ? *qliV2Params_.candidateTopkBlocks : CANDIDATE_TOPK_BLOCKS_OFF;
+    const int64_t candBlockSizeAttr =
+        (qliV2Params_.candidateBlockSize != nullptr) ? *qliV2Params_.candidateBlockSize : CANDIDATE_BLOCK_SIZE_OFF;
+    const bool candidateOff =
+        (candBlocksAttr == CANDIDATE_TOPK_BLOCKS_OFF) && (candBlockSizeAttr == CANDIDATE_BLOCK_SIZE_OFF);
+    const bool candidateOn = (candBlocksAttr == CANDIDATE_TOPK_BLOCKS_FIX) &&
+                             (candBlockSizeAttr == static_cast<int64_t>(CANDIDATE_BLOCK_SIZE_DEFAULT));
+    OP_CHECK_IF(!candidateOff && !candidateOn,
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    opName_, "candidate_topk_blocks and candidate_block_size",
+                    std::to_string(candBlocksAttr) + " and " + std::to_string(candBlockSizeAttr),
+                    "Candidate attributes must be (-1, -1) or (2048, 8)"),
+                return ge::GRAPH_FAILED);
+    if (candidateOn) {
+        OP_CHECK_IF(npuArch_ != NpuArch::DAV_2201,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "candidate_topk_blocks",
+                                                             "Candidate is only supported on Ascend910B/Ascend910_93"),
+                    return ge::GRAPH_FAILED);
+        const std::string layoutQuery(qliV2Params_.layOutQuery);
+        OP_CHECK_IF(layoutQuery != "BSND" && layoutQuery != "TND",
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "layout_q", layoutQuery.c_str(),
+                        "Candidate (candidate_topk_blocks = 2048) only supports layout_q=BSND/TND"),
+                    return ge::GRAPH_FAILED);
+        // candidate 的块级候选源只支持分页 key；arch22 放开 layout_k=TND 是给 fast 模板用的，
+        // 这里必须显式收紧，避免 candidate 误走 TND 紧凑 key 寻址。
+        OP_CHECK_IF(
+            std::string(qliV2Params_.layOutKey) != "PA_BBND",
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "layout_k", std::string(qliV2Params_.layOutKey).c_str(),
+                                                  "Candidate (candidate_topk_blocks = 2048) requires layout_k=PA_BBND"),
+            return ge::GRAPH_FAILED);
+        if (layoutQuery == "TND") {
+            OP_CHECK_IF(qliV2Params_.cuSeqLensQ.tensor == nullptr,
+                        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, "cu_seqlens_q",
+                                                                 "Candidate with layout_q=TND requires cu_seqlens_q"),
+                        return ge::GRAPH_FAILED);
+        }
+    }
 
     return ge::GRAPH_SUCCESS;
 }
@@ -950,11 +995,16 @@ ge::graphStatus QLIV2InfoParser::GetGSize()
                         "The value of (the head num of q divided by the head num of k) must <= 64"),
                     return ge::GRAPH_FAILED);
     } else {
-        OP_CHECK_IF(
-            gSize_ != G_SIZE_LIMIT && gSize_ != GSIZE_FAST_24 && gSize_ != GSIZE_FAST_32,
-            OP_LOGE(opName_, "N1 is %u, N2 is %u, N1 divided by N2 must equal 64, or be 24/32 for the fast template.",
-                    n1Size_, n2Size_),
-            return ge::GRAPH_FAILED);
+        // candidate 开启时放行 g=32（块级候选形态 mBaseSize=4*g）；关闭态仍要求 g=64 或 fast 模板的 24/32
+        const bool candidateOn = (qliV2Params_.candidateTopkBlocks != nullptr) &&
+                                 (*qliV2Params_.candidateTopkBlocks != CANDIDATE_TOPK_BLOCKS_OFF);
+        const bool fastG = !candidateOn && (gSize_ == GSIZE_FAST_24 || gSize_ == GSIZE_FAST_32);
+        OP_CHECK_IF(gSize_ != G_SIZE_LIMIT && !fastG && !(candidateOn && gSize_ == G_SIZE_LIMIT_CANDIDATE_32),
+                    OP_LOGE(opName_,
+                            "N1 is %u, N2 is %u, N1 divided by N2 must equal 64, or be 24/32 for the fast "
+                            "template (32 is also allowed when candidate is on).",
+                            n1Size_, n2Size_),
+                    return ge::GRAPH_FAILED);
     }
 
     return ge::GRAPH_SUCCESS;
@@ -1544,7 +1594,9 @@ ge::graphStatus QLIV2InfoParser::CheckKeyContiguous() const
 {
     bool keyNonContiguous = false;
     bool scaleNonContiguous = false;
-    // PA_BBND: 0轴允许非连续，从1轴开始检查；非PA_BBND: 从0轴开始检查
+    // PA_BBND: 0 轴允许非连续（stride 寻址），从 1 轴开始检查；非 PA_BBND: 从 0 轴开始检查。
+    // 注：arch22（910B/910_93）同样支持 0 轴非连续 key/scale（kernel 侧 keyStride0 寻址），
+    // 因此这里不再区分 SoC，PA_BBND 一律从 1 轴开始检查。
     // PA_BBND: axis 0 allows non-contiguous, check starts from axis 1
     // Non-PA_BBND: check starts from axis 0
     size_t checkStartIdx = (kLayout_ == DataLayout::PA_BBND) ? 1 : 0;
@@ -1677,6 +1729,15 @@ void QLIV2InfoParser::GenerateInfo(QLIV2TilingInfo& QLIV2Info)
     QLIV2Info.cmpRatio = *qliV2Params_.cmpRatio;
     QLIV2Info.returnValue = *qliV2Params_.returnValue;
     QLIV2Info.maxSeqlenQ = (qliV2Params_.maxSeqlenQ != nullptr) ? *qliV2Params_.maxSeqlenQ : -1;
+    // candidate（两级 TopK source 模式）：只接受 (-1,-1) 关闭或 (2048,8) 开启。
+    // 关闭态 candidateBlockSize 归一化为 8，避免 -1 落到 uint32_t 字段变成 0xFFFFFFFF
+    // （kernel 关闭态不读该字段，这里只为 TilingData 不留脏值）。
+    QLIV2Info.candidateTopkBlocks = (qliV2Params_.candidateTopkBlocks != nullptr) ?
+                                        static_cast<int32_t>(*qliV2Params_.candidateTopkBlocks) :
+                                        CANDIDATE_TOPK_BLOCKS_OFF;
+    QLIV2Info.candidateBlockSize = (QLIV2Info.candidateTopkBlocks == CANDIDATE_TOPK_BLOCKS_OFF) ?
+                                       CANDIDATE_BLOCK_SIZE_DEFAULT :
+                                       static_cast<uint32_t>(*qliV2Params_.candidateBlockSize);
 
     QLIV2Info.keyStridesVec = keyStridesVec_;
     QLIV2Info.keyDequantScaleStridesVec = keyDequantScaleStridesVec_;
@@ -1788,6 +1849,12 @@ ge::graphStatus QLIV2InfoParser::CheckTemplateCombinationSupport()
     if (npuArch_ != NpuArch::DAV_2201) {
         return ge::GRAPH_SUCCESS;
     }
+    const bool candidateOn = (qliV2Params_.candidateTopkBlocks != nullptr) &&
+                             (*qliV2Params_.candidateTopkBlocks != CANDIDATE_TOPK_BLOCKS_OFF);
+    if (candidateOn && gSize_ == G_SIZE_LIMIT_CANDIDATE_32) {
+        // candidate 慢路径允许 g=32，不走 fast 模板的 TND/mask3/cmp1 约束（由 candidate 校验负责）
+        return ge::GRAPH_SUCCESS;
+    }
     if ((gSize_ == GSIZE_FAST_24) || (gSize_ == GSIZE_FAST_32)) {
         OP_CHECK_IF(!IsFastTemplateEligible(static_cast<uint32_t>(gSize_), qLayout_, kLayout_, *qliV2Params_.sparseMode,
                                             static_cast<uint32_t>(*qliV2Params_.cmpRatio),
@@ -1826,9 +1893,12 @@ ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo* tilingI
     // ----------------fast template judge----------------
     // 当前 arch22 对应 DAV_2201（910B/910_93）；若新增同架构芯片，在此处扩展
     const bool isArch22 = ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_2201;
-    const bool fastTemplate = IsFastTemplateEligible(
-        tilingInfo->gSize, tilingInfo->inputQLayout, tilingInfo->inputKLayout, tilingInfo->sparseMode,
-        tilingInfo->cmpRatio, tilingInfo->returnValue, isArch22, tilingInfo->inputQType == ge::DT_INT8);
+    // candidate（两级 TopK source 模式）优先走慢路径内核：candidate 开启时禁用 fast 模板
+    const bool candidateOn = (tilingInfo->candidateTopkBlocks != CANDIDATE_TOPK_BLOCKS_OFF);
+    const bool fastTemplate =
+        !candidateOn && IsFastTemplateEligible(tilingInfo->gSize, tilingInfo->inputQLayout, tilingInfo->inputKLayout,
+                                               tilingInfo->sparseMode, tilingInfo->cmpRatio, tilingInfo->returnValue,
+                                               isArch22, tilingInfo->inputQType == ge::DT_INT8);
 
     // 一个 Mix group 含 1 个 AIC 与 2 个 AIV；与 kernel 侧 CrossCoreMessageId::AIV_COUNT_PER_GROUP 一致
     constexpr uint32_t FAST_AIV_PER_GROUP = 2U;
@@ -1936,12 +2006,30 @@ ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo* tilingI
     } else {
         uint32_t mm1ResSize = M_BASE_SIZE * S2_BASE_SIZE;
         workspaceSize += mm1ResSize * MM1_RES_ELEM_SIZE * DOUBLE_BUFFER * aicNum;
+        // W 区（AIV 写 w×qscale、AIC 读）：对应 kernel Init 的 weightWorkspaceGm，
+        // 每核 BLOCK_CUBE × mBaseSize(=S1_BASE_SIZE×gSize) × 2(双缓冲) × 2B。
+        // 此前 host 漏算该区：kernel 的 offset 链（mm1Res→W→vec1Res→candidateRes）比 host
+        // 记账每核多出 8~16KB，W 区之后的区域整体错位（当前被 mm1Res 项 64× 超配掩盖，
+        // 超配收敛后即越界）。公式与 kernel Init 逐字对齐。
+        {
+            constexpr uint32_t BLOCK_CUBE = 16;
+            uint64_t weightMemSize = static_cast<uint64_t>(BLOCK_CUBE) *
+                                     (static_cast<uint64_t>(S1_BASE_SIZE) * tilingInfo->gSize) * DOUBLE_BUFFER *
+                                     sizeof(uint16_t);
+            workspaceSize += weightMemSize * aicNum;
+        }
         // Decode流程(LD)需要Workspace大小
         // 临时存储Decode中间结果大小: 2(头/尾)*8(s1Base)*2(idx/value)*2048(K)*sizeof(int32)*24=6M
         workspaceSize +=
             V1_DECODE_DATA_NUM * S1_BASE_SIZE * V1_RES_ELEM_TYPE * TOPK_MAX_SIZE * V1_RES_ELEM_SIZE * aicNum;
         // 临时存储Decode中间参数信息大小: 2(头/尾)*8(s1Base)*16(paramNum)*sizeof(int64_t)*24=48k
         workspaceSize += V1_DECODE_DATA_NUM * S1_BASE_SIZE * V1_DECODE_PARAM_NUM * V1_DECODE_PARAM_ELEM_SIZE * aicNum;
+        // candidate（两级 TopK source 模式）块级候选跨核归约工作区：与 LD 中间结果同规格；
+        // 仅在 candidate 开启时预留（关闭态工作区与现网完全一致）
+        if (tilingInfo->candidateTopkBlocks != CANDIDATE_TOPK_BLOCKS_OFF) {
+            workspaceSize +=
+                V1_DECODE_DATA_NUM * S1_BASE_SIZE * V1_RES_ELEM_TYPE * TOPK_MAX_SIZE * V1_RES_ELEM_SIZE * aicNum;
+        }
     }
     // 同时预留两条路径的工作区
     if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510 &&
@@ -1971,8 +2059,12 @@ ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo* tilingI
     tilingData_.set_keyDequantScaleStride0(tilingInfo->keyDequantScaleStride0);
     tilingData_.set_quantMode(*tilingInfo->opParamInfo.quantMode);
     tilingData_.set_usedCoreNum(fastTemplate ? fastTemplateAicNum : blockDim);
+    // ---- fast 模板（arch22 g=24/32，candidate 关闭时生效）----
     tilingData_.set_fastUsedCoreNum(fastTemplate ? fastTemplateAicNum : 0U);
     tilingData_.set_fastWorkspaceGroupStride(fastTemplate ? fastWorkspaceGroupStride : 0ULL);
+    // ---- candidate（两级 TopK source 模式）----
+    tilingData_.set_candidateTopkBlocks(tilingInfo->candidateTopkBlocks);
+    tilingData_.set_candidateBlockSize(tilingInfo->candidateBlockSize);
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
 
@@ -2005,14 +2097,6 @@ ge::graphStatus TilingForQuantLightningIndexerV2(gert::TilingContext* context)
         return ge::GRAPH_FAILED);
     const auto* attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-    constexpr uint32_t ATTR_CANDIDATE_TOPK_BLOCKS_INDEX = 8;
-    constexpr uint32_t ATTR_CANDIDATE_BLOCK_SIZE_INDEX = 9;
-    const int64_t* candidateTopkBlocks = attrs->GetInt(ATTR_CANDIDATE_TOPK_BLOCKS_INDEX);
-    const int64_t* candidateBlockSize = attrs->GetInt(ATTR_CANDIDATE_BLOCK_SIZE_INDEX);
-    OP_CHECK_IF((candidateTopkBlocks != nullptr && *candidateTopkBlocks != -1) ||
-                    (candidateBlockSize != nullptr && *candidateBlockSize != -1),
-                OP_LOGE(context->GetNodeName(), "Candidate tiling and kernel are not implemented yet."),
-                return ge::GRAPH_FAILED);
     QLIV2TilingInfo QLIV2Info;
     auto platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_IF(
@@ -2021,6 +2105,21 @@ ge::graphStatus TilingForQuantLightningIndexerV2(gert::TilingContext* context)
                                   (std::vector<const char*>{"QuantLightningIndexerV2", "platformInfoPtr is null"})),
         return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
+    // candidate（两级 TopK source 模式）仅在 arch22（910B/910_93）落地；arch35 走 checker 路径，
+    // 这里统一兜底拒绝任何非关闭态参数对，避免 infershape 产出 candidate 形状而 kernel 不产出。
+    if (ascendcPlatform.GetCurNpuArch() != NpuArch::DAV_2201) {
+        const auto* attrs = context->GetAttrs();
+        const int64_t* candBlocks =
+            (attrs != nullptr) ? attrs->GetAttrPointer<int64_t>(ATTR_CANDIDATE_TOPK_BLOCKS_INDEX) : nullptr;
+        const int64_t* candBlockSize =
+            (attrs != nullptr) ? attrs->GetAttrPointer<int64_t>(ATTR_CANDIDATE_BLOCK_SIZE_INDEX) : nullptr;
+        const int64_t blocksAttr = (candBlocks != nullptr) ? *candBlocks : CANDIDATE_TOPK_BLOCKS_OFF;
+        const int64_t blockSizeAttr = (candBlockSize != nullptr) ? *candBlockSize : CANDIDATE_BLOCK_SIZE_OFF;
+        OP_CHECK_IF(blocksAttr != CANDIDATE_TOPK_BLOCKS_OFF || blockSizeAttr != CANDIDATE_BLOCK_SIZE_OFF,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("QuantLightningIndexerV2", "candidate_topk_blocks",
+                                                             "Candidate is only supported on Ascend910B/Ascend910_93"),
+                    return ge::GRAPH_FAILED);
+    }
     const bool useArch35Checker = ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510;
     QLIV2InfoParser qliV2InfoParser(context);
     const ge::graphStatus parseStatus =

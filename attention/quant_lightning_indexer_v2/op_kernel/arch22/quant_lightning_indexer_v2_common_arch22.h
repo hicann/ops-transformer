@@ -56,6 +56,10 @@ struct RunInfo {
     uint64_t tensorKeyScaleOffset;
     uint64_t tensorWeightsOffset;
     uint64_t indiceOutOffset;
+    // candidate（两级 TopK source 模式）: 本核候选块输出起始偏移;
+    // outputIdxOffsetCoreOffset: output_idx_offset 的 batch 级前缀（行 x kHeadNum 布局）
+    uint64_t candidateOutOffset;
+    uint64_t outputIdxOffsetCoreOffset;
 
     bool isFirstS2InnerLoop;
     bool isLastS2InnerLoop;
@@ -114,6 +118,11 @@ struct ConstInfo {
     bool isAccumSeqS1 = false;        // 是否累加模式
     bool isAccumSeqS2 = false;        // 是否累加模式
 
+    // candidate（两级 TopK source 模式）：由 TilingData 的 candidateTopkBlocks(!=-1) 推导
+    bool candidateOn = false;
+    uint32_t candidateTopkBlocks = 2048U;
+    uint32_t candidateBlockSize = 8U;
+
     uint32_t s2Start = 0U;
     uint32_t s2End = 0U;
     uint32_t bN2Start = 0U;
@@ -134,7 +143,11 @@ struct LdSplitCoreInfo {
     uint32_t workspaceNum = 0U; // 当前AIV核上规约任务的S2切分数量
     uint32_t mStart = 0U;
     uint32_t mNum = 0U;
+    uint32_t actS2Size = 0U; // 当前归约行的压缩后有效 K 长度，用于计算 candidate_block_length
     uint64_t indiceOutCoreOffset = 0U; // 最终输出索引搬出Topk的初始偏移地址
+    // candidate（两级 TopK source 模式）: 块级候选输出的初始偏移地址。
+    // s2 被切给多核时没有核能独占整行, 改由各分段核落工作区、LD 核归并后按本偏移直出。
+    uint64_t candidateOutCoreOffset = 0U;
 };
 
 template <typename T1, typename T2>

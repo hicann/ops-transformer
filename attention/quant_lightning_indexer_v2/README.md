@@ -49,7 +49,7 @@
 | mask_mode | 可选属性      | 表示mask的模式，默认值0。 | INT64          | -         |
 | cmp_ratio      | 可选属性      | 用于稀疏计算，表示k的压缩倍数，默认值1。 | INT64          | -         |
 | return_value      |  可选属性     | 表示是否输出`sparse_values`，默认值0。 | INT64          | -         |
-| candidate_topk_blocks | 可选属性 | 候选块输出容量。与candidate_block_size同时提供；两项均为-1时关闭候选选择，开启时仅支持2048。 | INT64 | - |
+| candidate_topk_blocks | 可选属性 | 候选块输出容量。与candidate_block_size同时提供；两项均为-1时关闭候选选择，开启时仅支持2048。candidate 开启时 g=N1/N2 支持64或32（g=32 走块级候选慢路径），关闭时要求64（fast 模板的24/32除外）。 | INT64 | - |
 | candidate_block_size | 可选属性 | 每个候选逻辑块包含的Key位置数。candidate_topk_blocks为-1时必须为-1，为2048时必须为8；与quant_sparse_lightning_indexer的配置一致。 | INT64 | - |
 | sparse_indices     | 输出      | 公式中的输出Out，参与稀疏attention计算的token索引值。 | INT32          | ND         |
 | sparse_values           | 输出      | 公式中的Indices输出对应的value值。`return_value`为1时shape与`sparse_indices`一致，`return_value`为0时shape为(0,) | BFLOAT16         | ND          |
