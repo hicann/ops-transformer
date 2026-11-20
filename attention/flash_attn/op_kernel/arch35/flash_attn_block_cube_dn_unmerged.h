@@ -38,6 +38,7 @@ public:
     static constexpr FA_LAYOUT LAYOUT_OUT = FA_T::attnOutLayout;
     static constexpr bool PAGE_ATTENTION = FA_T::pageAttention;
 
+    // Mmad/Fixpipe synchronize L0C in hardware through unitFlag.
     static constexpr FixpipeConfig FIXPIPE_ROW_MAJOR_UB = {CO2Layout::ROW_MAJOR, true};
 
     using Q_T = INPUT_T;
@@ -247,7 +248,7 @@ public:
     __aicore__ inline void CopyQuerySlice(const LocalTensor<Q_T>& dstTensor, uint32_t dOffset, uint32_t dRealSize,
                                           RunInfo& runInfo)
     {
-        uint32_t dstStride = (runInfo.actMSize + 15) >> 4 << 4;
+        uint32_t dstStride = (runInfo.actMSize + 31) >> 5 << 5;
         FaL1Tensor<Q_T, L1Format::NZ> l1Tensor{.tensor = dstTensor, .rowCount = dstStride};
 
         // 不合轴: 任务为单 query 头(n1)的纯 s1 块, 按 (b, n1) 直接寻址(n1 = n2*g + g)
@@ -322,6 +323,7 @@ public:
         fixpipeParams.srcStride = (fixpipeParams.mSize + 15) >> 4 << 4;
         fixpipeParams.dstStride = fixpipeParams.nSize / 2;
         fixpipeParams.dualDstCtl = 2;
+        fixpipeParams.unitFlag = UNITFLAG_EN_OUTER_LAST;
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;
@@ -355,13 +357,13 @@ public:
             uint32_t ldK = ((constInfo_.dSize + 15) >> 4) << 4;
             for (uint32_t mChunk = 0U; mChunk < mChunks; ++mChunk) {
                 const uint32_t mSize = (mChunk + 1U == mChunks) ? (actS2Size - mChunk * mm1L0cMTile) : mm1L0cMTile;
-                Mutex::Lock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
+
                 LocalTensor<MM_T> l0CSubTensor =
                     l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
                 // singleM 保持真实 s2 宽度: L1 的 K 分形是"每个 K 分形含整段 M"的主序, K 步进依赖真实行数;
                 // realM 才是一次 Mmad/一次 fixpipe 的行数(<=128), 保证单个 L0C 槽装得下。
-                MMParam param = MakeMMParam(actS2Size, (uint32_t)runInfo.actMSize, constInfo_.dSize, false, true, true,
-                                            true, 0, mSize, ldK, 0);
+                MMParam param = MakeMMParam(actS2Size, ((uint32_t)runInfo.actMSize + 31) >> 5 << 5, constInfo_.dSize,
+                                            false, true, true, true, UNITFLAG_EN_OUTER_LAST, mSize, ldK, 0);
                 // M 分形偏移: 每个 16 行分形固定 256 个元素, 与 D 无关
                 LocalTensor<KV_T> kL1ChunkTensor = kL1Tensor[mChunk * mm1L0cMTile * 16U];
                 if constexpr (s2BaseSize == 256) {
@@ -377,12 +379,9 @@ public:
                     MatmulBase<KV_T, Q_T, MM_T, 128, 128, dBaseSize, ABLayout::MK, ABLayout::KN>(
                         kL1ChunkTensor, qL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
                 }
-                Mutex::Unlock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
-                Mutex::Lock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
 
                 FixpipeMm1Dn(mm1ResUbTensor[mChunk * mm1L0cMTile * dstStride], l0CSubTensor, mSize, runInfo);
 
-                Mutex::Unlock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
                 l0cBufId_ = (l0cBufId_ + 1) % L0C_BUFCNT;
             }
         }
@@ -433,6 +432,7 @@ public:
         fixpipeParams.srcStride = fixpipeParams.mSize;
         fixpipeParams.dstStride = mBaseSize / CV_RATIO; // 每 AIV 64 列（DN 行距）
         fixpipeParams.dualDstCtl = 2;
+        fixpipeParams.unitFlag = UNITFLAG_EN_OUTER_LAST;
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;
@@ -449,7 +449,6 @@ public:
         Mutex::Unlock<PIPE_MTE2>(KV_L1_BUFFER_ID0 + kvL1BufId_);
         Mutex::Lock<PIPE_MTE1>(KV_L1_BUFFER_ID0 + kvL1BufId_);
         {
-            Mutex::Lock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
             LocalTensor<MM_T> l0CSubTensor = l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
             // 换操作数：A = Vᵀ（M = align16(dV), K = s2），B = Pᵀ（K = s2, N = mBaseSize）
             // 两者的 L1 来源都走 ifTranspose 载入（V 的 Nd2Nz / P 的 544B 布局），与旧 ND 的 A=P/B=V 同构
@@ -460,16 +459,13 @@ public:
                              false, // isRightTranspose: B 源为 [K=s2][N=m]
                              true,
                              true,
-                             0,
+                             UNITFLAG_EN_OUTER_LAST,
                              0,
                              (uint32_t)AttentionCommon::Align(runInfo.actSingleLoopS2Size, 16U),
                              0};
             MatmulBase<KV_T, Q_T, MM_T, dVBaseSize, mBaseSize, 128, ABLayout::MK, ABLayout::KN>(
                 vL1Tensor, pL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
-            Mutex::Unlock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
-            Mutex::Lock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
             FixpipeBmm2Dn(mm2ResUbTensor, l0CSubTensor);
-            Mutex::Unlock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
             l0cBufId_ = (l0cBufId_ + 1) % L0C_BUFCNT;
         }
         Mutex::Unlock<PIPE_MTE1>(KV_L1_BUFFER_ID0 + kvL1BufId_);

@@ -39,6 +39,7 @@ public:
     static constexpr FA_LAYOUT LAYOUT_OUT = FA_T::attnOutLayout;
     static constexpr bool PAGE_ATTENTION = FA_T::pageAttention;
 
+    // Mmad/Fixpipe synchronize L0C in hardware through unitFlag.
     static constexpr FixpipeConfig FIXPIPE_ROW_MAJOR_UB = {CO2Layout::ROW_MAJOR, true};
 
     using Q_T = INPUT_T;
@@ -312,6 +313,7 @@ public:
         fixpipeParams.srcStride = (fixpipeParams.mSize + 15) >> 4 << 4;
         fixpipeParams.dstStride = s2BaseSize;
         fixpipeParams.dualDstCtl = 1;
+        fixpipeParams.unitFlag = UNITFLAG_EN_OUTER_LAST;
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;
@@ -335,13 +337,12 @@ public:
         Mutex::Unlock<PIPE_MTE2>(KV_L1_BUFFER_ID0 + kvL1BufId_);
         Mutex::Lock<PIPE_MTE1>(KV_L1_BUFFER_ID0 + kvL1BufId_);
         {
-            Mutex::Lock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
             LocalTensor<MM_T> l0CSubTensor = l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
             // K 轴取 pad 后宽度(D=72 → 128), L1 pad 区已清零, Mmad 结果数学等价
             // Mmad K=D 精确累加; LoadData 搬运宽度按分形粒度对齐(对齐D=原值, D=72→80与Nd2Nz写入组数一致)
             uint32_t ldK = ((constInfo_.dSize + 15) >> 4) << 4;
             MMParam param = MakeMMParam((uint32_t)runInfo.actMSize, (uint32_t)runInfo.actSingleLoopS2Size,
-                                        constInfo_.dSize, false, true, true, true, 0, 0, ldK, 0);
+                                        constInfo_.dSize, false, true, true, true, UNITFLAG_EN_OUTER_LAST, 0, ldK, 0);
             if constexpr (dBaseSize > 128) {
                 if constexpr (s2BaseSize == 256) {
                     MatmulN<Q_T, KV_T, MM_T, 64, 128, 256, ABLayout::MK, ABLayout::KN>(
@@ -356,12 +357,8 @@ public:
                     qL1Tensor, kL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
             }
 
-            Mutex::Unlock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
-            Mutex::Lock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
-
             FixpipeMm1(mm1ResUbTensor, l0CSubTensor, runInfo);
 
-            Mutex::Unlock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
             l0cBufId_ = (l0cBufId_ + 1) % L0C_BUFCNT;
         }
         Mutex::Unlock<PIPE_MTE1>(KV_L1_BUFFER_ID0 + kvL1BufId_);
@@ -405,6 +402,7 @@ public:
         fixpipeParams.srcStride = (fixpipeParams.mSize + 15) >> 4 << 4;
         fixpipeParams.dstStride = (dVBaseSize + 15) >> 4 << 4;
         fixpipeParams.dualDstCtl = 1;
+        fixpipeParams.unitFlag = UNITFLAG_EN_OUTER_LAST;
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;
@@ -428,7 +426,6 @@ public:
             for (uint32_t n = 0; n < nLoops; n++) {
                 uint32_t tileN = (n == nLoops - 1) ? lastTileN : 128;
                 uint32_t tileLdN = (n == nLoops - 1) ? ldN : 128;
-                Mutex::Lock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
                 LocalTensor<MM_T> l0CSubTensor =
                     l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
                 MMParam param = {(uint32_t)mBaseSize,
@@ -438,7 +435,7 @@ public:
                                  false,
                                  true,
                                  true,
-                                 0,
+                                 UNITFLAG_EN_OUTER_LAST,
                                  0,
                                  0,
                                  tileLdN};
@@ -460,13 +457,10 @@ public:
                             pL1Tensor, vL1TileTensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
                     }
                 }
-                Mutex::Unlock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
-                Mutex::Lock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
 
                 uint32_t dstOffset = n * 128U;
                 FixpipeMm2PartialN(mm2ResUbTensor[dstOffset], l0CSubTensor, tileN, runInfo);
 
-                Mutex::Unlock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
                 l0cBufId_ = (l0cBufId_ + 1) % L0C_BUFCNT;
             }
         }
