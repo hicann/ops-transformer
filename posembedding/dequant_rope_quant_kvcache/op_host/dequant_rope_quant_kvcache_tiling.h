@@ -86,6 +86,7 @@ TILING_DATA_FIELD_DEF(int64_t, isPA);
 TILING_DATA_FIELD_DEF(int64_t, hasBias);
 TILING_DATA_FIELD_DEF(int64_t, hasAS);
 TILING_DATA_FIELD_DEF(int64_t, batch);
+TILING_DATA_FIELD_DEF(int64_t, cacheBatchNum);
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(DequantRopeQuantKvcache, DequantRopeQuantKvcacheTilingData)

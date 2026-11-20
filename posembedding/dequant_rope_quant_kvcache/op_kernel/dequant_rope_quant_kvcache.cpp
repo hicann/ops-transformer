@@ -13,7 +13,11 @@
  * \brief
  */
 #include "kernel_operator.h"
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+#include "arch35/dequant_rope_quant_kvcache_arch35.h"
+#else
 #include "dequant_rope_quant_kvcache.h"
+#endif
 using namespace AscendC;
 using namespace DequantRopeQuantKvcache;
 

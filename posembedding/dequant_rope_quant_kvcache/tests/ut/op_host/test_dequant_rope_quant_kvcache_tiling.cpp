@@ -46,8 +46,9 @@ struct DequantRopeQuantKvcacheTilingDataView {
     int64_t hasBias;
     int64_t hasAS;
     int64_t batch;
+    int64_t cacheBatchNum;
 };
-static_assert(sizeof(DequantRopeQuantKvcacheTilingDataView) == 23 * sizeof(int64_t));
+static_assert(sizeof(DequantRopeQuantKvcacheTilingDataView) == 24 * sizeof(int64_t));
 
 class DequantRopeQuantKvcacheTiling : public testing::Test {
 protected:
@@ -120,7 +121,7 @@ TEST_F(DequantRopeQuantKvcacheTiling, DequantRopeQuantKvcachetiling_01)
         &compileInfo);
 
     uint64_t expectTilingKey = 0;
-    string expectTilingData = "8 1 128 128 256 512 44 1024 320 1024 128 128 64 64 5 5 1 1 0 0 0 0 1 ";
+    string expectTilingData = "8 1 128 128 256 512 44 1024 320 1024 128 128 64 64 5 5 1 1 0 0 0 0 1 1 ";
     std::vector<size_t> expectWorkspaces = {16777216};
     drqk_test::ClearErrorMessages();
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
@@ -136,7 +137,7 @@ TEST_F(DequantRopeQuantKvcacheTiling, DequantRopeQuantKvcachetiling_unsupported_
     para.attrs_[4].attr_ = Ops::Transformer::AnyValue::CreateFrom<std::string>("XXXX");
 
     uint64_t expectTilingKey = 0;
-    string expectTilingData = "8 1 128 128 256 512 44 1024 320 1024 128 128 64 64 5 5 1 1 0 0 0 0 1 ";
+    string expectTilingData = "8 1 128 128 256 512 44 1024 320 1024 128 128 64 64 5 5 1 1 0 0 0 0 1 1 ";
     std::vector<size_t> expectWorkspaces = {16777216};
     drqk_test::ClearErrorMessages();
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
@@ -302,7 +303,7 @@ TEST_F(DequantRopeQuantKvcacheTiling, DequantRopeQuantKvcachetiling_02)
         &compileInfo);
 
     uint64_t expectTilingKey = 0;
-    string expectTilingData = "8 1 128 128 256 512 44 1024 320 1024 128 128 64 64 5 5 1 1 1 0 0 0 1 ";
+    string expectTilingData = "8 1 128 128 256 512 44 1024 320 1024 128 128 64 64 5 5 1 1 1 0 0 0 1 1 ";
     std::vector<size_t> expectWorkspaces = {16777216};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -334,7 +335,7 @@ TEST_F(DequantRopeQuantKvcacheTiling, DequantRopeQuantKvcachetiling_03)
         &compileInfo);
 
     uint64_t expectTilingKey = 0;
-    string expectTilingData = "8 1 128 128 256 512 44 1024 320 1024 128 128 64 64 5 5 0 0 1 0 0 0 1 ";
+    string expectTilingData = "8 1 128 128 256 512 44 1024 320 1024 128 128 64 64 5 5 0 0 1 0 0 0 1 1 ";
     std::vector<size_t> expectWorkspaces = {16777216};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -368,7 +369,7 @@ TEST_F(DequantRopeQuantKvcacheTiling, DequantRopeQuantKvcachetiling_04)
         &compileInfo);
 
     uint64_t expectTilingKey = 0;
-    string expectTilingData = "8 1 128 128 256 512 44 1024 320 1024 128 128 64 64 5 5 1 1 0 0 0 0 1 ";
+    string expectTilingData = "8 1 128 128 256 512 44 1024 320 1024 128 128 64 64 5 5 1 1 0 0 0 0 1 1 ";
     std::vector<size_t> expectWorkspaces = {16777216};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
@@ -400,7 +401,7 @@ TEST_F(DequantRopeQuantKvcacheTiling, DequantRopeQuantKvcachetiling_05)
         &compileInfo);
 
     uint64_t expectTilingKey = 0;
-    string expectTilingData = "8 1 128 128 256 512 44 1024 320 1024 128 128 64 64 5 5 0 0 0 0 0 0 1 ";
+    string expectTilingData = "8 1 128 128 256 512 44 1024 320 1024 128 128 64 64 5 5 0 0 0 0 0 0 1 1 ";
     std::vector<size_t> expectWorkspaces = {16777216};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }

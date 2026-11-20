@@ -65,7 +65,9 @@ constexpr uint32_t KEY_WEIGHT_IF_RESHAPE_CACHE = 100;
 constexpr uint32_t KEY_WEIGHT_IF_BIAS = 1000;
 constexpr uint32_t KEY_WEIGHT_IF_AS = 10000;
 constexpr uint32_t KEY_WEIGHT_IF_BIAS_DATATYPE = 100000;
-constexpr int64_t HIDDEN_SIZE_LIMIT_LENGTH = 12800;
+// README/ACLNN contract: x last dim <= 4096 and 64-byte aligned; applies to all SoCs.
+constexpr int64_t X_HIDDEN_SIZE_LIMIT = 4096;
+constexpr int64_t X_HIDDEN_SIZE_ALIGN = 64;
 constexpr int64_t INPUT_X_DIM = 3;
 constexpr int64_t INPUT_CACHE_DIM = 4;
 constexpr int64_t BASE_2 = 2;
@@ -166,6 +168,7 @@ struct TilingInfoDRQK {
     int64_t hasAS = 0;
     int64_t biasDataType = 0;
     int64_t isDequant = 0;
+    int64_t cacheBatchNum = 0;
     const int64_t* attrData;
 };
 } // namespace
@@ -201,8 +204,8 @@ static void DQRKPrintParam(gert::TilingContext* context, DequantRopeQuantKvcache
     OP_LOGD(nodeName, ">>> hasAS:              %ld", tiling.get_hasAS());
     OP_LOGD(nodeName, ">>> batch:              %ld", tiling.get_batch());
 }
-ge::graphStatus checkOptDtype(const uint64_t index, gert::TilingContext* context, const ge::char_t* nodeName_,
-                              const char* inputName)
+static ge::graphStatus checkOptDtype(const uint64_t index, gert::TilingContext* context, const ge::char_t* nodeName_,
+                                     const char* inputName)
 {
     auto optDesc = context->GetOptionalInputDesc(index);
     if (optDesc != nullptr) {
@@ -213,8 +216,8 @@ ge::graphStatus checkOptDtype(const uint64_t index, gert::TilingContext* context
     }
     return ge::GRAPH_SUCCESS;
 }
-ge::graphStatus checkDRQKDim(const gert::StorageShape* inShape, const std::vector<int64_t>& realShape,
-                             const ge::char_t* nodeName_, std::string logName)
+static ge::graphStatus checkDRQKDim(const gert::StorageShape* inShape, const std::vector<int64_t>& realShape,
+                                    const ge::char_t* nodeName_, std::string logName)
 {
     OP_CHECK_IF(inShape == nullptr,
                 REPORT_PREDEFINED_ERR_MSG(
@@ -237,7 +240,7 @@ ge::graphStatus checkDRQKDim(const gert::StorageShape* inShape, const std::vecto
     return ge::GRAPH_SUCCESS;
 }
 
-bool CheckPaCacheMode(const gert::RuntimeAttrs* attrs)
+static bool CheckPaCacheMode(const gert::RuntimeAttrs* attrs)
 {
     const char* tmpmode = attrs->GetStr(CACHE_MODE_IDX);
     if (tmpmode == nullptr) {
@@ -246,14 +249,28 @@ bool CheckPaCacheMode(const gert::RuntimeAttrs* attrs)
     return detail::ToLowerAscii(tmpmode) == "page";
 }
 
-void WarnForUnsupportedStringAttrs(const gert::RuntimeAttrs* attrs, const ge::char_t* nodeName)
+static ge::graphStatus CheckIndicesShape(const gert::StorageShape* inShape, int64_t batch, const ge::char_t* nodeName)
+{
+    OP_CHECK_IF(inShape == nullptr, OP_LOGE(nodeName, "indices input shape metadata is unavailable"),
+                return ge::GRAPH_FAILED);
+    const size_t rank = inShape->GetStorageShape().GetDimNum();
+    OP_CHECK_IF(rank != 1 && rank != 2, OP_LOGE(nodeName, "indices's rank [%zu] is invalid, it should be 1 or 2", rank),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(inShape->GetStorageShape().GetShapeSize() != batch,
+                OP_LOGE(nodeName, "indices's shape size [%ld] should be [%ld]",
+                        inShape->GetStorageShape().GetShapeSize(), batch),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+static void WarnForUnsupportedStringAttrs(const gert::RuntimeAttrs* attrs, const ge::char_t* nodeName)
 {
     auto emitWarning = [nodeName](const std::string& warning) { OP_LOGW(nodeName, "%s", warning.c_str()); };
     detail::EmitUnsupportedStringAttrWarnings(attrs->GetStr(QUANT_MODE_INDEX), attrs->GetStr(LAYOUT_INDEX),
                                               attrs->GetStr(CACHE_MODE_IDX), emitWarning);
 }
 
-ge::graphStatus CheckDRQKOutputShapes(gert::TilingContext* context, const TilingInfoDRQK& info, int64_t xDimNum)
+static ge::graphStatus CheckDRQKOutputShapes(gert::TilingContext* context, const TilingInfoDRQK& info, int64_t xDimNum)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     if (ascendcPlatform.GetSocVersion() != platform_ascendc::SocVersion::ASCEND950) {
@@ -290,7 +307,7 @@ ge::graphStatus CheckDRQKOutputShapes(gert::TilingContext* context, const Tiling
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckDRQKInputDtypes(gert::TilingContext* context)
+static ge::graphStatus CheckDRQKInputDtypes(gert::TilingContext* context)
 {
     const auto nodeName = context->GetNodeName();
     const auto* xDesc = context->GetInputDesc(X_INPUT_INDEX);
@@ -322,7 +339,7 @@ ge::graphStatus CheckDRQKInputDtypes(gert::TilingContext* context)
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus getDRQKShapeInfo(gert::TilingContext* context, TilingInfoDRQK& tilingInfoDRQK)
+static ge::graphStatus getDRQKShapeInfo(gert::TilingContext* context, TilingInfoDRQK& tilingInfoDRQK)
 {
     auto platformInfo = context->GetPlatformInfo();
     auto nodeName = context->GetNodeName();
@@ -453,8 +470,20 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext* context, TilingInfoDRQK& t
                 return ge::GRAPH_FAILED);
 
     int64_t xHiddenSize = xShape->GetStorageShape().GetDim(xShapeDimNum - 1);
+    OP_CHECK_IF(xHiddenSize < 0,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "x", Shape2String(xShape->GetStorageShape()).c_str(),
+                                                      "the last dimension of x must not be negative"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(xHiddenSize > X_HIDDEN_SIZE_LIMIT || xHiddenSize % X_HIDDEN_SIZE_ALIGN != 0,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    nodeName, "x", Shape2String(xShape->GetStorageShape()).c_str(),
+                    ("the last dimension of x must be <= " + std::to_string(X_HIDDEN_SIZE_LIMIT) + " and aligned to " +
+                     std::to_string(X_HIDDEN_SIZE_ALIGN))
+                        .c_str()),
+                return ge::GRAPH_FAILED);
 
     tilingInfoDRQK.cacheSeqlen = cacheShape->GetStorageShape().GetDim(1);
+    tilingInfoDRQK.cacheBatchNum = cacheShape->GetStorageShape().GetDim(0);
     tilingInfoDRQK.kvHeadNum = cacheShape->GetStorageShape().GetDim(KVCACHE_HEAD_DIM_INDEX);
     tilingInfoDRQK.hiddenSize = cacheShape->GetStorageShape().GetDim(KVCACHE_HIDDEN_DIM_INDEX);
     int64_t quantShapeSize = tilingInfoDRQK.kvHeadNum * tilingInfoDRQK.hiddenSize;
@@ -539,7 +568,7 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext* context, TilingInfoDRQK& t
     if ((checkDRQKDim(xShape, expX, nodeName, "x") == ge::GRAPH_FAILED) ||
         (checkDRQKDim(cosShape, expSinCos, nodeName, "cos") == ge::GRAPH_FAILED) ||
         (checkDRQKDim(sinShape, expSinCos, nodeName, "sin") == ge::GRAPH_FAILED) ||
-        (checkDRQKDim(indicesShape, {tilingInfoDRQK.batch}, nodeName, "indices") == ge::GRAPH_FAILED)) {
+        (CheckIndicesShape(indicesShape, tilingInfoDRQK.batch, nodeName) == ge::GRAPH_FAILED)) {
         return ge::GRAPH_FAILED;
     }
     OP_CHECK_IF(
@@ -581,6 +610,10 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext* context, TilingInfoDRQK& t
                     "EZ1008", (std::vector<const char*>{"opName", "reason"}),
                     (std::vector<const char*>{nodeName, "indices input descriptor is unavailable during Tiling"})),
                 return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        indiceDesc->GetDataType() != ge::DT_INT32,
+        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "indices", Ops::Base::ToString(indiceDesc->GetDataType()).c_str(), "INT32"),
+        return ge::GRAPH_FAILED);
     auto cosDesc = context->GetInputDesc(COS_INDEX);
     OP_CHECK_IF(cosDesc == nullptr,
                 REPORT_PREDEFINED_ERR_MSG(
@@ -660,7 +693,7 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext* context, TilingInfoDRQK& t
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
                     context->GetNodeName(), "x", Shape2String(xShape->GetStorageShape()).c_str(),
                     "the shape exceeds the operator's UB working capacity; x_last_dim=" + std::to_string(xHiddenSize) +
-                        ", static hidden-size limit=" + std::to_string(HIDDEN_SIZE_LIMIT_LENGTH)),
+                        ", static hidden-size limit=" + std::to_string(X_HIDDEN_SIZE_LIMIT)),
                 return ge::GRAPH_FAILED);
 
     tilingInfoDRQK.onceS = GetDiv(unUsedSize, onceSSize);
@@ -669,7 +702,7 @@ ge::graphStatus getDRQKShapeInfo(gert::TilingContext* context, TilingInfoDRQK& t
                 OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
                     context->GetNodeName(), "x", Shape2String(xShape->GetStorageShape()).c_str(),
                     "the shape exceeds the operator's UB working capacity; x_last_dim=" + std::to_string(xHiddenSize) +
-                        ", static hidden-size limit=" + std::to_string(HIDDEN_SIZE_LIMIT_LENGTH)),
+                        ", static hidden-size limit=" + std::to_string(X_HIDDEN_SIZE_LIMIT)),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -733,6 +766,7 @@ static ge::graphStatus TilingDequantRopeQuantKvcache(gert::TilingContext* contex
     tiling.set_hasBias(tilingInfoDRQK.hasBias);
     tiling.set_hasAS(tilingInfoDRQK.hasAS);
     tiling.set_batch(tilingInfoDRQK.batch);
+    tiling.set_cacheBatchNum(tilingInfoDRQK.cacheBatchNum);
     uint32_t tilingKey = static_cast<uint32_t>(tilingInfoDRQK.biasDataType);
 
     context->SetBlockDim(numBlocks);

@@ -44,6 +44,8 @@ struct DequantRopeQuantKvcacheTilingData {
     int64_t isPA = 1;
     int64_t hasBias = 1;
     int64_t hasAS = 1;
+    int64_t batch = 1;
+    int64_t cacheBatchNum = 1024;
 };
 
 inline void IDequantRopeQuantKvcacheTilingData(uint8_t* tiling, DequantRopeQuantKvcacheTilingData* const_data)
