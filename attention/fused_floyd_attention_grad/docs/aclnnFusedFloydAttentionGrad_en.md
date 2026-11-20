@@ -36,26 +36,26 @@
     Y=(P*V_1+P*V_2)
     $$
 
-    The backward propagation formula for attention is:
+    The backward propagation formula for attention is (where $scale$ is the input argument scaleValue, $dS = P \odot (dP - rowsum(dP \odot P))$, $dP = dY * V_1^T + dY * V_2^T$, and $rowsum$ sums over the last axis):
 
     $$
     dV_1=P^TdY
     $$
 
     $$
-    dV_2=P^TdY
+    dV_2[k,m,d]=\sum_n P[n,m,k] \cdot dY[n,m,d]
     $$
 
     $$
-    dQ=\frac{((dS)*K_1)}{\sqrt{d}}+\frac{((dS)*K_2)}{\sqrt{d}}
+    dQ=scale*((dS)*K_1+(dS)*K_2)
     $$
 
     $$
-    dK_1=\frac{((dS)^T*Q)}{\sqrt{d}}
+    dK_1=scale*((dS)^T*Q)
     $$
 
     $$
-    dK_2=\frac{((dS)^T*Q)}{\sqrt{d}}
+    dK_2[k,m,d]=scale*\sum_n dS[n,m,k] \cdot Q[n,m,d]
     $$
 
 ## Function Prototype
@@ -226,7 +226,7 @@ aclnnStatus aclnnFusedFloydAttentionGrad(
           <td>FLOAT16, BFLOAT16</td>
           <td>ND</td>
           <td>[B,H,N,M,D]</td>
-          <td>√</td>
+          <td>×</td>
         </tr>
         <tr>
           <td>dk1Out (aclTensor)</td>
@@ -236,7 +236,7 @@ aclnnStatus aclnnFusedFloydAttentionGrad(
           <td>FLOAT16, BFLOAT16</td>
           <td>ND</td>
           <td>[B,H,N,K,D]</td>
-          <td>√</td>
+          <td>×</td>
         </tr>
         <tr>
           <td>dv1Out (aclTensor)</td>
@@ -246,7 +246,7 @@ aclnnStatus aclnnFusedFloydAttentionGrad(
           <td>FLOAT16, BFLOAT16</td>
           <td>ND</td>
           <td>[B,H,N,K,D]</td>
-          <td>√</td>
+          <td>×</td>
         </tr>
         <tr>
           <td>dk2Out (aclTensor)</td>
@@ -256,7 +256,7 @@ aclnnStatus aclnnFusedFloydAttentionGrad(
           <td>FLOAT16, BFLOAT16</td>
           <td>ND</td>
           <td>[B,H,K,M,D]</td>
-          <td>√</td>
+          <td>×</td>
         </tr>
         <tr>
           <td>dv2Out (aclTensor)</td>
@@ -266,7 +266,7 @@ aclnnStatus aclnnFusedFloydAttentionGrad(
           <td>FLOAT16, BFLOAT16</td>
           <td>ND</td>
           <td>[B,H,K,M,D]</td>
-          <td>√</td>
+          <td>×</td>
         </tr>
         <tr>
           <td>scaleValue (double)</td>
@@ -393,7 +393,8 @@ aclnnStatus aclnnFusedFloydAttentionGrad(
   - K: value range is 128 to 1M, and K%128==0.
   - D: value range is 32/64/128.
 
-- Axis 0/2/4 of query and key1 must be the same.
+- Axis 0/1/2/4 of query and key1 must be the same.
+- Axis 0/1/4 of key2 must be the same as those of query, axis 2 of key2 must be the same as axis 3 of key1 (K), and axis 3 of key2 must be the same as axis 3 of query (M), that is, the shape of key2 is [B,H,K,M,D]. The shape of value2 must be the same as that of key2.
 - key1 and value1 must have the same shape.
 - key2 and value2 must have the same shape.
 - The shapes of query and dy/attentionIn must be the same.

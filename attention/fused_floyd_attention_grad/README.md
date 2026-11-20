@@ -24,30 +24,26 @@
     Y=(P*V_1+P*V_2)
     $$
 
-    则注意力的反向计算公式为：
-
-    $$
-    S=Softmax(S)
-    $$
+    则注意力的反向计算公式为（其中 $scale$ 为入参scaleValue，$dS = P \odot (dP - rowsum(dP \odot P))$，$dP = dY * V_1^T + dY * V_2^T$，$rowsum$ 表示对最后一轴求和）：
 
     $$
     dV_1=P^TdY
     $$
 
     $$
-    dV_2=P^TdY
+    dV_2[k,m,d]=\sum_n P[n,m,k] \cdot dY[n,m,d]
     $$
 
     $$
-    dQ=\frac{((dS)*K_1)}{\sqrt{d}}+\frac{((dS)*K_2)}{\sqrt{d}}
+    dQ=scale*((dS)*K_1+(dS)*K_2)
     $$
 
     $$
-    dK_1=\frac{((dS)^T*Q)}{\sqrt{d}}
+    dK_1=scale*((dS)^T*Q)
     $$
 
     $$
-    dK_2=\frac{((dS)^T*Q)}{\sqrt{d}}
+    dK_2[k,m,d]=scale*\sum_n dS[n,m,k] \cdot Q[n,m,d]
     $$
 
 ## 参数说明
@@ -180,7 +176,8 @@
   - K：取值范围为128\~1M且K%128==0。
   - D：取值范围为32/64/128。
 
-- query与key1的第0/2/4轴需相同。
+- query与key1的第0/1/2/4轴需相同。
+- key2的第0/1/4轴需与query相同，第2轴需与key1的第3轴相同（K），第3轴需与query的第3轴相同（M），即shape为[B,H,K,M,D]。
 - key1与value1 shape需相同。
 - key2与value2 shape需相同。
 - query与dy/attentionIn shape需相同。

@@ -9,9 +9,11 @@
  */
 
 #include "aclnn_fused_floyd_attention_grad.h"
+#include <utility>
 #include "opdev/common_types.h"
 #include "opdev/data_type_utils.h"
 #include "opdev/op_log.h"
+#include "opdev/tensor_view_utils.h"
 
 namespace {
 extern "C" aclnnStatus aclnnInnerFusedFloydAttentionGradGetWorkspaceSize(
@@ -29,6 +31,17 @@ aclnnStatus CheckTensorDataType(const aclTensor* tensor, op::DataType expectedTy
     if (tensor != nullptr && tensor->GetDataType() != expectedType) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s dtype is invalid: got %s, expected %s.", name,
                 op::ToString(tensor->GetDataType()).GetString(), op::ToString(expectedType).GetString());
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus CheckOutputContiguous(const aclTensor* tensor, const char* name)
+{
+    // The kernel writes outputs to GM by DataCopy with contiguous layout and ignores the view strides,
+    // so a non-contiguous output would silently keep stale data (see issue #7476). Reject it early.
+    if (tensor != nullptr && !IsContiguous(tensor)) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "%s must be contiguous: non-contiguous outputs are not supported.", name);
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
@@ -52,6 +65,14 @@ aclnnStatus aclnnFusedFloydAttentionGradGetWorkspaceSize(
     }
     if (query != nullptr) {
         ret = CheckTensorDataType(attentionInOptional, query->GetDataType(), "attentionIn (must match query)");
+        if (ret != ACLNN_SUCCESS) {
+            return ret;
+        }
+    }
+    for (const auto& out :
+         {std::make_pair(dqOut, "dqOut"), std::make_pair(dk1Out, "dk1Out"), std::make_pair(dv1Out, "dv1Out"),
+          std::make_pair(dk2Out, "dk2Out"), std::make_pair(dv2Out, "dv2Out")}) {
+        ret = CheckOutputContiguous(out.first, out.second);
         if (ret != ACLNN_SUCCESS) {
             return ret;
         }
