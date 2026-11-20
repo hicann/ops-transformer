@@ -65,7 +65,13 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor> MhcPreSin
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
     m.def("mhc_pre_sinkhorn_backward", &MhcPreSinkhornBackward, "mhc_pre_sinkhorn_backward");
-    m.def("mhc_pre_sinkhorn_backward_v2", &MhcPreSinkhornBackwardV2, "mhc_pre_sinkhorn_backward_v2");
+    // V2 末三参带默认值: 13 实参调用形态与 V1 完全等价(无 premix、HF32 开启),
+    // V1 直调迁移到 V2 只需改函数名; preMix/gradPre 默认成对为 None, 语义安全。
+    m.def("mhc_pre_sinkhorn_backward_v2", &MhcPreSinkhornBackwardV2, "mhc_pre_sinkhorn_backward_v2", py::arg("gradHin"),
+          py::arg("gradHPost"), py::arg("gradHRes"), py::arg("x"), py::arg("phi"), py::arg("alpha"), py::arg("bias"),
+          py::arg("hPre"), py::arg("hcBeforeNorm"), py::arg("invRms"), py::arg("sumOut"), py::arg("normOut"),
+          py::arg("hcEps"), py::arg("preMix") = py::none(), py::arg("gradPre") = py::none(),
+          py::arg("enableHf32") = true);
 }
 
 } // namespace op_api

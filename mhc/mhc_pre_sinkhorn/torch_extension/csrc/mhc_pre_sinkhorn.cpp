@@ -90,7 +90,12 @@ MhcPreSinkhorn(const at::Tensor& x, const at::Tensor& phi, const at::Tensor& alp
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 {
-    m.def("mhc_pre_sinkhorn", &MhcPreSinkhorn, "mhc_pre_sinkhorn");
+    // preMix/enableHf32 带默认值, 保持 V1(9 实参)直调形态兼容: 前 9 个参数位置与
+    // V1 完全一致, 省略时 preMix=None(无 premix)、enableHf32=True(与合入前固定
+    // HF32 cube 行为一致)。注意默认值不随全局开关——直调层需要 FP32 时显式传 false。
+    m.def("mhc_pre_sinkhorn", &MhcPreSinkhorn, "mhc_pre_sinkhorn", py::arg("x"), py::arg("phi"), py::arg("alpha"),
+          py::arg("bias"), py::arg("hcMult"), py::arg("numIters"), py::arg("hcEps"), py::arg("normEps"),
+          py::arg("outFlag"), py::arg("preMix") = py::none(), py::arg("enableHf32") = true);
 }
 
 } // namespace op_api

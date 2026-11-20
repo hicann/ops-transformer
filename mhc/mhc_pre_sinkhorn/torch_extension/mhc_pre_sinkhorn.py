@@ -149,13 +149,18 @@ class MhcPreSinkhornOpBuilder(OpBuilder):
         return ["csrc/mhc/mhc_pre_sinkhorn.cpp"]
 
     def schema(self) -> str:
-        # pre_mix 必须为位置参数(带默认值): torch.library.register_autograd 的
-        # has_kwarg_only_tensors 检查拒绝 kwarg-only Tensor 参数, 放在 * 之后会导致
-        # 算子无法注册 dispatcher 级自动反向。
+        # 参数面与公开 API 对齐, 不含 enable_hf32: HF32 由 dispatch 内部读取全局开关
+        # torch_npu.npu.aclnn.allow_hf32 后下发给 aclnn(与公开 wrapper 同源同函数,
+        # aclnn 层 enableHf32 属性接口不变)。pre_mix 必须为位置参数(带默认值):
+        # 放在 * 之后会被 torch.library.register_autograd 的 has_kwarg_only_tensors
+        # 检查拒绝; 全位置参数使 setup_context/backward 走最简三参契约
+        # (setup_context(ctx=, inputs=, output=), 不传 keyword_only_inputs)。
+        # 注意 torchair GE 侧构建函数(graph_convert 的 MhcPreSinkhorn)的 premix
+        # 仍须 keyword-only, 其约束在 GE 函数签名上, 与本 schema 无关。
         return (
             "mhc_pre_sinkhorn(Tensor x, Tensor phi, Tensor alpha, Tensor bias, "
             "int hcMult, int numIters, float hcEps, float normEps, bool outFlag, "
-            "Tensor? pre_mix=None, *, bool enable_hf32=True) -> "
+            "Tensor? pre_mix=None) -> "
             "(Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)"
         )
 
@@ -172,7 +177,6 @@ class MhcPreSinkhornOpBuilder(OpBuilder):
             norm_eps,
             out_flag,
             pre_mix=None,
-            enable_hf32=True,
         ):
             n = hc_mult
             if x.dim() == 3:
@@ -251,9 +255,24 @@ mhc_pre_sinkhorn_op_builder = MhcPreSinkhornOpBuilder()
 mhc_pre_sinkhorn_op_builder._ensure_initialized()
 
 
-# meta/dispatch/converter 的形参名必须与 schema 参数名(pre_mix/enable_hf32)保持一致:
-# 图模式下 keyword-only 参数(含 schema 默认值物化)按名以 kwargs 传入这些注册函数,
-# 改成 snake_case 会导致图模式报 unexpected keyword argument。
+def _get_global_allow_hf32():
+    """读取全局HF32开关 torch_npu.npu.aclnn.allow_hf32。
+
+    torch_npu 不可用或读取失败时回退为 True（与合入前 HF32 行为一致）。
+    公开 wrapper 与 PrivateUse1 dispatch 均由此取值下发 aclnn,
+    保证两条路径的 HF32 语义一致。
+    """
+    try:
+        import torch_npu
+
+        return bool(torch_npu.npu.aclnn.allow_hf32)
+    except Exception:
+        return True
+
+
+# meta/dispatch/converter 的形参名必须与 schema 参数名(pre_mix)保持一致:
+# 图模式下 torchair 可按名以 kwargs 传入这些注册函数, 形参名不一致会报
+# unexpected keyword argument。
 @impl(get_as_library(), mhc_pre_sinkhorn_op_builder.name, "PrivateUse1")
 def _mhc_pre_sinkhorn_dispatch(
     x,
@@ -266,8 +285,9 @@ def _mhc_pre_sinkhorn_dispatch(
     norm_eps,
     out_flag,
     pre_mix=None,
-    enable_hf32=True,
 ):
+    # schema 不含 enable_hf32: 与公开 wrapper 同源, 读全局开关后下发给 aclnn
+    enable_hf32 = _get_global_allow_hf32()
     op_module = mhc_pre_sinkhorn_op_builder.load()
     return op_module.mhc_pre_sinkhorn(
         x,
@@ -282,19 +302,6 @@ def _mhc_pre_sinkhorn_dispatch(
         pre_mix,
         enable_hf32,
     )
-
-
-def _get_global_allow_hf32():
-    """读取全局HF32开关 torch_npu.npu.aclnn.allow_hf32。
-
-    torch_npu 不可用或读取失败时回退为 True（与合入前 HF32 行为一致）。
-    """
-    try:
-        import torch_npu
-
-        return bool(torch_npu.npu.aclnn.allow_hf32)
-    except Exception:
-        return True
 
 
 def mhc_pre_sinkhorn(

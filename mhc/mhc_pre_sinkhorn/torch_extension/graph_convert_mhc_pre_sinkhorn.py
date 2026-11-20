@@ -147,8 +147,18 @@ if _TORCHAIR_AVAILABLE:
             .output("norm_out", "DT_FLOAT"),
         )
 
-    # converter 形参名须与 schema 参数名(pre_mix/enable_hf32)一致: 图模式按名传 kwargs,
-    # 改成 snake_case 会报 unexpected keyword argument。
+    # 与 torch schema 对齐(不含 enable_hf32): converter 形参名须与 schema 参数名
+    # (pre_mix)一致, 图模式按名传 kwargs, 形参名不一致会报 unexpected keyword
+    # argument。enable_hf32 于构图时读全局开关 torch_npu.npu.aclnn.allow_hf32 并
+    # 固化进 GE ATTR(与 eager 侧 wrapper/dispatch 同源)。
+    def _get_allow_hf32():
+        try:
+            import torch_npu
+
+            return bool(torch_npu.npu.aclnn.allow_hf32)
+        except Exception:
+            return True
+
     @register_fx_node_ge_converter(
         torch.ops.cann_ops_transformer.mhc_pre_sinkhorn.default
     )
@@ -163,7 +173,6 @@ if _TORCHAIR_AVAILABLE:
         norm_eps: float,
         out_flag: bool,
         pre_mix: Optional[Tensor] = None,
-        enable_hf32: bool = True,
         meta_outputs: TensorSpec = None,
     ):
         return MhcPreSinkhorn(
@@ -177,5 +186,5 @@ if _TORCHAIR_AVAILABLE:
             hc_eps=hc_eps,
             norm_eps=norm_eps,
             need_backward=out_flag,
-            enable_hf32=enable_hf32,
+            enable_hf32=_get_allow_hf32(),
         )
