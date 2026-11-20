@@ -85,6 +85,42 @@ __aicore__ inline void InitOutput(GlobalTensor<T> outGm, uint64_t totalElementNu
     }
 }
 
+// Initialize contiguous head spans, reusing the same per-head values for each group.
+template <typename T, uint32_t SYNC_ID, uint32_t POP_BUF_START_ADDR, uint32_t POP_BUF_ELE_SIZE>
+__aicore__ inline void InitOutputPerHead(AscendC::GlobalTensor<T>& outGm, AscendC::GlobalTensor<T>& headValuesGm,
+                                         uint64_t totalElementNum, uint64_t elementsPerHead, uint64_t headNum,
+                                         uint32_t vecCoreNum)
+{
+    if ASCEND_IS_AIV {
+        uint64_t coreSize = (totalElementNum + vecCoreNum - 1U) / vecCoreNum;
+        uint64_t offset = AscendC::GetBlockIdx() * coreSize;
+        uint64_t coreEnd = offset + coreSize;
+        uint64_t end = coreEnd < totalElementNum ? coreEnd : totalElementNum;
+        AscendC::LocalTensor<T> popBuffer =
+            AscendC::LocalTensor<uint8_t>(AscendC::TPosition::VECIN, POP_BUF_START_ADDR, POP_BUF_ELE_SIZE * sizeof(T))
+                .template ReinterpretCast<T>();
+
+        while (offset < end) {
+            uint64_t head = offset / elementsPerHead;
+            uint64_t nextHeadOffset = (head + 1U) * elementsPerHead;
+            uint64_t headEnd = nextHeadOffset < end ? nextHeadOffset : end;
+            T value = headValuesGm.GetValue(head % headNum);
+            AscendC::Mutex::Lock<PIPE_V>(SYNC_ID);
+            AscendC::Duplicate(popBuffer, value, POP_BUF_ELE_SIZE);
+            AscendC::Mutex::Unlock<PIPE_V>(SYNC_ID);
+            AscendC::Mutex::Lock<PIPE_MTE3>(SYNC_ID);
+            while (offset < headEnd) {
+                uint64_t remaining = headEnd - offset;
+                uint32_t count = remaining < POP_BUF_ELE_SIZE ? static_cast<uint32_t>(remaining) : POP_BUF_ELE_SIZE;
+                AscendC::DataCopyExtParams copyParams{1, static_cast<uint32_t>(count * sizeof(T)), 0, 0, 0};
+                AscendC::DataCopyPad(outGm[offset], popBuffer, copyParams);
+                offset += count;
+            }
+            AscendC::Mutex::Unlock<PIPE_MTE3>(SYNC_ID);
+        }
+    }
+}
+
 } // namespace AttentionCommon
 
 #endif // INIT_OUTPUT_H

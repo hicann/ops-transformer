@@ -344,8 +344,15 @@ public:
                 static constexpr float LSE_INIT_VAL = 3e+99;
                 static constexpr uint32_t LSE_POP_BUF_START_ADDR = BUFFER_SIZE_BYTE_32K;
                 static constexpr uint32_t LSE_POP_BUF_ELE_SIZE = BUFFER_SIZE_BYTE_32K / sizeof(float);
-                AttentionCommon::InitOutput<float, EVENT_ID1, LSE_POP_BUF_START_ADDR, LSE_POP_BUF_ELE_SIZE, true>(
-                    softmaxLseGm_, lseTotalSize, vecCoreNum, LSE_INIT_VAL);
+                if (unlikely(constInfo_.learnableSinkFlag)) {
+                    uint64_t seqSize = LAYOUT_T == FA_LAYOUT::TND ? tSize : constInfo_.s1Size;
+                    AttentionCommon::InitOutputPerHead<float, EVENT_ID1, LSE_POP_BUF_START_ADDR, LSE_POP_BUF_ELE_SIZE>(
+                        softmaxLseGm_, sinkGm_, lseTotalSize, seqSize, constInfo_.n2Size * constInfo_.gSize,
+                        vecCoreNum);
+                } else {
+                    AttentionCommon::InitOutput<float, EVENT_ID1, LSE_POP_BUF_START_ADDR, LSE_POP_BUF_ELE_SIZE, true>(
+                        softmaxLseGm_, lseTotalSize, vecCoreNum, LSE_INIT_VAL);
+                }
             }
 
             SyncAll();

@@ -215,12 +215,12 @@ cd build && ctest -R flash_attn_tiling --output-on-failure
 - **概念**：当某一行（一个 Q head 的一行 Q token）的所有 token 均被掩码排除（如 window 窗口外、seqused 截断、mask 全 1），该行没有任何有效参与计算的元素时，称为**无效行**。kernel 以该行 softmax max 是否仍为 `-inf`（softmaxMax == -inf，即没有任何有效 s 值）作为判定依据。
 - **行无效时输出**：
   - **attn_out**：无效行输出**清零**（写 0）。`RowInvalidUpdateVF` 用 `Select` 将 max == -inf 的行整体写 0（`vf_flashupdate_new.h`），FD 阶段由 `InvalidRows`/`InvalidMaskRows` 清零后写出。
-  - **softmax_lse**：无效行输出 **+inf**（3e+99）。代码不依赖数学推导（log(sum) + max 会得 -inf），而是显式处理：`ComputeLseOutputVF` 先算 `lse = log(sum) + max`，再用 `Select` 将 max == -inf 的行置为 `infValue = 3e+99`（`vf_flashupdate_new.h:522-523`）；FD 阶段 `ComputeScaleValue` 同样处理（`vf_flash_decode_arch35.h:312-313`）。
+  - **softmax_lse**：未传入 sink 时，无效行输出 **+inf**（3e+99）。代码不依赖数学推导（log(sum) + max 会得 -inf），而是显式处理：`ComputeLseOutputVF` 先算 `lse = log(sum) + max`，再用 `Select` 将 max == -inf 的行置为 `infValue = 3e+99`（`vf_flashupdate_new.h:522-523`）；FD 阶段 `ComputeScaleValue` 同样处理（`vf_flash_decode_arch35.h:312-313`）。
 
 #### 1.8 Sink（learnable sink）
 
 - **Sink**：在 softmax 分母中额外加入一项 `e^{sink - m}`（sink 同时参与 m 的 max 计算），用于提升部分模型（如 Qwen/GLM 系列）的数值稳定性。
-- 本算子接口已预留 `sinks` 输入（FLOAT32，shape (Q_N,)），但**当前版本尚未支持**：传入会因 checker 拦截报错（"sinks is currently not supported"），需要等后续版本开放。
+- `sinks` 输入为 FLOAT32，shape 为 (Q_N,)，每个 Q head 对应一个 sink。传入 sink 时，无有效 KV 的行应输出 attn_out = 0、softmax_lse = `sink[head]`；全局初始化也按 head 填入该值，覆盖未调度的行以及 `seqused_q` 之外的物理 Q 行。
 
 #### 1.9 FlashDecode
 
@@ -506,7 +506,9 @@ Process():
   FreeEventID + UnInitCrossCoreSync
 ```
 
-**① InitOutput**（`flash_attn_block_vec_dn.h` / `flash_attn_block_vec_nd.h` 的 `ClearOutput`，metadata header[8] 为 0 时执行；为 1 时跳过；为 2 时由非 TND kernel 比较 header[9] 的统一 Q 有效长度与物理 S，仅相等时跳过；metadata 同时检查各 batch 的 KV 长度与 mask 窗口；旧 metadata 默认初始化）：计算 attn_out 与 softmax_lse 的总大小（TND 取 T×g×N×DV），由 `2×coreNum` 个 AIV 按 32KB POP buffer 并行写 GM：attn_out 清零（0），LSE 预置 `3e+99`；写完后 `SyncAll` 保证后续计算可见（`flash_attn_block_vec_dn.h:263-291`）。
+**① InitOutput**（`flash_attn_block_vec_dn.h` / `flash_attn_block_vec_nd.h` 的 `ClearOutput`，metadata header[8] 为 0 时执行；为 1 时跳过；为 2 时由非 TND kernel 比较 header[9] 的统一 Q 有效长度与物理 S，仅相等时跳过；metadata 同时检查各 batch 的 KV 长度与 mask 窗口；旧 metadata 默认初始化）：计算 attn_out 与 softmax_lse 的总大小（TND 取 T×g×N×DV），由 `2×coreNum` 个 AIV 按 32KB POP buffer 并行写 GM：attn_out 清零（0），未传入 sink 时 LSE 预置 `3e+99`（`+inf`），传入 sink 时按 Q head 预置 `sink[head]`（TND 按 `[head, T]`，非 TND 按 `[batch, head, S]`），包括 `seqused_q` 之外的物理 Q 行；写完后 `SyncAll` 保证后续计算可见（`flash_attn_block_vec_dn.h:263-291`）。
+
+初始化通过 `ClearOutput<HAS_SINK>` 区分路径，沿用相同的 tiling key。不带 sink 时保留原有 `AttentionCommon::InitOutput`。带 sink 时，`ClearOutput<true>` 调用 `AttentionCommon::InitOutputPerHead`，按 Q head 写入 `sink[head]`；attention 清零与核间同步仍在 `ClearOutput` 中执行。每个 AIV 负责一个连续 LSE 区间，在 head 边界读取 `sink[head]`，复用 `Duplicate` 和 `DataCopyPad` 分段写 GM，UB 缓冲区上限仍为 32KB。
 
 TND 用累计长度差判断物理 Q 行覆盖，确认覆盖且 KV/mask 条件满足时将 header[8] 置为 1。非 TND 传入 `seqused_q` 时，若各 batch 的 Q 有效长度不同则初始化；若全部相同且各 batch 均满足 KV/mask 条件，则将 header[8] 置为 2、统一长度写入 header[9]，由 kernel 比较实际 Q 张量的物理 S 后决定是否跳过。KV 有效长度不要求各 batch 相同，也不要求等于 KV 张量的物理 S，但必须非空且不能使 Q 行全被 causal/band mask 遮住。
 
