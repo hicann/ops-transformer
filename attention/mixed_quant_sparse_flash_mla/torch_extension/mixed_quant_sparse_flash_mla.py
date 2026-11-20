@@ -169,36 +169,33 @@ class MixedQuantSparseFlashMlaOpBuilder(OpBuilder):
                 raise ValueError("The shape size of q should not be 0")
             if ori_kv is not None and ori_kv.numel() == 0:
                 raise ValueError("The shape size of ori_kv should not be 0")
+            cmp_only = quant_mode == 4 and ori_kv is None
+            if cmp_only:
+                if cmp_kv is None:
+                    raise ValueError("At least one of ori_kv and cmp_kv is required")
+                if cmp_kv.numel() == 0:
+                    raise ValueError("The shape size of cmp_kv should not be 0")
             attn_out = torch.empty(q.shape, dtype=q.dtype, device=q.device)
             if return_softmax_lse:
+                kv_head_axis = 1 if layout_kv == "TND" else 2
+                num_heads_kv = (
+                    cmp_kv.shape[kv_head_axis]
+                    if cmp_only
+                    else ori_kv.shape[kv_head_axis]
+                )
                 if layout_q == "TND":
-                    if layout_kv == "PA_BBND":
-                        softmax_lse = torch.empty(
-                            [
-                                ori_kv.shape[2],
-                                q.shape[0],
-                                int(q.shape[1] / ori_kv.shape[2]),
-                            ],
-                            dtype=torch.float32,
-                            device=q.device,
-                        )
-                    else:
-                        softmax_lse = torch.empty(
-                            [
-                                ori_kv.shape[1],
-                                q.shape[0],
-                                int(q.shape[1] / ori_kv.shape[1]),
-                            ],
-                            dtype=torch.float32,
-                            device=q.device,
-                        )
+                    softmax_lse = torch.empty(
+                        [num_heads_kv, q.shape[0], int(q.shape[1] / num_heads_kv)],
+                        dtype=torch.float32,
+                        device=q.device,
+                    )
                 else:
                     softmax_lse = torch.empty(
                         [
                             q.shape[0],
-                            ori_kv.shape[2],
+                            num_heads_kv,
                             q.shape[1],
-                            int(q.shape[2] / ori_kv.shape[2]),
+                            int(q.shape[2] / num_heads_kv),
                         ],
                         dtype=torch.float32,
                         device=q.device,

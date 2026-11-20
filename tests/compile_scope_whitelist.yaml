@@ -68,6 +68,16 @@ ops:
       - ascend910b
       - ascend910_93
       - ascend950
+    mixed_quant_sparse_flash_mla:
+      # Ascend950 CI 支持新 squeeze 接口后移除本条目
+      impact:
+      - mixed_quant_sparse_flash_mla
+      soc:
+      - ascend910b
+      - ascend910_93
+      - ascend960dt
+      - ascend960pr
+      - ascend350
     mixed_quant_sparse_flash_mla_metadata:
       impact:
       - mixed_quant_sparse_flash_mla_metadata
@@ -83,6 +93,16 @@ ops:
       soc:
       - ascend950
       - ascend960dt
+    quant_lightning_indexer_v2:
+      # Ascend950 CI 支持新 squeeze 接口后移除本条目
+      impact:
+      - quant_lightning_indexer_v2
+      soc:
+      - ascend910b
+      - ascend910_93
+      - ascend960dt
+      - ascend960pr
+      - ascend350
     quant_lightning_indexer_v2_metadata:
       impact:
       - quant_lightning_indexer_v2_metadata
@@ -97,6 +117,13 @@ ops:
       - quant_sparse_flash_mla
       soc:
       - ascend950
+    quant_sparse_lightning_indexer:
+      # Ascend950 CI 支持新 squeeze 接口后移除本条目
+      impact:
+      - quant_sparse_lightning_indexer
+      soc:
+      - ascend910b
+      - ascend910_93
     sparse_flash_mla_grad_metadata:
       impact:
       - sparse_flash_mla_grad_metadata

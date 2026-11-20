@@ -208,6 +208,26 @@ _ADDR_UB_BYTES = 216 * 1024
 _ADDR_COMPACT_BT = 2048
 _ADDR_COMPACT_K = 1024
 
+_ADDR_LOCAL_BT = 8192
+_ADDR_LOCAL_MAX_ROWS = 128
+_ADDR_LOCAL_ROWS = 22
+_ADDR_LOCAL_ORI_K = 256
+_ADDR_LOCAL_CMP_K = 1024
+_ADDR_LOCAL_ORI_INDEX_OFFSET = 2 * _ADDR_LOCAL_BT * 4
+_ADDR_LOCAL_CMP_INDEX_OFFSET = (
+    _ADDR_LOCAL_ORI_INDEX_OFFSET + _ADDR_LOCAL_ROWS * _ADDR_LOCAL_ORI_K * 4
+)
+_ADDR_LOCAL_ORI_LENGTH_OFFSET = (
+    _ADDR_LOCAL_CMP_INDEX_OFFSET + _ADDR_LOCAL_ROWS * _ADDR_LOCAL_CMP_K * 4
+)
+_ADDR_LOCAL_LENGTH_BYTES = ((_ADDR_LOCAL_ROWS * 4 + 31) // 32) * 32
+_ADDR_LOCAL_CMP_LENGTH_OFFSET = _ADDR_LOCAL_ORI_LENGTH_OFFSET + _ADDR_LOCAL_LENGTH_BYTES
+_ADDR_LOCAL_INPUT_ELEMS = (
+    _ADDR_LOCAL_CMP_LENGTH_OFFSET + _ADDR_LOCAL_LENGTH_BYTES
+) // 4
+_ADDR_LOCAL_OUTPUT_ELEMS = (
+    _ADDR_LOCAL_ROWS * (_ADDR_LOCAL_ORI_K + _ADDR_LOCAL_CMP_K) // 2
+)
 _ADDR_BATCH_ROWS = 16
 _ADDR_BATCH_MAX_DECODE_ROWS = 128
 _ADDR_PIPE_ORI_K = 128
@@ -290,6 +310,8 @@ _TENSOR_RANK_2D = 2
 _TENSOR_RANK_3D = 3
 _TENSOR_RANK_4D = 4
 _MAX_PA_BLOCK_SIZE = 1024
+# OpKit discovers exports with a symbolic torch module.
+_FLOAT32_MAX = float.fromhex("0x1.fffffep+127")
 # UB/GM paired-copy source stride is encoded in an unsigned 39-bit field.
 _DMA_SOURCE_STRIDE_MAX_BYTES = (1 << 39) - 1
 
@@ -377,6 +399,16 @@ def _copy_addr_elements_from_gm(ch, gm, elem_off, count):
         from_tensor(ch, layout=make_layout((1, count))),
         gm.view(gm.shape[0] * gm.shape[1])[elem_off : elem_off + count,].view(1, count),
     )
+
+
+def _addr_local_tab_w(k):
+    """Local AIVs own disjoint columns, including every masked tile tail."""
+    return ((k + TILE_N - 1) // TILE_N) * TILE_N
+
+
+def _addr_pipe_tab_w(k):
+    """Batched address producers write whole 64-column vectors, including the tail."""
+    return ((k + _ADDR_HALF - 1) // _ADDR_HALF) * _ADDR_HALF
 
 
 def _addr_tab_w(k):
@@ -833,7 +865,7 @@ class Vector:
                 invalid_odd = rr.vges(
                     odd_index_reg, dtypes.int32(valid_tile_kv_rows), mask=mask
                 )
-            max_cursor = rr.vstore_unalign_begin(sm_max)
+            max_tail = rr.vsqueeze_and_storeunalign_init(sm_max)
             # Explicit int32 loop values select the VF scalar ABI.
             for query_head_row in cannbotdsl.range(
                 dtypes.int32(0),
@@ -871,14 +903,11 @@ class Vector:
                         sm_max, softmax_state_offset + 2 * query_head_row
                     )
                 row_max_reg = rr.vmax(row_max_reg, prior_max_reg, mask=mask)
-                squeezed = rr.vsqueeze_and_storeunalign_init(
-                    row_max_reg, mask=two_lanes
-                )
                 rr.vsqueeze_and_storeunalign(
-                    sm_max, softmax_state_offset, squeezed, max_cursor
+                    sm_max, softmax_state_offset, row_max_reg, max_tail, mask=two_lanes
                 )
             rr.vsqueeze_and_storeunalign_finalize(
-                sm_max, softmax_state_offset, max_cursor
+                sm_max, softmax_state_offset, max_tail
             )
             rr.vmem_bar("vst_vld")
             if const_expr(not first or has_sink or not self.has_sinks):
@@ -894,7 +923,7 @@ class Vector:
                     rescale_factor_reg,
                     state_mask,
                 )
-            sum_cursor = rr.vstore_unalign_begin(sm_sum)
+            sum_tail = rr.vsqueeze_and_storeunalign_init(sm_sum)
             for query_head_row in cannbotdsl.range(
                 dtypes.int32(0),
                 dtypes.int32(head_rows),
@@ -930,11 +959,8 @@ class Vector:
                     mask=mask,
                 )
                 row_sum_reg = rr.vdup(row_sum_reg, mask=mask)
-                squeezed = rr.vsqueeze_and_storeunalign_init(
-                    row_sum_reg, mask=two_lanes
-                )
                 rr.vsqueeze_and_storeunalign(
-                    sm_sum, softmax_state_offset, squeezed, sum_cursor
+                    sm_sum, softmax_state_offset, row_sum_reg, sum_tail, mask=two_lanes
                 )
                 p_even_reg = rr.vcast(
                     exp_even_reg,
@@ -960,7 +986,7 @@ class Vector:
                     repeat_stride=0,
                 )
             rr.vsqueeze_and_storeunalign_finalize(
-                sm_sum, softmax_state_offset, sum_cursor
+                sm_sum, softmax_state_offset, sum_tail
             )
             if const_expr(not first or has_sink or not self.has_sinks):
                 rr.vmem_bar("vst_vld")
@@ -1489,6 +1515,7 @@ class MqsmlaKernel:
         has_cmp=False,
         layout_kv="PA_BBND",
         full_heads=True,
+        has_ori=True,
     ):
         self.full_heads = full_heads
         self.layout_kv = layout_kv
@@ -1497,6 +1524,7 @@ class MqsmlaKernel:
         self.tile_n = tile_n
         self.tile_d = D
         self.has_cmp = has_cmp
+        self.has_ori = has_ori
         # Cross-core chains: QK (AIC to AIV, depth 1), P (AIV to AIC, depth 1),
         # and PV (AIC to AIV, depth 1). UB shapes cover one AIV; P covers both halves.
 
@@ -1538,8 +1566,9 @@ class MqsmlaKernel:
         self._b_rt = cu_seqlens_q.shape[1] - 1
         self._scale = softmax_scale
         self._batch_consistency = batch_consistency
-        self._ori_page_stride = pa_phys_gm.stride[0]
-        self._pa_bs_rt = pa_phys_gm.shape[1]
+        if const_expr(self.has_ori):
+            self._ori_page_stride = pa_phys_gm.stride[0]
+            self._pa_bs_rt = pa_phys_gm.shape[1]
         if const_expr(self.has_cmp):
             self._cmp_page_stride = pa_phys_cmp_gm.stride[0]
             self._pa_cmp_bs_rt = pa_phys_cmp_gm.shape[1]
@@ -1566,24 +1595,40 @@ class MqsmlaKernel:
         if const_expr(self.has_cmp):
             self._pa_phys_cmp, self._pa_bt_cmp = pa_phys_cmp_gm, pa_bt_cmp_gm
             self._cmp_idx = cmp_idx_gm
+        self._query_rows = (
+            ori_idx_gm.shape[0] if const_expr(self.has_ori) else cmp_idx_gm.shape[0]
+        )
         # Address-prepass storage exists only in the vector-addressing template.
         _avec = _addr_vec_mode()
         if const_expr(_avec != "off"):
             self._avec_bs_ori = pa_phys_gm.shape[1]
             self._avec_k1 = ori_idx_gm.shape[1]
-            self._avec_k1_tab = _addr_tab_w(self._avec_k1)
+            if const_expr(_avec == "local"):
+                tab_width = _addr_local_tab_w
+            elif const_expr(_avec in ("pipe", "pipe_rows")):
+                tab_width = _addr_pipe_tab_w
+            else:
+                tab_width = _addr_tab_w
+            self._avec_k1_tab = tab_width(self._avec_k1)
             self._avec_k2_tab = 0
             if const_expr(self.has_cmp):
                 self._avec_bs_cmp = pa_phys_cmp_gm.shape[1]
                 self._avec_k2 = cmp_idx_gm.shape[1]
-                self._avec_k2_tab = _addr_tab_w(self._avec_k2)
-            if const_expr(_avec == "arena"):
+                self._avec_k2_tab = tab_width(self._avec_k2)
+            if const_expr(_avec == "local"):
+                self._addr_local_input = Buffer(
+                    MemLoc.UB, dtypes.int32, make_layout((1, _ADDR_LOCAL_INPUT_ELEMS))
+                )
+                self._addr_local_output = Buffer(
+                    MemLoc.UB, dtypes.int32, make_layout((1, _ADDR_LOCAL_OUTPUT_ELEMS))
+                )
+            elif const_expr(_avec == "arena"):
                 self._addr_ub = Buffer(
                     MemLoc.UB,
                     dtypes.int32,
                     make_layout((1, _ADDR_UB_BYTES // 4)),
                 )
-            elif const_expr(_avec == "pipe"):
+            elif const_expr(_avec in ("pipe", "pipe_rows")):
                 # DMA 分区按 32 B 对齐；48 个元素覆盖两侧索引 padding 与两组长度。
                 self._addr_pipe_bt1 = max(64, ((self._pa_bt.shape[1] + 7) // 8) * 8)
                 self._addr_pipe_bt2 = 0
@@ -1645,6 +1690,12 @@ class MqsmlaKernel:
             self._addr_tab = addr_ws_gm.view(dtypes.int32).view(
                 addr_ws_gm.shape[0] // 4 // tab_cols, tab_cols
             )
+            if const_expr(_avec in ("local", "pipe_rows")):
+                # Split boundaries can duplicate a query on adjacent cores.
+                # Give each core a distinct row for those independent writes.
+                self._addr_tab = self._addr_tab[
+                    self.block_idx : self.block_idx + self._ori_idx.shape[0], 0:tab_cols
+                ]
             self._addr_bar_flag = 9
             # Both AIVs share an intra-sync ID; AIV1 uses the fixed ID offset on the AIC side.
             self._addr_bar_sid = 9
@@ -1671,11 +1722,14 @@ class MqsmlaKernel:
         self._last_split_row = row_count - 1 if s2_end > 0 else dtypes.int64(-1)
         # Zero s2 boundaries encode whole-row execution. Compute tile bounds
         # directly; the global FD gate is read only after the main loop.
-        if const_expr(_addr_vec_mode() != "off"):
+        if const_expr(_addr_vec_mode() == "local"):
+            self._addr_precompute_local(row_count)
+            onchip_rewind(reset_sync_id=False)
+        elif const_expr(_addr_vec_mode() != "off"):
             # Publish the address table before the main loop consumes it.
             self._addr_start_batch = bn2_start
             self._addr_end_batch = bn2_end
-            if const_expr(_addr_vec_mode() == "pipe"):
+            if const_expr(_addr_vec_mode() in ("pipe", "pipe_rows")):
                 active_queries = dtypes.int64(-1)
                 if (
                     is_aic()
@@ -1720,8 +1774,8 @@ class MqsmlaKernel:
         # Drain the pipeline first: finalize_empty reuses its output buffers.
         blocks = self._ws.shape[0] // WS_BYTES_PER_CORE
         for m_idx in range(
-            self._ori_idx.shape[0] * self.block_idx // blocks,
-            self._ori_idx.shape[0] * (self.block_idx + 1) // blocks,
+            self._query_rows * self.block_idx // blocks,
+            self._query_rows * (self.block_idx + 1) // blocks,
         ):
             if self._n_end_rt(m_idx) == 0:
                 o_tile = self.output_view(m_idx)
@@ -1896,6 +1950,8 @@ class MqsmlaKernel:
         # ORI width is min(K1, topk_length), or K1 when lengths are absent.
         # Promote it to runtime Int64 even without lengths so FD tile-bound
         # predicates remain SSA values rather than Python booleans.
+        if const_expr(not self.has_ori):
+            return dtypes.int64(0)
         if const_expr(self._ori_topk_length is not None):
             return min(self._ori_idx.shape[1], _i64(self._ori_topk_length, m_idx))
         return dtypes.int64(self._ori_idx.shape[1])
@@ -1931,6 +1987,8 @@ class MqsmlaKernel:
     def _actual_n(self, m_idx: int, n):
         # Return the selected pool tile width for exponent and P masks.
         # The unselected conditional width does not describe an actual task.
+        if const_expr(not self.has_ori):
+            return self._cmp_valid(m_idx, n)
         ori_w = self._ori_width(m_idx, n)
         if const_expr(not self.has_cmp):
             return ori_w
@@ -2124,7 +2182,7 @@ class MqsmlaKernel:
         _consumer_vec = _mode != "off"
         tab = None
         if const_expr(_mode != "off"):
-            # Read the already-published PA row table directly in scalar gather.
+            # The vector prepass has already published the PA address table.
             tab = self._addr_tab
             col_base = self._avec_k1_tab if const_expr(is_cmp) else 0
         if const_expr(self.layout_kv != "PA_BBND"):
@@ -2143,46 +2201,70 @@ class MqsmlaKernel:
             sub_b = half * 4 + self.subblock_idx * 2 + chunk
             sub_row = sub_b * subtile_rows
             buf = tile_slice(raw_half, (_TILE_ROWS, _COMBINE_DIM), (chunk, 0))
-            bo_sp = 0 if batch is None else batch
-            # Clamp padded rows to the final token in the valid prefix before addressing.
-            last_off = n_rt - 1 - sub_row
-            addresses = []
-            pair_first = []
-            pair_gap = []
-            all_pairs_ok = dtypes.int32(1)
             if const_expr(_consumer_vec):
-                # Address rows are padded to 16 columns. Reuse the last valid
-                # chunk for the remaining masked chunks in a partial KV tile.
-                index_base = (
-                    col_base
-                    + s2_start
-                    + min(sub_row, ((n_rt - 1) // subtile_rows) * subtile_rows)
-                )
-                for pair in range_constexpr(subtile_rows // 2):
-                    pair_row_offset = pair * 2
-                    first_index_col = index_base + pair_row_offset
-                    second_index_col = first_index_col + 1
-                    first_row_index = _i64(tab, idx_row, first_index_col)
-                    second_row_index = _i64(tab, idx_row, second_index_col)
-                    # Both bounded and generic PA prepasses publish byte
-                    # offsets using the actual physical page stride.
-                    addr0, addr1 = first_row_index, second_row_index
-                    first = min(addr0, addr1)
-                    gap = max(addr0, addr1) - first
-                    addresses.append(addr0)
-                    addresses.append(addr1)
-                    pair_first.append(first)
-                    pair_gap.append(gap)
-                    all_pairs_ok = (
-                        (
-                            all_pairs_ok
-                            if gap - row_bytes <= _DMA_SOURCE_STRIDE_MAX_BYTES
-                            else dtypes.int32(0)
-                        )
-                        if gap >= row_bytes
-                        else dtypes.int32(0)
+                # Outside local mode, reuse the last valid 16-column chunk
+                # for the remaining masked chunks in a partial KV tile.
+                index_base = col_base + s2_start + sub_row
+                if const_expr(_mode != "local"):
+                    index_base = (
+                        col_base
+                        + s2_start
+                        + min(sub_row, ((n_rt - 1) // subtile_rows) * subtile_rows)
                     )
+                # Keep only two unrolled pairs live. An unrepresentable stride
+                # or duplicate falls back for its own pair, preserving the other DMAs.
+                for group in cannbotdsl.range(
+                    dtypes.int32(0),
+                    dtypes.int32(subtile_rows // 4),
+                    dtypes.int32(1),
+                    unroll=1,
+                ):
+                    for lane in range_constexpr(2):
+                        pair = group * 2 + lane
+                        addr0 = _i64(tab, idx_row, index_base + pair * 2)
+                        addr1 = _i64(tab, idx_row, index_base + pair * 2 + 1)
+                        if const_expr(_mode in ("local", "pipe_rows")):
+                            # Widen physical rows before converting them to bytes.
+                            addr0 = addr0 * row_bytes
+                            addr1 = addr1 * row_bytes
+                        first = min(addr0, addr1)
+                        second = max(addr0, addr1)
+                        stride = dtypes.uint64(second - first - row_bytes)
+                        # Deterministic level 3 preserves the caller's sparse order.
+                        if (
+                            stride <= _DMA_SOURCE_STRIDE_MAX_BYTES
+                            and self._batch_consistency == 0
+                        ):
+                            mem_copy(
+                                tile_slice(buf, (2, row_bytes), (pair, 0)),
+                                (
+                                    kv_bytes[first : first + row_bytes,].view(
+                                        1, row_bytes
+                                    ),
+                                    kv_bytes[second : second + row_bytes,].view(
+                                        1, row_bytes
+                                    ),
+                                ),
+                                copy_options(l2_cache_ctl=kv_l2_policy),
+                            )
+                        else:
+                            mem_copy(
+                                tile_slice(buf, (1, row_bytes), (pair * 2, 0)),
+                                kv_bytes[addr0 : addr0 + row_bytes,].view(1, row_bytes),
+                                copy_options(l2_cache_ctl=kv_l2_policy),
+                            )
+                            mem_copy(
+                                tile_slice(buf, (1, row_bytes), (pair * 2 + 1, 0)),
+                                kv_bytes[addr1 : addr1 + row_bytes,].view(1, row_bytes),
+                                copy_options(l2_cache_ctl=kv_l2_policy),
+                            )
             else:
+                bo_sp = 0 if batch is None else batch
+                last_off = n_rt - 1 - sub_row
+                addresses = []
+                pair_first = []
+                pair_gap = []
+                all_pairs_ok = dtypes.int32(1)
                 for pair in range_constexpr(subtile_rows // 2):
                     pair_row_offset = pair * 2
                     pos0 = s2_start + sub_row + min(pair_row_offset, last_off)
@@ -2216,34 +2298,36 @@ class MqsmlaKernel:
                         if gap >= row_bytes
                         else dtypes.int32(0)
                     )
-            # Deterministic level 3 requires sparse-index order, so disable pair sorting.
-            all_pairs_ok = (
-                dtypes.int32(0) if self._batch_consistency != 0 else all_pairs_ok
-            )
-            # Fill all 16 rows before publishing the slot. Reorder KV with inline scales;
-            # QK/PV share that order. Duplicate tail addresses use per-row copies.
-            if all_pairs_ok != 0:
-                for pair in range_constexpr(subtile_rows // 2):
-                    first = pair_first[pair]
-                    second = first + pair_gap[pair]
-                    dst = tile_slice(buf, (2, row_bytes), (pair, 0))
-                    mem_copy(
-                        dst,
-                        (
-                            kv_bytes[first : first + row_bytes,].view(1, row_bytes),
-                            kv_bytes[second : second + row_bytes,].view(1, row_bytes),
-                        ),
-                        copy_options(l2_cache_ctl=kv_l2_policy),
-                    )
-            else:
-                for pair_row_offset in range_constexpr(subtile_rows):
-                    addr = addresses[pair_row_offset]
-                    row = kv_bytes[addr : addr + row_bytes,].view(1, row_bytes)
-                    mem_copy(
-                        tile_slice(buf, (1, row_bytes), (pair_row_offset, 0)),
-                        row,
-                        copy_options(l2_cache_ctl=kv_l2_policy),
-                    )
+                # Deterministic level 3 requires sparse-index order, so disable pair sorting.
+                all_pairs_ok = (
+                    dtypes.int32(0) if self._batch_consistency != 0 else all_pairs_ok
+                )
+                # Fill all 16 rows before publishing the slot. Reorder KV with inline scales;
+                # QK/PV share that order. Duplicate tail addresses use per-row copies.
+                if all_pairs_ok != 0:
+                    for pair in range_constexpr(subtile_rows // 2):
+                        first = pair_first[pair]
+                        second = first + pair_gap[pair]
+                        dst = tile_slice(buf, (2, row_bytes), (pair, 0))
+                        mem_copy(
+                            dst,
+                            (
+                                kv_bytes[first : first + row_bytes,].view(1, row_bytes),
+                                kv_bytes[second : second + row_bytes,].view(
+                                    1, row_bytes
+                                ),
+                            ),
+                            copy_options(l2_cache_ctl=kv_l2_policy),
+                        )
+                else:
+                    for pair_row_offset in range_constexpr(subtile_rows):
+                        addr = addresses[pair_row_offset]
+                        row = kv_bytes[addr : addr + row_bytes,].view(1, row_bytes)
+                        mem_copy(
+                            tile_slice(buf, (1, row_bytes), (pair_row_offset, 0)),
+                            row,
+                            copy_options(l2_cache_ctl=kv_l2_policy),
+                        )
 
     @jit
     def antiquant_copy_batch(
@@ -2313,6 +2397,234 @@ class MqsmlaKernel:
             mask=mk,
         )
         rr.vstore(self._ch_addr_out, chunk * _ADDR_HALF, row, mk)
+
+    @jit
+    def _addr_load_local_group(self, batch, first, nr):
+        # 每组 query 不跨 batch；两侧索引、页表和长度由 MTE2 连续填充。
+        slot = self._addr_local_input
+        bt = from_tensor(slot, layout=make_layout((1, _ADDR_LOCAL_BT)))
+        _copy_addr_from_gm(
+            bt, self._pa_bt, batch * self._pa_bt.shape[1], self._pa_bt.shape[1]
+        )
+        sp = from_tensor(
+            slot,
+            layout=make_layout((1, _ADDR_LOCAL_ROWS * _ADDR_LOCAL_ORI_K)),
+            offset=_ADDR_LOCAL_ORI_INDEX_OFFSET,
+        )
+        _copy_addr_from_gm(sp, self._ori_idx, first * self._avec_k1, nr * self._avec_k1)
+        if const_expr(self._ori_topk_length is not None):
+            lens = from_tensor(
+                slot,
+                layout=make_layout((1, _ADDR_LOCAL_ROWS)),
+                offset=_ADDR_LOCAL_ORI_LENGTH_OFFSET,
+            )
+            mem_copy(
+                from_tensor(lens, layout=make_layout((1, nr))),
+                self._ori_topk_length[first : first + nr,].view(1, nr),
+            )
+        if const_expr(self.has_cmp):
+            bt = from_tensor(
+                slot,
+                layout=make_layout((1, _ADDR_LOCAL_BT)),
+                offset=_ADDR_LOCAL_BT * 4,
+            )
+            _copy_addr_from_gm(
+                bt,
+                self._pa_bt_cmp,
+                batch * self._pa_bt_cmp.shape[1],
+                self._pa_bt_cmp.shape[1],
+            )
+            sp = from_tensor(
+                slot,
+                layout=make_layout((1, _ADDR_LOCAL_ROWS * _ADDR_LOCAL_CMP_K)),
+                offset=_ADDR_LOCAL_CMP_INDEX_OFFSET,
+            )
+            _copy_addr_from_gm(
+                sp, self._cmp_idx, first * self._avec_k2, nr * self._avec_k2
+            )
+            if const_expr(self._cmp_topk_length is not None):
+                lens = from_tensor(
+                    slot,
+                    layout=make_layout((1, _ADDR_LOCAL_ROWS)),
+                    offset=_ADDR_LOCAL_CMP_LENGTH_OFFSET,
+                )
+                mem_copy(
+                    from_tensor(lens, layout=make_layout((1, nr))),
+                    self._cmp_topk_length[first : first + nr,].view(1, nr),
+                )
+
+    @jit
+    def _addr_compute_local_side(
+        self, sp, lens, bt, out, nr, kwidth, ktab, bs, tab_cols, col0, valid_rows
+    ):
+        # int32 索引 -> 页号 -> 物理行号，空行的 gather 掩码全关。
+        mask = rr.full_mask(elem_bits=32)
+        # 三种固定移位结果按页大小掩码合并，VF 内没有运行时分支。
+        page_size = rr.vdups(bs, dtypes.int32)
+        row_mask = rr.vadds(page_size, -1, mask=mask)
+        use64 = rr.veqs(page_size, 64, mask=mask)
+        use256 = rr.veqs(page_size, 256, mask=mask)
+        lane = rr.varange(0, dtypes.int32)
+        subtile_lane = rr.vbitwise_and(lane, rr.vdups(15, dtypes.int32), mask=mask)
+        # 每 AIV 生成各半 tile 内连续 32 列，MTE3 将紧凑 UB 输出散布回逻辑列。
+        own_lane = rr.vadd(
+            rr.vmuls(rr.vshr(lane, 5, mask=mask), 64, mask=mask),
+            rr.vbitwise_and(lane, rr.vdups(dtypes.int32(31), dtypes.int32), mask=mask),
+            mask=mask,
+        )
+        own_lane = rr.vadds(own_lane, dtypes.int32(self.subblock_idx) * 32, mask=mask)
+        for row in cannbotdsl.range(
+            dtypes.int32(0), dtypes.int32(nr), dtypes.int32(1), unroll=1
+        ):
+            active = rr.vgts(
+                rr.vdups(dtypes.int32(valid_rows) - row, dtypes.int32), 0, mask=mask
+            )
+            last = rr.vdups(dtypes.int32(kwidth - 1), dtypes.int32)
+            if const_expr(lens is not None):
+                width = rr.vload_broadcast(lens, row)
+                width = rr.vmins(width, kwidth, mask=mask)
+                active = rr.vgts(width, 0, mask=active)
+                last = rr.vadds(rr.vmaxs(width, 1, mask=mask), -1, mask=mask)
+            # Repeat the last valid 16-token subtile in fully masked regions.
+            # Distinct pairs can still use paired DMA; repeating one address
+            # would serialize every padded row through the scalar fallback.
+            last_subtile = rr.vbitwise_and(last, rr.vdups(-16, dtypes.int32), mask=mask)
+            repeat_col = rr.vadd(last_subtile, subtile_lane, mask=mask)
+            for chunk in cannbotdsl.range(
+                dtypes.int32(0), dtypes.int32(ktab // 128), dtypes.int32(1), unroll=1
+            ):
+                # 补齐完整 tile；每次生成本 AIV 的 32+32 列，尾列重复最后有效索引。
+                mk = mask
+                active_chunk = active
+                col = rr.vmin(
+                    rr.vadds(own_lane, chunk * 128, mask=mk), repeat_col, mask=mk
+                )
+                col = rr.vmin(col, last, mask=mk)
+                source_col = rr.vadds(col, row * kwidth, mask=mk)
+                idx = rr.vgather(
+                    sp, rr.vreinterpret(source_col, dtypes.uint32), mask=active_chunk
+                )
+                page = rr.vshr(idx, 7, mask=active_chunk)
+                page = rr.vselect(
+                    rr.vshr(idx, 6, mask=active_chunk), page, cond_mask=use64
+                )
+                page = rr.vselect(
+                    rr.vshr(idx, 8, mask=active_chunk), page, cond_mask=use256
+                )
+                physical_page = rr.vgather(
+                    bt, rr.vreinterpret(page, dtypes.uint32), mask=active_chunk
+                )
+                # 物理行 = 物理页号 * 页大小 + 页内偏移；全程 int32 精确计算。
+                in_page = rr.vbitwise_and(idx, row_mask, mask=active_chunk)
+                physical_base = rr.vmuls(physical_page, bs, mask=active_chunk)
+                physical_row = rr.vadd(physical_base, in_page, mask=active_chunk)
+                rr.vstore(out, row * tab_cols + col0 + chunk * 64, physical_row, mk)
+
+    @jit
+    def _addr_compute_local_group(self, slot, out, nr, first, batch):
+        valid_rows = nr
+        if self._has_seqused_q != 0:
+            valid_end = _i64(self._cu_q, 0, batch) + _i64(self._seqused_q, batch)
+            valid_rows = max(0, min(nr, valid_end - first))
+        bt1 = from_tensor(slot, layout=make_layout((1, _ADDR_LOCAL_BT)))
+        sp1 = from_tensor(
+            slot,
+            layout=make_layout((1, _ADDR_LOCAL_ROWS * _ADDR_LOCAL_ORI_K)),
+            offset=_ADDR_LOCAL_ORI_INDEX_OFFSET,
+        )
+        len1 = None
+        if const_expr(self._ori_topk_length is not None):
+            len1 = from_tensor(
+                slot,
+                layout=make_layout((1, _ADDR_LOCAL_ROWS)),
+                offset=_ADDR_LOCAL_ORI_LENGTH_OFFSET,
+            )
+        cols = (self._avec_k1_tab + (self._avec_k2_tab if self.has_cmp else 0)) // 2
+        if const_expr(self.has_cmp):
+            bt2 = from_tensor(
+                slot,
+                layout=make_layout((1, _ADDR_LOCAL_BT)),
+                offset=_ADDR_LOCAL_BT * 4,
+            )
+            sp2 = from_tensor(
+                slot,
+                layout=make_layout((1, _ADDR_LOCAL_ROWS * _ADDR_LOCAL_CMP_K)),
+                offset=_ADDR_LOCAL_CMP_INDEX_OFFSET,
+            )
+            len2 = None
+            if const_expr(self._cmp_topk_length is not None):
+                len2 = from_tensor(
+                    slot,
+                    layout=make_layout((1, _ADDR_LOCAL_ROWS)),
+                    offset=_ADDR_LOCAL_CMP_LENGTH_OFFSET,
+                )
+        nr = dtypes.int32(nr)
+        cols = dtypes.int32(cols)
+        kw1, kt1 = dtypes.int32(self._avec_k1), dtypes.int32(self._avec_k1_tab)
+        if const_expr(self.has_cmp):
+            kw2, kt2 = dtypes.int32(self._avec_k2), dtypes.int32(self._avec_k2_tab)
+        ori_bs = dtypes.int32(self._avec_bs_ori)
+        if const_expr(self.has_cmp):
+            cmp_bs = dtypes.int32(self._avec_bs_cmp)
+        with vf(mode="simd"):
+            self._addr_compute_local_side(
+                sp1,
+                len1,
+                bt1,
+                out,
+                nr,
+                kw1,
+                kt1,
+                ori_bs,
+                cols,
+                dtypes.int32(0),
+                valid_rows,
+            )
+            if const_expr(self.has_cmp):
+                self._addr_compute_local_side(
+                    sp2,
+                    len2,
+                    bt2,
+                    out,
+                    nr,
+                    kw2,
+                    kt2,
+                    cmp_bs,
+                    cols,
+                    kt1 // 2,
+                    valid_rows,
+                )
+
+    @jit
+    def _addr_precompute_local(self, m_count):
+        # 两个 AIV 写互不重叠的 32 列段；主体只读本 AIV 生成的列，无跨 AIV 消费。
+        cols = self._avec_k1_tab + (self._avec_k2_tab if self.has_cmp else 0)
+        batch = self._batch_of(self._m_start)
+        bound = self._bound_after(batch, dtypes.int64(self._b_rt))
+        current = dtypes.int64(0)
+        while current < m_count:
+            first = self._m_idx(current)
+            while first >= bound:
+                batch = batch + 1
+                bound = self._bound_after(batch, dtypes.int64(self._b_rt))
+            nr = min(_ADDR_LOCAL_ROWS, min(m_count - current, bound - first))
+            self._addr_load_local_group(batch, first, nr)
+            self._addr_compute_local_group(
+                self._addr_local_input, self._addr_local_output, nr, first, batch
+            )
+            # 一次 strided MTE3 将每 32 列落在完整逻辑行内，行列编号与 pipe 相同。
+            bursts = nr * cols // 64
+            flat = self._addr_tab.view(self._addr_tab.shape[0] * cols)
+            first_col = first * cols
+            dst = flat[first_col : first_col + nr * cols,].view(bursts, 64)
+            dst = dst[0:bursts, self.subblock_idx * 32 : self.subblock_idx * 32 + 32]
+            mem_copy(
+                dst,
+                from_tensor(self._addr_local_output, layout=make_layout((bursts, 32))),
+            )
+            current = current + nr
+        # 每个 AIV 仅消费自己的地址区，S 等待本地 MTE3 完成后才回收预处理存储。
+        vec_sync_all()
 
     @jit
     def _addr_load_group(self, batch, first, nr):
@@ -2407,17 +2719,21 @@ class MqsmlaKernel:
                 page_index = rr.vreinterpret(page, dtypes.uint32)
                 # 同一路径直接查 UB 页表，避免每组寄存器前缀和双路选择的额外指令。
                 physical_page = rr.vgather(bt, page_index, mask=active_chunk)
-                # 与 arch35 一致：真实页距独立于页内 token 大小。
                 in_page = rr.vbitwise_and(idx, row_mask, mask=active_chunk)
-                physical_base = rr.vmuls(
-                    physical_page, dtypes.int32(page_stride), mask=active_chunk
-                )
-                physical_row = rr.vadd(
-                    physical_base,
-                    rr.vmuls(in_page, row_bytes, mask=active_chunk),
-                    mask=active_chunk,
-                )
-                rr.vstore(out, row * tab_cols + col0 + chunk * 64, physical_row, mk)
+                if const_expr(_addr_vec_mode() == "pipe_rows"):
+                    # Contiguous PA can address the whole pool in INT32 rows.
+                    base = rr.vmuls(physical_page, bs, mask=active_chunk)
+                    address = rr.vadd(base, in_page, mask=active_chunk)
+                else:
+                    base = rr.vmuls(
+                        physical_page, dtypes.int32(page_stride), mask=active_chunk
+                    )
+                    address = rr.vadd(
+                        base,
+                        rr.vmuls(in_page, row_bytes, mask=active_chunk),
+                        mask=active_chunk,
+                    )
+                rr.vstore(out, row * tab_cols + col0 + chunk * 64, address, mk)
 
     @jit
     def _addr_compute_group(self, slot, out, nr, first, batch):
@@ -2447,11 +2763,11 @@ class MqsmlaKernel:
         if const_expr(self.has_cmp):
             kw2, _kt2 = dtypes.int32(self._avec_k2), dtypes.int32(self._avec_k2_tab)
         ori_bs = dtypes.int32(self._avec_bs_ori)
-        ori_chunks = dtypes.int32(self._avec_k1_tab // 64)
+        ori_chunks = dtypes.int32(self._avec_k1_tab // _ADDR_HALF)
         ori_page_scale = 4 if ori_bs == 64 else (2 if ori_bs == 128 else 1)
         if const_expr(self.has_cmp):
             cmp_bs = dtypes.int32(self._avec_bs_cmp)
-            cmp_chunks = dtypes.int32(self._avec_k2_tab // 64)
+            cmp_chunks = dtypes.int32(self._avec_k2_tab // _ADDR_HALF)
             cmp_page_scale = 4 if cmp_bs == 64 else (2 if cmp_bs == 128 else 1)
         with vf(mode="simd"):
             self._addr_compute_group_side(
@@ -2652,7 +2968,21 @@ class MqsmlaKernel:
         if const_expr(_addr_vec_mode() == "off"):
             batch = self._batch_of(m_idx)
 
-        if const_expr(not self.has_cmp):
+        if const_expr(not self.has_ori):
+            self.gather_batch(
+                raw_half,
+                half,
+                self._pa_phys_cmp,
+                self._pa_bt_cmp,
+                self._pa_cmp_bs_rt,
+                n * self.tile_n,
+                actual_n,
+                idx_tab=self._cmp_idx,
+                idx_row=m_idx,
+                batch=batch,
+                is_cmp=True,
+            )
+        elif const_expr(not self.has_cmp):
             self.gather_batch(
                 raw_half,
                 half,
@@ -2702,7 +3032,11 @@ class MqsmlaKernel:
     def stage_antiquant(self, n, ori_tiles, half, kv_lower_rows_l1, kv_upper_rows_l1):
         # 格式来自延迟 task；分支外选槽，保持每半块一次消费。
         raw_half = self.ch_batch_bytes.next_read()
-        if const_expr(self.has_cmp):
+        if const_expr(not self.has_ori):
+            self.antiquant_copy_batch(
+                raw_half, half, kv_lower_rows_l1, kv_upper_rows_l1, True
+            )
+        elif const_expr(self.has_cmp):
             if n >= ori_tiles:
                 self.antiquant_copy_batch(
                     raw_half, half, kv_lower_rows_l1, kv_upper_rows_l1, True
@@ -2928,14 +3262,14 @@ class MqsmlaKernel:
             return self._q.view(
                 self._q.shape[0] // self.tile_cube_m, self.tile_cube_m, self.tile_d
             )[self._m_idx(m_seq), None, None]
-        return self._q.view(self._ori_idx.shape[0], self.num_heads(), self.tile_d)[
+        return self._q.view(self._query_rows, self.num_heads(), self.tile_d)[
             self._m_idx(m_seq), None, None
         ]
 
     def output_view(self, m_idx):
         if const_expr(self.full_heads):
             return tile_slice(self._out, (self.tile_cube_m, self.tile_d), (m_idx, 0))
-        return self._out.view(self._ori_idx.shape[0], self.num_heads(), self.tile_d)[
+        return self._out.view(self._query_rows, self.num_heads(), self.tile_d)[
             m_idx, None, None
         ].view(self.num_heads(), self.tile_d)
 
@@ -2950,7 +3284,7 @@ class MqsmlaKernel:
             kv_lower_rows_l1, kv_upper_rows_l1 = self.next_kv(False)
             self.matmul_qk(job, kv_lower_rows_l1, kv_upper_rows_l1)
             active_rows = dtypes.int64(0)
-            if const_expr(_addr_vec_mode() == "pipe"):
+            if const_expr(_addr_vec_mode() in ("pipe", "pipe_rows")):
                 active_rows = self._pipe_active_queries
                 if active_rows < 0:
                     active_rows = dtypes.int64(0)
@@ -3218,8 +3552,20 @@ def _validate_inputs(
     TND padding produces zero O/LSE. A valid empty sparse row retains its
     sink/-inf LSE. BSND keeps its existing empty-row padding rule.
     """
-    if ori_kv is None:
-        raise ValueError("Invalid input: ori_kv is required")
+    has_ori = ori_kv is not None
+    if not has_ori and cmp_kv is None:
+        raise ValueError("Invalid input: at least one of ori_kv and cmp_kv is required")
+    if not has_ori and any(
+        value is not None
+        for value in (
+            ori_sparse_indices,
+            ori_block_table,
+            ori_topk_length,
+            cu_seqlens_ori_kv,
+            seqused_ori_kv,
+        )
+    ):
+        raise ValueError("Invalid input: ORI inputs require ori_kv")
     if layout_q not in ("TND", "BSND") or layout_kv not in ("PA_BBND", "TND", "BSND"):
         raise ValueError(
             "Invalid input: layout_q must be TND or BSND; "
@@ -3251,9 +3597,9 @@ def _validate_inputs(
         _validate_cu_seqlens(cu_seqlens_q, name="cu_seqlens_q")
         b = cu_seqlens_q.numel() - 1
     else:
-        b = q.shape[0]
         if cu_seqlens_q is not None:
-            _validate_cu_seqlens(cu_seqlens_q, name="cu_seqlens_q", batch=b)
+            raise ValueError("Invalid input: cu_seqlens_q is only supported for TND Q")
+        b = q.shape[0]
 
     if seqused_q is not None:
         if not isinstance(seqused_q, torch.Tensor):
@@ -3296,7 +3642,7 @@ def _validate_inputs(
     if has_cmp:
         if cmp_kv is None or cmp_sparse_indices is None:
             raise ValueError(
-                "ORI_CMP_SPARSE requires cmp_kv and cmp_sparse_indices together"
+                "Invalid input: cmp_kv and cmp_sparse_indices are required together"
             )
     elif (
         cmp_topk_length is not None
@@ -3316,9 +3662,9 @@ def _validate_inputs(
                 "Invalid input: kv_batch_strides requires TND KV and (ori_tokens, cmp_tokens)"
             )
         ori_batch_stride, cmp_batch_stride = kv_batch_strides
-        required = (
-            (ori_batch_stride, cmp_batch_stride) if has_cmp else (ori_batch_stride,)
-        )
+        required = (ori_batch_stride,) if has_ori else ()
+        if has_cmp:
+            required += (cmp_batch_stride,)
         if any(
             isinstance(value, bool) or not isinstance(value, int) or value <= 0
             for value in required
@@ -3330,21 +3676,28 @@ def _validate_inputs(
             raise ValueError(
                 "Invalid input: absent CMP requires kv_batch_strides=(ori_tokens, None)"
             )
+        if not has_ori and ori_batch_stride is not None:
+            raise ValueError(
+                "Invalid input: absent ORI requires kv_batch_strides=(None, cmp_tokens)"
+            )
 
-    _validate_kv_side(
-        ori_kv,
-        ori_block_table,
-        cu_seqlens_ori_kv,
-        name="ori_kv",
-        row_bytes=KV_ROW_BYTES_ORI,
-        batch=b,
-        layout=layout_kv,
-        batch_stride=ori_batch_stride,
-    )
-    _validate_indices(
-        ori_sparse_indices, name="ori_sparse_indices", query_shape=query_shape
-    )
-    _validate_lengths(ori_topk_length, name="ori_topk_length", query_shape=query_shape)
+    if has_ori:
+        _validate_kv_side(
+            ori_kv,
+            ori_block_table,
+            cu_seqlens_ori_kv,
+            name="ori_kv",
+            row_bytes=KV_ROW_BYTES_ORI,
+            batch=b,
+            layout=layout_kv,
+            batch_stride=ori_batch_stride,
+        )
+        _validate_indices(
+            ori_sparse_indices, name="ori_sparse_indices", query_shape=query_shape
+        )
+        _validate_lengths(
+            ori_topk_length, name="ori_topk_length", query_shape=query_shape
+        )
 
     if has_cmp:
         _validate_kv_side(
@@ -3376,8 +3729,8 @@ def _validate_inputs(
     if metadata is None:
         raise ValueError(
             "Invalid input: metadata is required and is never synthesized: generate it with "
-            "mixed_quant_sparse_flash_mla_metadata(ori_topk_length, cmp_topk_length, "
-            "num_heads_q=q.shape[-2], num_heads_kv=1, head_dim=512, quant_mode=1, has_cmp_kv=...) and pass "
+            "mixed_quant_sparse_flash_mla_metadata with quant_mode=1 and "
+            "has_ori_kv/has_cmp_kv matching the supplied KV pools, then pass "
             "the result in (two-stage call)"
         )
     if not isinstance(metadata, torch.Tensor):
@@ -3599,9 +3952,11 @@ def _run_mqsmla(
         q_flat = q_gm.view(m_rows, D)
     out_flat = out_gm.view(m_rows, D)
     ori_pool = ori_kv_gm
-    ori_idx_flat = ori_idx_gm.view(
-        ori_idx_gm.shape[0] * ori_idx_gm.shape[1], ori_idx_gm.shape[2]
-    )
+    ori_idx_flat = None
+    if const_expr(ori_idx_gm is not None):
+        ori_idx_flat = ori_idx_gm.view(
+            ori_idx_gm.shape[0] * ori_idx_gm.shape[1], ori_idx_gm.shape[2]
+        )
     ori_len_flat = None
     if const_expr(ori_len_gm is not None):
         ori_len_flat = ori_len_gm.view(ori_len_gm.shape[0] * ori_len_gm.shape[1])
@@ -3630,6 +3985,7 @@ def _run_mqsmla(
         has_cmp=(cmp_kv_gm is not None),
         layout_kv=layout_kv,
         full_heads=(head_bucket == 64),
+        has_ori=(ori_kv_gm is not None),
     )
     # Each core has two FD staging slots; workspace capacity determines the dynamic launch grid.
     blocks = workspace_gm.shape[0] // WS_BYTES_PER_CORE
@@ -3670,6 +4026,44 @@ def _select_addr_mode(
     num_heads=64,
 ):
     """Select staging and address units; K/page widths remain dynamic in AOT."""
+    if ori_kv is None:
+        return "off"
+    # The local prepass avoids an AIC/AIV relay and supports wider page
+    # tables and physical pools than the byte-addressed compact path.
+    local_fits = layout_kv == "PA_BBND" and num_heads == 64
+    for kv, bt, idx, limit in (
+        (ori_kv, ori_bt, ori_idx, _ADDR_LOCAL_ORI_K),
+        (cmp_kv, cmp_bt, cmp_idx, _ADDR_LOCAL_CMP_K),
+    ):
+        if kv is not None:
+            local_fits = local_fits and (
+                kv.shape[1] in (64, 128, 256)
+                and kv.stride(0) == kv.shape[1] * kv.shape[-1]
+                and kv.shape[0] * kv.shape[1] <= (1 << 31) - 1
+                and bt is not None
+                and bt.shape[1] <= _ADDR_LOCAL_BT
+                and idx.shape[2] <= limit
+            )
+    # Keep batched prefetch for long queries, including short unaligned K.
+    # The address workspace pads each side up to a full 64-column vector.
+    if (
+        local_fits
+        and ori_idx.shape[0] > _ADDR_LOCAL_MAX_ROWS
+        and ori_idx.shape[2] <= _ADDR_PIPE_ORI_K
+        and (cmp_kv is None or cmp_idx.shape[2] <= _ADDR_PIPE_CMP_K)
+    ):
+        if _addr_vec_eligible(ori_kv, ori_bt, ori_idx, cmp_kv, cmp_bt, cmp_idx):
+            return "pipe"
+        return "pipe_rows"
+    if local_fits and (
+        ori_idx.shape[0] <= _ADDR_LOCAL_MAX_ROWS
+        or ori_idx.shape[2] != _ADDR_PIPE_ORI_K
+        or (cmp_kv is not None and cmp_idx.shape[2] != _ADDR_PIPE_CMP_K)
+        or ori_bt.shape[1] > _ADDR_COMPACT_BT
+        or (cmp_kv is not None and cmp_bt.shape[1] > _ADDR_COMPACT_BT)
+        or not _addr_vec_eligible(ori_kv, ori_bt, ori_idx, cmp_kv, cmp_bt, cmp_idx)
+    ):
+        return "local"
     if not _addr_vec_eligible(ori_kv, ori_bt, ori_idx, cmp_kv, cmp_bt, cmp_idx):
         return "off"
     compact = (
@@ -3710,6 +4104,15 @@ def _get_compiled_kernel(
     num_heads=64,
 ):
     """Cache dynamic executables by optional inputs and address representation."""
+    if ori_kv is None:
+        return _get_compiled_variant(
+            True,
+            lse is not None,
+            "off",
+            layout_kv,
+            head_bucket=_head_bucket(num_heads),
+            has_ori=False,
+        )
     addr_mode = _select_addr_mode(
         ori_kv,
         ori_block_table,
@@ -3752,16 +4155,21 @@ def _get_compiled_variant(
     layout_kv="PA_BBND",
     pa_fast=False,
     head_bucket=64,
+    has_ori=True,
 ):
     """Share compilation, caching and address-mode lifetime with AOT export."""
-    if addr_mode not in ("pre", "off", "arena", "pipe"):
+    if addr_mode not in ("pre", "off", "arena", "pipe", "pipe_rows", "local"):
         raise ValueError(f"Unsupported address mode: {addr_mode}")
     if pa_fast and layout_kv != "PA_BBND":
         raise ValueError("PA specialization cannot be used for a dense KV layout")
-    if addr_mode == "pipe" and (not pa_fast or head_bucket != 64):
-        raise ValueError("Batched PA addressing requires full heads and compact PA")
+    if addr_mode in ("pipe", "pipe_rows") and (
+        layout_kv != "PA_BBND" or head_bucket != 64
+    ):
+        raise ValueError("Batched PA addressing requires full heads and PA layout")
     if head_bucket not in (32, 63, 64):
         raise ValueError(f"Unsupported head bucket: {head_bucket}")
+    if not has_ori and (not has_cmp or addr_mode != "off" or pa_fast):
+        raise ValueError("CMP-only kernels use the direct addressing variant")
     key = (
         has_cmp,
         has_lse,
@@ -3769,6 +4177,7 @@ def _get_compiled_variant(
         layout_kv,
         pa_fast,
         head_bucket,
+        has_ori,
     )
     with _COMPILE_LOCK:
         global _ADDR_VEC_OVERRIDE, _PA_FAST_OVERRIDE
@@ -3787,6 +4196,7 @@ def _compile_mqsmla(
     layout_kv="PA_BBND",
     pa_fast=False,
     head_bucket=64,
+    has_ori=True,
 ):
     """Declare the dynamic signature; the caller holds the compilation lock."""
     rows = Dim("T1", min=1)
@@ -3813,8 +4223,24 @@ def _compile_mqsmla(
         cmp_block_size = Dim("CMP_S2", min=1)
     ori_table_width = Dim("ORI_BT", min=1)
     cmp_table_width = Dim("CMP_BT", min=1)
-    ori_slots = 128 if pa_fast else Dim("K1", min=1)
-    cmp_slots = 512 if pa_fast else Dim("K2", min=1)
+    ori_slots = (
+        128
+        if pa_fast
+        else (
+            Dim("K1", min=1, max=_ADDR_PIPE_ORI_K)
+            if addr_mode in ("pipe", "pipe_rows")
+            else Dim("K1", min=1)
+        )
+    )
+    cmp_slots = (
+        512
+        if pa_fast
+        else (
+            Dim("K2", min=1, max=_ADDR_PIPE_CMP_K)
+            if addr_mode in ("pipe", "pipe_rows")
+            else Dim("K2", min=1)
+        )
+    )
     ori_stride = Dim("ORI_STRIDE", min=1)
     cmp_stride = Dim("CMP_STRIDE", min=1)
     # Divisibility lets the kernel recover its runtime launch grid.
@@ -3838,10 +4264,14 @@ def _compile_mqsmla(
             ),
             dtypes.uint8,
             stride=(ori_stride, KV_ROW_BYTES_ORI, KV_ROW_BYTES_ORI, 1),
-        ),
-        TensorSpec((rows, N2, ori_slots), i32),
-        TensorSpec((batch, ori_table_width), i32) if layout_kv == "PA_BBND" else None,
-        TensorSpec((rows, N2), i32),
+        )
+        if has_ori
+        else None,
+        TensorSpec((rows, N2, ori_slots), i32) if has_ori else None,
+        TensorSpec((batch, ori_table_width), i32)
+        if has_ori and layout_kv == "PA_BBND"
+        else None,
+        TensorSpec((rows, N2), i32) if has_ori else None,
         TensorSpec((rows, heads, D), dtypes.bfloat16),
         TensorSpec((heads,), dtypes.float32),
         TensorSpec((query_boundaries,), i32),
@@ -3875,7 +4305,9 @@ def _compile_mqsmla(
         TensorSpec((Dim(f"ADDR_WS_BYTES_{addr_mode.upper()}", min=1),), dtypes.uint8)
         if addr_mode != "off"
         else None,
-        TensorSpec((query_boundaries,), i32) if layout_kv == "TND" else None,
+        TensorSpec((query_boundaries,), i32)
+        if layout_kv == "TND" and has_ori
+        else None,
         TensorSpec((query_boundaries,), i32)
         if layout_kv == "TND" and has_cmp
         else None,
@@ -3942,6 +4374,13 @@ def _mixed_quant_sparse_flash_mla_out(
         layout_kv=layout_kv,
         kv_batch_strides=kv_batch_strides,
     )
+    scale = (
+        float(softmax_scale)
+        if softmax_scale is not None
+        else 1.0 / math.sqrt(q.shape[-1])
+    )
+    if not -_FLOAT32_MAX <= scale <= _FLOAT32_MAX:
+        raise ValueError("Invalid input: softmax_scale must be finite as float32")
     n1 = q.shape[-2]
     for name, tensor, shape, dtype in (
         ("out", out, tuple(q.shape), torch.bfloat16),
@@ -3971,21 +4410,21 @@ def _mixed_quant_sparse_flash_mla_out(
             )
     # BSND storage is already in flattened query order. Views do not copy Q/O,
     # indices or LSE. Mask padding on device, using the same rule as metadata.
+    has_ori, has_cmp = ori_kv is not None, cmp_kv is not None
     if layout_q == "BSND":
         batch, seq = q.shape[:2]
-        if cu_seqlens_q is None:
-            cu_seqlens_q = _bsnd_query_spans(batch, seq, q.device)
-        for_cmp = cmp_kv is not None
+        cu_seqlens_q = _bsnd_query_spans(batch, seq, q.device)
         if seqused_q is not None:
-            if ori_topk_length is None:
+            if has_ori and ori_topk_length is None:
                 ori_topk_length = _default_topk_length(ori_sparse_indices)
-            if for_cmp and cmp_topk_length is None:
+            if has_cmp and cmp_topk_length is None:
                 cmp_topk_length = _default_topk_length(cmp_sparse_indices)
         ori_topk_length = _flatten_bsnd_lengths(ori_topk_length, seqused_q)
         cmp_topk_length = _flatten_bsnd_lengths(cmp_topk_length, seqused_q)
         q, out = q.view(batch * seq, n1, D), out.view(batch * seq, n1, D)
-        ori_sparse_indices = ori_sparse_indices.view(batch * seq, N2, -1)
-        if for_cmp:
+        if has_ori:
+            ori_sparse_indices = ori_sparse_indices.view(batch * seq, N2, -1)
+        if has_cmp:
             cmp_sparse_indices = cmp_sparse_indices.view(batch * seq, N2, -1)
         if return_softmax_lse:
             lse = lse.view(N2, batch * seq, n1)
@@ -3994,20 +4433,22 @@ def _mixed_quant_sparse_flash_mla_out(
         # Uniform physical batch spans are a zero-copy BSND view. No prefix
         # tensor, page table or device operation is needed for KV addressing.
         batch = cu_seqlens_q.numel() - 1
-        ori_kv = ori_kv.view(batch, kv_batch_strides[0], N2, KV_ROW_BYTES_ORI)
-        if cmp_kv is not None:
+        if has_ori:
+            ori_kv = ori_kv.view(batch, kv_batch_strides[0], N2, KV_ROW_BYTES_ORI)
+        if has_cmp:
             cmp_kv = cmp_kv.view(batch, kv_batch_strides[1], N2, KV_ROW_BYTES_CMP)
         kernel_layout_kv = "BSND"
     elif layout_kv == "TND":
-        ori_kv = ori_kv.view(ori_kv.shape[0], 1, N2, KV_ROW_BYTES_ORI)
-        if cmp_kv is not None:
+        if has_ori:
+            ori_kv = ori_kv.view(ori_kv.shape[0], 1, N2, KV_ROW_BYTES_ORI)
+        if has_cmp:
             cmp_kv = cmp_kv.view(cmp_kv.shape[0], 1, N2, KV_ROW_BYTES_CMP)
     # Missing lengths mean all K columns are active. Reuse immutable default
     # inputs so present/missing lengths share a signature and the hot device
     # path does not gain a per-query presence branch or a repeated fill op.
-    if ori_topk_length is None:
+    if has_ori and ori_topk_length is None:
         ori_topk_length = _default_topk_length(ori_sparse_indices)
-    if cmp_kv is not None and cmp_topk_length is None:
+    if has_cmp and cmp_topk_length is None:
         cmp_topk_length = _default_topk_length(cmp_sparse_indices)
     # A -inf sink contributes zero softmax mass. Supplying the immutable
     # sentinel lets provided/absent sinks use the same compiled signature.
@@ -4026,10 +4467,19 @@ def _mixed_quant_sparse_flash_mla_out(
         n1,
     )
     if addr_mode != "off":
-        columns = _addr_tab_w(ori_sparse_indices.shape[2])
+        if addr_mode == "local":
+            tab_width = _addr_local_tab_w
+        elif addr_mode in ("pipe", "pipe_rows"):
+            tab_width = _addr_pipe_tab_w
+        else:
+            tab_width = _addr_tab_w
+        columns = tab_width(ori_sparse_indices.shape[2])
         if cmp_kv is not None:
-            columns += _addr_tab_w(cmp_sparse_indices.shape[2])
-        addr_bytes = q.shape[0] * columns * 4
+            columns += tab_width(cmp_sparse_indices.shape[2])
+        rows = q.shape[0]
+        if addr_mode in ("local", "pipe_rows"):
+            rows += _get_cube_core_num(q.device)
+        addr_bytes = rows * columns * 4
     # Allocate FD staging and the address table together.
     workspace_full = construct_workspace(metadata, addr_bytes)
     if addr_bytes:
@@ -4067,11 +4517,6 @@ def _mixed_quant_sparse_flash_mla_out(
     )
     # AOT fixes absent Tensor parameters at compile time and removes them from
     # the runtime signature. Remaining Tensor arguments keep their order.
-    scale = (
-        float(softmax_scale)
-        if softmax_scale is not None
-        else 1.0 / math.sqrt(q.shape[-1])
-    )
     batch_consistency = 1 if _batch_consistency_enabled() else 0
     compiled(
         *(tensor for tensor in tensors if tensor is not None),
@@ -4079,9 +4524,13 @@ def _mixed_quant_sparse_flash_mla_out(
         batch_consistency,
         *([addr_ws] if addr_ws is not None else []),
         *(
-            [cu_seqlens_ori_kv] + ([cu_seqlens_cmp_kv] if cmp_kv is not None else [])
+            (
+                prefix
+                for prefix in (cu_seqlens_ori_kv, cu_seqlens_cmp_kv)
+                if prefix is not None
+            )
             if kernel_layout_kv == "TND"
-            else []
+            else ()
         ),
         # AOT fixes optional Tensor presence at compile time. Keep one Tensor
         # slot and mirror arch35's runtime hasActualSeqQlen flag instead.
@@ -4127,7 +4576,8 @@ def mixed_quant_sparse_flash_mla(
 ):
     """ops-transformer parameter/return interface, retaining mixed FP8/FP4 KV.
 
-    KV encoding is mixed FP8/FP4; metadata comes from the existing library operator.
+    ORI uses FP8 and CMP uses FP4. Either pool may be omitted. Generate
+    metadata with has_ori_kv and has_cmp_kv matching the supplied pools.
     Non-default masks and non-sparse modes are rejected, not silently ignored.
     Explicit sparse indices determine KV selection, so cmp_ratio is ignored.
     """
@@ -4148,13 +4598,12 @@ def mixed_quant_sparse_flash_mla(
         raise NotImplementedError("Only topk_value_mode=1 is supported")
     if not isinstance(q, torch.Tensor):
         raise ValueError("q must be a Tensor")
-    if not isinstance(metadata, torch.Tensor) or metadata.numel() != 2048:
-        raise ValueError(
-            "metadata must be the int32[2048] result of the library metadata operator"
-        )
     layout_q, layout_kv = str(layout_q).upper(), str(layout_kv).upper()
     if layout_q not in ("BSND", "TND"):
         raise ValueError("layout_q must be BSND or TND")
+    q_rank = _TENSOR_RANK_3D if layout_q == "TND" else _TENSOR_RANK_4D
+    if q.dim() != q_rank:
+        raise ValueError(f"Invalid input: q must have rank {q_rank} for {layout_q}")
     out = torch.empty_like(q)
     lse_shape = (
         (1, q.shape[0], q.shape[-2])
@@ -4173,7 +4622,7 @@ def mixed_quant_sparse_flash_mla(
         cmp_sparse_indices=cmp_sparse_indices,
         ori_block_table=ori_block_table,
         cmp_block_table=cmp_block_table,
-        cu_seqlens_q=None if layout_q == "BSND" else cu_seqlens_q,
+        cu_seqlens_q=cu_seqlens_q,
         cu_seqlens_ori_kv=cu_seqlens_ori_kv,
         cu_seqlens_cmp_kv=cu_seqlens_cmp_kv,
         seqused_q=seqused_q,
@@ -4182,7 +4631,7 @@ def mixed_quant_sparse_flash_mla(
         ori_topk_length=ori_topk_length,
         cmp_topk_length=cmp_topk_length,
         sinks=sinks,
-        metadata=metadata[:MQSMLA_METADATA_TOTAL_SIZE],
+        metadata=metadata,
         softmax_scale=softmax_scale,
         layout_q=layout_q,
         layout_kv=layout_kv,
@@ -4209,12 +4658,25 @@ def _variant_calls():
                         dict(layout_kv="PA_BBND", pa_fast=True, **options),
                     )
             if head_bucket == 64:
+                yield (*args, "pipe"), dict(layout_kv="PA_BBND", **options)
+                yield (*args, "pipe_rows"), dict(layout_kv="PA_BBND", **options)
+                yield (*args, "local"), dict(layout_kv="PA_BBND", **options)
+                yield (
+                    (*args, "local"),
+                    dict(layout_kv="PA_BBND", pa_fast=True, **options),
+                )
                 yield (
                     (*args, "pipe"),
                     dict(layout_kv="PA_BBND", pa_fast=True, **options),
                 )
             for layout_kv in ("TND", "BSND"):
                 yield (*args, "off"), dict(layout_kv=layout_kv, **options)
+            if has_cmp:
+                for layout_kv in ("PA_BBND", "TND", "BSND"):
+                    yield (
+                        (*args, "off"),
+                        dict(layout_kv=layout_kv, has_ori=False, **options),
+                    )
 
 
 @aot.export("mixed_quant_sparse_flash_mla_dsl")
