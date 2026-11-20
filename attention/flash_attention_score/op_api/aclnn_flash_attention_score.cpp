@@ -490,6 +490,61 @@ static aclnnStatus InputDtypeCheck(const aclTensor* query, const aclTensor* key,
     }
     return ACLNN_SUCCESS;
 }
+// The arch92 tiling (V121) shares the arch35 regbase checks without overrides, so both platforms reject the
+// same inputs in the tiling layer; arch22 instead accepts any sparseMode when no attenMask is provided, so
+// these wrapper checks stay off arch22 and it keeps its legacy tiling-side behaviour and error codes.
+static bool IsArch35OrArch92Platform()
+{
+    const auto npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
+    return npuArch == NpuArch::DAV_3510 || npuArch == NpuArch::DAV_9201;
+}
+
+// Negative or undocumented attribute values keep the historical silent-default handling; only the sparse
+// modes that always failed in the tiling layer are rejected here with the documented parameter error.
+static aclnnStatus CheckV4SparseMode(int64_t sparseMode, const char* inputLayout)
+{
+    if (!IsArch35OrArch92Platform()) {
+        return ACLNN_SUCCESS;
+    }
+    // AnalysisAxis accepts any case for the layout string, so the TND check must be case-insensitive too.
+    std::string layoutStr(inputLayout);
+    for (auto& c : layoutStr) {
+        c = static_cast<char>(toupper(c));
+    }
+    const bool isTnd = layoutStr == "TND";
+    const int64_t maxSparseMode = isTnd ? 8 : 6;
+    if (sparseMode > maxSparseMode) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            op::internal::GetLogApiInfo().c_str(), "sparse_mode", std::to_string(sparseMode).c_str(),
+            "The value of sparse_mode must be within the range [0, 8] for the TND layout and [0, 6] for other layouts");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+// Keep the V4 dtype checks aligned with the documented dtypes and the existing checks on other platforms.
+static aclnnStatus CheckV4Dtypes(const aclTensor* query, const aclTensor* attenMask)
+{
+    if (!IsArch35OrArch92Platform()) {
+        return ACLNN_SUCCESS;
+    }
+    const auto qDtype = query->GetDataType();
+    if (qDtype != op::DataType::DT_FLOAT && qDtype != op::DataType::DT_FLOAT16 && qDtype != op::DataType::DT_BF16) {
+        std::string dtypeStr = op::ToString(DataType(qDtype)).GetString();
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+            op::internal::GetLogApiInfo().c_str(), "query, key and value", dtypeStr.c_str(),
+            "The dtypes of input query, key and value must be within the range {FLOAT, FLOAT16, BF16}");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (attenMask != nullptr && attenMask->GetDataType() != op::DataType::DT_BOOL &&
+        attenMask->GetDataType() != op::DataType::DT_UINT8) {
+        std::string maskDtypeStr = op::ToString(DataType(attenMask->GetDataType())).GetString();
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(op::internal::GetLogApiInfo().c_str(), "atten_mask", maskDtypeStr.c_str(),
+                                              "The dtype of input atten_mask must be BOOL or UINT8");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
 
 static aclnnStatus InputDtypeCheckQuant(const aclTensor* query, const aclTensor* key, const aclTensor* value,
                                         const aclTensor* attentionOut)
@@ -1728,9 +1783,11 @@ aclnnStatus aclnnFlashAttentionScoreV4GetWorkspaceSize(
         uniqueExecutor.ReleaseTo(executor);
         return ACLNN_SUCCESS;
     }
+    CHECK_RET(CheckV4SparseMode(sparseMode, inputLayout) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(
         InputDtypeCheck(query, key, value, attentionOutOut, realShiftOptional, pseType, sinkOptional) == ACLNN_SUCCESS,
         ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckV4Dtypes(query, attenMaskOptional) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     FaShapeInfo shapeInfo;
     CHECK_RET(AnalysisInput(query, key, value, inputLayout, headNum, shapeInfo) == ACLNN_SUCCESS,
               ACLNN_ERR_PARAM_INVALID);

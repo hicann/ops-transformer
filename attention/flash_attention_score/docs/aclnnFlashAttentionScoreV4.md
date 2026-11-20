@@ -377,7 +377,7 @@ aclnnStatus aclnnFlashAttentionScoreV4(
         <td>innerPrecise</td>
         <td>输入</td>
         <td>Host侧的int64_t。</td>
-        <td>配置为2时开启无效行处理，非必要不建议配置。</td>
+        <td>配置为2时开启无效行处理，非必要不建议配置。其他取值按默认模式处理。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -387,7 +387,7 @@ aclnnStatus aclnnFlashAttentionScoreV4(
         <td>sparseMode</td>
         <td>输入</td>
         <td>表示sparse的模式。</td>
-        <td>支持配置值为0、1、2、3、4、5、6。</td>
+        <td>支持配置值为0、1、2、3、4、5、6，TND布局下另支持7、8。非TND布局下取值为7、8及大于8的值、TND布局下大于8的值，在Ascend 950PR&950DT系列产品上返回161002；负值按默认模式（不压缩）处理。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -533,7 +533,7 @@ aclnnStatus aclnnFlashAttentionScoreV4(
     <tr>
       <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
       <td rowspan="1">161002</td>
-      <td>softmaxMaxOut、softmaxSumOut、attentionOutOut不全为空时，参数不满足校验要求，例如：query、key、value的数据类型不一致；提供的realShiftOptional在pseType为2或3时不是FLOAT32，或在其他pseType下与attentionOutOut的数据类型不同；或pseType不为2、3时，提供的sinkOptional的数据类型不是FLOAT32。</td>
+      <td>softmaxMaxOut、softmaxSumOut、attentionOutOut不全为空时，参数不满足校验要求，例如：query、key、value的数据类型不一致或不支持；提供的realShiftOptional在pseType为2或3时不是FLOAT32，或在其他pseType下与attentionOutOut的数据类型不同；或pseType不为2、3时，提供的sinkOptional的数据类型不是FLOAT32。Ascend 950PR&950DT系列产品上还包括：sparseMode超出当前布局允许的范围；attenMaskOptional的数据类型不符合要求。</td>
     </tr>
   </tbody>
   </table>

@@ -379,7 +379,7 @@ aclnnStatus aclnnFlashAttentionScoreV4(
         <td>innerPrecise</td>
         <td>Input</td>
         <td>int64_t on the host.</td>
-        <td>Enables invalid row handling when set to 2. Do not set it unless necessary.</td>
+        <td>Setting it to 2 enables invalid row handling and is not recommended unless necessary. Other values are handled as the default mode.</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -389,7 +389,7 @@ aclnnStatus aclnnFlashAttentionScoreV4(
         <td>sparseMode</td>
         <td>Input</td>
         <td>Specifies the sparse mode.</td>
-        <td>Supported values are 0, 1, 2, 3, 4, 5, and 6.</td>
+        <td>Supported values are 0, 1, 2, 3, 4, 5, and 6; values 7 and 8 are also supported for the TND layout. Values 7 and 8 and values greater than 8 for non-TND layouts, and values greater than 8 for the TND layout, return 161002 on Ascend 950PR&950DT series products; negative values are handled as the default (no compression) mode.</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -525,7 +525,7 @@ aclnnStatus aclnnFlashAttentionScoreV4(
     <tr>
       <td rowspan="1">ACLNN_ERR_PARAM_INVALID</td>
       <td rowspan="1">161002</td>
-      <td>When softmaxMaxOut, softmaxSumOut, and attentionOutOut are not all empty, parameters fail validation, for example: query, key, and value have different data types; realShiftOptional, when provided, is not FLOAT32 if pseType is 2 or 3, or has a different data type from attentionOutOut for other pseType values; or sinkOptional, when provided and pseType is neither 2 nor 3, is not FLOAT32.</td>
+      <td>When softmaxMaxOut, softmaxSumOut, and attentionOutOut are not all empty, parameters fail validation, for example: query, key, and value have different or unsupported data types; realShiftOptional, when provided, is not FLOAT32 if pseType is 2 or 3, or has a different data type from attentionOutOut for other pseType values; or sinkOptional, when provided and pseType is neither 2 nor 3, is not FLOAT32. On Ascend 950PR&950DT series products this also includes: sparseMode is outside the range allowed by the layout; attenMaskOptional has an invalid data type.</td>
     </tr>
   </tbody>
   </table>
