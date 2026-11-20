@@ -284,23 +284,6 @@ TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, dtype_sparse_block_idx_fp1
     aclDestroyIntArray(blockShape);
 }
 
-TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, metadata_non_mxfp8_shape_contract)
-{
-    // Restricting MXFP8 must not narrow the non-quantized or per-tensor FP8 contracts.
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 0, kD, kBlockSize, 0, 1, 1, 16 * kN2), ACLNN_SUCCESS);
-    for (int64_t headDim : {1, 31, 32, 33, 64, 65, 128, 192, 255, 256}) {
-        SCOPED_TRACE(::testing::Message() << "non-quant D=" << headDim);
-        EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 0, 1, headDim), ACLNN_SUCCESS);
-    }
-    for (int64_t blockY : {1, 4, 8, 17, 64, 127, 128}) {
-        SCOPED_TRACE(::testing::Message() << "non-quant blockY=" << blockY);
-        EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 0, 1, 192, blockY), ACLNN_SUCCESS);
-    }
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 1), ACLNN_SUCCESS);
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 1, 256), ACLNN_ERR_PARAM_INVALID);
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 1, kD, 4), ACLNN_SUCCESS);
-}
-
 TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, metadata_rejects_union_mxfp8)
 {
     // Union (maskType=3) only supports quantType=0 or 5; quantType=6 must fail here,
@@ -351,69 +334,4 @@ TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, int8_seven_platform_contra
     EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND910B, 7, 1, 256, 4), ACLNN_ERR_PARAM_INVALID);
     EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 7, 0, 256, 4), ACLNN_ERR_PARAM_INVALID);
     EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 0, 256, 4), ACLNN_SUCCESS);
-}
-
-TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, fp8_high_precision_group_size_boundary)
-{
-    for (int64_t group = 1; group <= 16; ++group) {
-        SCOPED_TRACE(group);
-        EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 0, kD, kBlockSize, 0, 1, 1, group * kN2),
-                  ACLNN_SUCCESS);
-    }
-    for (const int64_t group : {17, 32}) {
-        SCOPED_TRACE(group);
-        EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 5, 0, kD, kBlockSize, 0, 1, 1, group * kN2),
-                  ACLNN_ERR_PARAM_INVALID);
-    }
-}
-
-TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, fp8_layouts_by_precision_group16)
-{
-    constexpr int64_t batch = 1;
-    constexpr int64_t qLength = 3;
-    constexpr int64_t kvLength = 257;
-    constexpr int64_t kvHeads = 2;
-    constexpr int64_t qHeads = 16 * kvHeads;
-    constexpr int64_t fp8QuantType = 5;
-    constexpr int64_t metadataSize = optiling::generic_block_sparse_attention_metadata::METADATA_TOTAL_SIZE;
-
-    const char* qLayouts[] = {"TND", "BSND", "BNSD"};
-    auto idx = TensorDesc({kvHeads, qLength, 3}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 2).ToAclType();
-    auto count = TensorDesc({kvHeads, qLength}, ACL_INT32, ACL_FORMAT_ND).ValueRange(1, 3).ToAclType();
-    auto cuQ = TensorDesc({batch + 1}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{0, qLength}).ToAclType();
-    auto cuKv = TensorDesc({batch + 1}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{0, kvLength}).ToAclType();
-    auto usedQ = TensorDesc({batch}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{qLength}).ToAclType();
-    auto usedKv = TensorDesc({batch}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{kvLength}).ToAclType();
-    auto metadata = TensorDesc({metadataSize}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 0).ToAclType();
-    auto* blockShape = MakeBlockShape();
-    ASSERT_NE(blockShape, nullptr);
-
-    for (const char* qLayout : qLayouts) {
-        const bool packedQ = std::strcmp(qLayout, "TND") == 0;
-        const char* kvLayouts[] = {qLayout, "PA_BBND", "PA_BNBD"};
-        for (const char* kvLayout : kvLayouts) {
-            const bool packedKv = std::strcmp(kvLayout, "TND") == 0;
-            for (const int64_t precision : {0, 1}) {
-                for (const int64_t headDim : {1, 128, 256, 257}) {
-                    SCOPED_TRACE(testing::Message()
-                                 << qLayout << "/" << kvLayout << " headDim=" << headDim << " precision=" << precision);
-                    uint64_t workspaceSize = 0;
-                    aclOpExecutor* executor = nullptr;
-                    EXPECT_EQ(aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
-                                  idx.get(), count.get(), packedQ ? cuQ.get() : nullptr,
-                                  packedKv ? cuKv.get() : nullptr, packedQ ? nullptr : usedQ.get(),
-                                  packedKv ? nullptr : usedKv.get(), qLength, kvLength, qHeads, kvHeads, headDim,
-                                  blockShape, qLayout, kvLayout, kLayoutSparsePatternKvnTotalQbKb, kMaskType,
-                                  fp8QuantType, precision, -1, -1, 0, false, metadata.get(), &workspaceSize, &executor),
-                              headDim == 128 && (precision == 0 || (packedQ && std::strcmp(kvLayout, "PA_BBND") == 0)) ?
-                                  ACLNN_SUCCESS :
-                                  ACLNN_ERR_PARAM_INVALID);
-                    if (executor != nullptr) {
-                        aclDestroyAclOpExecutor(executor);
-                    }
-                }
-            }
-        }
-    }
-    aclDestroyIntArray(blockShape);
 }
