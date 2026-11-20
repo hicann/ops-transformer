@@ -124,7 +124,8 @@ private:
     static constexpr uint32_t DESCRIPTOR_CAPACITY = 32U;
     Sequence descriptors_[DESCRIPTOR_CAPACITY];
     bool descriptorsCached_ = false;
-    QuantFlashAttnTilingDataInt8 t_{};
+    // Scalar aggregate copies use 64-bit accesses; keep the private copy aligned without changing the tiling ABI.
+    alignas(uint64_t) QuantFlashAttnTilingDataInt8 t_{};
     AscendC::GlobalTensor<int32_t> cq_, ck_;
     AscendC::GlobalTensor<uint32_t> tasks_;
     Sequence seq_{};

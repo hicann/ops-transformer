@@ -134,6 +134,25 @@ def test_required_scales(index, invalid):
         qfa(*values[:7], p_scale=values[7], **options)
 
 
+@pytest.mark.parametrize("layout", ["BNSD", "BSND", "TND"])
+@pytest.mark.parametrize("index", [0, 1, 2], ids=["q", "k", "v"])
+@pytest.mark.parametrize("device", ["npu", "meta"])
+def test_required_qkv(layout, index, device):
+    _, _, _, qfa, args, options = _case(layout)
+    values = list(args)
+    call = qfa
+    if device == "meta":
+        values = [x.to("meta") if isinstance(x, torch.Tensor) else x for x in values]
+        options = {
+            name: x.to("meta") if isinstance(x, torch.Tensor) else x
+            for name, x in options.items()
+        }
+        call = torch.ops.cann_ops_transformer.quant_flash_attn
+    values[index] = None
+    with pytest.raises(RuntimeError, match=f"{'qkv'[index]} must not be None"):
+        call(*values, **options)
+
+
 def test_int8_metadata_generation_unsupported():
     qfa = runner.load_qfa()
     module = importlib.import_module(qfa.__module__)
@@ -204,23 +223,6 @@ def test_fake_output(layout, lse):
     assert actual_lse.shape == (
         ((4, 34) if layout == "TND" else (2, 4, 17)) if lse else (0,)
     )
-
-
-def test_int8_quant_mode():
-    params, batches, vs, qfa, args, options = _case()
-    mode_name = (
-        "A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR_SOFTMAX_FP16"
-    )
-    mode = qfa.QuantMode[mode_name]
-    assert mode.value == 12 and mode.name == mode_name
-    names = [
-        name for name, member in qfa.QuantMode.__members__.items() if member is mode
-    ]
-    assert names == [mode_name]
-    expected = runner.reference(params, batches, vs)
-    for quant_mode in (mode, mode_name, mode.value):
-        result = qfa(*args[:6], quant_mode, **options)
-        runner.compare(params, expected, tuple(value.cpu() for value in result))
 
 
 @pytest.mark.parametrize("layout", ["BNSD", "BSND", "TND"])

@@ -999,6 +999,8 @@ private:
                                                    static_cast<uint64_t>(FP16_REPEAT_LANES),
                                                    static_cast<uint8_t>(repeats), quantParams);
         }
+        // MulCast must finish reading scores before the in-place row reduction overwrites them.
+        PipeBarrier<PIPE_V>();
         if constexpr (D96_PREFILL)
             PublishP(slot, chunk, Min32(VecRows(), rows_ - chunk));
 

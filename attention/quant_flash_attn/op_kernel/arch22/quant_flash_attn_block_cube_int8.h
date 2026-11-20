@@ -642,10 +642,11 @@ protected:
         constexpr uint8_t maxLoadDataPadding = 255U;
         const uint8_t padList[] = {0, 0, 0, maxLoadDataPadding};
         LoadData3DParamsV2<int8_t> p(padList, mL1Aligned / CUBE_MN_ALIGNMENT, loadWindow, Align32(kSize),
-                                     Align32(kSize), Align16(mSize), 0U, 0U, 1U, 1U, 1U, 1U, 1U, 1U, false, false, 0);
+                                     Align32(kSize), Align16(mSize), 0U, m0, 1U, 1U, 1U, 1U, 1U, 1U, false, false, 0);
         SetFmatrix(mL1Aligned / CUBE_MN_ALIGNMENT, loadWindow, padList, FmatrixMode::FMATRIX_LEFT);
         SetLoadDataPaddingValue<int8_t>(0);
-        const uint32_t srcOff = k0 * mL1Aligned + m0 * INT8_C0;
+        // Keep the feature-map base fixed; mStartPt selects rows within that feature map.
+        const uint32_t srcOff = k0 * mL1Aligned;
         LoadData(aL0_[abSlot * L0_AB_ELEMS], src[srcOff], p);
     }
 

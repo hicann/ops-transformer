@@ -1451,6 +1451,7 @@ mask_mode参数解释：
 
 - 仅支持无 KV cache 的 INT8 全量化 MHA/GQA Prefill。`quant_mode` 传整数 `12` 或枚举 `QuantMode.A8C8_QK_INT8_PER_TOKEN_HEAD_V_INT8_PER_HEAD_P_INT8_PER_TENSOR_SOFTMAX_FP16`。
 - Q、K、V 为连续的 INT8 Tensor，输出为 BF16。`q_descale`、`k_descale`、`v_descale` 和 `p_scale` 必传，均为与 Q、K、V 位于同一 NPU 的连续 FP32 Tensor。Q、K 的反量化系数按 token 和 head 提供，形状为对应输入去掉 D 轴；V 的反量化系数按 head 提供，形状为 `(KV_N,)`，各 batch 共用；Softmax 权重的静态量化系数 `p_scale` 形状为 `(1,)`，其值转换为 FP16 前后均须为有限正数。
+- Q、K、V 不得为 `None`。设备 Tensor 的数值内容由调用方保证正确，接口不为这些内容增加 Host 值检查或 D2H 拷贝：`q_descale`、`k_descale`、`v_descale` 须为有限值，不支持 NaN、+Inf 或 -Inf；`p_scale` 须满足上述数值约束；TND 的累积长度须非负并满足下述约束。`max_seqlen_q`、`max_seqlen_kv` 是实际最大长度的上界，不要求与实际值相等。设备侧越界保护不等同于完整参数校验，违反这些数值约束可能产生未定义输出。
 - Q、K、V 的 D 相同，取值为 1～256，`Q_N` 必须能被 `KV_N` 整除。
 - `layout_q`、`layout_kv` 和 `layout_out` 仅支持 BNSD、BSND、TND。算子按 Q 的布局读取 `q_descale`，`layout_q_descale` 在此模式下可省略。BNSD 和 BSND 可混用，Q 和 KV 的 batch 大小须一致，`cu_seqlens_q` 和 `cu_seqlens_kv` 均省略。
 - TND 要求 Q、KV 和输出均为 TND。须传形状为 `(B+1,)` 的连续 INT32 累积序列长度 `cu_seqlens_q`、`cu_seqlens_kv`，从 0 开始、非递减，末元素等于对应的总 token 数。允许部分 batch 的 Q 长度为 0。非空 Q 序列须有非空 KV 序列。传入的 `max_seqlen_q`、`max_seqlen_kv` 须覆盖对应的实际最大长度，否则超出上界的序列可能不写入输出。

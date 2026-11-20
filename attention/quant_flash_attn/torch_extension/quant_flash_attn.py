@@ -239,6 +239,9 @@ def _check_int8_contract(
     unsupported,
 ):
     """INT8 scales follow their input's token/head order (without D)."""
+    torch._check(q is not None, lambda: "q must not be None")
+    torch._check(k is not None, lambda: "k must not be None")
+    torch._check(v is not None, lambda: "v must not be None")
     win_left = -1 if win_left is None else win_left
     win_right = -1 if win_right is None else win_right
     check = _check_int8

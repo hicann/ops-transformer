@@ -147,6 +147,7 @@ class QuantFlashAttnAclGraph(torch.nn.Module):
                 "cu_seqlens_kv",
                 "seqused_q",
                 "seqused_kv",
+                "sinks",
                 "attn_mask",
                 "metadata",
                 "v_tail",
