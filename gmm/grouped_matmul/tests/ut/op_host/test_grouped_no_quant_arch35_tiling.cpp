@@ -101,7 +101,7 @@ public:
 
     void Prepare(optiling::GMMCompileInfo& compileInfo) const
     {
-        // 950为AIV:AIC=2:1形态; 960dt为AIV:AIC=1:1形态
+        // Ascend950 has an AIV:AIC ratio of 2:1; Ascend960DT has a ratio of 1:1.
         const uint32_t aicNum = static_cast<uint32_t>(coreNum > 0 ? coreNum : 32);
         const uint32_t aivNum = GetNpuArch() == NpuArch::DAV_3510 ? aicNum * 2 : aicNum;
         compileInfo = {
@@ -127,15 +127,16 @@ public:
         // groupListType 0(cumsum)/1(count): 1D [E]; groupListType 2(sparse): 2D [E, 2].
         const int64_t groupListDimNum =
             groupListDimNumOverride > 0 ? groupListDimNumOverride : (groupListType == 2 ? 2 : 1);
-        // 桩只构造单个 x tensor，因此非 split 场景（groupType=-1）下 tiling 由 x tensor 数推导 groupNum(=1)，
-        // groupList 长度必须与之自洽，否则会触发 groupList 长度一致性校验误报。
+        // The stub builds a single x tensor, so in the non-split case (groupType=-1) the tiling derives groupNum (=1)
+        // from the x tensor count; the groupList length must stay consistent with it to avoid a false length-check
+        // failure.
         const int64_t effectiveGroupListLen = groupListLen > 0 ? groupListLen : (groupType == -1 ? 1 : groupNum);
         gert::StorageShape groupListShape =
             groupListDimNum == 2 ?
                 ops::ut::MakeGertStorageShape({effectiveGroupListLen, 2}, {effectiveGroupListLen, 2}) :
                 ops::ut::MakeGertStorageShape({effectiveGroupListLen}, {effectiveGroupListLen});
 
-        // weightDimNum==2: WeightNz 单 x-单 y 的 E=1 特殊场景（weight 列表仅 1 个二维 tensor）
+        // weightDimNum==2: the E=1 special case of WeightNz single x/single y (the weight list holds one 2-D tensor).
         vector<int64_t> weightOriginDims;
         if (weightDimNum == 2) {
             weightOriginDims = transposeWeight ? vector<int64_t>{n, k} : vector<int64_t>{k, n};
@@ -178,7 +179,8 @@ public:
             return;
         }
 
-        // golden留空(0/空串)表示期望值待回填(如960dt新增case): 打印实际值便于校验后补充
+        // An empty golden (0/blank) means the expected value is pending backfill: the actual value is printed for
+        // verification.
         if (expectBlockDim == 0U) {
             cout << "case[" << caseName << "] golden blockDim not set, actual: " << tilingInfo.blockNum << endl;
         } else {
@@ -221,8 +223,9 @@ public:
     int64_t groupType = 0;
     int64_t groupListType = 0;
     int64_t groupListDimNumOverride = 0; // 0: derive from groupListType; 1/2: force 1D/2D negative cases
-    int64_t weightDimNum = 3; // 3: weight 为 (E, K, N)；2: weight 为 (K, N)（WeightNz 单 x-单 y 特殊场景）
-    int64_t groupListLen = 0; // 0: 与 groupNum 一致；>0: 显式指定 groupList 长度（负向用例）
+    int64_t weightDimNum =
+        3; // 3: weight is (E, K, N); 2: weight is (K, N) (the WeightNz single x/single y special case).
+    int64_t groupListLen = 0; // 0: matches groupNum; >0: explicitly sets the groupList length (negative cases).
     int64_t splitItem = 0;
     int64_t actType = 0; // 0: none, 1: relu, 2: gelu tanh (same as aclnn actType)
     string weightFormat;
@@ -294,7 +297,7 @@ vector<GroupedNoQuantArch35TilingTestParam> GetParams(const string& socVersion)
             param.yDtype = ParseDtype(items[idx++]);
             param.hasBias = ParseBool(items[idx++]);
             param.result = ParseBool(items[idx++]);
-            // 空值(0/空串)表示golden待回填, 仅校验tiling执行结果
+            // An empty value (0/blank) means the golden is pending; only the tiling execution result is checked.
             param.expectBlockDim = items[idx].empty() ? 0U : static_cast<uint64_t>(stoull(items[idx]));
             idx++;
             param.expectTilingKey = items[idx].empty() ? 0U : static_cast<uint64_t>(stoull(items[idx]));
@@ -366,7 +369,8 @@ TEST_P(TestGroupedNoQuantArch35Tiling, generalTest)
 INSTANTIATE_TEST_SUITE_P(GROUPED_NO_QUANT_950, TestGroupedNoQuantArch35Tiling, testing::ValuesIn(GetAscend950Params()),
                          MakeParamName);
 
-// 960dt回归case: golden期望值留空待回填, 首次运行时打印实际tilingKey/blockDim/tilingData, 校验后填入csv对应字段
+// Ascend960DT regression cases: goldens are left empty for backfill; the first run prints the actual
+// tilingKey/blockDim/tilingData, which is verified and filled into the csv fields.
 INSTANTIATE_TEST_SUITE_P(GROUPED_NO_QUANT_960DT, TestGroupedNoQuantArch35Tiling,
                          testing::ValuesIn(GetAscend960DTParams()), MakeParamName);
 
