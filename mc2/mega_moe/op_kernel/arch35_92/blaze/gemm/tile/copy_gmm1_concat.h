@@ -39,6 +39,15 @@ struct Gmm1OutputView {
     // 普通 MMAD 通过该类型识别 GM/UB，实际写回仍使用本文件的重载。
     using iterator = typename Tensor::iterator;
     Tensor tensor;
+
+    // Delegate indexing to the wrapped tensor; keep the view type on the returned
+    // slice so the concat copy overload below still applies per L0C block.
+    template <typename Coord, typename Shape>
+    __aicore__ inline auto slice(const Coord& coord, const Shape& shape) const
+    {
+        auto slice = tensor.slice(coord, shape);
+        return Gmm1OutputView<decltype(slice)>{slice};
+    }
 };
 
 template <typename Tensor>
