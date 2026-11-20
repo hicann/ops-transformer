@@ -441,10 +441,13 @@ aclnnStatus aclnnGroupedMatmulSwigluQuant(
   - 4.<term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：bias不参与计算。传入非空指针时接口返回成功，输出与传空指针相同。
   <!-- end id7 -->
 
+<!-- npu="A3,910b" id8 -->
 - A8W4场景
 
   - 1.x的尾轴长度不能大于等于20000。
   - 2.N轴长度不能超过10240。
+  - 3.x尾轴长度K必须为64的倍数。SwiGLU切半前的输出宽度N在weight为ND格式时必须为32的倍数，在weight为FRACTAL_NZ格式时必须为64的倍数。
+<!-- end id8 -->
 
 ## 调用示例
 

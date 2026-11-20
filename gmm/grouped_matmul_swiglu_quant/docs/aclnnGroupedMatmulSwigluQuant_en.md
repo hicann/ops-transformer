@@ -440,10 +440,13 @@ aclnnStatus aclnnGroupedMatmulSwigluQuant(
   - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>: bias does not participate in the computation. A non-null pointer is accepted, and the output matches a null pointer.
   <!-- end id7 -->
 
+<!-- npu="A3,910b" id8 -->
 - A8W4 scenario
 
   - The last axis length of x cannot be greater than or equal to 20000.
   - The N axis length cannot exceed 10240.
+  - The last axis length K of x must be a multiple of 64. The output width N before the SwiGLU split must be a multiple of 32 for ND weights and a multiple of 64 for FRACTAL_NZ weights.
+<!-- end id8 -->
 
 ## Example
 

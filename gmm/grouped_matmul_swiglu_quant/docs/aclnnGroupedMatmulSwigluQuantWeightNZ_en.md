@@ -437,6 +437,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZ(
     - A8W4 scenario (`A` denotes the activation matrix (left matrix), `W` denotes the weight matrix (right matrix), and `4` denotes the `INT4` data type)
         - 1. The length of the last axis of x must be less than 20000.
         - 2. N must not exceed 10240.
+        - 3. The last axis length K of x and the output width N before the SwiGLU split must both be multiples of 64.
   <!-- end id7 -->
   <!-- npu="950" id11 -->
   - <term>Ascend 950PR&950DT products</term>:

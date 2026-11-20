@@ -435,6 +435,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZ(
     - A8W4场景（`A`指激活矩阵（左矩阵），`W`指权重矩阵（右矩阵），`4`指数据类型为`INT4`）
         - 1.x的尾轴长度不能大于等于20000。
         - 2.N轴长度不能超过10240。
+        - 3.x尾轴长度K和SwiGLU切半前的输出宽度N均必须为64的倍数。
   <!-- end id7 -->
   <!-- npu="950" id11 -->
   - <term>Ascend 950PR&950DT系列产品</term>：
