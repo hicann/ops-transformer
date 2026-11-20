@@ -57,7 +57,10 @@ bash test_run.sh load_graph -P ./data --super-kernel
 
 ### Batch 一致性
 
-批一致性策略通过 `--batch-consistency` 控制：
+`mixed_quant_sparse_flash_mla`（MQSMLA）和 `quant_sparse_flash_mla`（QSMLA）的 pytest batch一致性测试都依赖 SMLA 在此目录提供的 [batch_consistency 模块](./batch_consistency/)。
+运行 MQSMLA 或 QSMLA 测试时，将对应的算子目录与 `sparse_flash_mla/` 放在同一父目录下，或将此处的整个 `batch_consistency/` 目录复制到对应算子的 `tests/pytest/` 下。
+
+batch一致性策略通过 `--batch-consistency` 控制：
 
 ```bash
 bash test_run.sh load_graph -P ./data --batch-consistency on

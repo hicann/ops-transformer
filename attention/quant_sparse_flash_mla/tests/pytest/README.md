@@ -61,6 +61,11 @@ bash test_run.sh batch_exec --pt-dir my_pt --super-kernel
 批跑时在原命令末尾加 `--super-kernel`；默认沿用原执行模式。metadata 仍在图外生成，
 启用时保留单算子满核 debug（`debug_per_op_max_core_num=1`，不是限制为一个核）。
 
+### Batch 一致性
+
+QSMLA 的 pytest batch一致性测试依赖 SMLA pytest 目录中的共享模块 [batch_consistency](../../../sparse_flash_mla/tests/pytest/batch_consistency/)。
+运行测试时，将 `quant_sparse_flash_mla/` 和 `sparse_flash_mla/` 放在同一父目录下，或将整个 `sparse_flash_mla/tests/pytest/batch_consistency/` 目录复制到 `quant_sparse_flash_mla/tests/pytest/` 下。
+
 ### 运行测试用例
 
 #### 单用例测试

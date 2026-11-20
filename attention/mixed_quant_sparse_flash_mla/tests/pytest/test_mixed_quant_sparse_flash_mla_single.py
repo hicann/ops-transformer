@@ -164,8 +164,6 @@ def mqsmla(param_combinations):
         mixed_quant_sparse_flash_mla_golden.save_test_case(test_data, pt_save_path)
 
     if consistency_config is not None:
-        if params["layout_q"] == "TND" and test_data.get("cpu_lse") is not None:
-            test_data["cpu_lse"] = test_data["cpu_lse"].transpose(0, 1).contiguous()
 
         def consistency_executor(data):
             values = mixed_quant_sparse_flash_mla_process.test_mqsmla_quant_process_ci(

@@ -38,6 +38,7 @@ from .runner import (
 )
 from .schema import get_q_lengths
 from .transform import (
+    BatchCaseTransformer,
     InvalidTransformError,
     groups_from_split_sizes,
     transform_mode1_reorder,
@@ -47,7 +48,7 @@ from .transform import (
 )
 
 
-DEFAULT_MODES = ("reorder", "split", "token-split", "shape-change")
+DEFAULT_MODES = ("reorder", "split", "token-split", "shape-change", "cache-reorder")
 SUPPORTED_MODES = DEFAULT_MODES + ("token-isolation", "independent")
 RELATION_SCHEMA_VERSION = 1
 
@@ -309,6 +310,13 @@ def run_selected_mode(
     mode: str,
     prefix: str,
 ) -> Dict[str, Any]:
+    if mode == "cache-reorder":
+        try:
+            case = BatchCaseTransformer(data).reorder_pa_cache()
+        except InvalidTransformError as error:
+            pytest.skip(f"NOT_APPLICABLE: {error}")
+        return runner.run_cases(data, [case])
+
     seed = int(os.environ.get(f"{prefix}_CONSISTENCY_SEED", "20260716"))
     if mode == "reorder":
         if CaseAdapter(data).get_batch_size() < 2:
@@ -420,6 +428,14 @@ def run_configured_consistency(
     else:
         cases.append(shape_case)
         overrides.append([int(common_tokens)])
+
+    try:
+        cache_case = BatchCaseTransformer(data).reorder_pa_cache()
+    except InvalidTransformError as error:
+        skipped["cache-reorder"] = f"NOT_APPLICABLE: {error}"
+    else:
+        cases.append(cache_case)
+        overrides.append(None)
 
     runner = ConsistencyRunner(executor, precision_compare, set_device)
     report = runner.run_cases(data, cases, overrides)

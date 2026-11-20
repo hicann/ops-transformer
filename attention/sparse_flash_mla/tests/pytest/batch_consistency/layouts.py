@@ -117,6 +117,29 @@ def select_pa_block_table(
     return select_bsnd(block_table, batch_ids)
 
 
+def reverse_pa_blocks(cache: torch.Tensor) -> torch.Tensor:
+    """Move whole pages, including packed features and their quantization scales."""
+    reversed_cache = cache.view(torch.uint8).flip([0]).view(cache.dtype)
+    if cache.storage_offset() == 0 and cache.stride() == reversed_cache.stride():
+        return reversed_cache
+
+    # Padded and fused PA pools can have both a larger page stride and a nonzero offset.
+    storage = cache.new_empty(cache.untyped_storage().nbytes() // cache.element_size())
+    result = storage.as_strided(cache.shape, cache.stride(), cache.storage_offset())
+    result.copy_(reversed_cache)
+    return result
+
+
+def reverse_pa_offsets(
+    offsets: torch.Tensor, blocks: int, block_size: int
+) -> torch.Tensor:
+    """Map physical token offsets to reversed pages, keeping each in-page position."""
+    block_ids = offsets.long() // block_size
+    remapped = (blocks - 1 - block_ids) * block_size + offsets.remainder(block_size)
+    valid = (block_ids >= 0) & (block_ids < blocks)
+    return torch.where(valid, remapped, offsets).to(offsets.dtype)
+
+
 def validate_block_ids(
     block_table: Optional[torch.Tensor], cache_block_num: int
 ) -> None:

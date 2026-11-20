@@ -63,6 +63,70 @@ def make_padded_bsnd_case():
     }
 
 
+@pytest.mark.parametrize("topk_value_mode", [1, 2])
+def test_pa_cache_reorder_preserves_selected_tokens(topk_value_mode):
+    data = make_padded_bsnd_case()
+    tensors = data["input"]
+    for fields in (data, tensors, data["metadata_input"]):
+        fields["layout_kv"] = "PA_BBND"
+    data["params"]["topk_value_mode"] = topk_value_mode
+    for prefix, block_count, block_size in (("ori", 10, 4), ("cmp", 8, 2)):
+        # Include page padding, a nonzero storage offset and arbitrary packed FP8 bytes.
+        storage = torch.arange(block_count * (block_size + 1) * 8).to(torch.uint8)
+        cache = storage.view(block_count, block_size + 1, 1, 8)[:, 1:]
+        cache = cache.view(torch.float8_e4m3fn)
+        tensors[f"{prefix}_kv"] = cache
+        tensors[f"{prefix}_block_table"] = torch.tensor(
+            [[3, 6, -1]] * 3, dtype=torch.int32
+        )
+        indices = [1, block_size, 1, -1]
+        if topk_value_mode == 2:
+            indices = [3 * block_size + 1, 6 * block_size, 3 * block_size + 1, -1]
+        row = torch.tensor(indices, dtype=torch.int32)
+        tensors[f"{prefix}_sparse_indices"] = row.repeat(3, 2, 1, 1)
+        tensors[f"{prefix}_topk_length"] = torch.full((3, 2, 1), 3, dtype=torch.int32)
+        tensors[f"seqused_{prefix}_kv"] = torch.full(
+            (3,), block_size + 1, dtype=torch.int32
+        )
+        data["metadata_input"][f"max_seqlen_{prefix}_kv"] = block_size + 1
+
+    derived = BatchCaseTransformer(data).reorder_pa_cache().input_data["input"]
+    assert derived["q"] is tensors["q"]
+    for prefix in ("ori", "cmp"):
+        before = tensors[f"{prefix}_kv"].view(torch.uint8)
+        after = derived[f"{prefix}_kv"].view(torch.uint8)
+        assert after.stride() == before.stride()
+        assert after.storage_offset() == before.storage_offset()
+        table = derived[f"{prefix}_block_table"]
+        first, second, padding = table[0].tolist()
+        assert first > second and padding == -1
+        assert tensors[f"{prefix}_block_table"][0].tolist() == [3, 6, -1]
+        # Check entire pages, including any scales stored separately within a page.
+        assert torch.equal(after[first], before[3])
+        assert torch.equal(after[second], before[6])
+        assert derived[f"{prefix}_topk_length"] is tensors[f"{prefix}_topk_length"]
+        indices = derived[f"{prefix}_sparse_indices"]
+        if topk_value_mode == 1:
+            assert indices is tensors[f"{prefix}_sparse_indices"]
+        else:
+            size = after.shape[1]
+            expected = [first * size + 1, second * size, first * size + 1, -1]
+            assert (indices == indices.new_tensor(expected)).all()
+
+
+def test_cache_reorder_requires_movable_pa_blocks():
+    data = make_padded_bsnd_case()
+    with pytest.raises(InvalidTransformError, match="requires PA_BBND"):
+        BatchCaseTransformer(data).reorder_pa_cache()
+    for fields in (data, data["input"], data["metadata_input"]):
+        fields["layout_kv"] = "PA_BBND"
+    data["input"]["ori_kv"] = data["input"]["ori_kv"][:1]
+    data["input"]["ori_block_table"] = torch.zeros((3, 1), dtype=torch.int32)
+    data["input"]["cmp_kv"] = None
+    with pytest.raises(InvalidTransformError, match="moves no referenced PA blocks"):
+        BatchCaseTransformer(data).reorder_pa_cache()
+
+
 @pytest.mark.parametrize("batch_ids", [[0], [0, 1], [1, 0], [2, 0]])
 def test_bsnd_batch_selection_keeps_padded_kv_metadata(batch_ids):
     baseline = make_padded_bsnd_case()

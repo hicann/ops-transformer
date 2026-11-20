@@ -347,7 +347,7 @@ class ActualInputSemanticOracle:
 
 
 class BatchCaseTransformer:
-    """Owns coupled tensor/metadata updates for consistency modes 1-4."""
+    """Owns coupled tensor/metadata updates for consistency cases."""
 
     def __init__(self, input_data: Dict[str, Any]):
         schema.validate_schema(input_data)
@@ -559,6 +559,59 @@ class BatchCaseTransformer:
             max_cmp = int(cmp_kv.shape[1]) if cmp_kv is not None else 0
         adapter.metadata["max_seqlen_ori_kv"] = max_ori
         adapter.metadata["max_seqlen_cmp_kv"] = max_cmp
+
+    def reorder_pa_cache(self) -> ConsistencyCase:
+        if self.layout_kv != "PA_BBND":
+            raise InvalidTransformError("cache-reorder requires PA_BBND")
+
+        new_data = self._clone_input_data(self.input_data)
+        derived = new_data[self.adapter.tensor_key]
+        # Older SMLA PTs can store the mode only in params.
+        default_mode = (
+            self.adapter.params.get("topk_value_mode", 1)
+            if self.adapter.name == "smla"
+            else 1
+        )
+        physical_indices = self.tensors.get("topk_value_mode", default_mode) == 2
+        moved_pools = {}
+        for prefix in ("ori", "cmp"):
+            kv_key = f"{prefix}_kv"
+            kv = self.tensors.get(kv_key)
+            if kv is None or kv.shape[0] < 2:
+                continue
+            blocks, block_size = kv.shape[:2]
+            # Reversing page IDs flips address order for every pair on different
+            # pages, even when the original block table was already shuffled.
+            table_key = f"{prefix}_block_table"
+            index_key = f"{prefix}_sparse_indices"
+            table = self.tensors.get(table_key)
+            indices = self.tensors.get(index_key)
+            moved = False
+            if table is not None:
+                derived[table_key] = torch.where(table >= 0, blocks - 1 - table, table)
+                moved = not torch.equal(derived[table_key], table)
+            if physical_indices and indices is not None:
+                derived[index_key] = layouts.reverse_pa_offsets(
+                    indices, blocks, block_size
+                )
+                moved = moved or not torch.equal(derived[index_key], indices)
+            if moved:
+                derived[kv_key] = layouts.reverse_pa_blocks(kv)
+                moved_pools[prefix] = blocks
+
+        if not moved_pools:
+            raise InvalidTransformError("cache-reorder moves no referenced PA blocks")
+        schema.check_invariants(new_data)
+        return ConsistencyCase(
+            name="mode6_cache_reorder",
+            input_data=new_data,
+            output_origins=schema.build_baseline_origins(new_data, valid_only=True),
+            transform_meta={
+                "mode": 6,
+                "mode_name": "cache-reorder",
+                "reversed_pools": moved_pools,
+            },
+        )
 
     def reorder(
         self, order: Optional[List[int]], seed: Optional[int]

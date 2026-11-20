@@ -60,7 +60,10 @@ The option is disabled by default. When enabled, ACLGraph SuperKernel is used; m
 generated outside the graph. `debug_per_op_max_core_num=1` enables single-operator full-core
 debugging; it does not restrict execution to one core.
 
-### Batch consistency
+### Batch Consistency
+
+The pytest suites for `mixed_quant_sparse_flash_mla` (MQSMLA) and `quant_sparse_flash_mla` (QSMLA) both depend on SMLA’s [batch_consistency module](./batch_consistency/).
+When testing MQSMLA or QSMLA, keep its operator directory alongside `sparse_flash_mla/`, or copy the entire `batch_consistency/` directory from here into that operator’s `tests/pytest/` directory.
 
 Control batch consistency with `--batch-consistency`:
 
