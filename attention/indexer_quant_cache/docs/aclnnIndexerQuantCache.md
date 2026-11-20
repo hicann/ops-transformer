@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：在Indexer注意力机制的Epilogue阶段，对KV Cache进行原地压缩更新。将`float16`/`bfloat16`的激活值按逐块动态量化（Per-Block Dynamic Quantization）压缩为FP8（E4M3/E5M2）、HiFloat8（UINT8承载浮点编码）、MX-FP4或HiFloat4格式，并按`slotMapping`将量化结果与对应`cacheScale`散写到cache，值为 -1的token跳过不处理。支持MX-FP8、Normal、HiFloat8、MX-FP4、HiFloat4五种量化模式。
+- 接口功能：在Indexer注意力机制的Epilogue阶段，对KV Cache进行原地压缩更新。将`float16`/`bfloat16`的激活值按逐块动态量化（Per-Block Dynamic Quantization）压缩为FP8（E4M3/E5M2）、HiFloat8（UINT8承载浮点编码）、MX-FP4格式，并按`slotMapping`将量化结果与对应`cacheScale`散写到cache，值为 -1的token跳过不处理。支持MX-FP8、Normal、HiFloat8、MX-FP4四种量化模式。
 
 - 计算公式：
 
@@ -37,8 +37,6 @@
   - 场景2（quantMode=1，Normal）：按行动态量化，scale存储为`float32`；`roundScale=true`时，对上述公式算出的正scale再取`2^ceil(log2(scale))`，用于量化并写回。Normal模式的UINT8 cache承载HiFloat8编码。
   - 场景3（quantMode=2，HiFloat8）：输出为$x \times xScale$后的hifloat8。
   - 场景4（quantMode=3，MX-FP4）：按标准MX块（每32个元素）量化为FP4（`uint8`每字节打包2个fp4值），scale存储为`float8_e8m0`。
-
-  - 场景5（quantMode=4，HiFloat4）：仅ascend960dt（DAV_9201）支持，要求`d % 64 == 0`，cache为HIFLOAT4，cacheScale为HIFLOAT4_SCALE，每行d/64个scale元素。
 
 - 示例：
 
@@ -111,7 +109,7 @@ aclnnStatus aclnnIndexerQuantCache(
       <td>输入/输出</td>
       <td>表示当前层的分页KV Cache，原地更新，对应计算公式中的量化目标。<b>仅支持四维</b>（shape、headDim长度规则详见约束说明）。MX-FP4模式下cache为FP4（每字节打包2个fp4值）。</td>
       <td><li>不支持空Tensor。</li><li>既是输入也是输出（原地操作）。</li><li>数据类型需与quantMode匹配。</li><li><b>仅支持四维</b>[blockNum, blockSize, 1, headDim]，dim2固定为1，仅在<b>blockNum维支持非连续</b>（分页）。</li></td>
-      <td>FLOAT8_E4M3FN、FLOAT8_E5M2、UINT8、FLOAT4_E2M1、FLOAT4_E1M2、HIFLOAT4</td>
+      <td>FLOAT8_E4M3FN、FLOAT8_E5M2、UINT8、FLOAT4_E2M1、FLOAT4_E1M2</td>
       <td>ND</td>
       <td>[blockNum, blockSize, 1, headDim]（num_slots = blockNum × blockSize）</td>
       <td>√（仅blockNum维）</td>
@@ -121,7 +119,7 @@ aclnnStatus aclnnIndexerQuantCache(
       <td>输入/输出</td>
       <td>表示每块量化的scale因子，原地更新，对应计算公式中scale。<b>仅支持四维</b>，规则同cache，headDim须 ≥ scaleCol（详见约束说明）。</td>
       <td><li>不支持空Tensor。</li><li>既是输入也是输出（原地操作）。</li><li>数据类型需与quantMode匹配。</li><li><b>仅支持四维</b>[blockNum, blockSize, 1, headDim]，dim2固定为1，headDim ≥ scaleCol，仅在<b>blockNum维支持非连续</b>（分页）。</li></td>
-      <td>FLOAT、FLOAT8_E8M0、HIFLOAT4_SCALE</td>
+      <td>FLOAT、FLOAT8_E8M0</td>
       <td>ND</td>
       <td>[blockNum, blockSize, 1, scaleHeadDim]（scaleHeadDim ≥ scaleCol）</td>
       <td>√（仅blockNum维）</td>
@@ -262,9 +260,9 @@ aclnnStatus aclnnIndexerQuantCache(
 - **cache 与 cacheScale均仅支持四维shape** `[blockNum, blockSize, 1, headDim]`，倒数第二维固定为1（每token一个量化向量），不支持其他维数；num_slots = blockNum × blockSize。
 - cache/cacheScale**仅在blockNum维支持非连续**（分页）：各block可不紧密排布，但block内（blockSize、headDim维）须连续。
 - **headDim长度约束**：
-  - **cache.headDim ≥ d**（MX-FP4/HiFloat4模式以4位元素计，d个值占 ⌈d/2⌉ 字节）。
-  - **MX-FP4/HiFloat4（quantMode=3/4）模式下，cache.headDim必须为偶数**。
-  - **cacheScale.headDim ≥ scaleCol**，scaleCol：MX-FP8/MX-FP4（quantMode=0/3）为 ⌈d/32⌉；Normal/HiFloat8（quantMode=1/2）为 1；HiFloat4（quantMode=4）为 d/64。
+  - **cache.headDim ≥ d**（MX-FP4模式以4位元素计，d个值占 ⌈d/2⌉ 字节）。
+  - **MX-FP4（quantMode=3）模式下，cache.headDim必须为偶数**。
+  - **cacheScale.headDim ≥ scaleCol**，scaleCol：MX-FP8/MX-FP4（quantMode=0/3）为 ⌈d/32⌉；Normal/HiFloat8（quantMode=1/2）为 1。
   - 示例：d=128、quantMode=0 → scaleCol=4 → cache.headDim ≥ 128 且 cacheScale.headDim ≥ 4。
 - x的最后一维（d轴）须能被32整除且 d ≤ 8192。
 - slotMapping的维度应等于x的维度减1，即slotMapping为x除最后一维外的所有维度展平。

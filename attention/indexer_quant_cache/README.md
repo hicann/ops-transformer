@@ -13,7 +13,7 @@
 
 ## 功能说明
 
-- 算子功能：在Indexer注意力机制的Epilog阶段对KV Cache进行原地压缩更新。算子按量化模式将`float16`/`bfloat16`激活值`x`压缩为FP8（E4M3/E5M2）、HiFloat8（UINT8承载浮点编码）、MX-FP4或HiFloat4格式，并按`slot_mapping`将量化结果散写（scatter）到`cache`；除HiFloat8模式外，同时将对应scale写入`cache_scale`。`slot_mapping`中值为 -1的token跳过不处理。支持MX-FP8、Normal、HiFloat8、MX-FP4、HiFloat4五种量化模式。
+- 算子功能：在Indexer注意力机制的Epilog阶段对KV Cache进行原地压缩更新。算子按量化模式将`float16`/`bfloat16`激活值`x`压缩为FP8（E4M3/E5M2）、HiFloat8（UINT8承载浮点编码）、MX-FP4格式，并按`slot_mapping`将量化结果散写（scatter）到`cache`；除HiFloat8模式外，同时将对应scale写入`cache_scale`。`slot_mapping`中值为 -1的token跳过不处理。支持MX-FP8、Normal、HiFloat8、MX-FP4四种量化模式。
 
 - 计算公式：
 
@@ -28,19 +28,17 @@
   - `quant_mode=2`（HiFloat8）：将$x \times x\_scale$转换为hifloat8，不计算或写回`cache_scale`。
   - `quant_mode=3`（MX-FP4）：按标准MX块（每32元素）量化为FP4（uint8每字节打包2个fp4值），scale存储为`float8_e8m0`。
 
-  - `quant_mode=4`（HiFloat4）：仅ascend960dt（DAV_9201）支持，要求`d % 64 == 0`，cache为HIFLOAT4，cache_scale为HIFLOAT4_SCALE，每行d/64个scale元素。
-
 ## 参数说明
 
 | 参数名       | 输入/输出/属性 | 描述                                                                          | 数据类型                                                      | 数据格式 |
 | ------------ | -------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ | -------- |
-| cache        | 输入/输出      | 当前层的KV Cache向量缓存，原地更新，即公式中的量化目标。MX-FP4模式下为uint8，每字节打包2个fp4值。 | FLOAT8_E4M3FN、FLOAT8_E5M2、UINT8、FLOAT4_E2M1、FLOAT4_E1M2、HIFLOAT4   | ND       |
-| cache_scale  | 输入/输出      | 量化scale张量；HiFloat8模式下该输入保持不变，不写回。                        | FLOAT、FLOAT8_E8M0、HIFLOAT4_SCALE                                            | ND       |
+| cache        | 输入/输出      | 当前层的KV Cache向量缓存，原地更新，即公式中的量化目标。MX-FP4模式下为uint8，每字节打包2个fp4值。 | FLOAT8_E4M3FN、FLOAT8_E5M2、UINT8、FLOAT4_E2M1、FLOAT4_E1M2   | ND       |
+| cache_scale  | 输入/输出      | 量化scale张量；HiFloat8模式下该输入保持不变，不写回。                        | FLOAT、FLOAT8_E8M0                                            | ND       |
 | x            | 输入           | 待量化的激活输入，即公式中`x`。shape为[bs, d]。                              | FLOAT16、BFLOAT16                                             | ND       |
 | slot_mapping | 输入           | token到cache slot的索引映射，值为 -1表示跳过该token。shape为[bs]。       | INT32                                                        | ND       |
-| cache        | 输出           | 原地更新后的KV Cache，与输入`cache`为同一tensor。                            | FLOAT8_E4M3FN、FLOAT8_E5M2、UINT8、FLOAT4_E2M1、FLOAT4_E1M2、HIFLOAT4   | ND       |
-| cache_scale  | 输出           | MX-FP8、Normal、MX-FP4和HiFloat4模式下原地写回的scale；HiFloat8模式下保持输入值不变。   | FLOAT、FLOAT8_E8M0、HIFLOAT4_SCALE                                            | ND       |
-| quant_mode   | 可选属性       | 量化模式：0=MX-FP8，1=Normal，2=HiFloat8，3=MX-FP4，4=HiFloat4。默认值为1。                | INT                                                          | -        |
+| cache        | 输出           | 原地更新后的KV Cache，与输入`cache`为同一tensor。                            | FLOAT8_E4M3FN、FLOAT8_E5M2、UINT8、FLOAT4_E2M1、FLOAT4_E1M2   | ND       |
+| cache_scale  | 输出           | MX-FP8、Normal、MX-FP4模式下原地写回的scale；HiFloat8模式下保持输入值不变。   | FLOAT、FLOAT8_E8M0                                            | ND       |
+| quant_mode   | 可选属性       | 量化模式：0=MX-FP8，1=Normal，2=HiFloat8，3=MX-FP4。默认值为1。                | INT                                                          | -        |
 | round_scale  | 可选属性       | 仅Normal模式（quant_mode=1）下控制scale是否向上取到2的幂。默认值为true。              | BOOL                                                         | -        |
 | x_scale      | 可选属性       | HiFloat8模式（quant_mode=2）下的全局scale乘数。默认值为1.0。                 | FLOAT                                                        | -        |
 

@@ -25,7 +25,7 @@
 
 ## Function
 
-- Description: Performs in-place compressed updates on the KV Cache in the Epilog phase of the Indexer attention mechanism. Compresses `float16`/`bfloat16` activations into FP8 (E4M3/E5M2), HiFloat8 (floating-point codes stored in UINT8), MX-FP4, or HiFloat4 format through per-block dynamic quantization, and scatters the quantization results and the corresponding `cacheScale` values to the cache based on `slotMapping`. Tokens with a value of -1 are skipped. Supports five quantization modes: MX-FP8, Normal, HiFloat8, MX-FP4, and HiFloat4.
+- Description: Performs in-place compressed updates on the KV Cache in the Epilog phase of the Indexer attention mechanism. Compresses `float16`/`bfloat16` activations into FP8 (E4M3/E5M2), HiFloat8 (floating-point codes stored in UINT8), or MX-FP4 format through per-block dynamic quantization, and scatters the quantization results and the corresponding `cacheScale` values to the cache based on `slotMapping`. Tokens with a value of -1 are skipped. Supports four quantization modes: MX-FP8, Normal, HiFloat8, and MX-FP4.
 
 - Formula:
 
@@ -39,8 +39,6 @@
   - Use case 2 (quantMode=1, Normal): dynamic per-row quantization; scale is stored as `float32`. When `roundScale=true`, the positive scale computed by the formula above is rounded up to `2^ceil(log2(scale))` for quantization and writeback. UINT8 cache stores HiFloat8 codes in Normal mode.
   - Use case 3 (quantMode=2, HiFloat8): the output is hifloat8 after $x \times xScale$.
   - Use case 4 (quantMode=3, MX-FP4): quantization to FP4 is performed by standard MX block (32 elements per block) (`uint8` packs 2 fp4 values per byte), and scale is stored as `float8_e8m0`.
-
-  - Use case 5 (quantMode=4, HiFloat4): Supported only on ascend960dt (DAV_9201). Requires `d % 64 == 0`, HIFLOAT4 cache, and HIFLOAT4_SCALE cacheScale, with d/64 scale elements per row.
 
 - Example:
 
@@ -113,7 +111,7 @@ aclnnStatus aclnnIndexerQuantCache(
       <td>Input/Output</td>
       <td>Indicates the paged KV Cache of the current layer, updated in place, corresponding to the quantization target in the formula. <b>Only four dimensions are supported</b> (see Constraints for the shape and headDim length rules). In MX-FP4 mode, the cache is FP4 (two FP4 values packed per byte).</td>
       <td><li>Empty tensors are not supported.</li><li>Serves as both input and output (in-place operation).</li><li>The data type must match quantMode.</li><li><b>Only four dimensions are supported</b> [blockNum, blockSize, 1, headDim], with dim2 fixed to 1 and <b>only the blockNum dimension supports non-contiguity</b> (paging).</li></td>
-      <td>FLOAT8_E4M3FN, FLOAT8_E5M2, UINT8, FLOAT4_E2M1, FLOAT4_E1M2, HIFLOAT4</td>
+      <td>FLOAT8_E4M3FN, FLOAT8_E5M2, UINT8, FLOAT4_E2M1, FLOAT4_E1M2</td>
       <td>ND</td>
       <td>[blockNum, blockSize, 1, headDim] (num_slots = blockNum × blockSize)</td>
       <td>√ (blockNum dimension only)</td>
@@ -123,7 +121,7 @@ aclnnStatus aclnnIndexerQuantCache(
       <td>Input/Output</td>
       <td>Indicates the scale factor for per-block quantization, updated in place, corresponding to scale in the formula. <b>Only four dimensions are supported</b>, following the same rules as cache. headDim must be ≥ scaleCol (for details, see Constraints).</td>
       <td><li>Empty tensors are not supported.</li><li>Serves as both input and output (in-place operation).</li><li>Data type must match quantMode.</li><li><b>Only four dimensions</b> [blockNum, blockSize, 1, headDim] are supported, with dim2 fixed to 1 and headDim ≥ scaleCol, and <b>only the blockNum dimension</b> supports non-contiguous (paged) layout.</li></td>
-      <td>FLOAT, FLOAT8_E8M0, HIFLOAT4_SCALE</td>
+      <td>FLOAT, FLOAT8_E8M0</td>
       <td>ND</td>
       <td>[blockNum, blockSize, 1, scaleHeadDim] (scaleHeadDim ≥ scaleCol)</td>
       <td>√ (blockNum dimension only)</td>
@@ -264,9 +262,9 @@ aclnnStatus aclnnIndexerQuantCache(
 - **Both cache and cacheScale support only the four-dimensional shape** `[blockNum, blockSize, 1, headDim]`. The second-to-last dimension is fixed to 1 (one quantization vector per token). Other dimension counts are not supported; num_slots = blockNum × blockSize.
 - cache/cacheScale **supports non-contiguity only in the blockNum dimension** (paging): blocks can be sparsely arranged, but the data within each block (blockSize and headDim dimensions) must be contiguous.
 - **headDim length constraints**:
-  - **cache.headDim ≥ d** (in MX-FP4/HiFloat4 mode, counted in 4-bit elements; d values occupy ⌈d/2⌉ bytes).
-  - **In MX-FP4/HiFloat4 (quantMode=3/4) mode, cache.headDim must be an even number**.
-  - **cacheScale.headDim ≥ scaleCol**, where scaleCol is ⌈d/32⌉ for MX-FP8/MX-FP4 (quantMode=0/3), 1 for Normal/HiFloat8 (quantMode=1/2), and d/64 for HiFloat4 (quantMode=4).
+  - **cache.headDim ≥ d** (in MX-FP4 mode, counted in 4-bit elements; d values occupy ⌈d/2⌉ bytes).
+  - **In MX-FP4 (quantMode=3) mode, cache.headDim must be an even number**.
+  - **cacheScale.headDim ≥ scaleCol**, where scaleCol is ⌈d/32⌉ for MX-FP8/MX-FP4 (quantMode=0/3), and 1 for Normal/HiFloat8 (quantMode=1/2).
   - Example: d=128 and quantMode=0 → scaleCol=4 → cache.headDim ≥ 128 and cacheScale.headDim ≥ 4.
 - The last dimension (d axis) of x must be divisible by 32 and d ≤ 8192.
 - The dimension of slotMapping should equal the dimension of x minus 1; that is, slotMapping is obtained by flattening all dimensions of x except the last one.

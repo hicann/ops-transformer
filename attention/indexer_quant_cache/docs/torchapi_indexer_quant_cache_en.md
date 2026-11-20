@@ -132,7 +132,7 @@ This API has no return value. The computation results are written in-place direc
 
 ## Constraints
 
-- The current Torch API does not support HiFloat4 (mode4) available through ACLNN/GE. `torch.uint8` stores floating-point codes: cache carries E4M3 in mxfp8/fp8 mode, HiFloat8 in hifloat8 mode, and two E2M1 values per byte in mxfp4 mode; uint8 cache_scale carries E8M0 in mxfp8/mxfp4 mode.
+- `torch.uint8` stores floating-point codes: cache carries E4M3 in mxfp8/fp8 mode, HiFloat8 in hifloat8 mode, and two E2M1 values per byte in mxfp4 mode; uint8 cache_scale carries E8M0 in mxfp8/mxfp4 mode.
 
 - This API supports use in inference scenarios.
 - This API can be called in single-operator mode.

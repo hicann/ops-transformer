@@ -15,7 +15,7 @@ English | [简体中文](./README.md)
 
 ## Description
 
-- Operator function: Compresses and updates the KV Cache in place during the Epilog phase of the Indexer attention mechanism. The operator compresses the `float16`/`bfloat16` activation value `x` into FP8 (E4M3/E5M2), HiFloat8 (floating-point codes stored in UINT8), MX-FP4, or HiFloat4 format based on the quantization mode, and scatters the quantization results to `cache` based on `slot_mapping`. Except in HiFloat8 mode, the corresponding scale is also written to `cache_scale`. Tokens with a value of -1 in `slot_mapping` are skipped. Five quantization modes are supported: MX-FP8, Normal, HiFloat8, MX-FP4, and HiFloat4.
+- Operator function: Compresses and updates the KV Cache in place during the Epilog phase of the Indexer attention mechanism. The operator compresses the `float16`/`bfloat16` activation value `x` into FP8 (E4M3/E5M2), HiFloat8 (floating-point codes stored in UINT8), or MX-FP4 format based on the quantization mode, and scatters the quantization results to `cache` based on `slot_mapping`. Except in HiFloat8 mode, the corresponding scale is also written to `cache_scale`. Tokens with a value of -1 in `slot_mapping` are skipped. Four quantization modes are supported: MX-FP8, Normal, HiFloat8, and MX-FP4.
 
 - Computation formula:
 
@@ -30,19 +30,17 @@ English | [简体中文](./README.md)
   - `quant_mode=2` (HiFloat8): $x \times x\_scale$ is converted to hifloat8, and `cache_scale` is neither computed nor written back.
   - `quant_mode=3` (MX-FP4): The values are quantized to FP4 in standard MX blocks (every 32 elements) (uint8 packs 2 fp4 values per byte), and the scale is stored as `float8_e8m0`.
 
-  - `quant_mode=4` (HiFloat4): Supported only on ascend960dt (DAV_9201). Requires `d % 64 == 0`, HIFLOAT4 cache, and HIFLOAT4_SCALE cache_scale, with d/64 scale elements per row.
-
 ## Parameter Description
 
 | Parameter       | Input/Output/Attribute | Description                                                                          | Data Type                                                      | Data Format |
 | ------------ | -------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------ | -------- |
-| cache        | Input/Output      | KV Cache vector cache of the current layer, updated in place, that is, the quantization target in the formula. In MX-FP4 mode, it is uint8, with 2 fp4 values packed per byte. | FLOAT8_E4M3FN, FLOAT8_E5M2, UINT8, FLOAT4_E2M1, FLOAT4_E1M2, HIFLOAT4   | ND       |
-| cache_scale  | Input/Output      | Quantization scale tensor. In HiFloat8 mode, this input remains unchanged and is not written back.                        | FLOAT, FLOAT8_E8M0, HIFLOAT4_SCALE                             | ND       |
+| cache        | Input/Output      | KV Cache vector cache of the current layer, updated in place, that is, the quantization target in the formula. In MX-FP4 mode, it is uint8, with 2 fp4 values packed per byte. | FLOAT8_E4M3FN, FLOAT8_E5M2, UINT8, FLOAT4_E2M1, FLOAT4_E1M2   | ND       |
+| cache_scale  | Input/Output      | Quantization scale tensor. In HiFloat8 mode, this input remains unchanged and is not written back.                        | FLOAT, FLOAT8_E8M0                             | ND       |
 | x            | Input           | Activation input to be quantized, that is, `x` in the formula. The shape is [bs, d].                              | FLOAT16, BFLOAT16                                             | ND       |
 | slot_mapping | Input           | Index mapping from token to cache slot. A value of -1 indicates that the token is skipped. The shape is [bs].       | INT32                                                        | ND       |
-| cache        | Output           | KV Cache updated in place, which is the same tensor as the input `cache`.                            | FLOAT8_E4M3FN, FLOAT8_E5M2, UINT8, FLOAT4_E2M1, FLOAT4_E1M2, HIFLOAT4   | ND       |
-| cache_scale  | Output           | Scale written back in place in MX-FP8, Normal, MX-FP4, and HiFloat4 modes. In HiFloat8 mode, the input value remains unchanged.   | FLOAT, FLOAT8_E8M0, HIFLOAT4_SCALE                             | ND       |
-| quant_mode   | Optional attribute       | Quantization mode: 0=MX-FP8, 1=Normal, 2=HiFloat8, 3=MX-FP4, 4=HiFloat4. Default value: 1.                | INT                                                          | -        |
+| cache        | Output           | KV Cache updated in place, which is the same tensor as the input `cache`.                            | FLOAT8_E4M3FN, FLOAT8_E5M2, UINT8, FLOAT4_E2M1, FLOAT4_E1M2   | ND       |
+| cache_scale  | Output           | Scale written back in place in MX-FP8, Normal, and MX-FP4 modes. In HiFloat8 mode, the input value remains unchanged.   | FLOAT, FLOAT8_E8M0                             | ND       |
+| quant_mode   | Optional attribute       | Quantization mode: 0=MX-FP8, 1=Normal, 2=HiFloat8, 3=MX-FP4. Default value: 1.                | INT                                                          | -        |
 | round_scale  | Optional attribute       | Whether to round the scale up to a power of 2, only in Normal mode (quant_mode=1). Default value: true.              | BOOL                                                         | -        |
 | x_scale      | Optional attribute       | Global scale multiplier in HiFloat8 mode (quant_mode=2). Default value: 1.0.                 | FLOAT                                                        | -        |
 
