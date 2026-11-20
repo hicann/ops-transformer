@@ -73,7 +73,7 @@ __simd_vf__ inline void ProcessVec1Dn128V2VF(__ubuf__ T2* x_exp, __ubuf__ float*
     mem_bar(VST_VLD);
 
     if constexpr (hasAtten) {
-        for (uint16_t iter_m = 0; iter_m < uint16_t(s2BaseSize / 2); ++iter_m) {
+        for (uint16_t iter_m = 0; iter_m < uint16_t(n / 2); ++iter_m) {
             LoadAlign(vreg_src_0, src_ub_0 + iter_m * m * 2);
             LoadAlign(vreg_src_1, src_ub_1 + iter_m * m * 2);
             LoadAlign(vreg_src_2, src_ub_2 + iter_m * m * 2);
@@ -101,6 +101,25 @@ __simd_vf__ inline void ProcessVec1Dn128V2VF(__ubuf__ T2* x_exp, __ubuf__ float*
 
             Max(vreg_src_0, vreg_src_0, vreg_src_2, preg_input);
             Max(vreg_src_1, vreg_src_1, vreg_src_3, preg_input);
+            Max(vreg_max_0, vreg_max_0, vreg_src_0, preg_input);
+            Max(vreg_max_1, vreg_max_1, vreg_src_1, preg_input);
+        }
+        for (uint16_t iter_m = uint16_t(n / 2) * 2; iter_m < uint16_t(n); ++iter_m) {
+            LoadAlign(vreg_src_0, src_ub_0 + iter_m * m);
+            LoadAlign(vreg_src_1, src_ub_1 + iter_m * m);
+
+            Muls(vreg_src_0, vreg_src_0, scale, preg_input);
+            Muls(vreg_src_1, vreg_src_1, scale, preg_input);
+
+            LoadAlign<uint8_t, Reg::MaskDist::DIST_DS>(preg_mask_0, mask_ub_0 + iter_m * m);
+            LoadAlign<uint8_t, Reg::MaskDist::DIST_DS>(preg_mask_1, mask_ub_1 + iter_m * m);
+
+            Select(vreg_src_0, vreg_src_0, vreg_min, preg_mask_0);
+            Select(vreg_src_1, vreg_src_1, vreg_min, preg_mask_1);
+
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub_0 + iter_m * m, vreg_src_0, preg_input);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>(src_ub_1 + iter_m * m, vreg_src_1, preg_input);
+
             Max(vreg_max_0, vreg_max_0, vreg_src_0, preg_input);
             Max(vreg_max_1, vreg_max_1, vreg_src_1, preg_input);
         }
@@ -153,7 +172,7 @@ __simd_vf__ inline void ProcessVec1Dn128V2VF(__ubuf__ T2* x_exp, __ubuf__ float*
     if constexpr (hasAtten) {
         mem_bar(VST_VLD);
     }
-    for (uint16_t i = 0; i < uint16_t(s2BaseSize); ++i) {
+    for (uint16_t i = 0; i < uint16_t(n); ++i) {
         LoadAlign<T, Reg::LoadDist::DIST_DINTLV_B32>(vreg_src_0, vreg_src_1, input_x_local_UB + i * m);
 
         if constexpr (!hasAtten) {
