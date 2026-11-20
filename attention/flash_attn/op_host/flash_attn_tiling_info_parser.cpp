@@ -142,6 +142,7 @@ void FaInfoParser::GetOptionalInputParaInfo()
     GetOptionalInputParaPageAttentionInfo();
     GetOptionalInputParaSinksInfo();
     GetOptionalInputParaMaskInfo();
+    GetOptionalInputParaDropoutInfo();
 }
 void FaInfoParser::GetOptionalInputParaMaskInfo()
 {
@@ -173,6 +174,14 @@ void FaInfoParser::GetOptionalInputParaSinksInfo()
     opParamInfo_.sinks.desc = context_->GetOptionalInputDesc(SINKS_INDEX);
     opParamInfo_.metadata.tensor = context_->GetOptionalInputTensor(METADATA_INDEX);
     opParamInfo_.metadata.desc = context_->GetOptionalInputDesc(METADATA_INDEX);
+}
+
+void FaInfoParser::GetOptionalInputParaDropoutInfo()
+{
+    opParamInfo_.seed.tensor = context_->GetOptionalInputTensor(SEED_INDEX);
+    opParamInfo_.seed.desc = context_->GetOptionalInputDesc(SEED_INDEX);
+    opParamInfo_.offset.tensor = context_->GetOptionalInputTensor(OFFSET_INDEX);
+    opParamInfo_.offset.desc = context_->GetOptionalInputDesc(OFFSET_INDEX);
 }
 
 void FaInfoParser::GetInputParaInfo()
@@ -241,6 +250,9 @@ ge::graphStatus FaInfoParser::GetAttrParaInfo()
 
     // 索引9: return_softmax_lse (Int)
     opParamInfo_.returnSoftMaxLse = attrs->GetAttrPointer<int64_t>(ATTR_RETURN_LSE_INDEX);
+
+    // 索引10: dropout_p (Float), 丢弃概率
+    opParamInfo_.dropoutP = attrs->GetAttrPointer<float>(ATTR_DROPOUT_P_INDEX);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -562,6 +574,10 @@ void FaInfoParser::GenerateFeatureInfo(FaTilingInfo& faInfo)
     faInfo.totalLseSize =
         (opParamInfo_.lseOut.shape == nullptr) ? 0 : opParamInfo_.lseOut.shape->GetStorageShape().GetShapeSize();
 
+    // Dropout 参数组
+    faInfo.dropoutP = dropoutP_;
+    faInfo.hasDrop = (dropoutP_ > 0.0f);
+
     // 公共参数组 - 其他属性
     faInfo.maxSeqQ = maxSeqQ_;
     faInfo.maxSeqKv = maxSeqKv_;
@@ -706,6 +722,10 @@ ge::graphStatus FaInfoParser::ParseFeatureInfo()
     softmaxScale_ = (opParamInfo_.softmaxScale == nullptr) ? 1.0f : *opParamInfo_.softmaxScale;
     maxSeqQ_ = (opParamInfo_.maxSeqlenQ == nullptr) ? -1 : *opParamInfo_.maxSeqlenQ;
     maxSeqKv_ = (opParamInfo_.maxSeqlenKV == nullptr) ? -1 : *opParamInfo_.maxSeqlenKV;
+
+    // Dropout 参数组解析
+    // 文档约束：dropout_p 默认值为 0.0(不启用dropout)
+    dropoutP_ = (opParamInfo_.dropoutP == nullptr) ? 0.0f : *opParamInfo_.dropoutP;
 
     return ge::GRAPH_SUCCESS;
 }

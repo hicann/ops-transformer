@@ -103,7 +103,8 @@ template <typename INPUT_T, typename OUTPUT_T, bool PAGE_ATTENTION, FA_LAYOUT LA
           regbaseutil::DTemplateType dVTemplateType = regbaseutil::DTemplateType::Aligned128,
           regbaseutil::DTemplateType ORIGINAL_DV = regbaseutil::DTemplateType::Aligned128, bool HAS_MASK = false,
           uint32_t ubMm1ResBufcnt = 0, uint32_t ubMm2ResBufcnt = 0, uint32_t ubVec1ResBufcnt = 0,
-          uint32_t ubMaskBufcnt = 0, uint32_t l1PBufcnt = 0, uint32_t l1QBufcnt = 0, uint32_t l1KvBufcnt = 0>
+          uint32_t ubMaskBufcnt = 0, uint32_t l1PBufcnt = 0, uint32_t l1QBufcnt = 0, uint32_t l1KvBufcnt = 0,
+          bool HAS_DROP = false>
 struct FAType {
     using inputType = INPUT_T;
     using outputType = OUTPUT_T;
@@ -119,6 +120,7 @@ struct FAType {
     // ROW_PAD 按 originalDV 是否为 16 的倍数决定：非 16 对齐时为 true，例如 DV=72。
     static constexpr regbaseutil::DTemplateType originalDV = ORIGINAL_DV;
     static constexpr bool hasMask = HAS_MASK;
+    static constexpr bool hasDrop = HAS_DROP;
     // buffer 档位: 由入口按 config 从 ConfigValue/ConfigValueArch92 填充; arch35 block 不读取, 保持默认 0
     static constexpr uint32_t UB_MM1_RES_BUFCNT = ubMm1ResBufcnt;
     static constexpr uint32_t UB_MM2_RES_BUFCNT = ubMm2ResBufcnt;

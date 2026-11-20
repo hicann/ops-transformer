@@ -81,6 +81,16 @@ public:
             .DataTypeList({ge::DT_INT32})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
+        this->Input("seed")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_UINT64})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
+        this->Input("offset")
+            .ParamType(OPTIONAL)
+            .DataTypeList({ge::DT_UINT64})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
         this->Output("attn_out")
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT16, ge::DT_BF16})
@@ -102,6 +112,7 @@ public:
         this->Attr("layout_kv").AttrType(OPTIONAL).String("BSND");
         this->Attr("layout_out").AttrType(OPTIONAL).String("BSND");
         this->Attr("return_softmax_lse").AttrType(OPTIONAL).Int(0);
+        this->Attr("dropout_p").AttrType(OPTIONAL).Float(0.0f);
 
         OpAICoreConfig aicore_config_95;
         aicore_config_95.DynamicCompileStaticFlag(true)

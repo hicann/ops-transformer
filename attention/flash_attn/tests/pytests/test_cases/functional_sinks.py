@@ -92,7 +92,6 @@ TestCases = {
             [-1.0, 1.0],
         ],
         "variance": ["uniform"],
-        "seed": [86],
         "sinks": [True],
     },
     "FlashGen_S2_trunc_BSND_PA_BNBD_m0_1174": {
@@ -173,7 +172,6 @@ TestCases = {
             [-0.1, 0.1],
         ],
         "variance": ["high_var"],
-        "seed": [1174],
         "sinks": [True],
     },
     "FlashGen_S3_varlen_trunc_TND_TND_m4_2050": {
@@ -399,7 +397,6 @@ TestCases = {
             [-100.0, 100.0],
         ],
         "variance": ["with_zero"],
-        "seed": [2050],
         "sinks": [True],
     },
     "FlashGen_S4_exact_TND_PA_BBND_m3_3898": {
@@ -584,7 +581,6 @@ TestCases = {
             [-100.0, 100.0],
         ],
         "variance": ["with_zero"],
-        "seed": [3898],
         "sinks": [True],
     },
     "FlashGen_S5_empty_BNSD_PA_BBND_m0_4177": {
@@ -675,7 +671,6 @@ TestCases = {
             [-1.0, 1.0],
         ],
         "variance": ["uniform"],
-        "seed": [4177],
         "sinks": [True],
     },
     "FlashGen_S6_pa_decode_BNSD_PA_NZ_m0_5113": {
@@ -733,7 +728,6 @@ TestCases = {
             [-0.1, 0.1],
         ],
         "variance": ["high_var"],
-        "seed": [5113],
         "sinks": [True],
     },
     "FlashGen_S7_tnd_pa_varlen_TND_PA_BNBD_m4_6864": {
@@ -806,7 +800,6 @@ TestCases = {
             [-100.0, 100.0],
         ],
         "variance": ["with_zero"],
-        "seed": [6864],
         "sinks": [True],
     },
     "FlashGen_S1_varlen_TND_TND_m0_7441": {
@@ -884,7 +877,6 @@ TestCases = {
             [-0.1, 0.1],
         ],
         "variance": ["high_var"],
-        "seed": [7441],
         "sinks": [True],
     },
     "FlashGen_S2_trunc_BSND_BSND_m4_8632": {
@@ -1004,7 +996,6 @@ TestCases = {
             [-1.0, 1.0],
         ],
         "variance": ["high_var"],
-        "seed": [8632],
         "sinks": [True],
     },
     "FlashGen_S3_varlen_trunc_TND_PA_BBND_m3_9105": {
@@ -1042,7 +1033,6 @@ TestCases = {
             [-0.1, 0.1],
         ],
         "variance": ["extreme"],
-        "seed": [9105],
         "sinks": [True],
     },
     "FlashGen_S4_exact_TND_TND_m3_10713": {
@@ -1110,7 +1100,6 @@ TestCases = {
             [-1.0, 1.0],
         ],
         "variance": ["high_var"],
-        "seed": [10713],
         "sinks": [True],
     },
     "FlashGen_S5_empty_BNSD_BNSD_m4_11506": {
@@ -1147,7 +1136,6 @@ TestCases = {
             [-100.0, 100.0],
         ],
         "variance": ["with_zero"],
-        "seed": [11506],
         "sinks": [True],
     },
     "FlashGen_S6_pa_decode_BSND_PA_NZ_m0_12107": {
@@ -1197,7 +1185,6 @@ TestCases = {
             [-100.0, 100.0],
         ],
         "variance": ["uniform"],
-        "seed": [12107],
         "sinks": [True],
     },
     "FlashGen_S7_tnd_pa_varlen_TND_PA_BNBD_m4_13055": {
@@ -1281,7 +1268,6 @@ TestCases = {
             [-0.1, 0.1],
         ],
         "variance": ["uniform"],
-        "seed": [13055],
         "sinks": [True],
     },
     "FlashGen_S1_varlen_TND_TND_m4_14336": {
@@ -1356,7 +1342,6 @@ TestCases = {
             [-1.0, 1.0],
         ],
         "variance": ["uniform"],
-        "seed": [14336],
         "sinks": [True],
     },
     "FlashGen_S2_trunc_BSND_PA_NZ_m3_15111": {
@@ -1453,7 +1438,6 @@ TestCases = {
             [-0.1, 0.1],
         ],
         "variance": ["high_var"],
-        "seed": [15111],
         "sinks": [True],
     },
     "FlashGen_S3_varlen_trunc_TND_PA_BNBD_m0_16007": {
@@ -1594,7 +1578,6 @@ TestCases = {
             [-100.0, 100.0],
         ],
         "variance": ["uniform"],
-        "seed": [16007],
         "sinks": [True],
     },
     "FlashGen_S4_exact_TND_TND_m4_17268": {
@@ -1637,7 +1620,6 @@ TestCases = {
             [-1.0, 1.0],
         ],
         "variance": ["with_zero"],
-        "seed": [17268],
         "sinks": [True],
     },
     "FlashGen_S5_empty_BNSD_PA_BBND_m4_18586": {
@@ -1745,7 +1727,6 @@ TestCases = {
             [-0.1, 0.1],
         ],
         "variance": ["extreme"],
-        "seed": [18586],
         "sinks": [True],
     },
     "FlashGen_S6_pa_decode_BSND_PA_NZ_m4_19583": {
@@ -1820,7 +1801,6 @@ TestCases = {
             [-0.1, 0.1],
         ],
         "variance": ["extreme"],
-        "seed": [19583],
         "sinks": [True],
     },
     "FlashGen_S8_gap_case21_TND_TND_m0_902101": {
@@ -1854,7 +1834,6 @@ TestCases = {
             [-0.1, 0.1],
         ],
         "variance": ["uniform"],
-        "seed": [902101],
         "sinks": [True],
     },
     "FlashGen_S8_gap_case21_BSND_PA_BNBD_m3_902102": {
@@ -1888,7 +1867,6 @@ TestCases = {
             [-0.1, 0.1],
         ],
         "variance": ["uniform"],
-        "seed": [902102],
         "sinks": [True],
     },
     "FlashGen_S8_rot_deep_g2_TND_TND_m0_902103": {
@@ -1922,7 +1900,6 @@ TestCases = {
             [-0.1, 0.1],
         ],
         "variance": ["uniform"],
-        "seed": [902103],
         "sinks": [True],
     },
     "FlashGen_S8_mixkv_BNSD_BNSD_BSND_m0_902104": {
@@ -1953,7 +1930,6 @@ TestCases = {
             [-0.1, 0.1],
         ],
         "variance": ["uniform"],
-        "seed": [902104],
         "sinks": [True],
     },}
 # fmt: on

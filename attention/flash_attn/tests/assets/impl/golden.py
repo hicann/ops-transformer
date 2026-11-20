@@ -17,6 +17,8 @@ from typing import Optional, Tuple
 
 import torch
 
+from .dropout import DropoutMask
+
 
 class FlashAttnGolden:
     """FlashAttn Golden reference implementation (non-quantized).
@@ -72,6 +74,9 @@ class FlashAttnGolden:
         layout_kv: str = "BSND",
         layout_out: str = "BSND",
         return_softmax_lse: bool = False,
+        dropout_p: float = 0.0,
+        seed: Optional[torch.Tensor] = None,
+        offset: Optional[torch.Tensor] = None,
         device_mode: str = "cpu",
         compute_mode: str = "auto",
     ) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -195,6 +200,19 @@ class FlashAttnGolden:
             ):
                 raise ValueError(f"seqused_{name} exceeds physical sequence capacity")
 
+        dropout = DropoutMask(
+            dropout_p,
+            seed,
+            offset,
+            self._num_heads_q,
+            q_lens,
+            kv_lens,
+            layout_q,
+            self._num_heads_kv,
+        )
+        if dropout.dropout_p == 0.0:
+            dropout = None
+
         if compute_mode == "auto":
             if q_lens is not None and kv_lens is not None:
                 max_sq = max(q_lens)
@@ -230,14 +248,15 @@ class FlashAttnGolden:
             scale,
             sinks,
             compute_mode,
+            dropout,
         )
 
         if layout_out in ("TND", "NTD"):
-            attn_out = out_f32.to(orig_dtype)
+            attn_out = self._cast_round(out_f32, orig_dtype).to(orig_dtype)
             if layout_out == "NTD":
                 attn_out = attn_out.permute(1, 0, 2).contiguous()
         else:
-            out_bnsd = out_f32.to(orig_dtype)
+            out_bnsd = self._cast_round(out_f32, orig_dtype).to(orig_dtype)
             if layout_out == "BNSD":
                 attn_out = out_bnsd
             elif layout_out == "BSND":
@@ -271,6 +290,7 @@ class FlashAttnGolden:
         scale,
         sinks,
         compute_mode="tiled",
+        dropout=None,
     ):
         N_q = self._num_heads_q
         N_kv = self._num_heads_kv
@@ -381,6 +401,7 @@ class FlashAttnGolden:
                     qh = kv_h * group + g
                     q_bh = q_b[0, qh, :sq, :]
                     sink = sinks[qh] if sinks is not None else None
+                    drop = dropout.for_head(b, qh) if dropout is not None else None
                     if compute_mode == "tiled":
                         o, l = compute_fn(
                             q_bh,
@@ -393,9 +414,10 @@ class FlashAttnGolden:
                             delta,
                             win_left,
                             win_right,
+                            drop,
                         )
                     else:
-                        o, l = compute_fn(q_bh, k_bh, v_bh, mask_b, scale, sink)
+                        o, l = compute_fn(q_bh, k_bh, v_bh, mask_b, scale, sink, drop)
                     if is_tnd_out:
                         out_tnd[q_start : q_start + sq, qh, :] = o
                         lse_tnd[qh, q_start : q_start + sq] = l
@@ -546,6 +568,7 @@ class FlashAttnGolden:
         delta=0,
         win_left=-1,
         win_right=-1,
+        dropout=None,
     ):
         def mask_fn(qs, qe, ks, ke):
             if mask_mode in (3, 4):
@@ -559,14 +582,31 @@ class FlashAttnGolden:
                 )
             return None if mask is None else mask[qs:qe, ks:ke]
 
-        return self._attention(q, k, v, scale, self._tile_size, mask_fn, sink)
+        return self._attention(q, k, v, scale, self._tile_size, mask_fn, sink, dropout)
 
-    def _compute_full_single(self, q, k, v, mask, scale, sink):
+    def _compute_full_single(self, q, k, v, mask, scale, sink, dropout=None):
         return self._attention(
-            q, k, v, scale, max(q.shape[0], k.shape[0], 1), lambda *args: mask, sink
+            q,
+            k,
+            v,
+            scale,
+            max(q.shape[0], k.shape[0], 1),
+            lambda *args: mask,
+            sink,
+            dropout,
         )
 
-    def _attention(self, q, k, v, scale, tile_size, mask_fn, sink):
+    @staticmethod
+    def _cast_round(value, dtype):
+        """Match the arch35 vector-to-Cube P cast: round to nearest, ties away from zero."""
+        rounded = value.to(dtype)
+        low = rounded.float()
+        direction = torch.where(value > low, float("inf"), float("-inf"))
+        other = torch.nextafter(rounded, direction.to(dtype)).float()
+        tie = (value == (low + other) * 0.5) & (value != low)
+        return torch.where(tie, torch.where(value.abs() > low.abs(), other, low), low)
+
+    def _attention(self, q, k, v, scale, tile_size, mask_fn, sink, dropout=None):
         rows, length = q.shape[0], k.shape[0]
         out = torch.zeros((rows, v.shape[-1]), dtype=torch.float32, device=q.device)
         lse = torch.full((rows,), float("inf"), dtype=torch.float32, device=q.device)
@@ -589,7 +629,12 @@ class FlashAttnGolden:
                 correction = (maximum - safe_max).exp()
                 weights = (scores - safe_max).exp()
                 total = total * correction + weights.sum(-1, keepdim=True)
-                acc = acc * correction + weights.to(self._p_dtype).float() @ v[ks:ke]
+                if dropout is not None:
+                    weights = dropout(weights, qs, qe, ks, ke)
+                acc = (
+                    acc * correction
+                    + self._cast_round(weights, self._p_dtype) @ v[ks:ke]
+                )
                 maximum = new_max
             empty = total == 0
             output = acc / torch.where(empty, 1.0, total)
@@ -712,6 +757,7 @@ def _run_reference(golden_cls, arguments):
         q_cpu,
         k_cpu,
         v_cpu,
+        metadata=_to_cpu(arguments.get("metadata")),
         block_table=_to_cpu(arguments.get("block_table")),
         cu_seqlens_q=_to_cpu(arguments.get("cu_seqlens_q")),
         cu_seqlens_kv=_to_cpu(arguments.get("cu_seqlens_kv")),
@@ -728,6 +774,9 @@ def _run_reference(golden_cls, arguments):
         layout_kv=layout_kv,
         layout_out=arguments["layout_out"],
         return_softmax_lse=bool(arguments["return_softmax_lse"]),
+        dropout_p=arguments.get("dropout_p", 0.0),
+        seed=_to_cpu(arguments.get("seed")),
+        offset=_to_cpu(arguments.get("offset")),
         device_mode="cpu",
         compute_mode="auto",
     )
@@ -759,6 +808,9 @@ def cpu_flash_attn(
     layout_kv: str = "BSND",
     layout_out: str = "BSND",
     return_softmax_lse: bool = False,
+    dropout_p: float = 0.0,
+    seed: Optional[torch.Tensor] = None,
+    offset: Optional[torch.Tensor] = None,
     **_unused,
 ):
     """Compute CPU golden reference using FlashAttnGolden."""

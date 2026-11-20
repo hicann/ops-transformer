@@ -45,6 +45,8 @@ TEST_P(FlashAttnArch35TilingTest, tiling)
             param.sinks,
             param.attn_mask,
             param.metadata,
+            param.seed,
+            param.offset,
         },
         {
             param.attn_out,
@@ -63,6 +65,10 @@ TEST_P(FlashAttnArch35TilingTest, tiling)
             {"return_softmax_lse", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.return_softmax_lse)},
         },
         param.inputInstance, param.outputInstance, &param.compileInfo, "Ascend950", 64, 262144, 8192);
+    if (param.dropout_p.has_value()) {
+        tilingContextPara.attrs_.emplace_back("dropout_p",
+                                              Ops::Transformer::AnyValue::CreateFrom<float>(*param.dropout_p));
+    }
 
     ExecuteTestCase(tilingContextPara, param.expectResult, param.expectTilingKey, param.expectTilingDataHash, {}, 0,
                     true);
@@ -76,6 +82,12 @@ INSTANTIATE_TEST_SUITE_P(
     FlashAttnStride, FlashAttnArch35TilingTest,
     testing::ValuesIn(GetCasesFromCsv<FlashAttnTilingUtParam>(
         std::filesystem::path(__FILE__).replace_filename("test_flash_attn_tiling_stride.csv").string())),
+    PrintCaseInfoString<FlashAttnTilingUtParam>);
+
+INSTANTIATE_TEST_SUITE_P(
+    FlashAttnDropout, FlashAttnArch35TilingTest,
+    testing::ValuesIn(GetCasesFromCsv<FlashAttnTilingUtParam>(
+        std::filesystem::path(__FILE__).replace_filename("test_flash_attn_tiling_dropout.csv").string())),
     PrintCaseInfoString<FlashAttnTilingUtParam>);
 
 } // namespace FlashAttnUT

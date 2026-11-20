@@ -53,6 +53,15 @@
 
   The product of $Q$ and $K^T$ represents the attention of input $x$. To prevent this value from becoming too large, it is usually scaled by dividing by $\sqrt{d}$. After softmax normalization on each row, multiplying by $V$ yields an $n \times d$ matrix.
 
+  When **dropout** is enabled (`dropout_p > 0`), the normalized attention weights are masked and scaled:
+
+  $$
+  P = Softmax(\frac{QK^T}{\sqrt{d}}),\qquad
+  Attention_{drop} = \left(P \odot dropout\_mask / (1 - dropout\_p)\right)V
+  $$
+
+  Here, $dropout\_mask$ is a 0/1 mask generated inside the operator from `seed` and `offset`, and $\odot$ denotes elementwise multiplication. When `sinks` is provided, $P$ uses the denominator including the sink term below. Dropout only affects the weights multiplied by $V$; it does not change the softmax denominator or LSE.
+
   After **sink** is added, the calculation logic is as follows. The softmax_max and softmax_sum calculation parts are mainly modified.
 
   $$
@@ -110,7 +119,8 @@ cann_ops_transformer.flash_attn_metadata(
     layout_q=None,
     layout_kv=None,
     layout_out=None,
-    is_grad_enabled=False
+    is_grad_enabled=False,
+    dropout_p=0.0,
 ) -> Tensor
 ```
 
@@ -136,7 +146,10 @@ cann_ops_transformer.flash_attn(
     layout_q="BSND",
     layout_kv="BSND",
     layout_out="BSND",
-    return_softmax_lse=False
+    return_softmax_lse=False,
+    dropout_p=0.0,
+    seed=None,
+    offset=None,
 ) -> (Tensor, Tensor)
 ```
 
@@ -164,6 +177,7 @@ cann_ops_transformer.flash_attn(
 | layout_kv | string | Optional | Defines the layout format of input tensors k and v | string | - | - |
 | layout_out | string | Optional | Defines the layout format of the output tensor | string | - | - |
 | is_grad_enabled | bool | Optional | Whether to generate metadata required for backward gradients. Default value is False. When set to True, the metadata contains flash_attn_grad information required for backward | bool | - | - |
+| dropout_p | float | Optional | Probability that data is dropped, default 0.0. Value range: [0, 1). | double | - | - |
 
 **About `head_dim_v`**: `flash_attn_metadata` has no q/k/v tensor input, so the head_dim of V cannot be inferred from the tensor shape. It is therefore explicitly declared by the scalar parameter `head_dim_v`:
 
@@ -196,6 +210,9 @@ cann_ops_transformer.flash_attn(
 | layout_kv | string | Optional | Defines input k and v tensor layout format. | string | - | - |
 | layout_out | string | Optional | Defines output tensor layout format. | string | - | - |
 | return_softmax_lse | bool | Optional | Whether to obtain the LSE result of softmax. | bool | - | - |
+| dropout_p | float | Optional | Probability that data is dropped, default 0.0. Value range: [0, 1). | double | - | - |
+| seed | Tensor | Optional | Dropout random seed, default None. When dropout is enabled, the absent value is treated as 0. Must be None when dropout_p=0. | uint64 | ND | (1,) |
+| offset | Tensor | Optional | Dropout random position offset, default None. When dropout is enabled, the absent value is treated as 0. Must be None when dropout_p=0. | uint64 | ND | (1,) |
 
 ## Returns
 
@@ -250,6 +267,9 @@ cann_ops_transformer.flash_attn(
 |  Sinks Parameter Group  |     sinks     | INPUT(OPTIONAL) |   Tensor   |
 |   SoftmaxLSE Parameter Group   |    return_softmax_lse    | ATTR(OPTIONAL) |    bool    |
 |                      |      softmax_lse      |     OUTPUT     |   Tensor   |
+|   Dropout Parameter Group   |    dropout_p    | ATTR(OPTIONAL) |    float    |
+|                      |      seed      | INPUT(OPTIONAL) |   Tensor   |
+|                      |      offset      | INPUT(OPTIONAL) |   Tensor   |
 
 ### Baseline Information
 
@@ -751,6 +771,66 @@ Combination relationship between layout_q, layout_kv, and SeqLens parameters:
         </tr>
     </tbody>
 </table>
+
+#### Dropout Parameter Group
+
+<table style="undefined;table-layout: fixed; width:1625px">
+    <colgroup>
+        <col style="width: 147px">
+        <col style="width: 232px">
+        <col style="width: 232px">
+        <col style="width: 293px">
+        <col style="width: 185px">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>Parameter</th>
+            <th>Single-Parameter Validation</th>
+            <th>Existence Validation</th>
+            <th>Consistency Validation</th>
+            <th>Feature Cross-Validation</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>dropout_p</td>
+            <td>
+                <ul>
+                    <li>Only the double data type is supported.</li>
+                    <li>Must be finite and in [0,1).</li>
+                </ul>
+            </td>
+            <td>Optional attribute. The default value is 0.0.</td>
+            <td>None</td>
+            <td>When greater than 0, KV must be contiguous. This excludes PA_BBND, PA_BNBD, and PA_NZ.</td>
+        </tr>
+        <tr>
+            <td>seed</td>
+            <td>
+                <ul>
+                    <li>Only the uint64 data type is supported.</li>
+                    <li>tensor_shape is (1,).</li>
+                </ul>
+            </td>
+            <td>Optional input. The default value is None; when dropout is enabled, the absent value is treated as 0.</td>
+            <td>Must be None when dropout_p=0</td>
+            <td>Used for random mask generation only when dropout is enabled</td>
+        </tr>
+        <tr>
+            <td>offset</td>
+            <td>
+                <ul>
+                    <li>Only the uint64 data type is supported.</li>
+                    <li>tensor_shape is (1,).</li>
+                </ul>
+            </td>
+            <td>Optional input. The default value is None; when dropout is enabled, the absent value is treated as 0.</td>
+            <td>Must be None when dropout_p=0</td>
+            <td>Used for random mask generation only when dropout is enabled</td>
+        </tr>
+    </tbody>
+</table>
+
 
 ## Example
 

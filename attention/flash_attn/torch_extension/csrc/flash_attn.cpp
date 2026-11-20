@@ -71,11 +71,11 @@ at::Tensor FlashAttnMetadata(const c10::optional<at::Tensor>& cuSeqlensQ, const 
                              int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim, int64_t headDimV,
                              int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t maskMode,
                              int64_t winLeft, int64_t winRight, std::string layoutQ, std::string layoutKv,
-                             std::string layoutOut, bool isGradEnabled, const at::Tensor& output)
+                             std::string layoutOut, bool isGradEnabled, double dropoutP, const at::Tensor& output)
 {
     ACLNN_CMD(aclnnFlashAttnMetadata, cuSeqlensQ, cuSeqlensKv, sequsedQ, sequsedKv, batchSize, maxSeqlenQ, maxSeqlenKv,
               numHeadsQ, numHeadsKv, headDim, headDimV, maskMode, winLeft, winRight, layoutQ, layoutKv, layoutOut,
-              isGradEnabled, output);
+              isGradEnabled, dropoutP, output);
     return output;
 }
 
@@ -86,7 +86,8 @@ std::tuple<at::Tensor, at::Tensor> FlashAttn(
     const c10::optional<at::Tensor>& sinks, const c10::optional<at::Tensor>& attnMask,
     const c10::optional<at::Tensor>& metadata, double softmaxScale, int64_t maskMode, int64_t winLeft, int64_t winRight,
     int64_t maxSeqlenQ, int64_t maxSeqlenKv, string layoutQ, string layoutKv, string layoutOut,
-    int64_t returnSoftmaxLse)
+    int64_t returnSoftmaxLse, double dropoutP, const c10::optional<at::Tensor>& seed,
+    const c10::optional<at::Tensor>& offset)
 {
     CheckLayoutDims(q, "q", layoutQ);
     CheckLayoutDims(k, "k", layoutKv);
@@ -158,8 +159,8 @@ std::tuple<at::Tensor, at::Tensor> FlashAttn(
 
     // Python bool → C++ int64_t: pybind11 auto-converts return_softmax_lse (True→1, False→0) before reaching here
     ACLNN_CMD(aclnnFlashAttn, q, k, v, blockTable, cuSeqlensQ, cuSeqlensKv, sequsedQ, sequsedKv, sinks, attnMask,
-              metadata, softmaxScale, maskMode, winLeft, winRight, maxSeqlenQ, maxSeqlenKv, layoutQPtr, layoutKvPtr,
-              layoutOutPtr, returnSoftmaxLse, attentionOutput, softmaxLse);
+              metadata, seed, offset, softmaxScale, maskMode, winLeft, winRight, maxSeqlenQ, maxSeqlenKv, layoutQPtr,
+              layoutKvPtr, layoutOutPtr, returnSoftmaxLse, dropoutP, attentionOutput, softmaxLse);
 
     return std::tuple<at::Tensor, at::Tensor>(attentionOutput, softmaxLse);
 }

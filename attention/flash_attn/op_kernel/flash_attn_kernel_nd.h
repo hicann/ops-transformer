@@ -119,9 +119,9 @@ public:
     __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
                                 __gm__ uint8_t* blockTable, __gm__ uint8_t* cuSeqLensQ, __gm__ uint8_t* cuSeqLensKv,
                                 __gm__ uint8_t* seqUsedQ, __gm__ uint8_t* seqUsedKv, __gm__ uint8_t* learnableSink,
-                                __gm__ uint8_t* attenMask, __gm__ uint8_t* fiaMetaData, __gm__ uint8_t* attentionOut,
-                                __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
-                                __tiling_data_ptr__ FlashAttnNoQuantTilingArch35* tiling)
+                                __gm__ uint8_t* attenMask, __gm__ uint8_t* fiaMetaData, __gm__ uint8_t* seed,
+                                __gm__ uint8_t* offset, __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse,
+                                __gm__ uint8_t* workspace, __tiling_data_ptr__ FlashAttnNoQuantTilingArch35* tiling)
     {
         tilingData_ = tiling;
 
@@ -152,6 +152,14 @@ public:
             cubeBlock_.InitBlock(query, key, value, blockTable);
         }
         if ASCEND_IS_AIV {
+#if __NPU_ARCH__ == 3510
+            if constexpr (FA_T::hasDrop) {
+                constexpr uint64_t bytesPerCounter = regbaseutil::philoxRandomNumAlignSize;
+                constInfo_.seed = seed == nullptr ? 0 : *reinterpret_cast<__gm__ uint64_t*>(seed);
+                uint64_t offsetValue = offset == nullptr ? 0 : *reinterpret_cast<__gm__ uint64_t*>(offset);
+                constInfo_.dropCounter = offsetValue / bytesPerCounter + (offsetValue % bytesPerCounter != 0);
+            }
+#endif
             vecFaBlock_.InitBlock(attenMask, learnableSink, softmaxLse, attentionOut, workspace);
             vecFaBlock_.ClearOutput();
             if (constInfo_.enableFlashDecode) {
@@ -213,6 +221,9 @@ public:
         }
         // LSE
         constInfo_.isSoftmaxLseEnable = tilingData_->flashAttnBaseParams.isSoftMaxLseEnable;
+
+        constInfo_.keepProb = tilingData_->flashAttnDropParams.keepProb;
+        constInfo_.keepProbUint8 = tilingData_->flashAttnDropParams.keepProbUint8;
 
         constInfo_.dBasicBlock = BaseApi::Align64Func((uint16_t)constInfo_.dSizeV);
     }

@@ -436,7 +436,14 @@ struct SinkConstInfo {
     bool learnableSinkFlag = false;
 };
 
-struct ConstInfo_t : CommonConstInfo, PAConstInfo, LseConstInfo, SinkConstInfo {};
+struct DropConstInfo {
+    float keepProb = 1.0f;       // 保留概率；VF 使用 1/keepProb 缩放，1.0 表示无dropout
+    uint8_t keepProbUint8 = 255; // Philox 掩码生成阈值 keepProb*255
+    uint64_t seed = 0;           // Philox 种子
+    uint64_t dropCounter = 0;    // offset 按 16 向上换算的起始 counter
+};
+
+struct ConstInfo_t : CommonConstInfo, PAConstInfo, LseConstInfo, SinkConstInfo, DropConstInfo {};
 
 } // namespace FlashAttnKernel
 

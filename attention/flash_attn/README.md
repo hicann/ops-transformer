@@ -59,7 +59,7 @@ cd build_out
 - **`--tiling_key`（只编译指定 tiling key 变体）**：默认全量编译会生成所有 tiling key 的 kernel 变体，耗时较长。当只需要调试/验证特定布局与配置组合（如仅 BSND/BNSD/TND × 无 mask × D=128，走 DN 模板）时，可只编译对应变体以加速：
 
   ```bash
-  bash build.sh --pkg --soc=ascend950 --ops=flash_attn,flash_attn_metadata --tiling_key="67239936;67239937;67239938"
+  bash build.sh --pkg --soc=ascend950 --ops=flash_attn,flash_attn_metadata --tiling_key="134479872;134479873;134479874"
   ```
 
   各 tiling key 的编码含义见[开发者指南 §5](#5-tilingkey)。
@@ -227,6 +227,11 @@ cd build && ctest -R flash_attn_tiling --output-on-failure
 - **FlashDecode**：decode 阶段 S1 很小（如 1）、S2 很长时的优化——将 KV 方向 split-K 切分到多个 AIV 核并行计算，再跨核归约，避免单核串行扫描全部 KV。
 - 分两个阶段：FA 阶段每个 split 独立算局部 softmax max/sum 与部分输出（写入 workspace）；FD 阶段跨 split 归约全局 max/sum、重算 scale、加权求和得最终输出。
 - 自动启用（由 metadata 的 `enableFlashDecode` 决定），无需用户配置；`return_softmax_lse` 与 FlashDecode 可同时使用（LSE 从 FD 归约结果直接产出）。
+
+#### 1.10 Dropout
+
+- Dropout 默认关闭（`dropout_p=0.0`）。当 `dropout_p > 0` 时，算子根据 `seed` 和 `offset` 两个 Tensor 输入生成 Philox 掩码并执行 inverted dropout。LSE 基于施加 dropout 前的权重计算。
+- Dropout 仅支持前向计算，开启时要求 K/V 使用连续布局。
 
 ### 2. 代码分层
 
@@ -442,35 +447,36 @@ FD 段  [section][aivIdx(72)][16 字段]：bN2Idx, mIdx(gS1Idx), workspaceIdx, s
 
 ### 5. TilingKey
 
-**作用**：编译期决定生成哪些 kernel 变体，运行期选择变体。5 个模板参数按 8+8+1+8+4 位从 bit0 起拼成 tiling key（`flash_attn_template_tiling_key.h`）：
+**作用**：编译期决定生成哪些 kernel 变体，运行期选择变体。6 个模板参数按 8+8+1+1+8+4 位从 bit0 起拼成 tiling key（`flash_attn_template_tiling_key.h`）：
 
 | bits | 参数 | 取值 |
 |---|---|---|
 | 0-7 | InOutLayoutType | 0=BSND, 1=BNSD, 2=TND, 3=BNSD_BSND |
 | 8-15 | KvLayoutType | 0=连续, 1=PA_BBND, 2=PA_BNBD, 3=PA_NZ |
 | 16 | HasAttenMask | false/true |
-| 17-24 | TemplateId | 0=ND模板, 1=合轴 DN模板, 2=不合轴 DN模板 |
-| 25-28 | Config | 0~9（S1/S2/D/DV/originalDV 及 buffer 档位，见 §3 基本块；arch35 config 6/7 为 D=192/DV=128，config 8/9 为模板 D=DV=128、originalDV=72） |
+| 17 | HasDrop | false/true；dropout_p>0 时为 true |
+| 18-25 | TemplateId | 0=ND模板, 1=合轴 DN模板, 2=不合轴 DN模板 |
+| 26-29 | Config | 0~9（S1/S2/D/DV/originalDV 及 buffer 档位，见 §3 基本块；arch35 config 6/7 为 D=192/DV=128，config 8/9 为模板 D=DV=128、originalDV=72） |
 
 **SEL 实例化范围**（三段，编译期按组合枚举 kernel 变体）：
 
-- ND（templateId=0）：全组合 4×4×2×10=320 个；
-- 合轴 DN（templateId=1）：仅无 attenMask 且 config∈{0,2,6,8}，4×4×1×4=64 个；
-- 不合轴 DN（templateId=2）：全组合 4×4×2×10=320 个。
+- ND（templateId=0）：无 dropout 时为 4×4×2×10=320 个；有 dropout 时仅注册连续 KV，4×1×2×10=80 个；
+- 合轴 DN（templateId=1）：仅无 attenMask、无 dropout 且 config∈{0,2,6,8}，4×4×1×4=64 个；
+- 不合轴 DN（templateId=2）：无 dropout；组合 4×4×2×10=320 个。
 
-以上为编译期 SEL 枚举范围，运行时只选择满足 host 路由条件的变体。arch35 当前默认启用不合轴 DN，三段共704个变体/数据类型；arch92 仍使用共享 SEL，但 host 仅选择其支持的档位。
+以上为编译期 SEL 枚举范围，运行时只选择满足 host 路由条件的变体。arch35 当前默认启用不合轴 DN，三种路径共 784 个变体/数据类型；arch92 仍使用共享 SEL，但 host 仅选择其支持的档位。
 
-**生成**：host tiling 的 `GenTilingKey` 一步 —— `UpdateTilingKeyInfo`（按布局/mask/templateId/config 填 tilingKeyInfo）→ `GET_TPL_TILING_KEY`（`arch35/flash_attn_tiling.cpp`）。其中 `UpdateTilingKeyTemplateId` 调用与 metadata 共享的 `GetFlashAttnTemplateId`，依次选择不合轴 DN、合轴 DN、ND；`dnFlag_` 仅表示合轴 DN。具体条件见 §6。
+**生成**：host tiling 的 `GenTilingKey` 一步 —— `UpdateTilingKeyInfo`（按布局/mask/dropout/templateId/config 填 tilingKeyInfo）→ `GET_TPL_TILING_KEY`（`arch35/flash_attn_tiling.cpp`）。其中 `UpdateTilingKeyTemplateId` 调用与 metadata 共享的 `GetFlashAttnTemplateId`，依次选择不合轴 DN、合轴 DN、ND；`dnFlag_` 仅表示合轴 DN。 开启dropout时统一选择ND模板。具体条件见 §6。
 
 **下发与选择**：tiling 期 `SetTilingKey` 写入 TilingContext；运行时 kernel 按 key 选择变体执行。编译期可用 `--tiling_key` 指定只生成部分变体（见 Quick Start 编译）。
 
-**示例解码**：tiling key `67239936` = 0x4020000 → InOutLayoutType=0(BSND)、KvLayout=0(连续)、无mask、templateId=1(DN)、config=2(D=128, sOuter=64, sInner=128)。
+**示例解码**：tiling key `134479872` = 0x8040000 → InOutLayoutType=0(BSND)、KvLayout=0(连续)、无mask、无dropout、templateId=1(DN)、config=2(D=128, sOuter=64, sInner=128)。
 
 **与模板路由的关系**：`config` 区分基本块和原始 DV，`templateId` 区分 ND、合轴 DN、不合轴 DN；两者共同决定 kernel 变体。host 与 metadata 共享模板选择，详见 §6。
 
 ### 6. kernel 入口与模板范围
 
-kernel 按 tiling key 的 5 个模板参数编译出不同变体；运行时入口 `op_kernel/flash_attn.cpp` 同时编译 AIC 与 AIV（`KERNEL_TYPE_MIX_AIC_1_2`，`__DAV_CUBE__` 区分 Cube 编译/Vector 编译），每个 AIC 配 2 个 AIV（CV_RATIO=2）。
+kernel 按 tiling key 的 6 个模板参数编译出不同变体；运行时入口 `op_kernel/flash_attn.cpp` 同时编译 AIC 与 AIV（`KERNEL_TYPE_MIX_AIC_1_2`，`__DAV_CUBE__` 区分 Cube 编译/Vector 编译），每个 AIC 配 2 个 AIV（CV_RATIO=2）。
 
 arch35 路由由 `UpdateTilingKeyTemplateId` 调用共享函数决定；kernel 按 `templateId` 分发：
 
@@ -483,9 +489,9 @@ dnFlag_ = tilingKeyInfo_.templateId == FA_Template_DN;
 
 | 路径 | 条件（按优先级依次判断） | 调度框架 | softmax VF |
 |---|---|---|---|
-| 不合轴 DN（templateId=2） | `DN_UNMERGED_ROUTE_ENABLED=true`（当前默认）、真实 V head dim≤128、`maxSeqQ≥256` 且 `maskMode∈{0,3}` | flash_attn_kernel_dn_unmerged.h | ProcessVec1VfDnLine / ProcessVec1VfDn |
-| 合轴 DN（templateId=1） | 未命中不合轴 DN，且 `maskMode=0`、`sOuter=64`，支持维度对应 config∈{0,2,6,8} | flash_attn_kernel_dn.h | ProcessVec1VfDn |
-| ND（templateId=0） | 其余支持场景 | flash_attn_kernel_nd.h | ProcessVec1Vf |
+| 不合轴 DN（templateId=2） | 无dropout、`DN_UNMERGED_ROUTE_ENABLED=true`（当前默认）、真实 V head dim≤128、`maxSeqQ≥256` 且 `maskMode∈{0,3}` | flash_attn_kernel_dn_unmerged.h | ProcessVec1VfDnLine / ProcessVec1VfDn |
+| 合轴 DN（templateId=1） | 无dropout、未命中不合轴 DN，且 `maskMode=0`、`sOuter=64`，支持维度对应 config∈{0,2,6,8} | flash_attn_kernel_dn.h | ProcessVec1VfDn |
+| ND（templateId=0） | 开启dropout，或非DN其余支持场景 | flash_attn_kernel_nd.h | ProcessVec1Vf |
 
 例如真实 D=DV=72、`maxSeqQ=256`、`maskMode=0` 时，使用 config8、templateId2；`maxSeqQ=128` 且 `sOuter=64` 时使用 config8、templateId1。config8/9 的 `originalDV` 均为72，因此模板路由变化不会丢失输出 padding 信息。
 
@@ -604,18 +610,20 @@ AIC 侧按存储层级分配 buffer，覆盖 BMM1（Q×K^T）与 BMM2（P×V）�
 ### 9. block vector 层
 
 #### 9.1 buffer 分配
-**UB buffer 分配（以 ND 为例，`UbLayout` 结构体定义，`flash_attn_block_vec_nd.h:203-216`）**：ND 是功能最全的路径（含 mask），其布局覆盖 DN 全部 buffer 并多出 mask/tmp 两项；按地址从低到高排布，`static_assert(sizeof(UbLayout) <= 248KB)` 限制总占用；UB总size为256KB，但是由于需要为AscendC和VF预留8K，所以业务只能使用248K。
+**UB buffer 分配（以 ND 为例，`UbLayout` 结构体定义，`flash_attn_block_vec_nd.h`）**：ND 是功能最全的路径（含 mask、dropout），其布局覆盖 DN 全部 buffer 并多出 mask/tmp 和 dropout 缓冲；按地址从低到高排布，`static_assert(sizeof(UbLayout) <= 248KB)` 限制总占用；UB总size为256KB，但是由于需要为AscendC和VF预留8K，所以业务只能使用248K。
 
 | Buffer | 数量×大小 | 用途 | 分配策略 |
 |---|---|---|---|
 | `ubMmResBuffers_` | （D≤128：4；D=256：2）× (mBaseSize/2 × max(s2BaseSize, dVBaseSize) × sizeof(FP32))，D=128 时 ≈ 4×32KB | CV 通信 BUF：AIC BMM1/BMM2 fixpipe 结果分时复用（Vec1 softmax 输入 / Vec2 累加输入） | **多 buffer 轮转**：AIC fixpipe 写与 AIV 读并行，一 flag 一 buffer（AIV 侧 `CC_MM_0~3` / AIC 侧 `CROSSCORE_MM_0~3`）读写接力（见 §7⑤）；buffer 大小取 s2 与 dV 较大值，BMM1/BMM2 结果分时复用；`mmResBufId_` 单调递增计数器分配 buffer（取代 `loop%N`） |
-| `ubMaskBuffers_` | 2 × (mBaseSize/2 × s2BaseSize × sizeof(uint8)) | mask 从 GM 拷入的输入 BUF（仅 ND） | **双 buffer 预取**：当前轮 `AttenMaskCopyIn` 计算的同时 MTE3 预取下一轮 mask，规避 GM 访存延迟。真实需求 = 每个 AIV 的 mBaseSize/2 行 × s2BaseSize 个 INT8（1B），即 2×(mBaseSize/2 × s2BaseSize × 1B)（当前代码写死 2×8KB，仅等于 s2BaseSize=128 时的需求） |
+| `ubMaskBuffers_` | 2 × (mBaseSize/2 × s2BaseSize × sizeof(uint8)) | mask 从 GM 拷入的输入 BUF（仅 ND） | **双 buffer 预取**：当前轮 `AttenMaskCopyIn` 计算的同时 MTE3 预取下一轮 mask，规避 GM 访存延迟。真实需求 = 每个 AIV 的 mBaseSize/2 行 × s2BaseSize 个 INT8（1B），即 2×(mBaseSize/2 × s2BaseSize × 1B)（当前代码写死 2×8KB，仅等于 s2BaseSize=128 时的需求）。D=256/config=4 开启 dropout 时，用 Attention Mask 空闲的一块 Mask buffer 存放 dropout 索引、行暂存与 bit-packed 掩码|
 | `ubVec2Res_` | 1 × (mBaseSize/2 × Align64(dVBaseSize) × sizeof(FP32)) | Vec2 中间结果 + attn_out 输出 buffer | **单 buffer**：与 PRELOAD_N=2 流水配合（Vec2 与 2 轮前 Vec1 同时执行），首次 tile 用 `DataCopy` 分支跳过脏值（见 §7），无需双缓冲。大小按模板参数动态计算（`UB_VEC2_RES_BUF_BYTES = mBaseSize/CV_RATIO × Align64(dVBaseSize) × sizeof(T)`，原为写死 32768U） |
 | `ubVec1ResBuffers_` | 2 × ((mBaseSize/2 + 1) × s2BaseSize × sizeof(BF16/FP16)) | softmax 结果 cast 后拷至 L1(P) 的过渡 BUF | **双 buffer**：V pipe 写与 MTE3 拷 L1 并行，2 buffer 使两段传输交替。大小按模板参数动态计算（`UB_VEC1_RES_BUF_BYTES = (mBaseSize/CV_RATIO+1) × s2BaseSize × sizeof(INPUT_T)`，原为写死 33024U）。**行大小取 (mBaseSize/2 + 1) 而非 mBaseSize/2**：每行多留 1 个元素作为地址偏移，使相邻行的起始地址错开（不再同余于 UB bank 数），避免多行并发访问命中同一 bank 造成 bank 冲突；×2B 为 cast 回 FP16 的元素大小 |
 | `softmaxSumBuf_` / `softmaxMaxBuf_` | 各 3 × (mBaseSize/2 × sizeof(FP32)) | online softmax 的 sum/max 累加状态 | **3 buffer，`mloop % 3`**：每个 gS1 行（mloop）独立一组状态，3 轮转容纳 PRELOAD_N=2 下同时活跃的 mloop（当前行 + 2 行在途），需要注意的是由于VF的处理约束，单个buffer的大小需要256B对齐 |
 | `softmaxExpBuf_` | 3 × (mBaseSize/2 × sizeof(FP32)) | exp 中间结果 | **3 buffer，`loop % 3`**：与 sum/max 配合同步轮转，需要注意的是由于VF的处理约束，单个buffer的大小需要256B对齐 |
 | `ubLseOutBuffers_` | 2 × (mBaseSize/2 × 32B) | FD 中间结果（sum/max）拷出 GM，或 LSE 结果拷出 | **双 buffer**：MTE3 拷出与 V pipe 计算重叠，`UB_OUT_LSE_OUT_EVENT0/1` 轮转，32B是因为输出时单行的max和sum需要扩展为32B后输出 |
 | `softmaxTmpBuf_` | 1 × 512B | softmax 通用 VF 的中间结果缓存（仅 ND） | **单 buffer 常驻**：VF 调用内临时量，无跨轮依赖，512B 足够 |
+| `dropMaskIndexBuf_` | 开启dropout时为 (mBaseSize/CV_RATIO) × (s2BaseSize/16) × sizeof(uint32_t)，另加256B行暂存；关闭 Dropout 或复用 Mask 缓冲时仅占位 32B | Philox掩码索引与逐行生成暂存 | 单buffer；索引按tile的行数、列数、行起点及步长缓存复用 |
+| `dropMaskBuf_` | 开启dropout时为 (mBaseSize/CV_RATIO) × s2BaseSize / 8；关闭 Dropout 或复用 Mask 缓冲时仅占位 32B | bit-packed Philox掩码 | 单buffer，供Vec1的VF施加inverted dropout |
 
 **L1 buffer 分配（ND 同 DN）**：`l1PBuffers_` 3 × (mBaseSize×s2BaseSize×sizeof(INPUT_T))，softmax 结果（P）写 L1 供 BMM2 读取——**3 buffer 与 PRELOAD_N=2 配合**：AIV 写第 N 轮 P、AIC 读第 N-2 轮 P，中间始终有一个 buffer 处于「写入中/待读取/已释放」之外的缓冲态，避免跨核 flag 等待。需要与block_cube上对应L1 buffer的地址和大小完全对齐。
 

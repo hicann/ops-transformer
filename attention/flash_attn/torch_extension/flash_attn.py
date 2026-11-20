@@ -118,7 +118,7 @@ class FlashAttenOpBuilder(OpBuilder):
             "int? batch_size=None, int? max_seqlen_q=None, int? max_seqlen_kv=None, "
             "int? mask_mode=None, int? win_left=None, int? win_right=None, "
             "str? layout_q=None, str? layout_kv=None, str? layout_out=None, "
-            "bool is_grad_enabled=False) -> Tensor",
+            "bool is_grad_enabled=False, float dropout_p=0.0) -> Tensor",
             "flash_attn(Tensor q, Tensor k, Tensor v,"
             "Tensor?block_table=None, Tensor?cu_seqlens_q=None,"
             "Tensor?cu_seqlens_kv=None, Tensor?seqused_q=None,"
@@ -126,7 +126,7 @@ class FlashAttenOpBuilder(OpBuilder):
             "float softmax_scale=1.0, int mask_mode=0, int win_left=-1, int win_right=-1,"
             "int max_seqlen_q=-1, int max_seqlen_kv=-1,"
             'str layout_q="BSND", str layout_kv="BSND", str layout_out="BSND",'
-            "bool return_softmax_lse=False) -> (Tensor, Tensor)",
+            "bool return_softmax_lse=False, float dropout_p=0.0, Tensor? seed=None, Tensor? offset=None) -> (Tensor, Tensor)",
         ]
 
     def register_meta(self):
@@ -155,6 +155,7 @@ class FlashAttenOpBuilder(OpBuilder):
             layout_kv: Optional[str] = None,
             layout_out: Optional[str] = None,
             is_grad_enabled: Optional[bool] = False,
+            dropout_p: float = 0.0,
         ):
             b_size = _calculate_batch_size(batch_size, cu_seqlens_q, seqused_q)
             metadata_size = _calculate_metadata_size(
@@ -185,6 +186,9 @@ class FlashAttenOpBuilder(OpBuilder):
             layout_kv: Optional[str] = "BSND",
             layout_out: Optional[str] = "BSND",
             return_softmax_lse: Optional[bool] = False,
+            dropout_p: Optional[float] = 0.0,
+            seed: Optional[torch.Tensor] = None,
+            offset: Optional[torch.Tensor] = None,
         ):
             _validate_layout_dims(q, k, v, layout_q, layout_kv)
             if layout_q == "TND":
@@ -263,6 +267,7 @@ def flash_attn_metadata(
     layout_kv: Optional[str] = "BSND",
     layout_out: Optional[str] = "BSND",
     is_grad_enabled: Optional[bool] = False,
+    dropout_p: float = 0.0,
 ):
     """
     Dispatcher implementation: NPU.
@@ -305,6 +310,7 @@ def flash_attn_metadata(
         layout_kv,
         layout_out,
         is_grad_enabled,
+        dropout_p,
         output,
     )
 
@@ -332,6 +338,7 @@ def flash_attn_metadata_fallback(
     layout_kv: Optional[str] = None,
     layout_out: Optional[str] = None,
     is_grad_enabled: Optional[bool] = False,
+    dropout_p: float = 0.0,
 ):
     # 处理所有 tensor 都为 None 的情况
     return _flash_attn_metadata(
@@ -353,6 +360,7 @@ def flash_attn_metadata_fallback(
         layout_kv=layout_kv,
         layout_out=layout_out,
         is_grad_enabled=is_grad_enabled,
+        dropout_p=dropout_p,
     )
 
 
@@ -379,6 +387,9 @@ def flash_attn(
     layout_kv: Optional[str] = "BSND",
     layout_out: Optional[str] = "BSND",
     return_softmax_lse: Optional[bool] = False,
+    dropout_p: Optional[float] = 0.0,
+    seed: Optional[torch.Tensor] = None,
+    offset: Optional[torch.Tensor] = None,
 ):
     """
     dispatcher implementation for NPU.
@@ -415,6 +426,9 @@ def flash_attn(
         layout_kv,
         layout_out,
         return_softmax_lse,
+        dropout_p,
+        seed,
+        offset,
     )
 
 

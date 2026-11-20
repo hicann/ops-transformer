@@ -40,13 +40,13 @@ ACLNN_API aclnnStatus aclnnFlashAttnMetadataGetWorkspaceSize(
     const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
     const aclTensor* sequsedKvOptional, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenKv, int64_t numHeadsQ,
     int64_t numHeadsKv, int64_t headDim, int64_t headDimV, int64_t maskMode, int64_t winLeft, int64_t winRight,
-    const char* layoutQ, const char* layoutKv, const char* layoutOut, bool isGradEnabled, const aclTensor* metaData,
-    uint64_t* workspaceSize, aclOpExecutor** executor)
+    const char* layoutQ, const char* layoutKv, const char* layoutOut, bool isGradEnabled, double dropoutP,
+    const aclTensor* metaData, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     L2_DFX_PHASE_1(aclnnFlashAttnMetadata,
                    DFX_IN(cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, batchSize,
                           maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, headDimV, maskMode, winLeft,
-                          winRight, layoutQ, layoutKv, layoutOut, isGradEnabled),
+                          winRight, layoutQ, layoutKv, layoutOut, isGradEnabled, dropoutP),
                    DFX_OUT(metaData));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
@@ -57,6 +57,13 @@ ACLNN_API aclnnStatus aclnnFlashAttnMetadataGetWorkspaceSize(
                                                    numHeadsKv, headDim, headDimV, maskMode, winLeft, winRight, layoutQ,
                                                    layoutKv, layoutOut, metaData, isGradEnabled);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
+
+    CHECK_COND(dropoutP >= 0.0 && dropoutP < 1.0, ACLNN_ERR_RUNTIME_ERROR, "dropout_p must be finite and in [0, 1)");
+    const float dropoutPValue = static_cast<float>(dropoutP);
+    CHECK_COND(dropoutPValue < 1.0f, ACLNN_ERR_RUNTIME_ERROR, "dropout_p rounds to 1.0");
+    CHECK_COND(dropoutPValue == 0.0f || (strcmp(layoutKv, "PA_BBND") != 0 && strcmp(layoutKv, "PA_BNBD") != 0 &&
+                                         strcmp(layoutKv, "PA_NZ") != 0),
+               ACLNN_ERR_RUNTIME_ERROR, "dropout does not support paged KV cache (PA_BBND/PA_BNBD/PA_NZ)");
 
     const op::PlatformInfo& npuInfo = op::GetCurrentPlatformInfo();
     // Match the effective resources used by ACLNN tiling, including stream core limits.
@@ -71,10 +78,10 @@ ACLNN_API aclnnStatus aclnnFlashAttnMetadataGetWorkspaceSize(
     }
     const char* socVersion = npuInfo.GetSocLongVersion().c_str();
 
-    auto output = l0op::FlashAttnMetadata(cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional,
-                                          batchSize, maxSeqlenQ, maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, headDimV,
-                                          maskMode, winLeft, winRight, layoutQ, layoutKv, layoutOut, isGradEnabled,
-                                          socVersion, aicCoreNum, aivCoreNum, metaData, uniqueExecutor.get());
+    auto output = l0op::FlashAttnMetadata(
+        cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, batchSize, maxSeqlenQ,
+        maxSeqlenKv, numHeadsQ, numHeadsKv, headDim, headDimV, maskMode, winLeft, winRight, layoutQ, layoutKv,
+        layoutOut, isGradEnabled, socVersion, aicCoreNum, aivCoreNum, dropoutPValue, metaData, uniqueExecutor.get());
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();

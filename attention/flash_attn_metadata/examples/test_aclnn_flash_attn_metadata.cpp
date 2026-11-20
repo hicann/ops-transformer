@@ -208,9 +208,10 @@ int main()
 
     char socVersion[] = "ascend950";
     printf("start aclnnFlashAttnMetadata\n");
-    ret = aclnnFlashAttnMetadataGetWorkspaceSize(
-        nullptr, nullptr, nullptr, nullptr, batchSize, qS, kvS, numHeads, numKeyValueHeads, headDim, headDimV,
-        sparseMode, preTokens, nextTokens, "BSND", "BSND", "BSND", false, metadataTensor, &workspaceSize, &executor);
+    ret = aclnnFlashAttnMetadataGetWorkspaceSize(nullptr, nullptr, nullptr, nullptr, batchSize, qS, kvS, numHeads,
+                                                 numKeyValueHeads, headDim, headDimV, sparseMode, preTokens, nextTokens,
+                                                 "BSND", "BSND", "BSND", false, 0.0, metadataTensor, &workspaceSize,
+                                                 &executor);
     if (ret != ACL_SUCCESS) {
         printf("aclnnFlashAttnMetadataGetWorkspaceSize %d\n", ret);
         return -1;

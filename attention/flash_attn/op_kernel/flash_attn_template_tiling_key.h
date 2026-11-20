@@ -57,6 +57,9 @@ ASCENDC_TPL_ARGS_DECL(FlashAttn,
                       //    1: true
                       ASCENDC_TPL_BOOL_DECL(HasAttenMask, false, true),
 
+                      // Dropout is implemented by the arch35 ND path.
+                      ASCENDC_TPL_BOOL_DECL(HasDrop, false, true),
+
                       // templateId (8-bit)
                       //    0: ND模板
                       //    1: DN模板(合轴)
@@ -82,15 +85,25 @@ ASCENDC_TPL_SEL(
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
                                               InOutLayoutType_BNSD, InOutLayoutType_TND, InOutLayoutType_BNSD_BSND),
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3),
-                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
+                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true), ASCENDC_TPL_BOOL_SEL(HasDrop, false),
                          ASCENDC_TPL_UINT_SEL(TemplateId, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
                          ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)),
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+    // Dropout: continuous KV, ND only.
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
+                                              InOutLayoutType_BNSD, InOutLayoutType_TND, InOutLayoutType_BNSD_BSND),
+                         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true), ASCENDC_TPL_BOOL_SEL(HasDrop, true),
+                         ASCENDC_TPL_UINT_SEL(TemplateId, ASCENDC_TPL_UI_LIST, 0),
+                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
+                         ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)),
+#endif
     // DN模板（templateId=1）：仅无attenMask且config=0/2/6/8（sOuter=64, D=64/128, QK D=192/DV=128, 8 为 Dk=72 克隆档）
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
                                               InOutLayoutType_BNSD, InOutLayoutType_TND, InOutLayoutType_BNSD_BSND),
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3),
-                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false),
+                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false), ASCENDC_TPL_BOOL_SEL(HasDrop, false),
                          ASCENDC_TPL_UINT_SEL(TemplateId, ASCENDC_TPL_UI_LIST, 1),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 2, 6, 8),
                          ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)),
@@ -101,7 +114,7 @@ ASCENDC_TPL_SEL(
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
                                               InOutLayoutType_BNSD, InOutLayoutType_TND, InOutLayoutType_BNSD_BSND),
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3),
-                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
+                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true), ASCENDC_TPL_BOOL_SEL(HasDrop, false),
                          ASCENDC_TPL_UINT_SEL(TemplateId, ASCENDC_TPL_UI_LIST, 2),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 6, 7, 8, 9),
                          ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)),
@@ -112,7 +125,7 @@ ASCENDC_TPL_SEL(
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
                                               InOutLayoutType_BNSD, InOutLayoutType_TND, InOutLayoutType_BNSD_BSND),
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3),
-                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
+                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true), ASCENDC_TPL_BOOL_SEL(HasDrop, false),
                          ASCENDC_TPL_UINT_SEL(TemplateId, ASCENDC_TPL_UI_LIST, 2),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 10, 11, 12, 13),
                          ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)),

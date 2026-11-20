@@ -51,6 +51,9 @@ const std::string LAYOUT_Q_NAME = "layout_q";
 const std::string LAYOUT_KV_NAME = "layout_kv";
 const std::string LAYOUT_OUT_NAME = "layout_out";
 const std::string RETURN_SOFTMAX_LSE_NAME = "return_softmax_lse";
+const std::string DROPOUT_P_NAME = "dropout_p";
+const std::string SEED_NAME = "seed";
+const std::string OFFSET_NAME = "offset";
 const std::string ATTN_OUT_NAME = "attn_out";
 const std::string SOFTMAX_LSE_NAME = "softmax_lse";
 
@@ -71,6 +74,8 @@ constexpr uint32_t SEQUSED_KV_INDEX = 7;
 constexpr uint32_t SINKS_INDEX = 8;
 constexpr uint32_t ATTN_MASK_INDEX = 9;
 constexpr uint32_t METADATA_INDEX = 10;
+constexpr uint32_t SEED_INDEX = 11;
+constexpr uint32_t OFFSET_INDEX = 12;
 
 // Attributes Index
 constexpr uint32_t ATTR_SOFTMAX_SCALE_INDEX = 0; // softmax_mode (scaleValue)
@@ -83,6 +88,7 @@ constexpr uint32_t ATTR_LAYOUT_Q_INDEX = 6;      // layout_q
 constexpr uint32_t ATTR_LAYOUT_KV_INDEX = 7;     // layout_kv
 constexpr uint32_t ATTR_LAYOUT_OUT_INDEX = 8;    // layout_out
 constexpr uint32_t ATTR_RETURN_LSE_INDEX = 9;    // return_softmax_lse
+constexpr uint32_t ATTR_DROPOUT_P_INDEX = 10;    // dropout_p (丢弃概率)
 
 // Legacy aliases for backward compatibility
 constexpr uint32_t ATTR_SCALE_INDEX = ATTR_SOFTMAX_SCALE_INDEX;
@@ -167,6 +173,8 @@ struct FAParaInfo {
     FAOptionalParaInfo sinks = {nullptr, nullptr};
     FAOptionalParaInfo metadata = {nullptr, nullptr};
     FAOptionalParaInfo attnMask = {nullptr, nullptr};
+    FAOptionalParaInfo seed = {nullptr, nullptr};
+    FAOptionalParaInfo offset = {nullptr, nullptr};
 
     const float* softmaxScale = nullptr;
     const int64_t* maskMode = nullptr;
@@ -178,6 +186,7 @@ struct FAParaInfo {
     const char* layoutKV = nullptr;
     const char* layoutOut = nullptr;
     const int64_t* returnSoftMaxLse = nullptr;
+    const float* dropoutP = nullptr;
 
     FARequiredParaInfo attnOut = {nullptr, nullptr};
     FARequiredParaInfo lseOut = {nullptr, nullptr};
@@ -224,6 +233,10 @@ public:
     int64_t maskMode = 0;
     int64_t winLeft = 0;
     int64_t winRight = 0;
+
+    // Dropout
+    float dropoutP = 0.0f;
+    bool hasDrop = false;
 
     // Others Flag
     bool batchContinuousFlag = true;

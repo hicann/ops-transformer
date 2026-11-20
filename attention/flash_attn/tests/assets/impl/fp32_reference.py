@@ -20,7 +20,7 @@ class FP32Reference(FlashAttnGolden):
     def forward_golden(self, q, k, v, **kwargs):
         return super().forward_golden(q.float(), k.float(), v.float(), **kwargs)
 
-    def _attention(self, q, k, v, scale, tile_size, mask_fn, sink):
+    def _attention(self, q, k, v, scale, tile_size, mask_fn, sink, dropout=None):
         rows, length = q.shape[0], k.shape[0]
         output = torch.zeros((rows, v.shape[-1]), dtype=torch.float32, device=q.device)
         lse = torch.full((rows,), float("inf"), dtype=torch.float32, device=q.device)
@@ -39,7 +39,12 @@ class FP32Reference(FlashAttnGolden):
                 safe_max = torch.where(torch.isneginf(next_max), 0.0, next_max)
                 alpha = torch.exp(maximum - safe_max)
                 exponentials = torch.exp(scores - safe_max)
-                numerator = alpha * numerator + torch.mm(exponentials, v[begin:end])
+                weights = (
+                    exponentials
+                    if dropout is None
+                    else dropout(exponentials, start, stop, begin, end)
+                )
+                numerator = alpha * numerator + torch.mm(weights, v[begin:end])
                 denominator = alpha * denominator + exponentials.sum(
                     dim=1, keepdim=True
                 )

@@ -80,6 +80,7 @@ private:
     int32_t headDim_ = 0;
     int32_t headDimV_ = -1; // -1: 未指定, 归一化后等于 headDim_
     int32_t maskMode_ = 1;
+    float dropoutP_ = 0.0f;
     int64_t winLeft_ = -1;
     int64_t winRight_ = -1;
     std::string layoutQ_ = "BSND";

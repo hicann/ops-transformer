@@ -29,6 +29,7 @@
 #include "paged_attention_checker_flash_attn.h"
 #include "sinks_checker_flash_attn.h"
 #include "softmax_lse_checker_flash_attn.h"
+#include "dropout_checker_flash_attn.h"
 
 namespace optiling {
 namespace flash_attn {

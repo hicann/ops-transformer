@@ -82,13 +82,14 @@ __aicore__ inline constexpr bool IsPageAttention()
     return (KV_STORAGE_MODE != KV_STORAGE_MODE_CONTINUE);
 }
 
-template <uint8_t inOutLayoutType, uint8_t KvLayoutType, bool hasAttenMask, uint8_t templateId, uint8_t config>
+template <uint8_t inOutLayoutType, uint8_t KvLayoutType, bool hasAttenMask, bool hasDrop, uint8_t templateId,
+          uint8_t config>
 __global__ __aicore__ void flash_attn(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
                                       __gm__ uint8_t* blockTable, __gm__ uint8_t* cuSeqLensQ,
                                       __gm__ uint8_t* cuSeqLensKv, __gm__ uint8_t* sequsedQ, __gm__ uint8_t* sequsedKv,
                                       __gm__ uint8_t* sinks, __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata,
-                                      __gm__ uint8_t* attnOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
-                                      __gm__ uint8_t* tiling)
+                                      __gm__ uint8_t* seed, __gm__ uint8_t* offset, __gm__ uint8_t* attnOut,
+                                      __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     REGISTER_TILING_DEFAULT(optiling::FlashAttnTilingData);
     __gm__ uint8_t* user = GetUserWorkspace(workspace);
@@ -140,7 +141,7 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t* query, __gm__ uint8_t* key
     using FA_T = FlashAttnKernel::FAType<INPUT_T, OUT_T, pageAttention, qLayout, kvLayout, outLayout, s1TemplateType,
                                          s2TemplateType, dTemplateType, dVTemplateType, originalDVType, hasAttenMask,
                                          cfg.ubMm1ResBufcnt, cfg.ubMm2ResBufcnt, cfg.ubVec1ResBufcnt, cfg.ubMaskBufcnt,
-                                         cfg.l1PBufcnt, cfg.l1QBufcnt, cfg.l1KvBufcnt>;
+                                         cfg.l1PBufcnt, cfg.l1QBufcnt, cfg.l1KvBufcnt, hasDrop>;
 
     if constexpr (templateId == FA_Template_DN_Unmerged) {
         // 不合轴 DN: BN1_S1 分核, 独立文件(*_dn_unmerged.h), 全部注册维度/有无 mask 实例化;
@@ -191,7 +192,7 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t* query, __gm__ uint8_t* key
 #endif
         Kernel op;
         op.Init(query, key, value, blockTable, cuSeqLensQ, cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata,
-                attnOut, softmaxLse, user, &tilingData->baseTiling);
+                seed, offset, attnOut, softmaxLse, user, &tilingData->baseTiling);
         op.Process();
     }
 #endif

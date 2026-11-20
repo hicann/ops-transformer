@@ -199,6 +199,8 @@ bool FlashAttnMetadataCpuKernel::Prepare(CpuKernelContext& ctx)
         headDimV_ = headDim_;
     }
     GetAttrValueOpt(ctx, "is_grad_enabled", fagIsGradEnabled_);
+    auto dropoutPAttr = ctx.GetAttr("dropout_p");
+    dropoutP_ = dropoutPAttr == nullptr ? 0.0f : dropoutPAttr->GetFloat();
 
     KERNEL_CHECK_FALSE(ParamsCheck(), false, "Params check failed");
     return ParamsInit();
@@ -214,6 +216,10 @@ bool FlashAttnMetadataCpuKernel::ParamsInit()
 
 bool FlashAttnMetadataCpuKernel::ParamsCheck()
 {
+    KERNEL_CHECK_FALSE(std::isfinite(dropoutP_) && dropoutP_ >= 0.0f && dropoutP_ < 1.0f, false,
+                       "dropout_p must be finite and in [0, 1)");
+    KERNEL_CHECK_FALSE(dropoutP_ == 0.0f || (layoutKv_ != "PA_BBND" && layoutKv_ != "PA_BNBD" && layoutKv_ != "PA_NZ"),
+                       false, "dropout does not support paged KV cache (PA_BBND/PA_BNBD/PA_NZ)");
     KERNEL_CHECK_FALSE(CheckActualQuerySeq(), false, "Check query sequence failed");
     KERNEL_CHECK_FALSE(CheckActualKvSeq(), false, "Check kv sequence failed");
     // Non-TND layouts: metadata has no q/k/v tensors, so a side without
@@ -394,6 +400,7 @@ void FlashAttnMetadataCpuKernel::InitLoadBalanceParams()
             .maxSeqlenKv = maxSeqlenKv_,
             .winLeft = baseInfo.preToken,
             .winRight = baseInfo.nextToken,
+            .hasDrop = dropoutP_ > 0.0f,
         };
         optiling::flash_attn::fa_tiling_util::FaKernelConfigArch35 kernelConfig{};
         optiling::flash_attn::fa_tiling_util::CalcFaKernelConfigArch35::CalcConfig(kernelParam, kernelConfig);

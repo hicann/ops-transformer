@@ -99,6 +99,11 @@ struct FlashAttnWorkspaceParams {
     uint32_t logSumExpSize;
 };
 
+struct FlashAttnDropParams {
+    float keepProb = 1.0f;
+    uint8_t keepProbUint8 = 255;
+};
+
 struct FlashAttnS1OuterSplitCoreParams {
     bool enableS1OutSplit = 0;
     uint64_t totalSize;
@@ -111,6 +116,7 @@ public:
     FlashAttnPageAttentionParams flashAttnPageAttentionParams;
     FlashAttnWorkspaceParams flashAttnWorkspaceParams;
     FlashAttnS1OuterSplitCoreParams flashAttnS1OuterSplitCoreParams;
+    FlashAttnDropParams flashAttnDropParams;
 };
 
 class FlashAttnTilingData {

@@ -60,6 +60,7 @@ void FlashAttnTilingImplArch35::SplitPolicy()
         .maxSeqlenKv = faInfo_->maxSeqKv,
         .winLeft = winLeft,
         .winRight = winRight,
+        .hasDrop = faInfo_->hasDrop,
     };
     fa_tiling_util::CalcFaKernelConfigArch35::CalcConfig(param, kernelConfig_);
 
@@ -124,6 +125,7 @@ void FlashAttnTilingImplArch35::UpdateTilingKeyInfo()
     UpdateTilingKeyConfig();
     UpdateTilingKeyKvLayout();
     tilingKeyInfo_.hasAttenMask = (faInfo_->maskMode == static_cast<int64_t>(MaskMode::NO_MASK)) ? 0 : 1;
+    tilingKeyInfo_.hasDrop = faInfo_->hasDrop;
     UpdateTilingKeyTemplateId();
 }
 

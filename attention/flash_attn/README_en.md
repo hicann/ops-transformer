@@ -60,7 +60,7 @@ Compilation artifact: `build_out/cann-ops-transformer-custom_linux-x86_64.run`
 - **`--tiling_key` (compiles only the specified tiling key variants)**: the default full compilation generates kernel variants for all tiling keys and takes a long time. When you only need to debug or verify specific layout and configuration combinations (for example, only BSND/BNSD/TND × no mask × D=128, which uses the DN template), compile only the corresponding variants to speed up the process:
 
   ```bash
-  bash build.sh --pkg --soc=ascend950 --ops=flash_attn,flash_attn_metadata --tiling_key="67239936;67239937;67239938"
+  bash build.sh --pkg --soc=ascend950 --ops=flash_attn,flash_attn_metadata --tiling_key="134479872;134479873;134479874"
   ```
 
   For the encoding meaning of each tiling key, see [Developer Guide §5](#5-tilingkey).
@@ -227,6 +227,11 @@ Case definitions: `tests/ut/op_host/arch35/test_flash_attn_tiling.csv`. Addition
 - **FlashDecode**: an optimization for the decode stage when S1 is very small (such as 1) and S2 is very long—it splits along the KV direction into split-K segments computed in parallel by multiple AIV cores and then reduces across cores, avoiding serial scanning of the entire KV on a single core.
 - It has two stages: in the FA stage, each split independently computes the local softmax max/sum and partial outputs (written to the workspace); in the FD stage, global max/sum are reduced across splits, scale is recomputed, and a weighted sum produces the final output.
 - It is enabled automatically (determined by `enableFlashDecode` in the metadata) and requires no user configuration; `return_softmax_lse` and FlashDecode can be used together (LSE is produced directly from the FD reduction results).
+
+#### 1.10 Dropout
+
+- Dropout is disabled by default (`dropout_p=0.0`). When `dropout_p > 0`, the operator uses the `seed` and `offset` tensors to generate a Philox mask and apply inverted dropout. LSE is computed from the weights before dropout.
+- Dropout is supported only for forward computation. Enabling it requires a contiguous K/V layout.
 
 ### 2. Code layering
 
@@ -442,35 +447,36 @@ Total size = 16 + sectionNum×(36+72)×16 uint32 entries
 
 ### 5. TilingKey
 
-**Purpose**: decides at compilation time which kernel variants are generated, and selects the variant at runtime. The 5 template parameters are packed from bit0 into the tiling key with 8+8+1+8+4 bits (`flash_attn_template_tiling_key.h`):
+**Purpose**: decides at compilation time which kernel variants are generated, and selects the variant at runtime. The 6 template parameters are packed from bit0 into the tiling key with 8+8+1+1+8+4 bits (`flash_attn_template_tiling_key.h`):
 
 | bits | Parameter | Value |
 |---|---|---|
 | 0-7 | InOutLayoutType | 0=BSND, 1=BNSD, 2=TND, 3=BNSD_BSND |
 | 8-15 | KvLayoutType | 0=contiguous, 1=PA_BBND, 2=PA_BNBD, 3=PA_NZ |
 | 16 | HasAttenMask | false/true |
-| 17-24 | TemplateId | 0=ND template, 1=merged-axis DN template, 2=non-merged-axis DN template |
-| 25-28 | Config | 0~9 (S1/S2/D/DV/originalDV and buffer tiers, see §3 Basic Block; arch35 config 6/7 is D=192/DV=128, and config 8/9 is template D=DV=128 with originalDV=72) |
+| 17 | HasDrop | false/true; true when dropout_p>0 |
+| 18-25 | TemplateId | 0=ND template, 1=merged-axis DN template, 2=non-merged-axis DN template |
+| 26-29 | Config | 0~9 (S1/S2/D/DV/originalDV and buffer tiers, see §3 Basic Block; arch35 config 6/7 is D=192/DV=128, and config 8/9 is template D=DV=128 with originalDV=72) |
 
 **SEL instantiation range** (three segments; kernel variants are enumerated by combination at compilation time):
 
-- ND (templateId=0): full combination 4×4×2×10=320 variants;
-- Merged-axis DN (templateId=1): only no attenMask and config∈{0,2,6,8}, 4×4×1×4=64 variants;
-- Non-merged-axis DN (templateId=2): full combination 4×4×2×10=320 variants.
+- ND (templateId=0): 4×4×2×10=320 variants without dropout. dropout is registered for contiguous KV only (4×1×2×10=80 variants);
+- Merged-axis DN (templateId=1): only no attenMask, no dropout, and config∈{0,2,6,8}, 4×4×1×4=64 variants;
+- Non-merged-axis DN (templateId=2): 4×4×2×10=320 , with dropout disabled.
 
-The above is the compilation-time SEL enumeration range; at runtime only variants satisfying the host routing conditions are selected. arch35 currently enables the non-merged-axis DN by default, with 704 variants per data type across the three segments; arch92 still uses the shared SEL, but the host only selects the tiers it supports.
+The above is the compilation-time SEL enumeration range; at runtime only variants satisfying the host routing conditions are selected. arch35 currently enables the non-merged-axis DN by default, with 784 variants per data type across the three segments; arch92 still uses the shared SEL, but the host only selects the tiers it supports.
 
-**Generation**: one step of host tiling, `GenTilingKey` — `UpdateTilingKeyInfo` (fills tilingKeyInfo by layout/mask/templateId/config) → `GET_TPL_TILING_KEY` (`arch35/flash_attn_tiling.cpp`). Inside it, `UpdateTilingKeyTemplateId` calls `GetFlashAttnTemplateId`, which is shared with the metadata, and selects the non-merged-axis DN, the merged-axis DN, and ND in turn; `dnFlag_` indicates only the merged-axis DN. See §6 for the specific conditions.
+**Generation**: one step of host tiling, `GenTilingKey` — `UpdateTilingKeyInfo` (fills tilingKeyInfo by layout/mask/dropout/templateId/config) → `GET_TPL_TILING_KEY` (`arch35/flash_attn_tiling.cpp`). Inside it, `UpdateTilingKeyTemplateId` calls `GetFlashAttnTemplateId`, which is shared with the metadata, and selects the non-merged-axis DN, the merged-axis DN, and ND in turn; `dnFlag_` indicates only the merged-axis DN. When dropout is enabled, the ND template is always selected. See §6 for the specific conditions.
 
 **Dispatch and selection**: during tiling, `SetTilingKey` writes into TilingContext; at runtime the kernel selects the variant by key for execution. At compilation time `--tiling_key` can specify generation of only a subset of variants (see Quick Start compilation).
 
-**Example decoding**: tiling key `67239936` = 0x4020000 → InOutLayoutType=0(BSND), KvLayout=0(contiguous), no mask, templateId=1(DN), config=2(D=128, sOuter=64, sInner=128).
+**Example decoding**: tiling key `134479872` = 0x8040000 → InOutLayoutType=0(BSND), KvLayout=0(contiguous), no mask, no dropout, templateId=1(DN), config=2(D=128, sOuter=64, sInner=128).
 
 **Relation with template routing**: `config` distinguishes basic blocks and the original DV, and `templateId` distinguishes ND, the merged-axis DN, and the non-merged-axis DN; the two jointly determine the kernel variant. The host and the metadata share template selection; see §6 for details.
 
 ### 6. Kernel Entry and Template Range
 
-The kernel compiles different variants according to the 5 template parameters of the tiling key; the runtime entry `op_kernel/flash_attn.cpp` compiles AIC and AIV together (`KERNEL_TYPE_MIX_AIC_1_2`, with `__DAV_CUBE__` distinguishing Cube compilation from Vector compilation), and each AIC pairs with 2 AIVs (CV_RATIO=2).
+The kernel compiles different variants according to the 6 template parameters of the tiling key; the runtime entry `op_kernel/flash_attn.cpp` compiles AIC and AIV together (`KERNEL_TYPE_MIX_AIC_1_2`, with `__DAV_CUBE__` distinguishing Cube compilation from Vector compilation), and each AIC pairs with 2 AIVs (CV_RATIO=2).
 
 The arch35 routing is decided by `UpdateTilingKeyTemplateId` calling a shared function; the kernel dispatches by `templateId`:
 
@@ -483,9 +489,9 @@ dnFlag_ = tilingKeyInfo_.templateId == FA_Template_DN;
 
 | Path | Condition (checked in priority order) | Scheduling framework | softmax VF |
 |---|---|---|---|
-| Non-merged-axis DN (templateId=2) | `DN_UNMERGED_ROUTE_ENABLED=true` (the current default), real V head dim≤128, `maxSeqQ≥256`, and `maskMode∈{0,3}` | flash_attn_kernel_dn_unmerged.h | ProcessVec1VfDnLine / ProcessVec1VfDn |
-| Merged-axis DN (templateId=1) | The non-merged-axis DN is not hit, and `maskMode=0`, `sOuter=64`; the supported dimensions correspond to config∈{0,2,6,8} | flash_attn_kernel_dn.h | ProcessVec1VfDn |
-| ND (templateId=0) | Other supported scenarios | flash_attn_kernel_nd.h | ProcessVec1Vf |
+| Non-merged-axis DN (templateId=2) | No dropout, `DN_UNMERGED_ROUTE_ENABLED=true` (the current default), real V head dim≤128, `maxSeqQ≥256`, and `maskMode∈{0,3}` | flash_attn_kernel_dn_unmerged.h | ProcessVec1VfDnLine / ProcessVec1VfDn |
+| Merged-axis DN (templateId=1) | No dropout, the non-merged-axis DN is not hit, and `maskMode=0`, `sOuter=64`; the supported dimensions correspond to config∈{0,2,6,8} | flash_attn_kernel_dn.h | ProcessVec1VfDn |
+| ND (templateId=0) | Dropout is enabled, or the configuration is an otherwise supported non-DN scenario | flash_attn_kernel_nd.h | ProcessVec1Vf |
 
 For example, when real D=DV=72, `maxSeqQ=256`, and `maskMode=0`, config8 and templateId2 are used; when `maxSeqQ=128` and `sOuter=64`, config8 and templateId1 are used. The `originalDV` of config8/9 is 72, so changes in template routing do not lose the output padding information.
 
@@ -604,18 +610,20 @@ The AIC side allocates buffers according to the storage hierarchy, covering the 
 ### 9. block vector layer
 
 #### 9.1 buffer allocation
-**UB buffer allocation (taking ND as an example, the `UbLayout` struct definition, `flash_attn_block_vec_nd.h:203-216`)**: ND is the path with the most complete functionality (including mask). Its layout covers all DN buffers plus two extra items, mask/tmp. The layout is arranged from low to high addresses, and `static_assert(sizeof(UbLayout) <= 248KB)` limits the total usage. The total UB size is 256KB, but because 8K must be reserved for AscendC and VF, the business logic can only use 248K.
+**UB buffer allocation (taking ND as an example, the `UbLayout` struct definition, `flash_attn_block_vec_nd.h`)**: ND is the path with the most complete functionality (including mask and dropout). Its layout covers all DN buffers plus mask/tmp and dropout buffers. The layout is arranged from low to high addresses, and `static_assert(sizeof(UbLayout) <= 248KB)` limits the total usage. The total UB size is 256KB, but because 8K must be reserved for AscendC and VF, the business logic can only use 248K.
 
 | Buffer | Count×Size | Purpose | Allocation strategy |
 |---|---|---|---|
 | `ubMmResBuffers_` | (D≤128: 4; D=256: 2)× (mBaseSize/2 × max(s2BaseSize, dVBaseSize) × sizeof(FP32)); at D=128 this is ≈ 4×32KB | CV communication BUF: the AIC BMM1/BMM2 fixpipe results are time-division reused (Vec1 softmax input / Vec2 accumulation input) | **Multi-buffer rotation**: AIC fixpipe writes run in parallel with AIV reads, one flag per buffer (AIV side `CC_MM_0~3` / AIC side `CROSSCORE_MM_0~3`), a read-write relay (see §7⑤). The buffer size takes the larger of s2 and dV, and the BMM1/BMM2 results are time-division reused. Buffers are allocated by the monotonically increasing counter `mmResBufId_` (replacing `loop%N`) |
-| `ubMaskBuffers_` | 2 × (mBaseSize/2 × s2BaseSize × sizeof(uint8)) | Input BUF for copying the mask in from GM (ND only) | **Double-buffer prefetch**: while the current round `AttenMaskCopyIn` computes, MTE3 prefetches the next round mask, avoiding GM memory access latency. The actual requirement = mBaseSize/2 rows per AIV × s2BaseSize INT8 values (1B each), that is 2×(mBaseSize/2 × s2BaseSize × 1B) (the current code hardcodes 2×8KB, which only matches the requirement when s2BaseSize=128) |
+| `ubMaskBuffers_` | 2 × (mBaseSize/2 × s2BaseSize × sizeof(uint8)) | Input BUF for copying the mask in from GM (ND only) | **Double-buffer prefetch**: while the current round `AttenMaskCopyIn` computes, MTE3 prefetches the next round mask, avoiding GM memory access latency. The actual requirement = mBaseSize/2 rows per AIV × s2BaseSize INT8 values (1B each), that is 2×(mBaseSize/2 × s2BaseSize × 1B) (the current code hardcodes 2×8KB, which only matches the requirement when s2BaseSize=128). When dropout is enabled for D=256/config=4, an idle Attention Mask buffer holds the dropout indices, row scratch, and bit-packed mask. |
 | `ubVec2Res_` | 1 × (mBaseSize/2 × Align64(dVBaseSize) × sizeof(FP32)) | Vec2 intermediate result + attn_out output buffer | **Single buffer**: it works with the PRELOAD_N=2 pipeline (Vec2 executes at the same time as the Vec1 from 2 rounds earlier), and the first tile uses the `DataCopy` branch to skip dirty values (see §7), so double buffering is unnecessary. The size is computed dynamically from template parameters (`UB_VEC2_RES_BUF_BYTES = mBaseSize/CV_RATIO × Align64(dVBaseSize) × sizeof(T)`, previously hardcoded to 32768U) |
 | `ubVec1ResBuffers_` | 2 × ((mBaseSize/2 + 1) × s2BaseSize × sizeof(BF16/FP16)) | Transit BUF for copying the cast softmax result to L1 (P) | **Double buffer**: the V pipe write runs in parallel with the MTE3 copy to L1, and the 2 buffers alternate the two transfers. The size is computed dynamically from template parameters (`UB_VEC1_RES_BUF_BYTES = (mBaseSize/CV_RATIO+1) × s2BaseSize × sizeof(INPUT_T)`, previously hardcoded to 33024U). **The row size is (mBaseSize/2 + 1) instead of mBaseSize/2**: each row reserves 1 extra element as an address offset, so the start addresses of adjacent rows are staggered (no longer congruent modulo the number of UB banks), preventing concurrent access of multiple rows from hitting the same bank and causing bank conflicts; ×2B is the element size when cast back to FP16 |
 | `softmaxSumBuf_` / `softmaxMaxBuf_` | 3 × (mBaseSize/2 × sizeof(FP32)) each | sum/max accumulation state of the online softmax | **3 buffers, `mloop % 3`**: each gS1 row (mloop) has an independent set of state, and a rotation of 3 holds the mloop values active at the same time under PRELOAD_N=2 (the current row + 2 rows in flight). Note that due to VF processing constraints, the size of a single buffer must be 256B-aligned |
 | `softmaxExpBuf_` | 3 × (mBaseSize/2 × sizeof(FP32)) | exp intermediate results | **3 buffers, `loop % 3`**: the rotation stays in sync with sum/max; note that due to VF processing constraints, the size of a single buffer must be 256B-aligned |
 | `ubLseOutBuffers_` | 2 × (mBaseSize/2 × 32B) | Copying the FD intermediate results (sum/max) out to GM, or copying out the LSE result | **Double buffer**: the MTE3 copy-out overlaps with the V pipe computation, rotating `UB_OUT_LSE_OUT_EVENT0/1`; 32B is because the max and sum of a single row must be expanded to 32B before being output |
 | `softmaxTmpBuf_` | 1 × 512B | Intermediate result cache of the general-purpose softmax VF (ND only) | **Permanent single buffer**: temporary quantities within a VF call, no cross-round dependencies; 512B is sufficient |
+| `dropMaskIndexBuf_` | With dropout, (mBaseSize/CV_RATIO) × (s2BaseSize/16) × sizeof(uint32_t) plus 256B of row scratch. A 32B placeholder is reserved when dropout is disabled or the Mask buffer is reused. | Philox mask indices and scratch for per-row generation | Single buffer. Indices are cached by tile row count, column count, starting row, and stride. |
+| `dropMaskBuf_` | With dropout, (mBaseSize/CV_RATIO) × s2BaseSize / 8. A 32B placeholder is reserved when dropout is disabled or the Mask buffer is reused. | Bit-packed Philox mask | Single buffer, used by the Vec1 VF to apply inverted dropout |
 
 **L1 buffer allocation (ND is the same as DN)**: `l1PBuffers_` 3 × (mBaseSize×s2BaseSize×sizeof(INPUT_T)); the softmax result (P) is written to L1 for BMM2 to read. **The 3 buffers work with PRELOAD_N=2**: the AIV writes the P of round N and the AIC reads the P of round N-2, and there is always one buffer in a buffered state outside "being written / pending read / released", avoiding cross-core flag waits. The addresses and sizes must fully align with the corresponding L1 buffers on the block_cube side.
 

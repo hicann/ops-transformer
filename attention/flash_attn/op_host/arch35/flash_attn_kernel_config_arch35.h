@@ -39,6 +39,7 @@ struct FaKernelParamArch35 {
     int64_t maxSeqlenKv{-1};
     int64_t winLeft{-1};
     int64_t winRight{-1};
+    bool hasDrop{false};
 };
 
 struct FaKernelConfigArch35 {
@@ -106,6 +107,9 @@ private:
 
     static uint32_t CalcTemplateId(const FaKernelParamArch35& param)
     {
+        if (param.hasDrop) {
+            return FA_Template_ND;
+        }
         if (param.vHeadDim >= 256) { // VD>=256时, 直接路由到ND合轴模板, 因为其在所有场景性能最优
             return FA_Template_ND;
         }

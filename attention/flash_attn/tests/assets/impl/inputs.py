@@ -38,6 +38,9 @@ def customize_inputs(
     layout_kv="BSND",
     layout_out="BSND",
     return_softmax_lse=False,
+    dropout_p=0.0,
+    seed=None,
+    offset=None,
     **kwargs,
 ):
     arguments = dict(locals())
@@ -48,6 +51,8 @@ def customize_inputs(
         ("seqused_q", seqused_q),
         ("seqused_kv", seqused_kv),
         ("sinks", sinks),
+        ("seed", seed),
+        ("offset", offset),
     ):
         field = f"{name}_values"
         if field in kwargs:

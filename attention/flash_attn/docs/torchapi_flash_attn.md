@@ -51,6 +51,15 @@
 
   其中$Q$和$K^T$的乘积代表输入$x$的注意力，为避免该值变得过大，通常除以$\sqrt{d}$进行缩放，并对每行进行softmax归一化，与$V$相乘后得到一个$n \times d$的矩阵。
 
+  开启 **dropout**（`dropout_p > 0`）时，对归一化后的注意力权重施加掩码并缩放：
+
+  $$
+  P = Softmax(\frac{QK^T}{\sqrt{d}}),\qquad
+  Attention_{drop} = \left(P \odot dropout\_mask / (1 - dropout\_p)\right)V
+  $$
+
+  其中$dropout\_mask$为算子内部根据`seed`和`offset`生成的0/1掩码，$\odot$表示逐元素乘。传入`sinks`时，$P$使用下述包含sink项的分母；dropout仅作用于与$V$相乘的权重，不改变softmax分母及LSE。
+
   增加**sink**之后计算逻辑如下所示，主要修改相关softmax_max和softmax_sum逻辑计算部分。
 
   $$
@@ -108,7 +117,8 @@ cann_ops_transformer.flash_attn_metadata(
     layout_q=None,
     layout_kv=None,
     layout_out=None,
-    is_grad_enabled=False
+    is_grad_enabled=False,
+    dropout_p=0.0,
 ) -> Tensor
 ```
 
@@ -134,7 +144,10 @@ cann_ops_transformer.flash_attn(
     layout_q="BSND",
     layout_kv="BSND",
     layout_out="BSND",
-    return_softmax_lse=False
+    return_softmax_lse=False,
+    dropout_p=0.0,
+    seed=None,
+    offset=None,
 ) -> (Tensor, Tensor)
 ```
 
@@ -162,6 +175,7 @@ cann_ops_transformer.flash_attn(
 | layout_kv | string | 可选 | 定义输入k和v张量的布局格式 | string | - | - |
 | layout_out | string | 可选 | 定义输出张量的布局格式 | string | - | - |
 | is_grad_enabled | bool | 可选 | 是否生成反向梯度所需的metadata。默认值为False。当为True时，metadata将包含反向所需的flash_attn_grad信息 | bool | - | - |
+| dropout_p | float | 可选 | 表示丢弃概率，默认值为0.0；取值范围为[0, 1) | double | - | - |
 
 **关于 `head_dim_v`**：`flash_attn_metadata` 无 q/k/v 张量输入，无法从张量 shape 推导 V 的 head_dim，因此通过标量参数 `head_dim_v` 显式声明：
 
@@ -194,6 +208,9 @@ cann_ops_transformer.flash_attn(
 | layout_kv | string | 可选 | 定义输入k和v张量的布局格式 | string | - | - |
 | layout_out | string | 可选 | 定义输出张量的布局格式 | string | - | - |
 | return_softmax_lse | bool | 可选 | 是否需要获取softmax的LSE结果 | bool | - | - |
+| dropout_p | float | 可选 | 表示丢弃概率，默认值为0.0；取值范围为[0, 1) | double | - | - |
+| seed | Tensor | 可选 | Dropout随机种子，默认值为None；开启dropout时缺省按0处理，dropout_p=0时必须为None | uint64 | ND | (1,) |
+| offset | Tensor | 可选 | Dropout随机位置偏移，默认值为None；开启dropout时缺省按0处理，dropout_p=0时必须为None | uint64 | ND | (1,) |
 
 ## 返回值说明
 
@@ -248,6 +265,9 @@ cann_ops_transformer.flash_attn(
 |  Sinks参数组  |     sinks     | INPUT(OPTIONAL) |   Tensor   |
 |   SoftmaxLSE参数组   |    return_softmax_lse    | ATTR(OPTIONAL) |    bool    |
 |                      |      softmax_lse      |     OUTPUT     |   Tensor   |
+|   Dropout参数组   |    dropout_p    | ATTR(OPTIONAL) |    float    |
+|                      |      seed      | INPUT(OPTIONAL) |   Tensor   |
+|                      |      offset      | INPUT(OPTIONAL) |   Tensor   |
 
 ### 基准信息说明
 
@@ -782,6 +802,67 @@ layout_q、layout_kv与SeqLens参数的组合关系：
         </tr>
     </tbody>
 </table>
+
+#### Dropout参数组
+
+<table style="undefined;table-layout: fixed; width:1625px">
+    <colgroup>
+        <col style="width: 147px">
+        <col style="width: 232px">
+        <col style="width: 232px">
+        <col style="width: 293px">
+        <col style="width: 185px">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>参数</th>
+            <th>单参数校验</th>
+            <th>存在性校验</th>
+            <th>一致性校验</th>
+            <th>特性交叉校验</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>dropout_p</td>
+            <td>
+                <ul>
+                    <li>data_type仅支持double</li>
+                    <li>要求为[0,1)内有限数</li>
+                </ul>
+            </td>
+            <td>可选属性，默认值为0.0</td>
+            <td>无</td>
+            <td>大于0时仅支持连续KV；不支持PA_BBND、PA_BNBD、PA_NZ</td>
+        </tr>
+        <tr>
+            <td>seed</td>
+            <td>
+                <ul>
+                    <li>data_type仅支持uint64</li>
+                    <li>tensor_shape为(1,)</li>
+                </ul>
+            </td>
+            <td>可选输入，默认值为None；开启dropout时缺省按0处理</td>
+            <td>dropout_p=0时必须为None</td>
+            <td>仅在开启dropout时参与随机掩码生成</td>
+        </tr>
+        <tr>
+            <td>offset</td>
+            <td>
+                <ul>
+                    <li>data_type仅支持uint64</li>
+                    <li>tensor_shape为(1,)</li>
+                </ul>
+            </td>
+            <td>可选输入，默认值为None；开启dropout时缺省按0处理</td>
+            <td>dropout_p=0时必须为None</td>
+            <td>仅在开启dropout时参与随机掩码生成</td>
+        </tr>
+    </tbody>
+</table>
+
+
 
 ## 调用示例
 

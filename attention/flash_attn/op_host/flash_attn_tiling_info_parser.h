@@ -37,6 +37,7 @@ public:
     void GetOptionalInputParaSeqLengthInfo();
     void GetOptionalInputParaPageAttentionInfo();
     void GetOptionalInputParaSinksInfo();
+    void GetOptionalInputParaDropoutInfo();
 
     void GetOptionalInputParaInfo();
     void GetInputParaInfo();
@@ -143,6 +144,9 @@ public:
     // SoftmaxLSE 信息
     bool softmaxLseFlag_ = false;
     int64_t returnSoftmaxLse_ = 0;
+
+    // Dropout 信息
+    float dropoutP_ = 0.0f;
 
     // 其他属性信息
     float softmaxScale_ = 1.0;

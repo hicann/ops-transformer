@@ -126,14 +126,16 @@ void FlashAttnTilingBase::UpdateTilingKeyKvLayout()
 void FlashAttnTilingBase::GenTilingKey()
 {
     UpdateTilingKeyInfo();
-    tilingKey_ = GET_TPL_TILING_KEY(tilingKeyInfo_.inputLayout, tilingKeyInfo_.kvLayoutType,
-                                    tilingKeyInfo_.hasAttenMask, tilingKeyInfo_.templateId, tilingKeyInfo_.config);
+    tilingKey_ =
+        GET_TPL_TILING_KEY(tilingKeyInfo_.inputLayout, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.hasAttenMask,
+                           tilingKeyInfo_.hasDrop, tilingKeyInfo_.templateId, tilingKeyInfo_.config);
     OP_LOGI(faInfo_->opName, "The tilingkey is %llu.", tilingKey_);
     OP_LOGI(faInfo_->opName,
-            "The tilingkey param is inOutLayoutType: %llu, kvLayoutType: %llu, hasAttenMask: %llu, templateId: %llu, "
+            "The tilingkey param is inOutLayoutType: %llu, kvLayoutType: %llu, hasAttenMask: %llu, hasDrop: %llu, "
+            "templateId: %llu, "
             "config: %llu.",
             tilingKeyInfo_.inputLayout, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.hasAttenMask,
-            tilingKeyInfo_.templateId, tilingKeyInfo_.config);
+            tilingKeyInfo_.hasDrop, tilingKeyInfo_.templateId, tilingKeyInfo_.config);
 }
 void FlashAttnTilingBase::CalcNumBlocks(uint32_t aicNum)
 {
@@ -237,6 +239,10 @@ void FlashAttnTilingBase::SetFATilingData()
     tilingData_.baseTiling.flashAttnBaseParams.seqUsedQSize = seqUsedQFlag_ ? faInfo_->bSize : 0;
     tilingData_.baseTiling.flashAttnBaseParams.seqUsedKvSize = seqUsedKvFlag_ ? faInfo_->bSize : 0;
     tilingData_.baseTiling.flashAttnBaseParams.isSoftMaxLseEnable = faInfo_->softmaxLseFlag;
+    const float keepProb = 1.0f - faInfo_->dropoutP;
+    tilingData_.baseTiling.flashAttnDropParams.keepProb = keepProb;
+    tilingData_.baseTiling.flashAttnDropParams.keepProbUint8 =
+        static_cast<uint8_t>(keepProb * static_cast<float>(UINT8_MAX));
     tilingData_.baseTiling.flashAttnBaseParams.iscuSeqLengthsNull = !cuSeqLenQFlag_;
     tilingData_.baseTiling.flashAttnBaseParams.iscuSeqLengthsKVNull = !cuSeqLenKVFlag_;
     tilingData_.baseTiling.flashAttnBaseParams.coreNum = numBlocks_;

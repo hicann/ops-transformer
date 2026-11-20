@@ -43,6 +43,7 @@ void FAChecker::RegisterCheckers()
     checkers_.push_back(std::make_unique<SinksChecker>());
     checkers_.push_back(std::make_unique<MetadataChecker>());
     checkers_.push_back(std::make_unique<SoftmaxLSEChecker>());
+    checkers_.push_back(std::make_unique<DropoutChecker>());
 }
 
 ge::graphStatus FAChecker::Init(const FaTilingInfo& faInfo)

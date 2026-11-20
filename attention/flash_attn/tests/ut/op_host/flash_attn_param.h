@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <optional>
 #include "op_host_csv_case_loader.h"
 #include "tiling_context_faker.h"
 #include "infer_shape_context_faker.h"
@@ -66,6 +67,9 @@ struct FlashAttnTilingUtParam : public FlashAttnHostUtParamBase {
     gert::TilingContextPara::TensorDescription sinks = TD_DEFAULT;
     gert::TilingContextPara::TensorDescription attn_mask = TD_DEFAULT;
     gert::TilingContextPara::TensorDescription metadata = TD_DEFAULT;
+    gert::TilingContextPara::TensorDescription seed = TD_DEFAULT;
+    gert::TilingContextPara::TensorDescription offset = TD_DEFAULT;
+    std::optional<float> dropout_p;
 
     gert::TilingContextPara::TensorDescription attn_out = TD_DEFAULT;
     gert::TilingContextPara::TensorDescription softmax_lse = TD_DEFAULT;
@@ -99,6 +103,13 @@ struct FlashAttnTilingUtParam : public FlashAttnHostUtParamBase {
             GetTensorGE(csvMap, "attn_mask_shape", "attn_mask_dtype", "attn_mask_format", this->attn_mask));
         inputInstance.emplace_back(
             GetTensorGE(csvMap, "metadata_shape", "metadata_dtype", "metadata_format", this->metadata));
+        inputInstance.emplace_back(GetTensorGE(csvMap, "seed_shape", "seed_dtype", "seed_format", this->seed));
+        inputInstance.emplace_back(GetTensorGE(csvMap, "offset_shape", "offset_dtype", "offset_format", this->offset));
+
+        const auto dropoutP = ReadMap(csvMap, "dropout_p");
+        if (!dropoutP.empty()) {
+            dropout_p = std::stof(dropoutP);
+        }
 
         outputInstance.emplace_back(
             GetTensorGE(csvMap, "attn_out_shape", "attn_out_dtype", "attn_out_format", this->attn_out));

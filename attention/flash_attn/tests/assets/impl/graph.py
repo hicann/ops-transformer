@@ -30,6 +30,7 @@ class FlashAttnAclGraph(torch.nn.Module):
         layout_kv="BSND",
         layout_out="BSND",
         return_softmax_lse=False,
+        dropout_p=0.0,
     ):
         super().__init__()
         self.attrs = dict(
@@ -43,6 +44,7 @@ class FlashAttnAclGraph(torch.nn.Module):
             layout_kv=layout_kv,
             layout_out=layout_out,
             return_softmax_lse=return_softmax_lse,
+            dropout_p=dropout_p,
         )
 
     def forward(
@@ -59,6 +61,8 @@ class FlashAttnAclGraph(torch.nn.Module):
         sinks=None,
         attn_mask=None,
         metadata=None,
+        seed=None,
+        offset=None,
     ):
         if metadata is None or metadata.numel() == 0:
             raise ValueError(
@@ -76,5 +80,7 @@ class FlashAttnAclGraph(torch.nn.Module):
             sinks=sinks,
             attn_mask=attn_mask,
             metadata=metadata,
+            seed=seed,
+            offset=offset,
             **self.attrs,
         )

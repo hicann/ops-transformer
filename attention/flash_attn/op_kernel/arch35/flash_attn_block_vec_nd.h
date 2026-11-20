@@ -19,6 +19,7 @@
 
 #include "../utils/attenmask_m_gs1.h"
 #include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
+#include "../../../common/op_kernel/arch35/dropmask.h"
 #include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz.h"
 #include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz_dn.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flashupdate_new.h"
@@ -37,6 +38,37 @@ using namespace AscendC::Impl::Detail;
 namespace FlashAttnKernel {
 using ArchInfo::CV_RATIO;
 
+constexpr uint32_t DROP_RANDOM_UINT32_PER_INDEX = regbaseutil::philoxRandomNumAlignSize / sizeof(uint32_t);
+constexpr uint32_t DROP_MASK_BYTES_PER_INDEX =
+    regbaseutil::philoxRandomNumAlignSize / std::numeric_limits<uint8_t>::digits;
+// 公共接口至少写入128字节掩码，逐行复制时预留一个完整向量。
+constexpr uint32_t DROP_ROW_SCRATCH_BYTES = 256U;
+
+struct DropIndexCache {
+    uint32_t rows = 0;
+    uint32_t rowStride = 0;
+    uint32_t columns = 0;
+    bool splitRows = false;
+};
+
+__aicore__ inline void SetDropCounter(PhiloxCounter& counter, uint64_t base, uint64_t relativeIndex)
+{
+    uint64_t sum = base + relativeIndex;
+    counter[0] = static_cast<uint32_t>(sum);
+    counter[1] = static_cast<uint32_t>(sum >> 32);
+    counter[2] = static_cast<uint32_t>(sum < base);
+    counter[3] = 0;
+}
+
+__simd_vf__ inline void CopyDropMaskRow(__ubuf__ uint8_t* dst, __ubuf__ uint8_t* src, const uint32_t bytes)
+{
+    RegTensor<uint8_t> value;
+    UnalignRegForStore ureg;
+    LoadAlign(value, src);
+    StoreUnAlign<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE>(dst, value, ureg, bytes);
+    StoreUnAlignPost<uint8_t, Reg::PostLiteral::POST_MODE_UPDATE>(dst, ureg, 0);
+}
+
 template <typename FA_T>
 class FANoQuantGqaBlockVecNd {
 public:
@@ -52,9 +84,18 @@ public:
     static constexpr FA_LAYOUT LAYOUT_OUT = FA_T::attnOutLayout;
     static constexpr bool PAGE_ATTENTION = FA_T::pageAttention;
     static constexpr bool HAS_MASK = FA_T::hasMask;
+    static constexpr bool HAS_DROP = FA_T::hasDrop;
 
     using T = float;
     static constexpr uint32_t dTemplateAlign64 = BaseApi::Align64Func((uint16_t)FA_T::dVBaseSize);
+
+    // 按每个AIV的tile行数和列数分配压缩掩码、32位索引，另预留逐行暂存。
+    // 大逻辑位置在FlashAttn内通过重设基址或逐行拆分处理。
+    static constexpr uint32_t DROP_INDEX_BYTES =
+        mBaseSize / CV_RATIO * (s2BaseSize / regbaseutil::philoxRandomNumAlignSize) * sizeof(uint32_t);
+    static constexpr uint32_t UB_DROP_MASK_BUF_BYTES =
+        mBaseSize / CV_RATIO * s2BaseSize / std::numeric_limits<uint8_t>::digits;
+    static constexpr uint32_t UB_DROP_MASK_INDEX_BUF_BYTES = DROP_INDEX_BYTES + DROP_ROW_SCRATCH_BYTES;
 
     static constexpr uint32_t DB = 2;
     // 索引使用 loop & (DB - 1) 代替 loop % DB，要求 DB 必须是2的幂，否则位掩码结果错误
@@ -107,6 +148,8 @@ public:
     static constexpr uint32_t UB_VEC2_RES_BUF_BYTES = mBaseSize / CV_RATIO * dTemplateAlign64 * sizeof(T);
     LocalTensor<T> ubVec2Res_; // 存放vec2阶段VEC的中间处理结果, 并且作为attn_out的输出buffer, 需配对的MTE3和V的同步ID
 
+    // 保留Vec1双缓冲，复用attention mask合并后空闲的另一块缓冲。
+    static constexpr bool REUSE_MASK_BUF = HAS_DROP && dBaseSize == 256 && mBaseSize == 128 && s2BaseSize == 128;
     static constexpr uint32_t UB_VEC1_RES_BUFCNT = 2U;
     static constexpr uint32_t UB_VEC1_RES_BUF_BYTES = (mBaseSize / CV_RATIO + 1U) * s2BaseSize * sizeof(INPUT_T);
     LocalTensor<uint8_t> ubVec1ResBuffers_;
@@ -132,6 +175,13 @@ public:
     uint32_t lseOutUbBufId_ = 0;
 
     LocalTensor<uint8_t> vec1ApiTmpBuf_;
+
+    // dropout：掩码索引向量与位压缩掩码（HAS_DROP时有效）
+    LocalTensor<uint8_t> dropMaskIndexBuf_;
+    LocalTensor<uint8_t> dropMaskBuf_;
+    uint32_t dropMaskBatch_ = 0;
+    uint64_t dropMaskBatchOffset_ = 0; // 前序 batch 每个 Q head 的 counter 数量之和
+    DropIndexCache dropIndexCache_;
 
     const ConstInfo_t& constInfo_;
 
@@ -213,6 +263,10 @@ public:
                                  [UB_LSE_OUT_BUF_BYTES]; // 2 * 2K = 4K, 输出BUF:
                                                          // FD中间结果SUM和MAX拷出至GM，或者LSE结果拷出
             uint8_t softmaxTmpBuf[512U];                 // 0.5K, 常驻BUF, 用于softmax计算的中间结果缓存
+            // dropout 关闭或复用mask时仅占位32B，保持LocalTensor 32B对齐
+            uint8_t dropMaskIndexBuf[(HAS_DROP && !REUSE_MASK_BUF ? UB_DROP_MASK_INDEX_BUF_BYTES :
+                                                                    32U)]; // tile索引和逐行暂存
+            uint8_t dropMaskBuf[(HAS_DROP && !REUSE_MASK_BUF ? UB_DROP_MASK_BUF_BYTES : 32U)]; // tile位压缩掩码
         };
         static_assert(sizeof(UbLayout) <= (CV_RATIO == 1 ? 376 * 1024 : 248 * 1024), "UB buffer too large");
         ubMmResBuffers_ = LocalTensor<uint8_t>(TPosition::VECIN, OFFSET_OF_MEMBER(UbLayout, mmResBuffers),
@@ -238,6 +292,10 @@ public:
                                                 SIZE_OF_MEMBER(UbLayout, lseOutBuffers));
         vec1ApiTmpBuf_ = LocalTensor<uint8_t>(TPosition::VECIN, OFFSET_OF_MEMBER(UbLayout, softmaxTmpBuf),
                                               SIZE_OF_MEMBER(UbLayout, softmaxTmpBuf));
+        dropMaskIndexBuf_ = LocalTensor<uint8_t>(TPosition::VECIN, OFFSET_OF_MEMBER(UbLayout, dropMaskIndexBuf),
+                                                 SIZE_OF_MEMBER(UbLayout, dropMaskIndexBuf));
+        dropMaskBuf_ = LocalTensor<uint8_t>(TPosition::VECIN, OFFSET_OF_MEMBER(UbLayout, dropMaskBuf),
+                                            SIZE_OF_MEMBER(UbLayout, dropMaskBuf));
     }
 
     __aicore__ inline void ResetSoftmaxBuffer(uint32_t slotIdx, const RunInfo& runInfo)
@@ -425,6 +483,105 @@ public:
         lseOutUbBufId_ = (lseOutUbBufId_ + 1) % UB_LSE_OUT_BUFCNT;
     }
 
+    __aicore__ inline void UpdateDropIndexCache(const RunInfo& runInfo, uint32_t columns, uint32_t rowStride,
+                                                bool forceRefresh)
+    {
+        uint32_t rows = runInfo.actVecMSize;
+        DropIndexCache& cache = dropIndexCache_;
+        LocalTensor<int32_t> indices = dropMaskIndexBuf_.template ReinterpretCast<int32_t>();
+        bool refresh = forceRefresh || cache.rows != rows || cache.rowStride != rowStride || cache.columns != columns;
+        if (!refresh) {
+            return;
+        }
+        // Philox counter 承载块起点，uint32 索引承载块内相对距离。
+        cache.splitRows = rowStride != 0 && rows - 1 > (0xffffffffULL - (columns - 1)) / rowStride;
+        if (cache.splitRows) {
+            // 逐行设置counter起点，索引仅表示列偏移。
+            regbaseutil::GenIndexVec(indices, 1, columns, 0);
+        } else {
+            regbaseutil::GenIndexVec(indices, rows, columns, rowStride);
+        }
+        cache.rows = rows;
+        cache.rowStride = rowStride;
+        cache.columns = columns;
+        AscendC::PipeBarrier<PIPE_V>();
+    }
+
+    __aicore__ inline void GenDropMaskByRows(const RunInfo& runInfo, const PhiloxKey& key, uint64_t tileIndex,
+                                             uint32_t columns, uint32_t rowStride)
+    {
+        LocalTensor<int32_t> indices = dropMaskIndexBuf_.template ReinterpretCast<int32_t>();
+        LocalTensor<uint8_t> scratch = dropMaskIndexBuf_[DROP_INDEX_BYTES];
+        uint32_t rowBytes = columns * DROP_MASK_BYTES_PER_INDEX;
+        for (uint32_t row = 0; row < runInfo.actVecMSize; ++row) {
+            PhiloxCounter counter;
+            SetDropCounter(counter, constInfo_.dropCounter, tileIndex + static_cast<uint64_t>(row) * rowStride);
+            regbaseutil::GenMaskByIndexVec(scratch, indices, key, counter,
+                                           static_cast<uint16_t>(columns * DROP_RANDOM_UINT32_PER_INDEX),
+                                           constInfo_.keepProbUint8);
+            AscendC::PipeBarrier<PIPE_V>();
+            CopyDropMaskRow((__ubuf__ uint8_t*)dropMaskBuf_[row * rowBytes].GetPhyAddr(),
+                            (__ubuf__ uint8_t*)scratch.GetPhyAddr(), rowBytes);
+            AscendC::PipeBarrier<PIPE_V>();
+        }
+    }
+
+    __aicore__ inline void GenFlashAttnDropMask(const RunInfo& runInfo, const PhiloxKey& key, uint64_t batchIndex,
+                                                uint32_t rowStride, bool forceRefresh)
+    {
+        uint32_t columns = AttentionCommon::CeilDiv<uint32_t>(s2BaseSize, regbaseutil::philoxRandomNumAlignSize);
+        // 每个KV头内直接使用读取顺序的合轴行号（BSND/TND为S1G，BNSD为GS1）。
+        uint64_t rowStart = static_cast<uint64_t>(runInfo.n2Idx) * constInfo_.gSize * runInfo.actS1Size +
+                            runInfo.gS1Idx + runInfo.vecMbaseIdx;
+        uint64_t tileIndex = batchIndex + rowStart * rowStride + runInfo.s2Idx / regbaseutil::philoxRandomNumAlignSize;
+        UpdateDropIndexCache(runInfo, columns, rowStride, forceRefresh);
+        if (unlikely(dropIndexCache_.splitRows)) {
+            GenDropMaskByRows(runInfo, key, tileIndex, columns, rowStride);
+            return;
+        }
+        PhiloxCounter counter;
+        SetDropCounter(counter, constInfo_.dropCounter, tileIndex);
+        LocalTensor<int32_t> indices = dropMaskIndexBuf_.template ReinterpretCast<int32_t>();
+        regbaseutil::GenMaskByIndexVec(
+            dropMaskBuf_, indices, key, counter,
+            static_cast<uint16_t>(runInfo.actVecMSize * columns * DROP_RANDOM_UINT32_PER_INDEX),
+            constInfo_.keepProbUint8);
+    }
+
+    __aicore__ inline uint64_t GetDropBatchIndex(const RunInfo& runInfo, uint32_t rowStride)
+    {
+        uint64_t heads = static_cast<uint64_t>(constInfo_.n2Size) * constInfo_.gSize;
+        if constexpr (LAYOUT_T != FA_LAYOUT::TND) {
+            if (constInfo_.seqUsedQSize == 0 && constInfo_.seqUsedKvSize == 0) {
+                return static_cast<uint64_t>(runInfo.bIdx) * heads * runInfo.actS1Size * rowStride;
+            }
+        }
+        if (runInfo.bIdx < dropMaskBatch_) {
+            dropMaskBatch_ = 0;
+            dropMaskBatchOffset_ = 0;
+        }
+        while (dropMaskBatch_ < runInfo.bIdx) {
+            uint64_t qLen = qSeqLensTool_.GetActualSeqLength(dropMaskBatch_);
+            uint64_t kvLen = kvSeqLensTool_.GetActualSeqLength(dropMaskBatch_);
+            dropMaskBatchOffset_ +=
+                qLen * AttentionCommon::CeilDiv<uint64_t>(kvLen, regbaseutil::philoxRandomNumAlignSize);
+            ++dropMaskBatch_;
+        }
+        return dropMaskBatchOffset_ * heads;
+    }
+
+    __aicore__ inline void GenerateDropMask(RunInfo& runInfo, LocalTensor<uint8_t>& dropMaskUb)
+    {
+        uint32_t rowStride =
+            AttentionCommon::CeilDiv<uint64_t>(runInfo.actS2Size, regbaseutil::philoxRandomNumAlignSize);
+        uint64_t batchIndex = GetDropBatchIndex(runInfo, rowStride);
+        PhiloxKey key = {static_cast<uint32_t>(constInfo_.seed), static_cast<uint32_t>(constInfo_.seed >> 32)};
+        // 存在attention mask时，借用的缓冲随tile切换且索引被覆盖，需要刷新。
+        GenFlashAttnDropMask(runInfo, key, batchIndex, rowStride,
+                             constInfo_.enableFlashDecode || (REUSE_MASK_BUF && HAS_MASK));
+        dropMaskUb = dropMaskBuf_;
+    }
+
     __aicore__ inline void ProcessVec1Nd(LocalTensor<INPUT_T>& pL1Tensor, LocalTensor<T>& mm1ResUbTensor,
                                          RunInfo runInfo)
     {
@@ -454,45 +611,63 @@ public:
             Mutex::Lock<PIPE_V>(UB_IN_MASK_EVENT0 + maskBufId);
         }
 
+        if constexpr (REUSE_MASK_BUF) {
+            // AttenMaskCopyIn合并后不再使用前边界掩码，其缓冲保留至Vec1读取dropout掩码结束。
+            const uint32_t dropBufId = HAS_MASK ? (maskBufId ^ 1U) : 0U;
+            if constexpr (HAS_MASK) {
+                Mutex::Lock<PIPE_V>(UB_IN_MASK_EVENT0 + dropBufId);
+            }
+            dropMaskIndexBuf_ = ubMaskBuffers_[dropBufId * UB_MASK_BUF_BYTES];
+            dropMaskBuf_ = dropMaskIndexBuf_[UB_DROP_MASK_INDEX_BUF_BYTES];
+        }
+
+        if constexpr (HAS_DROP) {
+            GenerateDropMask(runInfo, dropMaskUb);
+            AscendC::PipeBarrier<PIPE_V>();
+        }
+
         Mutex::Lock<PIPE_V>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
 
         LocalTensor<INPUT_T> stage1CastTensor =
             ubVec1ResBuffers_[vec1ResUbBufId_ * UB_VEC1_RES_BUF_BYTES].template ReinterpretCast<INPUT_T>();
         if (likely(runInfo.actSingleLoopS2Size == 128)) {
             FaVectorApi::ProcessVec1Vf<T, INPUT_T, INPUT_T /*pseShiftType*/, true, mBaseSize, s2BaseSize, EQ_128,
-                                       HAS_MASK, PseTypeEnum::PSE_NONE_TYPE, false, false, false>(
+                                       HAS_MASK, PseTypeEnum::PSE_NONE_TYPE, HAS_DROP, false, false>(
                 stage1CastTensor, nullptr, sumUb, maxUb, mm1ResUbTensor, expUb, sumUb, maxUb, attenMaskUb, nonePseUb,
                 dropMaskUb, vec1ApiTmpBuf_, pScaleUb, runInfo.actVecMSize, runInfo.actSingleLoopS2Size,
                 0 /* pseStride */, 0.0f /* slopes */, 0.0f /* posShift */, static_cast<T>(constInfo_.scaleValue),
-                descaleQK, negativeFloatScalar_, 0.0F, queryScaleUb, deSCaleKValue);
+                descaleQK, negativeFloatScalar_, constInfo_.keepProb, queryScaleUb, deSCaleKValue);
         } else if (runInfo.actSingleLoopS2Size <= 64) {
             FaVectorApi::ProcessVec1Vf<T, INPUT_T, INPUT_T /*pseShiftType*/, true, mBaseSize, s2BaseSize,
-                                       GT_0_AND_LTE_64, HAS_MASK, PseTypeEnum::PSE_NONE_TYPE, false, false, false>(
+                                       GT_0_AND_LTE_64, HAS_MASK, PseTypeEnum::PSE_NONE_TYPE, HAS_DROP, false, false>(
                 stage1CastTensor, nullptr, sumUb, maxUb, mm1ResUbTensor, expUb, sumUb, maxUb, attenMaskUb, nonePseUb,
                 dropMaskUb, vec1ApiTmpBuf_, pScaleUb, runInfo.actVecMSize, runInfo.actSingleLoopS2Size,
                 0 /* pseStride */, 0.0f /* slopes */, 0.0f /* posShift */, static_cast<T>(constInfo_.scaleValue),
-                descaleQK, negativeFloatScalar_, 0.0F, queryScaleUb, deSCaleKValue);
+                descaleQK, negativeFloatScalar_, constInfo_.keepProb, queryScaleUb, deSCaleKValue);
         } else if (runInfo.actSingleLoopS2Size < 128) {
             FaVectorApi::ProcessVec1Vf<T, INPUT_T, INPUT_T /*pseShiftType*/, true, mBaseSize, s2BaseSize,
-                                       GT_64_AND_LTE_128, HAS_MASK, PseTypeEnum::PSE_NONE_TYPE, false, false, false>(
+                                       GT_64_AND_LTE_128, HAS_MASK, PseTypeEnum::PSE_NONE_TYPE, HAS_DROP, false, false>(
                 stage1CastTensor, nullptr, sumUb, maxUb, mm1ResUbTensor, expUb, sumUb, maxUb, attenMaskUb, nonePseUb,
                 dropMaskUb, vec1ApiTmpBuf_, pScaleUb, runInfo.actVecMSize, runInfo.actSingleLoopS2Size,
                 0 /* pseStride */, 0.0f /* slopes */, 0.0f /* posShift */, static_cast<T>(constInfo_.scaleValue),
-                descaleQK, negativeFloatScalar_, 0.0F, queryScaleUb, deSCaleKValue);
+                descaleQK, negativeFloatScalar_, constInfo_.keepProb, queryScaleUb, deSCaleKValue);
         } else {
             if constexpr (s2BaseSize == 256) {
                 FaVectorApi::ProcessVec1Vf<T, INPUT_T, INPUT_T /*pseShiftType*/, true, mBaseSize, s2BaseSize,
-                                           GT_128_AND_LTE_256, HAS_MASK, PseTypeEnum::PSE_NONE_TYPE, false>(
+                                           GT_128_AND_LTE_256, HAS_MASK, PseTypeEnum::PSE_NONE_TYPE, HAS_DROP, false>(
                     stage1CastTensor, nullptr, sumUb, maxUb, mm1ResUbTensor, expUb, sumUb, maxUb, attenMaskUb,
                     nonePseUb, dropMaskUb, vec1ApiTmpBuf_, expUb, runInfo.actVecMSize, runInfo.actSingleLoopS2Size,
                     0 /* pseStride */, 0.0f /* slopes */, 0.0f /* posShift */, static_cast<T>(constInfo_.scaleValue),
-                    descaleQK, negativeFloatScalar_, 0.0F);
+                    descaleQK, negativeFloatScalar_, constInfo_.keepProb);
             }
         }
         Mutex::Unlock<PIPE_V>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);
 
         if constexpr (HAS_MASK) {
             Mutex::Unlock<PIPE_V>(UB_IN_MASK_EVENT0 + maskBufId);
+            if constexpr (REUSE_MASK_BUF) {
+                Mutex::Unlock<PIPE_V>(UB_IN_MASK_EVENT0 + (maskBufId ^ 1U));
+            }
         }
 
         Mutex::Lock<PIPE_MTE3>(UB_OUT_VEC1_RES_EVENT0 + vec1ResUbBufId_);

@@ -54,6 +54,8 @@ Tensor order in CSV (matches the registered FlashAttn operator schema):
     [2] v              [5] cu_seqlens_kv      [8] sinks
                                                    [9] attn_mask
                                                   [10] metadata
+                                                  [11] seed
+                                                  [12] offset
 
 Unused positions use None. Small integer tensors (cu_seqlens, seqused)
 get their values from attributes dict → override_tensors_from_attributes.
@@ -310,6 +312,16 @@ def _build_attrs(p):
         bool(int(rsl)) if isinstance(rsl, (int, str)) else bool(rsl),
     )
 
+    # Dropout 参数仅在用例显式声明时输出, 保持无 dropout 用例 CSV 不变。
+    if p.get("dropout_p") is not None:
+        _set("dropout_p", float(p["dropout_p"]))
+    for name in ("seed", "offset"):
+        if p.get(name) is not None:
+            value = _integer_attribute(name, p[name])
+            if not 0 <= value < 1 << 64:
+                raise ValueError(f"{name} must fit uint64")
+            _set(f"{name}_values", [value])
+
     layout_q = p.get("layout_q", "BNSD")
     if layout_q == "TND":
         cu_q = p.get("cu_seqlens_q")
@@ -324,7 +336,7 @@ def _build_attrs(p):
     skv = p.get("seqused_kv")
     # 小整数张量的值不直接放同名 attr: TTK match_overload 会把
     # "张量参数名出现在 attrs" 重复计入输入数, 超出 FlashAttn 的
-    # 11 参数上限导致 PARAM_PLAN_FAILURE。改用 *_values 键,
+    # 张量参数上限导致 PARAM_PLAN_FAILURE。改用 *_values 键,
     # 由 impl/inputs.py customize_inputs 填入对应张量。
     _set("cu_seqlens_q_values", list(cu_q) if cu_q is not None else None)
     _set("cu_seqlens_kv_values", list(cu_kv) if cu_kv is not None else None)
@@ -442,6 +454,10 @@ def _build_row(case_name, p):
         attn_mask_shape,
         metadata_shape,
     ]
+    if "seed_values" in attrs or "offset_values" in attrs:
+        shapes.extend(
+            (1,) if f"{name}_values" in attrs else None for name in ("seed", "offset")
+        )
     dtype_str = DTYPE_MAP[p["Dtype"]]
 
     dtypes = [dtype_str, dtype_str, dtype_str]
@@ -452,6 +468,8 @@ def _build_row(case_name, p):
             dtypes.append("float32")
         elif i == 9:
             dtypes.append("int8")
+        elif i > 10:
+            dtypes.append("uint64")
         else:
             dtypes.append(INT_DTYPE)
 
@@ -459,6 +477,9 @@ def _build_row(case_name, p):
     if shapes[8] is not None:
         data_ranges[8] = tuple(p.get("sinks_range", (-1.0, 1.0)))
     data_ranges[10] = (0, 0)  # metadata 占位: TTK 按 range 填充 0 即可
+    for i in range(11, len(shapes)):
+        if shapes[i] is not None:
+            data_ranges[i] = (0, 0)
     data_ranges = tuple(data_ranges)
 
     prec = _precision(p)

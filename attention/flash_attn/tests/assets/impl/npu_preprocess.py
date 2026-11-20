@@ -18,8 +18,13 @@ METADATA_INDEX = 10
 
 
 def metadata_slot_declared(tensor_dtypes):
-    if not isinstance(tensor_dtypes, (tuple, list)) or len(tensor_dtypes) != 11:
-        raise ValueError("tensor_dtypes must declare all 11 FlashAttn input slots")
+    if (
+        not isinstance(tensor_dtypes, (tuple, list))
+        or not 11 <= len(tensor_dtypes) <= 13
+    ):
+        raise ValueError(
+            "tensor_dtypes must include the FlashAttn metadata slot and optional seed/offset slots"
+        )
     return tensor_dtypes[METADATA_INDEX] is not None
 
 
@@ -54,6 +59,7 @@ def build_metadata_arguments(q, k, v, kwargs):
         layout_q=layout_q,
         layout_kv=layout_kv,
         layout_out=kwargs["layout_out"],
+        dropout_p=kwargs.get("dropout_p", 0.0),
     )
 
 
@@ -79,6 +85,9 @@ def run(
     layout_kv="BSND",
     layout_out="BSND",
     return_softmax_lse=False,
+    dropout_p=0.0,
+    seed=None,
+    offset=None,
     **kwargs,
 ):
     if metadata is not None:
