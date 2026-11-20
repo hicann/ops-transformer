@@ -60,6 +60,9 @@ using GMMS8S4BasicApiTilingData = GroupedMatmulTilingData::GMMS8S4BasicApiTiling
 #include "arch35/weight_quant_asw/weight_quant_grouped_matmul_asw_cube.h"
 #include "arch35/weight_quant_asw/weight_quant_asw_tiling_key.h"
 #include "arch35/weight_quant_asw/grouped_matmul_weight_antiquant_tensor_api.h"
+#if IS_BLAZE
+#include "arch35/weight_quant_asw/gmm_tensor_api_mx_a8w4_kernel.h"
+#endif
 #elif defined(V310_GMM_ANTI_QUANT)
 #include "arch35/weight_quant_basic_block/basic_block_config.h"
 #include "arch35/weight_quant_basic_block/grouped_matmul_weight_quant_basic_controller.h"
@@ -528,7 +531,19 @@ __global__ __aicore__ void grouped_matmul(GM_ADDR x, GM_ADDR weight, GM_ADDR bia
                       WeightQuantTools::IsMxA8HiF4<DTYPE_X, DTYPE_WEIGHT, DTYPE_ANTIQUANT_SCALE>() ||
                       WeightQuantTools::IsA16MxFp4<DTYPE_X, DTYPE_WEIGHT, DTYPE_ANTIQUANT_SCALE>() ||
                       WeightQuantTools::IsA16MxHiF4<DTYPE_X, DTYPE_WEIGHT, DTYPE_ANTIQUANT_SCALE>()) {
-            INVOKE_GMM_WEIGHT_QUANT_MXA8W4_ASW_OP_IMPL(WeightQuantASWMxKernel, CubeFormat::NZ, false, true);
+#if IS_BLAZE
+            if constexpr (AscendC::IsSameType<DTYPE_X, fp8_e4m3fn_t>::value &&
+                          AscendC::IsSameType<DTYPE_WEIGHT, fp4x2_e2m1_t>::value &&
+                          AscendC::IsSameType<DTYPE_ANTIQUANT_SCALE, fp8_e8m0_t>::value) {
+                GET_TILING_DATA_MEMBER(GMMWeightQuantAswTilingData, gmmWeightQuantAswParams, gmmBaseParams_, tiling);
+                GET_TILING_DATA_MEMBER(GMMWeightQuantAswTilingData, mmTilingData, mmTilingData_, tiling);
+                GROUPED_MATMUL::GmmTensorApiMxA8W4Kernel<DTYPE_X, DTYPE_WEIGHT, DTYPE_BIAS, DTYPE_Y>(
+                    x, weight, bias, antiquantScale, groupList, perTokenScale, y, &gmmBaseParams_, &mmTilingData_);
+            } else
+#endif
+            {
+                INVOKE_GMM_WEIGHT_QUANT_MXA8W4_ASW_OP_IMPL(WeightQuantASWMxKernel, CubeFormat::NZ, false, true);
+            }
         }
     }
 #elif defined(V310_GMM_ANTI_QUANT)
