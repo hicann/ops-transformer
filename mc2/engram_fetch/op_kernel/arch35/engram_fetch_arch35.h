@@ -47,7 +47,7 @@ namespace Mc2Kernel {
 
 constexpr AscendC::UrmaWqeEntry URMA_UNORDERED_CFG = {
     .odr = 5,
-    .fence = 1,
+    .fence = 0,
     .se = 0,
     .cqe = 0,
     .inlineEn = 0,
@@ -69,6 +69,12 @@ __aicore__ inline void SyncFunc()
     AscendC::WaitFlag<event>(eventID);
 }
 
+// 统一校验 indices 中的条目是否落在合法表范围 [0, totalEntries)
+__aicore__ inline bool IsValidEntry(int32_t idx, int64_t totalEntries)
+{
+    return idx >= 0 && static_cast<int64_t>(idx) < totalEntries;
+}
+
 class EngramFetchArch35 {
 public:
     __aicore__ inline EngramFetchArch35() = default;
@@ -82,20 +88,29 @@ public:
 
 private:
     __aicore__ inline void LocalCopySlice(GM_ADDR dst, GM_ADDR src, uint64_t len);
+    __aicore__ inline void CopyLocalToken(const AscendC::LocalTensor<int32_t>& indicesLocal,
+                                          const AscendC::LocalTensor<uint32_t>& tokenIdxInRank,
+                                          const AscendC::LocalTensor<uint64_t>& commBufferLocal, uint32_t rankStart,
+                                          uint32_t tokenPos, uint32_t indicesBatchStart, uint32_t localIdxStart,
+                                          uint64_t hiddenBytes, int64_t totalEntries);
+    __aicore__ inline void FetchSfAll();
+    __aicore__ inline void StageSfGroup(uint32_t groupIdx, uint32_t chunkLen, uint32_t rowsPerTile, uint32_t sfSlot,
+                                        uint64_t sfBytes, const AscendC::LocalTensor<int32_t>& idxUb);
     __aicore__ inline void GatherSf(int32_t globalIdx, uint64_t globalTokenIdx);
     template <bool HasSf>
     __aicore__ inline void GatherWave(const AscendC::LocalTensor<int32_t>& indicesLocal, uint32_t batchOffset,
                                       uint32_t waveLen, uint32_t tokenBase);
+    __aicore__ inline void GatherLocalWave(const AscendC::LocalTensor<int32_t>& indicesLocal,
+                                           const AscendC::LocalTensor<uint32_t>& tokenIdxInRank,
+                                           uint32_t indicesBatchStart, uint32_t rankStart, uint32_t tokenPosBase,
+                                           uint32_t tokenStride, uint32_t waveLen);
     template <bool HasSf>
     __aicore__ inline void LocalFetchRange(uint32_t indicesBatchStart, uint32_t tokenStart, uint32_t tokenEnd);
     __aicore__ inline void CopyContextToUb();
     __aicore__ inline void CopyIndicesToUb(uint32_t indicesBatchStart, uint32_t indicesBatchLen);
     __aicore__ inline void ScatterByRank(uint32_t batchLen);
-    template <bool HasSf>
     __aicore__ inline void FetchByRank(uint32_t indicesBatchStart);
-    template <bool HasSf>
     __aicore__ inline void LocalFetchTokens(uint32_t indicesBatchStart, uint32_t tokenOffset, uint32_t tokenStride);
-    template <bool HasSf>
     __aicore__ inline void RemoteFetchRank(uint32_t ownerRank, uint32_t indicesBatchStart, uint32_t channelIdxInRank,
                                            uint32_t channelCount);
     __aicore__ inline void GatherRankTokens(uint32_t ownerRank, uint32_t batchLen, uint32_t compareCntMax,
@@ -103,6 +118,8 @@ private:
     AscendC::TPipe* tpipe_{nullptr};
     GM_ADDR indicesGM_{nullptr};
     GM_ADDR fetchedGM_{nullptr};
+    // 兜底 WQE(fence=1+cqe=1) 写目标: 仅作 barrier/CQE 落地, 不承载有效数据
+    GM_ADDR workspaceGM_{nullptr};
     __gm__ EngramCommContext* ctxPtr_{nullptr};
 
     uint32_t aivId_{0};
@@ -158,8 +175,8 @@ __aicore__ inline void EngramFetchArch35::Init(GM_ADDR commContext, GM_ADDR indi
     fetchedGM_ = fetched;
     fetchedSfGM_ = fetchedSf;
     sfTableGM_ = reinterpret_cast<__gm__ uint8_t*>(sfTable);
+    workspaceGM_ = workspaceGM;
     aivId_ = AscendC::GetBlockIdx();
-    (void)workspaceGM;
 
     ctxPtr_ = (__gm__ EngramCommContext*)commContext;
     rankId_ = ctxPtr_->rankId;
@@ -189,9 +206,11 @@ __aicore__ inline void EngramFetchArch35::Init(GM_ADDR commContext, GM_ADDR indi
     localWaveEnabled_ = false;
     localRowsPerWave_ = 1U;
     // wave 打包要求行宽按 32B 对齐；不满足时保留逐行 fallback。
-    if (numRanks_ == 1U && hiddenBytes_ > 0 && static_cast<uint64_t>(hiddenBytes_) % UB_ALIGN == 0U &&
-        rowBytes <= TILE_BYTES_INFER_MAX) {
-        uint32_t rows = static_cast<uint32_t>(static_cast<uint64_t>(TILE_BYTES_INFER_MAX) / rowBytes);
+    // sliced(numRanks>1) 模式本地 token 同样启用 wave: 行宽只含 data(SF 由 FetchSfAll 统一后置处理)。
+    const uint64_t waveRowBytes = (numRanks_ == 1U) ? rowBytes : static_cast<uint64_t>(hiddenBytes_);
+    if (hiddenBytes_ > 0 && static_cast<uint64_t>(hiddenBytes_) % UB_ALIGN == 0U &&
+        waveRowBytes <= TILE_BYTES_INFER_MAX) {
+        uint32_t rows = static_cast<uint32_t>(static_cast<uint64_t>(TILE_BYTES_INFER_MAX) / waveRowBytes);
         constexpr uint32_t minRowsPerWave = 8U;
         uint64_t waveFixedUb = HCOMM_INIT_SIZE + ENGRAM_BATCH_BUFFER_BYTES + UB_RESERVED_SIZE + UB_ALIGN * 5U;
         uint64_t waveRelayUb = static_cast<uint64_t>(TILE_BYTES_INFER_MAX) * RELAY_BUFFER_NUM_INFER;
@@ -257,6 +276,11 @@ __aicore__ inline void EngramFetchArch35::Init(GM_ADDR commContext, GM_ADDR indi
     tpipe_->InitBuffer(divisorBuf_, int32BufSize);
     uint32_t maskBufSize = AscendC::Ceil(AscendC::Ceil(compareCntMax, BITS_PER_BYTE), UB_ALIGN) * UB_ALIGN;
     tpipe_->InitBuffer(maskBuf_, maskBufSize);
+
+    // positions 复用: [0, indicesBatchSize) 常量序列, Init 生成一次, ScatterByRank 直接复用
+    // (batchLen <= indicesBatchSize_, 前 batchLen 个即 [0, batchLen) 的 GatherMask 序列)
+    AscendC::ArithProgression<int32_t>(positionsBuf_.Get<int32_t>(), 0, 1, indicesBatchSize_);
+    SyncFunc<AscendC::HardEvent::V_S>();
 }
 
 __aicore__ inline void EngramFetchArch35::CopyContextToUb()
@@ -320,10 +344,8 @@ __aicore__ inline void EngramFetchArch35::ScatterByRank(uint32_t batchLen)
         AscendC::Ceil(batchLen * sizeof(int32_t), ALIGNED_LEN_256) * ALIGNED_LEN_256 / sizeof(int32_t);
 
     AscendC::LocalTensor<int32_t> rankIDs = rankIDsBuf_.Get<int32_t>();
-    AscendC::LocalTensor<int32_t> positions = positionsBuf_.Get<int32_t>();
     AscendC::LocalTensor<int32_t> divisor = divisorBuf_.Get<int32_t>();
 
-    AscendC::ArithProgression<int32_t>(positions, 0, 1, batchLen);
     AscendC::Duplicate<int32_t>(divisor, numEntriesPerRank_, compareCntMax);
 
     AscendC::Duplicate<int32_t>(rankIDs, static_cast<int32_t>(numRanks_), compareCntMax);
@@ -373,14 +395,20 @@ __aicore__ inline void EngramFetchArch35::Process()
                 }
             } else {
                 ScatterByRank(indicesBatchLen);
-                FetchByRank<HasSf>(indicesBatchStart);
+                FetchByRank(indicesBatchStart);
             }
             indicesBatchStart += indicesBatchLen;
+        }
+        if constexpr (HasSf) {
+            if (numRanks_ > 1U) {
+                // SF统一后置：所有WQE投递完成后再执行。最后一条WQE最早下发（不被各批SF推迟），
+                // SF的MTE时间与仍在进行的远端传输重叠（不同引擎），wait尾延迟随之缩短
+                FetchSfAll();
+            }
         }
     }
 }
 
-template <bool HasSf>
 __aicore__ inline void EngramFetchArch35::LocalFetchTokens(uint32_t indicesBatchStart, uint32_t tokenOffset,
                                                            uint32_t tokenStride)
 {
@@ -395,23 +423,79 @@ __aicore__ inline void EngramFetchArch35::LocalFetchTokens(uint32_t indicesBatch
     uint32_t localIdxStart = rankId_ * numEntriesPerRank;
     uint32_t rankStart = rankOffsets(rankId_);
     uint32_t cnt = rankCounts(rankId_);
+    const int64_t totalEntries = static_cast<int64_t>(numEntriesPerRank_) * numRanks_;
+    if (localWaveEnabled_ && tokenStride > 0U) {
+        // sliced 本地路径 wave 批量化: 本核按 tokenStride 连续的一组 token 打包进同一 relay
+        // buffer, MTE2 批量装载一次同步, MTE3 按全局 token 序散射写出; 索引非法的 wave 回退逐行。
+        uint32_t pos = tokenOffset;
+        while (pos < cnt) {
+            uint32_t waveLen = (cnt - pos + tokenStride - 1U) / tokenStride;
+            if (waveLen > localRowsPerWave_) {
+                waveLen = localRowsPerWave_;
+            }
+            bool hasInvalid = false;
+            for (uint32_t row = 0; row < waveLen; ++row) {
+                int32_t globalIdx = indicesLocal(tokenIdxInRank(rankStart + pos + row * tokenStride));
+                if (!IsValidEntry(globalIdx, totalEntries)) {
+                    hasInvalid = true;
+                    break;
+                }
+            }
+            if (!hasInvalid) {
+                GatherLocalWave(indicesLocal, tokenIdxInRank, indicesBatchStart, rankStart, pos, tokenStride, waveLen);
+            } else {
+                for (uint32_t row = 0; row < waveLen; ++row) {
+                    uint32_t tokenPos = pos + row * tokenStride;
+                    CopyLocalToken(indicesLocal, tokenIdxInRank, commBufferLocal, rankStart, tokenPos,
+                                   indicesBatchStart, localIdxStart, hiddenBytes, totalEntries);
+                }
+            }
+            pos += waveLen * tokenStride;
+        }
+        SyncFunc<AscendC::HardEvent::MTE3_S>();
+        return;
+    }
     for (uint32_t tokenPos = tokenOffset; tokenPos < cnt; tokenPos += tokenStride) {
-        uint32_t i = tokenIdxInRank(rankStart + tokenPos);
-        int32_t globalIdx = indicesLocal(i);
-        const int64_t totalEntries = static_cast<int64_t>(numEntriesPerRank_) * numRanks_;
-        if (globalIdx < 0 || static_cast<int64_t>(globalIdx) >= totalEntries) {
-            continue;
-        }
-        uint32_t localEntryIdx = static_cast<uint32_t>(globalIdx) - localIdxStart;
-        uint64_t globalTokenIdx = indicesBatchStart + i;
-        GM_ADDR dst = fetchedGM_ + globalTokenIdx * hiddenBytes;
-        GM_ADDR src = (GM_ADDR)commBufferLocal(rankId_) + static_cast<uint64_t>(localEntryIdx) * hiddenBytes;
-        LocalCopySlice(dst, src, hiddenBytes);
-        if constexpr (HasSf) {
-            GatherSf(globalIdx, globalTokenIdx);
-        }
+        CopyLocalToken(indicesLocal, tokenIdxInRank, commBufferLocal, rankStart, tokenPos, indicesBatchStart,
+                       localIdxStart, hiddenBytes, totalEntries);
     }
     SyncFunc<AscendC::HardEvent::MTE3_S>();
+}
+
+__aicore__ inline void EngramFetchArch35::GatherLocalWave(const AscendC::LocalTensor<int32_t>& indicesLocal,
+                                                          const AscendC::LocalTensor<uint32_t>& tokenIdxInRank,
+                                                          uint32_t indicesBatchStart, uint32_t rankStart,
+                                                          uint32_t tokenPosBase, uint32_t tokenStride, uint32_t waveLen)
+{
+    // sliced 本地 wave: waveLen 行源数据(经 tokenIdxInRank 间接寻址)批量搬入 relay buffer,
+    // 一次 EnQue/DeQue 同步后按全局 token 序散射写回 fetchedGM; 索引有效性由调用方预检。
+    const uint64_t hiddenBytes = static_cast<uint64_t>(hiddenBytes_);
+    AscendC::LocalTensor<uint64_t> commBufferLocal = commBufferBuf_.Get<uint64_t>();
+    GM_ADDR tableBase = (GM_ADDR)commBufferLocal(rankId_);
+    AscendC::GlobalTensor<uint8_t> srcGm;
+    srcGm.SetGlobalBuffer((__gm__ uint8_t*)tableBase);
+    AscendC::LocalTensor<uint8_t> relayBuffer = relayQue_.AllocTensor<uint8_t>();
+    // hiddenBytes已32B整除(localWaveEnabled_前提), 裸DataCopy的blockLen单位=32B块(dav_3510)
+    AscendC::DataCopyParams loadParams{1U, static_cast<uint16_t>(hiddenBytes / UB_ALIGN), 0U, 0U};
+    const uint32_t localIdxStart = rankId_ * static_cast<uint32_t>(numEntriesPerRank_);
+    for (uint32_t row = 0; row < waveLen; ++row) {
+        uint32_t i = tokenIdxInRank(rankStart + tokenPosBase + row * tokenStride);
+        int32_t globalIdx = indicesLocal(i);
+        uint32_t localEntryIdx = static_cast<uint32_t>(globalIdx) - localIdxStart;
+        AscendC::DataCopy(relayBuffer[row * hiddenBytes], srcGm[static_cast<uint64_t>(localEntryIdx) * hiddenBytes],
+                          loadParams);
+    }
+    relayQue_.EnQue<uint8_t>(relayBuffer);
+    relayBuffer = relayQue_.DeQue<uint8_t>();
+    AscendC::GlobalTensor<uint8_t> dstGm;
+    dstGm.SetGlobalBuffer((__gm__ uint8_t*)fetchedGM_);
+    AscendC::DataCopyParams storeParams{1U, static_cast<uint16_t>(hiddenBytes), 0U, 0U};
+    for (uint32_t row = 0; row < waveLen; ++row) {
+        uint32_t i = tokenIdxInRank(rankStart + tokenPosBase + row * tokenStride);
+        uint64_t globalTokenIdx = static_cast<uint64_t>(indicesBatchStart) + i;
+        AscendC::DataCopyPad(dstGm[globalTokenIdx * hiddenBytes], relayBuffer[row * hiddenBytes], storeParams);
+    }
+    relayQue_.FreeTensor<uint8_t>(relayBuffer);
 }
 
 template <bool HasSf>
@@ -432,21 +516,22 @@ __aicore__ inline void EngramFetchArch35::GatherWave(const AscendC::LocalTensor<
     AscendC::GlobalTensor<uint8_t> srcGm;
     srcGm.SetGlobalBuffer((__gm__ uint8_t*)tableBase);
     AscendC::LocalTensor<uint8_t> relayBuffer = relayQue_.AllocTensor<uint8_t>();
-    AscendC::DataCopyExtParams dataLoadParams{1U, static_cast<uint32_t>(hiddenBytes), 0U, 0U, 0U};
-    AscendC::DataCopyPadExtParams<uint8_t> loadPad{false, 0, 0, 0};
+    // hiddenBytes已32B整除(localWaveEnabled_前提), 裸DataCopy的blockLen单位=32B块(dav_3510)
+    AscendC::DataCopyParams dataLoadParams{1U, static_cast<uint16_t>(hiddenBytes / UB_ALIGN), 0U, 0U};
     for (uint32_t row = 0; row < waveLen; ++row) {
         int32_t entry = indicesLocal.GetValue(batchOffset + row);
-        AscendC::DataCopyPad(relayBuffer[row * hiddenBytes], srcGm[static_cast<uint64_t>(entry) * hiddenBytes],
-                             dataLoadParams, loadPad);
+        AscendC::DataCopy(relayBuffer[row * hiddenBytes], srcGm[static_cast<uint64_t>(entry) * hiddenBytes],
+                          dataLoadParams);
     }
     if constexpr (HasSf) {
         AscendC::GlobalTensor<uint8_t> sfSrcGm;
         sfSrcGm.SetGlobalBuffer(sfTableGM_);
         AscendC::DataCopyExtParams sfLoadParams{1U, static_cast<uint32_t>(sfBytes), 0U, 0U, 0U};
+        AscendC::DataCopyPadExtParams<uint8_t> sfLoadPad{false, 0, 0, 0};
         for (uint32_t row = 0; row < waveLen; ++row) {
             int32_t entry = indicesLocal.GetValue(batchOffset + row);
             AscendC::DataCopyPad(relayBuffer[dataBytes + row * sfSlot], sfSrcGm[static_cast<uint64_t>(entry) * sfBytes],
-                                 sfLoadParams, loadPad);
+                                 sfLoadParams, sfLoadPad);
         }
     }
     relayQue_.EnQue<uint8_t>(relayBuffer);
@@ -489,7 +574,7 @@ __aicore__ inline void EngramFetchArch35::LocalFetchRange(uint32_t indicesBatchS
         if (localWaveEnabled_) {
             for (uint32_t offset = 0; offset < waveLen; ++offset) {
                 int32_t entry = indicesLocal.GetValue(current - indicesBatchStart + offset);
-                if (entry < 0 || static_cast<int64_t>(entry) >= totalEntries) {
+                if (!IsValidEntry(entry, totalEntries)) {
                     hasInvalid = true;
                     break;
                 }
@@ -503,7 +588,7 @@ __aicore__ inline void EngramFetchArch35::LocalFetchRange(uint32_t indicesBatchS
         for (uint32_t offset = 0; offset < waveLen; ++offset) {
             uint32_t token = current + offset;
             int32_t entry = indicesLocal.GetValue(token - indicesBatchStart);
-            if (entry < 0 || static_cast<int64_t>(entry) >= totalEntries) {
+            if (!IsValidEntry(entry, totalEntries)) {
                 continue;
             }
             GM_ADDR dst = fetchedGM_ + static_cast<uint64_t>(token) * hiddenBytes;
@@ -540,7 +625,6 @@ __aicore__ inline void EngramFetchArch35::FlushPreparedReads()
     preparedReadCount_ = 0U;
 }
 
-template <bool HasSf>
 __aicore__ inline void EngramFetchArch35::RemoteFetchRank(uint32_t ownerRank, uint32_t indicesBatchStart,
                                                           uint32_t channelIdxInRank, uint32_t channelCount)
 {
@@ -553,6 +637,7 @@ __aicore__ inline void EngramFetchArch35::RemoteFetchRank(uint32_t ownerRank, ui
 
     uint64_t hiddenBytes = static_cast<uint64_t>(hiddenBytes_);
     uint32_t numEntriesPerRank = static_cast<uint32_t>(numEntriesPerRank_);
+    const int64_t totalEntries = static_cast<int64_t>(numEntriesPerRank_) * static_cast<int64_t>(numRanks_);
 
     uint32_t idxStart = ownerRank * numEntriesPerRank;
     uint32_t rankStart = rankOffsets(ownerRank);
@@ -564,55 +649,78 @@ __aicore__ inline void EngramFetchArch35::RemoteFetchRank(uint32_t ownerRank, ui
     uint32_t rankReadIdx = (totalBlocks_ >= numRanks_) ? 0U : (ownerRank / totalBlocks_);
     GM_ADDR remoteBase = (GM_ADDR)commBufferLocal(ownerRank);
     AscendC::LocalTensor<uint32_t> rankReadCnt = rankReadCntBuf_.Get<uint32_t>();
+    // 在途计数放标量寄存器：循环内免UB读改写，函数出口统一写回
+    uint32_t readCnt = rankReadCnt.GetValue(rankReadIdx);
 
-    for (uint32_t tokenPos = channelIdxInRank; tokenPos < rankTokenCount; tokenPos += channelCount) {
+    uint32_t tokenPos = channelIdxInRank;
+    if (tokenPos < rankTokenCount) {
         uint32_t i = tokenIdxInRank(rankStart + tokenPos);
         int32_t globalIdx = indicesLocal(i);
-        uint32_t localEntryIdx = static_cast<uint32_t>(globalIdx) - idxStart;
-        uint64_t globalTokenIdx = indicesBatchStart + i;
-        GM_ADDR dst = fetchedGM_ + globalTokenIdx * hiddenBytes;
-        GM_ADDR remoteSrcAddr = remoteBase + static_cast<uint64_t>(localEntryIdx) * hiddenBytes;
-        bool isLast = (tokenPos + channelCount >= rankTokenCount);
-        bool needDrain = (rankReadCnt(rankReadIdx) + 1U >= HCOMM_SQ_MAX_PENDING);
-        if (isLast || needDrain) {
-            PrepareRead<URMA_CQE_CFG>(channelHandle, remoteBase, dst, remoteSrcAddr, hiddenBytes);
-        } else {
-            PrepareRead<URMA_UNORDERED_CFG>(channelHandle, remoteBase, dst, remoteSrcAddr, hiddenBytes);
-        }
-        ++rankReadCnt(rankReadIdx);
-        if (needDrain) {
-            FlushPreparedReads();
-            int32_t drainRet = hcomm_.Drain(static_cast<AscendC::ChannelHandle>(channelHandle));
-            ascendc_assert(drainRet == 0, "mid-stream Drain failed, ret=%d\n", drainRet);
-            rankReadCnt(rankReadIdx) = 0;
-        }
-        if constexpr (HasSf) {
-            GatherSf(globalIdx, globalTokenIdx);
+        while (true) {
+            bool isLast = (tokenPos + channelCount >= rankTokenCount);
+            // 预取下一token的(i, globalIdx)：与本次WQE投递重叠，消除 i→indices 两次串行UB读的阻塞。
+            // nextGlobalIdx 的合法性不在此处校验，下一轮 globalIdx=nextGlobalIdx 后经 IsValidEntry 覆盖。
+            uint32_t nextI = 0U;
+            int32_t nextGlobalIdx = 0;
+            if (!isLast) {
+                nextI = tokenIdxInRank(rankStart + tokenPos + channelCount);
+                nextGlobalIdx = indicesLocal(nextI);
+            }
+            if (IsValidEntry(globalIdx, totalEntries)) {
+                uint32_t localEntryIdx = static_cast<uint32_t>(globalIdx) - idxStart;
+                uint64_t globalTokenIdx = indicesBatchStart + i;
+                GM_ADDR dst = fetchedGM_ + globalTokenIdx * hiddenBytes;
+                GM_ADDR remoteSrcAddr = remoteBase + static_cast<uint64_t>(localEntryIdx) * hiddenBytes;
+                bool needDrain = (readCnt + 1U >= HCOMM_SQ_MAX_PENDING);
+                if (isLast || needDrain) {
+                    PrepareRead<URMA_CQE_CFG>(channelHandle, remoteBase, dst, remoteSrcAddr, hiddenBytes);
+                } else {
+                    PrepareRead<URMA_UNORDERED_CFG>(channelHandle, remoteBase, dst, remoteSrcAddr, hiddenBytes);
+                }
+                ++readCnt;
+                if (needDrain) {
+                    FlushPreparedReads();
+                    int32_t drainRet = hcomm_.Drain(static_cast<AscendC::ChannelHandle>(channelHandle));
+                    ascendc_assert(drainRet == 0, "mid-stream Drain failed, ret=%d\n", drainRet);
+                    readCnt = 0;
+                }
+            } else if (isLast) {
+                // isLast 的 token 索引非法：本批 cqe=0 乱序读既无 fence 屏障又无 CQE 完成标记，
+                // 补一条 fence=1+cqe=1 兜底 WQE（读 remoteBase 安全地址、写 workspace scratch），
+                // 不触碰非法 token 的输出槽，避免把表首行数据写进本应保持原值的槽位。
+                PrepareRead<URMA_CQE_CFG>(channelHandle, remoteBase, workspaceGM_, remoteBase, hiddenBytes);
+            }
+            if (isLast) {
+                break;
+            }
+            tokenPos += channelCount;
+            i = nextI;
+            globalIdx = nextGlobalIdx;
         }
     }
+    rankReadCnt.SetValue(rankReadIdx, readCnt);
     if (preparedReadCount_ > 0U) {
         FlushPreparedReads();
     }
 }
 
-template <bool HasSf>
 __aicore__ inline void EngramFetchArch35::FetchByRank(uint32_t indicesBatchStart)
 {
     if (totalBlocks_ >= numRanks_) {
         auto coreAssign = GetCoreAssignment(totalBlocks_, aivId_, numRanks_, rankId_, channelsPerRank_);
         if (coreAssign.assignedRank != rankId_) {
-            RemoteFetchRank<HasSf>(coreAssign.assignedRank, indicesBatchStart, coreAssign.idxInRankGroup,
-                                   coreAssign.rankGroupSize);
+            RemoteFetchRank(coreAssign.assignedRank, indicesBatchStart, coreAssign.idxInRankGroup,
+                            coreAssign.rankGroupSize);
         } else {
-            LocalFetchTokens<HasSf>(indicesBatchStart, coreAssign.idxInRankGroup, coreAssign.rankGroupSize);
+            LocalFetchTokens(indicesBatchStart, coreAssign.idxInRankGroup, coreAssign.rankGroupSize);
         }
     } else {
         uint32_t startRank = (aivId_ < numRanks_) ? aivId_ : rankId_;
         for (uint32_t ownerRank = startRank; ownerRank < numRanks_; ownerRank += totalBlocks_) {
             if (ownerRank == rankId_) {
-                LocalFetchTokens<HasSf>(indicesBatchStart, 0, 1);
+                LocalFetchTokens(indicesBatchStart, 0, 1);
             } else {
-                RemoteFetchRank<HasSf>(ownerRank, indicesBatchStart, 0, 1);
+                RemoteFetchRank(ownerRank, indicesBatchStart, 0, 1);
             }
         }
     }
@@ -641,6 +749,111 @@ __aicore__ inline void EngramFetchArch35::GatherSf(int32_t globalIdx, uint64_t g
     relayQue_.FreeTensor<uint8_t>(sfTmp);
 }
 
+__aicore__ inline void EngramFetchArch35::FetchSfAll()
+{
+    // SF统一后置：SF与rank切片彻底解耦（sfTable/fetchedSf均为本地内存），按连续chunk均分到所有AIV核，
+    // chunk indices一次性载入UB后攒UB批拷，relayQue_深度做组间流水。
+    const uint64_t sfBytes = static_cast<uint64_t>(numSfPacks_) * static_cast<uint64_t>(sfElemSize_);
+    if (sfBytes == 0U) {
+        return;
+    }
+    const uint32_t sfSlot = static_cast<uint32_t>((sfBytes + UB_ALIGN - 1U) / UB_ALIGN * UB_ALIGN);
+    uint32_t rowsPerTile = tileBytes_ / sfSlot;
+    if (rowsPerTile == 0U) {
+        rowsPerTile = 1U;
+    }
+    uint32_t numTokens = static_cast<uint32_t>(numTokens_);
+    uint32_t chunkCap = (numTokens + totalBlocks_ - 1U) / totalBlocks_;
+    if (chunkCap == 0U) {
+        return;
+    }
+    uint32_t chunkStart = aivId_ * chunkCap;
+    if (chunkStart >= numTokens) {
+        return;
+    }
+    uint32_t chunkEnd = (chunkStart + chunkCap > numTokens) ? numTokens : chunkStart + chunkCap;
+    const int64_t totalEntries = static_cast<int64_t>(numEntriesPerRank_) * numRanks_;
+
+    AscendC::LocalTensor<int32_t> idxUb = indicesBuf_.Get<int32_t>();
+    AscendC::GlobalTensor<int32_t> indicesGm;
+    indicesGm.SetGlobalBuffer((__gm__ int32_t*)indicesGM_);
+    AscendC::GlobalTensor<uint8_t> sfDstGm;
+    sfDstGm.SetGlobalBuffer((__gm__ uint8_t*)fetchedSfGM_);
+    AscendC::DataCopyPadExtParams<int32_t> idxPad{false, 0, 0, 0};
+    AscendC::DataCopyExtParams sfStoreParams{1U, static_cast<uint32_t>(sfBytes), 0U, 0U, 0U};
+
+    uint32_t done = 0U;
+    while (chunkStart + done < chunkEnd) {
+        uint32_t curBatchLen = chunkEnd - chunkStart - done;
+        if (curBatchLen > indicesBatchSize_) {
+            curBatchLen = indicesBatchSize_;
+        }
+        uint32_t batchTokenBase = chunkStart + done;
+        AscendC::DataCopyExtParams idxParams{1U, curBatchLen * static_cast<uint32_t>(sizeof(int32_t)), 0U, 0U, 0U};
+        AscendC::DataCopyPad(idxUb, indicesGm[batchTokenBase], idxParams, idxPad);
+        SyncFunc<AscendC::HardEvent::MTE2_S>();
+
+        uint32_t totalGroups = (curBatchLen + rowsPerTile - 1U) / rowsPerTile;
+        constexpr uint32_t PIPE_DEPTH = RELAY_BUFFER_NUM_INFER;
+        uint32_t nextStage = 0U;
+        const uint32_t prologue = (totalGroups < PIPE_DEPTH - 1U) ? totalGroups : (PIPE_DEPTH - 1U);
+        for (uint32_t g = 0U; g < prologue; ++g) {
+            StageSfGroup(g, curBatchLen, rowsPerTile, sfSlot, sfBytes, idxUb);
+            ++nextStage;
+        }
+        for (uint32_t g = 0U; g < totalGroups; ++g) {
+            if (nextStage < totalGroups) {
+                StageSfGroup(nextStage, curBatchLen, rowsPerTile, sfSlot, sfBytes, idxUb);
+                ++nextStage;
+            }
+            AscendC::LocalTensor<uint8_t> batchBuf = relayQue_.DeQue<uint8_t>();
+            const uint32_t kStart = g * rowsPerTile;
+            uint32_t count = curBatchLen - kStart;
+            if (count > rowsPerTile) {
+                count = rowsPerTile;
+            }
+            // 拷出：UB批量结果逐行落到fetchedSf（token连续）；无效globalIdx跳过
+            for (uint32_t k = 0U; k < count; ++k) {
+                int32_t globalIdx = idxUb.GetValue(kStart + k);
+                if (!IsValidEntry(globalIdx, totalEntries)) {
+                    continue;
+                }
+                AscendC::DataCopyPad(sfDstGm[static_cast<uint64_t>(batchTokenBase + kStart + k) * sfBytes],
+                                     batchBuf[static_cast<uint64_t>(k) * sfSlot], sfStoreParams);
+            }
+            relayQue_.FreeTensor<uint8_t>(batchBuf);
+        }
+        done += curBatchLen;
+    }
+}
+
+__aicore__ inline void EngramFetchArch35::StageSfGroup(uint32_t groupIdx, uint32_t chunkLen, uint32_t rowsPerTile,
+                                                       uint32_t sfSlot, uint64_t sfBytes,
+                                                       const AscendC::LocalTensor<int32_t>& idxUb)
+{
+    // 攒一组：组内SF行按globalIdx散布在sfTable，逐行搬入UB后EnQue（不等待，由流水统一消费）
+    const uint32_t kStart = groupIdx * rowsPerTile;
+    uint32_t count = chunkLen - kStart;
+    if (count > rowsPerTile) {
+        count = rowsPerTile;
+    }
+    const int64_t totalEntries = static_cast<int64_t>(numEntriesPerRank_) * numRanks_;
+    AscendC::GlobalTensor<uint8_t> sfSrcGm;
+    sfSrcGm.SetGlobalBuffer(sfTableGM_);
+    AscendC::DataCopyExtParams sfLoadParams{1U, static_cast<uint32_t>(sfBytes), 0U, 0U, 0U};
+    AscendC::DataCopyPadExtParams<uint8_t> sfPad{false, 0, 0, 0};
+    AscendC::LocalTensor<uint8_t> batchBuf = relayQue_.AllocTensor<uint8_t>();
+    for (uint32_t k = 0U; k < count; ++k) {
+        int32_t globalIdx = idxUb.GetValue(kStart + k);
+        if (!IsValidEntry(globalIdx, totalEntries)) {
+            continue;
+        }
+        AscendC::DataCopyPad(batchBuf[static_cast<uint64_t>(k) * sfSlot],
+                             sfSrcGm[static_cast<uint64_t>(globalIdx) * sfBytes], sfLoadParams, sfPad);
+    }
+    relayQue_.EnQue<uint8_t>(batchBuf);
+}
+
 __aicore__ inline void EngramFetchArch35::LocalCopySlice(GM_ADDR dst, GM_ADDR src, uint64_t len)
 {
     AscendC::GlobalTensor<uint8_t> srcGm;
@@ -665,6 +878,25 @@ __aicore__ inline void EngramFetchArch35::LocalCopySlice(GM_ADDR dst, GM_ADDR sr
 
         off += thisLen;
     }
+}
+
+__aicore__ inline void EngramFetchArch35::CopyLocalToken(const AscendC::LocalTensor<int32_t>& indicesLocal,
+                                                         const AscendC::LocalTensor<uint32_t>& tokenIdxInRank,
+                                                         const AscendC::LocalTensor<uint64_t>& commBufferLocal,
+                                                         uint32_t rankStart, uint32_t tokenPos,
+                                                         uint32_t indicesBatchStart, uint32_t localIdxStart,
+                                                         uint64_t hiddenBytes, int64_t totalEntries)
+{
+    uint32_t i = tokenIdxInRank(rankStart + tokenPos);
+    int32_t globalIdx = indicesLocal(i);
+    if (!IsValidEntry(globalIdx, totalEntries)) {
+        return;
+    }
+    uint32_t localEntryIdx = static_cast<uint32_t>(globalIdx) - localIdxStart;
+    uint64_t globalTokenIdx = static_cast<uint64_t>(indicesBatchStart) + i;
+    GM_ADDR dst = fetchedGM_ + globalTokenIdx * hiddenBytes;
+    GM_ADDR src = (GM_ADDR)commBufferLocal(rankId_) + static_cast<uint64_t>(localEntryIdx) * hiddenBytes;
+    LocalCopySlice(dst, src, hiddenBytes);
 }
 #endif
 
