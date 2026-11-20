@@ -116,6 +116,8 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
     const aclrtStream stream)
 ```
 
+> 说明：`aclnnFusedInferAttentionScoreV4GetMaxWorkspaceSize`用于图模式（aclGraph）下根据计算流程计算最大workspace大小，供内部/测试使用。该接口未在公开头文件`aclnn_fused_infer_attention_score_v4.h`中声明，不建议用户直接调用。请使用上述公开的两段式接口。
+
 ## aclnnFusedInferAttentionScoreV4GetWorkspaceSize
 
 - **参数说明：**
@@ -582,7 +584,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
             <li>不支持pse/左padding/公共前缀/后量化。</li>
         </ul>
         </td>
-        <td>BFLOAT16、FLOAT16</td>
+        <td>BFLOAT16</td>
         <td>ND</td>
         <td>(Q_N)</td>
         <td>×</td>
@@ -783,6 +785,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
         RingAttention算法对query乘key的结果，先取max得到softmax_max。query乘key的结果减去softmax_max，再取exp，接着求sum，得到softmax_sum。最后对softmax_sum取log，再加上softmax_max得到的结果。</td>
         <td>
         <ul>
+            <li>softmaxLseFlag为True时，softmaxLse为必选参数，不可传入空指针。</li>
             <li>softmaxLseFlag为True时，数据为inf的代表无效数据。</li>
             <li>softmaxLseFlag为False时，如果softmaxLse传入的Tensor非空，则直接返回该Tensor数据，如果softmaxLse传入的是nullptr，则返回shape为{1}全0的Tensor。</li>
         </ul>
@@ -836,6 +839,11 @@ aclnnStatus aclnnFusedInferAttentionScoreV4(
                 <td>ACLNN_ERR_PARAM_NULLPTR</td>
                 <td>161001</td>
                 <td>传入的query、key、value、attentionOut是空指针。</td>
+            </tr>
+            <tr>
+                <td>ACLNN_ERR_PARAM_NULLPTR</td>
+                <td>161001</td>
+                <td>softmaxLseFlag为true时，softmaxLse传入空指针。</td>
             </tr>
             <tr>
                 <td>ACLNN_ERR_PARAM_INVALID</td>
