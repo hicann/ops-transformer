@@ -312,6 +312,8 @@ protected:
         OP_CHECK_IF(sizeof(tilingData) % sizeof(uint64_t) != 0,
                     OP_LOGE(context_->GetNodeName(), "Tiling data size[%zu] is not aligned to 8", sizeof(tilingData)),
                     return ge::GRAPH_FAILED);
+        OP_CHECK_IF(context_->GetRawTilingData() == nullptr,
+                    OP_LOGE(context_->GetNodeName(), "RawTilingData is nullptr."), return ge::GRAPH_FAILED);
         errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
                                reinterpret_cast<const void*>(&tilingData), sizeof(tilingData));
         if (ret != EOK) {

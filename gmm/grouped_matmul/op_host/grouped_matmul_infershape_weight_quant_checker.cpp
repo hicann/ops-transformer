@@ -767,9 +767,17 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckGroupSize(const gert::Infe
     int64_t groupSize = 0;
 
     auto antiquantScaleShape = context->GetDynamicInputShape(GMM_INDEX_IN_ANTIQUANT_SCALE, tensorIdx);
-    auto antiquantScaleDimNum = antiquantScaleShape->GetDimNum();
-    if (enableMxShapeGeneralization_ && IsMxA8W4NZ(xDtype_, weightDtype_)) {
-        const size_t scaleKAxis = gmmAttrs.transposeWeight ? PENULTIMATE_DIM : ANTEPENULTIMATE_DIM;
+    OP_CHECK_NULL_WITH_CONTEXT(context, antiquantScaleShape);
+    const size_t antiquantScaleDimNum = antiquantScaleShape->GetDimNum();
+    const bool isMxA8W4NZ = IsMxA8W4NZ(xDtype_, weightDtype_);
+    const size_t scaleKAxis = gmmAttrs.transposeWeight ? PENULTIMATE_DIM : ANTEPENULTIMATE_DIM;
+    OP_CHECK_IF(isMxA8W4NZ && antiquantScaleDimNum < scaleKAxis,
+                OP_LOGE(context->GetNodeName(),
+                        "antiquantScale[%zu] dim num should be at least [%zu], but the actual dim num is [%zu].",
+                        tensorIdx, scaleKAxis, antiquantScaleDimNum),
+                return ge::GRAPH_FAILED);
+
+    if (enableMxShapeGeneralization_ && isMxA8W4NZ) {
         // Each scale pair covers 2 K32 groups. Add the coverage minus 1 to round up.
         const int64_t expectedPairs = (weightKDim_ + MX_GROUP_SIZE * 2 - 1) / (MX_GROUP_SIZE * 2);
         OP_CHECK_IF(antiquantScaleShape->GetDim(antiquantScaleDimNum - scaleKAxis) != expectedPairs ||
@@ -787,11 +795,9 @@ ge::graphStatus GroupedMatmulWeightQuantChecker::CheckGroupSize(const gert::Infe
     }
     // 2含义: (g, k/groupSize, n)的k轴索引，此处groupNum是K轴上量化分组的groupNum，与groupNum_含义不同
     int64_t groupNum;
-    if (IsMxA8W4NZ(xDtype_, weightDtype_)) {
+    if (isMxA8W4NZ) {
         // antiquantScaleShape: (g,n,k/64,2) (g, k/64, n, 2) 静态图两次infershape，两个分支
-        groupNum = gmmAttrs.transposeWeight ?
-                       antiquantScaleShape->GetDim(antiquantScaleDimNum - PENULTIMATE_DIM) * MX_A8W4_GROUP_FACTOR :
-                       antiquantScaleShape->GetDim(antiquantScaleDimNum - ANTEPENULTIMATE_DIM) * MX_A8W4_GROUP_FACTOR;
+        groupNum = antiquantScaleShape->GetDim(antiquantScaleDimNum - scaleKAxis) * MX_A8W4_GROUP_FACTOR;
     } else if (IsA16W4Pergroup(xDtype_, weightDtype_, context, tensorIdx)) {
         // 伪量化A16W4 pergroup场景antiquantScale只支持非转置
         groupNum = antiquantScaleShape->GetDim(antiquantScaleDimNum - PENULTIMATE_DIM);

@@ -75,19 +75,25 @@ bool GroupedWeightQuantMatmulAswTiling::AnalyzeInputs()
                 OP_LOGE(inputParams_.opName, "Failed to check grouped_matmul inputs."), return false);
 
     SetGroupSize();
-    SetMKN();
-    return true;
+    return SetMKN();
 }
 
-void GroupedWeightQuantMatmulAswTiling::SetMKN()
+bool GroupedWeightQuantMatmulAswTiling::SetMKN()
 {
     auto xShapePtr = context_->GetDynamicInputShape(GmmConstants::X_INDEX, 0);
     const gert::Shape& xShape = xShapePtr->GetOriginShape();
     size_t xDimNum = xShape.GetDimNum();
+    OP_CHECK_IF(xDimNum < GmmConstants::LAST_SECOND_DIM_INDEX,
+                OP_LOGE(inputParams_.opName, "Invalid x origin dimension, expect >= 2, actual [%zu].", xDimNum),
+                return false);
 
     auto wShapePtr = context_->GetDynamicInputShape(GmmConstants::WEIGHT_INDEX, 0);
     const gert::Shape& wShape = wShapePtr->GetOriginShape();
     size_t wDimNum = wShape.GetDimNum();
+
+    OP_CHECK_IF(wDimNum < GmmConstants::LAST_SECOND_DIM_INDEX,
+                OP_LOGE(inputParams_.opName, "Invalid weight origin dimension, expect >= 2, actual [%zu].", wDimNum),
+                return false);
 
     inputParams_.mSize = inputParams_.transX ? xShape.GetDim(xDimNum - GmmConstants::LAST_FIRST_DIM_INDEX) :
                                                xShape.GetDim(xDimNum - GmmConstants::LAST_SECOND_DIM_INDEX);
@@ -95,6 +101,7 @@ void GroupedWeightQuantMatmulAswTiling::SetMKN()
                                                xShape.GetDim(xDimNum - GmmConstants::LAST_FIRST_DIM_INDEX);
     inputParams_.nSize = inputParams_.transWeight ? wShape.GetDim(wDimNum - GmmConstants::LAST_SECOND_DIM_INDEX) :
                                                     wShape.GetDim(wDimNum - GmmConstants::LAST_FIRST_DIM_INDEX);
+    return true;
 }
 
 void GroupedWeightQuantMatmulAswTiling::SetGroupSize()

@@ -79,7 +79,7 @@ public:
 private:
     bool GetPlatformInfo();
     bool AnalyzeInputs();
-    void SetMKN();
+    bool SetMKN();
     void SetGroupSize();
     void DoLibApiTiling();
     void DoOpTiling();
