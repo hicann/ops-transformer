@@ -43,7 +43,7 @@
 
 <div style="padding-left:40px;">
 
-  阶段1：根据矩阵乘法导数规则，计算$dP$和$dV$:
+  阶段1：根据矩阵乘法导数规则，计算$dP$和$dV$：
 
 </div>
 
@@ -57,7 +57,7 @@
 
 <div style="padding-left:40px;">
 
-   阶段2：计算$dS$:
+   阶段2：计算$dS$：
 
 </div>
 
@@ -67,7 +67,7 @@
 
 <div style="padding-left:40px;">
 
-   阶段3：计算$dQ$与$dK$:
+   阶段3：计算$dQ$与$dK$：
 
 </div>
 
@@ -179,7 +179,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
         <tr>
             <td>value</td>
             <td>输入</td>
-            <td>attention结构的输入v。</td>
+            <td>attention结构的输入V。</td>
             <td>
             不支持空Tensor。<br>
             可选项。传入空指针时启用KV merge，内部按value=key处理；此时要求dValueOut也传入空指针，dKeyOut返回dK+dV的合并结果。
@@ -260,7 +260,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
             <td>
             <ul>
                 <li>不支持空Tensor。</li>
-                <li>可选项：当layout为TND，该变量存在。</li>
+                <li>可选项：当layout为TND时，该变量存在。</li>
                 <li>长度与B保持一致。</li>
                 <li>累加和与T1保持一致(EOD场景下累加和可以小于T1)。</li>
                 <li>取值须为非负数，传入负值可能触发芯片告警（alarm）。</li>
@@ -278,7 +278,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
             <td>
             <ul>
                 <li>不支持空Tensor。</li>
-                <li>可选项：当layout为TND，该变量存在。</li>
+                <li>可选项：当layout为TND时，该变量存在。</li>
                 <li>长度与B保持一致。</li>
                 <li>累加和与T2保持一致(EOD场景下累加和可以小于T2)。</li>
             </ul>
@@ -291,7 +291,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
         <tr>
             <td>queryRopeOptional</td>
             <td>输入</td>
-            <td>MLA rope部分：Query位置编码的输出。</td>
+            <td>MLA RoPE部分：Query位置编码的输出。</td>
             <td>
             不支持空Tensor。<br>
             可选项。queryRopeOptional和keyRopeOptional必须同时传入或同时为空指针。
@@ -299,7 +299,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
             <td>(B,S1,N1,Dr)、(T1,N1,Dr)<br>
-            Dr：64
+            统一维度名称，将参数表中的Dr改为Drope，与规格表及调用示例中的注释保持一致。
             </td>
             <td>√</td>
         </tr>
@@ -373,7 +373,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
             <td>Attention算子里，对S矩阵的滑窗起始位置。</td>
             <td>
             <ul>
-                <li>sparseMode=4时，pre_tokens生效。</li>
+                删除该条模式4相关说明，改为与支持范围一致的表述（如：sparseMode取0、3时为占位参数，仅支持取值2147483647），并将参数名统一写作preTokens。
                 <li>仅支持取值：2147483647</li>
             </ul>
             </td>
@@ -388,7 +388,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
             <td>Attention算子里，对S矩阵的滑窗终止位置。</td>
             <td>
             <ul>
-                <li>sparseMode=4时，next_tokens生效。</li>
+                删除该条模式4相关说明，改为与支持范围一致的表述（如：sparseMode取0、3时为占位参数，仅支持取值2147483647），并将参数名统一写作nextTokens。
                 <li>仅支持取值：2147483647</li>
             </ul>
             </td>
@@ -457,7 +457,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
             <td>
             不支持空Tensor。<br>
             <ul>
-                <li>当输入queryRope存在，此变量才会输出。</li>
+                <li>当输入queryRope存在时，此变量才会输出。</li>
                 <li>与输入query的Shape维度保持一致。</li>
             </ul>
             </td>
@@ -514,7 +514,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
             <tr>
                 <td>ACLNN_ERR_RUNTIME_ERROR</td>
                 <td>361001</td>
-                <td>API内部调用npu runtime的接口异常。</td>
+                <td>API内部调用NPU runtime的接口异常。</td>
             </tr>
             <tr>
                 <td>ACLNN_ERR_INNER_TILING_ERROR</td>
@@ -558,7 +558,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
         <tr>
         <td>stream</td>
         <td>输入</td>
-        <td>指定执行任务的Stream流。</td>
+        <td>指定执行任务的Stream。</td>
         </tr>
     </tbody>
     </table>
@@ -665,7 +665,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
         </tr>
         <tr>
             <td>S1、S2</td>
-            <td>S1支持1~128K，S2支持1~1M</td>
+            <td>S1支持1~128k，S2支持1~1M</td>
             <td>S1、S2支持不等长</td>
         </tr>
         <tr>
@@ -694,7 +694,7 @@ aclnnStatus aclnnSparseFlashAttentionGrad(
         <tr>
             <td>K</td>
             <td>1024、2048、3072、4096、5120、6144、7168、8192</td>
-            <td>不建议K * sparseBlockSize超过100k，由于内部算法硬件限制可能会导致oom</td>
+            <td>不建议K * sparseBlockSize超过100k，由于内部算法硬件限制可能会导致OOM</td>
         </tr>
         <tr>
             <td>layout</td>

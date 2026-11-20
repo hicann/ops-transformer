@@ -354,7 +354,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingGrad(
       <td>传入的参数shape不满足约束说明章节中的条件。</td>
     </tr>
     <tr>
-      <td>传入的mode参数不在0、1、2、3范围内。 </td>
+      <td>传入的mode参数不在0、1、2、3范围内。</td>
     </tr>
   </tbody>
   </table>
@@ -408,9 +408,9 @@ aclnnStatus aclnnRotaryPositionEmbeddingGrad(
 - 确定性计算：
   - aclnnRotaryPositionEmbeddingGrad默认确定性实现。
 
-    输入张量dy支持BNSD、BSND、SBND、TND排布。各参数的shape约束可以描述如下：
-    - 输入张量dy、cos、sin及输出张量dx的最后一维大小必须相同，且小于等于1024。对于half、interleave和interleave-half模式，最后一维必须能被2整除，对于quarter模式，最后一维必须能被4整除。
-    - 输入张量dy和输出张量dx的shape必须完全相同。
+- 各参数的shape约束如下（输入张量dy支持BNSD、BSND、SBND、TND排布）：
+    - 输入张量dy、cos、sin及输出张量dxOut的最后一维大小必须相同，且小于等于1024。对于half、interleave和interleave-half模式，最后一维必须能被2整除，对于quarter模式，最后一维必须能被4整除。
+    - 输入张量dy和输出张量dxOut的shape必须完全相同。
     - 输入张量cos和sin的shape必须完全相同，cos和sin的shape需要与dy满足[broadcast关系](../../../docs/zh/context/broadcast_relationship.md)，且广播后的shape必须等于dy的shape。
     - 当dy为TND时，cos、sin支持T1D、TND。
 
@@ -422,7 +422,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingGrad(
     - 输入张量dy、xOptional和输出张量dxOut的shape必须完全相同。
     - 输入张量cos、sin和输出张量dcosOut、dsinOut的shape必须完全相同，且cos和sin的shape必须完全相同。
     - half模式：
-      - B，N < 1000；当需要计算dsin、dcos时，B * N <= 1024
+      - B、N < 1000；当需要计算dsin、dcos时，B * N <= 1024
       - 当dy为BNSD时，cos、sin支持11SD、B1SD、BNSD；当cos、sin为B1SD时需满足B < S
       - 当dy为BSND时，cos、sin支持1S1D、BS1D、BSND；当cos、sin为BS1D时需满足B < S
       - 当dy为SBND时，cos、sin支持S11D、SB1D、SBND

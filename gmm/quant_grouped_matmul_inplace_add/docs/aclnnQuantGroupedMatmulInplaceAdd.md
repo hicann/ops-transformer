@@ -191,7 +191,7 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(
       <td>整数型参数，用于输入m、n、k方向上的量化分组大小。</td>
       <td>
         <ul>
-          <li>groupSize输入由3个方向的groupSizeM，groupSizeN，groupSizeK三个值拼接组成，每个值占16位，共占用int64_t类型groupSize的低48位（groupSize中的高16位的数值无效），计算公式为：groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32。</li>
+          <li>groupSize输入由3个方向的groupSizeM、groupSizeN、groupSizeK三个值拼接组成，每个值占16位，共占用int64_t类型groupSize的低48位（groupSize中的高16位的数值无效），计算公式为：groupSize = groupSizeK | groupSizeN << 16 | groupSizeM << 32。</li>
           <li>当前只支持传0。</li>
         </ul>
       </td>
@@ -301,10 +301,10 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(
 
         | 参数 | shape限制 |
         |:---------:| :------ |
-        |scale1Optional| 3维tensor，shape为((K / 64) + g, M, 2)，scale\_i起始地址偏移为((K\_0 + K\_1 + ...+ K\_{i-1})/ 64 + g\_i) \* M \* 2，即scale_0的起始地址偏移为0，scale_1的起始地址偏移为(K\_0 / 64 + 1) \* M \* 2， scale_2的起始地址偏移为((K\_0 + K\_1) / 64 + 2) \* M \* 2,依此类推|
-        |scale2| 3维tensor，shape为((K / 64) + g, N, 2),起始地址偏移与scale1Optional同理|
+        |scale1Optional| 3维tensor，shape为((K / 64) + g, M, 2)，scale\_i起始地址偏移为((K\_0 + K\_1 + ...+ K\_{i-1})/ 64 + g\_i) \* M \* 2，即scale_0的起始地址偏移为0，scale_1的起始地址偏移为(K\_0 / 64 + 1) \* M \* 2，scale_2的起始地址偏移为((K\_0 + K\_1) / 64 + 2) \* M \* 2，依此类推|
+        |scale2| 3维tensor，shape为((K / 64) + g, N, 2)，起始地址偏移与scale1Optional同理|
 
-      - 在mxfp4量化场景下：x1和x2的数据类型必须同时为FLOAT4_E2M1，且scale1Optional和scale2必须同时为FLOAT8_E8M0；x1的M轴、x2的N轴必须为偶数；K\*M不等于2、K\*N不等于2。
+      - 在mx量化场景下：x1和x2的数据类型必须同时为FLOAT4_E2M1，且scale1Optional和scale2必须同时为FLOAT8_E8M0；x1的M轴、x2的N轴必须为偶数；K\*M不等于2、K\*N不等于2。
 
   - groupList第1维最大支持1024，即最多支持1024个group。
 
@@ -312,7 +312,7 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```c++
+```cpp
 #include <iostream>
 #include <vector>
 #include <memory>

@@ -102,7 +102,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
       <td>-</td>
       <td>INT8</td>
       <td>NZ</td>
-      <td>shape支持5维。维度为(e, n1, k1, k0, n0)，其中k0 = 16，n0 = 32， x1 shape中的k和x2 shape中的k1需要满足以下关系：ceilDiv（k,16） = k1。可使用aclnnCalculateMatmulWeightSizeV2接口以及aclnnTransMatmulWeight接口完成输入Format从ND到AI处理器亲和数据排布格式（NZ）的转换。e取值范围[1,256]。</td>
+      <td>shape支持5维。维度为(e, n1, k1, k0, n0)，其中k0 = 16，n0 = 32，x1 shape中的k和x2 shape中的k1需要满足以下关系：ceilDiv(k,16) = k1。可使用aclnnCalculateMatmulWeightSizeV2接口以及aclnnTransMatmulWeight接口完成输入格式从ND到AI处理器亲和数据排布格式（NZ）的转换。e取值范围[1,256]。</td>
       <td>-</td>
     </tr>
     <tr>
@@ -148,7 +148,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
     <tr>
       <td>sharedInput</td>
       <td>输入</td>
-      <td>moe计算中共享专家的输出，需要与moe专家的输出进行combine操作。</td>
+      <td>MoE计算中共享专家的输出，需要与MoE专家的输出进行combine操作。</td>
       <td>可选参数，支持空指针；为空时不融合共享专家输出。</td>
       <td>BF16</td>
       <td>ND</td>
@@ -158,7 +158,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
     <tr>
       <td>logit</td>
       <td>输入</td>
-      <td>moe专家对各个token的logit大小。</td>
+      <td>MoE专家对各个token的logit大小。</td>
       <td>必选参数，不支持空指针；sharedInput为空时仍须提供。</td>
       <td>FLOAT32</td>
       <td>ND</td>
@@ -168,7 +168,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
     <tr>
       <td>rowIndex</td>
       <td>输入</td>
-      <td>moe专家输出按照该rowIndex进行combine，其中的值即为combine做scatter add的索引。</td>
+      <td>MoE专家输出按照该rowIndex进行combine，其中的值即为combine做scatter add的索引。</td>
       <td>必选参数，不支持空指针。</td>
       <td>INT32、INT64</td>
       <td>ND</td>
@@ -188,7 +188,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
     <tr>
       <td>sharedInputWeight</td>
       <td>输入</td>
-      <td>共享专家与moe专家进行combine的系数，sharedInput先与该参数乘，然后再和moe专家结果累加。</td>
+      <td>共享专家与MoE专家进行combine的系数，sharedInput先与该参数乘，然后再和MoE专家结果累加。</td>
       <td></td>
       <td>FLOAT32</td>
       <td></td>
@@ -295,13 +295,13 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
     <tr>
       <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
       <td rowspan="4">161002</td>
-      <td>x1、x2、scale、bias、pertokenScaleOptional、groupList、sharedInput、logit、rowIndex、sharedInputWeight、sharedInputOffset、transposeX1、transposeX2或out的数据类型和数据格式不在支持的范围内。</td>
+      <td>x1、x2、scale、bias、pertokenScaleOptional、groupList、sharedInput、logit、rowIndex、sharedInputWeight、sharedInputOffset、transposeX1、transposeX2或out的数据类型或数据格式不在支持的范围内。</td>
     </tr>
     <tr>
       <td>x1、x2、scale、bias、pertokenScaleOptional、groupList、sharedInput、logit、rowIndex或out的shape不满足校验条件。</td>
     </tr>
     <tr>
-      <td>x1、x2、scale、bias、pertokenScaleOptional、groupList、sharedInput、 logit、rowIndex或out是空tensor。</td>
+      <td>x1、x2、scale、bias、pertokenScaleOptional、groupList、sharedInput、logit、rowIndex或out是空tensor。</td>
     </tr>
     <tr>
       <td>dtype、sharedInputOffset、transposeX1、transposeX2、groupListType的取值范围不满足条件。</td>
@@ -362,14 +362,14 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingWeightNz(
 
   | x1   | x2   | scale   | bias | pertokenScaleOptional | groupList | sharedInput | logit   | rowIndex | out   |
   | ---- | ---- | ------- | ---- | --------------------- | --------- | ----------- | ------- | -------- | ----- |
-  | INT8 | INT8 | FLOAT32 | null | FLOAT32 / null        | INT64     | BFLOAT16    | FLOAT32 | INT64    | FLOAT |
-  | INT8 | INT8 | FLOAT32 | null | FLOAT32 / null        | INT64     | null        | FLOAT32 | INT64    | FLOAT |
+  | INT8 | INT8 | FLOAT32 | null | FLOAT32 / null        | INT64     | BFLOAT16    | FLOAT32 | INT64    | FLOAT32 |
+  | INT8 | INT8 | FLOAT32 | null | FLOAT32 / null        | INT64     | null        | FLOAT32 | INT64    | FLOAT32 |
 
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
   #include <iostream>
   #include <memory>
   #include <vector>

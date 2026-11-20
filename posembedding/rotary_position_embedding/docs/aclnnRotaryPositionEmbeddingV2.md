@@ -26,7 +26,7 @@
 - 接口功能：执行单路旋转位置编码计算。本接口相较于[aclnnRotaryPositionEmbedding](aclnnRotaryPositionEmbedding.md)，新增入参rotate，在推荐场景中通过输入旋转编码矩阵获得性能收益，请根据实际情况选择合适的接口。
 
 - rotate推荐使用场景
-  - interleave模式，且B *N* S > 28800。
+  - interleave模式，且B*N*S > 28800。
   - half模式仅在以下场景时推荐使用：输入矩阵x需要在最后一个维度切分多份时，每一份都需要调用aclnnRotaryPositionEmbedding接口进行旋转位置编码计算，可以通过构造旋转编码矩阵实现一次调用获得性能收益，以x的layout为BSND需要切分为3份为例：
      x切分为3份，$x = [x1|x2|x3]_{(dim=4)} ∈ R^{B×S×N×D}, x1 ∈ R^{B×S×N×D1},x2 ∈ R^{B×S×N×D2},x3 ∈ R^{B×S×N×D3},其中D = D1 + D2 + D3$，那么可以构造一个rotate矩阵，实现调用一次aclnnRotaryPositionEmbeddingV2接口完成x的旋转位置编码计算功能，rotate矩阵构造如下：
 
@@ -232,7 +232,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
     - <term>Ascend 950PR&950DT系列产品</term>：0=half，1=interleave，2=quarter，3=interleave-half。
 
     <!-- end id9 -->
-    - 兼容性说明：在 <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term> 上传入 `2=quarter` 或 `3=interleave-half` 时，接口**不返回错误码**，而是打印 **warning** 日志，提示该 mode 仅 <term>Ascend 950PR&950DT系列产品</term> 支持，并按照half 语义计算。
+    - 兼容性说明：在 <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term> 上传入 `2=quarter` 或 `3=interleave-half` 时，接口**不返回错误码**，而是打印 **warning** 日志，提示该mode仅 <term>Ascend 950PR&950DT系列产品</term> 支持，并按照half语义计算。
 
   - 参数rotate约束：
 
@@ -285,7 +285,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
       <td>传入的x、cos、sin、out的shape不匹配。</td>
     </tr>
     <tr>
-      <td>传入的mode参数不在0、1、2、3范围内。 </td>
+      <td>传入的mode参数不在0、1、2、3范围内。</td>
     </tr>
   </tbody>
   </table>
@@ -341,10 +341,10 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
   输入张量x支持BNSD、BSND、SBND、TND排布。
   输入张量x、cos、sin及输出张量y的D维度大小必须相同，满足D<896，且必须为2的倍数。
   输入张量x和输出张量y的shape必须完全相同。
-  输入张量cos和sin的shape必须完全相同.
+  输入张量cos和sin的shape必须完全相同。
 
   - half模式：
-    - B，N < 1000;
+    - B，N < 1000。
     - 当x为BNSD时，cos、sin支持11SD、B1SD、BNSD
       - 当（D/2）% (32/inputDtypeSize) == 0时，需满足B*N <= S* 8
       - 当（D/2）% (32/inputDtypeSize) != 0时，需满足B*N*2 <= (S + coreNum -1) / coreNum或者D >= 80
@@ -742,7 +742,7 @@ aclnnStatus aclnnRotaryPositionEmbeddingV2(
   ```
 <!-- end id18 -->
 
-- 辅助矩阵rotate生成示例（仅在<term>Atlas A3系列产品</term>、  <term>Atlas A2系列产品</term>上使用）：
+- 辅助矩阵rotate生成示例（仅在<term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>上使用）：
 
   ```python
   import torch

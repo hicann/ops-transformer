@@ -25,7 +25,7 @@
 
 - 接口功能：融合GroupedMatmul、dequant、SwiGLU和quant。该接口为weight NZ特化版本，支持Ascend 950PR&950DT系列产品的单Tensor MX A8W8、MX A8W4及A4W4 BF16输出场景。`weight`必须为三维FRACTAL_NZ格式，A8W8和A4W4支持转置和非转置weightNZ；MX A8W4仅支持转置weightNZ。`x`仅支持非转置输入。
 
-- 与V2接口的主要区别：增加SwiGLU计算参数`swigluMode`、`clampLimit`、`gluAlpha`和`gluBias`，以及MX量化参数`roundMode`、`scaleAlg`和`dstTypeMax`。量化输出路径的`swigluMode`仅支持2；原有A4W4 BF16输出路径支持0或2，且`outputScale`必须为nullptr。
+- 补充V2与V3两段参数调用代码对比示例：V2段仅保留原有grouped matmul与反量化入参，V3段在相同位置增加swigluMode、clampLimit、gluAlpha、gluBias及roundMode、scaleAlg、dstTypeMax，并在示例前说明新增参数的业务作用与兼容性。：增加SwiGLU计算参数`swigluMode`、`clampLimit`、`gluAlpha`和`gluBias`，以及MX量化参数`roundMode`、`scaleAlg`和`dstTypeMax`。量化输出路径的`swigluMode`仅支持2；原有A4W4 BF16输出路径支持0或2，且`outputScale`必须为nullptr。
 
 - 计算公式：
 
@@ -135,7 +135,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
   | xScale（const aclTensor *） | 输入 | 激活量化因子。 | 按K方向每64个元素对应两个E8M0 scale。 | FLOAT8_E8M0 | ND | 3维，(M, ceil(K / 64), 2) | √ |
   | smoothScale（const aclTensor *） | 可选输入 | 按expert的平滑量化因子。 | 仅MX A8W4可选，非空时必须为Device HBM内存，不接受Host Tensor；其他场景必须传nullptr。FP32 SwiGLU结果乘smooth后再进行BF16舍入和MX量化。 | FLOAT | ND | 2维，(E, N / 2) | √，入口连续化 |
   | groupList（const aclTensor *） | 输入 | 分组信息。 | 长度必须为E；其语义由groupListType决定。A8W4及A4W4 BF16输出要求Device内存；A8W8保持原有行为。 | INT64 | ND | 1维，(E) | √ |
-  | dequantMode（int64_t） | 输入 | 反量化模式。 | 当前仅支持2，表示MX量化反量化。 | - | - | - | - |
+  | dequantMode（int64_t） | 输入 | 反量化模式。 | 当前仅支持2，表示MX反量化。 | - | - | - | - |
   | dequantDtype（int64_t） | 输入 | GroupedMatmul中间结果类型。 | 当前仅支持ACL_FLOAT（枚举值为0）。 | - | - | - | - |
   | quantMode（int64_t） | 输入 | 输出量化模式。 | 当前仅支持2，表示MX量化。 | - | - | - | - |
   | groupListType（int64_t） | 输入 | 分组列表解释方式。 | 0表示cumsum，1表示count。 | - | - | - | - |
@@ -185,7 +185,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
       <td>输入或输出的参数维度、shape或format不满足约束，例如weight不是三维FRACTAL_NZ格式，或输出shape不匹配。</td>
     </tr>
     <tr>
-      <td>当前设备不是Ascend 950，或者weight、weightScale的TensorList长度不为1。</td>
+      <td>当前设备不是Ascend 950PR&950DT系列产品，或者weight、weightScale的TensorList长度不为1。</td>
     </tr>
     <tr>
       <td>dequantMode、quantMode、dequantDtype不满足2、2、ACL_FLOAT的约束。</td>

@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：将两次FlashAttention的输出根据其不同的softmax的max和sum更新。**与[RingAttentionUpdate](./aclnnRingAttentionUpdate.md)接口的区别是：在输入排布为TND的场景下，原RingAttentionUpdate接口中的softmax相关输入的数据排布为BNS8，RingAttentionUpdateV2接口支持传入字符串参数inputSoftmaxLayout，用于控制softmax相关输入的数据排布是否与attention保持一致（即采用TND排布）。**
+- 接口功能：将两次FlashAttention的输出根据其不同的softmax的max和sum更新。**与[RingAttentionUpdate](./aclnnRingAttentionUpdate.md)接口的区别是：在输入排布为TND的场景下，原RingAttentionUpdate接口中的softmax相关输入的数据排布为BNS8，RingAttentionUpdateV2接口支持传入字符串参数inputSoftmaxLayoutOptional，用于控制softmax相关输入的数据排布是否与attention保持一致（即采用TND排布）。**
 - 计算公式：
 
 $$
@@ -304,7 +304,7 @@ aclnnStatus aclnnRingAttentionUpdateV2(
     <tr>
       <td>ACLNN_ERR_INNER_TILING_ERROR</td>
       <td>561002</td>
-      <td>当inputSoftmaxLayoutOptional输入值不在支持范围之内。</td>
+      <td>当inputSoftmaxLayoutOptional的输入值不在支持范围之内时。</td>
     </tr>
   </tbody>
   </table>

@@ -352,7 +352,7 @@ aclnnStatus aclnnBlockAttnResPrepare(
 - `blockRes`与`pseudoQuery`的最后一维必须相同。
 - `validBlocks[0] == 0`时，返回online softmax的空状态；`validBlocks[0] > N`时按`N`处理。
 - 所有输入和输出Tensor均必须为连续Tensor，不支持非连续Tensor。
-- `T == 0`或`S == 0`时，在参数校验和形状推导通过后返回对应shape的空输出，不发起AICore计算；上述非空计算的上限不适用于该路径，`eps`有效范围及其他接口校验仍适用。
+- `T == 0`或`S == 0`时，在参数校验和形状推导通过后返回对应shape的空输出，不发起AI Core计算；上述非空计算的上限不适用于该路径，`eps`有效范围及其他接口校验仍适用。
 
 ## 调用示例
 

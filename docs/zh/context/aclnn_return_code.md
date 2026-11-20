@@ -1,28 +1,28 @@
 # aclnn返回码
 
-调用aclnn API时，常见的接口返回码如[表1](#table1)所示。
-对于异常状态码值，可以通过aclGetRecentErrMsg接口（[《Runtime运行时 API》](https://hiascend.com/document/redirect/CannCommunityRuntimeApi)）获取异常信息，可根据报错提示排查问题或联系技术支持。
+调用aclnn API时，全文统一使用一个标准名称（如"返回码"），将表1标题与表2标题、表头列名统一为"返回码"相关表述，如"返回码名称""返回码值""返回码说明"如[表1](#table1)所示。
+对于异常状态码值，可以通过aclGetRecentErrMsg接口（《[Runtime运行时API](https://hiascend.com/document/redirect/CannCommunityRuntimeApi)》）获取异常信息，可根据报错提示排查问题或联系技术支持。
 
-**表1**  返回状态码 <a id="table1"></a>
+**表1** 返回状态码 <a id="table1"></a>
 
 | 状态码名称 | 状态码值 | 状态码说明 |
 | ----- | ----- | ------ |
 | ACLNN_SUCCESS | 0 | 成功。 |
 | ACLNN_ERR_PARAM_NULLPTR | 161001 | 参数校验错误，参数中存在非法的nullptr。 |
 | ACLNN_ERR_PARAM_INVALID | 161002 | 参数校验错误，如输入的两个数据类型不满足输入类型推导关系。 |
-| ACLNN_ERR_RUNTIME_ERROR | 361001 | API内部调用npu runtime的接口异常。 |
+| ACLNN_ERR_RUNTIME_ERROR | 361001 | API内部调用NPU runtime的接口异常。 |
 | ACLNN_ERR_INNER_XXX | 561xxx | API内部发生异常。 |
 
 更多关于ACLNN_ERR_INNER_XXX类状态码的说明如[表2](#table2)所示。
 
-**表2**  异常状态码 <a id="table2"></a>
+**表2** 异常状态码 <a id="table2"></a>
 
 | 状态码名称 | 状态码值 | 状态码说明 |
 | ----- | ----- | ------ |
 | ACLNN_ERR_INNER |   561000     |    内部异常：API发生内部异常。     |
 | ACLNN_ERR_INNER_INFERSHAPE_ERROR     |  561001      |  内部异常：API内部进行输出shape推导发生错误。       |
-| ACLNN_ERR_INNER_TILING_ERROR     |   561002     |   内部异常：API内部做npu kernel的tiling时发生异常。     |
-| ACLNN_ERR_INNER_FIND_KERNEL_ERROR   |   561003  |  内部异常：API内部做查找npu kernel异常（可能因为算子二进制包未安装）。    |
+| ACLNN_ERR_INNER_TILING_ERROR     |   561002     |   内部异常：API内部做NPU kernel的tiling时发生异常。     |
+| ACLNN_ERR_INNER_FIND_KERNEL_ERROR   |   561003  |  内部异常：API内部做查找NPU kernel异常（可能因为算子二进制包未安装）。    |
 | ACLNN_ERR_INNER_CREATE_EXECUTOR     |    561101    |   内部异常：API内部创建aclOpExecutor失败（可能因为操作系统异常）。      |
 | ACLNN_ERR_INNER_NOT_TRANS_EXECUTOR     |  561102      |   内部异常：API内部未调用uniqueExecutor ReleaseTo。      |
 | ACLNN_ERR_INNER_NULLPTR            |   561103     |    内部异常：aclnn API内部发生异常，出现了nullptr的异常。     |

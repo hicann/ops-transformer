@@ -44,7 +44,7 @@
   $$
 
   4.分组矩阵乘+反量化
-    - 4.1 若输入的$scale_{weight}$数据类型为FLOAT32,则：
+    - 4.1 若输入的$scale_{weight}$数据类型为FLOAT32，则：
 
   $$
     \begin{aligned}
@@ -58,7 +58,7 @@
     \end{aligned}
   $$
 
-  - 4.2 若输入的$scale_{weight}$数据类型为INT64,则：
+  - 4.2 若输入的$scale_{weight}$数据类型为INT64，则：
 
     $$
     x^{*}_{quantized} = x_{quantized}[group[i-1]:group[i]] \\
@@ -162,7 +162,7 @@ aclnnStatus aclnnQuantGroupedMatmulDequantWeightNZ(
       <tr>
       <td>groupList</td>
       <td>输入</td>
-      <td>公式中的group。表示moe场景下输入张量x分组的前缀和结果，shape是1维[g]。</td>
+      <td>公式中的group。表示MoE场景下输入张量x分组的前缀和结果，shape是1维[g]。</td>
       <td>-</td>
       <td>INT64</td>
       <td>ND</td>
@@ -213,7 +213,7 @@ aclnnStatus aclnnQuantGroupedMatmulDequantWeightNZ(
       <td>xQuantMode</td>
       <td>输入</td>
       <td>指定输入x的量化模式。</td>
-      <td>支持取值pertoken/pertensor，动态量化时只支持pertoken。pertoken表示每个token（某一行）都有自己的量化参数；pertensor表示整个张量使用统一的量化参数。</td>
+      <td>支持取值pertoken/pertensor，动态量化时只支持pertoken。pertoken表示每个token（某一行）都有自己的量化系数；pertensor表示整个张量使用统一的量化系数。</td>
       <td>STRING</td>
       <td>-</td>
       <td>-</td>
@@ -233,7 +233,7 @@ aclnnStatus aclnnQuantGroupedMatmulDequantWeightNZ(
       <td>out</td>
       <td>输出</td>
       <td>计算结果，必选参数，公式中的out。</td>
-      <td>shape支持2维，各个维度表示：（m，n）。其中m与x的m一致，n与weight的n一致。</td>
+      <td>shape支持2维，各个维度表示：（m，n），其中m与x的m一致，n与weight的n一致。</td>
       <td>FLOAT16</td>
       <td>ND</td>
       <td>2</td>
@@ -343,14 +343,14 @@ aclnnStatus aclnnQuantGroupedMatmulDequantWeightNZ(
 
 - **返回值**
 
-  aclnnStatus: 返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+  aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
 ## 约束说明
 
 - 确定性计算：
   - aclnnQuantGroupedMatmulDequantWeightNZ默认确定性实现。
 
-- n，k都需要是16的整数倍。
+- n、k都需要是16的整数倍。
 - 当weightScale数据类型为INT64时，必须要求xScaleOptional数据类型为FLOAT16，且xQuantMode值为pertensor；当xScaleOptional数据类型为FLOAT16时，必须要求weightScale数据类型为INT64，且xQuantMode值为pertensor。
 
 ## 调用示例

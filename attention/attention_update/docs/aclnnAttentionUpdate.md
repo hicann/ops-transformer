@@ -51,7 +51,7 @@ $$
 | 分片输入 | 长度为P，每个Tensor的shape为`[T]` | 长度为P，每个Tensor的shape为`[T,D]` | P |
 | 首轴拼接输入 | 长度为1，Tensor的shape为`[P,T]` | 长度为1，Tensor的shape为`[P,T,D]` | P |
 
-其中，P表示序列并行的并行度sp，`T = batch * seqLen * headNum`，`D = headDim`。两个输入的P、T必须一致；两种输入表示均支持P=1。
+其中，P表示序列并行的并行度SP，`T = batch * seqLen * headNum`，`D = headDim`。两个输入的P、T必须一致；两种输入表示均支持P=1。
 
 首轴拼接输入的`lse`必须为连续FLOAT32 Tensor，`localOut`支持非连续Tensor。
 输出`out`的shape为`[T,D]`；`updateType=1`时，`lseOut`的shape为`[T]`、数据类型为FLOAT32。
@@ -122,7 +122,7 @@ aclnnStatus aclnnAttentionUpdate(
         <td>输入</td>
         <td>各SP域的局部attentionOut。</td>
         <td>分片输入长度为sp；首轴拼接输入长度为1，详见输入说明。</td>
-        <td>FLOAT32，FLOAT16，BFLOAT16</td>
+        <td>FLOAT32、FLOAT16、BFLOAT16</td>
         <td>ND</td>
         <td>[batch * seqLen * headNum, headDim]；首轴拼接输入为 [sp, batch * seqLen * headNum, headDim]</td>
         <td>首轴拼接输入支持</td>
@@ -140,7 +140,7 @@ aclnnStatus aclnnAttentionUpdate(
       <tr>
         <td>out</td>
         <td>输出</td>
-        <td>输出的tensor。</td>
+        <td>输出的Tensor。</td>
         <td>
           -
         </td>
@@ -214,7 +214,7 @@ aclnnStatus aclnnAttentionUpdate(
           <td>传入的lse、localOut或者out的数据类型/数据格式不在支持的范围之内。</td>
         </tr>
         <tr>
-          <td>传入的updateType或者sp不在取值范围。</td>
+          <td>传入的updateType或者sp不在取值范围内。</td>
         </tr>
         <tr>
           <td>传入的lse、localOut或者out的shape不满足约束。</td>
@@ -258,7 +258,7 @@ aclnnStatus aclnnAttentionUpdate(
     <tr>
       <td>stream</td>
       <td>输入</td>
-      <td>指定执行任务的Stream流。</td>
+      <td>指定执行任务的Stream。</td>
     </tr>
   </tbody>
   </table>
@@ -271,7 +271,7 @@ aclnnStatus aclnnAttentionUpdate(
 
 - 确定性计算：
   - aclnnAttentionUpdate默认确定性实现。
-- 序列并行的并行度sp取值范围：
+- 序列并行的并行度SP取值范围：
 
   <!-- npu="A3,910b" id7 -->
   - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：[1, 128]。
@@ -280,7 +280,7 @@ aclnnStatus aclnnAttentionUpdate(
   - <term>Ascend 950PR&950DT系列产品</term>：[1, 16]。
   <!-- end id8 -->
 
-- headDim取值范围[8, 512]且是8的倍数。
+- headDim取值范围为[8, 512]且是8的倍数。
 - 支持T=0的空输入，此时out的shape为`[0,D]`；updateType为1时，lseOut的shape为`[0]`。
 
 ## 调用示例

@@ -133,7 +133,7 @@
     queryPass = query[..., rotaryDim:]
     $$
 
-    （1）rotate\_half（GPT-NeoX style）计算模式：
+    （3）rotate\_half（GPT-NeoX style）计算模式：（并将后续的"（2）rotate\_interleaved"改为"（4）"，或将旋转计算模式另起层级，与cacheMode编号区分）
 
     $$
     x1, x2 = torch.chunk(queryRot, 2, dim=-1)
@@ -199,7 +199,7 @@
     queryPass = query[..., rotaryDim:]
     $$
 
-    （1）rotate\_half（GPT-NeoX style）计算模式：
+    （3）rotate\_half（GPT-NeoX style）计算模式：（并将后续的"（2）rotate\_interleaved"改为"（4）"，或将旋转计算模式另起层级，与cacheMode编号区分）
 
     $$
     x1, x2 = torch.chunk(queryRot, 2, dim=-1)
@@ -305,7 +305,7 @@ aclnnStatus aclnnRopeWithSinCosCacheV2(
         <td>positions</td>
         <td>输入</td>
         <td>公式中的positions，用于选取位置编码张量。</td>
-        <td><ul><li>不支持空tensor。</li><li>rope模式shape为(numTokens)。</li><li>mrope模式shape为(3, numTokens)或(4, numTokens)。</li></ul></td>
+        <td><ul><li>不支持空Tensor。</li><li>rope模式shape为(numTokens)。</li><li>mrope模式shape为(3, numTokens)或(4, numTokens)。</li></ul></td>
         <td>INT64</td>
         <td>ND</td>
         <td>1-2</td>
@@ -315,7 +315,7 @@ aclnnStatus aclnnRopeWithSinCosCacheV2(
         <td>queryIn</td>
         <td>输入</td>
         <td>公式中的query，要执行旋转位置编码的第一个张量。</td>
-        <td><ul><li>不支持空tensor。</li><li>要求是一个2D的Tensor，shape为(numTokens,  numQHeads*headSize)。</li></ul></td>
+        <td><ul><li>不支持空Tensor。</li><li>要求是一个2D的Tensor，shape为(numTokens,  numQHeads*headSize)。</li></ul></td>
         <td>BFLOAT16、FLOAT16、FLOAT32</td>
         <td>ND</td>
         <td>2</td>
@@ -325,7 +325,7 @@ aclnnStatus aclnnRopeWithSinCosCacheV2(
         <td>keyIn</td>
         <td>输入</td>
         <td>要执行旋转位置编码的第二个张量。</td>
-        <td><ul><li>不支持空tensor。</li><li>要求是一个2D的Tensor，shape为(numTokens,  numKHeads*headSize)。</li></ul></td>
+        <td><ul><li>不支持空Tensor。</li><li>要求是一个2D的Tensor，shape为(numTokens,  numKHeads*headSize)。</li></ul></td>
         <td>BFLOAT16、FLOAT16、FLOAT32</td>
         <td>ND</td>
         <td>2</td>
@@ -335,7 +335,7 @@ aclnnStatus aclnnRopeWithSinCosCacheV2(
         <td>cosSinCache</td>
         <td>输入</td>
         <td>表示参与计算的位置编码张量。</td>
-        <td><ul><li>不支持空tensor。</li><li>要求是一个2D的Tensor，shape为(maxSeqLen, rotaryDim)，maxSeqLen表示模型处理的序列的最大长度，rotaryDim表示旋转位置嵌入的维度大小。</li></ul></td>
+        <td><ul><li>不支持空Tensor。</li><li>要求是一个2D的Tensor，shape为(maxSeqLen, rotaryDim)，maxSeqLen表示模型处理的序列的最大长度，rotaryDim表示旋转位置编码的维度大小。</li></ul></td>
         <td>BFLOAT16、FLOAT16、FLOAT32</td>
         <td>ND</td>
         <td>2</td>
@@ -345,7 +345,7 @@ aclnnStatus aclnnRopeWithSinCosCacheV2(
         <td>mropeSection</td>
         <td>输入</td>
         <td>公式中的mropeSection，mrope模式下用于整合输入的位置编码张量信息。</td>
-        <td>输入mropeSection属性表示开启mrope模式，不开启mrope模式（即rope模式）输入为nullptr。</td>
+        <td>输入mropeSection属性表示开启mrope模式，不开启mrope模式（即rope模式）时，输入为nullptr。</td>
         <td>aclIntArray</td>
         <td>-</td>
         <td>-</td>
@@ -354,7 +354,7 @@ aclnnStatus aclnnRopeWithSinCosCacheV2(
       <tr>
         <td>headSize</td>
         <td>输入</td>
-        <td>每个注意力头维度大小。</td>
+        <td>每个注意力头的维度大小。</td>
         <td>-</td>
         <td>INT64</td>
         <td>-</td>
@@ -386,7 +386,7 @@ aclnnStatus aclnnRopeWithSinCosCacheV2(
         <td>输出</td>
         <td>query执行旋转位置编码后的结果。</td>
         <td><ul><li>数据类型同query。</li><li>要求是一个2D的Tensor，shape为(numTokens,  numQHeads*headSize)。</li></ul></td>
-        <td>FLOAT32、FLOAT16、BFLOAT16</td>
+        <td>BFLOAT16、FLOAT16、FLOAT32</td>
         <td>ND</td>
         <td>2</td>
         <td>×</td>
@@ -396,7 +396,7 @@ aclnnStatus aclnnRopeWithSinCosCacheV2(
         <td>输出</td>
         <td>key执行旋转位置编码后的结果。</td>
         <td><ul><li>数据类型同key。</li><li>要求是一个2D的Tensor，shape为(numTokens,  numKHeads*headSize)。</li></ul></td>
-        <td>FLOAT32、FLOAT16、BFLOAT16</td>
+        <td>BFLOAT16、FLOAT16、FLOAT32</td>
         <td>ND</td>
         <td>2</td>
         <td>×</td>
@@ -503,16 +503,16 @@ aclnnStatus aclnnRopeWithSinCosCacheV2(
 - queryIn和keyIn的1维大小必须是headSize的整数倍。
 - queryIn、keyIn、cosSinCache输入的数据类型需要保持一致。
 - headSize：数据类型为BFLOAT16或FLOAT16时为32的倍数，数据类型为FLOAT32时为16的倍数。
-- rotaryDim：始终小于等于headSize；数据类型为BFLOAT16或FLOAT16时为32的倍数，数据类型为FLOAT32时为16的倍数;mrope模式下应满足mropeSection所有元素累加和为rotaryDim值的一半。
+- rotaryDim：始终小于等于headSize；数据类型为BFLOAT16或FLOAT16时为32的倍数，数据类型为FLOAT32时为16的倍数；mrope模式下应满足mropeSection所有元素累加和为rotaryDim值的一半。
 - 输入tensor positions的取值应小于cosSinCache的0维maxSeqLen。
 - mrope模式下，mropeSection：取值当前仅支持[11, 11, 10]、[16, 24, 24]、[24, 20, 20]、[8, 12, 12]和[16, 16, 16, 16]。
-- mrope模式下，cacheMode仅支持0和1,当mropeSection为[16, 16, 16, 16]时，仅支持0。
+- mrope模式下，cacheMode仅支持0和1，当mropeSection为[16, 16, 16, 16]时，仅支持0。
 
 ## 调用示例
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 #include <iostream>
 #include <vector>
 #include "acl/acl.h"

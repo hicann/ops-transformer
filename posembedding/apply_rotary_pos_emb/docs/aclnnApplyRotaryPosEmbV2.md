@@ -26,7 +26,7 @@
 - 接口功能：推理网络为了提升性能，将query和key两路算子融合成一路。执行旋转位置编码计算，计算结果执行原地更新。
    本接口针对[aclnnApplyRotaryPosEmb](aclnnApplyRotaryPosEmb.md)做了如下功能变更，请根据实际情况选择合适的接口：
 
-   - 新增rotaryMode参数，用于控制不同的旋转编码方式
+   - 新增rotaryMode参数，用于控制不同的旋转位置编码方式
 - 计算公式：
 
   （1）rotaryMode为"half"：
@@ -305,7 +305,7 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
         <ul>
           <li>取值范围：1-BSND、2-SBND、3-BNSD、4-TND。</li>
           <li><term>Atlas推理系列产品</term>、<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持1-BSND的4维Tensor、4-TND的3维Tensor。</li>
-          <li><term>Ascend 950PR&950DT系列产品</term>：支持1-BSND、2-SBND、3-BNSD的4维Tensor, 4-TND的3维Tensor。</li>
+          <li><term>Ascend 950PR&950DT系列产品</term>：支持1-BSND、2-SBND、3-BNSD的4维Tensor，4-TND的3维Tensor。</li>
         </ul>
       </td>
       <td>int64</td>
@@ -438,7 +438,7 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
   - layout为1时，queryRef、keyRef、cos、sin输入shape的前2维（B、S）必须相等；layout为4时，第1维（T）必须相等。
   - queryRef、keyRef输入shape的最后一维（D）必须相等，cos、sin输入shape的最后一维（D）必须相等。
   - 输入张量queryRef、keyRef、cos、sin的dtype必须相同。
-  - layout为1时，输入queryRef的shape用（q_b, q_s, q_n, q_d）表示，keyRef shape用（q_b, q_s, k_n, q_d）表示，cos和sin shape用（q_b, q_s, 1, cos_d）表示。其中，b表示batch_size，s表示seq_length，n表示head_num，d表示head_dim。layout为4时，输入queryRef的shape用（q_t, q_n, q_d）表示，keyRef shape用（q_t, k_n, q_d）表示，cos和sin shape用（q_t, 1, cos_d）表示。其中，t表示b和s合轴，n表示head_num，d表示head_dim
+  - layout为1时，输入queryRef的shape用（q_b, q_s, q_n, q_d）表示，keyRef的shape用（q_b, q_s, k_n, q_d）表示，cos和sin的shape用（q_b, q_s, 1, cos_d）表示。其中，b表示batch_size，s表示seq_length，n表示head_num，d表示head_dim。layout为4时，输入queryRef的shape用（q_t, q_n, q_d）表示，keyRef的shape用（q_t, k_n, q_d）表示，cos和sin的shape用（q_t, 1, cos_d）表示。其中，t表示b和s合轴，n表示head_num，d表示head_dim。
 
     - 当输入是BFLOAT16时，cast表示为1，castSize为4，DtypeSize为2
     - 当输入是FLOAT16或FLOAT32时，cast表示为0，castSize = DtypeSize（FLOAT16时为2，FLOAT32时为4）
@@ -460,7 +460,7 @@ aclnnStatus aclnnApplyRotaryPosEmbV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 #include "acl/acl.h"
 #include "aclnnop/aclnn_apply_rotary_pos_emb_v2.h"
 #include <iostream>

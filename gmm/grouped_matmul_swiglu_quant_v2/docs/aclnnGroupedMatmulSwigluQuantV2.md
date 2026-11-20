@@ -23,14 +23,14 @@
 
 ## 功能说明
 
-- 接口功能：融合GroupedMatmul、dequant、swiglu和quant，详细解释见计算公式。
+- 接口功能：融合GroupedMatmul、dequant、SwiGLU和quant，详细解释见计算公式。
 
   相较于[aclnnGroupedMatmulSwigluQuant](../../grouped_matmul_swiglu_quant/docs/aclnnGroupedMatmulSwigluQuant.md)接口，**此接口新增：**
 
     <!-- npu="950" id7 -->
     - <term>Ascend 950PR&950DT系列产品</term>：
       - 新增了MXFP8、MXFP4、Pertoken量化场景。
-      - 参数weight, weightScale, weightAssistMatrix的字段类型变为tensorlist，请根据实际情况选择合适的接口。
+      - 参数weight、weightScale、weightAssistMatrix的字段类型变为TensorList，请根据实际情况选择合适的接口。
     <!-- end id7 -->
 
 - 计算公式：
@@ -62,22 +62,22 @@
 
       - **计算过程**
 
-        - 1.根据groupList[i]确定当前分组的token ，$i \in [0,Len(groupList)]$。
+        - 1.根据groupList[i]确定当前分组的token，$i \in [0,Len(groupList)]$。
 
           >例子：假设groupList=[3,4,4,6]、groupListType=cumsum或groupList=[3,1,0,2]、groupListType=count。
           >
           >注：以上两种不同的分组方式，实际为相同的分组结果。
           >
-          >第0个右矩阵`W[0,:,:]`，对应索引位置[0,3)的token`x[0:3]`（共3-0=3个token），对应`x_scale[0:3]`、`w_scale[0]`、`bias[0]`、`offset[0]`、`Q[0:3]`、`Q_scale[0:3]`、`Q_offset[0:3]`；
+          >第0个右矩阵`W[0,:,:]`，对应索引位置[0,3)的token`x[0:3]`（共3-0=3个token），对应`x_scale[0:3]`、`w_scale[0]`、`bias[0]`、`offset[0]`、`Q[0:3]`、`Q_scale[0:3]`、`Q_offset[0:3]`。
           >
-          >第1个右矩阵`W[1,:,:]`，对应索引位置[3,4)的token`x[3:4]`（共4-3=1个token），对应`x_scale[3:4]`、`w_scale[1]`、`bias[1]`、`offset[1]`、`Q[3:4]`、`Q_scale[3:4]`、`Q_offset[3:4]`；
+          >第1个右矩阵`W[1,:,:]`，对应索引位置[3,4)的token`x[3:4]`（共4-3=1个token），对应`x_scale[3:4]`、`w_scale[1]`、`bias[1]`、`offset[1]`、`Q[3:4]`、`Q_scale[3:4]`、`Q_offset[3:4]`。
           >
-          >第2个右矩阵`W[2,:,:]`，对应索引位置[4,4)的token`x[4:4]`（共4-4=0个token），对应`x_scale[4:4]`、`w_scale[2]`、`bias[2]`、`offset[2]`、`Q[4:4]`、`Q_scale[4:4]`、`Q_offset[4:4]`；
+          >第2个右矩阵`W[2,:,:]`，对应索引位置[4,4)的token`x[4:4]`（共4-4=0个token），对应`x_scale[4:4]`、`w_scale[2]`、`bias[2]`、`offset[2]`、`Q[4:4]`、`Q_scale[4:4]`、`Q_offset[4:4]`。
           >
-          >第3个右矩阵`W[3,:,:]`，对应索引位置[4,6)的token`x[4:6]`（共6-4=2个token），对应`x_scale[4:6]`、`w_scale[3]`、`bias[3]`、`offset[3]`、`Q[4:6]`、`Q_scale[4:6]`、`Q_offset[4:6]`；
+          >第3个右矩阵`W[3,:,:]`，对应索引位置[4,6)的token`x[4:6]`（共6-4=2个token），对应`x_scale[4:6]`、`w_scale[3]`、`bias[3]`、`offset[3]`、`Q[4:6]`、`Q_scale[4:6]`、`Q_offset[4:6]`。
           >
           >注：grouplist中未指定的部分将不会参与更新。
-          >例如当groupList=[12,14,18]、GroupListType=cumsum，X的shape为[30，:]时。
+          >例如当groupList=[12,14,18]、groupListType=cumsum，X的shape为[30，:]时。
           >
           >则第一个输出Q的shape为[30，:]，其中Q[18:，：]的部分不会进行更新和初始化，其中数据为显存空间申请时的原数据。
           >
@@ -93,7 +93,7 @@
 
           $S_{i}=Swish(C_{i,act})\odot gate_{i}$  &nbsp;&nbsp;其中$Swish(x)=\frac{x}{1+e^{-x}}$
 
-        - 3.量化输出结果
+        - 4.量化输出结果
 
           $Q\_scale_{i} = \frac{max(|S_{i}|)}{127}$
 
@@ -139,7 +139,7 @@
           - 3.1.将左矩阵$\mathbb{Z_8}$，转变为高低位两部分的$\mathbb{Z_4}$
             $X\_high\_4bits_{i} = \lfloor \frac{X_{i}}{16} \rfloor$
             $X\_low\_4bits_{i} = X_{i} \& 0x0f - 8$
-          - 3.2.做矩阵乘时，开启per-channel或per-group量化
+          - 3.2.做矩阵乘时，开启per-channel或per-group量化。
             per-channel：
 
             $C\_high_{i} = (X\_high\_4bits_{i} \cdot W_{i}) \odot w\_scale_{i}$
@@ -152,7 +152,7 @@
 
             $C\_low_{i} = \\ Σ_{k=0}^{K-1}((X\_low\_4bits_{i}[:, k * num\_per\_group : (k+1) * num\_per\_group] \cdot W_{i}[k *   num\_per\_group : (k+1) * num\_per\_group, :]) \odot w\_scale_{i}[k, :] )$
 
-          - 3.3.将高低位的矩阵乘结果还原为整体的结果
+          - 3.3.将高低位的矩阵乘结果还原为整体的结果。
 
             $C_{i} = (C\_high_{i} * 16 + C\_low_{i} + weightAssistMatrix_{i}) \odot x\_scale_{i}$
 
@@ -160,7 +160,7 @@
 
             $S_{i}=Swish(C_{i,act})\odot gate_{i}$  &nbsp;&nbsp;其中$Swish(x)=\frac{x}{1+e^{-x}}$
 
-        - 3.量化输出结果
+        - 4.量化输出结果
 
           $Q\_scale_{i} = \frac{max(|S_{i}|)}{127}$
 
@@ -193,7 +193,7 @@
 
       - **计算过程**
 
-        - 1.根据groupList[i]确定当前分组的token ，$i \in [0,Len(groupList)]$。
+        - 1.根据groupList[i]确定当前分组的token，$i \in [0,Len(groupList)]$。
           - 分组逻辑与A8W8相同。
 
         - 2.根据分组确定的入参进行如下计算：
@@ -206,7 +206,7 @@
 
           $S_{i} = S_{i} \odot smoothScale_{i\ Broadcast}$
 
-        - 3.量化输出结果
+        - 4.量化输出结果
 
           $Q\_scale_{i} = \frac{max(|S_{i}|)}{127}$
 
@@ -227,7 +227,7 @@
 
         * $X∈\mathbb{Z_8}^{M \times K}$：激活矩阵（左矩阵），M是总token数，K是特征维度。
         * $W∈\mathbb{Z_8}^{E \times K \times N}$：分组权重矩阵（右矩阵），E是专家个数，K是特征维度，N是输出维度。
-        * $w\_scale∈\mathbb{R}^{E \times ceil(K / 64) \times N \times 2}$：分组权重矩阵（右矩阵）的逐通道缩放因子，E是专家个数，K是特征维度， N是输出维度。
+        * $w\_scale∈\mathbb{R}^{E \times ceil(K / 64) \times N \times 2}$：分组权重矩阵（右矩阵）的逐通道缩放因子，E是专家个数，K是特征维度，N是输出维度。
         * $x\_scale∈\mathbb{R}^{M \times ceil(K / 64) \times 2}$：激活矩阵（左矩阵）的逐token缩放因子，M是总token数，K是特征维度。
         * $grouplist∈\mathbb{N}^{E}$：cumsum或count的分组索引列表。
       - **输出**：
@@ -235,7 +235,7 @@
         * $Q∈\mathbb{Z_8}^{M \times N / 2}$：量化后的输出矩阵。
         * $Q\_scale∈\mathbb{R}^{M \times ceil((N / 2) / 64) \times 2}$：量化缩放因子。
       - **计算过程**
-        - 1.根据groupList[i]确定当前分组的token ，$i \in [0,Len(groupList)]$
+        - 1.根据groupList[i]确定当前分组的token，$i \in [0,Len(groupList)]$
 
         - 2.根据分组确定的入参进行如下计算：
 
@@ -245,14 +245,14 @@
 
           $S_{i}=Swish(C_{i,act})\odot gate_{i}$，其中$Swish(x)=\frac{x}{1+e^{-x}}$
 
-        - 3.量化输出结果
+        - 4.量化输出结果
 
           $shared\_exp = \left\lfloor \log_2(max_i(|S_i|)) \right\rceil - emax$
 
           $QScale = 2 ^ {shared\_exp}$
 
           $Q_i = quantize\_to\_element\_format(S_i/Qscale), \space i\space from\space 1\space to\space blocksize$
-          - $emax$: 对应数据类型的最大正则数的指数位。
+          - $emax$: 对应数据类型的最大正规数的指数位。
 
             |   DataType    | emax |
             | :-----------: | :--: |
@@ -282,9 +282,9 @@
         * $Q∈\mathbb{Z_8}^{M \times N / 2}$：量化后的输出矩阵。
         * $Q\_scale∈\mathbb{R}^{M}$：量化缩放因子。
       - **计算过程**
-        - 1.根据groupList[i]确定当前分组的token ，$i \in [0,Len(groupList)]$
+        - 1.根据groupList[i]确定当前分组的token，$i \in [0,Len(groupList)]$
 
-           - 2.根据分组确定的入参进行如下计算：
+        - 2.根据分组确定的入参进行如下计算：
 
              $C_{i} = (X_{i}\cdot W_{i} )\odot xScale_{i} \odot wScale_{i}$
 
@@ -292,8 +292,8 @@
 
              $S_{i}=Swish(C_{i,act})\odot gate_{i}$，其中$Swish(x)=\frac{x}{1+e^{-x}}$
 
-             其中，$xScale_{i}$代表的是对应token对的量化因子
-           - 3.量化输出结果
+             其中，$xScale_{i}$代表的是对应token的量化因子
+           - 4.量化输出结果
 
              $Q\_scale_{i} = \frac{max(|S_{i}|)}{max(type)}$
 
@@ -306,7 +306,7 @@
 
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnGroupedMatmulSwigluQuantV2GetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnGroupedMatmulSwigluQuantV2”接口执行计算。
 
-```Cpp
+```cpp
 aclnnStatus aclnnGroupedMatmulSwigluQuantV2GetWorkspaceSize(
     const aclTensor     *x,
     const aclTensorList *weight,
@@ -327,7 +327,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2GetWorkspaceSize(
     aclOpExecutor       **executor)
 ```
 
-```Cpp
+```cpp
 aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
     void          *workspace,
     uint64_t       workspaceSize,
@@ -509,7 +509,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
         <td>tuningConfigOptional</td>
         <td rowspan="1">可选输入</td>
         <td>用于算子预估M/E的大小，走不同的算子模板，以适配不同场景性能要求。</td>
-        <td>数组，传入的第一个数字表示各个专家处理的token数的预期值，用于优化tiling，A4W4 右矩阵NZ输入时开启，其他输入请传入空指针。</td>
+        <td>数组，传入的第一个数字表示各个专家处理的token数的预期值，用于优化tiling，A4W4右矩阵NZ输入时开启，其他输入请传入空指针。</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -560,18 +560,18 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
 
     <!-- npu="A3,910b" id10 -->
     - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-      - 上表数据类型列中的角标“1”代表该系列不支持的数据类型
+      - 上表数据类型列中的角标“1”代表该系列不支持的数据类型。
       - weight在A4W4下支持NZ输入转置，其他场景仅支持非转置。INT32为A8W4和A4W4场景下的适配用途，实际1个INT32会被解释为8个INT4数据，A8W8场景不支持ND数据格式。
-      - 支持dequantMode参数：A8W4和A4W4场景支持取值0和1；A8W8场景下该参数不参与校验，传入非0取值会被忽略且不报错，固定按激活矩阵per-token、权重矩阵per-channel的反量化方式计算，建议传0。
-      - A8W4和A4W4场景不支持dequantDtype和quantMode参数；A8W8场景下dequantDtype不参与校验，传入任意取值会被忽略且不报错，建议传28（表示UNDEFINED）。
-      - A8W8场景下bias不参与校验，传入非空指针时会被忽略且不报错，偏移值不参与计算，需传空指针；A8W8场景下weightScale的数据格式不参与校验，算子内部按ND线性布局读取数据，需传入ND格式。
+      - 支持dequantMode参数：A8W4和A4W4场景支持取值0和1。A8W8场景下该参数不参与校验，传入非0取值会被忽略且不报错，固定按激活矩阵per-token、权重矩阵per-channel的反量化方式计算，建议传0。
+      - A8W4和A4W4场景不支持dequantDtype和quantMode参数。A8W8场景下dequantDtype不参与校验，传入任意取值会被忽略且不报错，建议传28（表示UNDEFINED）。
+      - A8W8场景下bias不参与校验，传入非空指针时会被忽略且不报错，偏移值不参与计算，需传空指针。A8W8场景下weightScale的数据格式不参与校验，算子内部按ND线性布局读取数据，需传入ND格式。
       - x和weight不支持空Tensor。
-      - weight NZ转置输入时，仅支持单Tensor模式
+      - weight NZ转置输入时，仅支持单Tensor模式。
       - weight、weightScale和weightAssistMatrix支持单Tensor场景（tensorlist长度为1）和多Tensor场景（tensorlist长度大于1）。
     <!-- end id10 -->
     <!-- npu="950" id11 -->
     - <term>Ascend 950PR&950DT系列产品</term>：
-      - 上表数据类型列中的角标“2”代表该系列不支持的数据类型
+      - 上表数据类型列中的角标“2”代表该系列不支持的数据类型。
       - weight支持转置，格式仅支持ND，不支持FRACTAL_NZ。
       - 支持dequantMode参数：MX量化场景支持取值2，Pertoken场景支持取值为0。
       - 支持dequantDtype参数：MX量化场景支持取值0，Pertoken场景支持取值为0、1、27。
@@ -820,7 +820,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
   - <term>Ascend 950PR&950DT系列产品</term>：
     - groupList第1维最大支持1024，即最多支持1024个group。
     - MX量化场景下需满足以下约束条件：
-        - 数据类型需要满足下表。表中MXFP4的ND和FRACTAL_NZ表示weight的存储格式。weight采用FRACTAL_NZ时，x和weight可独立选择FLOAT4_E2M1或FLOAT4_E1M2；两种交叉组合（x为FLOAT4_E2M1、weight为FLOAT4_E1M2，以及x为FLOAT4_E1M2、weight为FLOAT4_E2M1）均受支持。
+        - 数据类型需要满足下表。表中MXFP4的ND和FRACTAL_NZ表示weight的存储格式。weight采用FRACTAL_NZ时，x和weight可独立选择FLOAT4_E2M1或FLOAT4_E1M2。两种交叉组合（x为FLOAT4_E2M1、weight为FLOAT4_E1M2，以及x为FLOAT4_E1M2、weight为FLOAT4_E2M1）均受支持。
           <table style="undefined;table-layout: fixed; width: 1134px"><colgroup>
           <col style="width: 130px">
           <col style="width: 130px">
@@ -906,7 +906,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
           </table>
 
         - weightScale转置属性需要与weight保持一致。
-        - MX量化场景下，当输入为fp8数据类型时，需满足N为2对齐；当输入为fp4数据类型时，需满足N为4对齐。
+        - MX量化场景下，当输入为fp8数据类型时，需满足N为2对齐。当输入为fp4数据类型时，需满足N为4对齐。
         - MXFP4场景不支持K=2。
         - MXFP4场景需满足K为偶数。
 

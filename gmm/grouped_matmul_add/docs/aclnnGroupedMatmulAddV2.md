@@ -82,7 +82,7 @@ aclnnStatus aclnnGroupedMatmulAddV2(
       <th>使用说明</th>
       <th>数据类型</th>
       <th>数据格式</th>
-      <th style="white-space: nowrap">维度(shape)</th>
+      <th style="white-space: nowrap">维度（shape）</th>
       <th>非连续的Tensor</th>
     </tr>
   </thead>
@@ -242,7 +242,9 @@ aclnnStatus aclnnGroupedMatmulAddV2(
       <td rowspan="2">161002</td>
       <td>x、weight、groupList、yRef的数据类型或数据格式不在支持的范围之内。</td>
     </tr>
+      <tr>
       <td>x与weight的数据类型不一致。</td>
+    </tr>
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161002</td>
@@ -282,7 +284,7 @@ aclnnStatus aclnnGroupedMatmulAddV2(
 - groupList第1维最大支持1024，即最多支持1024个group。
 
 <!-- npu="A3,910b" id7 -->
-### Atlas A3/A2 系列产品
+### Atlas A3/A2系列产品
 
 - x和weight中每一组tensor的最后一维大小都应小于65536。$x$的最后一维指当x不转置时$x$的K轴或当x转置时$x$的M轴。$weight$的最后一维指当weight不转置时$weight$的N轴或当weight转置时$weight$的K轴。
 <!-- end id7 -->
@@ -291,7 +293,7 @@ aclnnStatus aclnnGroupedMatmulAddV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```c++
+```cpp
 #include <iostream>
 #include <vector>
 #include <memory>

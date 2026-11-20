@@ -4,7 +4,7 @@
 
 - 如需编译执行算子API，请确保基础环境已搭建完成，包括驱动、固件、CANN软件包、ops包等。
 
-- 算子API的调用流程和编译运行操作详情请参见[《应用开发（C&C++）》](https://hiascend.com/document/redirect/CannCommunityCppInferWizard)中“单算子调用>单算子API执行>调用aclnn接口示例代码”。
+- 算子API的调用流程和编译运行操作详情请参见《[应用开发（C&C++）](https://hiascend.com/document/redirect/CannCommunityCppInferWizard)》中“单算子调用>单算子API执行>调用aclnn接口示例代码”。
 
 ## 编译前准备
 
@@ -35,7 +35,7 @@
 
 - **CMakeLists文件**
 
-    CMake文件示例如下，请根据实际情况修改：
+    CMakeLists.txt文件示例如下，请根据实际情况修改：
 
     ```bash
     # Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
@@ -118,7 +118,7 @@
   1. 提前准备好算子的调用代码（\*.cpp）和编译脚本（CMakeLists.txt）。
   2. 配置环境变量。
 
-     安装CANN软件后，使用CANN运行用户登录环境，执行如下命令生效环境变量。
+     安装CANN软件后，使用CANN运行用户登录环境，执行如下命令使环境变量生效。
 
         ```bash
         source ${INSTALL_DIR}/set_env.sh
@@ -177,7 +177,7 @@
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnFlashAttentionScoreGetWorkspaceSize failed. ERROR: %d.\n[ERROR msg]%s", ret, aclGetRecentErrMsg()); return ret);
         ```
 
-        上述构造空指针问题获取报错信息示例如下:
+        上述构造空指针问题获取报错信息示例如下：
 
         ```text
         aclnnFlashAttentionScoreGetWorkspaceSize failed. ERROR: 161001

@@ -125,7 +125,7 @@ aclnnStatus aclnnNsaCompressGrad(
       <tr>
         <td>actSeqLenOptionalOptional</td>
         <td>输入</td>
-        <td>描述每个Batch对应的S大小。当前必须显式传入非nullptr参数，单batch长度为S时传入[S]。</td>
+        <td>描述每个batch对应的S大小。当前必须显式传入非nullptr参数，单batch长度为S时传入[S]。</td>
         <td>-</td>
         <td>INT64</td>
         <td>ND</td>
@@ -155,7 +155,7 @@ aclnnStatus aclnnNsaCompressGrad(
       <tr>
         <td>actSeqLenType</td>
         <td>输入</td>
-        <td>序列长度的表示方式，取值为0或1。0表示actSeqLenOptionalOptional为各batch序列长度的累积和，1表示各batch的独立序列长度，当前建议使用0。例如batch长度为64、80时，取值0对应[64, 144]，取值1对应[64, 80]。</td>
+        <td>序列长度的表示方式，取值为0或1。0表示actSeqLenOptional为各batch序列长度的累积和，1表示各batch的独立序列长度，当前建议使用0。例如batch长度为64、80时，取值0对应[64, 144]，取值1对应[64, 80]。</td>
         <td>-</td>
         <td>INT64</td>
         <td>-</td>
@@ -306,7 +306,7 @@ aclnnStatus aclnnNsaCompressGrad(
 - 确定性计算：
   - aclnnNsaCompressGrad默认确定性实现。
 - 本接口不支持非连续输出。
-- compressBlockSize和compressStride必须是16的整数倍，且compressBlockSize >= compressStride
+- compressBlockSize和compressStride必须是16的整数倍，且compressBlockSize >= compressStride。
 
 ## 调用示例
 

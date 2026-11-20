@@ -23,10 +23,10 @@
 
 ## 功能说明
 
-- 算子功能：（多模态）transformer注意力机制中，针对query、key和Value实现归一化（Norm）、旋转位置编码（Rope）、特征拼接（Concat）融合算子功能反向推导：
+- 算子功能：（多模态）transformer注意力机制中，针对query、key和value实现归一化（Norm）、旋转位置编码（Rope）、特征拼接（Concat）融合算子功能反向推导：
 
     - 归一化（Norm）当前支持层归一化（LayerNorm）和带仿射变换参数层归一化（AFFINE LayerNorm）类型。
-    - 旋转位置编码（Rope）支持Interleave和Half类型。
+    - 旋转位置编码（RoPE）支持Interleave和Half类型。
 
 - 计算公式：
 
@@ -46,7 +46,7 @@
         \right\}
     $$
 
-    - **其中（μ为均值，σ^2为方差）:**
+    - **其中（μ为均值，σ^2为方差）：**
     $$
       \hat{x} = \frac{x - \mu}{\sqrt{\sigma^2 + \epsilon}}, \quad \quad \frac{\partial L}{\partial \hat{x}} = \frac{\partial L}{\partial y} \odot \gamma, \quad \quad \text{rstd} = \frac{1}{\sqrt{\sigma^2 + \epsilon}}
     $$
@@ -61,13 +61,13 @@
         \frac{\partial L}{\partial x} = \frac{\partial L}{\partial y} \cdot \text{cos} + Half({\frac{\partial L}{\partial y} \cdot \text{sin}}) \odot  \text{negMask}
     $$
 
-    - **其中，Interleave()表示headDim维度奇数与偶数位置交替重组，Half()表示headDim维度后一半与前一半整体重组（即先取后一半、再取前一半），例如x = [0,1,2,3,4,5,6,7],则Interleave(x) = [1,0,3,2,5,4,7,6]，Half(x)=[4,5,6,7,0,1,2,3]；negMask长度与headDim一致，取值随RoPE模式变化：Interleave模式下偶数位为1、奇数位为-1，即(1, -1, 1, -1, 1, ...)；Half模式下前一半为1、后一半为-1，即(1, ..., 1, -1, ..., -1)**
+    - **其中，Interleave()表示headDim维度奇数与偶数位置交替重组，Half()表示headDim维度后一半与前一半整体重组（即先取后一半、再取前一半），例如x = [0,1,2,3,4,5,6,7]，则Interleave(x) = [1,0,3,2,5,4,7,6]，Half(x)=[4,5,6,7,0,1,2,3]；negMask长度与headDim一致，取值随RoPE模式变化：Interleave模式下偶数位为1、奇数位为-1，即(1, -1, 1, -1, 1, ...)；Half模式下前一半为1、后一半为-1，即(1, ..., 1, -1, ..., -1)**
 
 ## 函数原型
 
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnNormRopeConcatBackwardGetWorkspaceSize”接口获取入参并根据计算流程计算所需workspace大小，再调用“aclnnNormRopeConcatBackward”接口执行计算。
 
-```Cpp
+```cpp
 aclnnStatus aclnnNormRopeConcatBackwardGetWorkspaceSize(
     const aclTensor *gradQueryOutput,
     const aclTensor *gradKeyOutput,
@@ -220,7 +220,7 @@ aclnnStatus aclnnNormRopeConcatBackward(
           <td>normQueryWeight</td>
           <td>可选输入</td>
           <td>正向query进行归一化操作的权重值，对应公式中的γ。</td>
-          <td>当图片Query、Key进行带仿射LayerNorm归一化操作时传入，数据类型与参数gradQueryOutput保持一致。</td>
+          <td>当图片Query、Key进行带仿射变换参数层归一化操作时传入，数据类型与参数gradQueryOutput保持一致。</td>
           <td>FLOAT32、FLOAT16、BFLOAT16</td>
           <td>ND</td>
           <td>[headDim]</td>
@@ -510,7 +510,7 @@ aclnnStatus aclnnNormRopeConcatBackward(
           <td>gradNormAddedQueryBias</td>
           <td>可选输出</td>
           <td>公式中网络层对正向输入encoderQuery进行归一化操作的β偏移反向梯度值。</td>
-          <td>当文本Query、Key进行带仿射LayerNorm归一化操作时输出，数据类型与参数gradQueryOutput保持一致</td>
+          <td>当文本Query、Key进行带仿射LayerNorm归一化操作时输出，数据类型与参数gradQueryOutput保持一致。</td>
           <td>FLOAT32、FLOAT16、BFLOAT16</td>
           <td>ND</td>
           <td>[headDim]</td>
@@ -645,7 +645,7 @@ aclnnStatus aclnnNormRopeConcatBackward(
 
   通过aclnn单算子调用示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-    ```c++
+    ```cpp
     #include <algorithm>
     #include <cstdint>
     #include <iostream>

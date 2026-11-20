@@ -137,7 +137,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <tr>
     <td>cuSeqlensQOptional（aclTensor*）</td>
     <td>输入</td>
-    <td>Q为TND时为各Batch有效token数的累计和；Q为BSND时为[0, 各样本有效Q长度]，长度各自不超过S1</td>
+    <td>Q为TND时为各Batch有效token数的累计和；Q为BSND时为[0, 各样本有效Q长度]，长度各自不超过S1。</td>
     <td><ul><li>shape约束为长度为B+1的一维tensor。</li><li>不能出现负值。</li></ul></td>
     <td>INT32</td>
     <td>ND</td>
@@ -188,7 +188,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>blockTableOptional（aclTensor*）</td>
     <td>输入</td>
     <td>表示PageAttention中KV存储使用的block映射表。</td>
-    <td><ul><li>不支持空tensor。</li><li>PageAttention场景下，blockTableOptional必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个batch中最大的序列长度对应的block数量）</li></ul></td>
+    <td><ul><li>不支持空tensor。</li><li>PageAttention场景下，blockTableOptional必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个batch中最大的序列长度对应的block数量）。</li></ul></td>
     <td>INT32</td>
     <td>ND</td>
     <td>2</td>
@@ -199,7 +199,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>输入</td>
     <td>表示topK结果输出索引所需要加上的偏移。支持的shape为：
         <ul><li>layoutQOptional为"BSND"时shape为[B, S1, N2]。</li><li>layoutQOptional为"TND"时shape为[T1, N2]。</li></ul></td>
-    <td><ul><li>值必须大于等于0。</li><li>加上偏移后，topK index不能超过int32最大值</li></ul></td>
+    <td><ul><li>值必须大于等于0。</li><li>加上偏移后，topK index不能超过int32最大值。</li></ul></td>
     <td>INT32</td>
     <td>ND</td>
     <td>2-3</td>
@@ -269,7 +269,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <tr>
     <td>cmpRatio（int64_t）</td>
     <td>输入</td>
-    <td>用于稀疏计算，表示k的压缩倍数。</td>
+    <td>用于稀疏计算，表示k的压缩率。</td>
     <td><ul><li>支持[1, 128]。</li></ul></td>
     <td>INT64</td>
     <td>-</td>
@@ -332,7 +332,7 @@ aclnnStatus aclnnLightningIndexerV2(
     </table>
 
   - q、k、w参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、N（Head Num）表示多头数、D（Head Dim）表示hidden层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
-  - 使用S1和S2分别表示q和k的输入样本序列长度，N1和N2分别表示q和k对应的多头数，k表示最后选取的索引个数。参数q中的D和参数k中的D值相等为128。T1和T2分别表示q和k的输入样本序列长度的累加和。
+  - 使用S1和S2分别表示q和k的输入样本序列长度，N1和N2分别表示q和k对应的多头数，topk表示最后选取的索引个数。参数q中的D和参数k中的D值相等为128。T1和T2分别表示q和k的输入样本序列长度的累加和。
 
 - **返回值：**
 
@@ -411,7 +411,7 @@ aclnnStatus aclnnLightningIndexerV2(
 
 - 确定性计算与batch一致性：
   - 默认确定性实现，相同输入多次调用结果一致。
-  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：batch一致性：通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3来开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。
+  - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：batch一致性，通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3来开启batch一致性，开启后可以保证计算结果和所在批次大小、位置无关。
 
 - 参数q的N支持1~64，k的N支持1。
 - headdim支持128。
@@ -423,7 +423,7 @@ aclnnStatus aclnnLightningIndexerV2(
 <!-- npu="A3,910b" id7 -->
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - topk取值范围当前仅支持[1, 2048]，以及3072、4096、5120、6144、7168、8192。
-  - Q为BSND时，cuSeqlensQOptional可选；不传使用S1，传入格式为[0, 各样本有效Q长度…]，长度各自不超过S1。
+  - Q为BSND时，cuSeqlensQOptional可选；不传使用S1，传入格式为[0, 各样本有效Q长度…]，长度各自不超过S1
   - Q为TND时，cuSeqlensQOptional必传，使用累计长度，相邻值之差为样本长度。
   - K为BSND时，cuSeqlensKOptional不传；sequsedKOptional可选，不传使用S2，传入使用各样本有效K长度。
   - K为TND时，cuSeqlensKOptional必传，使用累计长度，相邻值之差为样本长度。
@@ -434,7 +434,7 @@ aclnnStatus aclnnLightningIndexerV2(
 - <term>Ascend 950PR&950DT系列产品</term>：
   - 当传入的参数layoutQOptional为BSND时，不支持传入cuSeqlensQOptional；当layoutKOptional为BSND或PA_BBND时，不支持传入cuSeqlensKOptional。
   - 当传入参数outputIdxOffsetOptional时，支持大于等于0的索引偏移值；且应满足约束：加上传入的索引偏移值后，得到的sparseIndicesOut值不超过INT32的最大值。
-  - 当传入的参数layoutQOptional为TND时，必须传入cuSeqlensQOptional，如果也传入sequsedQOptional，应保证由sequsedQOptional传入的各个batch的q长度不超过根据cuSeqlensQOptional计算出的各个batch的q序列长度。当某个batch由sequsedQOptional传入的q序列长度seqlen1小于由cuSeqlensQOptional计算出的q长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的q输出的sparseIndicesOut和sparseValuesOut全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。
+  - 当传入的参数layoutQOptional为TND时，必须传入cuSeqlensQOptional，如果也传入sequsedQOptional，应保证由sequsedQOptional传入的各个batch的q长度不超过根据cuSeqlensQOptional计算出的各个batch的q序列长度。当某个batch由sequsedQOptional传入的q序列长度seqlen1小于由cuSeqlensQOptional计算出的q长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的q输出的sparseIndicesOut和sparseValuesOut全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致AI Core执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。
   - 当传入的cmpRatio > 1且maskMode = 3时，必须传入cmpResidualKOptional，其余情况不传入。
   - 当传入的参数layoutKOptional为PA_BBND时，必须传入sequsedKOptional。
   - 参数metadataOptional必须传入。

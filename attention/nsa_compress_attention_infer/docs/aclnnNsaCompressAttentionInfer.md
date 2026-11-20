@@ -86,14 +86,14 @@ aclnnStatus aclnnNsaCompressAttentionInfer(
 
   <table style="undefined;table-layout: fixed; width: 1567px">
   <colgroup>
-    <col style="width: 170px">  <!-- 参数名 -->
-    <col style="width: 120px">  <!-- 输入/输出 -->
-    <col style="width: 300px">  <!-- 描述 -->
-    <col style="width: 330px">  <!-- 使用说明 -->
-    <col style="width: 212px">  <!-- 数据类型 -->
-    <col style="width: 100px">  <!-- 数据格式 -->
-    <col style="width: 190px">  <!-- 维度(shape) -->
-    <col style="width: 145px">  <!-- 非连续的tensor -->
+    <col style="width: 170px"> <!-- 参数名 -->
+    <col style="width: 120px"> <!-- 输入/输出 -->
+    <col style="width: 300px"> <!-- 描述 -->
+    <col style="width: 330px"> <!-- 使用说明 -->
+    <col style="width: 212px"> <!-- 数据类型 -->
+    <col style="width: 100px"> <!-- 数据格式 -->
+    <col style="width: 190px"> <!-- 维度(shape) -->
+    <col style="width: 145px"> <!-- 非连续的tensor -->
   </colgroup>
   <thead>
     <tr>
@@ -118,7 +118,7 @@ aclnnStatus aclnnNsaCompressAttentionInfer(
           <li>query的S轴小于等于4。</li>
           <li>query中的N和numHeads值相等，且N轴必须是key/value的N轴（H/D）的整数倍，此外，query的N轴与key/value的N轴（H/D）的比值（即GQA中的group大小）小于等于128，且128是group的整数倍。</li>
           <li>query中的D和key的D(H/numKeyValueHeads)值相等，小于等于192且大于等于value的D轴。</li>
-          <li>query，key，value输入的数据类型完全相同，为FLOAT16或BFLOAT16。</li>
+          <li>query、key、value输入的数据类型完全相同，为FLOAT16或BFLOAT16。</li>
         </ul>
       </td>
       <td>FLOAT16、BFLOAT16</td>
@@ -166,7 +166,7 @@ aclnnStatus aclnnNsaCompressAttentionInfer(
       <td>attentionMaskOptional</td>
       <td>可选输入</td>
       <td>attention掩码矩阵。</td>
-      <td>仅在Q_S大于1的情况下生效</td>
+      <td>仅在Q_S大于1的情况下生效。</td>
       <td>-</td>
       <td>ND</td>
       <td>-</td>
@@ -392,12 +392,12 @@ aclnnStatus aclnnNsaCompressAttentionInfer(
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td>query、key、value、blockTableOptional、attentionOut、topKOutput的数据类型不在支持的范围内。</td>
+      <td>query、key、value、blockTableOptional、output、topKOutput的数据类型不在支持的范围内。</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_RUNTIME_ERROR</td>
       <td>361001</td>
-      <td>API内存调用npu runtime的接口异常。</td>
+      <td>API内部调用npu runtime的接口异常。</td>
     </tr>
   </tbody>
   </table>
