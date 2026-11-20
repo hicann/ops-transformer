@@ -60,6 +60,26 @@ weight 的尾部打包 Reshape 不属于“可融合转置链”，不能随转�
 
 - 算子的 `transpose_w` 属性须为 `false`，融合后设为 `true`；已为 `true` 时不再融合。
 
+### MXFP4、MXFP8 单位轴转置的处理行为
+
+以下 K、N 均指逻辑维度。对于 MXFP4 和 MXFP8，weight 的 K 轴与 weight_scale 的量化块轴不是同一个轴；`ceil(K/64)=1` 表示只有一个量化块，并不要求 `K=1`。是否触发本 GE Pass，取决于前端优化后的两侧转置链能否配套匹配。
+
+#### MXFP4
+
+使用包含 MXFP4 单位轴适配（TorchAir PR #4001）的版本时，ND 字节载体转置路径满足其视图及布局检查后，以下场景由 TorchAir 预先处理：
+
+- 动态图：`N=1` 或 Scale 块数 `ceil(K/64)=1`，且 Scale 转置降为等价 Reshape 或两个单位轴间的转置已被省略。
+- 静态图：`N=1` 且 `ceil(K/64)=1`，Weight 转置降为等价 Reshape，Scale 两个单位轴间的转置已被省略。
+
+TorchAir 处理后已设置 `transpose_w=true`，该节点不再触发本 GE Pass；未被接管的路径仍须满足前述 GE 融合模式。上述条件不放宽算子自身的 shape 约束。
+
+#### MXFP8
+
+MXFP8 不由上述 TorchAir MXFP4 专用逻辑接管。weight 交换逻辑 N、K 轴，weight_scale 交换 N 轴与量化块轴，分别判断单位轴：
+
+- 动态图：weight 的 `K=1` 或 `N=1`，或 weight_scale 的 `N=1` 或 `ceil(K/64)=1` 时，相应的单位轴转置可能改写为 Reshape 或被省略。若优化后的两侧转置链无法配套匹配，则不触发本 GE Pass。
+- 静态图：`K=N=1` 且两侧的恒等转置均已被省略时，不触发本 GE Pass。若仍保留可配套匹配的转置链（包括等价 Reshape），则仍可触发融合。
+
 ## 支持的型号
 
 <!-- npu="950" id1 -->
