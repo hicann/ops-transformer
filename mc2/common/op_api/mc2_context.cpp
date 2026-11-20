@@ -14,10 +14,13 @@
  */
 
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <new>
+#include <set>
 #include <utility>
 #include <dlfcn.h>
 #include "acl/acl_rt.h"
@@ -40,6 +43,23 @@ constexpr const char* UB_WINDOW_TAG = "mc2_ub_window_v3";
 constexpr const char* ROCE_WINDOW_TAG = "mc2_roce_window_v3";
 
 constexpr uint32_t GROUP_RANK_NUM = 4U;
+
+#if HCOMM_VERSION_NUM >= HCOMM_BARRIER_RTP_MIN_VERSION
+constexpr std::array g_barrierProtocols = {CommProtocol::COMM_PROTOCOL_UB_MEM, CommProtocol::COMM_PROTOCOL_UB_CTP,
+                                           CommProtocol::COMM_PROTOCOL_UB_RTP, CommProtocol::COMM_PROTOCOL_ROCE};
+#else
+constexpr std::array g_barrierProtocols = {CommProtocol::COMM_PROTOCOL_UB_MEM, CommProtocol::COMM_PROTOCOL_UBC_CTP,
+                                           CommProtocol::COMM_PROTOCOL_ROCE};
+#endif
+
+bool IsBarrierUrmaProtocol(CommProtocol protocol)
+{
+    bool isUrma = protocol == CommProtocol::COMM_PROTOCOL_UBC_CTP;
+#if HCOMM_VERSION_NUM >= HCOMM_BARRIER_RTP_MIN_VERSION
+    isUrma = isUrma || protocol == CommProtocol::COMM_PROTOCOL_UB_RTP;
+#endif
+    return isUrma;
+}
 
 bool MatchesInstanceEndpoint(const EndpointDesc& linkEndpoint, const EndpointDesc& instanceEndpoint)
 {
@@ -152,6 +172,13 @@ aclnnStatus Mc2Context::LoadProtocolSymbols(CommProtocol protocol)
 
 aclnnStatus Mc2Context::LoadHcclSymbols(CommProtocol protocol)
 {
+    auto ret = LoadCommonHcclSymbols();
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    return LoadProtocolSymbols(protocol);
+}
+
+aclnnStatus Mc2Context::LoadCommonHcclSymbols()
+{
     aclnnStatus ret = OpenHcclLibrary();
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     struct SymbolInfo {
@@ -183,7 +210,18 @@ aclnnStatus Mc2Context::LoadHcclSymbols(CommProtocol protocol)
         }
     }
     OP_LOGD("All HCCL symbols loaded successfully");
-    return LoadProtocolSymbols(protocol);
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::LoadBarrierSymbols()
+{
+    auto ret = LoadCommonHcclSymbols();
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    HcclCommMemReg = GetHcclLibFunc<decltype(HcclCommMemReg)>(hcclLibHandle_, "HcclCommMemReg");
+    HcclChannelGetRemoteMems =
+        GetHcclLibFunc<decltype(HcclChannelGetRemoteMems)>(hcclLibHandle_, "HcclChannelGetRemoteMems");
+    CHECK_RET(HcclCommMemReg != nullptr && HcclChannelGetRemoteMems != nullptr, ACLNN_ERR_INNER);
+    return ACLNN_SUCCESS;
 }
 
 aclnnStatus Mc2Context::LoadTopologySymbols()
@@ -978,7 +1016,7 @@ aclnnStatus Mc2Context::CreatMc2Context(const HcclComm& hcclHandle, const std::s
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus Mc2Context::CreatMc2ContextTensor(void* ctx, aclTensor*& mc2Context)
+aclnnStatus Mc2Context::CreatMc2ContextTensor(void* ctx, aclTensor*& mc2Context, uint64_t ctxSize)
 {
     OP_LOGD("Start to create Mc2Context Tensor");
     if (ctx == nullptr) {
@@ -986,8 +1024,7 @@ aclnnStatus Mc2Context::CreatMc2ContextTensor(void* ctx, aclTensor*& mc2Context)
         return ACLNN_ERR_INNER;
     }
 
-    uint64_t mc2ContextLength = sizeof(Mc2MoeContext);
-    int64_t shape[1] = {static_cast<int64_t>(mc2ContextLength / sizeof(uint32_t))};
+    int64_t shape[1] = {static_cast<int64_t>(ctxSize / sizeof(uint32_t))};
     int64_t strides[1] = {1};
 
     mc2Context = aclCreateTensor(shape, 1, ACL_INT32, strides, 0, ACL_FORMAT_ND, shape, 1, ctx);
@@ -1389,7 +1426,487 @@ aclnnStatus Mc2Context::GetMc2ContextTensor(const char* groupEp, const char* opN
     if (rankSizePerServer != nullptr) {
         *rankSizePerServer = instance.rankSizePerServer_;
     }
-    return instance.CreatMc2ContextTensor(ctx, mc2Context);
+    return instance.CreatMc2ContextTensor(ctx, mc2Context, sizeof(Mc2MoeContext));
+}
+
+aclnnStatus Mc2Context::BarrierContext::Init(int64_t worldSize)
+{
+    auto ret = owner.HcclGetRankSize(comm, &owner.epRankSize_);
+    if (ret != HCCL_SUCCESS) {
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Failed to get barrier rank size, ret=%d", static_cast<int32_t>(ret));
+        return ACLNN_ERR_INNER;
+    }
+    if ((worldSize < Mc2Barrier::MIN_RANKS) || (worldSize > Mc2Barrier::MAX_RANKS) ||
+        (owner.epRankSize_ != static_cast<uint32_t>(worldSize))) {
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Invalid barrier group size, worldSize=%ld, ranks=%u", worldSize,
+                                owner.epRankSize_);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return owner.GetRankId(comm, rank);
+}
+
+aclnnStatus Mc2Context::BarrierContext::GetContext(const std::string& tag, void*& ctx, uint64_t& bytes)
+{
+    auto ret = owner.HcclEngineCtxGet(comm, tag.c_str(), CommEngine::COMM_ENGINE_AIV, &ctx, &bytes);
+    if (ret == HCCL_E_NOT_FOUND) {
+        void* priorState = nullptr;
+        uint64_t priorBytes = 0;
+        const auto stateRet =
+            owner.HcclEngineCtxGet(comm, tag.c_str(), CommEngine::COMM_ENGINE_CPU, &priorState, &priorBytes);
+        if (stateRet != HCCL_E_NOT_FOUND) {
+            OP_LOGE_LIBOPAPI_REPORT("Mc2Context",
+                                    "Barrier initialization is incomplete; recreate the communication "
+                                    "domain before retrying, rank=%u, tag=%s",
+                                    rank, tag.c_str());
+            return ACLNN_ERR_INNER;
+        }
+        return CreateContext(tag, ctx, bytes);
+    }
+    CHECK_RET(ret == HCCL_SUCCESS && ctx != nullptr, ACLNN_ERR_INNER);
+    void* state = nullptr;
+    uint64_t stateSize = 0;
+    ret = owner.HcclEngineCtxGet(comm, tag.c_str(), CommEngine::COMM_ENGINE_CPU, &state, &stateSize);
+    CHECK_RET(ret == HCCL_SUCCESS && state != nullptr && stateSize == sizeof(State), ACLNN_ERR_INNER);
+    const auto& cached = *static_cast<const State*>(state);
+    if (cached.context != ctx) {
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context",
+                                "Barrier context copy did not complete; recreate the communication domain, "
+                                "rank=%u, tag=%s",
+                                rank, tag.c_str());
+        return ACLNN_ERR_INNER;
+    }
+    CHECK_RET(bytes == Mc2Barrier::ContextBytes(cached.localSize, cached.railSize), ACLNN_ERR_INNER);
+    CHECK_RET(CheckTransportSupport(cached.railSize) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::BarrierContext::CreateContext(const std::string& tag, void*& ctx, uint64_t& bytes)
+{
+    auto ret = Discover();
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    bytes = Mc2Barrier::ContextBytes(local.size(), rail.size());
+    std::vector<uint64_t> storage((bytes + sizeof(uint64_t) - 1U) / sizeof(uint64_t));
+    auto& context = *new (storage.data()) Mc2Barrier::Context;
+    context.worldSize = owner.epRankSize_;
+    context.rank = rank;
+    context.localSize = local.size();
+    context.railSize = rail.size();
+    InitPeers(context);
+    void* state = nullptr;
+    auto stateRet = owner.HcclEngineCtxCreate(comm, tag.c_str(), CommEngine::COMM_ENGINE_CPU, sizeof(State), &state);
+    CHECK_RET(stateRet == HCCL_SUCCESS && state != nullptr, ACLNN_ERR_INNER);
+    auto& cached = *new (state) State{nullptr, context.localSize, context.railSize};
+    HcclMemHandle memHandle = nullptr;
+    const std::string windowTag = tag + "_buffer";
+    ret = RegisterWindow(windowTag, context, memHandle);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    ret = BuildChannels(context, windowTag, memHandle);
+    if (ret != ACLNN_SUCCESS) {
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context",
+                                "Failed to build barrier channels; recreate the communication domain, "
+                                "rank=%u, tag=%s, ret=%d",
+                                rank, tag.c_str(), static_cast<int32_t>(ret));
+        return ret;
+    }
+    OP_LOGI("Barrier resources: windowBytes=%lu, channels=%u", context.windowBytes,
+            context.localSize + context.railSize - 2U);
+    return CacheContext(tag, context, cached, ctx, bytes);
+}
+
+aclnnStatus Mc2Context::BarrierContext::CacheContext(const std::string& tag, const Mc2Barrier::Context& context,
+                                                     State& cached, void*& ctx, uint64_t bytes)
+{
+    auto ret = owner.HcclEngineCtxCreate(comm, tag.c_str(), CommEngine::COMM_ENGINE_AIV, bytes, &ctx);
+    if (ret != HCCL_SUCCESS || ctx == nullptr) {
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context",
+                                "Failed to create barrier context; recreate the communication domain, "
+                                "rank=%u, tag=%s, ret=%d",
+                                rank, tag.c_str(), static_cast<int32_t>(ret));
+        return ACLNN_ERR_INNER;
+    }
+    ret = owner.HcclEngineCtxCopy(comm, CommEngine::COMM_ENGINE_AIV, tag.c_str(), &context, bytes,
+                                  KOPY_DEFAULT_CTX_OFFSET);
+    if (ret != HCCL_SUCCESS) {
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context",
+                                "Failed to copy barrier context; recreate the communication domain, "
+                                "rank=%u, tag=%s, ret=%d",
+                                rank, tag.c_str(), static_cast<int32_t>(ret));
+        return ACLNN_ERR_INNER;
+    }
+    cached.context = ctx;
+    return ACLNN_SUCCESS;
+}
+
+void Mc2Context::BarrierContext::InitPeers(Mc2Barrier::Context& context)
+{
+    std::sort(local.begin(), local.end());
+    std::sort(rail.begin(), rail.end());
+    context.localSlot = std::lower_bound(local.begin(), local.end(), rank) - local.begin();
+    context.railSlot = std::lower_bound(rail.begin(), rail.end(), rank) - rail.begin();
+    auto* peers = reinterpret_cast<Mc2Barrier::Peer*>(&context + 1);
+    for (uint32_t i = 0; i < local.size(); ++i) {
+        new (peers + i) Mc2Barrier::Peer;
+        peers[i].rank = local[i];
+    }
+    for (uint32_t i = 0; i < rail.size(); ++i) {
+        new (peers + local.size() + i) Mc2Barrier::Peer;
+        peers[local.size() + i].rank = rail[i];
+    }
+}
+
+uint32_t Mc2Context::BarrierContext::Priority(CommProtocol protocol)
+{
+    return std::find(g_barrierProtocols.begin(), g_barrierProtocols.end(), protocol) - g_barrierProtocols.begin();
+}
+
+bool Mc2Context::BarrierContext::IsUsableLink(const CommLink& link)
+{
+    const auto& src = link.srcEndpointDesc.loc;
+    const auto& dst = link.dstEndpointDesc.loc;
+    if (src.locType != ENDPOINT_LOC_TYPE_DEVICE || dst.locType != ENDPOINT_LOC_TYPE_DEVICE) {
+        return false;
+    }
+    if (link.linkAttr.linkProtocol == CommProtocol::COMM_PROTOCOL_UB_MEM ||
+        link.linkAttr.linkProtocol == CommProtocol::COMM_PROTOCOL_ROCE) {
+        return true;
+    }
+    if (src.device.superDevId != Mc2Barrier::NO_RANK && dst.device.superDevId != Mc2Barrier::NO_RANK) {
+        return src.device.superDevId == dst.device.superDevId;
+    }
+    return src.device.devPhyId != Mc2Barrier::NO_RANK && src.device.devPhyId == dst.device.devPhyId;
+}
+
+aclnnStatus Mc2Context::BarrierContext::SelectLink(uint32_t layer, uint32_t src, uint32_t dst, CommLink& link,
+                                                   bool& found)
+{
+    CommLink* candidates = nullptr;
+    uint32_t count = 0;
+    auto ret = owner.HcclRankGraphGetLinks(comm, layer, src, dst, &candidates, &count);
+    found = false;
+    if (ret == HCCL_E_NOT_FOUND || ret == HCCL_E_NOT_SUPPORT) {
+        return ACLNN_SUCCESS;
+    }
+    CHECK_RET(ret == HCCL_SUCCESS && (count == 0 || candidates != nullptr), ACLNN_ERR_INNER);
+    for (CommProtocol protocol : g_barrierProtocols) {
+        for (uint32_t i = 0; i < count; ++i) {
+            if (candidates[i].linkAttr.linkProtocol == protocol && IsUsableLink(candidates[i])) {
+                link = candidates[i];
+                found = true;
+                return ACLNN_SUCCESS;
+            }
+        }
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::BarrierContext::DiscoverLayer(uint32_t layer)
+{
+    LayerRanks layerRanks;
+    auto ret = owner.GetLayerRanks(comm, layer, layerRanks);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    for (uint32_t peer : layerRanks.ranks) {
+        if (peer == rank) {
+            continue;
+        }
+        CommLink link;
+        bool found = false;
+        ret = SelectLink(layer, rank, peer, link, found);
+        CHECK_RET(ret == ACLNN_SUCCESS, ret);
+        if (!found) {
+            continue;
+        }
+        const uint32_t card = link.srcEndpointDesc.loc.device.superDevId;
+        if (selfCard != Mc2Barrier::NO_RANK && card != Mc2Barrier::NO_RANK && selfCard != card) {
+            OP_LOGE_LIBOPAPI_REPORT("Mc2Context",
+                                    "Barrier source identity mismatch, rank=%u, peer=%u, card=%u, expected=%u", rank,
+                                    peer, card, selfCard);
+            return ACLNN_ERR_INNER;
+        }
+        if (card != Mc2Barrier::NO_RANK) {
+            selfCard = card;
+        }
+        auto it = links.find(peer);
+        if (it == links.end() || Priority(link.linkAttr.linkProtocol) < Priority(it->second.linkAttr.linkProtocol)) {
+            links[peer] = link;
+        }
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::BarrierContext::CheckReverseLinks(const std::vector<uint32_t>& layers)
+{
+    for (const auto& entry : links) {
+        bool found = false;
+        CommProtocol protocol = CommProtocol::COMM_PROTOCOL_UB_MEM;
+        for (uint32_t layer : layers) {
+            CommLink reverse{};
+            bool available = false;
+            auto ret = SelectLink(layer, entry.first, rank, reverse, available);
+            CHECK_RET(ret == ACLNN_SUCCESS, ret);
+            if (available && (!found || Priority(reverse.linkAttr.linkProtocol) < Priority(protocol))) {
+                protocol = reverse.linkAttr.linkProtocol;
+                found = true;
+            }
+        }
+        if (!found || protocol != entry.second.linkAttr.linkProtocol) {
+            OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Asymmetric barrier link, rank=%u, peer=%u, forward=%d, reverse=%d",
+                                    rank, entry.first, static_cast<int32_t>(entry.second.linkAttr.linkProtocol),
+                                    found ? static_cast<int32_t>(protocol) : -1);
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::BarrierContext::Discover()
+{
+    uint32_t* layers = nullptr;
+    uint32_t count = 0;
+    auto ret = owner.GetNetLayers(comm, layers, count);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    const std::vector<uint32_t> layerIds(layers, layers + count);
+    for (uint32_t layer : layerIds) {
+        ret = DiscoverLayer(layer);
+        CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    }
+    ret = CheckReverseLinks(layerIds);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    local = {rank};
+    rail = {rank};
+    std::set<uint32_t> localCards{selfCard};
+    for (const auto& entry : links) {
+        const uint32_t card = entry.second.dstEndpointDesc.loc.device.superDevId;
+        if (entry.second.linkAttr.linkProtocol == CommProtocol::COMM_PROTOCOL_UB_MEM) {
+            if (card != Mc2Barrier::NO_RANK && !localCards.insert(card).second) {
+                OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Duplicate barrier local card, rank=%u, peer=%u, card=%u", rank,
+                                        entry.first, card);
+                return ACLNN_ERR_INNER;
+            }
+            local.push_back(entry.first);
+        } else {
+            rail.push_back(entry.first);
+        }
+    }
+    if (local.size() * rail.size() != owner.epRankSize_) {
+        OP_LOGE_LIBOPAPI_REPORT(
+            "Mc2Context", "Invalid barrier topology, rank=%u, world=%u, local=%zu, rail=%zu, selfCard=%u, links=%zu",
+            rank, owner.epRankSize_, local.size(), rail.size(), selfCard, links.size());
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    ret = CheckTransportSupport(rail.size());
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    OP_LOGI("Barrier topology: local=%zu, rail=%zu", local.size(), rail.size());
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::BarrierContext::CheckTransportSupport(uint32_t railSize)
+{
+    if ((!allowMixedProtocols || HCOMM_VERSION_NUM < MC2_BARRIER_HCOMM_MIN_VERSION) && railSize > 1U) {
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context",
+                                "Mixed-protocol barrier requires DAV_3510 and AIV Hcomm 9.2 or later; "
+                                "rank=%u, rail=%u, HCOMM version=%u",
+                                rank, railSize, static_cast<uint32_t>(HCOMM_VERSION_NUM));
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::BarrierContext::RegisterWindow(const std::string& tag, Mc2Barrier::Context& context,
+                                                       HcclMemHandle& memHandle)
+{
+    constexpr uint64_t alignment = 2UL * 1024UL * 1024UL;
+    const uint64_t required = Mc2Barrier::WindowBytes(context.localSize, context.railSize);
+    context.windowBytes = (required + alignment - 1) / alignment * alignment;
+    void* window = nullptr;
+    auto ret = owner.HcclEngineCtxCreate(comm, tag.c_str(), CommEngine::COMM_ENGINE_AIV, context.windowBytes, &window);
+    if (ret != HCCL_SUCCESS || window == nullptr) {
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Failed to allocate barrier window, rank=%u, tag=%s, bytes=%lu, ret=%d",
+                                rank, tag.c_str(), context.windowBytes, static_cast<int32_t>(ret));
+        return ACLNN_ERR_INNER;
+    }
+    aclmdlRICaptureMode mode = ACL_MODEL_RI_CAPTURE_MODE_RELAXED;
+    auto aclRet = aclmdlRICaptureThreadExchangeMode(&mode);
+    CHECK_RET(aclRet == ACL_SUCCESS, ACLNN_ERR_INNER);
+    aclRet = aclrtMemset(window, context.windowBytes, 0, context.windowBytes);
+    const auto restoreRet = aclmdlRICaptureThreadExchangeMode(&mode);
+    CHECK_RET(restoreRet == ACL_SUCCESS, ACLNN_ERR_INNER);
+    if (aclRet != ACL_SUCCESS) {
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Failed to clear barrier window, rank=%u, tag=%s, ret=%d", rank,
+                                tag.c_str(), static_cast<int32_t>(aclRet));
+        return ACLNN_ERR_INNER;
+    }
+    CommMem memory{};
+    memory.type = COMM_MEM_TYPE_DEVICE;
+    memory.addr = window;
+    memory.size = context.windowBytes;
+    ret = owner.HcclCommMemReg(comm, tag.c_str(), &memory, &memHandle);
+    if (ret != HCCL_SUCCESS) {
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Failed to register barrier window, rank=%u, tag=%s, ret=%d", rank,
+                                tag.c_str(), static_cast<int32_t>(ret));
+        return ACLNN_ERR_INNER;
+    }
+    context.window = reinterpret_cast<uint64_t>(window);
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::BarrierContext::ResolvePeerWindow(Mc2Barrier::Peer& peer, const std::string& tag,
+                                                          uint64_t required)
+{
+    uint32_t count = 0;
+    CommMem* memories = nullptr;
+    char** tags = nullptr;
+    auto ret = owner.HcclChannelGetRemoteMems(comm, peer.handle, &count, &memories, &tags);
+    CHECK_RET(ret == HCCL_SUCCESS, ACLNN_ERR_INNER);
+    for (uint32_t i = 0; i < count && memories != nullptr && tags != nullptr; ++i) {
+        if (tags[i] != nullptr && tag == tags[i] && memories[i].size >= required) {
+            peer.window = reinterpret_cast<uint64_t>(memories[i].addr);
+            break;
+        }
+    }
+    CHECK_RET(peer.window != 0 && peer.handle != 0, ACLNN_ERR_INNER);
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::BarrierContext::DescribeChannels(Mc2Barrier::Context& context, HcclMemHandle& memHandle,
+                                                         std::vector<HcclChannelDesc>& descs)
+{
+    auto* peers = reinterpret_cast<Mc2Barrier::Peer*>(&context + 1);
+    descs.resize(context.localSize + context.railSize);
+    for (uint32_t i = 0; i < descs.size(); ++i) {
+        auto& peer = peers[i];
+        auto& desc = descs[i];
+        CHECK_RET(HcclChannelDescInit(&desc, 1) == HCCL_SUCCESS, ACLNN_ERR_INNER);
+        if (peer.rank == rank) {
+            peer.window = context.window;
+            continue;
+        }
+        const auto& link = links.find(peer.rank)->second;
+        const auto protocol = link.linkAttr.linkProtocol;
+        if (protocol == CommProtocol::COMM_PROTOCOL_UB_MEM) {
+            peer.protocol = Mc2Barrier::Protocol::UBMEM;
+        } else if (protocol == CommProtocol::COMM_PROTOCOL_ROCE) {
+            peer.protocol = Mc2Barrier::Protocol::ROCE;
+        } else if (IsBarrierUrmaProtocol(protocol)) {
+            peer.protocol = Mc2Barrier::Protocol::URMA;
+        } else {
+            OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Unsupported barrier channel protocol, rank=%u, peer=%u, protocol=%d",
+                                    rank, peer.rank, static_cast<int32_t>(protocol));
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        context.protocolMask |= 1U << static_cast<uint32_t>(peer.protocol);
+        desc.remoteRank = peer.rank;
+        desc.channelProtocol = protocol;
+        desc.localEndpoint = link.srcEndpointDesc;
+        desc.remoteEndpoint = link.dstEndpointDesc;
+        desc.memHandles = &memHandle;
+        desc.memHandleNum = 1;
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::BarrierContext::AcquireBatch(const std::string& tag, const std::vector<HcclChannelDesc>& descs,
+                                                     const std::vector<Mc2Barrier::Peer*>& peers, uint64_t required)
+{
+    if (descs.empty()) {
+        return ACLNN_SUCCESS;
+    }
+    std::vector<ChannelHandle> handles(descs.size());
+    auto ret = owner.HcclChannelAcquire(comm, CommEngine::COMM_ENGINE_AIV, descs.data(), descs.size(), handles.data());
+    if (ret != HCCL_SUCCESS) {
+        OP_LOGE_LIBOPAPI_REPORT(
+            "Mc2Context", "Failed to acquire barrier channels, rank=%u, count=%zu, protocol=%d, ret=%d", rank,
+            descs.size(), static_cast<int32_t>(descs.front().channelProtocol), static_cast<int32_t>(ret));
+        return ACLNN_ERR_INNER;
+    }
+    for (size_t i = 0; i < handles.size(); ++i) {
+        peers[i]->handle = handles[i];
+        auto aclnnRet = ResolvePeerWindow(*peers[i], tag, required);
+        CHECK_RET(aclnnRet == ACLNN_SUCCESS, aclnnRet);
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::BarrierContext::AcquireGroup(Mc2Barrier::Peer* entries, uint32_t count, uint32_t selfSlot,
+                                                     const HcclChannelDesc* descs, const std::string& tag,
+                                                     uint64_t required)
+{
+    const uint32_t rounds = Mc2Barrier::ChannelBatchRounds(count);
+    for (CommProtocol protocol : g_barrierProtocols) {
+        for (uint32_t round = 0; round < rounds; ++round) {
+            const uint32_t first = Mc2Barrier::ChannelBatchBegin(selfSlot, round);
+            const uint32_t end = std::min(count, first + Mc2Barrier::CHANNEL_BATCH_SIZE);
+            std::vector<HcclChannelDesc> selected;
+            std::vector<Mc2Barrier::Peer*> peers;
+            for (uint32_t i = first; i < end; ++i) {
+                if (entries[i].rank != rank && descs[i].channelProtocol == protocol) {
+                    selected.push_back(descs[i]);
+                    peers.push_back(&entries[i]);
+                }
+            }
+            auto ret = AcquireBatch(tag, selected, peers, required);
+            CHECK_RET(ret == ACLNN_SUCCESS, ret);
+        }
+    }
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::BarrierContext::BuildChannels(Mc2Barrier::Context& context, const std::string& tag,
+                                                      HcclMemHandle memHandle)
+{
+    std::vector<HcclChannelDesc> descs;
+    auto ret = DescribeChannels(context, memHandle, descs);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    auto* peers = reinterpret_cast<Mc2Barrier::Peer*>(&context + 1);
+    const uint64_t required = Mc2Barrier::WindowBytes(context.localSize, context.railSize);
+    ret = AcquireGroup(peers, context.localSize, context.localSlot, descs.data(), tag, required);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    return AcquireGroup(peers + context.localSize, context.railSize, context.railSlot, descs.data() + context.localSize,
+                        tag, required);
+}
+
+bool Mc2Context::BarrierContext::SupportsStaticGraph(int64_t worldSize)
+{
+    return Init(worldSize) == ACLNN_SUCCESS && Discover() == ACLNN_SUCCESS &&
+           local.size() == static_cast<size_t>(worldSize) && rail.size() == 1;
+}
+
+bool Mc2Context::SupportsBarrierStaticGraph(const char* groupEp, int64_t worldSize)
+{
+    Mc2Context instance;
+    if (groupEp == nullptr || instance.LoadBarrierSymbols() != ACLNN_SUCCESS) {
+        return false;
+    }
+    HcclComm comm;
+    if (instance.GetCommHandle(groupEp, comm) != ACLNN_SUCCESS) {
+        return false;
+    }
+    BarrierContext barrier{instance, comm};
+    barrier.allowMixedProtocols = op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510;
+    return barrier.SupportsStaticGraph(worldSize);
+}
+
+aclnnStatus Mc2Context::GetBarrierContextTensor(const char* groupEp, int64_t worldSize, aclTensor*& mc2Context)
+{
+    Mc2Context instance;
+    mc2Context = nullptr;
+    CHECK_RET(groupEp != nullptr, ACLNN_ERR_PARAM_NULLPTR);
+    auto ret = instance.LoadBarrierSymbols();
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    HcclComm hcclHandle;
+    ret = instance.GetCommHandle(groupEp, hcclHandle);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    BarrierContext barrier{instance, hcclHandle};
+    barrier.allowMixedProtocols = op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510;
+    ret = barrier.Init(worldSize);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    const std::string tag = std::string(groupEp) + "_distribute_barrier_context_v6";
+    ret = instance.ValidateContextTag(tag + "_buffer");
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    void* ctx = nullptr;
+    uint64_t bytes = 0;
+    ret = barrier.GetContext(tag, ctx, bytes);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    return instance.CreatMc2ContextTensor(ctx, mc2Context, bytes);
 }
 
 aclnnStatus Mc2Context::GetMc2RankSize(const char* groupEp, uint32_t& rankSize)

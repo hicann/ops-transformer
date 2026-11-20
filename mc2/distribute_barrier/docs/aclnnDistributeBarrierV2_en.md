@@ -162,7 +162,7 @@ aclnnStatus aclnnDistributeBarrierV2(
     <!-- npu="950" id8 -->
     - <term>Ascend 950PR&950DT products</term>:
         - The unit of the timeout duration in the timeOutOptional parameter is us. The recommended value is 5000000us. The minimum timeout duration may vary depending on the actual environment.
-        - The value range of `epWorldSize` is [2, 1024].
+        - The value range of `epWorldSize` is [2, 204800].
 
     <!-- end id8 -->
 
@@ -251,9 +251,23 @@ aclnnStatus aclnnDistributeBarrierV2(
 - Communication mode constraints:
 
     <!-- npu="950" id9 -->
-    - <term>Ascend 950PR&950DT products</term>: Only UB Memory communication is supported.
+    - <term>Ascend 950PR&950DT products</term>:
+        - Available protocols, in priority order: UB Memory, UB CTP (UBC), UB RTP (UBG), then RoCE.
+        - Cross-supernode communication requires matching physical device IDs. Cross-UB-domain communication requires the AIV Hcomm interfaces from CANN 9.2 or later.
+        - Concurrent calls on one communicator are not supported. Recreate it after initialization or execution failure.
 
     <!-- end id9 -->
+
+- Elastic call constraints:
+
+    <!-- npu="950" id11 -->
+    - <term>Ascend 950PR&950DT products</term>:
+        - Across UB domains, the total excluded rank count must be less than the device count of one UB domain, discovered by the Host from the UB Memory topology. This limit does not apply within a single UB domain.
+        - Before the first shrink, all ranks must complete communication-resource initialization in non-elastic mode.
+        - Without `elasticInfoOptional`, or with `elasticInfoOptional[0] == 0`, all ranks must participate. With `elasticInfoOptional[0] == 1`, only active ranks participate; inactive ranks must skip the call.
+        - All participants must use the same active rank set and bidirectional rank mappings. These may change between calls, but must remain unchanged during each call.
+
+    <!-- end id11 -->
 
 - Usage scenario description:
     - Call this operator in a network model that requires full-card synchronization to mask performance fluctuations caused by fast and slow cards, assisting in performance analysis.

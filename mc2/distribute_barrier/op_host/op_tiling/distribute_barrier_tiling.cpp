@@ -19,6 +19,8 @@
 #include <unistd.h>
 
 #include <cmath>
+#include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -35,6 +37,8 @@
 #include "register/op_def_registry.h"
 #include "op_host/op_tiling/mc2_tiling_utils.h"
 #include "distribute_barrier_tiling_helper.h"
+#include "../../../common/op_kernel/mc2_moe_context.h"
+#include "fallback/fallback.h"
 
 using namespace AscendC;
 using namespace ge;
@@ -53,6 +57,10 @@ static void PrintTilingDataInfo(DistributeBarrierTilingData& tilingData)
     OPS_LOG_D(A_INNER_DEBUG_BARRIER, "rankId is %u.", tilingData.distributeBarrierInfo.rankId);
     OPS_LOG_D(A_INNER_DEBUG_BARRIER, "aivNum is %u.", tilingData.distributeBarrierInfo.aivNum);
     OPS_LOG_D(A_INNER_DEBUG_BARRIER, "totalUbSize is %lu.", tilingData.distributeBarrierInfo.totalUbSize);
+    OPS_LOG_D(A_INNER_DEBUG_BARRIER, "isAuto is %u.", tilingData.distributeBarrierInfo.isAuto);
+    if (tilingData.distributeBarrierInfo.isAuto) {
+        OPS_LOG_D(A_INNER_DEBUG_BARRIER, "contextSize is %lu.", tilingData.distributeBarrierInfo.totalWinSize);
+    }
     OPS_LOG_D(A_INNER_DEBUG_BARRIER, "isInputTimeOut is %u.", tilingData.distributeBarrierInfo.isInputTimeOut);
     OPS_LOG_D(A_INNER_DEBUG_BARRIER, "isInputElasticInfo is %u.", tilingData.distributeBarrierInfo.isInputElasticInfo);
 }
@@ -124,6 +132,18 @@ static bool CheckElasticInfo(const gert::TilingContext* context, const uint32_t 
         return false);
     return true;
 }
+static int64_t GetMaxWorldSize(const gert::TilingContext* context, const DistributeBarrierConfig& config, bool& isAuto)
+{
+    const auto* shape = config.isMc2Context ? context->GetInputShape(config.contextIndex) : nullptr;
+    isAuto = shape != nullptr && shape->GetStorageShape().GetDimNum() == ONE_DIM &&
+             shape->GetStorageShape().GetDim(0) % 2 != 0;
+    NpuArch npuArch = mc2tiling::GetNpuArch(context);
+    if (npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) {
+        return isAuto ? Mc2Barrier::MAX_RANKS : MAX_WORLD_SIZE_A5;
+    }
+    return MAX_WORLD_SIZE_A3;
+}
+
 static bool CheckAndSetAttrs(const gert::TilingContext* context, DistributeBarrierTilingData& tilingData,
                              std::string& group, bool isInputTimeOut, bool isInputElasticInfo,
                              const DistributeBarrierConfig& config)
@@ -132,14 +152,6 @@ static bool CheckAndSetAttrs(const gert::TilingContext* context, DistributeBarri
     OP_TILING_CHECK(attrs == nullptr,
                     Mc2Error::ReportTilingFailure(context->GetNodeName(), "RuntimeAttrs holder is absent"),
                     return false);
-    NpuArch npuArch = mc2tiling::GetNpuArch(context);
-    int64_t MAX_WORLD_SIZE = 0;
-    if (npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) {
-        MAX_WORLD_SIZE = MAX_WORLD_SIZE_A5;
-    } else {
-        MAX_WORLD_SIZE = MAX_WORLD_SIZE_A3;
-    }
-
     auto groupPtr = attrs->GetAttrPointer<char>(config.attrGroupIndex);
     auto worldSizePtr = attrs->GetAttrPointer<int64_t>(config.attrWorldSizeIndex);
 
@@ -153,6 +165,7 @@ static bool CheckAndSetAttrs(const gert::TilingContext* context, DistributeBarri
         OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "world_size", "Required attribute is absent"),
         return false);
 
+    const int64_t MAX_WORLD_SIZE = GetMaxWorldSize(context, config, tilingData.distributeBarrierInfo.isAuto);
     OP_TILING_CHECK(
         (*worldSizePtr < MIN_WORLD_SIZE) || (*worldSizePtr > MAX_WORLD_SIZE),
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -219,8 +232,9 @@ static void DistributeBarrierConfigIndexSet(DistributeBarrierConfig& config)
     return;
 }
 
-static ge::graphStatus CheckMc2Context(const gert::TilingContext* context, const char* nodeName,
-                                       const DistributeBarrierConfig& config)
+static ge::graphStatus CheckMc2ContextShape(const gert::TilingContext* context, const char* nodeName,
+                                            const DistributeBarrierConfig& config,
+                                            DistributeBarrierTilingData& tilingData)
 {
     const gert::StorageShape* contextStorageShape = context->GetInputShape(config.contextIndex);
     OP_TILING_CHECK(contextStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "context"),
@@ -231,8 +245,22 @@ static ge::graphStatus CheckMc2Context(const gert::TilingContext* context, const
                         (std::to_string(contextStorageShape->GetStorageShape().GetDimNum()) + "D").c_str(), "1D"),
                     return ge::GRAPH_FAILED);
     int64_t contextDim0 = contextStorageShape->GetStorageShape().GetDim(0);
+    tilingData.distributeBarrierInfo.totalWinSize = contextDim0;
     OP_LOGD(nodeName, "context dim0 = %ld", contextDim0);
+    const uint32_t world = tilingData.distributeBarrierInfo.worldSize;
+    const bool isAutoContext = tilingData.distributeBarrierInfo.isAuto;
+    OP_TILING_CHECK(isAutoContext ? !Mc2Barrier::IsValidContextSize(contextDim0, world) :
+                                    contextDim0 != Mc2Aclnn::MC2_CONTEXT_ELEMS,
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                        nodeName, "context", std::to_string(contextDim0).c_str(),
+                        "context length must match the legacy layout or an automatic topology"),
+                    return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
 
+static ge::graphStatus CheckMc2Context(const gert::TilingContext* context, const char* nodeName,
+                                       const DistributeBarrierConfig& config, DistributeBarrierTilingData& tilingData)
+{
     auto contextDesc = context->GetInputDesc(config.contextIndex);
     OP_TILING_CHECK(
         contextDesc == nullptr,
@@ -251,13 +279,60 @@ static ge::graphStatus CheckMc2Context(const gert::TilingContext* context, const
             "non-FRACTAL_NZ"),
         return ge::GRAPH_FAILED);
 
-    return ge::GRAPH_SUCCESS;
+    return CheckMc2ContextShape(context, nodeName, config, tilingData);
 }
 
 constexpr uint64_t CalcDistributeBarrierWinSize(uint32_t aivNum)
 {
     return BARRIER_WIN_STATE_OFFSET + BARRIER_STATE_WIN_OFFSET +
            static_cast<uint64_t>(aivNum) * BARRIER_UB_ALIGN * sizeof(float) * 2UL;
+}
+
+static ge::graphStatus SetContextBufferSize(gert::TilingContext* context, DistributeBarrierTilingData* tilingData,
+                                            uint32_t numBlocks)
+{
+    auto& info = tilingData->distributeBarrierInfo;
+    if (info.isAuto) {
+        const uint32_t required = Mc2Barrier::AutoUbBytes(info.worldSize, numBlocks - 1U, info.isInputElasticInfo);
+        OP_TILING_CHECK(info.totalUbSize < required,
+                        Mc2Error::ReportTilingFailure(context->GetNodeName(), "Insufficient UB for Barrier buffers; "
+                                                                              "required bytes=" +
+                                                                                  std::to_string(required)),
+                        return ge::GRAPH_FAILED);
+    } else if (info.isMc2Context) {
+        OP_TILING_CHECK(
+            static_cast<uint64_t>(BARRIER_STATE_OFFSET) * info.worldSize > BARRIER_STATE_WIN_OFFSET,
+            Mc2Error::ReportTilingFailure(context->GetNodeName(), "State region exceeds the flag window offset"),
+            return ge::GRAPH_FAILED);
+        info.totalWinSize = CalcDistributeBarrierWinSize(info.aivNum);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus SetLaunchConfig(gert::TilingContext* context, DistributeBarrierTilingData* tilingData)
+{
+    const char* nodeName = context->GetNodeName();
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
+    uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
+    uint64_t ubSize = 0UL;
+    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
+    OP_TILING_CHECK(aivNum < 2,
+                    Mc2Error::ReportTilingFailure(
+                        nodeName, "Available AIV core count=" + std::to_string(aivNum) +
+                                      "; required at least 2 because one core receives while the remaining cores send"),
+                    return ge::GRAPH_FAILED);
+    const uint32_t numBlocks = ascendcPlatform.CalcTschBlockDim(aivNum, 0, aivNum);
+    OP_TILING_CHECK(numBlocks < 2,
+                    Mc2Error::ReportTilingFailure(nodeName, "Barrier requires at least two launch blocks"),
+                    return ge::GRAPH_FAILED);
+    context->SetBlockDim(numBlocks);
+    OP_TILING_CHECK(context->SetScheduleMode(1) != ge::GRAPH_SUCCESS,
+                    Mc2Error::ReportTilingFailure(nodeName, "Schedule mode output slot is absent"),
+                    return ge::GRAPH_FAILED);
+    tilingData->distributeBarrierInfo.totalUbSize = ubSize;
+    tilingData->distributeBarrierInfo.aivNum = aivNum;
+    OPS_LOG_D(A_INNER_DEBUG_BARRIER, "numBlocks=%u, aivNum=%u, ubSize=%lu", numBlocks, aivNum, ubSize);
+    return SetContextBufferSize(context, tilingData, numBlocks);
 }
 
 ge::graphStatus DistributeBarrierExtendTilingFuncNew(gert::TilingContext* context,
@@ -276,68 +351,31 @@ ge::graphStatus DistributeBarrierExtendTilingFuncNew(gert::TilingContext* contex
                                                     std::to_string(sizeof(DistributeBarrierTilingData)) + " bytes"),
         return ge::GRAPH_FAILED);
     std::string group = "";
-    bool isInputTimeOut = false;
-    bool isInputElasticInfo = false;
-    const gert::StorageShape* timeOutStorageShape = context->GetOptionalInputShape(config.timeOutIndex);
-    const gert::StorageShape* elasticInfoStorageShape = context->GetOptionalInputShape(config.elasticInfoIndex);
-    isInputTimeOut = (timeOutStorageShape != nullptr);
-    isInputElasticInfo = (elasticInfoStorageShape != nullptr);
+    const bool isInputTimeOut = context->GetOptionalInputShape(config.timeOutIndex) != nullptr;
+    const bool isInputElasticInfo = context->GetOptionalInputShape(config.elasticInfoIndex) != nullptr;
     tilingData->distributeBarrierInfo.isInputTimeOut = isInputTimeOut;
     tilingData->distributeBarrierInfo.isInputElasticInfo = isInputElasticInfo;
     tilingData->distributeBarrierInfo.isMc2Context = config.isMc2Context;
 
-    // 检查context输入
-    if (config.isMc2Context) {
-        OP_TILING_CHECK(CheckMc2Context(context, nodeName, config) != ge::GRAPH_SUCCESS,
-                        OP_LOGE_WITHOUT_REPORT(nodeName, "Tiling check context failed."), return ge::GRAPH_FAILED);
-    }
-
-    // Function that get check and set Attrs
     OP_TILING_CHECK(!CheckAndSetAttrs(context, *tilingData, group, isInputTimeOut, isInputElasticInfo, config),
                     OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "Check and set attributes failed!"),
                     return ge::GRAPH_FAILED);
 
-    // Set WorkSpace
+    if (config.isMc2Context) {
+        OP_TILING_CHECK(CheckMc2Context(context, nodeName, config, *tilingData) != ge::GRAPH_SUCCESS,
+                        OP_LOGE_WITHOUT_REPORT(nodeName, "Tiling check context failed."), return ge::GRAPH_FAILED);
+    }
+
     OP_TILING_CHECK(SetWorkSpace(context) != ge::GRAPH_SUCCESS,
                     OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "Tiling set workspace failed."),
                     return ge::GRAPH_FAILED);
 
     if (!config.isMc2Context) {
-        // Set HcommCfg
         OP_TILING_CHECK(SetHcommCfg(context, tilingData, group) != ge::GRAPH_SUCCESS,
                         OP_LOGE_WITHOUT_REPORT(nodeName, "Tiling SetHcommCfg failed."), return ge::GRAPH_FAILED);
     }
-    // Set numBlocks
-    uint32_t numBlocks = 1U;
-    auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
-    uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
-    uint64_t ubSize = 0UL;
-    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
-    OP_TILING_CHECK(aivNum < 2,
-                    Mc2Error::ReportTilingFailure(
-                        nodeName, "Available AIV core count=" + std::to_string(aivNum) +
-                                      "; required at least 2 because one core receives while the remaining cores send"),
-                    return ge::GRAPH_FAILED);
-    numBlocks = ascendcPlatform.CalcTschBlockDim(aivNum, 0, aivNum);
-    OP_TILING_CHECK(
-        numBlocks == 0,
-        Mc2Error::ReportTilingFailure(nodeName, "Calculated launch block count=0; check platform scheduling resources"),
-        return ge::GRAPH_FAILED);
-    context->SetBlockDim(numBlocks);
-    OP_TILING_CHECK(context->SetScheduleMode(1) != ge::GRAPH_SUCCESS,
-                    Mc2Error::ReportTilingFailure(nodeName, "Schedule mode output slot is absent"),
-                    return ge::GRAPH_FAILED);
-    tilingData->distributeBarrierInfo.totalUbSize = ubSize;
-    tilingData->distributeBarrierInfo.aivNum = aivNum;
-    if (config.isMc2Context) {
-        const uint64_t totalWinSize = CalcDistributeBarrierWinSize(aivNum);
-        OP_TILING_CHECK(static_cast<uint64_t>(BARRIER_STATE_OFFSET) * tilingData->distributeBarrierInfo.worldSize >
-                            BARRIER_STATE_WIN_OFFSET,
-                        Mc2Error::ReportTilingFailure(nodeName, "State region exceeds the flag window offset"),
-                        return ge::GRAPH_FAILED);
-        tilingData->distributeBarrierInfo.totalWinSize = totalWinSize;
-    }
-    OPS_LOG_D(A_INNER_DEBUG_BARRIER, "numBlocks=%u, aivNum=%u, ubSize=%lu", numBlocks, aivNum, ubSize);
+    OP_TILING_CHECK(SetLaunchConfig(context, tilingData) != ge::GRAPH_SUCCESS,
+                    OP_LOGE_WITHOUT_REPORT(nodeName, "Tiling set launch config failed."), return ge::GRAPH_FAILED);
 
     PrintTilingDataInfo(*tilingData);
     OPS_LOG_D("DistributeBarrier", "tiling process finished successfully!!!");
@@ -353,6 +391,45 @@ ge::graphStatus DistributeBarrierTilingFunc(gert::TilingContext* context)
 }
 
 struct DistributeBarrierCompileInfo {};
+
+static ge::graphStatus SelectBarrierFormat(ge::DataType dtype, const char* group, int64_t worldSize,
+                                           ge::AscendString& result)
+{
+    constexpr size_t dtypePrefixLength = sizeof("DT_") - 1U;
+    std::string type = ge::TypeUtils::DataTypeToSerialString(dtype);
+    if (type == "DT_UNDEFINED" || type.size() <= dtypePrefixLength) {
+        return ge::GRAPH_FAILED;
+    }
+    type = type.substr(dtypePrefixLength);
+    std::transform(type.begin(), type.end(), type.begin(), [](unsigned char c) { return std::tolower(c); });
+    using SupportsStatic = bool (*)(const char*, int64_t);
+    static auto supportsStatic =
+        reinterpret_cast<SupportsStatic>(fallback::GetOpApiFuncAddr("BarrierSupportsStaticGraph"));
+    const bool native = group != nullptr && worldSize >= MIN_WORLD_SIZE && worldSize <= MAX_WORLD_SIZE_A5 &&
+                        supportsStatic != nullptr && supportsStatic(group, worldSize);
+    const std::string json = "{\"input0\":{\"name\":\"x_ref\",\"format\":\"ND\",\"dtype\":\"" + type +
+                             "\"},\"input1\":{\"name\":\"time_out\",\"format\":\"ND\",\"dtype\":\"int32\"},"
+                             "\"input2\":{\"name\":\"elastic_info\",\"format\":\"ND\",\"dtype\":\"int32\"},"
+                             "\"output0\":{\"name\":\"x_ref\",\"format\":\"ND\",\"dtype\":\"" +
+                             type + "\"},\"fallback\":{\"enable\":\"" + (native ? "false" : "true") +
+                             "\",\"unknownshape_enable\":\"true\"}}";
+    result = ge::AscendString(json.c_str());
+    OP_LOGD("DistributeBarrier", "Graph selection: world=%ld, native=%d", worldSize, native);
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus DistributeBarrierSelectFormat(const ge::Operator& op, ge::AscendString& result)
+{
+    ge::AscendString group;
+    int64_t worldSize = 0;
+    (void)op.GetAttr("group", group);
+    (void)op.GetAttr("world_size", worldSize);
+    return SelectBarrierFormat(op.GetInputDescByName("x_ref").GetDataType(), group.GetString(), worldSize, result);
+}
+
+static const OpCheckFuncHelper g_barrierSelectFormat(FUNC_OP_SELECT_FORMAT, "DistributeBarrier",
+                                                     DistributeBarrierSelectFormat);
+
 ge::graphStatus TilingParseForDistributeBarrier(gert::TilingParseContext* context)
 {
     const gert::TilingParseContext* const_context = context;

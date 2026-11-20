@@ -9,6 +9,5 @@
 # -----------------------------------------------------------------------------------------------------------
 
 if (UT_TEST_ALL OR OP_KERNEL_UT)
-    AddOpTestCase(distribute_barrier_extend "Ascend950PR_9599"
-                  "-DDTYPE_X_REF=half -include${CMAKE_CURRENT_SOURCE_DIR}/distribute_barrier_tiling_def.h" "")
+    add_subdirectory(arch35)
 endif()

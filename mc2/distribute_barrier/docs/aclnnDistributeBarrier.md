@@ -167,7 +167,7 @@ aclnnStatus aclnnDistributeBarrier(
     <!-- end id7 -->
     <!-- npu="950" id8 -->
     - <term>Ascend 950DT系列产品</term>：
-        - `worldSize`取值支持[2, 1024]。
+        - `worldSize`取值支持[2, 204800]。
 
     <!-- end id8 -->
 
@@ -221,7 +221,10 @@ aclnnStatus aclnnDistributeBarrier(
 - 通信方式约束：
 
     <!-- npu="950" id9 -->
-    - <term>Ascend 950DT系列产品</term>：仅支持UB Memory通信。
+    - <term>Ascend 950DT系列产品</term>：
+        - 可用协议优先级由高到低：UB Memory、UB CTP（UBC）、UB RTP（UBG）、RoCE。
+        - 跨超节点仅支持相同物理卡号之间通信。跨UB domain通信需要CANN 9.2或更高版本的AIV Hcomm接口。
+        - 同一通信域不支持并发调用；初始化或执行失败后须重建通信域。
 
     <!-- end id9 -->
 

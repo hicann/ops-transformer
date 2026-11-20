@@ -10,4 +10,21 @@
 
 if(UT_TEST_ALL OR OP_API_UT)
     add_modules_ut_sources(UT_NAME ${OP_API_MODULE_NAME} MODE PRIVATE DIR ${CMAKE_CURRENT_SOURCE_DIR})
+    add_dependencies(${OP_API_MODULE_NAME}_cases_obj opbuild_gen_inner)
+    set_property(SOURCE
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_aclnn_distribute_barrier.cpp
+        TARGET_DIRECTORY ${OP_API_MODULE_NAME}_cases_obj APPEND PROPERTY
+        COMPILE_OPTIONS -fno-access-control)
+    target_include_directories(${OP_API_MODULE_NAME}_cases_obj
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../../../common/op_kernel)
+    target_sources(${OP_API_MODULE_NAME}_cases_obj PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../op_api/distribute_barrier_base.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../op_api/aclnn_distribute_barrier.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../op_api/aclnn_distribute_barrier_v2.cpp)
+    set_property(SOURCE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../op_api/distribute_barrier_base.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../op_api/aclnn_distribute_barrier.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../op_api/aclnn_distribute_barrier_v2.cpp
+        TARGET_DIRECTORY ${OP_API_MODULE_NAME}_cases_obj APPEND PROPERTY
+        COMPILE_DEFINITIONS BUILD_OPEN_PROJECT_API=1 OP_LOG_LIBOPAPI_ONLY)
 endif()

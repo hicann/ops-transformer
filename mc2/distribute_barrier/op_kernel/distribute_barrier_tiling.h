@@ -26,8 +26,10 @@ struct DistributeBarrierInfo {
     bool isInputTimeOut;
     bool isInputElasticInfo;
     bool isMc2Context;
-    bool reserved1;
+    bool isAuto;
 };
+
+static_assert(sizeof(DistributeBarrierInfo) == 40, "Barrier tiling ABI changed");
 
 struct DistributeBarrierTilingData {
     Mc2InitTiling mc2InitTiling;

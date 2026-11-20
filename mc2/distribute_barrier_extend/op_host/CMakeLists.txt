@@ -22,7 +22,9 @@ if (BUILD_OPEN_PROJECT)  # custom
 
     # --cce-auto-sync=off：指定CCE编译器是否自动执行线程间或模块间的同步操作
     set(CONDITION_UNIT ${ASCEND_COMPUTE_UNIT})
-    if("${CONDITION_UNIT}" STREQUAL "ascend950")
+    if("${CONDITION_UNIT}" STREQUAL "ascend950" OR
+       "${CONDITION_UNIT}" STREQUAL "ascend960dt" OR
+       "${CONDITION_UNIT}" STREQUAL "ascend960pr")
         add_ops_compile_options(
             OP_NAME DistributeBarrierExtend
             OPTIONS --cce-auto-sync=off

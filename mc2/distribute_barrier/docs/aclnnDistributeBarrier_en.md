@@ -164,7 +164,7 @@ aclnnStatus aclnnDistributeBarrier(
     <!-- end id7 -->
     <!-- npu="950" id8 -->
     - <term>Ascend 950PR&950DT products</term>:
-        - `epWorldSize`: value range [2, 1024].
+        - `epWorldSize`: value range [2, 204800].
 
     <!-- end id8 -->
 
@@ -218,7 +218,10 @@ aclnnStatus aclnnDistributeBarrier(
 - Communication mode constraints:
 
     <!-- npu="950" id9 -->
-    - <term>Ascend 950PR&950DT products</term>: Only UB Memory communication is supported.
+    - <term>Ascend 950PR&950DT products</term>:
+        - Available protocols, in priority order: UB Memory, UB CTP (UBC), UB RTP (UBG), then RoCE.
+        - Cross-supernode communication requires matching physical device IDs. Cross-UB-domain communication requires the AIV Hcomm interfaces from CANN 9.2 or later.
+        - Concurrent calls on one communicator are not supported. Recreate it after initialization or execution failure.
 
     <!-- end id9 -->
 

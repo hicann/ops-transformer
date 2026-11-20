@@ -33,6 +33,8 @@ __attribute__((visibility("default"))) bool BarrierCheckNullStatus(const aclTens
 // 入参校验
 __attribute__((visibility("default"))) aclnnStatus BarrierCheckParams(const aclTensor* xRef, const char* group);
 
+__attribute__((visibility("default"))) bool BarrierSupportsStaticGraph(const char* group, int64_t worldSize);
+
 __attribute__((visibility("default"))) aclnnStatus aclnnDistributeBarrierGetWorkspaceSizeBase(
     const aclTensor* xRef, const aclTensor* timeOut, const aclTensor* elasticInfo, const char* group, int64_t worldSize,
     uint64_t* workspaceSize, aclOpExecutor** executor);

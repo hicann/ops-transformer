@@ -13,6 +13,7 @@
  * \brief
  */
 #include <algorithm>
+#include <cstring>
 
 #include "aclnn_distribute_barrier_v2.h"
 #include "aclnn_kernels/common/op_error_check.h"
@@ -33,6 +34,7 @@
 #endif
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
 #include "common/op_api/mc2_context.h"
+#include "aclnnInner_distribute_barrier_extend.h"
 #endif
 
 using namespace op;
@@ -40,15 +42,6 @@ using namespace op;
 extern "C" {
 #endif
 extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
-
-extern aclnnStatus aclnnInnerDistributeBarrierExtend(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
-                                                     aclrtStream stream);
-
-extern aclnnStatus aclnnInnerDistributeBarrierExtendGetWorkspaceSize(const aclTensor* context, const aclTensor* xRef,
-                                                                     const aclTensor* timeOut,
-                                                                     const aclTensor* elasticInfo, const char* group,
-                                                                     int64_t worldSize, uint64_t* workspaceSize,
-                                                                     aclOpExecutor** executor);
 
 // check nullptr
 bool BarrierCheckNullStatus(const aclTensor* xRef, const char* group)
@@ -75,37 +68,54 @@ aclnnStatus BarrierCheckParams(const aclTensor* xRef, const char* group)
     return ACLNN_SUCCESS;
 }
 
+static bool BarrierIsA5()
+{
+    auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
+    return npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202;
+}
+
+bool BarrierSupportsStaticGraph(const char* group, int64_t worldSize)
+{
+    if (!BarrierIsA5()) {
+        return true;
+    }
+#if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
+    return Mc2Aclnn::Mc2Context::SupportsBarrierStaticGraph(group, worldSize);
+#else
+    return false;
+#endif
+}
+
 aclnnStatus aclnnDistributeBarrierGetWorkspaceSizeBase(const aclTensor* xRef, const aclTensor* timeOut,
                                                        const aclTensor* elasticInfo, const char* group,
                                                        int64_t worldSize, uint64_t* workspaceSize,
                                                        aclOpExecutor** executor)
 {
+    if (workspaceSize == nullptr || executor == nullptr) {
+        OP_LOGE_WITH_INVALID_INPUT("aclnnDistributeBarrier", workspaceSize == nullptr ? "workspaceSize" : "executor");
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
     auto retParam = BarrierCheckParams(xRef, group);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
-    aclTensor* mc2Context = nullptr;
-    aclnnStatus getWorkspaceSizesRes = ACLNN_ERR_INNER;
-    aclnnStatus ret = ACLNN_ERR_INNER;
 
     char groupBuf[HCCL_GROUP_NAME_MAX] = {0};
-    if (group != nullptr) {
-        (void)strncpy_s(groupBuf, HCCL_GROUP_NAME_MAX, group, HCCL_GROUP_NAME_MAX - 1);
+    (void)strncpy_s(groupBuf, HCCL_GROUP_NAME_MAX, group, HCCL_GROUP_NAME_MAX - 1);
+    if (!BarrierIsA5()) {
+        return aclnnInnerDistributeBarrierGetWorkspaceSize(const_cast<aclTensor*>(xRef), timeOut, elasticInfo, groupBuf,
+                                                           worldSize, workspaceSize, executor);
     }
-    aclTensor* xRefBuf = const_cast<aclTensor*>(xRef);
-    auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
-    if (npuArch != Ops::Base::DAV_3510 && npuArch != Ops::Base::DAV_9201 && npuArch != Ops::Base::DAV_9202) {
-        getWorkspaceSizesRes = aclnnInnerDistributeBarrierGetWorkspaceSize(xRefBuf, timeOut, elasticInfo, groupBuf,
-                                                                           worldSize, workspaceSize, executor);
-    } else {
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
-        uint64_t hcclBuffSize = 0;
-        const char* opName = "distribute_barrier_extend";
-        ret = Mc2Aclnn::Mc2Context::GetMc2ContextTensor(group, opName, hcclBuffSize, mc2Context);
-        CHECK_RET(ret == ACLNN_SUCCESS, ret);
-        getWorkspaceSizesRes = aclnnInnerDistributeBarrierExtendGetWorkspaceSize(
-            mc2Context, xRefBuf, timeOut, elasticInfo, groupBuf, worldSize, workspaceSize, executor);
+    aclTensor* mc2Context = nullptr;
+    aclnnStatus ret = Mc2Aclnn::Mc2Context::GetBarrierContextTensor(group, worldSize, mc2Context);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    return aclnnInnerDistributeBarrierExtendGetWorkspaceSize(mc2Context, const_cast<aclTensor*>(xRef), timeOut,
+                                                             elasticInfo, groupBuf, worldSize, workspaceSize, executor);
+#else
+    OP_LOGE_LIBOPAPI_REPORT(
+        "DistributeBarrier", "A5 barrier requires HCOMM channel support, compiled version=%u, minimum=%u",
+        static_cast<uint32_t>(HCOMM_VERSION_NUM), static_cast<uint32_t>(HCCL_CHANNEL_SUPPORT_VERSION));
+    return ACLNN_ERR_INNER;
 #endif
-    }
-    return getWorkspaceSizesRes;
 }
 
 aclnnStatus aclnnDistributeBarrierBase(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
@@ -115,8 +125,7 @@ aclnnStatus aclnnDistributeBarrierBase(void* workspace, uint64_t workspaceSize, 
         NnopbaseSetHcclServerType(executor, NNOPBASE_HCCL_SERVER_TYPE_MTE);
     }
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
-    auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
-    if (npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202) {
+    if (BarrierIsA5()) {
         OP_LOGD("aclnn_distribute_barrier_extend inner start");
         return aclnnInnerDistributeBarrierExtend(workspace, workspaceSize, executor, stream);
     }

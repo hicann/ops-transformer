@@ -21,6 +21,7 @@
 #include "graph/utils/type_utils.h"
 #include "op_host/tiling_base.h"
 #include "register/tilingdata_base.h"
+#include "../../../common/op_kernel/mc2_moe_context.h"
 
 namespace optiling {
 constexpr uint64_t INIT_TILINGKEY = 10000UL;
@@ -44,7 +45,7 @@ constexpr uint32_t SYSTEM_NEED_WORKSPACE = 16U * 1024U * 1024U;
 constexpr uint64_t MB_SIZE = 1024UL * 1024UL;
 constexpr uint32_t OP_TYPE_ALL_TO_ALL = 8U;
 
-const int64_t MIN_WORLD_SIZE = 2;
+const int64_t MIN_WORLD_SIZE = Mc2Barrier::MIN_RANKS;
 const int64_t MAX_WORLD_SIZE_A3 = 384;
 const int64_t MAX_WORLD_SIZE_A5 = 1024;
 

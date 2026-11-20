@@ -17,6 +17,7 @@
 #define MC2_CONTEXT_H
 
 #define HCCL_CHANNEL_SUPPORT_VERSION 89999700
+#define HCOMM_BARRIER_RTP_MIN_VERSION 90200000
 #if __has_include("version/hcomm_version.h")
 #include "version/hcomm_version.h"
 #else
@@ -42,8 +43,49 @@ public:
                                            CommProtocol protocol = CommProtocol::COMM_PROTOCOL_UB_MEM,
                                            uint32_t* rankSizePerServer = nullptr);
     static aclnnStatus GetMc2RankSize(const char* groupEp, uint32_t& rankSize);
+    static aclnnStatus GetBarrierContextTensor(const char* groupEp, int64_t worldSize, aclTensor*& mc2Context);
+    static bool SupportsBarrierStaticGraph(const char* groupEp, int64_t worldSize);
 
 private:
+    struct BarrierContext {
+        struct State {
+            void* context;
+            uint32_t localSize;
+            uint32_t railSize;
+        };
+        Mc2Context& owner;
+        HcclComm comm;
+        uint32_t rank = 0;
+        uint32_t selfCard = Mc2Barrier::NO_RANK;
+        bool allowMixedProtocols = true;
+        std::unordered_map<uint32_t, CommLink> links{};
+        std::vector<uint32_t> local{};
+        std::vector<uint32_t> rail{};
+
+        aclnnStatus Init(int64_t worldSize);
+        aclnnStatus GetContext(const std::string& tag, void*& ctx, uint64_t& bytes);
+        aclnnStatus CreateContext(const std::string& tag, void*& ctx, uint64_t& bytes);
+        aclnnStatus CacheContext(const std::string& tag, const Mc2Barrier::Context& context, State& cached, void*& ctx,
+                                 uint64_t bytes);
+        aclnnStatus SelectLink(uint32_t layer, uint32_t src, uint32_t dst, CommLink& link, bool& found);
+        aclnnStatus DiscoverLayer(uint32_t layer);
+        aclnnStatus CheckReverseLinks(const std::vector<uint32_t>& layers);
+        aclnnStatus Discover();
+        bool SupportsStaticGraph(int64_t worldSize);
+        aclnnStatus CheckTransportSupport(uint32_t railSize);
+        aclnnStatus RegisterWindow(const std::string& tag, Mc2Barrier::Context& context, HcclMemHandle& memHandle);
+        aclnnStatus ResolvePeerWindow(Mc2Barrier::Peer& peer, const std::string& tag, uint64_t required);
+        aclnnStatus DescribeChannels(Mc2Barrier::Context& context, HcclMemHandle& memHandle,
+                                     std::vector<HcclChannelDesc>& descs);
+        aclnnStatus AcquireBatch(const std::string& tag, const std::vector<HcclChannelDesc>& descs,
+                                 const std::vector<Mc2Barrier::Peer*>& peers, uint64_t required);
+        aclnnStatus AcquireGroup(Mc2Barrier::Peer* entries, uint32_t count, uint32_t selfSlot,
+                                 const HcclChannelDesc* descs, const std::string& tag, uint64_t required);
+        aclnnStatus BuildChannels(Mc2Barrier::Context& context, const std::string& tag, HcclMemHandle memHandle);
+        static bool IsUsableLink(const CommLink& link);
+        static uint32_t Priority(CommProtocol protocol);
+        void InitPeers(Mc2Barrier::Context& context);
+    };
     struct TopologyInstance;
     struct RankLinkInfo {
         CommProtocol protocol;
@@ -71,6 +113,8 @@ private:
     aclnnStatus OpenHcclLibrary();
     aclnnStatus LoadProtocolSymbols(CommProtocol protocol);
     aclnnStatus LoadHcclSymbols(CommProtocol protocol);
+    aclnnStatus LoadCommonHcclSymbols();
+    aclnnStatus LoadBarrierSymbols();
     aclnnStatus LoadTopologySymbols();
     aclnnStatus GetCommHandle(const char* groupEp, HcclComm& hcclHandle);
     aclnnStatus GetHcclCommLink(const HcclComm& hcclHandle, uint32_t netLayerId, uint32_t srcRankId, uint32_t dstRankId,
@@ -125,7 +169,7 @@ private:
     aclnnStatus CreatMc2Context(const HcclComm& hcclHandle, const std::string& mc2ContextTag, const CommEngine& engine,
                                 CommProtocol protocol, Mc2MoeContext* mc2ContextStruct, void*& ctx,
                                 uint64_t& hcclBuffSize);
-    aclnnStatus CreatMc2ContextTensor(void* ctx, aclTensor*& mc2Context);
+    aclnnStatus CreatMc2ContextTensor(void* ctx, aclTensor*& mc2Context, uint64_t ctxSize);
     aclnnStatus GetLayerRanks(const HcclComm& hcclHandle, uint32_t layerId, LayerRanks& layer) const;
     static bool HasLinkWithProtocol(const CommLink* linksList, uint32_t netLinkNum, const CommProtocol& protocol);
     bool SupportsProtocol(const HcclComm& hcclHandle, uint32_t layerId, uint32_t srcRankId, uint32_t dstRankId,

@@ -160,7 +160,7 @@ aclnnStatus aclnnDistributeBarrierV2(
     <!-- npu="950" id8 -->
     - <term>Ascend 950DT系列产品</term>：
         - `timeOut`参数里的超时时间单位为μs，建议配置5000000μs，根据实际环境不同超时时间下限可能不同。
-        - `worldSize`取值支持[2, 1024]。
+        - `worldSize`取值支持[2, 204800]。
 
     <!-- end id8 -->
 
@@ -250,9 +250,23 @@ aclnnStatus aclnnDistributeBarrierV2(
 - 通信方式约束：
 
     <!-- npu="950" id9 -->
-    - <term>Ascend 950DT系列产品</term>：仅支持UB Memory通信。
+    - <term>Ascend 950DT系列产品</term>：
+        - 可用协议优先级由高到低：UB Memory、UB CTP（UBC）、UB RTP（UBG）、RoCE。
+        - 跨超节点仅支持相同物理卡号之间通信。跨UB domain通信需要CANN 9.2或更高版本的AIV Hcomm接口。
+        - 同一通信域不支持并发调用；初始化或执行失败后须重建通信域。
 
     <!-- end id9 -->
+
+- 弹性调用约束：
+
+    <!-- npu="950" id11 -->
+    - <term>Ascend 950DT系列产品</term>：
+        - 跨UB domain缩容时，全域排除的rank数须小于单个UB domain卡数（由Host根据UB Memory拓扑识别）；单域内缩容不受此限。
+        - 首次缩容前，所有rank须以非缩容模式完成通信资源初始化。
+        - 未传入`elasticInfo`或`elasticInfo[0] == 0`时须全员参与；`elasticInfo[0] == 1`时仅有效rank参与，其余rank须跳过调用。
+        - 参与rank的有效集合和双向rank映射须一致；可在两次调用之间更换，执行期间不可修改。
+
+    <!-- end id11 -->
 
 - 使用场景说明：
     - 在需要进行全卡同步的网络模型中调用该算子，可以屏蔽快慢卡引入的性能波动问题，协助分析性能。
