@@ -27,6 +27,13 @@
   </tr></thead>
 <tbody>
   <tr>
+    <td>engram</td>
+    <td><a href="../../engram/engram_gate/README.md">engram_gate</a></td>
+    <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>AI Core</td>
+    <td>Engram 残差门控前向计算，可输出未归一化加权点积、门控值与 RMS 倒数。</td>
+  </tr>
+
+  <tr>
     <td>attention</td>
     <td><a href="../../attention/attention_update/README.md">attention_update</a></td>
     <td>✓</td>

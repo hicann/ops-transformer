@@ -26,6 +26,7 @@
 
 |    接口名   |   说明     | 确定性说明（A2）  | 确定性说明（A3）  | 确定性说明（Ascend 950） |
 | ----------- | ------------------- | ---------  | ---------  | --------- |
+|[aclnnEngramGate](../../engram/engram_gate/docs/aclnnEngramGate.md)|执行 Engram 残差门控前向计算，可输出反向计算所需的中间结果。|-|-|默认确定性实现|
 |[aclnnAllGatherMatmul](../../mc2/all_gather_matmul/docs/aclnnAllGatherMatmul.md)|完成AllGather通信与MatMul计算融合。|默认确定性实现|默认确定性实现|默认确定性实现|
 |[aclnnAllGatherMatmulV2](../../mc2/all_gather_matmul_v2/docs/aclnnAllGatherMatmulV2.md)|aclnnAllGatherMatmulV2接口是对aclnnAllGatherMatmul接口的功能拓展。|默认确定性实现|默认确定性实现|默认确定性实现|
 |[aclnnAlltoAllMatmul](../../mc2/allto_all_matmul/docs/aclnnAlltoAllMatmul.md)|完成AlltoAll通信与MatMul计算融合。|默认确定性实现|默认确定性实现|默认确定性实现|
