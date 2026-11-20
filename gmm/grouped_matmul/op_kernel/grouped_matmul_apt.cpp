@@ -701,33 +701,33 @@ __global__ __aicore__ void grouped_matmul(GM_ADDR x, GM_ADDR weight, GM_ADDR bia
     REGISTER_TILING_DEFAULT(GMMNoQuantTilingData);
     static_assert(NO_QUANT_ACT == GMM_ACT_NONE || NO_QUANT_ACT == GMM_ACT_RELU || NO_QUANT_ACT == GMM_ACT_GELU_TANH,
                   "Unsupported NO_QUANT_ACT value.");
-    constexpr GROUPED_MATMUL::GmmActMode actMode = static_cast<GROUPED_MATMUL::GmmActMode>(NO_QUANT_ACT);
-    if constexpr (actMode == GROUPED_MATMUL::GmmActMode::GELU_TANH) {
-        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2); // GELU epilogue 需要 1:2 AIC:AIV
+    constexpr GROUPED_MATMUL::GmmActMode ACT_MODE = static_cast<GROUPED_MATMUL::GmmActMode>(NO_QUANT_ACT);
+    if constexpr (ACT_MODE == GROUPED_MATMUL::GmmActMode::GELU_TANH) {
+        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2); // GELU epilogue 需 1:2 AIC:AIV
     }
     if constexpr (NO_QUANT_B_TRANS == GMM_NO_TRANS && NO_QUANT_A_TRANS == GMM_NO_TRANS) {
         if constexpr (wFormat == CubeFormat::NZ) {
-            GroupedMatMulKernel<asc::te::nd_ext_layout_ptn, asc::te::nz_layout_ptn, actMode>(x, weight, bias, groupList,
-                                                                                             y, tiling);
+            GroupedMatMulKernel<asc::te::nd_ext_layout_ptn, asc::te::nz_layout_ptn, ACT_MODE>(x, weight, bias,
+                                                                                              groupList, y, tiling);
         } else {
-            GroupedMatMulKernel<asc::te::nd_ext_layout_ptn, asc::te::nd_ext_layout_ptn, actMode>(x, weight, bias,
-                                                                                                 groupList, y, tiling);
+            GroupedMatMulKernel<asc::te::nd_ext_layout_ptn, asc::te::nd_ext_layout_ptn, ACT_MODE>(x, weight, bias,
+                                                                                                  groupList, y, tiling);
         }
     } else if constexpr (NO_QUANT_B_TRANS == GMM_NO_TRANS && NO_QUANT_A_TRANS == GMM_TRANS) { // x transposed
         if constexpr (wFormat == CubeFormat::NZ) {
-            GroupedMatMulKernel<asc::te::dn_ext_layout_ptn, asc::te::nz_layout_ptn, actMode>(x, weight, bias, groupList,
-                                                                                             y, tiling);
+            GroupedMatMulKernel<asc::te::dn_ext_layout_ptn, asc::te::nz_layout_ptn, ACT_MODE>(x, weight, bias,
+                                                                                              groupList, y, tiling);
         } else {
-            GroupedMatMulKernel<asc::te::dn_ext_layout_ptn, asc::te::nd_ext_layout_ptn, actMode>(x, weight, bias,
-                                                                                                 groupList, y, tiling);
+            GroupedMatMulKernel<asc::te::dn_ext_layout_ptn, asc::te::nd_ext_layout_ptn, ACT_MODE>(x, weight, bias,
+                                                                                                  groupList, y, tiling);
         }
     } else if constexpr (NO_QUANT_B_TRANS == GMM_TRANS && NO_QUANT_A_TRANS == GMM_NO_TRANS) { // weight transposed
         if constexpr (wFormat == CubeFormat::NZ) {
-            GroupedMatMulKernel<asc::te::nd_ext_layout_ptn, asc::te::zn_layout_ptn, actMode>(x, weight, bias, groupList,
-                                                                                             y, tiling);
+            GroupedMatMulKernel<asc::te::nd_ext_layout_ptn, asc::te::zn_layout_ptn, ACT_MODE>(x, weight, bias,
+                                                                                              groupList, y, tiling);
         } else {
-            GroupedMatMulKernel<asc::te::nd_ext_layout_ptn, asc::te::dn_ext_layout_ptn, actMode>(x, weight, bias,
-                                                                                                 groupList, y, tiling);
+            GroupedMatMulKernel<asc::te::nd_ext_layout_ptn, asc::te::dn_ext_layout_ptn, ACT_MODE>(x, weight, bias,
+                                                                                                  groupList, y, tiling);
         }
     }
 #endif

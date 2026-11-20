@@ -18,6 +18,10 @@
 
 #include "ascendc/host_api/tiling/template_argument.h"
 
+#ifndef ASCENDC_TPL_1_BW
+#define ASCENDC_TPL_1_BW 1 // 每个参数占用1个bit位
+#endif
+
 #define GMM_NO_TRANS 0
 #define GMM_TRANS 1
 
