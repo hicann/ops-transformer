@@ -25,10 +25,14 @@
 
 - **接口功能**：
 
-    在KV Cache的Epilog阶段对cache进行原地量化压缩更新，封装aclnnKvCompressEpilog。将bfloat16激活值x量化压缩后，按slot_mapping散写到cache，slot_mapping中值为-1的token跳过不处理。x尾轴d的后64列为rope段、前d-64列为nope段。支持四种量化模式：
+    在KV Cache的Epilog阶段对cache进行原地量化压缩更新，封装aclnnKvCompressEpilog。将bfloat16激活值x量化压缩后，按slot_mapping散写到cache，slot_mapping中值为-1的token跳过不处理，取值越界的token静默跳过。quant_mode=0/1/2下x尾轴d的后64列为rope段、前d-64列为nope段；quant_mode=3/4对整行量化（无rope/nope拆分）。支持五种量化模式：
   - `"fp8_bf16"`/`"fp8_e8m0"`（内部0/1）：逐组动态量化压缩为FP8（uint8打包），rope段保留bfloat16；两者区别仅为每组scale的表示（bf16 / e8m0）；
   - `"hifloat8_fp4"`（内部2）：rope段hifloat8**静态**量化（乘x_scale后取hifloat8），nope段per-group **float4_E2M1 动态**量化（scale=组内amax/6以bfloat16写出）；
-  - `"int8_bf16"`（内部1，仅<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>承载）：nope段（前448列，每64元素一组共7组）INT8**对称动态**量化（scale=组内amax/127以bfloat16写出），rope段保留bfloat16；要求d=512。
+  <!-- npu="A3,910b" id9 -->
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：`"int8_bf16"`（内部1）的nope段（前448列，每64元素一组共7组）做INT8**对称动态**量化（scale=组内amax/127以bfloat16写出），rope段保留bfloat16；要求d=512。
+  <!-- end id9 -->
+  - `"nope_rope_fp8_bf16"`（内部3，枚举NOPE_ROPE_FP8_BF16）：对整行x按quant_group_size（仅支持32）做**MXFP8全行**动态量化（cache为float8_e4m3fn/float8_e5m2，scale=组内amax/FP8_MAX以bf16写出，round_scale=True时scale向上取到2的幂），无rope/nope拆分；
+  - `"nope_rope_fp4_bf16"`（内部4，枚举NOPE_ROPE_FP4_BF16）：对整行x做**MXFP4 packed全行**量化（每两元素一字节E2M1，共享指数scale按位编码为bf16，quant_group_size支持16/32，主场景为16）。
 
 - 语义说明：
 
@@ -65,15 +69,15 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
         <td>cache</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>当前层的分页KV Cache，<b>仅支持四维shape</b>（num_slots = blockNum × blockSize），<b>headDim须 ≥ kvCacheCol</b>（kvCacheCol计算见约束说明）。在<b>blockNum维支持非连续</b>（分页）。数据格式为$ND$。</td>
-        <td>uint8</td>
-        <td>(blockNum, blockSize, 1, headDim)</td>
+        <td>当前层的KV Cache，原地更新。<code>quant_mode=0/1/2</code>仅支持四维分页<code>[blockNum, blockSize, 1, headDim]</code>（num_slots = blockNum × blockSize）；<code>quant_mode=3/4</code>支持二维平铺<code>[N, concatCol]</code>或四维分页<code>[blockNum, blockSize, 1, cacheCol]</code>。<b>尾轴须 ≥ 每行写出字节数</b>（见约束说明）；分页布局仅在blockNum维支持非连续，2D平铺支持行stride非连续。数据格式为$ND$。</td>
+        <td>uint8、float8_e4m3fn、float8_e5m2</td>
+        <td>2D (N, concatCol) 或 4D (blockNum, blockSize, 1, cacheCol)</td>
     </tr>
     <tr>
         <td>x</td>
         <td>Tensor</td>
         <td>必选</td>
-        <td>待量化的激活输入，d需满足d % 64 == 0且64 &lt; d ≤ 8192；<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上quant_mode=1时d必须等于512。数据格式为$ND$。</td>
+        <td>待量化的激活输入，quant_mode=0/1/2时d需满足d % 64 == 0且64 &lt; d ≤ 8192；quant_mode=3/4时d需满足0 &lt; d ≤ 8192、d % quant_group_size == 0且d % 128 == 0。数据格式为$ND$。</td>
         <td>bfloat16</td>
         <td>(bs, d)</td>
     </tr>
@@ -97,14 +101,16 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
         <td>quant_mode</td>
         <td>str</td>
         <td>可选</td>
-        <td>量化模式（字符串，大小写不敏感；TorchNPU内部经枚举映射为算子侧int）。默认值<code>"fp8_e8m0"</code>。四种模式中 <code>"fp8_bf16"</code> 与 <code>"fp8_e8m0"</code> 为同一种per-group FP8 量化方法（nope/rope整体逐组动态量化为FP8（e4m3） 并打包进uint8），仅scale表示不同。可选值与含义：
+        <td>量化模式（字符串，大小写不敏感；TorchNPU内部经枚举映射为算子侧int）。默认值<code>"fp8_e8m0"</code>。各模式中 <code>"fp8_bf16"</code> 与 <code>"fp8_e8m0"</code> 为同一种per-group FP8 量化方法（nope/rope整体逐组动态量化为FP8（e4m3） 并打包进uint8），仅scale表示不同。可选值与含义：
             <ul>
                 <li><code>"fp8_bf16"</code>（内部0）：per-group FP8 量化，组大小由quant_group_size决定（内核固定按64），每组一个 <b>bf16</b> scale。</li>
                 <li><code>"fp8_e8m0"</code>（内部1）：per-group FP8 量化，每组一个 <b>e8m0</b>（2 的幂指数） scale，即MX-FP8 微缩放。</li>
                 <li><code>"hifloat8_fp4"</code>（内部2）：rope段（尾轴后64 列）HiFloat8 <b>静态</b>量化（乘x_scale后取HiFloat8）；nope段（前d-64 列）per-group <b>float4_E2M1 动态</b>量化（scale=组内amax/6，以bf16 写出）。</li>
                 <li><code>"int8_bf16"</code>（内部1，仅<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>承载）：nope段（前448 列，每64 元素一组共7 组）<b>INT8 对称动态</b>量化（scale=组内amax/127，以bf16 写出），rope段保留bf16 原始位型；要求d=512、headDim≥608，每token行定长608B。</li>
+                <li><code>"nope_rope_fp8_bf16"</code>(内部3)：整行MXFP8量化（枚举 NOPE_ROPE_FP8_BF16=3，覆盖nope+rope全行，x为bf16），cache须为float8_e4m3fn/float8_e5m2，quant_group_size仅支持32，cache支持2D平铺/4D分页布局。</li>
+                <li><code>"nope_rope_fp4_bf16"</code>(内部4)：整行MXFP4 packed量化（枚举 NOPE_ROPE_FP4_BF16=4），cache须为uint8，quant_group_size支持16/32，cache支持2D平铺/4D分页布局（主场景group=16）。</li>
             </ul>
-            下文约束说明中出现的quant_mode=0/1/2 指上表对应的内部int取值（int8_bf16与fp8_e8m0同为1，按平台分流）。</td>
+            下文约束说明中出现的quant_mode=0/1/2/3/4 指上表对应的内部int取值（int8_bf16与fp8_e8m0同为1，按平台分流）。</td>
         <td>STR</td>
         <td>-</td>
     </tr>
@@ -112,7 +118,7 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
         <td>round_scale</td>
         <td>bool</td>
         <td>可选</td>
-        <td>group模式下是否对每组scale向上取到2的幂。默认值True，quant_mode=2及A2/A3的int8_bf16下不生效。</td>
+        <td>group模式下是否对每组scale向上取到2的幂。默认值True，quant_mode=2/4及A2/A3的int8_bf16下不生效。</td>
         <td>bool</td>
         <td>-</td>
     </tr>
@@ -127,6 +133,16 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
 </tbody>
 </table>
 
+<!-- npu="950" id10 -->
+- <term>Ascend 950PR&950DT系列产品</term>：
+  - cache数据类型：quant_mode=0/1/2/4时为uint8，quant_mode=3时为float8_e4m3fn或float8_e5m2。
+<!-- end id10 -->
+<!-- npu="A3,910b" id11 -->
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
+  - cache数据类型仅支持uint8。
+  - quant_mode=1时，x的最后一维d必须等于512。
+<!-- end id11 -->
+
 ## 返回值说明
 
 该接口无返回值。计算结果直接原地写回输入张量`cache`，`cache`在计算后shape和dtype保持不变；未被`slot_mapping`命中的行保留原值。
@@ -135,8 +151,8 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
 
 - 该接口支持推理场景下使用。
 - 该接口支持单算子模式和TorchAir图模式调用（经graph_convert注册的GE converter下沉为KvCompressEpilog算子，eager与图模式结果一致）。
-- cache仅支持四维shape `[blockNum, blockSize, 1, headDim]`，倒数第二维固定为1（每token一个压缩向量），不支持其他维数。
-- cache仅在blockNum维支持非连续：各block可不紧密排布，但block内（blockSize、headDim维）须连续。
+- `quant_mode=0/1/2`：cache仅支持四维shape `[blockNum, blockSize, 1, headDim]`，倒数第二维固定为1（每token一个压缩向量）。`quant_mode=3/4`：cache支持2D平铺或4D分页，详见上方参数表与约束说明。
+- cache非连续：quant_mode=0/1/2仅blockNum维支持非连续，block内（blockSize、headDim维）须连续；quant_mode=3/4的2D平铺支持行stride非连续，4D分页支持blockNum维非连续（块内须连续）。
 - headDim约束：cache末维headDim必须 ≥ 每行写出字节数kvCacheCol = 对齐(concatCol)，concatCol按量化模式计算：
   - quant_mode=0/1：concatCol = (d−64) + 128 + ⌈(d−64)/64⌉ × scaleBytes，scaleBytes为mode0=2、mode1=1；
   - quant_mode=2：concatCol = 64 + (d−64)/2 + (d−64)/quant_group_size × 2；
@@ -145,12 +161,13 @@ cann_ops_transformer.kv_compress_epilog(cache, x, slot_mapping, *, quant_group_s
   - 示例：d=512、quant_mode=1 → kvCacheCol=583 → headDim ≥ 583（示例中取640）；quant_mode=1（A2/A3）→ kvCacheCol=608 → headDim ≥ 608。
 - slot_mapping的维度应等于x的维度减1，即slot_mapping为x除最后一维外的所有维度展平。
 - x的最后一维（d轴）需满足d % 64 == 0且64 < d ≤ 8192，按每64个元素一组进行逐组量化。
+- quant_mode=3/4时，x的最后一维（d轴）需满足0 < d ≤ 8192、d % quant_group_size == 0且d % 128 == 0（整行量化，无rope/nope拆分）。
 - quant_mode=2时，quant_group_size仅支持16/32/64，且nope段长度(d-64)需能被quant_group_size整除。
 <!-- npu="950" id7 -->
-- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上quant_mode=1承载INT8量化（d=512、608B行），本平台quant_mode=1为group(e8m0)量化。
+- <term>Ascend 950PR&950DT系列产品</term>上quant_mode=1为group（e8m0）量化，quant_mode支持0/1/2/3/4。
 <!-- end id7 -->
 <!-- npu="A3,910b" id8 -->
-- quant_mode=1时（INT8量化），d必须等于512、quant_group_size必须为64、headDim须 ≥ 608；round_scale/x_scale不生效。仅支持quant_mode=1，其他取值报错。
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上，quant_mode仅支持1（INT8量化）：d必须等于512、quant_group_size必须为64、headDim须 ≥ 608；round_scale/x_scale不生效，其他取值报错。
 <!-- end id8 -->
 - slot_mapping中值为-1的token会被跳过不处理；其余有效元素取值范围为[0, num_slots - 1]，且元素值应保证不重复，重复时不保证结果正确性。
 

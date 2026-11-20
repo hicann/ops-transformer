@@ -57,10 +57,10 @@ if _TORCHAIR_AVAILABLE:
         node_name=None,
     ):
         """REG_OP(KvCompressEpilog)\n
-        .INPUT(cache, TensorType({DT_UINT8}))\n
+        .INPUT(cache, TensorType({DT_UINT8, DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2}))\n
         .INPUT(x, TensorType({DT_BF16}))\n
         .INPUT(slot_mapping, TensorType({DT_INT32, DT_INT64}))\n
-        .OUTPUT(cache, TensorType({DT_UINT8}))\n
+        .OUTPUT(cache, TensorType({DT_UINT8, DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2}))\n
         .ATTR(quant_group_size, Int, 64)\n
         .ATTR(quant_mode, Int, 1)\n
         .ATTR(round_scale, Bool, true)\n
@@ -90,14 +90,14 @@ if _TORCHAIR_AVAILABLE:
             outputs=outputs,
             dependencies=dependencies,
             ir=IrDef("KvCompressEpilog")
-            .input("cache", "DT_UINT8")
+            .input("cache", "DT_UINT8, DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2")
             .input("x", "DT_BF16")
             .input("slot_mapping", "DT_INT32, DT_INT64")
             .attr("quant_group_size", attr.Int(64))
             .attr("quant_mode", attr.Int(1))
             .attr("round_scale", attr.Bool(True))
             .attr("x_scale", attr.Float(1.0))
-            .output("cache", "DT_UINT8"),
+            .output("cache", "DT_UINT8, DT_FLOAT8_E4M3FN, DT_FLOAT8_E5M2"),
         )
 
     @register_fx_node_ge_converter(

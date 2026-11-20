@@ -34,9 +34,9 @@ namespace optiling {
 
 // ---------- 输入/输出/属性索引（arch22 / arch35 相同 schema） ----------
 constexpr int64_t KV_COMPRESS_CACHE_INPUT_INDEX = 0;
+constexpr int64_t KV_COMPRESS_CACHE_OUTPUT_INDEX = 0;
 constexpr int64_t X_INPUT_INDEX = 1;
 constexpr int64_t SLOT_MAPPING_INDEX = 2;
-constexpr int64_t KV_COMPRESS_CACHE_OUTPUT_INDEX = 0;
 
 constexpr int64_t QUANT_GROUP_SIZE_ATTR_INDEX = 0;
 constexpr int64_t QUANT_MODE_ATTR_INDEX = 1;
@@ -44,6 +44,30 @@ constexpr int64_t ROUND_SCALE_ATTR_INDEX = 2;
 constexpr int64_t SCALE_ATTR_INDEX = 3;
 
 // ---------- 两个架构共用的布局常量 ----------
+// quant_mode=3: MXFP8 全行量化（全部 d 元素，per-group amax scale 存 bf16，可选 scale 2 的幂取整；
+//               cache dtype 须为 float8_e4m3fn/float8_e5m2，group 仅支持 32）
+constexpr int64_t QUANT_MODE_MXFP8 = 3;
+// quant_mode=4: MXFP4 packed 全行量化（全部 d 元素，两元素一字节 E2M1，共享指数 scale 编码为 bf16；
+//               cache dtype 须为 uint8，group 支持 16/32）
+constexpr int64_t QUANT_MODE_MXFP4 = 4;
+
+// mode 3/4 布局与约束常量
+constexpr int64_t MXFP_GROUP_SIZE_16 = 16;
+constexpr int64_t MXFP_GROUP_SIZE_32 = 32;
+constexpr int64_t MXFP_D_LENGTH_MAX = 8192;
+// mode3/4 的 d 对齐约束（v1.12 新增）：d 须为 128 的倍数——规避不对齐 dataCol 下的
+// 已知 kernel 缺陷类（r7/r8 P1），并将 d%group 之外的合法形状收敛到对齐几何。
+constexpr int64_t MXFP_D_LENGTH_ALIGN = 128;
+constexpr int64_t MXFP_CACHE_RANK_2D = 2;
+constexpr int64_t MXFP_CACHE_RANK_4D = 4;
+// cache 布局标记：1 = layout1 平铺 2D [N, kvCacheCol]；2 = layout2 分页 4D
+constexpr int64_t MXFP_LAYOUT_1 = 1;
+constexpr int64_t MXFP_LAYOUT_2 = 2;
+constexpr int64_t MXFP_LAYOUT2_CACHE_COL_DIM = 3;
+constexpr int64_t MXFP_X_BUFFER_ALIGN = 16;
+constexpr int64_t MXFP_X_ELEMENT_BYTES = 2;
+constexpr int64_t MXFP_DOUBLE_BUFFER = 2;
+
 constexpr int64_t DEFAULT_QUANT_GROUP_SIZE = 64;
 constexpr int64_t DEFAULT_WORKSPACE_SIZE = 0;
 // rope 段长度（x 尾轴后 64 列，两个架构一致）
@@ -91,6 +115,30 @@ TILING_DATA_FIELD_DEF(int64_t, rowFactor);
 TILING_DATA_FIELD_DEF(int64_t, tailRowFactorOfFormerBlock);
 TILING_DATA_FIELD_DEF(int64_t, tailRowFactorOfTailBlock);
 TILING_DATA_FIELD_DEF(float, scalesAttr);
+// ===== 以下 6 字段仅 mode 3/4 路径（TilingKey 2xxx/21xx）写入并读取；=====
+// ===== legacy 路径（key 0）不读不写，其值无意义。=====
+TILING_DATA_FIELD_DEF(int64_t, layout);
+// cache 布局标记，由 cache rank 派生：1 = layout1 平铺 2D [N, kvCacheCol]；
+// 2 = layout2 分页 4D [blockNum, kvCacheBlockSize, 1, layout2CacheCol]。
+// legacy(key 0) 路径不写（单布局，无需标记）。
+TILING_DATA_FIELD_DEF(int64_t, cacheRows);
+// cache 逻辑总行数（token 槽位数），单位：行。
+// layout1 = dim0(N)；layout2 = blockNum * kvCacheBlockSize。
+// 仅用于 slot 越界静默跳过判断（slot 值在 [-1, cacheRows) 之外跳过）。
+TILING_DATA_FIELD_DEF(int64_t, dataCol);
+// 单行量化数据字节数，单位：字节。
+// mode3(MXFP8) = d；mode4(MXFP4 packed，2 元素/字节) = d/2。
+TILING_DATA_FIELD_DEF(int64_t, scaleBytes);
+// 单行 scale 总字节数 = scaleCol * 2（每个 scale 为一个 bf16），单位：字节。
+// 注意与 scaleCol（scale 个数）区分：个数 vs 字节数。
+TILING_DATA_FIELD_DEF(int64_t, layout2TokenBundleSize);
+// 【仅 layout2】单个 token 交错 bundle（[dataCol 数据 | scaleBytes scale]）的总大小，
+// 单位：字节。block 内第 pos 个 token 的写入起始偏移 =
+//     block * kvCacheBlockStride + pos * layout2TokenBundleSize。
+// 约束 layout2TokenBundleSize <= kvCacheRowStride，bundle 之后的行尾间隙不写。
+TILING_DATA_FIELD_DEF(int64_t, layout2CacheCol);
+// 【仅 layout2】cache dim3 的物理列宽（storage shape 最后一维），单位：字节。
+// 约束：layout2CacheCol >= layout2TokenBundleSize；块尾间隙不写。
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(KvCompressEpilog, KvCompressEpilogTilingData)

@@ -23,10 +23,17 @@
 #include "arch22/kv_compress_epilog_kernel_arch22.h"
 #else
 #include "arch35/kv_compress_epilog_kernel.h"
+#include "arch35/kv_compress_epilog_layout2d.h"
+#include "arch35/kv_compress_epilog_layout4d.h"
 #endif
 
 using namespace AscendC;
 
+// TilingKey 分发矩阵：
+//   key 0            -> legacy mode 0/1/2（rope/nope 拆分量化，uint8 cache 4D）
+//   key 2000/2100    -> mode 3 MXFP8  全行量化（2D 平铺 / 4D 分页）
+//   key 2001/2101    -> mode 4 MXFP4-g32 全行量化
+//   key 2002/2102    -> mode 4 MXFP4-g16 全行量化
 extern "C" __global__ __aicore__ void kv_compress_epilog(GM_ADDR cache, GM_ADDR x, GM_ADDR slot_mapping,
                                                          GM_ADDR cache_out, GM_ADDR workspace, GM_ADDR tiling)
 {
@@ -50,8 +57,36 @@ extern "C" __global__ __aicore__ void kv_compress_epilog(GM_ADDR cache, GM_ADDR 
 #else
     int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();
     if (TILING_KEY_IS(0)) {
+        // legacy mode 0/1/2：仅 uint8 cache 组合的实例化包含本路径；fp8 组合由 tiling
+        // 校验保证不会下发 key 0（mode 0/1/2 要求 cache 为 uint8）。
+#if !defined(ORIG_DTYPE_CACHE) || (ORIG_DTYPE_CACHE == DT_UINT8)
         KvCompressEpilogOps::KvCompressEpilog<DTYPE_X, DTYPE_SLOT_MAPPING, DTYPE_CACHE> op(&pipe);
         op.Init(x, slot_mapping, cache, tilingData);
+        op.Process();
+#endif
+    } else if (TILING_KEY_IS(2000)) {
+        KvCompressEpilogMxfpOps::KvCompressEpilogLayout2dFp8Kernel<DTYPE_X, DTYPE_SLOT_MAPPING, DTYPE_CACHE> op(&pipe);
+        op.Init(cache, x, slot_mapping, tilingData);
+        op.Process();
+    } else if (TILING_KEY_IS(2001)) {
+        KvCompressEpilogMxfpOps::KvCompressEpilogLayout2dFp4G32Kernel<DTYPE_X, DTYPE_SLOT_MAPPING> op(&pipe);
+        op.Init(cache, x, slot_mapping, tilingData);
+        op.Process();
+    } else if (TILING_KEY_IS(2002)) {
+        KvCompressEpilogMxfpOps::KvCompressEpilogLayout2dFp4G16Kernel<DTYPE_X, DTYPE_SLOT_MAPPING> op(&pipe);
+        op.Init(cache, x, slot_mapping, tilingData);
+        op.Process();
+    } else if (TILING_KEY_IS(2100)) {
+        KvCompressEpilogMxfpOps::KvCompressEpilogLayout4dFp8Kernel<DTYPE_X, DTYPE_SLOT_MAPPING, DTYPE_CACHE> op(&pipe);
+        op.Init(cache, x, slot_mapping, tilingData);
+        op.Process();
+    } else if (TILING_KEY_IS(2101)) {
+        KvCompressEpilogMxfpOps::KvCompressEpilogLayout4dFp4G32Kernel<DTYPE_X, DTYPE_SLOT_MAPPING> op(&pipe);
+        op.Init(cache, x, slot_mapping, tilingData);
+        op.Process();
+    } else if (TILING_KEY_IS(2102)) {
+        KvCompressEpilogMxfpOps::KvCompressEpilogLayout4dFp4G16Kernel<DTYPE_X, DTYPE_SLOT_MAPPING> op(&pipe);
+        op.Init(cache, x, slot_mapping, tilingData);
         op.Process();
     }
     AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(oriOverflowMode);

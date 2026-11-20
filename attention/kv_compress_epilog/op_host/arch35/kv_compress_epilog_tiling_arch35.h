@@ -73,6 +73,12 @@ protected:
     ge::graphStatus ValidateShapes();
     ge::graphStatus ValidateDtypes();
 
+    // mode 3/4 (MXFP8/MXFP4) 路径
+    bool IsMxfpMode() const;
+    ge::graphStatus GetMxfpCacheLayout();
+    ge::graphStatus DoMxfpTiling();
+    uint64_t GetMxfpTilingKey() const;
+
     // Utilities
     uint64_t GetTilingKey() const;
     void DumpTilingInfo();
@@ -106,6 +112,14 @@ private:
     int64_t tailRowFactorOfFormerBlock_ = 0;
     int64_t tailRowFactorOfTailBlock_ = 0;
 
+    // mode 3/4 (MXFP8/MXFP4) 路径专用
+    int64_t layout_ = 0;                 // 0=legacy(不写) 1=layout1(2D) 2=layout2(4D)
+    int64_t cacheRows_ = 0;              // cache 逻辑总行数（token 槽位）
+    int64_t dataCol_ = 0;                // 量化数据字节数（fp8=d / fp4=d/2）
+    int64_t scaleBytes_ = 0;             // scale 总字节数 = scaleCol * 2
+    int64_t layout2TokenBundleSize_ = 0; // layout2 单 token bundle 大小 = dataCol + scaleBytes
+    int64_t layout2CacheCol_ = 0;        // layout2 cache dim3 物理列宽
+
     // Attributes
     int64_t quantGroupSize_ = DEFAULT_QUANT_GROUP_SIZE;
     int64_t quantMode_ = 1;
@@ -116,6 +130,7 @@ private:
     ge::DataType xDtype_ = ge::DT_BF16;
     ge::DataType slotMappingDtype_ = ge::DT_INT32;
     ge::DataType kvCacheDtype_ = ge::DT_FLOAT8_E5M2;
+    ge::DataType cacheDtype_ = ge::DT_UINT8;
 };
 
 } // namespace optiling

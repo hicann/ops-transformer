@@ -23,7 +23,10 @@
 
 ## 功能说明
 
-- 接口功能：在KV Cache的Epilog阶段，对KV Cache进行原地压缩更新。将`bfloat16`激活值量化压缩后，按`slotMapping`散写到cache，值为 -1的token跳过不处理。`x`尾轴`d`的后64列为rope段、前`d-64`列为nope段。支持四种量化模式：group(bf16 scale)、group(e8m0 scale)、rope hifloat8静态 + nope FLOAT4_E2M1动态、nope INT8对称动态量化（rope保留bf16）。
+- 接口功能：在KV Cache的Epilog阶段，对KV Cache进行原地压缩更新。将`bfloat16`激活值量化压缩后，按`slotMapping`散写到cache，值为 -1的token跳过不处理，取值越界的token静默跳过。`quantMode=0/1/2`下`x`尾轴`d`的后64列为rope段、前`d-64`列为nope段；`quantMode=3/4`对整行量化（无rope/nope拆分）。支持五种量化模式：group(bf16 scale)、group(e8m0 scale)、rope hifloat8静态 + nope FLOAT4_E2M1动态、MXFP8全行、MXFP4 packed全行。
+<!-- npu="A3,910b" id9 -->
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上`quantMode=1`承载nope INT8对称动态量化（rope保留bf16）。
+<!-- end id9 -->
 
 - 计算公式：
 
@@ -37,20 +40,32 @@
 
   - 场景2（quantMode=1）：同场景1，但`scale`存储为`float8_e8m0`，`roundScale=true`时`scale`向上取到2的幂。
 
-  - 场景3（quantMode=2）：rope段（后64列）做hifloat8**静态**量化，nope段（前d-64列）做per-group **FLOAT4_E2M1 动态**量化（`FP4\_MAX=6.0`），`scale`以`bfloat16`写出，`roundScale`不生效：
+  - 场景3（quantMode=2）：rope段（后64列）做hifloat8**静态**量化，nope段（前d-64列）做per-group **FLOAT4_E2M1动态**量化（`FP4\_MAX=6.0`），`scale`以`bfloat16`写出，`roundScale`不生效：
 
     $$
     rope_i = \mathrm{hifloat8}(x_i \cdot xScale), \qquad
     scale_g = \frac{\max(|x_g|)}{FP4\_MAX}, \quad nope_i = \mathrm{FLOAT4\_E2M1}\left(\frac{x_i}{scale_g}\right)
     $$
 
-  - 场景4（quantMode=1，<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上承载INT8）：`d`固定为512，前448列为nope段（每64元素一组共7组）做INT8**对称动态**量化，后64列为rope段按`bfloat16`原始位型写出；`scale`以`bfloat16`写出，`roundScale`、`xScale`不生效。每token行定长608B：rope 128B | nope 448B | scale 14B | pad 18B(写0)。取整为数学真值的 RNE（四舍六入五取偶）：
+  - 场景4（quantMode=1，<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上承载INT8）：`d`固定为512，前448列为nope段（每64元素一组共7组）做INT8**对称动态**量化，后64列为rope段按`bfloat16`原始位型写出；`scale`以`bfloat16`写出，`roundScale`、`xScale`不生效。每token行定长608B：rope 128B | nope 448B | scale 14B | pad 18B(写0)。取整为数学真值的RNE（四舍六入五取偶）：
 
     $$
     amax_g = \max(|x_g|), \quad
     scale_g = \begin{cases} 1.0, & amax_g = 0 \\ \frac{amax_g}{127}, & amax_g \neq 0 \end{cases}, \quad
     q_i = \mathrm{clip}\left(\mathrm{RNE}\left(\frac{x_i}{scale_g}\right), -128, 127\right)
     $$
+
+  - 场景5（quantMode=3，MXFP8全行）：整行按`quantGroupSize`（仅支持32）分组做MXFP8动态量化，cache为`float8_e4m3fn/float8_e5m2`（`FP8\_MAX`分别取448/57344）：
+
+    $$
+    scale_g = \frac{\max(|x_g|, 10^{-4})}{FP8\_MAX}, \quad q_i = \mathrm{round}\left(\frac{x_i}{scale_g}\right)
+    $$
+
+    `roundScale=true`时`scale`向上取到2的幂；`scale`以`bfloat16`写出。
+
+  - 场景6（quantMode=4，MXFP4 packed全行）：整行MXFP4量化，每两元素打包一字节E2M1（RNE），共享指数`scale`按位编码为`bfloat16`（含Inf/NaN/0位级修正），`quantGroupSize`支持16/32。
+
+- cache布局：`quantMode=0/1/2`仅支持四维`[blockNum, blockSize, 1, headDim]`；`quantMode=3/4`另支持二维平铺`[N, kvCacheCol]`（slot即行号）与四维分页`[blockNum, blockSize, 1, cacheCol]`（每token交错`[data|scale]`bundle，块尾/步长间隙不写，块步长由cache view stride派生）。行布局（`quantMode=3/4`，平铺）：`[dataCol数据][scaleCol个bf16 scale]`，无pad、行尾不写；dataCol=FP8取d / FP4取d/2，scaleCol=d/quantGroupSize。
 
 - 示例：
 
@@ -71,6 +86,18 @@
   quantGroupSize = 64
   quantMode = 1
   cache out shape:    [128, 16, 1, 608]   (原地更新，被引用行的前608B被覆写)
+  ```
+
+  ```python
+  # MXFP4-g16 主场景（quantMode=4，平铺 2D cache）
+  cache shape:        [4096, 320]         # 2D [N, concatCol], concatCol = d/2 + 2*(d/16) = 320（无pad）
+  x shape:            [1024, 512]
+  slot_mapping shape: [1024]
+  quantGroupSize = 16
+  quantMode = 4
+  roundScale = true
+  xScale = 1.0
+  cache out shape:    [4096, 320]         (原地更新)
   ```
 
 ## 函数原型
@@ -128,11 +155,11 @@ aclnnStatus aclnnKvCompressEpilog(
       <td>cacheRef（aclTensor*）</td>
       <td>输入/输出</td>
       <td>表示当前层的KV Cache向量缓存，原地更新，对应计算公式中的量化目标。</td>
-      <td><li>不支持空Tensor。</li><li>既是输入也是输出。</li><li>仅支持四维[blockNum, blockSize, 1, headDim]，dim2固定为1。</li></td>
-      <td>UINT8</td>
+      <td><li>不支持空Tensor。</li><li>既是输入也是输出。</li><li>quantMode=0/1/2：仅支持四维[blockNum, blockSize, 1, headDim]，dim2固定为1。</li><li>quantMode=3/4：支持二维[N, concatCol]（平铺，无pad）或四维[blockNum, blockSize, 1, cacheCol]（分页）。</li></td>
+      <td>UINT8、FLOAT8_E4M3FN、FLOAT8_E5M2</td>
       <td>ND</td>
-      <td>[blockNum, blockSize, 1, headDim]</td>
-      <td>√（仅blockNum维）</td>
+      <td>见使用说明</td>
+      <td>quantMode=0/1/2仅blockNum维支持非连续；quantMode=3/4的二维平铺支持行stride非连续，四维分页布局支持块间非连续（blockNum维），间隙保持原值</td>
     </tr>
     <tr>
       <td>x（const aclTensor*）</td>
@@ -168,7 +195,7 @@ aclnnStatus aclnnKvCompressEpilog(
       <td>quantMode（int64_t）</td>
       <td>输入</td>
       <td>量化模式。</td>
-      <td>枚举值支持0、1、2，其中0表示group量化（scale存储为bfloat16），1表示group量化（scale存储为float8_e8m0），2表示rope段hifloat8静态量化 + nope段FLOAT4_E2M1动态量化（scale存储为bfloat16），1在<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上表示nope段INT8对称动态量化 + rope段保留bfloat16（scale存储为bfloat16，要求d=512；其余平台为group量化，scale存储为float8_e8m0）。默认值为1。</td>
+      <td>枚举值支持0、1、2、3、4，其中0表示group量化（scale存储为bfloat16），1表示group量化（scale存储为float8_e8m0），2表示rope段hifloat8静态量化 + nope段FLOAT4_E2M1动态量化（scale存储为bfloat16），3表示MXFP8全行量化（cache为float8_e4m3fn/float8_e5m2，group仅支持32），4表示MXFP4 packed全行量化（cache为uint8，group支持16/32）。默认值为1。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -215,6 +242,17 @@ aclnnStatus aclnnKvCompressEpilog(
       <td>-</td>
     </tr>
   </tbody></table>
+
+<!-- npu="950" id10 -->
+- <term>Ascend 950PR&950DT系列产品</term>：
+  - cache数据类型：quantMode=0/1/2/4时为UINT8，quantMode=3时为FLOAT8_E4M3FN或FLOAT8_E5M2。
+  - quantMode支持0/1/2/3/4，其中quantMode=1表示group量化（scale存储为float8_e8m0）。
+<!-- end id10 -->
+<!-- npu="A3,910b" id11 -->
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
+  - cache数据类型仅支持UINT8。
+  - quantMode仅支持1，表示nope段INT8对称动态量化 + rope段保留bfloat16（scale存储为bfloat16，要求d=512）；其余取值报错。
+<!-- end id11 -->
 
 - **返回值**
 
@@ -281,16 +319,20 @@ aclnnStatus aclnnKvCompressEpilog(
 ## 约束说明
 
 - 确定性计算：aclnnKvCompressEpilog默认确定性实现。
-- **cache仅支持四维shape** `[blockNum, blockSize, 1, headDim]`（num_slots = blockNum × blockSize），倒数第二维固定为1，不支持其他维数；仅在blockNum维支持非连续。
-- **headDim约束**：cache末维headDim须 ≥ 每行写出字节数kvCacheCol = 对齐(concatCol)。concatCol：quantMode=0/1为(d-64)+128+⌈(d-64)/64⌉×scaleBytes（mode0=2、mode1=1）；quantMode=2为64+(d-64)/2+((d-64)/quantGroupSize)×2；<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上quantMode=1恒为608。对齐：quantMode=1不补齐，quantMode=0/2按32B对齐。示例：d=256、quantMode=1 → kvCacheCol=323 → headDim ≥ 323；quantMode=1（A2/A3）→ kvCacheCol=608 → headDim ≥ 608。
+- **cache shape约束**：quantMode=0/1/2仅支持四维`[blockNum, blockSize, 1, headDim]`（num_slots = blockNum × blockSize），倒数第二维固定为1，仅在blockNum维支持非连续；quantMode=3/4支持二维平铺`[N, concatCol]`（slot即行号，尾轴≥concatCol，无32B取整要求）或四维分页`[blockNum, blockSize, 1, cacheCol]`（每token交错[data|scale]bundle，尾轴≥concatCol，块尾/步长间隙不写，块步长由cache view stride派生，连续时为blockSize×cacheCol；32B对齐为建议值，不再强制）。
+- **块间非连续（quantMode=3/4）**：四维分页cache各块之间可有间隙；块步长取cache的view stride(0)，须不小于`blockSize × cacheCol`；32B对齐为建议值，不再强制。块内token按`[data|scale]` bundle紧凑排列，块间间隙不写。
+- **headDim约束**：cache末维headDim须 ≥ 每行写出字节数。quantMode=3/4：行宽=concatCol（无pad），headDim ≥ concatCol。quantMode=0/1/2：headDim ≥ kvCacheCol = 对齐(concatCol)；concatCol：quantMode=0/1为(d-64)+128+⌈(d-64)/64⌉×scaleBytes（mode0=2、mode1=1）；quantMode=2为64+(d-64)/2+((d-64)/quantGroupSize)×2。对齐：quantMode=1不补齐，quantMode=0/2按32B对齐。示例：d=256、quantMode=1 → kvCacheCol=323 → headDim ≥ 323。
+<!-- npu="A3,910b" id12 -->
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上quantMode=1的kvCacheCol恒为608，headDim ≥ 608。
+<!-- end id12 -->
 - slotMapping的维度应等于x的维度减1，即slotMapping为x除最后一维外的所有维度展平。
-- x的最后一维（d轴）需满足d % 64 == 0且64 < d ≤ 8192，按每64个元素一组进行逐组量化。
+- x的最后一维（d轴）：quantMode=0/1/2需满足d % 64 == 0且64 < d ≤ 8192；quantMode=3/4需满足0 < d ≤ 8192、d % quantGroupSize == 0且d % 128 == 0（无rope/nope拆分）。
 - quantMode=2时，quantGroupSize仅支持16/32/64，且nope段长度(d-64)需能被quantGroupSize整除；x需为bfloat16。
 <!-- npu="950" id7 -->
-- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上quantMode=1承载INT8量化（d=512、608B行），本平台quantMode=1为group(e8m0)量化。
+- <term>Ascend 950PR&950DT系列产品</term>上quantMode=1为group（e8m0）量化，quantMode支持0/1/2/3/4。
 <!-- end id7 -->
 <!-- npu="A3,910b" id8 -->
-- quantMode=1时（INT8量化），d必须等于512（448列nope + 64列rope）、quantGroupSize必须为64、headDim须 ≥ 608；roundScale/xScale不生效。仅支持quantMode=1，其他取值报错。
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上，quantMode仅支持1（INT8量化）：d必须等于512（448列nope + 64列rope）、quantGroupSize必须为64、headDim须 ≥ 608；roundScale/xScale不生效，其他取值报错。
 <!-- end id8 -->
 - slotMapping中值为 -1的token会被跳过不处理；其余有效元素取值范围为[0, num_slots - 1]，且元素值应保证不重复，重复时不保证结果正确性。
 

@@ -105,6 +105,7 @@ int main()
 
     // Mode 1, d=256: 128 rope bytes + 192 nope bytes + 3 scale bytes = 323 bytes per slot.
     // The cache row has 384 bytes; each token writes a distinct slot within the 2048-slot cache.
+    // 执行成功后紧接着以 MXFP4-g16 主场景（mode 4，2D 平铺 cache）再跑一遍。
     constexpr int64_t blockNum = 128;
     constexpr int64_t blockSize = 16;
     constexpr int64_t headDim = 384;
@@ -148,5 +149,37 @@ int main()
     }
 
     LOG_PRINT("KvCompressEpilog execution completed successfully!\n");
+
+    // MXFP4-g16 主场景（mode 4）：2D 平铺 cache [N, kvCacheCol]，整行量化。
+    // d=256 -> dataCol=128, scaleCol=16, concatCol=160, kvCacheCol=RoundUp(160,32)=160。
+    constexpr int64_t mxfpRows = 2048;
+    constexpr int64_t mxfpCacheCol = 160;
+    std::vector<uint8_t> mxfpCacheData(mxfpRows * mxfpCacheCol, 0);
+    auto mxfpCache =
+        resources.CreateTensor({mxfpRows, mxfpCacheCol}, ACL_UINT8, mxfpCacheData.data(), mxfpCacheData.size());
+    auto mxfpX = resources.CreateTensor({tokenNum, d}, ACL_BF16, xData.data(), xData.size() * sizeof(uint16_t));
+    if (mxfpCache == nullptr || mxfpX == nullptr) {
+        return 1;
+    }
+    int64_t mxfpGroupSize = 16;
+    int64_t mxfpMode = 4;
+    workspaceSize = 0;
+    executor = nullptr;
+    if (!Check(aclnnKvCompressEpilogGetWorkspaceSize(mxfpCache, mxfpX, slotMapping, mxfpGroupSize, mxfpMode, roundScale,
+                                                     xScale, &workspaceSize, &executor),
+               "aclnnKvCompressEpilogGetWorkspaceSize(MXFP4)")) {
+        return 1;
+    }
+    if (workspaceSize != 0 &&
+        !Check(aclrtMalloc(&resources.workspace, workspaceSize, ACL_MEM_MALLOC_NORMAL_ONLY), "aclrtMalloc workspace")) {
+        return 1;
+    }
+    if (!Check(aclnnKvCompressEpilog(resources.workspace, workspaceSize, executor, resources.stream),
+               "aclnnKvCompressEpilog(MXFP4)") ||
+        !Check(aclrtSynchronizeStream(resources.stream), "aclrtSynchronizeStream")) {
+        return 1;
+    }
+
+    LOG_PRINT("KvCompressEpilog MXFP4 execution completed successfully!\n");
     return 0;
 }

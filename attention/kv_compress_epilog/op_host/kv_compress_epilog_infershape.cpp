@@ -33,7 +33,8 @@ graphStatus InferShape4KvCompressEpilog(gert::InferShapeContext* context)
 
 graphStatus InferDtype4KvCompressEpilog(gert::InferDataTypeContext* context)
 {
-    // 输出 cache 与输入 cache dtype 一致（UINT8）。
+    // 输出 cache 与输入 cache dtype 一致（uint8 / float8_e4m3fn / float8_e5m2，按实际传入）。
+    // shape 推导同上：rank 2（平铺）或 rank 4（分页）均原样复制。
     context->SetOutputDataType(0, context->GetInputDataType(0));
     return GRAPH_SUCCESS;
 }

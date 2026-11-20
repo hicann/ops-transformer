@@ -11,6 +11,8 @@
 #include <gtest/gtest.h>
 #include <iostream>
 #include <limits>
+#include <utility>
+#include <vector>
 #include "tiling/platform/platform_ascendc.h"
 #include "tiling_case_executor.h"
 #include "../../../op_host/kv_compress_epilog_tiling.h"
@@ -230,6 +232,133 @@ TEST_F(KvCompressEpilogTiling, kv_compress_epilog_tiling_cache_dim2_not_one_reje
     ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
 }
 
+// ==================== mode 3/4 (MXFP8/MXFP4 全行量化) 用例 ====================
+// d=512: mode3 dataCol=512,scaleCol=16,concatCol=544,kvCacheCol=544
+//        mode4-g32 dataCol=256,scaleCol=16,concatCol=288,kvCacheCol=288
+//        mode4-g16 dataCol=256,scaleCol=32,concatCol=320,kvCacheCol=320
+static gert::TilingContextPara MakeMxfpPara(std::initializer_list<int64_t> cacheShape, ge::DataType cacheDtype,
+                                            int64_t mode, int64_t group, float xScale = 1.0f, int64_t d = 512)
+{
+    const gert::StorageShape cacheStorageShape(cacheShape, cacheShape);
+    return gert::TilingContextPara("KvCompressEpilog",
+                                   {
+                                       {cacheStorageShape, cacheDtype, ge::FORMAT_ND},
+                                       {{{1024, d}, {1024, d}}, ge::DT_BF16, ge::FORMAT_ND},
+                                       {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND},
+                                   },
+                                   {
+                                       {cacheStorageShape, cacheDtype, ge::FORMAT_ND},
+                                   },
+                                   {
+                                       {"quant_group_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(group)},
+                                       {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(mode)},
+                                       {"round_scale", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+                                       {"x_scale", Ops::Transformer::AnyValue::CreateFrom<float>(xScale)},
+                                   },
+                                   &compileInfo, "Ascend950", compileInfo.coreNum, compileInfo.ubSize);
+}
+
+// mode3 MXFP8-e4m3 layout1(2D): key=2000, workspace=32
+TEST_F(KvCompressEpilogTiling, mxfp8_e4m3_layout1_key2000)
+{
+    auto para = MakeMxfpPara({2048, 544}, ge::DT_FLOAT8_E4M3FN, 3, 32);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 2000, "", {0});
+}
+
+// mode3 MXFP8-e5m2 layout1(2D): key=2000
+TEST_F(KvCompressEpilogTiling, mxfp8_e5m2_layout1_key2000)
+{
+    auto para = MakeMxfpPara({2048, 544}, ge::DT_FLOAT8_E5M2, 3, 32);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 2000, "", {0});
+}
+
+// mode4 MXFP4-g32 layout1(2D): key=2001
+TEST_F(KvCompressEpilogTiling, mxfp4_g32_layout1_key2001)
+{
+    auto para = MakeMxfpPara({2048, 288}, ge::DT_UINT8, 4, 32);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 2001, "", {0});
+}
+
+// mode4 MXFP4-g16 layout1(2D) 主场景: key=2002
+TEST_F(KvCompressEpilogTiling, mxfp4_g16_layout1_key2002)
+{
+    auto para = MakeMxfpPara({2048, 320}, ge::DT_UINT8, 4, 16);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 2002, "", {0});
+}
+
+// layout1 无 pad：cache 尾轴只要求 >= concatCol（不再要求 RoundUp(concatCol,32)）。
+// d=128/g16 -> concatCol=80（旧对齐值 96）；d=128/g32 -> concatCol=72（旧 96）；
+// d=128/mode3 -> concatCol=136（旧 160）。
+TEST_F(KvCompressEpilogTiling, mxfp4_g16_layout1_row_eq_concat_ok)
+{
+    auto para = MakeMxfpPara({2048, 80}, ge::DT_UINT8, 4, 16, 1.0f, 128);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 2002, "", {0});
+}
+
+TEST_F(KvCompressEpilogTiling, mxfp4_g16_layout1_row_between_concat_and_old_align_ok)
+{
+    auto para = MakeMxfpPara({2048, 88}, ge::DT_UINT8, 4, 16, 1.0f, 128);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 2002, "", {0});
+}
+
+TEST_F(KvCompressEpilogTiling, mxfp4_g16_layout1_row_below_concat_rejected)
+{
+    auto para = MakeMxfpPara({2048, 79}, ge::DT_UINT8, 4, 16, 1.0f, 128);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+TEST_F(KvCompressEpilogTiling, mxfp4_g32_layout1_row_eq_concat_ok)
+{
+    auto para = MakeMxfpPara({2048, 72}, ge::DT_UINT8, 4, 32, 1.0f, 128);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 2001, "", {0});
+}
+
+TEST_F(KvCompressEpilogTiling, mxfp4_g32_layout1_row_below_concat_rejected)
+{
+    auto para = MakeMxfpPara({2048, 71}, ge::DT_UINT8, 4, 32, 1.0f, 128);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+TEST_F(KvCompressEpilogTiling, mxfp8_layout1_row_eq_concat_ok)
+{
+    auto para = MakeMxfpPara({2048, 136}, ge::DT_FLOAT8_E4M3FN, 3, 32, 1.0f, 128);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 2000, "", {0});
+}
+
+TEST_F(KvCompressEpilogTiling, mxfp8_layout1_row_below_concat_rejected)
+{
+    auto para = MakeMxfpPara({2048, 135}, ge::DT_FLOAT8_E4M3FN, 3, 32, 1.0f, 128);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// mode3 MXFP8-e4m3 layout2(4D): key=2100
+TEST_F(KvCompressEpilogTiling, mxfp8_e4m3_layout2_key2100)
+{
+    auto para = MakeMxfpPara({128, 16, 1, 544}, ge::DT_FLOAT8_E4M3FN, 3, 32);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 2100, "", {0});
+}
+
+// mode4 MXFP4-g32 layout2(4D): key=2101
+TEST_F(KvCompressEpilogTiling, mxfp4_g32_layout2_key2101)
+{
+    auto para = MakeMxfpPara({128, 16, 1, 288}, ge::DT_UINT8, 4, 32);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 2101, "", {0});
+}
+
+// mode4 MXFP4-g16 layout2(4D): key=2102
+TEST_F(KvCompressEpilogTiling, mxfp4_g16_layout2_key2102)
+{
+    auto para = MakeMxfpPara({128, 16, 1, 320}, ge::DT_UINT8, 4, 16);
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 2102, "", {0});
+}
+
+// (负) mode3 搭配 uint8 cache -> dtype 不匹配
+TEST_F(KvCompressEpilogTiling, mxfp8_uint8_cache_rejected)
+{
+    auto para = MakeMxfpPara({2048, 544}, ge::DT_UINT8, 3, 32);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
 // ---------------------------------------------------------------------------
 // arch22 (DAV_2201, SoC Ascend910B) quant_mode=1: rope bf16 位型直通 + nope per-group int8 动态量化。
 //   x 必须 2D [bs, 512] (前 448 列 nope, 后 64 列 rope); quant_group_size 恒 64;
@@ -345,5 +474,213 @@ TEST_F(KvCompressEpilogTiling, kv_compress_epilog_tiling_arch22_mode2_rejected)
 TEST_F(KvCompressEpilogTiling, kv_compress_epilog_tiling_arch35_mode7_rejected)
 {
     auto para = MakeInt8Para(1024, 512, 608, 64, 7, ge::DT_INT32, "Ascend950");
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// (负) mode4 搭配 fp8 cache -> dtype 不匹配
+TEST_F(KvCompressEpilogTiling, mxfp4_fp8_cache_rejected)
+{
+    auto para = MakeMxfpPara({2048, 288}, ge::DT_FLOAT8_E4M3FN, 4, 32);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// (负) mode3 仅支持 group=32
+TEST_F(KvCompressEpilogTiling, mxfp8_group16_rejected)
+{
+    auto para = MakeMxfpPara({2048, 544}, ge::DT_FLOAT8_E4M3FN, 3, 16);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// (负) mode4 仅支持 group 16/32
+TEST_F(KvCompressEpilogTiling, mxfp4_group64_rejected)
+{
+    auto para = MakeMxfpPara({2048, 288}, ge::DT_UINT8, 4, 64);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// (负) cache rank=3 非法
+TEST_F(KvCompressEpilogTiling, mxfp_cache_rank3_rejected)
+{
+    auto para = MakeMxfpPara({64, 16, 544}, ge::DT_UINT8, 4, 32);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// (负) layout2 dim2 != 1
+TEST_F(KvCompressEpilogTiling, mxfp_layout2_dim2_not_one_rejected)
+{
+    auto para = MakeMxfpPara({64, 16, 2, 320}, ge::DT_UINT8, 4, 16);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// (负) layout1 行宽不足（rowStride=512 < kvCacheCol=544）
+TEST_F(KvCompressEpilogTiling, mxfp_layout1_row_too_narrow_rejected)
+{
+    auto para = MakeMxfpPara({2048, 512}, ge::DT_FLOAT8_E4M3FN, 3, 32);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// (负) layout2 行宽不足（cacheCol=256 < tokenBundle=288）
+TEST_F(KvCompressEpilogTiling, mxfp_layout2_row_too_narrow_rejected)
+{
+    auto para = MakeMxfpPara({64, 16, 1, 256}, ge::DT_UINT8, 4, 32);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// (负) mode3/4 的 x_scale 必须为 1.0
+TEST_F(KvCompressEpilogTiling, mxfp_xscale_not_one_rejected)
+{
+    auto para = MakeMxfpPara({2048, 544}, ge::DT_FLOAT8_E4M3FN, 3, 32, 2.0f);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// (负) d 不能被 group 整除（d=520, 520%16!=0）
+TEST_F(KvCompressEpilogTiling, mxfp_d_not_divisible_rejected)
+{
+    gert::TilingContextPara para("KvCompressEpilog",
+                                 {
+                                     {{{2048, 336}, {2048, 336}}, ge::DT_UINT8, ge::FORMAT_ND},
+                                     {{{1024, 520}, {1024, 520}}, ge::DT_BF16, ge::FORMAT_ND},
+                                     {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND},
+                                 },
+                                 {
+                                     {{{2048, 336}, {2048, 336}}, ge::DT_UINT8, ge::FORMAT_ND},
+                                 },
+                                 {
+                                     {"quant_group_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+                                     {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+                                     {"round_scale", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+                                     {"x_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+                                 },
+                                 &compileInfo, "Ascend950", compileInfo.coreNum, compileInfo.ubSize);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// (负) mode3/4 的 d 须为 128 的倍数（d=96: 96%16==0 通过 group 校验, 但 96%128!=0）
+TEST_F(KvCompressEpilogTiling, mxfp_d_not_multiple_of_128_rejected)
+{
+    gert::TilingContextPara para("KvCompressEpilog",
+                                 {
+                                     {{{2048, 160}, {2048, 160}}, ge::DT_UINT8, ge::FORMAT_ND},
+                                     {{{1024, 96}, {1024, 96}}, ge::DT_BF16, ge::FORMAT_ND},
+                                     {{{1024}, {1024}}, ge::DT_INT32, ge::FORMAT_ND},
+                                 },
+                                 {
+                                     {{{2048, 160}, {2048, 160}}, ge::DT_UINT8, ge::FORMAT_ND},
+                                 },
+                                 {
+                                     {"quant_group_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(16)},
+                                     {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+                                     {"round_scale", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+                                     {"x_scale", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+                                 },
+                                 &compileInfo, "Ascend950", compileInfo.coreNum, compileInfo.ubSize);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// ==================== 非连续 cache view stride 注入（缺陷 D-3 / 交付条件 C3） ====================
+// 生产形态: 分页 KV 块表跳转, cache 为非连续 view。tiling 须从 cache descriptor 的 view stride
+// 派生物理行步长/块步长(替代 v2 的 block_stride attr)并落到 TilingData。注入方式: cache 输入
+// TensorDescription 挂 stride_(tiling_case_executor 走 TensorV2 路径, InputIsView() 为真)。
+// 注: TilingData 序列化为 int64 槽位、序与 op_host 字段声明序一致(scalesAttr float 占 1 槽)。
+namespace {
+constexpr size_t TD_KV_CACHE_COL = 2;
+constexpr size_t TD_KV_CACHE_ROW_STRIDE = 3;
+constexpr size_t TD_KV_CACHE_BLOCK_SIZE = 4;
+constexpr size_t TD_KV_CACHE_BLOCK_STRIDE = 5;
+constexpr size_t TD_LAYOUT = 21;
+constexpr size_t TD_CACHE_ROWS = 22;
+
+// 读 TilingData 序列化 buffer 的第 slot 个 int64 字段（槽位序见上方说明）。
+int64_t TdSlot(const TilingInfo& info, size_t slot)
+{
+    EXPECT_GE(info.tilingDataSize, (slot + 1) * sizeof(int64_t));
+    return reinterpret_cast<const int64_t*>(info.tilingData.get())[slot];
+}
+} // namespace
+
+// 同 MakeMxfpPara，并为 cache 输入描述挂 view stride（cacheStrides 元素序与 cache 各维一致）。
+static gert::TilingContextPara MakeMxfpStridedPara(std::initializer_list<int64_t> cacheShape, ge::DataType cacheDtype,
+                                                   int64_t mode, int64_t group,
+                                                   std::initializer_list<int64_t> cacheStrides)
+{
+    auto para = MakeMxfpPara(cacheShape, cacheDtype, mode, group);
+    auto& cacheDesc = para.inputTensorDesc_[0];
+    cacheDesc.stride_ = gert::Stride(cacheStrides);
+    cacheDesc.hasStride_ = true;
+    return para;
+}
+
+// (正) layout1 加宽行 view: mode3 d=512 -> kvCacheCol=544, 物理行步长 576(32B 对齐加宽)。
+//      逻辑 [2048, 544] + stride {576, 1}: tiling 须从 view stride(0) 派生 kvCacheRowStride=576
+//      (而非逻辑列宽 544), 行尾 [544, 576) 不写。
+TEST_F(KvCompressEpilogTiling, mxfp8_layout1_strided_row_view_ok)
+{
+    auto para = MakeMxfpStridedPara({2048, 544}, ge::DT_FLOAT8_E4M3FN, 3, 32, {576, 1});
+    TilingInfo info;
+    ASSERT_TRUE(ExecuteTiling(para, info));
+    EXPECT_EQ(info.tilingKey, 2000UL);
+    EXPECT_EQ(TdSlot(info, TD_LAYOUT), 1);
+    EXPECT_EQ(TdSlot(info, TD_CACHE_ROWS), 2048);
+    EXPECT_EQ(TdSlot(info, TD_KV_CACHE_COL), 544);
+    EXPECT_EQ(TdSlot(info, TD_KV_CACHE_ROW_STRIDE), 576);
+    EXPECT_EQ(TdSlot(info, TD_KV_CACHE_BLOCK_SIZE), 1);
+    EXPECT_EQ(TdSlot(info, TD_KV_CACHE_BLOCK_STRIDE), 576);
+}
+
+// (正) layout2 非连续块(块表跳转): mode4-g16 d=512 -> bundle=320, cacheCol=320, blockSize=16。
+//      连续 blockStride 应为 16*320=5120, 注入 5248(5120+128, 32B 对齐): tiling 须从 view
+//      stride(0) 派生 kvCacheBlockStride=5248, 块间 128B 间隙不写。
+TEST_F(KvCompressEpilogTiling, mxfp4_layout2_strided_noncontig_ok)
+{
+    auto para = MakeMxfpStridedPara({128, 16, 1, 320}, ge::DT_UINT8, 4, 16, {5248, 320, 320, 1});
+    TilingInfo info;
+    ASSERT_TRUE(ExecuteTiling(para, info));
+    EXPECT_EQ(info.tilingKey, 2102UL);
+    EXPECT_EQ(TdSlot(info, TD_LAYOUT), 2);
+    EXPECT_EQ(TdSlot(info, TD_CACHE_ROWS), 2048);
+    EXPECT_EQ(TdSlot(info, TD_KV_CACHE_ROW_STRIDE), 320);
+    EXPECT_EQ(TdSlot(info, TD_KV_CACHE_BLOCK_SIZE), 16);
+    EXPECT_EQ(TdSlot(info, TD_KV_CACHE_BLOCK_STRIDE), 5248);
+}
+
+// (正) layout2 加宽行 + 非连续块组合: cacheCol=352(> bundle 320), blockStride=5760(> 16*352=5632)。
+//      同时覆盖"行加宽"与"块间隙"两条不写路径的 tiling 推导。
+TEST_F(KvCompressEpilogTiling, mxfp4_layout2_strided_widened_noncontig_ok)
+{
+    auto para = MakeMxfpStridedPara({128, 16, 1, 352}, ge::DT_UINT8, 4, 16, {5760, 352, 352, 1});
+    TilingInfo info;
+    ASSERT_TRUE(ExecuteTiling(para, info));
+    EXPECT_EQ(info.tilingKey, 2102UL);
+    EXPECT_EQ(TdSlot(info, TD_KV_CACHE_ROW_STRIDE), 352);
+    EXPECT_EQ(TdSlot(info, TD_KV_CACHE_BLOCK_STRIDE), 5760);
+}
+
+// (负) layout2 view 派生 blockStride(4096) < blockSize*cacheCol(5120) -> GRAPH_FAILED。
+//      证明约束用的是"派生步长"而非连续回退值。
+TEST_F(KvCompressEpilogTiling, mxfp4_layout2_blockstride_too_small_rejected)
+{
+    auto para = MakeMxfpStridedPara({128, 16, 1, 320}, ge::DT_UINT8, 4, 16, {4096, 320, 320, 1});
+    ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// (正) layout2 view 派生 blockStride(5121) 非 32B 对齐：只校验 >= blockSize*cacheCol，放行。
+//      32B 对齐为建议值，不再作为拒绝条件。
+TEST_F(KvCompressEpilogTiling, mxfp4_layout2_blockstride_unaligned_ok)
+{
+    auto para = MakeMxfpStridedPara({128, 16, 1, 320}, ge::DT_UINT8, 4, 16, {5121, 320, 320, 1});
+    TilingInfo info;
+    ASSERT_TRUE(ExecuteTiling(para, info));
+    EXPECT_EQ(info.tilingKey, 2102UL);
+    EXPECT_EQ(TdSlot(info, TD_LAYOUT), 2);
+    EXPECT_EQ(TdSlot(info, TD_KV_CACHE_ROW_STRIDE), 320);
+    EXPECT_EQ(TdSlot(info, TD_KV_CACHE_BLOCK_SIZE), 16);
+    EXPECT_EQ(TdSlot(info, TD_KV_CACHE_BLOCK_STRIDE), 5121);
+}
+
+// (负) layout1 view 派生行步长(512) < kvCacheCol(544) -> GRAPH_FAILED(行宽不足, 写出越界)。
+//      证明约束用的是 view stride(0) 派生值而非逻辑列宽 544。
+TEST_F(KvCompressEpilogTiling, mxfp8_layout1_strided_row_too_narrow_rejected)
+{
+    auto para = MakeMxfpStridedPara({2048, 544}, ge::DT_FLOAT8_E4M3FN, 3, 32, {512, 1});
     ExecuteTestCase(para, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
 }

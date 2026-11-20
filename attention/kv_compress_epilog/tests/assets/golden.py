@@ -65,10 +65,22 @@ astype(bf16) 数值转换）；mode0/1 全程 f32；mode2 scale/inv 各自 f32 �
 
     python3 -m ttk kernel -i ttk_kernel_kv_compress_epilog_st.csv \
         --plugin tests/assets/golden.py
+
+mode 3/4（v2，layout1 2D / layout2 4D，MXFP8 / packed MXFP4 全行量化）：
+  3  整行按 quant_group_size（仅 32）分组做 MXFP8 动态量化，cache 为
+     float8_e4m3fn/e5m2；scale 以 bf16 写出，round_scale 为真时向上取 2 的幂。
+  4  整行做 packed MXFP4 量化（两元素一字节 E2M1，共享指数 scale 以 bf16
+     按位编码写出），quant_group_size 支持 16/32。
+  mode 3/4 无 rope/nope 拆分，cache 支持 2D 平铺与 4D 分页；数值路径与
+  legacy 分离（_V2_ 前缀函数），入口按 quant_mode 分发。
 """
 
 __spec__ = {
     "kv_compress_epilog": "KvCompressEpilogTestSpec",
+    "aclnnKvCompressEpilog": "KvCompressEpilogTestSpec",
+    "torch.ops.cann_ops_transformer.kv_compress_epilog": "KvCompressEpilogTestSpec",
+    "cann_ops_transformer.ops.kv_compress_epilog": "KvCompressEpilogTestSpec",
+    "e2e_api.kv_compress_epilog_out": "KvCompressEpilogTestSpec",
 }
 
 import os
@@ -163,6 +175,16 @@ def _to_numpy(t):
         if tc.dtype == torch.bfloat16:
             return tc.view(torch.uint16).numpy().view(BF16)
         return tc.numpy()
+    if (
+        isinstance(t, np.ndarray)
+        and BF16 is not None
+        and t.dtype != BF16
+        and t.dtype.itemsize == 2
+        and t.dtype.kind in ("V", "u")
+    ):
+        # TTK npy 通道可能以 2 字节 void/uint16 传递 bf16，按原始位视图解释；
+        # float16 等真正的 2 字节浮点 dtype 不受影响（保持上游行为）。
+        return np.ascontiguousarray(t).view(np.uint16).view(BF16)
     return np.ascontiguousarray(t)
 
 
@@ -476,6 +498,588 @@ def _kv_compress_epilog_core(
     return np.ascontiguousarray(out)
 
 
+_V2_QUANT_MODE_NAMES = {
+    "fp8_bf16": 0,
+    "fp8_e8m0": 1,
+    "hifloat8_fp4": 2,
+    "nope_rope_fp8_bf16": 3,
+    "nope_rope_fp4_bf16": 4,
+}
+
+
+def _V2_quant_mode_int(quant_mode):
+    if isinstance(quant_mode, str):
+        return _V2_QUANT_MODE_NAMES[quant_mode.strip().lower()]
+    return int(quant_mode)
+
+
+def _V2_make_slots(cache, x, slot_mapping):
+    """mode 3/4 的 slot 生成：2D cache 按行、4D cache 按 blockNum*blockSize。"""
+    bs = int(np.prod(tuple(x.shape[:-1])))
+    if cache.ndim == 4:
+        num_slots = int(cache.shape[0] * cache.shape[1])
+    else:
+        num_slots = int(cache.shape[0])
+    if bs > num_slots:
+        raise ValueError(
+            "kv_compress_epilog: bs (%d) must not exceed numSlots (%d)"
+            % (bs, num_slots)
+        )
+    slots = np.arange(bs, dtype=np.int64) * num_slots // bs
+    if bs > 1:
+        slots[-1] = -1
+    if hasattr(slot_mapping, "copy_"):
+        import torch
+
+        slot_mapping.copy_(
+            torch.as_tensor(
+                slots, dtype=slot_mapping.dtype, device=slot_mapping.device
+            ).reshape(slot_mapping.shape)
+        )
+        return (cache, x, slot_mapping)
+    slot_data = slots.astype(slot_mapping.dtype).reshape(slot_mapping.shape)
+    slot_mapping[...] = slot_data
+    return (cache, x, slot_data)
+
+
+_V2_BF16 = None
+_V2_F8E4M3 = None
+_V2_F8E5M2 = None
+_V2_DTYPES_READY = False
+_V2_FP8_E4M3_MAX = np.float32(448.0)
+_V2_FP8_E5M2_MAX = np.float32(57344.0)
+_V2_EPS = np.float32(1e-4)
+_V2_GROUP = 32
+_V2_GROUP16 = 16
+_V2_LEGAL_COMBOS = {(3, 32), (4, 32), (4, 16)}
+_V2_BF16_NAN_BITS = np.uint16(0x7F81)  # KCEV2_BF16_NAN
+_V2_BF16_EXP_MASK = np.uint16(0x7F80)
+_V2_FP4_E2M1_MAX_EXP_FIELD = 2  # 0x0100 >> 7
+
+
+def _V2_ensure_dtypes():
+    """Lazily import ml_dtypes (bf16 + fp8 views)."""
+    global _V2_BF16, _V2_F8E4M3, _V2_F8E5M2, _V2_DTYPES_READY
+    if _V2_DTYPES_READY:
+        return
+    try:
+        import ml_dtypes
+    except ImportError as e:
+        raise RuntimeError(
+            "kv_compress_epilog_v2 golden needs ml_dtypes (pip3 install ml-dtypes)"
+        ) from e
+    _V2_BF16 = ml_dtypes.bfloat16
+    _V2_F8E4M3 = ml_dtypes.float8_e4m3fn
+    _V2_F8E5M2 = ml_dtypes.float8_e5m2
+    _V2_DTYPES_READY = True
+
+
+def _V2_to_numpy(t):
+    """Materialise a (possibly strided torch) tensor as contiguous numpy,
+    preserving raw bits for sub-byte / fp8 dtypes."""
+    try:
+        import torch
+    except ImportError:
+        torch = None
+    if torch is not None and isinstance(t, torch.Tensor):
+        tc = t.detach().cpu().contiguous()
+        if tc.dtype == torch.bfloat16:
+            return tc.view(torch.uint16).numpy().view(_V2_BF16)
+        if str(tc.dtype) in ("torch.float8_e4m3fn",):
+            return tc.view(torch.uint8).numpy().view(_V2_F8E4M3)
+        if str(tc.dtype) in ("torch.float8_e5m2",):
+            return tc.view(torch.uint8).numpy().view(_V2_F8E5M2)
+        if tc.dtype == torch.uint8:
+            return tc.numpy()
+        if tc.dtype in (torch.int32, torch.int64):
+            return tc.numpy()
+        raise TypeError("unsupported tensor dtype: %s" % tc.dtype)
+    if (
+        isinstance(t, np.ndarray)
+        and _V2_BF16 is not None
+        and t.dtype != _V2_BF16
+        and t.dtype.itemsize == 2
+    ):
+        # TTK npy 通道可能以 2 字节 void/uint16 传 bf16，按原始位视图解释。
+        return np.ascontiguousarray(t).view(np.uint16).view(_V2_BF16)
+    return np.ascontiguousarray(t)
+
+
+def _V2_as_uint8_2d(cache_np):
+    """[N, col] cache in any supported element dtype -> uint8 view of same shape."""
+    if cache_np.dtype == np.uint8:
+        return cache_np
+    item = cache_np.dtype.itemsize
+    if item != 1:
+        raise TypeError("cache element must be 1 byte, got %s" % cache_np.dtype)
+    return cache_np.view(np.uint8)
+
+
+def _V2_fp8_type(cache_np):
+    """fp8 element type + qmax of the cache tensor."""
+    dt = str(cache_np.dtype)
+    if "e5m2" in dt:
+        return _V2_F8E5M2, _V2_FP8_E5M2_MAX
+    if "e4m3" in dt:
+        return _V2_F8E4M3, _V2_FP8_E4M3_MAX
+    raise TypeError("mode-3 cache dtype must be float8_e4m3fn/float8_e5m2, got %s" % dt)
+
+
+def _V2_round_scale_pow2_v2(s_f32):
+    """Replicate VFProcessMxFp8 roundScale (f32 pow2-round-up bit arithmetic).
+
+    e=(bits>>23)&0xFF; m=bits&0x7FFFFF; u=e-127+(m!=0); bits=(u+127)<<23.
+    (u+127)==256 sets the sign bit (int32 shift) -> -0.0f. Only reachable for
+    non-finite s (NaN amax); normal scales stay powers of two.
+    """
+    bits = np.ascontiguousarray(s_f32, dtype=np.float32).view(np.uint32)
+    e = ((bits >> np.uint32(23)) & np.uint32(0xFF)).astype(np.int64)
+    m = (bits & np.uint32(0x7FFFFF)).astype(np.int64)
+    u = e - 127 + (m != 0).astype(np.int64)
+    newbits = ((u + 127) << 23) & np.int64(0xFFFFFFFF)
+    return newbits.astype(np.uint32).view(np.float32)
+
+
+def _V2_encode_mxfp8_row(x_f32_row, d, fp8_dt, fp8_max, round_scale, group=_V2_GROUP):
+    """One row of MXFP8: returns (data bytes [d], scale bits [G] uint16)."""
+    g = d // group
+    data = np.zeros(d, dtype=np.uint8)
+    scales = np.zeros(g, dtype=np.uint16)
+    # 冻结契约：scale 必须用"乘倒数"计算（amax * (1/fp8_max)），与 kernel VF 行为位级一致；
+    # 勿改成 amax / fp8_max —— 两种写法在浮点下可差 1 bit，导致边界数值（如 431.99997）比对翻转。
+    coeff = np.float32(1.0) / np.float32(fp8_max)
+    for gi in range(g):
+        blk = x_f32_row[gi * group : (gi + 1) * group]
+        amax = np.float32(np.abs(blk).max()) if blk.size else np.float32(0.0)
+        s = np.maximum(amax, _V2_EPS) * coeff
+        if round_scale:
+            s = _V2_round_scale_pow2_v2(s)
+        s = np.asarray(s, dtype=np.float32).reshape(())  # normalise to 0-d scalar
+        q = np.asarray(blk / s, dtype=np.float32)
+        q = np.clip(q, np.float32(-fp8_max), np.float32(fp8_max))
+        data[gi * group : gi * group + blk.shape[0]] = (
+            np.asarray(q, np.float32).astype(fp8_dt).view(np.uint8)
+        )
+        scales[gi] = np.float32(s).astype(_V2_BF16).view(np.uint16)
+    return data, scales
+
+
+_V2_FP4_MIDS = np.array([0.25, 0.75, 1.25, 1.75, 2.5, 3.5, 5.0], dtype=np.float32)
+
+
+def _V2_fp4_rne_codes(q_f32):
+    """RNE codes (0..15) for fp4_e2m1. NaN -> +0 (code 0); -0 -> 0x8.
+
+    Magnitude grid {0,.5,1,1.5,2,3,4,6}; ties at midpoints resolve to the
+    even code (RNE). Values above 6 saturate to 6 (code 7).
+    """
+    sign = (q_f32.view(np.uint32) >> np.uint32(31)).astype(np.uint8)
+    nan = np.isnan(q_f32)
+    a = np.where(nan, np.float32(0.0), np.abs(q_f32)).astype(np.float32)
+    idx = np.searchsorted(_V2_FP4_MIDS, a, side="left").astype(np.uint8)
+    tie = (a[:, None] == _V2_FP4_MIDS[None, :]).any(axis=1)
+    code = np.where(tie & (idx % 2 == 1), idx + np.uint8(1), idx).astype(np.uint8)
+    code = np.minimum(code, np.uint8(7))
+    return (code | (sign << np.uint8(3))).astype(np.uint8)
+
+
+def _V2_encode_mxfp4_row(x_bf16_bits_row, d, group=_V2_GROUP):
+    """One row of MXFP4 (g32 or g16): returns (packed data bytes [d/2],
+    scale bits [G] uint16). Numerics identical per group; only the group
+    size differs (frozen from VFProcessMxFp4Group16VF)."""
+    g = d // group
+    nib = np.zeros(d, dtype=np.uint8)
+    scales = np.zeros(g, dtype=np.uint16)
+    for gi in range(g):
+        blk_bits = np.ascontiguousarray(x_bf16_bits_row[gi * group : (gi + 1) * group])
+        e_field = ((blk_bits >> np.uint16(7)) & np.uint16(0xFF)).astype(np.int32)
+        e_max = int(e_field.max())
+        finite = e_max != 0xFF
+        nonzero = e_max != 0
+        e_c = (
+            e_max if e_max > _V2_FP4_E2M1_MAX_EXP_FIELD else _V2_FP4_E2M1_MAX_EXP_FIELD
+        )
+        shared_field = e_c - _V2_FP4_E2M1_MAX_EXP_FIELD
+        if not finite:
+            scale_bits = np.uint16(_V2_BF16_NAN_BITS)
+            hs_bits = np.uint16(_V2_BF16_NAN_BITS)
+        elif not nonzero:
+            scale_bits = np.uint16(0x0000)
+            hs_bits = np.uint16(0x0000)
+        else:
+            scale_bits = np.uint16((shared_field << 7) & 0xFFFF)
+            hs_bits = np.uint16((0x7F00 - (shared_field << 7)) & 0xFFFF)
+        scales[gi] = scale_bits
+        if not finite:
+            nib[gi * group : (gi + 1) * group] = 0  # x * NaN = NaN -> CAST_RINT -> +0
+        else:
+            hs_val = (
+                np.array([hs_bits], dtype=np.uint16)
+                .view(_V2_BF16)
+                .astype(np.float32)[0]
+            )
+            blk_f32 = blk_bits.view(_V2_BF16).astype(np.float32)
+            q = (blk_f32 * np.float32(hs_val)).astype(np.float32)  # pow2 mul: exact
+            nib[gi * group : (gi + 1) * group] = _V2_fp4_rne_codes(q)
+    packed = (nib[0::2] | (nib[1::2] << np.uint8(4))).astype(np.uint8)
+    return packed, scales
+
+
+def _V2_torch_scale_bytes(scale_bits):
+    """[T, G] int32 scale bit patterns -> [T, 2G] uint8 little-endian bytes."""
+    import torch
+
+    lo = (scale_bits & 0xFF).to(torch.uint8)
+    hi = ((scale_bits >> 8) & 0xFF).to(torch.uint8)
+    return torch.stack((lo, hi), dim=-1).reshape(scale_bits.shape[0], -1)
+
+
+def _V2_torch_mxfp8(x_bf16, group, fp8_dtype, fp8_max, round_scale):
+    """Torch implementation of MXFP8 row quantization (mode 3)."""
+    import torch
+
+    t, d = x_bf16.shape
+    g = d // group
+    x = x_bf16.reshape(t, g, group).to(torch.float32)
+    amax = x.abs().amax(dim=-1)
+    s = torch.clamp(amax, min=float(_V2_EPS)) * (1.0 / float(fp8_max))
+    if round_scale:
+        bits = s.contiguous().view(torch.int32)
+        e = (bits >> 23) & 0xFF
+        m = bits & 0x7FFFFF
+        u = e - 127 + (m != 0).to(torch.int32)
+        s = ((u + 127) << 23).view(torch.float32)
+    q = torch.clamp(x / s.unsqueeze(-1), -float(fp8_max), float(fp8_max))
+    data = q.reshape(t, d).to(fp8_dtype).view(torch.uint8)
+    scale_bits = s.to(torch.bfloat16).contiguous().view(torch.uint16).to(torch.int32)
+    return data, _V2_torch_scale_bytes(scale_bits)
+
+
+_V2_TORCH_MXFP8_COMPILED = None
+
+
+def _V2_torch_mxfp8_cuda(*args):
+    global _V2_TORCH_MXFP8_COMPILED
+    if _V2_TORCH_MXFP8_COMPILED is None:
+        import torch
+
+        _V2_TORCH_MXFP8_COMPILED = torch.compile(_V2_torch_mxfp8, dynamic=True)
+    return _V2_TORCH_MXFP8_COMPILED(*args)
+
+
+def _V2_torch_mxfp4(x_bf16, group):
+    """Torch implementation of packed MXFP4 row quantization (mode 4)."""
+    import torch
+
+    t, d = x_bf16.shape
+    g = d // group
+    xb = x_bf16.contiguous().view(torch.uint16)
+    xg = xb.reshape(t, g, group)
+    e_field = (xg.to(torch.int32) >> 7) & 0xFF
+    e_max = e_field.amax(dim=-1)
+    finite = e_max != 0xFF
+    nonzero = e_max != 0
+    e_c = torch.maximum(e_max, torch.full_like(e_max, _V2_FP4_E2M1_MAX_EXP_FIELD))
+    shared = e_c - _V2_FP4_E2M1_MAX_EXP_FIELD
+    scale_bits = (shared << 7) & 0xFFFF
+    hs_bits = (0x7F00 - (shared << 7)) & 0xFFFF
+    zero_bits = torch.zeros_like(scale_bits)
+    nan_bits = torch.full_like(scale_bits, _V2_BF16_NAN_BITS)
+    scale_bits = torch.where(
+        finite, torch.where(nonzero, scale_bits, zero_bits), nan_bits
+    )
+    hs_bits = torch.where(finite, torch.where(nonzero, hs_bits, zero_bits), nan_bits)
+
+    hs = hs_bits.to(torch.uint16).contiguous().view(torch.bfloat16).to(torch.float32)
+    q = x_bf16.reshape(t, g, group).to(torch.float32) * hs.unsqueeze(-1)
+    abs_q = q.abs()
+    abs_q = torch.where(torch.isnan(q), torch.zeros_like(abs_q), abs_q)
+    mids = torch.tensor(
+        [0.25, 0.75, 1.25, 1.75, 2.5, 3.5, 5.0], dtype=torch.float32, device=q.device
+    )
+    idx = torch.searchsorted(mids, abs_q, right=False)
+    tie = (abs_q.unsqueeze(-1) == mids).any(dim=-1)
+    code = torch.where(tie & (idx % 2 == 1), idx + 1, idx).clamp(max=7)
+    sign = (q.contiguous().view(torch.int32) >> 31) & 1
+    code = (code | (sign << 3)).to(torch.uint8)
+    code = torch.where(finite.unsqueeze(-1), code, torch.zeros_like(code))
+    nib = code.reshape(t, d)
+    packed = (nib[:, 0::2] | (nib[:, 1::2] << 4)).to(torch.uint8)
+    return packed, _V2_torch_scale_bytes(scale_bits)
+
+
+def _V2_layout(d, quant_mode, group=_V2_GROUP):
+    """Host tiling layout for layout1: no padding, written row = data + scale.
+    group in {32, 16} (mode4 only for 16)."""
+    g = d // group
+    data_col = d if quant_mode == 3 else d // 2
+    concat = data_col + g * 2
+    return g, data_col, concat, concat, 0
+
+
+def _V2_layout2_params(d, quant_mode, group):
+    """Layout2 token bundle geometry (r8 interleaved):
+    (data_col, scale_bytes, token_stride). token_stride = data_col +
+    scale_bytes exactly; there is no per-scale padding any more."""
+    data_col = d if quant_mode == 3 else d // 2
+    scale_bytes = 2 * (d // group)
+    token_stride = data_col + scale_bytes
+    return data_col, scale_bytes, token_stride
+
+
+def _V2_kv_compress_core(
+    cache,
+    x,
+    slot_mapping,
+    quant_group_size=32,
+    quant_mode=3,
+    round_scale=True,
+    x_scale=1.0,
+):
+    """Compute the in-place updated cache. Returns cache in its original dtype.
+
+    cache 2D -> layout1: row = [data|scale], no padding, tail preserved.
+    cache 4D [B, S, 1, C] -> layout2 paged (r8): interleaved per-token
+    [data|scale] bundles, block_stride addressing (0 -> S*C contiguous).
+    """
+    _V2_ensure_dtypes()
+    quant_mode = int(quant_mode)
+    quant_group_size = int(quant_group_size)
+    round_scale = bool(round_scale) and int(round_scale) != 0
+    if (quant_mode, quant_group_size) not in _V2_LEGAL_COMBOS:
+        raise ValueError(
+            "invalid quant_mode and quant_group_size combination, got "
+            "(%d, %d); supported combinations are (3,32), (4,32), and (4,16)."
+            % (quant_mode, quant_group_size)
+        )
+    if quant_mode not in (3, 4):  # defensive; covered by _V2_LEGAL_COMBOS
+        raise ValueError("quant_mode must be 3 or 4, got %s" % quant_mode)
+
+    cache_np = _V2_to_numpy(cache)
+    x_np = _V2_to_numpy(x)
+    sm = np.asarray(_V2_to_numpy(slot_mapping)).reshape(-1).astype(np.int64)
+
+    if cache_np.ndim not in (2, 4):
+        raise ValueError("cache must be 2D or 4D, got rank %d" % cache_np.ndim)
+    if x_np.dtype != _V2_BF16 and x_np.dtype.itemsize == 2:
+        # TTK npy 通道下 bfloat16 以 2 字节 void dtype 传入，按位转回 bf16
+        x_np = np.ascontiguousarray(x_np).view(np.uint16).view(_V2_BF16)
+    if x_np.dtype != _V2_BF16:
+        raise TypeError("x must be bfloat16, got %s" % x_np.dtype)
+    T, d = x_np.shape
+    x_bits = np.ascontiguousarray(x_np).view(np.uint16)
+    if d % quant_group_size != 0:
+        raise ValueError(
+            "d=%d not divisible by quant_group_size=%d" % (d, quant_group_size)
+        )
+    if d > 8192:
+        raise ValueError("d=%d exceeds the 8192 limit" % d)
+    # d%128 约束（v1.12）：与算子 tiling 层同拒非法输入，勿删——非法 d 应被拦截而非参与比对。
+    if d % 128 != 0:
+        raise ValueError("d=%d must be a multiple of 128 when quant_mode is 3/4" % d)
+
+    if cache_np.ndim == 4:
+        return _V2_core_layout2(
+            cache_np, x_bits, sm, d, T, quant_group_size, quant_mode, round_scale
+        )
+
+    cache_u8 = _V2_as_uint8_2d(cache_np).copy()
+    n_rows, row_stride = cache_u8.shape
+
+    g, data_col, concat, kv_col, pad = _V2_layout(d, quant_mode, quant_group_size)
+    if row_stride < concat:
+        raise ValueError("cache row width %d < required %d" % (row_stride, concat))
+
+    fp8_dt, fp8_max = (None, None)
+    if quant_mode == 3:
+        fp8_dt, fp8_max = _V2_fp8_type(cache_np)
+
+    for i in range(T):
+        slot = int(sm[i])
+        if slot < 0 or slot >= n_rows:
+            continue
+        if quant_mode == 3:
+            x_f32_row = x_bits[i].view(_V2_BF16).astype(np.float32)
+            data, scales = _V2_encode_mxfp8_row(
+                x_f32_row, d, fp8_dt, fp8_max, round_scale, quant_group_size
+            )
+        else:
+            data, scales = _V2_encode_mxfp4_row(x_bits[i], d, quant_group_size)
+        row = cache_u8[slot]
+        row[0:data_col] = data
+        row[data_col:concat] = scales.view(np.uint8)
+        # bytes in [concat, row_stride) intentionally preserved (no padding)
+    # return in the original cache dtype view
+    if cache_np.dtype == np.uint8:
+        return cache_u8
+    return cache_u8.view(cache_np.dtype)
+
+
+def _V2_core_layout2(
+    cache_np, x_bits, sm, d, T, quant_group_size, quant_mode, round_scale
+):
+    """Layout2 paged write (r8 interleaved). Models the flat backing buffer
+    with the given block stride, applies per-token [data|scale] bundle writes,
+    returns the 4D view.
+
+    Contract frozen from op_host/kv_compress_epilog_v2_tiling_arch35.cpp and
+    op_kernel/kv_compress_epilog_v2_layout2.h (interleaved redesign):
+        block layout: |data0|scale0|data1|scale1|...|tail|
+        token_base = bi*bs + p*tokenStride;
+        value_off = token_base;  scale_off = token_base + dataCol;
+        scale writes exactly scaleBytes (no padding zero);
+        tail/gaps/unhit/out-of-range slots preserved; slot range [0, B*S).
+    """
+    B, S, head, C = cache_np.shape
+    if head != 1:
+        raise ValueError("layout2 cache dim2 must be 1, got %d" % head)
+    if B <= 0 or S <= 0 or C <= 0:
+        raise ValueError("layout2 cache dims must be positive")
+    data_col, scale_bytes, token_stride = _V2_layout2_params(
+        d, quant_mode, quant_group_size
+    )
+    bs = S * C  # 连续块：blockStride 由 tiling 从 storage shape 派生（= S*C）
+    if C < token_stride:
+        raise ValueError(
+            "layout2 cache row width must be at least %d, got %d" % (token_stride, C)
+        )
+    # blockStride 只要求 >= S*C；32B 对齐为建议值，不再强制。
+    n_rows = B * S
+
+    cache_u8 = np.ascontiguousarray(cache_np).view(np.uint8)
+    flat = np.zeros(B * bs, dtype=np.uint8)
+    view_rows = cache_u8.reshape(B, S * C)
+    for bi in range(B):
+        flat[bi * bs : bi * bs + S * C] = view_rows[bi]
+
+    fp8_dt, fp8_max = (None, None)
+    if quant_mode == 3:
+        fp8_dt, fp8_max = _V2_fp8_type(cache_np)
+
+    for i in range(T):
+        slot = int(sm[i])
+        if slot < 0 or slot >= n_rows:
+            continue
+        bi, p = divmod(slot, S)
+        base = bi * bs
+        if quant_mode == 3:
+            x_f32_row = x_bits[i].view(_V2_BF16).astype(np.float32)
+            data, scales = _V2_encode_mxfp8_row(
+                x_f32_row, d, fp8_dt, fp8_max, round_scale, quant_group_size
+            )
+        else:
+            data, scales = _V2_encode_mxfp4_row(x_bits[i], d, quant_group_size)
+        token_base = base + p * token_stride
+        flat[token_base : token_base + data_col] = data
+        soff = token_base + data_col
+        flat[soff : soff + scale_bytes] = scales.view(np.uint8)
+    out = np.empty((B, S, 1, C), dtype=np.uint8)
+    out_rows = out.reshape(B, S * C)
+    for bi in range(B):
+        out_rows[bi] = flat[bi * bs : bi * bs + S * C]
+    if cache_np.dtype == np.uint8:
+        return out
+    return out.view(cache_np.dtype)
+
+
+class KvCompressEpilogThirdPartyTorch:
+    """Torch GPU reference for mode 3/4, used by TTK --xpu-perf."""
+
+    def __call__(
+        self,
+        cache,
+        x,
+        slot_mapping,
+        quant_group_size=64,
+        quant_mode=1,
+        round_scale=True,
+        x_scale=1.0,
+        **kwargs,
+    ):
+        import torch
+
+        quant_group_size = kwargs.pop("quantGroupSize", quant_group_size)
+        quant_mode = kwargs.pop("quantMode", quant_mode)
+        round_scale = kwargs.pop("roundScale", round_scale)
+        x_scale = kwargs.pop("xScale", x_scale)
+        cache_dtype = kwargs.pop("cache_dtype", kwargs.pop("cacheDtype", ""))
+        mode = _V2_quant_mode_int(quant_mode)
+        if mode not in (3, 4):
+            raise NotImplementedError(
+                "third_party torch reference currently supports quant_mode 3/4, got %d"
+                % mode
+            )
+        if float(x_scale) != 1.0:
+            raise ValueError("x_scale must be 1.0 when quant_mode is 3/4")
+        group = int(quant_group_size)
+        round_scale = bool(round_scale) and int(round_scale) != 0
+        d = int(x.shape[-1])
+        x2 = x.reshape(-1, d).contiguous()
+        slots = slot_mapping.reshape(-1)
+        if mode == 3:
+            if cache.dtype == torch.uint8:
+                if "e5m2" in str(cache_dtype):
+                    cache = cache.view(torch.float8_e5m2)
+                elif "e4m3" in str(cache_dtype) or cache_dtype:
+                    cache = cache.view(torch.float8_e4m3fn)
+                else:
+                    raise TypeError("mode-3 cache must be float8_e4m3fn/float8_e5m2")
+            fp8_max = 57344.0 if "e5m2" in str(cache.dtype) else 448.0
+            if x2.is_cuda:
+                data, scale_bytes = _V2_torch_mxfp8_cuda(
+                    x2, group, cache.dtype, fp8_max, round_scale
+                )
+            else:
+                data, scale_bytes = _V2_torch_mxfp8(
+                    x2, group, cache.dtype, fp8_max, round_scale
+                )
+        else:
+            if cache.dtype != torch.uint8:
+                raise TypeError("mode-4 cache must be uint8")
+            if x2.is_cuda:
+                try:
+                    from torch._vendor.quack.mx_utils import to_mxfp4_compiled
+                except ImportError:
+                    data, scale_bytes = _V2_torch_mxfp4(x2, group)
+                else:
+                    data, scale_e8m0 = to_mxfp4_compiled(x2, group)
+                    scale_bits = scale_e8m0.view(torch.uint8).to(torch.int32) << 7
+                    scale_bytes = torch.stack(
+                        (
+                            (scale_bits & 0xFF).to(torch.uint8),
+                            ((scale_bits >> 8) & 0xFF).to(torch.uint8),
+                        ),
+                        dim=-1,
+                    ).reshape(scale_bits.shape[0], -1)
+            else:
+                data, scale_bytes = _V2_torch_mxfp4(x2, group)
+
+        data_col = int(data.shape[1])
+        concat = data_col + int(scale_bytes.shape[1])
+        cache_u8 = cache.view(torch.uint8) if cache.dtype != torch.uint8 else cache
+        packed = torch.cat((data, scale_bytes), dim=1)
+        rows = int(cache.shape[0])
+        if cache.dim() != 2:
+            block_size = int(cache.shape[1])
+            rows *= block_size
+        valid = (slots >= 0) & (slots < rows)
+        idx = slots[valid].to(torch.long)
+        dst_col = torch.arange(concat, device=cache.device)
+        if cache.dim() == 2:
+            cache_u8[idx.unsqueeze(1), dst_col] = packed[valid]
+        else:
+            block_size = int(cache.shape[1])
+            cache_col = int(cache.shape[3])
+            block_view = cache_u8.as_strided(
+                (int(cache.shape[0]), block_size * cache_col),
+                (cache_u8.stride(0), 1),
+            )
+            block = torch.div(idx, block_size, rounding_mode="floor")
+            base = (idx % block_size) * concat
+            block_view[block.unsqueeze(1), base.unsqueeze(1) + dst_col] = packed[valid]
+        return [cache_u8]
+
+
 # ---- int8 npz 定值注入机制（tests/st/data/<testcase_name>.npz）----
 # ST runner --input-dir 的 golden 侧入口：注入目录由 set_input_dir() 或环境变量
 # KV_COMPRESS_EPILOG_INPUT_DIR 指定，缺省回退到仓内 tests/st/data；
@@ -606,6 +1210,23 @@ class KvCompressEpilogTestSpec:
         quant_mode = kwargs.pop("quantMode", quant_mode)
         round_scale = kwargs.pop("roundScale", round_scale)
         x_scale = kwargs.pop("xScale", x_scale)
+        mode = _V2_quant_mode_int(quant_mode)
+        if mode in (3, 4):
+            _V2_ensure_dtypes()
+            x_np = _V2_to_numpy(x)
+            if x_np.ndim > 2:
+                x_np = x_np.reshape(-1, x_np.shape[-1])
+            slots = np.asarray(_V2_to_numpy(slot_mapping)).reshape(-1)
+            out = _V2_kv_compress_core(
+                cache,
+                x_np,
+                slots,
+                quant_group_size=int(quant_group_size),
+                quant_mode=mode,
+                round_scale=round_scale,
+                x_scale=float(x_scale),
+            )
+            return [np.ascontiguousarray(out)]
         _ensure_dtypes()
         out = _kv_compress_epilog_core(
             cache,
@@ -619,7 +1240,16 @@ class KvCompressEpilogTestSpec:
         return [np.ascontiguousarray(out)]
 
     @staticmethod
-    def customize_inputs(cache, x, slot_mapping, **kwargs):
+    def customize_inputs(
+        cache,
+        x,
+        slot_mapping,
+        quant_group_size=64,
+        quant_mode=1,
+        round_scale=True,
+        x_scale=1.0,
+        **kwargs,
+    ):
         """slot_mapping 取值约束强（-1 或 [0, num_slots)、不应重复），随机数据无法
         满足：改为确定性生成——均匀散布的唯一 slot 覆盖各 cache block，并按 bs
         规模混入 -1 跳过 token（bs>=2 最后一个、bs>=10 另加中间一个）。
@@ -631,13 +1261,15 @@ class KvCompressEpilogTestSpec:
         （SA-07/SA-08）；注入文件不存在时回退既有确定性逻辑；mode 0/1/2 行为不变。
         """
         _ensure_dtypes()  # customize_inputs 先于 golden 执行, BF16 等 dtype 句柄需先就绪
-        quant_mode = kwargs.get("quant_mode", kwargs.get("quantMode", None))
+        quant_mode = kwargs.get("quant_mode", kwargs.get("quantMode", quant_mode))
         if quant_mode is None:
             quant_mode = 1
         if int(quant_mode) == 1 and _is_arch22_platform():
             bundle = _load_case_npz(_resolve_case_name(kwargs))
             if bundle is not None:
                 return _inject_case_npz(cache, x, slot_mapping, bundle)
+        if _V2_quant_mode_int(quant_mode) in (3, 4):
+            return _V2_make_slots(cache, x, slot_mapping)
 
         bs = int(np.prod(tuple(x.shape[:-1])))
         num_slots = int(
@@ -669,11 +1301,14 @@ class KvCompressEpilogTestSpec:
         slot_mapping[...] = slots.reshape(slot_mapping.shape).astype(slot_mapping.dtype)
         return (cache, x, slot_mapping)
 
+    third_party = {"torch": KvCompressEpilogThirdPartyTorch}
     tolerance = {
-        # 验收口径变更: int8 量化输出 <= 1 LSB (ATK kvce_int8_lsb1 同义)。
-        # ttk quant 标准: 整型输出逐元素 |diff| <= 1 (round(x/scale) 为阶跃函数,
-        # 商跨 x.5 边界时不同实现的 1ulp 差异必然翻转一格, 见 ttk comparison/quant.py)。
-        "uint8": {"standard": "quant"},
+        # TTK v3.0.0 的 quant 判据仅支持 int4/int8，uint8 不能声明 quant；
+        # legacy int8 与 mode4 packed 输出均按逐字节比对（A2/A3 若需 1 LSB 容差，
+        # 在对应 ST CSV 的 precision_tolerances 列显式声明）。
+        "uint8": {"standard": "binary_equal"},
+        "float8_e4m3fn": {"standard": "binary_equal"},
+        "float8_e5m2": {"standard": "binary_equal"},
     }
 
 

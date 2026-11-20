@@ -324,3 +324,348 @@ TEST(KvCompressEpilogTilingStruct, FieldsWritable)
     EXPECT_FLOAT_EQ(t.scalesAttr, 1.0f);
     EXPECT_GT(sizeof(KvCompressEpilogTilingData), 0u);
 }
+
+// ==================== mode 4 (MXFP4 packed) kernel 用例（ICPU CPU 仿真） ====================
+// mode4 为 uint8 cache 路径, 可在现有 DTYPE 宏 (uint8_t) 下于 ICPU 执行;
+// mode3 (fp8 cache) 的字节级精度由真机 ST (ttk aclnn 9 用例) 覆盖, ICPU 不实例化 fp8 dtype。
+// 校验: 有效 slot 的数据段被写入(非哨兵) + 哨兵区(行尾 pad / 块尾 / skip 行)保持原值不写。
+namespace {
+struct MxfpParams {
+    int64_t bs;
+    int64_t d;
+    int64_t group;
+    bool layout2; // false=layout1(2D), true=layout2(4D)
+    int64_t blockDim;
+    bool withSkip;
+    std::string desc;
+    // >0 时 layout2 块间留 blockGap 字节间隙(块表跳转的非连续摆位):
+    // blockStride = blockSize*cacheCol + blockGap（32B 对齐为建议值，非强制）, 间隙区保持哨兵不写。
+    int64_t blockGap = 0;
+};
+
+TEST(KvCompressEpilogMxfpKernelTest, RunMxfp4Kernel)
+{
+    const std::vector<MxfpParams> cases = {
+        {32, 256, 32, false, 1, false, "mxfp4_g32_layout1"},
+        {32, 256, 16, false, 1, false, "mxfp4_g16_layout1_main"}, // 主场景
+        {24, 256, 16, true, 1, true, "mxfp4_g16_layout2_skip"},   // 4D 分页 + skip
+        {48, 256, 32, true, 2, false, "mxfp4_g32_layout2_2core"},
+        // 非连续块(块表跳转): blockGap=128 -> blockStride=8*192+128=1664, 块间 128B 间隙不写。
+        {24, 256, 16, true, 1, true, "mxfp4_g16_layout2_noncontig_skip", 128},
+        // 非连续块 + 双核: 多核 slot 散写跨非连续块寻址。blockStride=8*176+96=1504。
+        {48, 256, 32, true, 2, false, "mxfp4_g32_layout2_noncontig_2core", 96},
+        // 非连续块 + 非 32B 对齐 blockStride: blockGap=24 -> blockStride=8*192+24=1560, 间隙不写。
+        {24, 256, 16, true, 1, true, "mxfp4_g16_layout2_noncontig_unaligned_skip", 24},
+    };
+    for (const auto& p : cases) {
+        std::cout << "[KvCompressEpilog][mxfp4] " << p.desc << " bs=" << p.bs << " d=" << p.d << " group=" << p.group
+                  << " layout=" << (p.layout2 ? "4D" : "2D") << std::endl;
+        AscendC::SetKernelMode(KernelMode::AIV_MODE);
+
+        // mxfp 行格式: dataCol = d/2, scaleCol = d/group, concatCol = dataCol + 2*scaleCol,
+        // layout1 无 pad: kvCacheCol = concatCol
+        const int64_t dataCol = p.d / 2;
+        const int64_t scaleCol = p.d / p.group;
+        const int64_t scaleBytes = scaleCol * 2;
+        const int64_t concatCol = dataCol + scaleBytes;
+        const int64_t kvCacheCol = concatCol;
+
+        // layout1: cache 2D [rows, headDim], headDim=kvCacheCol+32 (加宽行验证行尾不写);
+        // layout2: cache 4D [B, S, 1, C], C=tokenBundle+32 (块尾不写), blockSize=S=8
+        const int64_t blockSize = p.layout2 ? 8 : 1;
+        int64_t blockNum = 0;
+        int64_t cacheCol = 0;
+        int64_t blockStride = 0;
+        int64_t cacheRows = 0;
+        if (p.layout2) {
+            cacheCol = dataCol + scaleBytes + 32;              // > tokenBundle
+            blockNum = (p.bs + blockSize - 1) / blockSize + 1; // 留一个空块
+            blockStride = blockSize * cacheCol + p.blockGap;   // 非连续: 块间留 blockGap 间隙
+            cacheRows = blockNum * blockSize;
+        } else {
+            cacheCol = kvCacheCol + 32;
+            blockNum = 1;
+            blockStride = 0;
+            cacheRows = p.bs + 1;
+        }
+
+        KvCompressEpilogTilingData t;
+        std::memset(&t, 0, sizeof(t));
+        int64_t rowOfFormer = CeilDiv(p.bs, p.blockDim);
+        int64_t usedCore = std::min(CeilDiv(p.bs, rowOfFormer), p.blockDim);
+        int64_t rowOfTail = p.bs - (usedCore - 1) * rowOfFormer;
+        int64_t rowFactor = rowOfFormer; // 单 tile 即可 (bs<=48, UB 足够)
+        t.bs = p.bs;
+        t.d = p.d;
+        t.kvCacheCol = kvCacheCol;
+        t.kvCacheRowStride = p.layout2 ? cacheCol : cacheCol; // 两布局行步长均为物理列宽
+        t.kvCacheBlockSize = blockSize;
+        t.kvCacheBlockStride = p.layout2 ? blockStride : cacheCol;
+        t.scaleCol = scaleCol;
+        t.concatCol = concatCol;
+        t.padCol = kvCacheCol - concatCol;
+        t.quantMode = 4;
+        t.roundScale = 1;
+        t.perGroupSize = p.group;
+        t.rowOfFormerBlock = rowOfFormer;
+        t.rowOfTailBlock = rowOfTail;
+        t.rowLoopOfFormerBlock = CeilDiv(rowOfFormer, rowFactor);
+        t.rowLoopOfTailBlock = CeilDiv(rowOfTail, rowFactor);
+        t.rowFactor = rowFactor;
+        t.tailRowFactorOfFormerBlock = rowFactor;
+        t.tailRowFactorOfTailBlock = rowFactor;
+        t.scalesAttr = 1.0f;
+        t.layout = p.layout2 ? 2 : 1;
+        t.cacheRows = cacheRows;
+        t.dataCol = dataCol;
+        t.scaleBytes = scaleBytes;
+        t.layout2TokenBundleSize = dataCol + scaleBytes;
+        t.layout2CacheCol = p.layout2 ? cacheCol : 0;
+
+        size_t shapeX = static_cast<size_t>(p.bs) * p.d * sizeof(uint16_t);
+        size_t shapeCache =
+            p.layout2 ? static_cast<size_t>(blockNum) * blockStride : static_cast<size_t>(cacheRows) * cacheCol;
+        size_t shapeSlot = static_cast<size_t>(p.bs) * sizeof(int32_t);
+        uint8_t* xGm = GmAllocWrapper<uint8_t>(shapeX);
+        uint8_t* slotGm = GmAllocWrapper<uint8_t>(shapeSlot);
+        uint8_t* cacheGm = GmAllocWrapper<uint8_t>(shapeCache);
+        uint8_t* cacheOutGm = GmAllocWrapper<uint8_t>(shapeCache);
+        uint8_t* workspace = GmAllocWrapper<uint8_t>(SYS_WORKSPACE);
+        uint8_t* tilingGm = GmAllocWrapper<uint8_t>(sizeof(KvCompressEpilogTilingData));
+
+        FillBf16(xGm, p.bs * p.d);
+        std::memset(cacheGm, 0xA5, shapeCache); // 哨兵: 未写入区必须保持 0xA5
+        std::memset(cacheOutGm, 0xA5, shapeCache);
+        std::memset(workspace, 0, SYS_WORKSPACE);
+        std::memcpy(tilingGm, &t, sizeof(KvCompressEpilogTilingData));
+
+        int32_t* slot = reinterpret_cast<int32_t*>(slotGm);
+        for (int64_t i = 0; i < p.bs; ++i) {
+            slot[i] = static_cast<int32_t>(i);
+        }
+        int64_t skipped = 0;
+        if (p.withSkip) {
+            for (int64_t i = 0; i < p.bs; i += 3) {
+                slot[i] = -1;
+                ++skipped;
+            }
+        }
+
+        const uint64_t tilingKey = p.layout2 ? (p.group == 16 ? 2102UL : 2101UL) : (p.group == 16 ? 2002UL : 2001UL);
+        ICPU_SET_TILING_KEY(tilingKey);
+        ICPU_RUN_KF(kv_compress_epilog, static_cast<uint32_t>(usedCore), cacheGm, xGm, slotGm, cacheOutGm, workspace,
+                    tilingGm);
+
+        // 校验 1: 每个有效 slot 的数据段 [0, dataCol) 与 scale 段被写 (不再是全 0xA5)
+        int64_t written = 0;
+        int64_t untouchedBad = 0;
+        const int64_t bundle = dataCol + scaleBytes;
+        for (int64_t i = 0; i < p.bs; ++i) {
+            if (slot[i] < 0 || slot[i] >= cacheRows) {
+                continue;
+            }
+            uint8_t* row = nullptr;
+            if (p.layout2) {
+                const int64_t blk = slot[i] / blockSize;
+                const int64_t pos = slot[i] % blockSize;
+                row = cacheGm + blk * blockStride + pos * bundle;
+            } else {
+                row = cacheGm + slot[i] * cacheCol;
+            }
+            bool dataChanged = false;
+            for (int64_t c = 0; c < dataCol; ++c) {
+                if (row[c] != 0xA5) {
+                    dataChanged = true;
+                    break;
+                }
+            }
+            if (dataChanged) {
+                ++written;
+            }
+            // 校验 2a (layout1): 行尾 [kvCacheCol, cacheCol) 不写 (行步长=cacheCol, 无跨行重叠)
+            if (!p.layout2) {
+                for (int64_t c = kvCacheCol; c < cacheCol; ++c) {
+                    if (row[c] != 0xA5) {
+                        ++untouchedBad;
+                        break;
+                    }
+                }
+            }
+        }
+        // 校验 2b (layout2): bundle 紧凑排列(tokenStride 间隔), 哨兵区 = 块尾 [blockSize*bundle,
+        //     blockSize*cacheCol) 与块间间隙 [blockSize*cacheCol, blockStride)(非连续 blockGap>0 时)
+        //     —— 所有块的块尾/间隙均不应被写
+        if (p.layout2) {
+            for (int64_t blk = 0; blk < blockNum; ++blk) {
+                uint8_t* tail = cacheGm + blk * blockStride + blockSize * bundle;
+                for (int64_t c = 0; c < blockStride - blockSize * bundle; ++c) {
+                    if (tail[c] != 0xA5) {
+                        ++untouchedBad;
+                        break;
+                    }
+                }
+            }
+        }
+        EXPECT_EQ(written, p.bs - skipped) << p.desc << ": written=" << written << " expected=" << (p.bs - skipped);
+        EXPECT_EQ(untouchedBad, 0) << p.desc << ": sentinel region was overwritten";
+
+        AscendC::GmFree(xGm);
+        AscendC::GmFree(slotGm);
+        AscendC::GmFree(cacheGm);
+        AscendC::GmFree(cacheOutGm);
+        AscendC::GmFree(workspace);
+        AscendC::GmFree(tilingGm);
+    }
+}
+
+// ==================== mode3 MXFP8 round_scale=0 多行 UB 行步长回归 ====================
+// 基线 VFProcessMxFp8<TCache,false> 必须按 RoundUp<uint8_t>(kvCacheCol) 计算 UB 行起点，
+// 与 layout2d/layout4d 的 CopyOutRows 保持一致。若不齐，多行 batch 从第 2 行起会读错 UB：
+// ICPU 表现为数据错位，真机则因非 32B 对齐向量写触发 VEC_ERROR。
+// 这里逐字节比较“单行独立运行”与“多行 batch 运行”中同一 x 行落到同一 slot 的结果。
+namespace {
+struct Mxfp8AddrCfg {
+    int64_t bs;
+    int64_t d;
+    int64_t rowStride;
+    int64_t roundScale;
+    std::string desc;
+};
+
+void FillMxfp8Rows(std::vector<uint16_t>& xbuf, int64_t rows, int64_t d)
+{
+    for (int64_t r = 0; r < rows; ++r) {
+        for (int64_t i = 0; i < d; ++i) {
+            // 0.25 的倍数，bf16 可精确表示；行间、列间均不同，便于暴露行错位。
+            float v = static_cast<float>(r + 1) * 0.25f + static_cast<float>(i % 16) * 0.125f;
+            uint32_t bits = 0;
+            std::memcpy(&bits, &v, sizeof(bits));
+            xbuf[r * d + i] = static_cast<uint16_t>(bits >> 16);
+        }
+    }
+}
+
+void RunMxfp8Kernel(const Mxfp8AddrCfg& cfg, const std::vector<uint16_t>& xAll, const std::vector<int32_t>& slots,
+                    int64_t cacheRows, std::vector<uint8_t>& cache)
+{
+    AscendC::SetKernelMode(KernelMode::AIV_MODE);
+    const int64_t groups = cfg.d / 32;
+    const int64_t dataCol = cfg.d;
+    const int64_t concatCol = dataCol + groups * 2;
+    const int64_t kvCacheCol = concatCol;
+
+    KvCompressEpilogTilingData t;
+    std::memset(&t, 0, sizeof(t));
+    t.bs = cfg.bs;
+    t.d = cfg.d;
+    t.kvCacheCol = kvCacheCol;
+    t.kvCacheRowStride = cfg.rowStride;
+    t.kvCacheBlockSize = 1;
+    t.kvCacheBlockStride = cfg.rowStride;
+    t.scaleCol = groups;
+    t.concatCol = concatCol;
+    t.padCol = 0;
+    t.quantMode = 3;
+    t.roundScale = cfg.roundScale;
+    t.perGroupSize = 32;
+    t.rowOfFormerBlock = cfg.bs;
+    t.rowOfTailBlock = cfg.bs;
+    t.rowLoopOfFormerBlock = 1;
+    t.rowLoopOfTailBlock = 1;
+    t.rowFactor = cfg.bs;
+    t.tailRowFactorOfFormerBlock = cfg.bs;
+    t.tailRowFactorOfTailBlock = cfg.bs;
+    t.scalesAttr = 1.0f;
+    t.layout = 1;
+    t.cacheRows = cacheRows;
+    t.dataCol = dataCol;
+    t.scaleBytes = groups * 2;
+    t.layout2TokenBundleSize = concatCol;
+    t.layout2CacheCol = 0;
+
+    size_t shapeX = static_cast<size_t>(cfg.bs) * cfg.d * sizeof(uint16_t);
+    size_t shapeCache = static_cast<size_t>(cacheRows) * cfg.rowStride;
+    uint8_t* xGm = GmAllocWrapper<uint8_t>(shapeX);
+    uint8_t* slotGm = GmAllocWrapper<uint8_t>(cfg.bs * sizeof(int32_t));
+    uint8_t* cacheGm = GmAllocWrapper<uint8_t>(shapeCache);
+    uint8_t* cacheOutGm = GmAllocWrapper<uint8_t>(shapeCache);
+    uint8_t* workspace = GmAllocWrapper<uint8_t>(SYS_WORKSPACE);
+    uint8_t* tilingGm = GmAllocWrapper<uint8_t>(sizeof(KvCompressEpilogTilingData));
+
+    std::memcpy(xGm, xAll.data(), shapeX);
+    std::memcpy(slotGm, slots.data(), cfg.bs * sizeof(int32_t));
+    std::memset(cacheGm, 0xCC, shapeCache);
+    std::memset(cacheOutGm, 0, shapeCache);
+    std::memset(workspace, 0, SYS_WORKSPACE);
+    std::memcpy(tilingGm, &t, sizeof(KvCompressEpilogTilingData));
+
+    ICPU_SET_TILING_KEY(2000);
+    ICPU_RUN_KF(kv_compress_epilog, 1, cacheGm, xGm, slotGm, cacheOutGm, workspace, tilingGm);
+    cache.assign(cacheGm, cacheGm + shapeCache);
+
+    AscendC::GmFree(xGm);
+    AscendC::GmFree(slotGm);
+    AscendC::GmFree(cacheGm);
+    AscendC::GmFree(cacheOutGm);
+    AscendC::GmFree(workspace);
+    AscendC::GmFree(tilingGm);
+}
+
+int64_t CountMxfp8RowMismatch(const Mxfp8AddrCfg& cfg)
+{
+    std::vector<uint16_t> xAll(static_cast<size_t>(cfg.bs) * cfg.d);
+    FillMxfp8Rows(xAll, cfg.bs, cfg.d);
+    std::vector<int32_t> slots(cfg.bs);
+    for (int64_t i = 0; i < cfg.bs; ++i) {
+        slots[i] = static_cast<int32_t>(i);
+    }
+
+    // 逐行单 batch 运行作为参考：同一 x 行、slot=0。
+    std::vector<std::vector<uint8_t>> refRows(cfg.bs);
+    for (int64_t r = 0; r < cfg.bs; ++r) {
+        Mxfp8AddrCfg one = cfg;
+        one.bs = 1;
+        std::vector<uint16_t> xOne(xAll.begin() + r * cfg.d, xAll.begin() + (r + 1) * cfg.d);
+        std::vector<int32_t> slotOne = {0};
+        std::vector<uint8_t> oneCache;
+        RunMxfp8Kernel(one, xOne, slotOne, 1, oneCache);
+        refRows[r].assign(oneCache.begin(), oneCache.begin() + cfg.rowStride);
+    }
+
+    std::vector<uint8_t> multiCache;
+    RunMxfp8Kernel(cfg, xAll, slots, cfg.bs, multiCache);
+
+    int64_t badRows = 0;
+    int64_t firstBadByte = -1;
+    for (int64_t r = 0; r < cfg.bs; ++r) {
+        const uint8_t* got = multiCache.data() + slots[r] * cfg.rowStride;
+        for (int64_t b = 0; b < cfg.rowStride; ++b) {
+            if (got[b] != refRows[r][b]) {
+                ++badRows;
+                if (firstBadByte < 0) {
+                    firstBadByte = b;
+                }
+                break;
+            }
+        }
+    }
+    std::cout << "[mxfp8-addr] " << cfg.desc << " d=" << cfg.d << " rowStride=" << cfg.rowStride
+              << " rs=" << cfg.roundScale << " mismatchRows=" << badRows << "/" << cfg.bs
+              << " firstBadByte=" << firstBadByte << std::endl;
+    return badRows;
+}
+} // namespace
+
+TEST(KvCompressEpilogMxfp8AddrTest, RoundScaleOffMultiRowUbStride)
+{
+    // d=128: kvCacheCol=136 非 32B 对齐，CopyOutRows 按 160 取行。
+    EXPECT_EQ(CountMxfp8RowMismatch(Mxfp8AddrCfg{8, 128, 160, 0, "d128_unaligned_rs0"}), 0)
+        << "round_scale=0 multi-row must use aligned UB row stride";
+    // d=256: kvCacheCol=272 非 32B 对齐，CopyOutRows 按 288 取行。
+    EXPECT_EQ(CountMxfp8RowMismatch(Mxfp8AddrCfg{8, 256, 288, 0, "d256_unaligned_rs0"}), 0)
+        << "round_scale=0 multi-row must use aligned UB row stride";
+    // 对照：d=512 的 kvCacheCol=544 本身 32B 对齐。
+    EXPECT_EQ(CountMxfp8RowMismatch(Mxfp8AddrCfg{8, 512, 544, 0, "d512_aligned_rs0_control"}), 0)
+        << "aligned control should match";
+}
+} // namespace
