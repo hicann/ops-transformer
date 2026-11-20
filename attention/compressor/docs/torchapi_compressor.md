@@ -117,8 +117,14 @@ cann_ops_transformer.compressor(
 | cache_mode | int | 可选 | state_cache的存储模式，默认值为1。<br>1：连续buffer。<br>2：循环buffer。 | int | - |
 
 <!-- npu="A3,910b" id7 -->
-- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：cmp_ratio仅支持2/4/8/16/32/64/128。
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
+  - cmp_ratio仅支持2/4/8/16/32/64/128。
+  - cache_mode=2时仅支持coff=1。
 <!-- end id7 -->
+
+<!-- npu="950" id8 -->
+- <term>Ascend 950PR&950DT系列产品</term>：保持压缩尾部刷新[alignDown(start_pos + seqused, cmp_ratio) - (coff - 1) * cmp_ratio, start_pos + seqused)，需满足block_size >= S + coff * cmp_ratio - 1。
+<!-- end id8 -->
 
 ## 返回值说明
 
@@ -170,9 +176,12 @@ cann_ops_transformer.compressor(
     </div>
 - 该接口支持B、S、T取0，即shape与B、S、T值相关的入参允许传入空tensor，其余入参不支持传入空tensor。该场景下state_cache不做更新，输出cmp_kv为空tensor。
 - state_block_table元素取值范围为[0, block_num)，block_num为state_cache第0维大小。元素值直接用作state_cache的block索引，越界会导致内存非法访问。元素值为0时：cache_mode=1（连续buffer）下写state_cache操作跳过该位置；cache_mode=2（循环buffer）下读写操作均不跳过。算子不做重复校验，需由调用方保证元素值唯一性：cache_mode=1下元素值0为“未分配”哨兵值可重复出现，非0值须全局唯一；cache_mode=2下0为有效物理块号，所有元素值须全局唯一。重复会导致多个逻辑块/batch写同一物理块区域，造成state_cache数据踩踏覆盖。
+- state_cache写入策略：
+  - cache_mode=1：本次调用的全部有效token按state_block_table的逻辑块写入。
+  - cache_mode=2：刷新本次有效输入末尾min(seqused, block_size)个token（seqused未指定时取每个batch的序列长度）。
 - 支持D为128/512。
 - 支持H为1k~10k，512对齐。
-- 支持block_size为1~1024。
+- 支持block_size为1~1024；cache_mode=2时需满足block_size >= coff * cmp_ratio - 1。
 - 支持如下三种典型组合场景：
   - C4A: D=512, coff=2, cmp_ratio=4;
   - C4Li: D=128, coff=2, cmp_ratio=4;

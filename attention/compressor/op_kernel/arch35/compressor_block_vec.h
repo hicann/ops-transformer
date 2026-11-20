@@ -54,7 +54,8 @@ public:
     __aicore__ inline void FreeEventID();
     // =================================执行计算=================================
     __aicore__ inline void InitVec1GlobalTensor(GlobalTensor<T> kvMm1ResGm, GlobalTensor<T> scoreMm1ResGm,
-                                                GlobalTensor<T> kvCacheTcGm, GlobalTensor<T> scoreCacheTcGm);
+                                                GlobalTensor<T> kvCacheTcGm, GlobalTensor<T> scoreCacheTcGm,
+                                                GlobalTensor<T> tempStateCacheGm);
 
 protected:
     GlobalTensor<T> scoreMm1ResGm_;
@@ -131,9 +132,18 @@ protected:
     __aicore__ inline void CopyOutVec1ResToOutput(const LocalTensor<T>& comperssoredUb, const Vec1SliceInfo& sliceInfo,
                                                   uint32_t compressTcSize, uint32_t dStartIdx, uint32_t dDealSize);
     __aicore__ inline void CalcTilingStrategy(Vec1SplitInfo& splitInfo);
+    // cache_mode=2 且本轮同时读写同一批环槽时：写先落到 workspace（一轮的量），
+    // 等本轮 vec 全流程结束、全 vec 同步后再搬回 state_cache。
+public:
+    __aicore__ inline void SetTempStateCacheRound(bool enable, const Vec1RunInfo& info);
+    __aicore__ inline void WriteStateToTempStateCache(const LocalTensor<T>& local, uint32_t tempRowStart,
+                                                      uint32_t seqCnt, uint32_t dStartIdx, uint32_t dDealSize,
+                                                      uint32_t stateIdx);
+    __aicore__ inline void FlushTempStateCache();
     __aicore__ inline void SaveState(const LocalTensor<T>& srcLocal, const GlobalTensor<T>& stateGm,
                                      const GlobalTensor<int32_t>& blockTableGm, const Vec1SliceInfo& sliceInfo,
-                                     uint32_t dStartIdx, uint32_t dDealSize, uint32_t dBaseSize, uint32_t stateIdx);
+                                     uint32_t dStartIdx, uint32_t dDealSize, uint32_t dBaseSize, uint32_t stateIdx,
+                                     uint32_t roundRowBase = 0U);
     template <bool IS_SCORE>
     __aicore__ inline void DuplicateFirstBlock(const LocalTensor<T>& dstLocal, uint32_t duplicateRowCount,
                                                uint32_t duplicateColCount, uint32_t singleRowCount);
@@ -153,6 +163,9 @@ protected:
     GlobalTensor<int32_t> sequsedGm_;
     GlobalTensor<int32_t> stateBlockTableGm_;
     GlobalTensor<T> stateCacheGm_;
+    GlobalTensor<T> tempStateCacheGm_;      // 一轮 state 暂存
+    bool useTempStateCache_ = false;        // 本轮是否启用暂存
+    Vec1RunInfo tempStateCacheRoundInfo_{}; // 所有 AIV 共享同一全局 V1 轮次及行坐标
     GlobalTensor<T> apeGm_;
     GlobalTensor<X_T> cmpKvOutGm_;
     GlobalTensor<T> softmaxScoreOutGm_;
@@ -223,12 +236,14 @@ template <typename COMP>
 __aicore__ inline void CompressorBlockVector<COMP>::InitVec1GlobalTensor(GlobalTensor<T> kvMm1ResGm,
                                                                          GlobalTensor<T> scoreMm1ResGm,
                                                                          GlobalTensor<T> kvCacheTcGm,
-                                                                         GlobalTensor<T> scoreCacheTcGm)
+                                                                         GlobalTensor<T> scoreCacheTcGm,
+                                                                         GlobalTensor<T> tempStateCacheGm)
 {
     this->kvMm1ResGm_ = kvMm1ResGm;
     this->scoreMm1ResGm_ = scoreMm1ResGm;
     this->kvCacheTcGm_ = kvCacheTcGm;
     this->scoreCacheTcGm_ = scoreCacheTcGm;
+    this->tempStateCacheGm_ = tempStateCacheGm;
 }
 
 template <typename COMP>
@@ -614,21 +629,39 @@ __aicore__ inline void CompressorBlockVector<COMP>::SaveState(const LocalTensor<
                                                               const GlobalTensor<T>& stateGm,
                                                               const GlobalTensor<int32_t>& blockTableGm,
                                                               const Vec1SliceInfo& sliceInfo, uint32_t dStartIdx,
-                                                              uint32_t dDealSize, uint32_t dBaseSize, uint32_t stateIdx)
+                                                              uint32_t dDealSize, uint32_t dBaseSize, uint32_t stateIdx,
+                                                              uint32_t roundRowBase)
 {
     uint64_t startSeqIdx = sliceInfo.bStartPos + sliceInfo.sIdx;
     uint32_t endSeqIdx = startSeqIdx + sliceInfo.validSeqCnt;
     uint64_t srcBaseOffset = sliceInfo.dealedSeqCnt * coff_ * dBaseSize;
 
     if constexpr (COMP::cacheMode == CACHE_MODE::RING_BUFFER) {
-        uint64_t compressSeqIdx = Trunc(sliceInfo.bStartPos + sliceInfo.bSeqUsed, (uint64_t)cmpRatio_);
-        uint32_t writeSeqStartIdx =
-            compressSeqIdx > (coff_ - 1) * cmpRatio_ ? compressSeqIdx - (coff_ - 1) * cmpRatio_ : 0;
+        // ape 未传入时保留原有 ring 刷新窗口（压缩尾部），否则刷新末尾 min(seqUsed, blockSize) 个 token。
+        uint64_t writeSeqStartIdx =
+            GetRingWriteStart(sliceInfo.bStartPos, sliceInfo.bSeqUsed, static_cast<uint32_t>(cmpRatio_),
+                              static_cast<uint32_t>(coff_), constInfo_.blockSize, COMP::hasApe);
         if (endSeqIdx <= writeSeqStartIdx) {
             return;
         }
-        srcBaseOffset += (max(startSeqIdx, (uint64_t)writeSeqStartIdx) - startSeqIdx) * coff_ * dBaseSize;
-        startSeqIdx = max(startSeqIdx, (uint64_t)writeSeqStartIdx);
+        srcBaseOffset += (max(startSeqIdx, writeSeqStartIdx) - startSeqIdx) * coff_ * dBaseSize;
+        startSeqIdx = max(startSeqIdx, writeSeqStartIdx);
+        if (useTempStateCache_) {
+            // 本轮同时读写了重叠的环槽：本轮所有 state 写先落到 workspace，
+            // 等本轮 vec 全流程走完、全 vec 同步之后再搬回 state_cache。
+            // sliceInfo 的行偏移相对本核 UB 切块；roundRowBase 将其还原为全局 V1 轮次坐标。
+            uint32_t tempRowStart = roundRowBase + sliceInfo.dealedSeqCnt +
+                                    static_cast<uint32_t>(startSeqIdx - sliceInfo.bStartPos - sliceInfo.sIdx);
+            uint32_t seqCnt = endSeqIdx - startSeqIdx;
+            if constexpr (COMP::coff == COFF::OVERLAP) {
+                WriteStateToTempStateCache(srcLocal[srcBaseOffset], tempRowStart, seqCnt, dStartIdx, dDealSize,
+                                           stateIdx);
+                srcBaseOffset += dBaseSize;
+                dStartIdx += constInfo_.headDim;
+            }
+            WriteStateToTempStateCache(srcLocal[srcBaseOffset], tempRowStart, seqCnt, dStartIdx, dDealSize, stateIdx);
+            return;
+        }
     }
 
     if constexpr (COMP::coff == COFF::OVERLAP) {
@@ -709,6 +742,77 @@ __aicore__ inline void CompressorBlockVector<COMP>::ReadState(const LocalTensor<
             AccessCacheState<true>(dstLocal[dstBaseOffset], stateGm, blockTableGm, sliceInfo.bIdx, startSeqIdx,
                                    endSeqIdx, dStartIdx, dDealSize, stateIdx);
         }
+    }
+}
+
+template <typename COMP>
+__aicore__ inline void CompressorBlockVector<COMP>::SetTempStateCacheRound(bool enable, const Vec1RunInfo& info)
+{
+    useTempStateCache_ = enable;
+    tempStateCacheRoundInfo_ = info;
+}
+
+template <typename COMP>
+__aicore__ inline void CompressorBlockVector<COMP>::WriteStateToTempStateCache(const LocalTensor<T>& local,
+                                                                               uint32_t tempRowStart, uint32_t seqCnt,
+                                                                               uint32_t dStartIdx, uint32_t dDealSize,
+                                                                               uint32_t stateIdx)
+{
+    if (seqCnt == 0U) {
+        return;
+    }
+    uint64_t rowWidth = static_cast<uint64_t>(constInfo_.headDim) * coff_ * STATE_INTERLEAVE_FACTOR;
+    uint64_t tempOffset = static_cast<uint64_t>(tempRowStart) * rowWidth +
+                          static_cast<uint64_t>(stateIdx) * coff_ * constInfo_.headDim + dStartIdx;
+    DataCopyWithOutputQue(tempStateCacheGm_[tempOffset], local, seqCnt, dDealSize, coff_ * dDealSize,
+                          static_cast<uint32_t>(rowWidth));
+}
+
+template <typename COMP>
+__aicore__ inline void CompressorBlockVector<COMP>::FlushTempStateCache()
+{
+    if constexpr (COMP::cacheMode == CACHE_MODE::RING_BUFFER) {
+        if (!useTempStateCache_) {
+            return;
+        }
+        uint32_t aivNum = constInfo_.usedCoreNum * 2U;
+        uint32_t aivIdx = GetBlockIdx();
+        if (aivNum == 0U) {
+            return;
+        }
+        uint64_t rowWidth = static_cast<uint64_t>(constInfo_.headDim) * coff_ * STATE_INTERLEAVE_FACTOR;
+        CompressorVec1SliceIterator<COMP> sliceIterator(tools_);
+        sliceIterator.SetMaxBatchSize(constInfo_.batchSize);
+        sliceIterator.Reset(tempStateCacheRoundInfo_.bStart, tempStateCacheRoundInfo_.sStart);
+        sliceIterator.SetNeedDealTcSize(tempStateCacheRoundInfo_.dealTcNum);
+        while (!sliceIterator.IsEnd()) {
+            const Vec1SliceInfo& slice = sliceIterator.GetSlice();
+            uint64_t sliceSeqStartIdx = slice.bStartPos + slice.sIdx;
+            uint64_t flushSeqStartIdx = max(
+                sliceSeqStartIdx, GetRingWriteStart(slice.bStartPos, slice.bSeqUsed, static_cast<uint32_t>(cmpRatio_),
+                                                    static_cast<uint32_t>(coff_), constInfo_.blockSize, COMP::hasApe));
+            uint64_t flushSeqEndIdx = sliceSeqStartIdx + slice.validSeqCnt;
+            for (uint64_t seqIdx = flushSeqStartIdx; seqIdx < flushSeqEndIdx; ++seqIdx) {
+                uint64_t tempRowIdx = slice.dealedSeqCnt + seqIdx - sliceSeqStartIdx;
+                if ((tempRowIdx % aivNum) != static_cast<uint64_t>(aivIdx)) {
+                    continue;
+                }
+                uint64_t tempRowOffset = tempRowIdx * rowWidth;
+                LocalTensor<T> tempStateCacheUb = tmpBuff1.template Get<T>();
+                DataCopyWithInputQue(tempStateCacheUb, tempStateCacheGm_[tempRowOffset], 1U,
+                                     static_cast<uint32_t>(rowWidth), static_cast<uint32_t>(rowWidth),
+                                     static_cast<uint32_t>(rowWidth));
+                PipeBarrier<PIPE_V>();
+                int32_t stateBlkId = stateBlockTableGm_.GetValue(slice.bIdx);
+                uint64_t stateCacheOffset = static_cast<uint64_t>(stateBlkId) * constInfo_.stateCacheStrideDim0 +
+                                            (seqIdx % static_cast<uint64_t>(constInfo_.blockSize)) * rowWidth;
+                DataCopyWithOutputQue(stateCacheGm_[stateCacheOffset], tempStateCacheUb, 1U,
+                                      static_cast<uint32_t>(rowWidth), static_cast<uint32_t>(rowWidth),
+                                      static_cast<uint32_t>(rowWidth));
+            }
+            sliceIterator.IteratorSlice();
+        }
+        useTempStateCache_ = false;
     }
 }
 

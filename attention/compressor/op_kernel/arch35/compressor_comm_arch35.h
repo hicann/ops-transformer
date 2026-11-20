@@ -211,8 +211,8 @@ struct ConstInfo {
     uint64_t mm1KvResSize = 0;
     uint64_t mm1ScoreResSize = 0;
     uint32_t vec1TailCacheSize = 0;
-    uint64_t vec1ResSize = 0;
-    uint64_t mm1ResSize = 0; // 所有cube输出kv/score结果的总大小
+    uint64_t tempStateCacheSize = 0; // ring state 写暂存区大小（元素）
+    uint64_t mm1ResSize = 0;         // 所有cube输出kv/score结果的总大小
 
     uint32_t aiCoreIdx = 0;
     uint32_t nSize = 0;
@@ -249,9 +249,6 @@ struct RunInfo {
     uint32_t scStart = 0;
     uint32_t scEnd = 0;
     uint32_t dealScSize = 0;
-
-    // vec1Res offset
-    uint64_t vec1ResOffset = 0;
 };
 
 struct Vec1RunInfo {
@@ -269,9 +266,6 @@ struct MSplitInfo {
     uint32_t vecEndB = 0U;
     uint32_t vecEndS = 0U;
     uint32_t dealTcNum = 0U;
-    // vec1Res offset
-    uint64_t vec1StartOffset = 0;
-    uint64_t vec1ResOffset = 0;
 };
 
 struct BlockInfo {

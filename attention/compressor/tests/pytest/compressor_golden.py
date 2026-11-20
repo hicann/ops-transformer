@@ -28,6 +28,38 @@ import argparse
 np.random.seed(21)  # 固定随机种子
 np.set_printoptions(suppress=True)
 
+# state_cache ring 模式的 block_size 约定
+MAX_BLOCK_SIZE = 1024
+DEFAULT_BLOCK_SIZE = 128
+
+
+def resolve_block_size(block_size, coff, cmp_ratio, seq_len, cache_mode):
+    """解析 state_cache 的 block_size。
+
+    cache_mode=2（ring）下显式值优先；未指定（None/0）时回退到"读写不同槽"的自动值，
+    以保持历史用例行为不变；显式值低于 coff*cmp_ratio-1 时抬到下限，超过上限时截断。
+    """
+    coff_val = max(1, int(coff))
+    ratio_val = max(1, int(cmp_ratio))
+    min_size = max(1, coff_val * ratio_val - 1)
+    if cache_mode != 2:
+        return int(block_size) if block_size else DEFAULT_BLOCK_SIZE
+    auto_size = min(coff_val * ratio_val + int(seq_len) - 1, MAX_BLOCK_SIZE)
+    if block_size is None or int(block_size) == 0:
+        return auto_size
+    size = int(block_size)
+    if size < min_size:
+        print(
+            f"Warning: block_size={size} is below coff*cmp_ratio-1={min_size}, "
+            f"raised to {min_size}"
+        )
+        size = min_size
+    if size > MAX_BLOCK_SIZE:
+        print(f"Warning: block_size={size} exceeds {MAX_BLOCK_SIZE}, truncated")
+        size = MAX_BLOCK_SIZE
+    return size
+
+
 DEVICE_ID = 0
 torch.npu.config.allow_internal_format = True
 
@@ -529,7 +561,15 @@ def cpu_compressor_fp64(
             else:
                 batch_seq_used = cu_seqlens[b_idx + 1] - cu_seqlens[b_idx]
         compress_seq_id = (batch_start_pos + batch_seq_used) // cmp_ratio * cmp_ratio
+        # cache_mode=2: state 写入窗口 = 本次序列末尾 min(batch_seq_used, block_size) 个 token
+        seq_end_all = batch_start_pos + batch_seq_used
+        ring_save_start = (
+            seq_end_all - kv_state.shape[1] if seq_end_all > kv_state.shape[1] else 0
+        )
 
+        # cache_mode=2：本 batch 的 state 写全部推迟到压缩计算之后，
+        # 保证读写同槽时历史读读到的仍是调用入口的旧值（写集合/update 掩码不变）
+        pending_state_writes = []
         batch_seq_idx = 0
         while batch_seq_idx < batch_seq_used:
             start_seq_idx = batch_start_pos + batch_seq_idx
@@ -551,38 +591,49 @@ def cpu_compressor_fp64(
 
             if cache_mode == 1:
                 save_flag = True
+                clip = 0
+            elif ape is None:
+                # 不传 ape（V2 接口）：刷新末尾 min(seqUsed, block_size) 个 token
+                save_flag = end_seq_idx > ring_save_start
+                clip = max(start_seq_idx, ring_save_start) - start_seq_idx
             else:
-                save_flag = (
-                    True
-                    if start_seq_idx >= (compress_seq_id - (coff - 1) * cmp_ratio)
-                    else False
-                )
+                # 传入 ape（V1 接口）：保持原压缩尾部刷新
+                save_flag = start_seq_idx >= (compress_seq_id - (coff - 1) * cmp_ratio)
+                clip = 0
             compress_flag = True if start_seq_idx < compress_seq_id else False
 
             if save_flag:
-                tmp_kv_state = new_kv_state[start_offset:end_offset, :]
-                tmp_score_state = new_score_state[start_offset:end_offset, :]
-                write_state_page_cache(
-                    kv_state,
-                    update_kv_position,
-                    tmp_kv_state,
-                    b_idx,
-                    start_seq_idx,
-                    end_seq_idx,
-                    block_table,
-                    cache_mode=cache_mode,
-                )
-                write_state_page_cache(
-                    score_state,
-                    update_score_position,
-                    tmp_score_state,
-                    b_idx,
-                    start_seq_idx,
-                    end_seq_idx,
-                    block_table,
-                    cache_mode=cache_mode,
-                )
-
+                if cache_mode == 2 and ape is None:
+                    pending_state_writes.append(
+                        (
+                            start_seq_idx + clip,
+                            end_seq_idx,
+                            new_kv_state[start_offset + clip : end_offset, :],
+                            new_score_state[start_offset + clip : end_offset, :],
+                        )
+                    )
+                else:
+                    # 原路径（cache_mode=1 或传入 ape）：立即写，保持原"先写后读"顺序
+                    write_state_page_cache(
+                        kv_state,
+                        update_kv_position,
+                        new_kv_state[start_offset:end_offset, :],
+                        b_idx,
+                        start_seq_idx,
+                        end_seq_idx,
+                        block_table,
+                        cache_mode=cache_mode,
+                    )
+                    write_state_page_cache(
+                        score_state,
+                        update_score_position,
+                        new_score_state[start_offset:end_offset, :],
+                        b_idx,
+                        start_seq_idx,
+                        end_seq_idx,
+                        block_table,
+                        cache_mode=cache_mode,
+                    )
             if compress_flag:
                 sc_kv_state = np.zeros(
                     shape=(coff, cmp_ratio, head_dim), dtype=matmul_dtype
@@ -743,6 +794,28 @@ def cpu_compressor_fp64(
                 out_sum_sc_cnt = out_sum_sc_cnt + 1
 
             batch_seq_idx = end_seq_idx - batch_start_pos
+        # 压缩计算（含历史读）结束后再刷新 state，避免同槽写覆盖本次读
+        for w_start, w_end, w_kv, w_score in pending_state_writes:
+            write_state_page_cache(
+                kv_state,
+                update_kv_position,
+                w_kv,
+                b_idx,
+                w_start,
+                w_end,
+                block_table,
+                cache_mode=cache_mode,
+            )
+            write_state_page_cache(
+                score_state,
+                update_score_position,
+                w_score,
+                b_idx,
+                w_start,
+                w_end,
+                block_table,
+                cache_mode=cache_mode,
+            )
         out_cu_seqlen[b_idx + 1] = out_sum_sc_cnt
         out_seqused[b_idx] = batch_out_sc_id
 
@@ -856,7 +929,15 @@ def cpu_compressor(
                 )  # x的shape为2维, Th
         # 小于compress_seq_id的seq_id为需要压缩的token
         compress_seq_id = (batch_start_pos + batch_seq_used) // cmp_ratio * cmp_ratio
+        # cache_mode=2: state 写入窗口 = 本次序列末尾 min(batch_seq_used, block_size) 个 token
+        seq_end_all = batch_start_pos + batch_seq_used
+        ring_save_start = (
+            seq_end_all - kv_state.shape[1] if seq_end_all > kv_state.shape[1] else 0
+        )
 
+        # cache_mode=2：本 batch 的 state 写全部推迟到压缩计算之后，
+        # 保证读写同槽时历史读读到的仍是调用入口的旧值（写集合/update 掩码不变）
+        pending_state_writes = []
         batch_seq_idx = 0
         while batch_seq_idx < batch_seq_used:
             # 获取要处理的S方向起始和结束点, 已加start_pos
@@ -882,38 +963,49 @@ def cpu_compressor(
             # 2.判断块是否需要压缩
             if cache_mode == 1:
                 save_flag = True
+                clip = 0
+            elif ape is None:
+                # 不传 ape（V2 接口）：刷新末尾 min(seqUsed, block_size) 个 token
+                save_flag = end_seq_idx > ring_save_start
+                clip = max(start_seq_idx, ring_save_start) - start_seq_idx
             else:
-                save_flag = (
-                    True
-                    if start_seq_idx >= (compress_seq_id - (coff - 1) * cmp_ratio)
-                    else False
-                )
+                # 传入 ape（V1 接口）：保持原压缩尾部刷新
+                save_flag = start_seq_idx >= (compress_seq_id - (coff - 1) * cmp_ratio)
+                clip = 0
             compress_flag = True if start_seq_idx < compress_seq_id else False
 
             if save_flag:
-                tmp_kv_state = new_kv_state[start_offset:end_offset, :]
-                tmp_score_state = new_score_state[start_offset:end_offset, :]
-                write_state_page_cache(
-                    kv_state,
-                    update_kv_position,
-                    tmp_kv_state,
-                    b_idx,
-                    start_seq_idx,
-                    end_seq_idx,
-                    block_table,
-                    cache_mode=cache_mode,
-                )
-                write_state_page_cache(
-                    score_state,
-                    update_score_position,
-                    tmp_score_state,
-                    b_idx,
-                    start_seq_idx,
-                    end_seq_idx,
-                    block_table,
-                    cache_mode=cache_mode,
-                )
-
+                if cache_mode == 2 and ape is None:
+                    pending_state_writes.append(
+                        (
+                            start_seq_idx + clip,
+                            end_seq_idx,
+                            new_kv_state[start_offset + clip : end_offset, :],
+                            new_score_state[start_offset + clip : end_offset, :],
+                        )
+                    )
+                else:
+                    # 原路径（cache_mode=1 或传入 ape）：立即写，保持原"先写后读"顺序
+                    write_state_page_cache(
+                        kv_state,
+                        update_kv_position,
+                        new_kv_state[start_offset:end_offset, :],
+                        b_idx,
+                        start_seq_idx,
+                        end_seq_idx,
+                        block_table,
+                        cache_mode=cache_mode,
+                    )
+                    write_state_page_cache(
+                        score_state,
+                        update_score_position,
+                        new_score_state[start_offset:end_offset, :],
+                        b_idx,
+                        start_seq_idx,
+                        end_seq_idx,
+                        block_table,
+                        cache_mode=cache_mode,
+                    )
             if compress_flag:
                 # init value and shape of one sc state
                 sc_kv_state = np.zeros(
@@ -1083,6 +1175,28 @@ def cpu_compressor(
 
             # update loop idx
             batch_seq_idx = end_seq_idx - batch_start_pos
+        # 压缩计算（含历史读）结束后再刷新 state，避免同槽写覆盖本次读
+        for w_start, w_end, w_kv, w_score in pending_state_writes:
+            write_state_page_cache(
+                kv_state,
+                update_kv_position,
+                w_kv,
+                b_idx,
+                w_start,
+                w_end,
+                block_table,
+                cache_mode=cache_mode,
+            )
+            write_state_page_cache(
+                score_state,
+                update_score_position,
+                w_score,
+                b_idx,
+                w_start,
+                w_end,
+                block_table,
+                cache_mode=cache_mode,
+            )
         out_cu_seqlen[b_idx + 1] = out_sum_sc_cnt
         out_seqused[b_idx] = batch_out_sc_id
 
@@ -1119,7 +1233,7 @@ def run_compressor_eager(
     start_pos=None,
     seqused=None,
     cu_seqlens=None,
-    block_size=128,
+    block_size=None,
     data_type=torch.bfloat16,
     hidden_size=4096,
     save_state_seqlens=None,
@@ -1222,6 +1336,8 @@ def run_compressor_eager(
 
     # ======================== check input params finish ========================
     # ======================== gen input data start =============================
+    # block_size 解析：cache_mode=2 时显式值优先，未指定才回退自动值
+    block_size = resolve_block_size(block_size, coff, cmp_ratio, S, cache_mode)
     # page state
     if cache_mode == 1:
         max_block_num_per_batch = (S_max + block_size - 1) // block_size
@@ -1294,9 +1410,6 @@ def run_compressor_eager(
             ).to(torch.float32)
     else:
         block_table = torch.tensor(random.sample(list(range(B)), B), dtype=torch.int32)
-        block_size = min(
-            (2 * cmp_ratio + S - 1) if coff == 2 else (cmp_ratio + S - 1), 1024
-        )  # block_size max is 1024
         if B == 0:
             kv_state = torch.tensor(
                 np.random.uniform(

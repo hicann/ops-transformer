@@ -119,8 +119,14 @@ cann_ops_transformer.compressor(
 | cache_mode | int | Optional | Storage mode of state_cache. The default value is 1.<br>1: contiguous buffer.<br>2: circular buffer. | int | - |
 
 <!-- npu="A3,910b" id7 -->
-- <term>Atlas A3 products</term>, <term>Atlas A2 products</term>: cmp_ratio supports only 2/4/8/16/32/64/128.
+- <term>Atlas A3 products</term>, <term>Atlas A2 products</term>:
+  - cmp_ratio supports only 2/4/8/16/32/64/128.
+  - cache_mode=2 supports only coff=1.
 <!-- end id7 -->
+
+<!-- npu="950" id8 -->
+- <term>Ascend 950PR&950DT products</term>: the compression-tail window [alignDown(start_pos + seqused, cmp_ratio) - (coff - 1) * cmp_ratio, start_pos + seqused) is kept, and block_size >= S + coff * cmp_ratio - 1 is required.
+<!-- end id8 -->
 
 ## Return Values
 
@@ -172,9 +178,12 @@ cann_ops_transformer.compressor(
     </div>
 - This API supports B, S, and T being set to 0. That is, input parameters whose shapes depend on the values of B, S, and T allow empty tensors, while other input parameters do not support empty tensors. In this case, state_cache is not updated, and the output cmp_kv is an empty tensor.
 - The value range of the state_block_table elements is [0, block_num), where block_num is the size of dimension 0 of state_cache. Element values are directly used as block indexes of state_cache. Out-of-range values cause invalid memory access. When the element value is 0: for cache_mode=1 (contiguous buffer), the write operation to state_cache skips this position; for cache_mode=2 (circular buffer), neither read nor write operations skip this position. The operator does not check for duplicates. The caller must ensure the uniqueness of element values: for cache_mode=1, the element value 0 is an "unallocated" sentinel value and can appear multiple times, while non-zero values must be globally unique; for cache_mode=2, 0 is a valid physical block number, and all element values must be globally unique. Duplicates cause multiple logical blocks/batches to write to the same physical block area, resulting in data overwrite in state_cache.
+- state_cache write policy:
+  - cache_mode=1: all valid tokens of the current call are written according to the logical blocks of state_block_table.
+  - cache_mode=2: the last min(seqused, block_size) tokens of the current input are refreshed (seqused defaults to each batch's sequence length).
 - D of 128/512 is supported.
 - H in the range 1K-10K is supported and must be aligned to 512.
-- block_size in the range 1-1024 is supported.
+- block_size in the range 1-1024 is supported; when cache_mode=2, block_size >= coff * cmp_ratio - 1 is required.
 - The following three typical combination use cases are supported:
   - C4A: D=512, coff=2, cmp_ratio=4;
   - C4Li: D=128, coff=2, cmp_ratio=4;

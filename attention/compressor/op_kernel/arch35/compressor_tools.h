@@ -113,6 +113,65 @@ __aicore__ inline uint32_t CompressorTools<COMP>::GetTIdxByBatch(uint32_t bIdx)
     }
 }
 
+// ==================== cache_mode=2 状态刷新的公共判定 ====================
+// 刷新本次有效输入最后 min(S, blockSize) 个 token；S 取该 batch 的 seq_used。
+__aicore__ inline uint64_t GetStateWriteStart(uint64_t bStartPos, uint32_t bSeqUsed, uint32_t blockSize)
+{
+    uint64_t endSeqIdx = bStartPos + static_cast<uint64_t>(bSeqUsed);
+    return endSeqIdx - min(bSeqUsed, blockSize);
+}
+
+// ring 写窗口统一入口：
+//   hasApe=false -> 新语义：末尾 min(seqUsed, blockSize) 个 token（仅 V2 接口/不传 ape）
+//   hasApe=true  -> 原语义：压缩尾部 [alignDown_r(P+U) - (coff-1)r, P+U)
+// 同槽判定 / 写暂存 / 落盘三处必须使用同一个窗口，否则会出现"判定了 A 却落盘 B"的错位。
+__aicore__ inline uint64_t GetRingWriteStart(uint64_t bStartPos, uint32_t bSeqUsed, uint32_t cmpRatio, uint32_t coff,
+                                             uint32_t blockSize, bool hasApe)
+{
+    if (!hasApe) {
+        return GetStateWriteStart(bStartPos, bSeqUsed, blockSize);
+    }
+    uint64_t compressSeqEndIdx = Trunc(bStartPos + static_cast<uint64_t>(bSeqUsed), static_cast<uint64_t>(cmpRatio));
+    uint64_t backRows = static_cast<uint64_t>(coff - 1U) * static_cast<uint64_t>(cmpRatio);
+    uint64_t writeSeqStart = compressSeqEndIdx > backRows ? compressSeqEndIdx - backRows : 0U;
+    // 实际写范围被裁剪到本次调用内（SaveState 以 slice 起点为下界），这里同样 clamp 到 bStartPos
+    return writeSeqStart > bStartPos ? writeSeqStart : bStartPos;
+}
+
+// 本次调用的 state 写是否会落到本次读用过的槽位上：
+//   读集合 [readSeqStartIdx, readSeqEndIdx) = [alignDown_r(P) - (coff-1)r, P)
+//   写集合 [writeSeqStartIdx, writeSeqEndIdx) = [GetRingWriteStart(...), P + U)
+// 环上同槽 <=> 存在 k>=0，使写集合与读集合平移 k 个环（k * ringRows 行）后相交
+__aicore__ inline bool IsStateRWConflict(uint64_t bStartPos, uint32_t bSeqUsed, uint32_t cmpRatio, uint32_t coff,
+                                         uint32_t blockSize, bool hasApe)
+{
+    uint64_t ringRows = static_cast<uint64_t>(blockSize);
+    if (ringRows == 0U || bSeqUsed == 0U) {
+        return false;
+    }
+    uint64_t backRows = static_cast<uint64_t>(coff - 1U) * static_cast<uint64_t>(cmpRatio);
+    uint64_t readSeqEndIdx = bStartPos;
+    uint64_t readSeqStartIdx = bStartPos > backRows ? Trunc(bStartPos, static_cast<uint64_t>(cmpRatio)) - backRows : 0U;
+    uint64_t writeSeqEndIdx = bStartPos + static_cast<uint64_t>(bSeqUsed);
+    uint64_t writeSeqStartIdx = GetRingWriteStart(bStartPos, bSeqUsed, cmpRatio, coff, blockSize, hasApe);
+    if (readSeqStartIdx >= readSeqEndIdx || writeSeqStartIdx >= writeSeqEndIdx) {
+        return false;
+    }
+    // 环上相交 <=> 存在 k>=0，使写集合与读集合平移 k 个环后相交。
+    // 旧窗口的写起点可能小于读终点（直接写历史行），因此 k 从 0 起算，下界需按 floor 计算。
+    int64_t writeStartToReadEndGap = static_cast<int64_t>(writeSeqStartIdx) - static_cast<int64_t>(readSeqEndIdx);
+    int64_t ringShiftMin = writeStartToReadEndGap / static_cast<int64_t>(ringRows);
+    if (writeStartToReadEndGap % static_cast<int64_t>(ringRows) != 0 && writeStartToReadEndGap < 0) {
+        ringShiftMin -= 1;
+    }
+    ringShiftMin += 1;
+    if (ringShiftMin < 0) {
+        ringShiftMin = 0;
+    }
+    int64_t ringShiftMax = static_cast<int64_t>((writeSeqEndIdx - readSeqStartIdx - 1U) / ringRows);
+    return ringShiftMin <= ringShiftMax;
+}
+
 // iterator
 struct Vec1SliceInfo {
     __aicore__ inline Vec1SliceInfo() {}

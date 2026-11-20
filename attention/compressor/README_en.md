@@ -213,14 +213,11 @@ English | [简体中文](./README.md)
 </tbody>
 </table>
 
-- <term>Atlas A3 products</term> and <term>Atlas A2 products</term>:
-  - cmp_ratio supports only 2/4/8/16/32/64/128.
-
 ## Constraints
 
 - Dimension meanings of x: B (Batch Size) indicates the batch size of input samples, S (Sequence Length) indicates the sequence length of input samples, H (Head Size) indicates the size of the hidden layer, D (Head Dim) indicates the size of the minimum unit of the hidden layer, and T indicates the accumulated sequence length of input samples across all batches.
 - Input shape restrictions:
-    - state_cache supports the input shape [block_num, block_size, 2\*coff\*D] and requires block_num>0. When cache_mode=2, block_size >= coff * cmp_ratio + S - 1 must be satisfied.
+    - state_cache supports the input shape [block_num, block_size, 2\*coff\*D] and requires block_num>0.
     - If the BS dimensions of x are merged, that is, the input shape of x is [T,H]:
         - The input shape of cu_seqlens must be [B+1,]. The value of each element in this parameter indicates the total number of tokens of the current batch and all preceding batches, that is, the prefix sum. Therefore, the value of each later element must be greater than or equal to the value of the previous element, the first element must be 0, and the last element must be T.
         - seqused supports the input shape [B,] and requires that the number of valid tokens of each batch be less than or equal to the corresponding Sequence Length, that is, seqused[n] <= cu_seqlens[n+1] - cu_seqlens[n], and not less than 0.
@@ -231,6 +228,9 @@ English | [简体中文](./README.md)
         - seqused supports the input shape [B,] and requires that the number of valid tokens of each batch be less than or equal to the corresponding Sequence Length, that is, seqused[n] <= S, and not less than 0.
         - When cache_mode=1, state_block_table supports the input shape [B, ceil(Smax/block_size)]. Smax is the maximum Sequence Length across batches, that is, Smax=max(start_pos)+S. When cache_mode=2, state_block_table supports the input shape [B].
         - cmp_kv has the output shape [B, ceil(S/cmp_ratio), D]: (compressed_tokens+pad0) + (compressed_tokens+pad1) + ... + (compressed_tokens+padN).
+- state_cache write policy:
+  - cache_mode=1: all valid tokens of the current call are written according to the logical blocks of state_block_table.
+  - cache_mode=2: the last min(seqused, block_size) tokens of the current input are refreshed (seqused defaults to each batch's sequence length).
 - Valid output range: compressed_tokens[n]=(start_pos[n]+Seqlen[n])/cmp_ratio-start_pos[n]/cmp_ratio, where Seqlen indicates the number of valid tokens in each batch. For the non-BS-merged layout, the valid results of each batch occupy the first compressed_tokens[n] rows; for the BS-merged layout, valid results are concatenated in batch order and the total valid range is the first sum(compressed_tokens[n]) rows. The remaining tail rows in the allocated capacity are not written by the operator.
 - Input value range restrictions:
   - This API supports generalization over B and S, with the following scenario restrictions:
@@ -260,12 +260,13 @@ English | [简体中文](./README.md)
 - Input attribute restrictions:
   - D of 128/512 is supported.
   - H of 1K to 10K, aligned to 512, is supported.
-  - block_size of 1 to 1024 is supported.
+  - block_size of 1 to 1024 is supported; when cache_mode=2, block_size >= coff * cmp_ratio - 1 is required.
   - The following three typical combination scenarios are supported:
       - C4A: D=512, coff=2, and cmp_ratio=4.
       - C4Li: D=128, coff=2, and cmp_ratio=4.
       - C128A: D=512, coff=1, and cmp_ratio=128.
-  - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>: <em>ape</em> cannot be omitted and must be passed.
+  - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>: cmp_ratio supports only 2/4/8/16/32/64/128; cache_mode=2 supports only coff=1.
+  - <term>Ascend 950PR&950DT products</term>: when ape is passed, the compression-tail window [alignDown(start_pos + seqused, cmp_ratio) - (coff - 1) * cmp_ratio, start_pos + seqused) is kept, and block_size >= S + coff * cmp_ratio - 1 is required.
 
 ## Invocation Description
 

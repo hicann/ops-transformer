@@ -68,6 +68,9 @@ private:
     __aicore__ inline void ComputeVec1(const Vec1RunInfo& info);
 
     __aicore__ inline bool IsNeedExcuteC1(RunInfo info);
+    __aicore__ inline void CalcNeedStateConflictScan();
+    // 本轮是否同时包含"同槽 batch"的读片与写片（需要把本轮 state 写先暂存）
+    __aicore__ inline bool NeedTempStateCache(const Vec1RunInfo& info);
     // 计算Cube/Vec1参数（NORMAL独有）
     __aicore__ inline void CalcC1V1Params(RunInfo& info, Vec1RunInfo& vec1Info, BatchInfo& batchInfo, uint32_t loopIdx);
     // 从constInfo直接读取mStart/mEnd（FULL_LOAD独有）
@@ -91,6 +94,9 @@ private:
     static constexpr uint32_t SYNC_V1_FLAG2 = 5;
     static constexpr uint32_t SYNC_C1_V1_FLAG = 7;
     static constexpr uint32_t SYNC_V1_C1_FLAG = 9;
+    // cache_mode=2：全 AIV 暂存写完成 / 落盘完成，不与 AIC 的流水同步混用。
+    static constexpr uint32_t SYNC_V1_STATE_READY_FLAG = 11;
+    static constexpr uint32_t SYNC_V1_STATE_DONE_FLAG = 12;
 
     // ==============================TilingData&TPipe==============================
     TPipe* pipe_;
@@ -102,7 +108,7 @@ private:
     GlobalTensor<MM1_OUT_T> vec1ScoreCacheGm;
     GlobalTensor<MM1_OUT_T> Vec1InputKvGm;
     GlobalTensor<MM1_OUT_T> Vec1InputScoreGm;
-    GlobalTensor<VEC1_OUT_T> vec2InputGm;
+    GlobalTensor<VEC1_OUT_T> tempStateCacheGm; // cache_mode=2 一轮 state 写暂存
     // ================================Task Info====================================
     CompressorTools<COMP> tools_;
     ConstInfo constInfo{};
@@ -120,6 +126,7 @@ private:
     uint32_t dealKSize_ = 0;
     uint32_t hStart_ = 0;
     bool isFirstUpdateCurGroup = true;
+    bool needStateConflictScan = false;
 };
 
 template <typename COMP, bool IS_FULL_LOAD>
@@ -178,7 +185,72 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::Init(
         blockVec_.Init(x, wKv, wGate, stateCache, ape, stateBlockTable, cuSeqlens, seqUsed, startPos, cmpKvOut,
                        softmaxScoreOut, kvOut);
         blockVec_.InitBuffers(pipe_);
-        blockVec_.InitVec1GlobalTensor(Vec1InputKvGm, Vec1InputScoreGm, vec1KvCacheGm, vec1ScoreCacheGm);
+        blockVec_.InitVec1GlobalTensor(Vec1InputKvGm, Vec1InputScoreGm, vec1KvCacheGm, vec1ScoreCacheGm,
+                                       tempStateCacheGm);
+        CalcNeedStateConflictScan();
+    }
+}
+
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::CalcNeedStateConflictScan()
+{
+    if constexpr (!IS_FULL_LOAD && COMP::cacheMode == CACHE_MODE::RING_BUFFER) {
+        if constexpr (COMP::hasApe) {
+            // 传入 ape：走原刷新窗口与原读写顺序，不做同槽保护
+            needStateConflictScan = false;
+            return;
+        }
+        if constexpr (COMP::xLayout == X_LAYOUT::TH) {
+            // 不传 ape（V2 接口）：GetLoopTimes 已通过 SkipInvalidBatch 遍历所有 batch 并累计保守判定；
+            // 为 false 时说明所有 batch 的物理长度都装得下"本次写 + 历史读回"，无需同槽保护。
+            if (!needStateConflictScan) {
+                return;
+            }
+        }
+    }
+    needStateConflictScan = false;
+    if constexpr (!IS_FULL_LOAD && COMP::cacheMode == CACHE_MODE::RING_BUFFER) {
+        // 只有不传 ape（新刷新语义）才需要同槽保护
+        if constexpr (COMP::xLayout == X_LAYOUT::BSH) {
+            uint64_t maxReadWriteSpan =
+                static_cast<uint64_t>(constInfo.sSize) + static_cast<uint64_t>(COMP::coff) * constInfo.cmpRatio - 1U;
+            if (constInfo.blockSize >= maxReadWriteSpan) {
+                return;
+            }
+        }
+        // 单 batch 的 sp=0 prefill 没有历史状态；C4 小 S/大环由上面的形状判断直接排除。
+        needStateConflictScan = constInfo.batchSize != 1U || tools_.GetStartPos(0U) != 0U;
+    }
+}
+
+template <typename COMP, bool IS_FULL_LOAD>
+__aicore__ inline bool CompressorKernel<COMP, IS_FULL_LOAD>::NeedTempStateCache(const Vec1RunInfo& info)
+{
+    if constexpr (COMP::cacheMode != CACHE_MODE::RING_BUFFER) {
+        return false;
+    } else {
+        if (!needStateConflictScan || info.dealTcNum == 0U) {
+            return false;
+        }
+        CompressorVec1SliceIterator<COMP> sliceIterator(tools_);
+        sliceIterator.SetMaxBatchSize(constInfo.batchSize);
+        sliceIterator.Reset(info.bStart, info.sStart);
+        sliceIterator.SetNeedDealTcSize(info.dealTcNum);
+        while (!sliceIterator.IsEnd()) {
+            const Vec1SliceInfo& slice = sliceIterator.GetSlice();
+            uint64_t sliceEnd = slice.bStartPos + slice.sIdx + slice.validSeqCnt;
+            // 历史读只可能出现在前 r 行。按实际 V1 迭代器处理 seq_used 空洞和跨 batch，
+            // 仅当本轮还会写入该 batch 的尾部状态时才暂存；长序列的分离读写轮不加同步。
+            if (slice.compressTcSize > 0U && slice.sIdx < constInfo.cmpRatio &&
+                GetRingWriteStart(slice.bStartPos, slice.bSeqUsed, constInfo.cmpRatio,
+                                  static_cast<uint32_t>(COMP::coff), constInfo.blockSize, COMP::hasApe) < sliceEnd &&
+                IsStateRWConflict(slice.bStartPos, slice.bSeqUsed, constInfo.cmpRatio,
+                                  static_cast<uint32_t>(COMP::coff), constInfo.blockSize, COMP::hasApe)) {
+                return true;
+            }
+            sliceIterator.IteratorSlice();
+        }
+        return false;
     }
 }
 
@@ -263,6 +335,21 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::SkipInvalidBatch(Ba
     for (; batchInfo.bIdx < constInfo.batchSize; ++batchInfo.bIdx) {
         batchInfo.seqCnt = tools_.GetSeqLength(batchInfo.bIdx);
         if (batchInfo.seqCnt > 0) {
+            if ASCEND_IS_AIV {
+                // TH+ring 且不传 ape：按物理长度保守累计"是否可能同槽"，供 CalcNeedStateConflictScan 关掉保护。
+                // 物理 seqCnt >= seqUsed，写窗口跨度 <= seqUsed，历史读回 <= coff*cmpRatio-1，
+                // 因此 seqCnt <= blockSize - coff*cmpRatio + 1 时一定不会同槽。
+                if constexpr (!COMP::hasApe && COMP::xLayout == X_LAYOUT::TH &&
+                              COMP::cacheMode == CACHE_MODE::RING_BUFFER) {
+                    uint32_t minRingRows = static_cast<uint32_t>(COMP::coff) * constInfo.cmpRatio - 1U;
+                    // 不依赖 host 拦截 blockSize 下限，这里自行兜底下溢
+                    uint32_t safeSeqSize =
+                        constInfo.blockSize > minRingRows ?
+                            constInfo.blockSize - static_cast<uint32_t>(COMP::coff) * constInfo.cmpRatio + 1U :
+                            0U;
+                    needStateConflictScan = needStateConflictScan || batchInfo.seqCnt > safeSeqSize;
+                }
+            }
             break;
         }
     }
@@ -413,7 +500,7 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::CalcSplitCoreInfo()
     uint32_t coff = (uint32_t)COMP::coff;
     constInfo.mm1KvResSize = (uint64_t)constInfo.mBaseSize * constInfo.headDim * coff;
     constInfo.mm1ScoreResSize = (uint64_t)constInfo.mBaseSize * constInfo.headDim * coff;
-    constInfo.vec1ResSize = (uint64_t)constInfo.mBaseSize * constInfo.headDim * constInfo.nSize;
+    constInfo.tempStateCacheSize = (uint64_t)constInfo.mBaseSize * constInfo.headDim * constInfo.nSize;
 
     constInfo.dbSize = (uint64_t)constInfo.coreGroupNum * constInfo.mm1KvResSize;
 }
@@ -447,6 +534,10 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::InitWorkspace(__gm_
 
     vec1ScoreCacheGm.SetGlobalBuffer((__gm__ MM1_OUT_T*)(workspace + offset));
     offset += constInfo.dbWorkspaceRatio * constInfo.vec1TailCacheSize * sizeof(MM1_OUT_T);
+
+    // ring 模式 state 写暂存区：映射到 host 预留的 tempStateCacheSize 区（原 vec1 输出/vec2 输入预留区），
+    // 所有 AIV 共享；nSize=2、dbWorkspaceRatio=2，预留行宽 4*D，足够容纳 2*coff*D（coff<=2）。
+    tempStateCacheGm.SetGlobalBuffer((__gm__ MM1_OUT_T*)(workspace + offset));
 }
 
 template <typename COMP, bool IS_FULL_LOAD>
@@ -555,7 +646,23 @@ __aicore__ inline void CompressorKernel<COMP, IS_FULL_LOAD>::ProcessNormalLoop()
         if ASCEND_IS_AIC {
             ComputeMm1(extraInfo0, isNeedExcuteC1);
         } else {
+            // 本轮若同时存在同槽 batch 的读片与写片，则本轮 state 写先落 workspace，
+            // 等本轮 vec 全流程走完、全 vec 同步后再搬回 state_cache
+            bool needTempStateCache = NeedTempStateCache(vec1Info);
+            if (needTempStateCache) {
+                blockVec_.SetTempStateCacheRound(true, vec1Info);
+            }
             ComputeVec1(vec1Info);
+            if (needTempStateCache) {
+                // ComputeVec1 已全 AIV 同步历史读。MODE0 同步暂存写，并阻塞其消费者 MTE2，
+                // MODE2 仅用于 AIC/AIV 通信，不能在 AIV 侧自发自等。
+                CrossCoreSetFlag<SYNC_MODE0, PIPE_MTE3>(SYNC_V1_STATE_READY_FLAG);
+                CrossCoreWaitFlag<SYNC_MODE0, PIPE_MTE2>(SYNC_V1_STATE_READY_FLAG);
+                blockVec_.FlushTempStateCache();
+                // 所有核完成落盘后才允许下一轮读缓存及复用同一暂存区。
+                CrossCoreSetFlag<SYNC_MODE0, PIPE_MTE3>(SYNC_V1_STATE_DONE_FLAG);
+                CrossCoreWaitFlag<SYNC_MODE0, PIPE_MTE2>(SYNC_V1_STATE_DONE_FLAG);
+            }
         }
     }
 }

@@ -172,8 +172,10 @@ __aicore__ inline void CompressorBlockVectorNormal<COMP>::OverLap(
             PipeBarrier<PIPE_V>();
         }
     }
+    // 同轮读写同槽时，SaveState 会落到一轮暂存，等本轮 vec 全流程结束、全 vec 同步后再落盘，
+    // 因此这里仍然是"写先读后"（写与读不共享 state_cache 地址）。
     this->SaveState(srcLocal, stateGm, blockTableGm, sliceInfo, dStartIdx, dDealSize, dDealSize,
-                    static_cast<uint32_t>(IS_SCORE));
+                    static_cast<uint32_t>(IS_SCORE), globalSeqIdx);
     this->template ReadState<IS_SCORE>(dstLocal, stateGm, blockTableGm, sliceInfo, dStartIdx, dDealSize,
                                        static_cast<uint32_t>(IS_SCORE));
 
@@ -278,6 +280,7 @@ __aicore__ inline void CompressorBlockVectorNormal<COMP>::DealVec1BaseBlock(
     }
     this->compressedCnt_ += statisticInfo.compressorScCnt;
 }
+
 template <typename COMP>
 __aicore__ inline void CompressorBlockVectorNormal<COMP>::CalcGroupInfo(const Vec1RunInfo& info,
                                                                         Vec1SplitInfo& splitInfo)

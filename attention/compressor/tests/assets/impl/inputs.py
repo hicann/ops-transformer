@@ -15,6 +15,9 @@ import random
 import numpy as np
 import gc
 
+# state_cache 的默认 block_size（与 pytest 侧 DEFAULT_BLOCK_SIZE 保持一致）
+DEFAULT_BLOCK_SIZE = 128
+
 
 def to_list(value):
     if value is None:
@@ -114,9 +117,10 @@ def _fill_seq_descriptors(
     **kwargs,
 ):
     if x is None or not torch.is_tensor(x):
-        return None, None, None, 0, 0, 0, 128
+        return None, None, None, 0, 0, 0, DEFAULT_BLOCK_SIZE
 
-    block_size = 128
+    # 用例显式指定的 block_size 优先，其次取 state_cache 的实际形状，最后回退默认值
+    block_size = int(kwargs.get("block_size") or DEFAULT_BLOCK_SIZE)
     if (
         state_cache is not None
         and torch.is_tensor(state_cache)

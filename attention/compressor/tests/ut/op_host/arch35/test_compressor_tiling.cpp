@@ -847,3 +847,472 @@ TEST_F(CompressorTilingArch35, test10)
     int64_t expectTilingKey = 544;
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey);
 }
+
+// ====================================================================
+// 补充用例：ring/FULL_LOAD/EMPTY_X 及单参数校验失败分支
+// ====================================================================
+
+// cache_mode=2 且不传 ape：blockSize(8) < S(4) + coff(2)*cmp_ratio(4) - 1 = 11，
+// FULL_LOAD 回退 NORMAL（覆盖 SetTemplateId 的 fullLoadConflictFallback 分支）
+TEST_F(CompressorTilingArch35, ring_no_ape_full_load_fallback)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 4, 4096}, {2, 4, 4096}}, ge::DT_BF16, ge::FORMAT_ND},  // x
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},  // wkv
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},  // wgate
+            {{{4, 8, 2048}, {4, 8, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache (ring)
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},                     // ape absent
+            {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},                   // state_block_table
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                     // cu_seqlens
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                     // seqused
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},                     // start_pos
+        },
+        {
+            {{{2, 1, 512}, {2, 1, 512}}, ge::DT_BF16, ge::FORMAT_ND},        // cmp_kv
+            {{{4, 8, 2048}, {4, 8, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},     // state_cache (in-place)
+            {{{2, 1, 4, 512}, {2, 1, 4, 512}}, ge::DT_FLOAT, ge::FORMAT_ND}, // softmax_score
+            {{{2, 1, 4, 512}, {2, 1, 4, 512}}, ge::DT_FLOAT, ge::FORMAT_ND}, // kv
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+        },
+        &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, std::numeric_limits<uint64_t>::max());
+}
+
+// cache_mode=2 且传 ape：不做同槽回退，走 FULL_LOAD 切分（覆盖 SetFullLoadSplitInfo）
+TEST_F(CompressorTilingArch35, ring_ape_full_load)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 4, 4096}, {2, 4, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{256, 4096}, {256, 4096}}, ge::DT_BF16, ge::FORMAT_ND}, // coff*headDim = 2*128
+            {{{256, 4096}, {256, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 8, 512}, {4, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND}, // state_cache (ring)
+            {{{4, 256}, {4, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},       // ape
+            {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 1, 128}, {2, 1, 128}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 8, 512}, {4, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 1, 4, 128}, {2, 1, 4, 128}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 1, 4, 128}, {2, 1, 4, 128}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+        },
+        &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, std::numeric_limits<uint64_t>::max());
+}
+
+// cache_mode=2 且 state_cache 首维(1) < batchSize(2)：ring 分支报错
+TEST_F(CompressorTilingArch35, ring_block_num_lt_batch)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1, 128, 2048}, {1, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND}, // blockNum=1 < B=2
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1, 128, 2048}, {1, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+        },
+        &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// BSH 且 B=0：EMPTY_X 模板（覆盖空 x 的 workspace/blockDim 分支）
+TEST_F(CompressorTilingArch35, empty_x_bsh)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{0, 8, 4096}, {0, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{0, 8}, {0, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{0, 2, 512}, {0, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{0, 2, 8, 512}, {0, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{0, 2, 8, 512}, {0, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+        },
+        &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, std::numeric_limits<uint64_t>::max());
+}
+
+// ape dtype 非 fp32：CheckSingleParaApe 失败
+TEST_F(CompressorTilingArch35, bad_ape_dtype)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 1024}, {4, 1024}}, ge::DT_INT32, ge::FORMAT_ND}, // ape dtype error
+            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+        },
+        &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// state_block_table dtype 非 int32：CheckSingleParaStateBlockTable 失败
+TEST_F(CompressorTilingArch35, bad_block_table_dtype)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 8}, {2, 8}}, ge::DT_INT64, ge::FORMAT_ND}, // dtype error
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+        },
+        &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// seqused 维数为 2：CheckSingleParaSeqused 失败
+TEST_F(CompressorTilingArch35, bad_seqused_dim)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{2, 1}, {2, 1}}, ge::DT_INT32, ge::FORMAT_ND}, // 2-D seqused
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+        },
+        &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// start_pos dtype 非 int32：CheckSingleParaStartPos 失败
+TEST_F(CompressorTilingArch35, bad_start_pos_dtype)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{2}, {2}}, ge::DT_FLOAT, ge::FORMAT_ND}, // dtype error
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+        },
+        &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// cmp_ratio 超出 [2,128]：CheckSingleParaCmpRatio 失败
+TEST_F(CompressorTilingArch35, bad_cmp_ratio)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(256)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+        },
+        &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// cmp_kv 维数为 2：CheckSingleParaCmpKv 失败
+TEST_F(CompressorTilingArch35, bad_cmp_kv_dim)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 512}, {2, 512}}, ge::DT_BF16, ge::FORMAT_ND}, // 2-D cmp_kv
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+        },
+        &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// grad_enabled=true 且 softmax_score dtype 非 fp32：CheckSingleParaSoftmaxScore 失败
+TEST_F(CompressorTilingArch35, grad_bad_softmax_dtype)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_INT32, ge::FORMAT_ND}, // dtype error
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+            {"grad_enabled", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+        },
+        &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// grad_enabled=true 且 kv 维数为 2：CheckSingleParaKv 失败
+TEST_F(CompressorTilingArch35, grad_bad_kv_dim)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 512}, {2, 512}}, ge::DT_FLOAT, ge::FORMAT_ND}, // 2-D kv
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+            {"grad_enabled", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+        },
+        &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// wkv dtype 非浮点：CheckSingleParaWkv 失败并触发 dtype 日志分支
+TEST_F(CompressorTilingArch35, bad_wkv_dtype)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_INT32, ge::FORMAT_ND}, // dtype error
+            {{{1024, 4096}, {1024, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+        },
+        &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}
+
+// wkv headDim(384) 不在 {128,512}：CheckSingleParaWkv 的 headDim 校验失败
+TEST_F(CompressorTilingArch35, bad_wkv_head_dim)
+{
+    optiling::CompressorCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "Compressor",
+        {
+            {{{2, 8, 4096}, {2, 8, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{768, 4096}, {768, 4096}}, ge::DT_BF16, ge::FORMAT_ND}, // 768/2 = 384
+            {{{768, 4096}, {768, 4096}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{4, 1024}, {4, 1024}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 8}, {2, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2, 2, 512}, {2, 2, 512}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{4, 128, 2048}, {4, 128, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 2, 8, 512}, {2, 2, 8, 512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
+            {"coff", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"state_cache_stride_dim0", Ops::Transformer::AnyValue::CreateFrom<int64_t>(262144)},
+        },
+        &compileInfo, "Ascend950", Compressor_tiling_A5SocInfo, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, std::numeric_limits<uint64_t>::max());
+}

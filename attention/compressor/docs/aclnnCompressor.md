@@ -179,7 +179,7 @@ aclnnStatus aclnnCompressor(
       <td>不支持空Tensor。</td>
       <td>FLOAT</td>
       <td>ND</td>
-      <td>[block_num,block_size,2* coff* D]，要求block_num>0；cacheMode=2时，需满足block_size >= coff* cmp_ratio + S - 1。</td>
+      <td>[block_num,block_size,2* coff* D]，要求block_num>0。</td>
       <td>支持0轴非连续</td>
     </tr>
     <tr>
@@ -340,6 +340,7 @@ aclnnStatus aclnnCompressor(
   <!-- npu="A3,910b" id7 -->
   - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
     - cmpRatio仅支持2/4/8/16/32/64/128。
+    - cacheMode=2时仅支持coff=1。
   <!-- end id7 -->
 
 - **返回值**
@@ -444,7 +445,7 @@ aclnnStatus aclnnCompressor(
   - batch一致性：通过aclrtSetSysParamOpt()配置ACL_OPT_DETERMINISTIC为3来开启batch一致性，开启后可以满足计算结果和所在批次大小、位置无关。
 - x参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、D（Head Dim）表示hidden层的最小单元大小、T表示所有Batch输入样本序列长度的累加和。
 - 输入shape限制：
-  - stateCacheRef支持输入shape为[block_num, block_size, 2\*coff\*D]，要求block_num>0；cacheMode=2时，需满足block_size >= coff * cmp_ratio + S - 1。
+  - stateCacheRef支持输入shape为[block_num, block_size, 2\*coff\*D]，要求block_num>0。
   - 当x采用BS合轴，即x的输入shape为[T,H]时：
     - cuSeqlensOptional输入shape必须为[B+1,]，且该参数为前缀和数组，后一个元素的值必须大于等于前一个元素的值，第一位必须为0，最后一位必须为T。
     - sequsedOptional支持输入shape为[B,]，要求0 ≤ sequsedOptional[n] ≤ cuSeqlensOptional[n+1] - cuSeqlensOptional[n]。
@@ -455,6 +456,13 @@ aclnnStatus aclnnCompressor(
     - sequsedOptional支持输入shape为[B,]，要求0 ≤ sequsedOptional[n] ≤ S。
     - cacheMode=1时，stateBlockTableOptional支持输入shape为[B, ceil(Smax/block_size)]，Smax=max(start_pos)+S；cacheMode=2时，支持输入shape为[B]。
     - cmpKvOut输出shape为[B, ceil(S/cmp_ratio), D]：(compressed_tokens+pad0) + (compressed_tokens+pad1) + ... + (compressed_tokens+padN)。
+- stateCacheRef写入策略：
+  - cacheMode=1：本次调用的全部有效token按stateBlockTableOptional的逻辑块写入。
+  - cacheMode=2：刷新本次有效输入末尾min(seqused, block_size)个token（seqused未指定时取每个batch的序列长度）。
+
+<!-- npu="950" id8 -->
+- <term>Ascend 950PR&950DT系列产品</term>：保持压缩尾部刷新[alignDown(start_pos + seqused, cmp_ratio) - (coff - 1) * cmp_ratio, start_pos + seqused)，需满足block_size >= S + coff * cmp_ratio - 1。
+<!-- end id8 -->
 - 输出有效范围：compressed_tokens[n]=(start_pos[n]+Seqlen[n])/cmp_ratio-start_pos[n]/cmp_ratio，其中，Seqlen表示不同Batch中的有效token数。BS非合轴时，每batch的有效结果位于输出的前compressed_tokens[n]行；BS合轴时，按batch顺序连续拼接，总有效范围为前sum(compressed_tokens[n])行。输出分配容量中其余尾行算子不写入。
 - 输入值域限制：
   - 该接口支持B、S泛化，且存在如下场景限制：
@@ -484,7 +492,7 @@ aclnnStatus aclnnCompressor(
 - 输入属性限制：
   - 支持D为128/512。
   - 支持H为1K~10K，512对齐。
-  - 支持blockSize为1~1024。
+  - 支持blockSize为1~1024；cacheMode=2时需满足block_size >= coff * cmp_ratio - 1。
   - 支持如下三种典型组合场景：
     - C4A：D=512，coff=2，cmp_ratio=4。
     - C4Li：D=128，coff=2，cmp_ratio=4。

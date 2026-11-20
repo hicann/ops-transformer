@@ -181,7 +181,7 @@ aclnnStatus aclnnCompressor(
       <td>Empty tensors are not supported.</td>
       <td>FLOAT</td>
       <td>ND</td>
-      <td>[block_num,block_size,2* coff* D], requiring block_num>0; when cacheMode=2, block_size >= coff* cmp_ratio + S - 1 must be satisfied.</td>
+      <td>[block_num,block_size,2* coff* D], requiring block_num>0.</td>
       <td>Supports non-contiguous input on axis 0.</td>
     </tr>
     <tr>
@@ -342,6 +342,7 @@ aclnnStatus aclnnCompressor(
   <!-- npu="A3,910b" id7 -->
   - <term>Atlas A3 products</term>, <term>Atlas A2 products</term>:
     - cmpRatio supports only 2/4/8/16/32/64/128.
+    - cacheMode=2 supports only coff=1.
   <!-- end id7 -->
 
 - **Return Value**
@@ -446,7 +447,7 @@ aclnnStatus aclnnCompressor(
   - batch consistency: Set ACL_OPT_DETERMINISTIC to 3 via aclrtSetSysParamOpt() to enable batch consistency. After batch consistency is enabled, computation results are independent of the batch size and position.
 - Dimensions of x: B (Batch Size) indicates the batch size of input samples, S (Sequence Length) indicates the sequence length of input samples, H (Head Size) indicates the size of the hidden layer, D (Head Dim) indicates the size of the minimum unit of the hidden layer, and T indicates the accumulated sequence length of input samples across all batches.
 - Input shape constraints:
-  - stateCacheRef supports input shape [block_num, block_size, 2\*coff\*D], and block_num must be greater than 0; when cacheMode=2, block_size >= coff * cmp_ratio + S - 1 must be satisfied.
+  - stateCacheRef supports input shape [block_num, block_size, 2\*coff\*D], and block_num must be greater than 0.
   - When BS coaxial is adopted for x, that is, the input shape of x is [T,H]:
     - The input shape of cuSeqlensOptional must be [B+1,]. This parameter is a prefix sum array. The value of each element must be greater than or equal to that of the previous element, the first element must be 0, and the last element must be T.
     - sequsedOptional supports input shape [B,], and 0 ≤ sequsedOptional[n] ≤ cuSeqlensOptional[n+1] - cuSeqlensOptional[n] is required.
@@ -457,6 +458,13 @@ aclnnStatus aclnnCompressor(
     - sequsedOptional supports input shape [B,], and 0 ≤ sequsedOptional[n] ≤ S is required.
     - When cacheMode=1, stateBlockTableOptional supports input shape of [B, ceil(Smax/block_size)], where Smax=max(start_pos)+S; when cacheMode=2, the supported input shape is [B].
     - The output shape of cmpKvOut is [B, ceil(S/cmp_ratio), D]: (compressed_tokens+pad0) + (compressed_tokens+pad1) + ... + (compressed_tokens+padN).
+- stateCacheRef write policy:
+  - cacheMode=1: all valid tokens of the current call are written according to the logical blocks of stateBlockTableOptional.
+  - cacheMode=2: the last min(seqused, block_size) tokens of the current input are refreshed (seqused defaults to each batch's sequence length).
+
+<!-- npu="950" id8 -->
+- <term>Ascend 950PR&950DT products</term>: the compression-tail window [alignDown(start_pos + seqused, cmp_ratio) - (coff - 1) * cmp_ratio, start_pos + seqused) is kept, and block_size >= S + coff * cmp_ratio - 1 is required.
+<!-- end id8 -->
 - Valid output range: compressed_tokens[n]=(start_pos[n]+Seqlen[n])/cmp_ratio-start_pos[n]/cmp_ratio, where Seqlen indicates the number of valid tokens in each batch. For the non-BS-merged layout, the valid results of each batch occupy the first compressed_tokens[n] rows; for the BS-merged layout, valid results are concatenated in batch order and the total valid range is the first sum(compressed_tokens[n]) rows. The remaining tail rows in the allocated capacity are not written by the operator.
 - Input value range restrictions:
   - This API supports generalization of B and S, with the following use case restrictions:
@@ -486,7 +494,7 @@ aclnnStatus aclnnCompressor(
 - Input attribute restrictions:
   - Supports D of 128/512.
   - Supports H of 1K-10K, aligned to 512.
-  - Supports blockSize of 1-1024.
+  - Supports blockSize of 1-1024; when cacheMode=2, block_size >= coff * cmp_ratio - 1 is required.
   - Supports the following three typical combination use cases:
     - C4A: D=512, coff=2, cmp_ratio=4.
     - C4Li: D=128, coff=2, cmp_ratio=4.

@@ -192,7 +192,7 @@ ge::graphStatus CompressorTiling::SetWorkSpaceInfo() const
     if (coff == COFF_VALUE_2) {
         workspaceParams_->vec1TailCacheSize = baseParams_->cmpRatio * baseParams_->headDim;
     }
-    workspaceParams_->vec1ResSize = innerSplitParams_->mBaseSize * baseParams_->headDim * baseParams_->nSize;
+    workspaceParams_->tempStateCacheSize = innerSplitParams_->mBaseSize * baseParams_->headDim * baseParams_->nSize;
 
     return ge::GRAPH_SUCCESS;
 }
@@ -208,9 +208,22 @@ ge::graphStatus CompressorTiling::SetTemplateId() const
         return ge::GRAPH_SUCCESS;
     }
     if (npuArch_ == NpuArch::DAV_3510) {
+        // ring 下若 block_size 覆盖不了"整段 chunk + 读窗口"，FULL_LOAD 的
+        // "先整段写 state、再读 state"可能与本次读同槽；此时回退 NORMAL 模板，
+        // 由 NORMAL 按 batch 判定读写顺序（见 compressor_block_vec_normal.h）。
+        // 只有不传 ape（V2 接口）才走"末尾 min(seqUsed, bs)"的新窗口；传入 ape 保持原压缩尾部窗口，
+        // 原窗口下不做同槽保护，也不需要禁用 FULL_LOAD。
+        bool fullLoadConflictFallback = false;
+        if (!context_->hasApe &&
+            static_cast<uint8_t>(*context_->cacheMode) == static_cast<uint8_t>(CACHE_MODE::RING_BUFFER) &&
+            context_->coff != nullptr && context_->cmpRatio != nullptr) {
+            uint64_t requiredBlockSize = static_cast<uint64_t>(baseParams_->seqSize) +
+                                         static_cast<uint64_t>(*context_->coff) * (*context_->cmpRatio) - 1U;
+            fullLoadConflictFallback = static_cast<uint64_t>(pageAttentionParams_->blockSize) < requiredBlockSize;
+        }
         // 设置高性能模板
-        if (context_->layout == LayoutType::LAYOUT_BSH && baseParams_->seqSize <= FULL_LOAD_MAX_SEQ_SIZE &&
-            baseParams_->tokenSize <= FULL_LOAD_MAX_TOKEN_SIZE) {
+        if (!fullLoadConflictFallback && context_->layout == LayoutType::LAYOUT_BSH &&
+            baseParams_->seqSize <= FULL_LOAD_MAX_SEQ_SIZE && baseParams_->tokenSize <= FULL_LOAD_MAX_TOKEN_SIZE) {
             context_->templateId = TemplateId::FULL_LOAD;
         }
         return ge::GRAPH_SUCCESS;
@@ -281,8 +294,8 @@ ge::graphStatus CompressorTiling::SetInnerSplitInfo() const
 
 ge::graphStatus CompressorTiling::CalcWorkSpace()
 {
-    constexpr uint32_t MM1_RES_ELEM_SIZE = 4; // 4: fp32
-    constexpr uint32_t V1_RES_ELEM_SIZE = 4;  // 4: fp32
+    constexpr uint32_t MM1_RES_ELEM_SIZE = 4;          // 4: fp32
+    constexpr uint32_t TEMP_STATE_CACHE_ELEM_SIZE = 4; // 4: fp32
     uint32_t maxGroupNum = aicNum_ / (baseParams_->headDim / innerSplitParams_->dBaseSize);
     workspaceSize_ = libapiSize_;
     workspaceSize_ +=
@@ -291,8 +304,10 @@ ge::graphStatus CompressorTiling::CalcWorkSpace()
         workspaceParams_->mm1ScoreResSize * maxGroupNum * MM1_RES_ELEM_SIZE * workspaceParams_->dbWorkspaceRatio;
     workspaceSize_ +=
         workspaceParams_->vec1TailCacheSize * MM1_RES_ELEM_SIZE * workspaceParams_->dbWorkspaceRatio * 2; // 2 kv和score
-    workspaceSize_ +=
-        workspaceParams_->vec1ResSize * maxGroupNum * V1_RES_ELEM_SIZE * workspaceParams_->dbWorkspaceRatio;
+    workspaceSize_ += workspaceParams_->tempStateCacheSize * maxGroupNum * TEMP_STATE_CACHE_ELEM_SIZE *
+                      workspaceParams_->dbWorkspaceRatio;
+    // 上面这段是 ring 模式的 state 写暂存区（tempStateCacheGm）：每组 mBaseSize 行、
+    // 行宽 2*headDim，nSize*dbWorkspaceRatio=4 >= 2*coff，够放下 2*coff*headDim。
 
     if (context_->workSpaces) {
         context_->workSpaces[0] = workspaceSize_;
