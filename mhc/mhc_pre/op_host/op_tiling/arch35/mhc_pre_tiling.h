@@ -57,6 +57,8 @@ TILING_DATA_FIELD_DEF(uint32_t, mkUseGmStage);
 TILING_DATA_FIELD_DEF(uint32_t, stage2UsedAivNum);
 TILING_DATA_FIELD_DEF(uint32_t, stage2RowsPerCore);
 TILING_DATA_FIELD_DEF(uint32_t, implMode);
+TILING_DATA_FIELD_DEF(uint32_t, bsStageRows);
+TILING_DATA_FIELD_DEF(uint32_t, bsXQueueBytes);
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(MhcPre, MhcPreTilingData);
@@ -138,6 +140,32 @@ protected:
     size_t GetLastRequiredInputIndex() const;
 
 private:
+    enum class MkSchedule950 : uint32_t {
+        OrdinaryL1 = 0U,
+        OrdinaryGm = 1U,
+        WeightReuse = 2U,
+        SharedX = 3U,
+        WeightReuseWave = 4U,
+        None = 5U,
+    };
+    struct MkPlan950 {
+        MkSchedule950 schedule = MkSchedule950::None;
+        uint64_t weightReuseKGrid = 0U;
+
+        bool UsesWeightReuse() const
+        {
+            return schedule == MkSchedule950::WeightReuse || schedule == MkSchedule950::WeightReuseWave;
+        }
+    };
+    MkPlan950 SelectMkPlan950() const;
+    bool UseShortKMk() const;
+    bool SupportsMkWeightReuse() const;
+    uint64_t SelectWeightReuseKDim(uint64_t activeCoreNum, bool canPipeline) const;
+    ge::graphStatus CalculateBsTiling950(uint32_t fusionAlign);
+    ge::graphStatus CalculateMkTiling950();
+    ge::graphStatus CheckMkUb950();
+    void SetMkStage2Rows(uint64_t availableAiv);
+
     uint64_t CalculateMkPart1UbBytes(uint64_t rowCapacity, uint64_t kUbSize, bool useGmStage) const;
     void CalculateMkKSplit(uint64_t kDim, uint64_t& singleCoreK, uint64_t& splitK, uint64_t& actualKBlockNum) const;
     uint64_t SelectMkKTile(uint64_t mRows, bool useSequentialKPartials) const;
@@ -146,6 +174,7 @@ private:
     MhcPreTilingData tilingData_;
     uint32_t blockDim_ = 32; // AIC
     uint32_t aivBlockDim_ = 64;
+    bool isAscend950_ = false;
     uint64_t totalLength_ = 0;
     uint64_t m_ = 0;
     uint64_t ubSize_ = 0;
@@ -166,6 +195,7 @@ private:
     float scaleMean_ = 0.0f;
     uint32_t implMode_ = 0;
     TilingMode tilingMode_ = TilingMode::SPLIT_BS;
+    MkPlan950 mkPlan950_;
     uint32_t hasResi_ = 1;
 };
 

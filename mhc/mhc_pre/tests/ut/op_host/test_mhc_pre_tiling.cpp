@@ -13,6 +13,7 @@
 #include <iostream>
 #include <gtest/gtest.h>
 #include "../../../op_host/op_tiling/arch35/mhc_pre_tiling.h"
+#include "../../../op_host/op_tiling/arch35/mhc_pre_mk_wave_policy.h"
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
 
@@ -1078,7 +1079,7 @@ TEST_F(MhcPreTiling, Ut_Check_Case22_B2_S4096_n4_d1536_NoGamma)
          {"hc_eps", Ops::Transformer::AnyValue::CreateFrom<float>(hcEps)}},
         &compileInfo, "Ascend950", 32, 262144, 4096, MakeAscend950SocInfo(32));
 
-    int64_t expectTilingKey = 2;
+    int64_t expectTilingKey = 3;
     string expectTilingDataStr = "";
     std::vector<size_t> expectWorkspaces = {};
 
@@ -1135,12 +1136,11 @@ TEST_F(MhcPreTiling, Ut_Check_Case23_OutFlag1_SplitBS_BSND_BF16)
 }
 
 /*
- * 测试用例24：outFlag=1，SPLIT_ND模式，BSND layout
+ * 测试用例24：outFlag=1，M-K 模式，BSND layout
  * B=1，S=64，n=6，d=2048，x的数据类型为float16
- * totalLength=64 <= 512 → SPLIT_ND
  * 预期结果：成功
  */
-TEST_F(MhcPreTiling, Ut_Check_Case24_OutFlag1_SplitND_BSND_FP16)
+TEST_F(MhcPreTiling, Ut_Check_Case24_OutFlag1_Mk_BSND_FP16)
 {
     uint32_t B = 1;
     uint32_t S = 64;
@@ -1230,12 +1230,11 @@ TEST_F(MhcPreTiling, Ut_Check_Case25_OutFlag1_SplitBS_TND_BF16)
 }
 
 /*
- * 测试用例26：outFlag=1，SPLIT_ND模式，TND layout
+ * 测试用例26：outFlag=1，M-K 模式，TND layout
  * T=256，n=8，d=768，x的数据类型为float16
- * totalLength=256 <= 512 → SPLIT_ND
  * 预期结果：成功
  */
-TEST_F(MhcPreTiling, Ut_Check_Case26_OutFlag1_SplitND_TND_FP16)
+TEST_F(MhcPreTiling, Ut_Check_Case26_OutFlag1_Mk_TND_FP16)
 {
     uint32_t T = 256;
     uint32_t n = 8;
@@ -1370,7 +1369,7 @@ TEST_F(MhcPreTiling, Ut_Check_BasicApi_N4_SplitBS_HasResi_Gamma)
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     ASSERT_FALSE(tilingInfo.workspaceSizes.empty());
-    EXPECT_GT(tilingInfo.workspaceSizes[0], 20 * 1024 * 1024);
+    EXPECT_EQ(tilingInfo.workspaceSizes[0], 20U * 1024U * 1024U);
 }
 
 /*
@@ -1418,8 +1417,7 @@ TEST_F(MhcPreTiling, Ut_Check_BasicApi_N6_SplitBS)
 }
 
 /*
- * BS outFlag=0 stores compact hMix in workspace. Long M must reserve the full
- * [M, fusionSize] region in addition to X staging and system workspace.
+ * BS outFlag=0 consumes the projection in UB even when a core processes multiple M blocks.
  */
 TEST_F(MhcPreTiling, Ut_Check_BasicApi_N8_LongM_Workspace)
 {
@@ -1455,8 +1453,7 @@ TEST_F(MhcPreTiling, Ut_Check_BasicApi_N8_LongM_Workspace)
     ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
     ASSERT_FALSE(tilingInfo.workspaceSizes.empty());
     constexpr size_t systemWorkspaceSize = 20U * 1024U * 1024U;
-    size_t hMixWorkspaceSize = static_cast<size_t>(B) * S * phiDim0 * sizeof(float);
-    EXPECT_GT(tilingInfo.workspaceSizes[0], systemWorkspaceSize + hMixWorkspaceSize);
+    EXPECT_EQ(tilingInfo.workspaceSizes[0], systemWorkspaceSize);
 }
 
 /*
@@ -1534,8 +1531,6 @@ TEST_F(MhcPreTiling, Ut_Check_MK_N4_M1024_D5120_HasResi)
     uint32_t kL1Size = readField(fieldOffset([](auto& data, uint32_t value) { data.set_kL1Size(value); }));
     uint32_t kUbSize = readField(fieldOffset([](auto& data, uint32_t value) { data.set_kUbSize(value); }));
     uint32_t mmOffset = readField(fieldOffset([](auto& data, uint32_t value) { data.set_mkWorkspaceMmOffset(value); }));
-    uint32_t rmsOffset =
-        readField(fieldOffset([](auto& data, uint32_t value) { data.set_mkWorkspaceRmsOffset(value); }));
     uint32_t finalOffset =
         readField(fieldOffset([](auto& data, uint32_t value) { data.set_mkWorkspaceFinalOffset(value); }));
     uint32_t mkUseGmStage = readField(fieldOffset([](auto& data, uint32_t value) { data.set_mkUseGmStage(value); }));
@@ -1562,8 +1557,7 @@ TEST_F(MhcPreTiling, Ut_Check_MK_N4_M1024_D5120_HasResi)
     EXPECT_EQ(kL1Size, 128U);
     EXPECT_EQ(kUbSize, kL1Size);
     EXPECT_EQ(mmOffset, 0U);
-    EXPECT_LT(mmOffset, rmsOffset);
-    EXPECT_LT(rmsOffset, finalOffset);
+    EXPECT_EQ(finalOffset, roundUp(expectedWorkspaceGroupK * B * S * phi_dim0 * sizeof(float), 512U));
     EXPECT_EQ(mkUseGmStage, 0U);
     EXPECT_EQ(stage2UsedAivNum, expectedStage2UsedAivNum);
     EXPECT_EQ(stage2RowsPerCore, expectedStage2RowsPerCore);
@@ -1757,8 +1751,20 @@ static void CheckMkGeneralizedTiling(uint32_t totalLength, uint32_t n, uint32_t 
     uint32_t actualImplMode = readField(fieldOffset([](auto& data, uint32_t value) { data.set_implMode(value); }));
     uint32_t mkUseGmStage = readField(fieldOffset([](auto& data, uint32_t value) { data.set_mkUseGmStage(value); }));
     EXPECT_EQ(actualImplMode, static_cast<uint32_t>(implMode));
-    bool expectL1Stage = (implMode == 0 && totalLength >= 512U) || (n == 8U && totalLength < 1536U);
-    EXPECT_EQ(mkUseGmStage, expectL1Stage ? 0U : 1U);
+    bool shortK = totalLength <= 256U && phiDim1 < 512U;
+    bool expectL1Stage = !shortK && ((implMode == 0 && totalLength >= 512U) || (n == 8U && totalLength < 1536U));
+    if (shortK) {
+        EXPECT_EQ(mDim, 1U);
+        uint32_t expectedSplitK = (phiDim1 + tilingInfo.blockNum - 1U) / tilingInfo.blockNum;
+        ASSERT_EQ(splitK, expectedSplitK);
+        EXPECT_EQ(kDim, (phiDim1 + expectedSplitK - 1U) / expectedSplitK);
+        size_t projectionBytes = static_cast<size_t>(kDim) * totalLength * phiDim0 * sizeof(float);
+        size_t xOffset = (projectionBytes + 511U) / 512U * 512U;
+        size_t xBytes = (static_cast<size_t>(totalLength) * phiDim1 * sizeof(float) + 31U) / 32U * 32U;
+        ASSERT_FALSE(tilingInfo.workspaceSizes.empty());
+        EXPECT_EQ(tilingInfo.workspaceSizes[0], 20U * 1024U * 1024U + xOffset + xBytes + totalLength * sizeof(float));
+    }
+    EXPECT_EQ(mkUseGmStage, shortK ? 3U : (expectL1Stage ? 0U : 1U));
     EXPECT_EQ(kL1Size % 128U, 0U);
     EXPECT_EQ(fusionAlign % 8U, 0U);
     EXPECT_LE(static_cast<uint64_t>(kL1Size) * fusionAlign, 128U * 256U);
@@ -1841,9 +1847,14 @@ TEST_F(MhcPreTiling, Ut_Check_MK_SequentialPartials_AllNAndResiModes)
     }
 }
 
-TEST_F(MhcPreTiling, Ut_Check_MK_Fallback_SmallK)
+TEST_F(MhcPreTiling, Ut_Check_MK_ShortK)
 {
-    CheckMkGeneralizedTiling(128U, 4U, 16U, 1);
+    CheckMkGeneralizedTiling(1U, 4U, 16U, 6, 0, false);
+    CheckMkGeneralizedTiling(128U, 4U, 16U, 2);
+    CheckMkGeneralizedTiling(255U, 6U, 16U, 2, 0, true, 1);
+    CheckMkGeneralizedTiling(256U, 8U, 16U, 2);
+    CheckMkGeneralizedTiling(257U, 4U, 16U, 0);
+    CheckMkGeneralizedTiling(256U, 4U, 128U, 2);
     CheckMkGeneralizedTiling(32U, 4U, 2560U, 2);
 }
 
@@ -1925,4 +1936,278 @@ TEST_F(MhcPreTiling, Ut_Check_CoreRatio_1to4_Fail)
 TEST_F(MhcPreTiling, Ut_Check_CoreRatio_2to1_Fail)
 {
     CheckCoreRatioFailure(64, 32);
+}
+
+TEST_F(MhcPreTiling, Ut_Check_MK_Part2_ControlledCores)
+{
+    constexpr uint32_t m = 65536U;
+    constexpr uint32_t d = 2048U;
+    constexpr uint32_t aic = 8U;
+    optiling::MhcPreCompileInfo compileInfo = {};
+    gert::TilingContextPara para("MhcPre",
+                                 {{{{m, 4U, d}, {m, 4U, d}}, ge::DT_BF16, ge::FORMAT_ND},
+                                  {{{24U, 4U * d}, {24U, 4U * d}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                  {{{3U}, {3U}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                  {{{24U}, {24U}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+                                 {{{{m, d}, {m, d}}, ge::DT_BF16, ge::FORMAT_ND},
+                                  {{{m, 4U}, {m, 4U}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                  {{{m, 4U, 4U}, {m, 4U, 4U}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                  {{{m}, {m}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                  {{{m, 24U}, {m, 24U}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                  {{{m, 4U}, {m, 4U}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+                                 {{"out_flag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                  {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
+                                  {"hc_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
+                                  {"op_impl_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
+                                 &compileInfo, "Ascend950", aic, 262144, 4096, MakeAscend950SocInfo(aic));
+    TilingInfo info;
+    ASSERT_TRUE(ExecuteTiling(para, info));
+    EXPECT_EQ(info.tilingKey, 3U);
+    EXPECT_EQ(info.blockNum, aic);
+}
+
+// Both modes select BF16 weight reuse for this shape. Verify the implementation mode, grid,
+// and workspace layout consumed by Part2.
+TEST_F(MhcPreTiling, Ut_Check_MK_Full_3072_4_5120)
+{
+    for (int64_t implMode : {0, 1}) {
+        optiling::MhcPreCompileInfo compileInfo = {};
+        gert::TilingContextPara para("MhcPre",
+                                     {{{{3072, 4, 5120}, {3072, 4, 5120}}, ge::DT_BF16, ge::FORMAT_ND},
+                                      {{{24, 20480}, {24, 20480}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                      {{{3}, {3}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                      {{{24}, {24}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+                                     {{{{3072, 5120}, {3072, 5120}}, ge::DT_BF16, ge::FORMAT_ND},
+                                      {{{3072, 4}, {3072, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                      {{{3072, 4, 4}, {3072, 4, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                      {{{3072}, {3072}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                      {{{3072, 24}, {3072, 24}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                      {{{3072, 4}, {3072, 4}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+                                     {{"out_flag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                      {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
+                                      {"hc_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
+                                      {"op_impl_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(implMode)}},
+                                     &compileInfo, "Ascend950", 32, 262144, 4096, MakeAscend950SocInfo(32));
+        TilingInfo info;
+        ASSERT_TRUE(ExecuteTiling(para, info));
+        constexpr uint32_t sentinel = 0x5A5AA55AU;
+        auto readField = [&](auto setter) -> uint32_t {
+            optiling::MhcPreTilingData schema;
+            std::vector<uint8_t> buffer(schema.GetDataSize(), 0U);
+            setter(schema, sentinel);
+            schema.SaveToBuffer(buffer.data(), buffer.size());
+            for (size_t offset = 0; offset + sizeof(uint32_t) <= buffer.size(); ++offset) {
+                uint32_t value = 0;
+                std::memcpy(&value, buffer.data() + offset, sizeof(value));
+                if (value == sentinel) {
+                    EXPECT_LE(offset + sizeof(value), info.tilingDataSize);
+                    std::memcpy(&value, info.tilingData.get() + offset, sizeof(value));
+                    return value;
+                }
+            }
+            ADD_FAILURE() << "Tiling field missing";
+            return 0U;
+        };
+        constexpr uint32_t expectedKDim = 16U;
+        EXPECT_EQ(info.tilingKey, 3U);
+        EXPECT_EQ(readField([](auto& t, uint32_t v) { t.set_implMode(v); }), static_cast<uint32_t>(implMode));
+        const bool wave = implMode == 0;
+        EXPECT_EQ(readField([](auto& t, uint32_t v) { t.set_mkUseGmStage(v); }), wave ? 4U : 2U);
+        EXPECT_EQ(readField([](auto& t, uint32_t v) { t.set_cubeBlockDimM(v); }), 2U);
+        EXPECT_EQ(readField([](auto& t, uint32_t v) { t.set_cubeBlockDimK(v); }), expectedKDim);
+        EXPECT_EQ(readField([](auto& t, uint32_t v) { t.set_mL1Size(v); }), 128U);
+        EXPECT_EQ(readField([](auto& t, uint32_t v) { t.set_kL1Size(v); }), 256U);
+        EXPECT_EQ(readField([](auto& t, uint32_t v) { t.set_multCoreSplitKSize(v); }), 1280U);
+        const uint32_t projectionGroups = wave ? 48U : 16U;
+        const uint32_t projectionWidth = wave ? 32U : 24U;
+        const size_t projectionBytes = projectionGroups * 3072U * projectionWidth * sizeof(float);
+        EXPECT_EQ(readField([](auto& t, uint32_t v) { t.set_mkWorkspaceFinalOffset(v); }), projectionBytes);
+        size_t rmsBytes = (20480U / 256U) * 3072U * sizeof(float);
+        ASSERT_FALSE(info.workspaceSizes.empty());
+        EXPECT_EQ(info.workspaceSizes[0], 20U * 1024U * 1024U + projectionBytes + rmsBytes);
+    }
+}
+
+TEST_F(MhcPreTiling, Ut_Check_MK_Wave_AdaptivePartition)
+{
+    struct Case {
+        uint32_t totalLength;
+        uint32_t d;
+        int64_t implMode;
+        int64_t outFlag;
+        uint32_t aicNum;
+        uint32_t mDim;
+        uint32_t kDim;
+    };
+    const Case cases[] = {
+        {2048U, 6144U, 0, 1, 32U, 2U, 16U}, // Candidate: same 32 AICs, fewer K partials.
+        {2048U, 6144U, 1, 1, 32U, 1U, 32U}, // HF32 keeps the original policy.
+        {2048U, 6144U, 0, 0, 32U, 2U, 16U}, // Wave also supports disabled optional outputs.
+        {1024U, 6144U, 0, 1, 32U, 2U, 16U}, // The policy also handles other M scales.
+        {512U, 6144U, 0, 1, 32U, 2U, 16U},  // Minimum two-wave candidate.
+        {256U, 6144U, 0, 1, 32U, 1U, 32U},  // Keep the inter-wave overlap opportunity.
+        {384U, 6144U, 0, 1, 32U, 1U, 32U},  // An incomplete M256 wave is not eligible.
+        {768U, 4096U, 0, 1, 32U, 1U, 32U},  // K512 partials tie, so keep the original grid.
+        {2048U, 8192U, 0, 1, 32U, 1U, 32U}, // Sequential partials remove the group-count benefit.
+        {4096U, 2560U, 0, 1, 32U, 4U, 8U},  // Reducing K would increase MM groups.
+        {3072U, 2560U, 0, 1, 32U, 4U, 8U},  {4096U, 6144U, 0, 1, 32U, 2U, 16U}, {2048U, 5120U, 0, 1, 32U, 2U, 16U},
+        {2048U, 7168U, 0, 1, 32U, 2U, 16U}, {2048U, 6144U, 0, 1, 16U, 1U, 16U}, // Other active core counts are
+                                                                                // unchanged.
+    };
+    for (const auto& c : cases) {
+        SCOPED_TRACE(::testing::Message() << "T=" << c.totalLength << ", D=" << c.d << ", mode=" << c.implMode
+                                          << ", out=" << c.outFlag << ", AIC=" << c.aicNum);
+        uint32_t b = 2U;
+        uint32_t s = c.totalLength / b;
+        uint32_t hidden = 4U * c.d;
+        optiling::MhcPreCompileInfo compileInfo = {};
+        gert::TilingContextPara para("MhcPre",
+                                     {{{{b, s, 4U, c.d}, {b, s, 4U, c.d}}, ge::DT_BF16, ge::FORMAT_ND},
+                                      {{{24U, hidden}, {24U, hidden}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                      {{{3U}, {3U}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                      {{{24U}, {24U}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+                                     {{{{b, s, c.d}, {b, s, c.d}}, ge::DT_BF16, ge::FORMAT_ND},
+                                      {{{b, s, 4U}, {b, s, 4U}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                      {{{b, s, 4U, 4U}, {b, s, 4U, 4U}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                      {{{b, s}, {b, s}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                      {{{b, s, 24U}, {b, s, 24U}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                      {{{b, s, 4U}, {b, s, 4U}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+                                     {{"out_flag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(c.outFlag)},
+                                      {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
+                                      {"hc_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
+                                      {"op_impl_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(c.implMode)}},
+                                     &compileInfo, "Ascend950", c.aicNum, 262144, 4096, MakeAscend950SocInfo(c.aicNum));
+        TilingInfo info;
+        ASSERT_TRUE(ExecuteTiling(para, info));
+        constexpr uint32_t sentinel = 0x5A5AA55AU;
+        auto readField = [&](auto setter) -> uint32_t {
+            optiling::MhcPreTilingData schema;
+            std::vector<uint8_t> buffer(schema.GetDataSize(), 0U);
+            setter(schema, sentinel);
+            schema.SaveToBuffer(buffer.data(), buffer.size());
+            for (size_t offset = 0; offset + sizeof(uint32_t) <= buffer.size(); ++offset) {
+                uint32_t value = 0U;
+                std::memcpy(&value, buffer.data() + offset, sizeof(value));
+                if (value == sentinel) {
+                    EXPECT_LE(offset + sizeof(value), info.tilingDataSize);
+                    if (offset + sizeof(value) > info.tilingDataSize) {
+                        return 0U;
+                    }
+                    std::memcpy(&value, info.tilingData.get() + offset, sizeof(value));
+                    return value;
+                }
+            }
+            ADD_FAILURE() << "Tiling field missing";
+            return 0U;
+        };
+        EXPECT_EQ(info.tilingKey, 3);
+        EXPECT_EQ(info.blockNum, c.aicNum);
+        EXPECT_EQ(readField([](auto& t, uint32_t v) { t.set_cubeBlockDimM(v); }), c.mDim);
+        EXPECT_EQ(readField([](auto& t, uint32_t v) { t.set_cubeBlockDimK(v); }), c.kDim);
+        EXPECT_EQ(readField([](auto& t, uint32_t v) { t.set_multCoreSplitKSize(v); }), hidden / c.kDim);
+        EXPECT_EQ(readField([](auto& t, uint32_t v) { t.set_mL1Size(v); }), 128U);
+        EXPECT_EQ(readField([](auto& t, uint32_t v) { t.set_kL1Size(v); }), 256U);
+        const uint32_t coreK = hidden / c.kDim;
+        const bool wave = c.implMode == 0 && c.aicNum == 32U && c.totalLength % (c.mDim * 128U) == 0U && coreK >= 512U;
+        EXPECT_EQ(readField([](auto& t, uint32_t v) { t.set_mkUseGmStage(v); }), wave ? 4U : 2U);
+        // All FP32 entries here are in the small-projection-precision range.
+        const uint32_t partialK = c.implMode == 0 ? 512U : (coreK >= 2048U ? 1024U : coreK);
+        const uint32_t groups = c.kDim * ((coreK + partialK - 1U) / partialK);
+        EXPECT_EQ(readField([](auto& t, uint32_t v) { t.set_mkWorkspaceFinalOffset(v); }),
+                  groups * c.totalLength * (wave ? 32U : 24U) * sizeof(float));
+    }
+}
+
+TEST_F(MhcPreTiling, Ut_Check_MK_WeightReuse_RoutingBoundaries)
+{
+    struct Case {
+        uint32_t m;
+        uint32_t d;
+        int32_t deterministicLevel;
+        uint64_t fp32Key;
+        uint64_t hf32Key;
+    };
+    const Case cases[] = {
+        {256U, 64U, 0, 2U, 2U}, // K=256 uses the short-K MK partition.
+        {1U, 5120U, 0, 3U, 3U}, // Small M uses two-stage weight reuse.
+        {511U, 5120U, 0, 3U, 3U},   {512U, 5120U, 0, 3U, 3U},
+        {2048U, 3584U, 0, 3U, 3U},  {2049U, 5120U, 0, 3U, 3U}, // Keep MK when K parallelism is available.
+        {49149U, 5120U, 0, 0U, 3U},                            // A partial M tile excludes MK wave.
+        {49152U, 5120U, 0, 3U, 3U}, {49155U, 5120U, 0, 0U, 0U},
+        {65536U, 5120U, 0, 0U, 0U}, {65536U, 6144U, 0, 3U, 0U}, // Ordinary BS does not get wave priority.
+        {65537U, 5120U, 0, 0U, 0U}, {65536U, 5120U, 3, 0U, 0U},
+    };
+    for (int64_t implMode : {0, 1}) {
+        for (const auto& c : cases) {
+            SCOPED_TRACE(::testing::Message() << "M=" << c.m << ", D=" << c.d << ", mode=" << implMode
+                                              << ", deterministic=" << c.deterministicLevel);
+            uint32_t d = c.d;
+            optiling::MhcPreCompileInfo compileInfo = {};
+            gert::TilingContextPara para("MhcPre",
+                                         {{{{c.m, 4U, d}, {c.m, 4U, d}}, ge::DT_BF16, ge::FORMAT_ND},
+                                          {{{24U, 4U * d}, {24U, 4U * d}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                          {{{3U}, {3U}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                          {{{24U}, {24U}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+                                         {{{{c.m, d}, {c.m, d}}, ge::DT_BF16, ge::FORMAT_ND},
+                                          {{{c.m, 4U}, {c.m, 4U}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                          {{{c.m, 4U, 4U}, {c.m, 4U, 4U}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                          {{{c.m}, {c.m}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                          {{{c.m, 24U}, {c.m, 24U}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                          {{{c.m, 4U}, {c.m, 4U}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+                                         {{"out_flag", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+                                          {"norm_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
+                                          {"hc_eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-6f)},
+                                          {"op_impl_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(implMode)}},
+                                         &compileInfo, "Ascend950", 32, 262144, 4096, MakeAscend950SocInfo(32));
+            para.deterministicInfo_ = c.deterministicLevel;
+            TilingInfo info;
+            ASSERT_TRUE(ExecuteTiling(para, info));
+            EXPECT_EQ(info.tilingKey, implMode == 0 ? c.fp32Key : c.hf32Key);
+        }
+    }
+}
+
+TEST_F(MhcPreTiling, Ut_Check_MK_Wave_AdaptivePolicyGuards)
+{
+    using optiling::detail::SelectMhcPreMkWaveKDim;
+    struct Case {
+        uint64_t totalLength;
+        uint64_t matK;
+        uint64_t d;
+        uint64_t activeCores;
+        uint64_t originalKDim;
+        uint64_t expectedKDim;
+    };
+    const Case cases[] = {
+        {2048U, 24576U, 6144U, 32U, 32U, 16U}, {768U, 16384U, 4096U, 32U, 32U, 32U},
+        {256U, 24576U, 6144U, 32U, 32U, 32U},  {384U, 24576U, 6144U, 32U, 32U, 32U},
+        {2048U, 32768U, 8192U, 32U, 32U, 32U}, {2048U, 20480U, 5120U, 32U, 16U, 16U},
+        {2048U, 28672U, 7168U, 32U, 16U, 16U}, {2048U, 24576U, 6144U, 16U, 16U, 16U},
+        {0U, 24576U, 6144U, 32U, 32U, 32U},    {2048U, 24576U, 6144U, 32U, 0U, 0U},
+        {2048U, 24576U, 6144U, 32U, 24U, 24U}, {2048U, 24576U, 6144U, 32U, 64U, 64U},
+        {2048U, 24575U, 6144U, 32U, 32U, 32U}, {2048U, 24580U, 6145U, 32U, 32U, 32U},
+        {2048U, 4096U, 1024U, 32U, 32U, 32U},  {2048U, 65536U, 16384U, 32U, 32U, 32U},
+    };
+    for (const auto& c : cases) {
+        SCOPED_TRACE(::testing::Message() << "T=" << c.totalLength << ", D=" << c.d << ", AIC=" << c.activeCores
+                                          << ", K=" << c.originalKDim);
+        EXPECT_EQ(SelectMhcPreMkWaveKDim(c.totalLength, c.matK, c.d, c.activeCores, c.originalKDim), c.expectedKDim);
+    }
+}
+
+TEST_F(MhcPreTiling, Ut_Check_MK_Wave_UbBudget)
+{
+    using optiling::detail::GetMhcPreMkWaveChunkD;
+    using optiling::detail::GetMhcPreMkWaveFixedUbBytes;
+    constexpr uint64_t ubBytes = 256U * 1024U;
+    const uint64_t gamma7168 = GetMhcPreMkWaveFixedUbBytes(7168U, 16U, 112U, true);
+    const uint64_t noGamma7168 = GetMhcPreMkWaveFixedUbBytes(7168U, 16U, 112U, false);
+    EXPECT_EQ(gamma7168, 181984U);
+    EXPECT_EQ(noGamma7168, 179936U);
+    EXPECT_EQ(GetMhcPreMkWaveChunkD(7168U, 1792U, 256U, gamma7168, ubBytes), 3968U);
+    EXPECT_EQ(GetMhcPreMkWaveChunkD(7168U, 1792U, 256U, noGamma7168, ubBytes), 4096U);
+    EXPECT_EQ(GetMhcPreMkWaveChunkD(7168U, 1792U, 256U, gamma7168, gamma7168 + 2559U), 0U);
+    EXPECT_EQ(GetMhcPreMkWaveChunkD(7168U, 1792U, 256U, gamma7168, gamma7168 + 2560U), 128U);
+    const uint64_t gamma8192 = GetMhcPreMkWaveFixedUbBytes(8192U, 16U, 128U, true);
+    EXPECT_EQ(GetMhcPreMkWaveChunkD(8192U, 2048U, 256U, gamma8192, ubBytes), 3584U);
 }

@@ -13,6 +13,12 @@ if (BUILD_OPEN_PROJECT)
         mhc_pre_def.cpp
     )
 
+    add_ops_compile_options(
+        OP_NAME MhcPre
+        COMPUTE_UNIT Ascend950PR_9599
+        OPTIONS -DMHC_PRE_ENABLE_ASCEND950=1
+    )
+
     if("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend950")
         add_ops_compile_options(
             OP_NAME MhcPre
