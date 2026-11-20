@@ -42,6 +42,28 @@ void CheckLayoutDims(const at::Tensor& tensor, const char* name, const std::stri
     TORCH_CHECK(tensor.dim() == expected, name, " with layout ", layout, " expects ", expected, " dims, but got ",
                 tensor.dim(), " dims ", tensor.sizes());
 }
+
+void CheckLayoutCombo(const string& layoutQ, const string& layoutKv, const string& layoutOut)
+{
+    if (layoutKv != layoutQ) {
+        return;
+    }
+    if (layoutQ == "BSND") {
+        TORCH_CHECK(layoutOut == "BSND",
+                    "flash_attn: when layout_q and layout_kv are BSND, layout_out must be "
+                    "BSND, but got ",
+                    layoutOut);
+    } else if (layoutQ == "BNSD") {
+        TORCH_CHECK(layoutOut == "BNSD" || layoutOut == "BSND",
+                    "flash_attn: when layout_q and layout_kv are BNSD, layout_out must be BNSD or BSND, but got ",
+                    layoutOut);
+    } else if (layoutQ == "TND") {
+        TORCH_CHECK(layoutOut == "TND",
+                    "flash_attn: when layout_q and layout_kv are TND, layout_out must be "
+                    "TND, but got ",
+                    layoutOut);
+    }
+}
 } // namespace
 
 at::Tensor FlashAttnMetadata(const c10::optional<at::Tensor>& cuSeqlensQ, const c10::optional<at::Tensor>& cuSeqlensKv,
@@ -69,6 +91,7 @@ std::tuple<at::Tensor, at::Tensor> FlashAttn(
     CheckLayoutDims(q, "q", layoutQ);
     CheckLayoutDims(k, "k", layoutKv);
     CheckLayoutDims(v, "v", layoutKv);
+    CheckLayoutCombo(layoutQ, layoutKv, layoutOut);
 
     int64_t tSize = 0;
     int64_t nSize = 0;
@@ -117,10 +140,14 @@ std::tuple<at::Tensor, at::Tensor> FlashAttn(
     at::Tensor softmaxLse = at::empty(softmaxOutSize, q.options().dtype(at::kFloat));
 
     if (layoutOut == "TND") {
+        TORCH_CHECK(layoutQ == "TND", "flash_attn: out shape of TND requires layout_q TND, but got ", layoutQ);
         attentionOutSize = {tSize, nSize, dSizeV};
     } else if (layoutOut == "BNSD") {
+        TORCH_CHECK(layoutQ == "BNSD", "flash_attn: out shape of BNSD requires layout_q BNSD, but got ", layoutQ);
         attentionOutSize = {bSize, nSize, sSize, dSizeV};
     } else {
+        TORCH_CHECK(layoutQ == "BSND" || layoutQ == "BNSD",
+                    "flash_attn: out shape of BSND requires layout_q BSND or BNSD, but got ", layoutQ);
         attentionOutSize = {bSize, sSize, nSize, dSizeV};
     }
     at::Tensor attentionOutput = at::empty(attentionOutSize, q.options().dtype(q.dtype()));
