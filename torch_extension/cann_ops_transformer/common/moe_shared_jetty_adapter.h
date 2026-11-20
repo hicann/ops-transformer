@@ -24,11 +24,6 @@ namespace Mc2Api {
 constexpr char MOE_COMM_ALG_AUTO[] = "auto";
 constexpr const char* MOE_COMM_ALG_DEFAULT = MOE_COMM_ALG_AUTO;
 constexpr char MOE_COMM_ALG_CLOS_ONLY[] = "clos_only";
-constexpr int64_t MOE_CLOS_ONLY_MIN_RANK_SIZE = 2;
-// Internal compatibility aliases. The public comm_alg names are auto and clos_only.
-constexpr const char* MOE_COMM_ALG_FULLMESH = MOE_COMM_ALG_AUTO;
-constexpr const char* MOE_COMM_ALG_SHARED_JETTY = MOE_COMM_ALG_CLOS_ONLY;
-constexpr int64_t MOE_SHARED_JETTY_MIN_RANK_SIZE = 16;
 
 at::Tensor BuildMoeSharedJettyContext(const std::string& groupName, uint64_t requiredBufferSize);
 

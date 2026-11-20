@@ -12,15 +12,13 @@
 #define MOE_SHARED_JETTY_CONTEXT_H
 
 #include <cstdint>
-#include "moe_ep_comm_alg_def.h"
 
 namespace Mc2Kernel {
 // One AIV sender exclusively owns one physical Jetty. Each Jetty serves all
 // remote peers through a multi-channel handle instead of being split by rank.
-constexpr uint32_t MOE_SHARED_JETTY_NUM = 32;
+constexpr uint32_t MOE_SHARED_JETTY_NUM = 64;
 constexpr uint32_t MOE_SHARED_JETTY_SQ_DEPTH = 4096;
 constexpr uint32_t MOE_SHARED_JETTY_CQ_DEPTH = 64;
-constexpr uint32_t MOE_SHARED_JETTY_MIN_RANK_SIZE = Mc2Tiling::MOE_EP_SHARED_JETTY_MIN_RANK_SIZE;
 constexpr uint32_t MOE_SHARED_JETTY_MAX_RANK_SIZE = 1024;
 
 struct MoeSharedJettyContext {

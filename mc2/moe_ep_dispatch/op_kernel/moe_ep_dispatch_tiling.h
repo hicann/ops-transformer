@@ -65,7 +65,6 @@ struct MoeEpDispatchWorkspaceLayout {
     uint64_t sendCntOffset;
     uint64_t tilePrefixOffset;
     uint64_t expertPartialOffset;
-    uint64_t tileReadyOffset;
     uint64_t srcTokenListBytes;
     uint64_t srcTokenTableOffset;
     uint64_t sendEntryTokenRangeBytes; // 单个 token 范围的发送记录字节数

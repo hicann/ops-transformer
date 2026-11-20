@@ -17,6 +17,7 @@
 #include <iostream>
 #include <gtest/gtest.h>
 #include "tiling_case_executor.h"
+#include "../../../../../common/op_kernel/moe_shared_jetty_context.h"
 #include "../../../../../common/op_api/moe_ep_comm_alg.h"
 
 namespace MoeEpDispatchUT {
@@ -165,7 +166,7 @@ TEST_P(MoeEpDispatchArch35TilingTest, GeneralCases)
 
 INSTANTIATE_TEST_CASE_P(MoeEpDispatchTilingUT, MoeEpDispatchArch35TilingTest, testing::ValuesIn(g_testCases));
 
-TEST(MoeEpDispatchArch35RoutingTest, ClosOnlyUsesSharedTemplateStartingAt16Ranks)
+TEST(MoeEpDispatchArch35RoutingTest, ClosOnlyAlwaysUsesSharedTemplate)
 {
     for (int64_t ep : {2, 8, 15, 16, 32, 64}) {
         SCOPED_TRACE(ep);
@@ -180,14 +181,11 @@ TEST(MoeEpDispatchArch35RoutingTest, ClosOnlyUsesSharedTemplateStartingAt16Ranks
         TilingInfo automatic;
         TilingInfo closOnly;
         ASSERT_TRUE(ExecuteTiling(BuildTilingContextPara(param, "auto", 2052), automatic));
-        const bool sharedJetty = ep >= 16;
-        ASSERT_TRUE(ExecuteTiling(BuildTilingContextPara(param, "clos_only", sharedJetty ? 2116 : 2052), closOnly));
-        if (sharedJetty) {
-            EXPECT_NE(closOnly.tilingKey, automatic.tilingKey);
-            ExecuteTestCase(BuildTilingContextPara(param, "clos_only", 2052), ge::GRAPH_FAILED, SKIP_KEY, "", {});
-        } else {
-            EXPECT_EQ(closOnly.tilingKey, automatic.tilingKey);
-        }
+        ASSERT_TRUE(ExecuteTiling(
+            BuildTilingContextPara(param, "clos_only", sizeof(Mc2Kernel::MoeSharedJettyContext) / sizeof(int32_t)),
+            closOnly));
+        EXPECT_NE(closOnly.tilingKey, automatic.tilingKey);
+        ExecuteTestCase(BuildTilingContextPara(param, "clos_only", 2052), ge::GRAPH_FAILED, SKIP_KEY, "", {});
         ExecuteTestCase(BuildTilingContextPara(param, "", 2052), ge::GRAPH_FAILED, SKIP_KEY, "", {});
     }
 }
@@ -199,7 +197,9 @@ TEST(MoeEpDispatchArch35RoutingTest, ClosOnlyRejectsHybridTopology)
     param.numExperts = 16;
     param.topoType = 1;
     param.rankNumPerServer = 4;
-    ExecuteTestCase(BuildTilingContextPara(param, "clos_only", 2116), ge::GRAPH_FAILED, SKIP_KEY, "", {});
+    ExecuteTestCase(
+        BuildTilingContextPara(param, "clos_only", sizeof(Mc2Kernel::MoeSharedJettyContext) / sizeof(int32_t)),
+        ge::GRAPH_FAILED, SKIP_KEY, "", {});
 }
 
 TEST(MoeEpCommAlgTest, AcceptsOnlySupportedNames)
@@ -212,16 +212,11 @@ TEST(MoeEpCommAlgTest, AcceptsOnlySupportedNames)
     EXPECT_FALSE(Mc2Aclnn::IsValidMoeEpCommAlg("fullmesh"));
 }
 
-TEST(MoeEpCommAlgTest, PortPolicyAndTemplateAreResolvedSeparately)
+TEST(MoeEpCommAlgTest, ClosOnlySelectsSharedTemplate)
 {
-    for (int64_t ep : {2, 8, 15, 16, 32, 64}) {
-        const auto expectedMode =
-            ep >= 16 ? Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY : Mc2Tiling::MOE_EP_COMM_ALG_CLOS_ONLY;
-        EXPECT_EQ(Mc2Aclnn::ParseMoeEpCommAlg("clos_only", ep), expectedMode);
-        EXPECT_EQ(Mc2Aclnn::ParseMoeEpCommAlg("auto", ep), Mc2Tiling::MOE_EP_COMM_ALG_AUTO);
-        EXPECT_EQ(Mc2Aclnn::ParseMoeEpCommAlg(nullptr, ep), Mc2Tiling::MOE_EP_COMM_ALG_AUTO);
-    }
-    EXPECT_NE(Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY, Mc2Tiling::MOE_EP_COMM_ALG_CLOS_ONLY);
+    EXPECT_EQ(Mc2Aclnn::ParseMoeEpCommAlg("clos_only"), Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY);
+    EXPECT_EQ(Mc2Aclnn::ParseMoeEpCommAlg("auto"), Mc2Tiling::MOE_EP_COMM_ALG_AUTO);
+    EXPECT_EQ(Mc2Aclnn::ParseMoeEpCommAlg(nullptr), Mc2Tiling::MOE_EP_COMM_ALG_AUTO);
 }
 
 } // namespace MoeEpDispatchUT

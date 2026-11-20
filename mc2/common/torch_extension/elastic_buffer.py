@@ -31,12 +31,11 @@ _ENGRAM_INT_TO_DTYPE = {v: k for k, v in _ENGRAM_DTYPE_TO_INT.items()}
 _ENGRAM_SF_DTYPES = (torch.float32, torch.float8_e8m0fnu)
 _ENGRAM_GRAD_DTYPES = (torch.bfloat16, torch.float16, torch.float32)
 _MOE_EP_METADATA_FIELDS = 5
-_MOE_SHARED_JETTY_NUM = 32
+_MOE_SHARED_JETTY_NUM = 64
 _MOE_COMM_ALG_AUTO = "auto"
 _MOE_COMM_ALG_CLOS_ONLY = "clos_only"
 _MOE_COMM_ALGS = (_MOE_COMM_ALG_AUTO, _MOE_COMM_ALG_CLOS_ONLY)
 _MOE_CLOS_ONLY_MIN_WORLD_SIZE = 2
-_MOE_SHARED_JETTY_MIN_WORLD_SIZE = 16
 
 _MOE_EP_METADATA_ALIGN_ELEMENTS = 128  # 512 bytes, int32 elements
 
@@ -452,10 +451,7 @@ def _get_moe_ep_window_layout(
     dispatch_count_size = world_size * _inline_align(
         local_experts_num * state_dtype_size, win_addr_align
     )
-    if (
-        comm_alg == _MOE_COMM_ALG_CLOS_ONLY
-        and world_size >= _MOE_SHARED_JETTY_MIN_WORLD_SIZE
-    ):
+    if comm_alg == _MOE_COMM_ALG_CLOS_ONLY:
         dispatch_notify_count = _MOE_SHARED_JETTY_NUM
         combine_flag_count = world_size * _MOE_SHARED_JETTY_NUM
     else:
@@ -747,8 +743,8 @@ class ElasticBuffer:
             comm_alg: MoE communication port mode. ``"auto"`` (default) uses
                 both FullMesh and Clos ports available in the topology;
                 ``"clos_only"`` uses Clos ports only and disables FullMesh
-                ports. EP sizes >= 16 use the shared-Jetty template;
-                EP sizes from 2 to 15 use the legacy Clos-only template.
+                ports. All supported EP sizes use the shared-Jetty template
+                with 64 Jettys for both dispatch and combine.
                 Empty strings are not supported. Clos-only mode requires
                 direct topology and rejects UBG (UB_RTP) links.
         """

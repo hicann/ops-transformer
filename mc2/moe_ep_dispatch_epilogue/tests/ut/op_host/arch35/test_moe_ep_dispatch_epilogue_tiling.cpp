@@ -17,6 +17,7 @@
 #include <iostream>
 #include <gtest/gtest.h>
 #include "tiling_case_executor.h"
+#include "../../../../../common/op_kernel/moe_shared_jetty_context.h"
 
 namespace MoeEpDispatchEpilogueUT {
 
@@ -162,7 +163,7 @@ TEST_P(MoeEpDispatchEpilogueArch35TilingTest, GeneralCases)
 INSTANTIATE_TEST_CASE_P(MoeEpDispatchEpilogueTilingUT, MoeEpDispatchEpilogueArch35TilingTest,
                         testing::ValuesIn(g_testCases));
 
-TEST(MoeEpDispatchEpilogueArch35RoutingTest, ClosOnlyUsesSharedTemplateStartingAt16Ranks)
+TEST(MoeEpDispatchEpilogueArch35RoutingTest, ClosOnlyAlwaysUsesSharedTemplate)
 {
     for (int64_t ep : {2, 8, 15, 16, 32, 64}) {
         SCOPED_TRACE(ep);
@@ -176,14 +177,11 @@ TEST(MoeEpDispatchEpilogueArch35RoutingTest, ClosOnlyUsesSharedTemplateStartingA
         TilingInfo automatic;
         TilingInfo closOnly;
         ASSERT_TRUE(ExecuteTiling(BuildTilingContextPara(param, "auto", 2052), automatic));
-        const bool sharedJetty = ep >= 16;
-        ASSERT_TRUE(ExecuteTiling(BuildTilingContextPara(param, "clos_only", sharedJetty ? 2116 : 2052), closOnly));
-        if (sharedJetty) {
-            EXPECT_NE(closOnly.tilingKey, automatic.tilingKey);
-            ExecuteTestCase(BuildTilingContextPara(param, "clos_only", 2052), ge::GRAPH_FAILED, SKIP_KEY, "", {});
-        } else {
-            EXPECT_EQ(closOnly.tilingKey, automatic.tilingKey);
-        }
+        ASSERT_TRUE(ExecuteTiling(
+            BuildTilingContextPara(param, "clos_only", sizeof(Mc2Kernel::MoeSharedJettyContext) / sizeof(int32_t)),
+            closOnly));
+        EXPECT_NE(closOnly.tilingKey, automatic.tilingKey);
+        ExecuteTestCase(BuildTilingContextPara(param, "clos_only", 2052), ge::GRAPH_FAILED, SKIP_KEY, "", {});
         ExecuteTestCase(BuildTilingContextPara(param, "", 2052), ge::GRAPH_FAILED, SKIP_KEY, "", {});
     }
 }
@@ -195,7 +193,9 @@ TEST(MoeEpDispatchEpilogueArch35RoutingTest, ClosOnlyRejectsHybridTopology)
     param.numExperts = 16;
     param.topoType = 1;
     param.rankNumPerServer = 4;
-    ExecuteTestCase(BuildTilingContextPara(param, "clos_only", 2116), ge::GRAPH_FAILED, SKIP_KEY, "", {});
+    ExecuteTestCase(
+        BuildTilingContextPara(param, "clos_only", sizeof(Mc2Kernel::MoeSharedJettyContext) / sizeof(int32_t)),
+        ge::GRAPH_FAILED, SKIP_KEY, "", {});
 }
 
 } // namespace MoeEpDispatchEpilogueUT

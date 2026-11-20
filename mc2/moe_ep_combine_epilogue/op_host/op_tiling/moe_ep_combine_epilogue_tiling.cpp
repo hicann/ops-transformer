@@ -424,7 +424,7 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext* context, const
     rankNumPerServerOut = topology.rankNumPerServer;
     serverNum = topology.serverNum;
     networkMode = topology.networkMode;
-    commAlg = Mc2Aclnn::ParseMoeEpCommAlg(commAlgPtr, epWorldSize);
+    commAlg = Mc2Aclnn::ParseMoeEpCommAlg(commAlgPtr);
 
     return ge::GRAPH_SUCCESS;
 }

@@ -359,7 +359,7 @@ static ge::graphStatus CheckAttrParams(const gert::TilingContext* context, const
     serverNum = topology.serverNum;
     networkMode = topology.networkMode;
     rankNumPerServerOut = topology.rankNumPerServer;
-    commAlg = Mc2Aclnn::ParseMoeEpCommAlg(commAlgPtr, epWorldSize);
+    commAlg = Mc2Aclnn::ParseMoeEpCommAlg(commAlgPtr);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -434,9 +434,8 @@ static ge::graphStatus MoeEpCombineTilingFunc(gert::TilingContext* context)
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
-    OP_TILING_CHECK(commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY && aivNum < Mc2Kernel::MOE_SHARED_JETTY_NUM,
-                    OP_LOGE(nodeName, "clos_only combine requires at least %u AIVs, but got %u.",
-                            Mc2Kernel::MOE_SHARED_JETTY_NUM, aivNum),
+    OP_TILING_CHECK(commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY && aivNum == 0U,
+                    OP_LOGE(nodeName, "clos_only combine requires at least one AIV, but got %u.", aivNum),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(
         aivNum > MOE_EP_PER_CORE_DIAG_SLOT_COUNT,

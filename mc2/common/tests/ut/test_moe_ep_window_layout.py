@@ -65,16 +65,21 @@ class MoeEpWindowLayoutTest(unittest.TestCase):
                     self.layout(ep, "auto").state_buffer_bytes, state_bytes
                 )
 
-    def test_clos_below_16_preserves_legacy_window_layout(self):
-        for ep in [2, 8, 15]:
+    def test_clos_small_groups_use_shared_window_layout(self):
+        for ep, state_bytes in [(2, 291328), (8, 690688), (15, 1156608)]:
             with self.subTest(ep=ep):
-                self.assertEqual(self.layout(ep, "clos_only"), self.layout(ep, "auto"))
+                self.assertEqual(
+                    self.layout(ep, "clos_only").state_buffer_bytes, state_bytes
+                )
+                self.assertNotEqual(
+                    self.layout(ep, "clos_only"), self.layout(ep, "auto")
+                )
 
-    def test_shared_layout_starts_at_16(self):
+    def test_shared_layout_uses_64_jettys(self):
         for ep, state_bytes in [
-            (16, 682496),
-            (32, 1223168),
-            (64, 2304512),
+            (16, 1223168),
+            (32, 2288128),
+            (64, 4418048),
         ]:
             with self.subTest(ep=ep):
                 clos = self.layout(ep, "clos_only")

@@ -189,7 +189,7 @@ __aicore__ inline void MoeEpCombineEpilogue<TemplateMoeEpCombineEpilogueTypeFunc
     if constexpr (ClosOnly) {
         auto ctx = reinterpret_cast<__gm__ Mc2Kernel::MoeSharedJettyContext*>(context);
         rankId_ = ctx->epRankId;
-        combineChannelCount_ = ctx->sharedJettyNum < aivNum_ ? ctx->sharedJettyNum : aivNum_;
+        combineChannelCount_ = ctx->sharedJettyNum;
         for (uint32_t i = 0; i < epWorldSize_; ++i) {
             winRankAddr_[i] = (GM_ADDR)ctx->epHcclBuffer[i];
         }

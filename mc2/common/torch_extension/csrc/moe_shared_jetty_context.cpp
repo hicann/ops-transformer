@@ -27,7 +27,6 @@
 
 namespace Mc2Api {
 namespace {
-constexpr uint32_t SHARED_JETTY_NUM = Mc2Kernel::MOE_SHARED_JETTY_NUM;
 constexpr size_t SHARED_JETTY_MAX_TAG_SIZE = 255;
 constexpr CommEngine COMM_ENGINE = CommEngine::COMM_ENGINE_AIV;
 constexpr uint64_t BUFFER_ALIGNMENT = 2ULL * 1024ULL * 1024ULL;
@@ -255,13 +254,12 @@ private:
     {
         CheckHccl(HcclGetRankIdFunc(comm_, &context_.epRankId), "HcclGetRankId");
         CheckHccl(HcclGetRankSizeFunc(comm_, &rankSize_), "HcclGetRankSize");
-        TORCH_CHECK(rankSize_ >= Mc2Kernel::MOE_SHARED_JETTY_MIN_RANK_SIZE &&
-                        rankSize_ <= Mc2Kernel::MOE_SHARED_JETTY_MAX_RANK_SIZE,
-                    "MoE shared Jetty rank size must be in [", Mc2Kernel::MOE_SHARED_JETTY_MIN_RANK_SIZE, ", ",
-                    Mc2Kernel::MOE_SHARED_JETTY_MAX_RANK_SIZE, "], got ", rankSize_);
+        TORCH_CHECK(rankSize_ >= 2U && rankSize_ <= Mc2Kernel::MOE_SHARED_JETTY_MAX_RANK_SIZE,
+                    "MoE shared Jetty rank size must be in [2, ", Mc2Kernel::MOE_SHARED_JETTY_MAX_RANK_SIZE, "], got ",
+                    rankSize_);
         TORCH_CHECK(context_.epRankId < rankSize_, "Invalid shared Jetty rank ID: ", context_.epRankId);
         context_.epRankSize = rankSize_;
-        context_.sharedJettyNum = SHARED_JETTY_NUM;
+        context_.sharedJettyNum = Mc2Kernel::MOE_SHARED_JETTY_NUM;
     }
 
     static bool IsSameEndpoint(const EndpointDesc& lhs, const EndpointDesc& rhs)
@@ -667,11 +665,14 @@ private:
         }
         std::sort(localLayers.begin(), localLayers.end());
         localLayers.erase(std::unique(localLayers.begin(), localLayers.end()), localLayers.end());
-        CheckSupportedProtocols(localLayers);
 
         // Use rank 0's ordered layer IDs as the common schedule. A layer absent on rank 0 cannot serve all ranks.
         const auto counts = AllGatherMetadata(std::vector<uint64_t>{localLayers.size()});
         const uint64_t rootCount = counts[GLOBAL_LANE_ROOT_RANK];
+        if (rootCount == 0) {
+            // All ranks agree that no root layer can provide a shared UBC endpoint.
+            CheckSupportedProtocols(localLayers);
+        }
         TORCH_CHECK(rootCount > 0 && rootCount <= std::numeric_limits<size_t>::max(),
                     "No usable network layer list on shared Jetty root rank");
         std::vector<uint32_t> rootLayers(static_cast<size_t>(rootCount), 0U);
@@ -687,6 +688,8 @@ private:
                 return;
             }
         }
+        // UBC selection failed collectively. Only now diagnose unsupported UBG alternatives.
+        CheckSupportedProtocols(localLayers);
         TORCH_CHECK(false, "No UBC layer has a shared Jetty endpoint that covers all peers");
     }
 
@@ -805,6 +808,7 @@ private:
             ++counts[empty];
         }
 
+        // Dispatch and Combine both use all shared Jettys and the same weighted lane allocation.
         std::vector<uint32_t> schedule;
         schedule.reserve(context_.sharedJettyNum);
         for (uint32_t group = 0; group < groupNum; ++group) {
@@ -822,8 +826,8 @@ private:
         SelectSharedLayer();
         RegisterDeviceBuffer(contextTag, bufferTag);
         // BW_COEFF is the physical-port count behind the Endpoint on current HCOMM implementations. All ranks use
-        // the same global coefficient and largest-remainder schedule, so a 2:6 topology receives exactly 8:24 of
-        // the 32 Jettys instead of making an independent local choice.
+        // the same global coefficients and schedule. A 2:6 topology receives 16:48 of all 64 Jettys
+        // for both Dispatch and Combine instead of making an independent local choice.
         const auto jettyGroups = BuildJettyGroupSchedule();
         std::vector<ChannelHandle> channels;
         for (uint32_t jetty = 0; jetty < context_.sharedJettyNum; ++jetty) {
@@ -886,11 +890,11 @@ public:
         // Reject them because the HCCL C API would stop at the first NUL and use a truncated group name.
         TORCH_CHECK(groupName.find('\0') == std::string::npos, "HCCL group name must not contain embedded NULs");
         const std::string contextTag = groupName + "_moe_dispatch_combine_shared_jetty_v2_j" +
-                                       std::to_string(SHARED_JETTY_NUM) + "_sq" +
+                                       std::to_string(Mc2Kernel::MOE_SHARED_JETTY_NUM) + "_sq" +
                                        std::to_string(Mc2Kernel::MOE_SHARED_JETTY_SQ_DEPTH) + "_cq" +
                                        std::to_string(Mc2Kernel::MOE_SHARED_JETTY_CQ_DEPTH);
         const std::string bufferTag = contextTag + "_buffer";
-        const std::string lastQueueTag = contextTag + "_jetty_" + std::to_string(SHARED_JETTY_NUM - 1);
+        const std::string lastQueueTag = contextTag + "_jetty_" + std::to_string(Mc2Kernel::MOE_SHARED_JETTY_NUM - 1);
         TORCH_CHECK(lastQueueTag.size() <= SHARED_JETTY_MAX_TAG_SIZE && bufferTag.size() <= SHARED_JETTY_MAX_TAG_SIZE,
                     "Shared Jetty resource tag is too long");
         TORCH_CHECK(requiredBufferSize > 0 && requiredBufferSize % BUFFER_ALIGNMENT == 0,
@@ -900,8 +904,6 @@ public:
         TORCH_CHECK(comm_ != nullptr, "Null HCCL communicator");
         context_ = {};
         GetRankInfo();
-        TORCH_CHECK(context_.epRankSize >= MOE_SHARED_JETTY_MIN_RANK_SIZE, "shared Jetty requires at least ",
-                    MOE_SHARED_JETTY_MIN_RANK_SIZE, " ranks, but HCCL communicator has ", context_.epRankSize);
         requiredBufferSize_ = requiredBufferSize;
         void* ctx = GetOrCreateContext(contextTag, bufferTag);
         const int64_t elements = sizeof(context_) / sizeof(int32_t);

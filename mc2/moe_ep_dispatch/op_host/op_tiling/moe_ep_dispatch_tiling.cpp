@@ -29,7 +29,6 @@
 #include "tiling/tiling_api.h"
 #include "../../op_kernel/moe_ep_dispatch_tiling.h"
 #include "../../op_kernel/moe_ep_dispatch_tiling_key.h"
-#include "../../op_kernel/moe_ep_dispatch_schedule.h"
 #include "../../../common/op_kernel/moe_shared_jetty_context.h"
 #include "../../../common/op_api/moe_ep_comm_alg.h"
 
@@ -854,7 +853,7 @@ static ge::graphStatus CheckCommAttr(const gert::TilingContext* context, const c
     info.hybrid.rankNumPerServer = topology.rankNumPerServer;
     info.hybrid.serverNum = topology.serverNum;
     info.networkMode = topology.networkMode;
-    commAlg = Mc2Aclnn::ParseMoeEpCommAlg(commAlgPtr, epWorldSize);
+    commAlg = Mc2Aclnn::ParseMoeEpCommAlg(commAlgPtr);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -994,29 +993,29 @@ static void SetSendEntryLayout(MoeEpDispatchInfo& info)
 
 static uint64_t BuildClosOnlyDispatchWorkspaceLayout(MoeEpDispatchInfo& info)
 {
-    uint64_t peers = info.cfg.epWorldSize;
-    uint64_t experts = info.cfg.numExperts;
-    uint64_t cores = info.aivNum;
-    uint64_t tokens = info.cfg.numTokens;
     auto& workspace = info.workspace;
-    workspace.tileTokens =
-        MoeEpDispatchSchedule::TileTokens(info.cfg.numTokens, info.aivNum, info.cfg.topK, info.metaSlotBytes);
-    workspace.tileCount = MoeEpDispatchSchedule::TileCount(info.cfg.numTokens, workspace.tileTokens);
-    uint64_t rankStride = AlignUpWin(peers * sizeof(int32_t));
-    uint64_t expertStride = AlignUpWin(experts * sizeof(int32_t));
-    workspace.sendCntOffset = workspace.tileCount * rankStride;
-    workspace.tilePrefixOffset = workspace.sendCntOffset + rankStride + expertStride;
-    workspace.expertPartialOffset = workspace.tilePrefixOffset + (workspace.tileCount + 1ULL) * rankStride;
-    workspace.tileReadyOffset = workspace.expertPartialOffset + cores * expertStride;
-    workspace.dstRankInfoOffset = workspace.tileReadyOffset + AlignUpWin(workspace.tileCount * uint64_t{UB_ALIGN});
-    uint64_t rankInfoBytes = AlignUpWin(tokens * info.cfg.topK * sizeof(int16_t));
-    workspace.srcTokenTableOffset = workspace.dstRankInfoOffset + rankInfoBytes;
-    workspace.srcTokenListBytes = AlignUpWin(tokens * sizeof(int32_t));
+    workspace.tileTokens = 0U;
+    workspace.tileCount = 0U;
+    workspace.tilePrefixOffset = 0UL;
+    workspace.expertPartialOffset = 0UL;
+    workspace.srcTokenTableOffset = 0UL;
+    workspace.srcTokenListBytes = 0UL;
     workspace.sendEntryTokenRangeBytes = 0UL;
     workspace.routeWorkspaceOffset = 0UL;
     workspace.scaleoutSendEntryOffset = 0UL;
     workspace.scaleupSendEntryOffset = 0UL;
-    return SYSTEM_NEED_WORKSPACE + workspace.srcTokenTableOffset + peers * workspace.srcTokenListBytes + UB_ALIGN;
+    workspace.sendCntOffset = 0UL;
+    workspace.dstRankInfoOffset = 0UL;
+    if (info.isCached) {
+        return SYSTEM_NEED_WORKSPACE + UB_ALIGN;
+    }
+    // Match the original direct preparation; the output holds [sendCount, srcTokenId...].
+    uint64_t rankStride = AlignUpWin(static_cast<uint64_t>(info.cfg.epWorldSize) * sizeof(int32_t));
+    uint64_t expertStride = AlignUpWin(static_cast<uint64_t>(info.cfg.numExperts) * sizeof(int32_t));
+    workspace.sendCntOffset = static_cast<uint64_t>(info.aivNum) * rankStride;
+    workspace.dstRankInfoOffset = workspace.sendCntOffset + rankStride + expertStride;
+    uint64_t rankInfoBytes = AlignUpWin(static_cast<uint64_t>(info.cfg.numTokens) * info.cfg.topK * sizeof(int16_t));
+    return SYSTEM_NEED_WORKSPACE + workspace.dstRankInfoOffset + rankInfoBytes + UB_ALIGN;
 }
 
 static uint64_t BuildAutoDispatchWorkspaceLayout(MoeEpDispatchInfo& info)
@@ -1026,7 +1025,6 @@ static uint64_t BuildAutoDispatchWorkspaceLayout(MoeEpDispatchInfo& info)
     info.workspace.sendCntOffset = 0UL;
     info.workspace.tilePrefixOffset = 0UL;
     info.workspace.expertPartialOffset = 0UL;
-    info.workspace.tileReadyOffset = 0UL;
     info.workspace.srcTokenListBytes = 0UL;
     info.workspace.srcTokenTableOffset = 0UL;
     uint64_t epWorldSize = static_cast<uint64_t>(info.cfg.epWorldSize);
@@ -1172,12 +1170,6 @@ static ge::graphStatus SetPlatformAndNetworkInfo(gert::TilingContext* context, M
     if (commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY) {
         OP_TILING_CHECK(info.networkMode != NETWORK_DIRECT,
                         OP_LOGE(nodeName, "Internal error: clos_only dispatch only supports direct topology."),
-                        return ge::GRAPH_FAILED);
-        OP_TILING_CHECK(aivNum <= Mc2Kernel::MOE_SHARED_JETTY_NUM,
-                        OP_LOGE(nodeName,
-                                "clos_only dispatch requires %u sender AIVs and at least one prepare AIV, "
-                                "but got %u AIVs.",
-                                Mc2Kernel::MOE_SHARED_JETTY_NUM, aivNum),
                         return ge::GRAPH_FAILED);
     }
     OP_TILING_CHECK(aivNum == 0U, OP_LOGE(nodeName, "Platform reports aiv_num=0."), return ge::GRAPH_FAILED);

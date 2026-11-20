@@ -58,7 +58,7 @@ ge::graphStatus CalcMoeEpWindowLayout(const MoeEpWindowLayoutParams& params, Moe
     const uint64_t expertCountSize = epWorldSize * AlignMoeEpWin(params.localExpertNum * sizeof(int32_t));
 
     if (params.commAlg == Mc2Tiling::MOE_EP_COMM_ALG_SHARED_JETTY) {
-        layout.dispatchNotifyCount = static_cast<uint32_t>(MOE_EP_DISPATCH_NOTIFY_COUNT);
+        layout.dispatchNotifyCount = static_cast<uint32_t>(MOE_EP_JETTY_COUNT);
     } else {
         uint64_t notifySlots = MOE_EP_FULLMESH_CHANNEL_BUDGET / (epWorldSize - 1UL);
         if (notifySlots > MOE_EP_FULLMESH_DISPATCH_NOTIFY_COUNT) {

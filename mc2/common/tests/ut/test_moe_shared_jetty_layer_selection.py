@@ -107,7 +107,8 @@ HcclResult HcclRankGraphGetLinksFunc(int, uint32_t layer, uint32_t src, uint32_t
     values.clear();
     const bool missing = src == 1 && dst == 2 &&
         ((scenario == "missing_link" && layer == 0) || scenario == "all_missing");
-    if (!missing) {
+    // The UBG fallback scenario must have no usable UBC path.
+    if (!missing && scenario != "ubg") {
         auto remote = endpoint(layer, dst);
         if (scenario == "reciprocal_mismatch" && layer == 0 && src == 1 && dst == 2)
             remote.commAddr.raws[2] = 1;

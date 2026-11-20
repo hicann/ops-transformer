@@ -1156,9 +1156,7 @@ private:
 
 class MoeContextBuilder : public HcclContextBuilderBase {
 public:
-    explicit MoeContextBuilder(bool closOnly = false)
-        : closOnly_(closOnly)
-    {}
+    MoeContextBuilder() = default;
     ~MoeContextBuilder()
     {
         // RAII: Build 完整成功(所有权已转移)之外的任意异常路径，回滚已申请的物理内存，防泄露
@@ -1178,18 +1176,9 @@ public:
         AcquireHcclHandle(groupName, hcclComm);
 
         CommProtocol protocol = CommProtocol::COMM_PROTOCOL_UB_CTP;
-        if (closOnly_) {
-            uint32_t rankId = 0;
-            GetRankInfo(hcclComm, rankId, rankNumPerServer_);
-            TORCH_CHECK(rankNumPerServer_ >= HCCL_MIN_RANK_SIZE && rankNumPerServer_ < MOE_SHARED_JETTY_MIN_RANK_SIZE,
-                        "Legacy Clos-only context requires rank size in [", HCCL_MIN_RANK_SIZE, ", ",
-                        MOE_SHARED_JETTY_MIN_RANK_SIZE, "), got ", rankNumPerServer_);
-            SelectClosOnlyLinks(hcclComm, rankId, rankNumPerServer_);
-        } else {
-            GetCommProtocol(hcclComm, protocol);
-            rankNumPerServer_ = rankNumPerUbDomain_;
-            CheckIsMixLayered(hcclComm);
-        }
+        GetCommProtocol(hcclComm, protocol);
+        rankNumPerServer_ = rankNumPerUbDomain_;
+        CheckIsMixLayered(hcclComm);
 
         // 所需实际总字节数需要大于0，且2MB对齐
         TORCH_CHECK(customCclBufferSize > 0, "ccl buffer size must be greater than 0, got ", customCclBufferSize);
@@ -1200,9 +1189,7 @@ public:
         MoeCommContext context;
         TORCH_CHECK(rankNumPerServer_ > 0, "rank_num_per_server must be positive after resolving MoE topology");
         context.rankSizePerServer = rankNumPerServer_;
-        // Port policies must not reuse one another's cached channels or registered buffers.
-        const std::string opName =
-            closOnly_ ? "moe_dispatch_combine_clos_only_legacy_v1" : "moe_dispatch_combine_multi_channel";
+        const std::string opName = "moe_dispatch_combine_multi_channel";
 
         void* ctx = nullptr;
         BuildContext(hcclComm, groupName, opName, protocol, context, ctx);
@@ -1410,46 +1397,6 @@ private:
         return false;
     }
 
-    void SelectClosOnlyLinks(const HcclComm& commHandle, uint32_t srcRankId, uint32_t rankSize)
-    {
-        uint32_t* layerList = nullptr;
-        uint32_t layerNum = 0;
-        GetNetLayers(commHandle, layerList, layerNum);
-        TORCH_CHECK(layerNum > 0 && layerList != nullptr, "No network layers for legacy Clos-only context");
-        const std::vector<uint32_t> layerIds(layerList, layerList + layerNum);
-        for (uint32_t layer : layerIds) {
-            const auto peers = GetLayerRanks(commHandle, layer).ranks;
-            for (uint32_t peer : peers) {
-                if (peer == srcRankId) {
-                    continue;
-                }
-                TORCH_CHECK(!SupportsProtocol(commHandle, layer, srcRankId, peer, CommProtocol::COMM_PROTOCOL_UB_RTP),
-                            "comm_alg='clos_only' does not support UBG (UB_RTP) links; rank=", srcRankId,
-                            ", peer=", peer, ", layer=", layer);
-            }
-        }
-        std::vector<uint32_t> customLayers;
-        for (uint32_t layer : layerIds) {
-            CommTopo topoType = COMM_TOPO_RESERVED;
-            auto ret = HcclRankGraphGetTopoTypeByLayerFunc(commHandle, layer, &topoType);
-            TORCH_CHECK(ret == HCCL_SUCCESS, "Get Clos-only topology type failed, ret: ", ret);
-            if (topoType == COMM_TOPO_CUSTOM) {
-                customLayers.push_back(layer);
-            } else if (topoType == COMM_TOPO_CLOS && CoversAllRanks(GetLayerRanks(commHandle, layer).ranks, rankSize) &&
-                       CollectMixLinks(commHandle, layer, srcRankId, rankSize, nullptr, closLinksByRank_)) {
-                ASCEND_LOGI("[ClosOnly] rank %u selects Clos layer %u for legacy channels", srcRankId, layer);
-                return;
-            }
-        }
-        for (uint32_t layer : customLayers) {
-            if (FindCustomMixInstance(commHandle, layer, COMM_TOPO_CLOS, srcRankId, rankSize, closLinksByRank_)) {
-                return;
-            }
-        }
-        TORCH_CHECK(false, "No Clos topology covers all peers for legacy Clos-only context; ",
-                    "FullMesh fallback is disabled");
-    }
-
     void SelectExplicitMixLayers(const HcclComm& commHandle, const std::vector<uint32_t>& layerIds, uint32_t srcRankId,
                                  uint32_t rankSize, std::vector<uint32_t>& customLayers,
                                  std::array<bool, MIX_LAYERED>& found)
@@ -1642,22 +1589,19 @@ private:
                 continue;
             }
             uint32_t peerIndex = (peer > srcRankId) ? (peer - 1) : peer;
-            RankLinkInfo linkInfo = closOnly_ ? RankLinkInfo{} : ResolveLinkInfo(peer, protocol, netLayerList);
+            RankLinkInfo linkInfo = ResolveLinkInfo(peer, protocol, netLayerList);
             CommLink* links = nullptr;
-            if (closOnly_) {
-                links = &closLinksByRank_[peer];
-            } else if (!mixLayeredInfo_.isUseMixLayered) {
+            if (!mixLayeredInfo_.isUseMixLayered) {
                 GetHcclCommLink(commHandle, linkInfo.layer, srcRankId, peer, linkInfo.protocol, links);
             }
             for (uint32_t channel = 0; channel < channelsPerRank; ++channel) {
                 // Handles are compact by remote rank because the local rank does not need an HCOMM channel.
-                if (!closOnly_ && mixLayeredInfo_.isUseMixLayered) {
+                if (mixLayeredInfo_.isUseMixLayered) {
                     links = &mixLayeredInfo_.linksByRank[channel % MIX_LAYERED][peer];
                 }
                 uint32_t channelId = peerIndex * channelsPerRank + channel;
-                channelDesc[channelId].channelProtocol = closOnly_ || mixLayeredInfo_.isUseMixLayered ?
-                                                             CommProtocol::COMM_PROTOCOL_UB_CTP :
-                                                             linkInfo.protocol;
+                channelDesc[channelId].channelProtocol =
+                    mixLayeredInfo_.isUseMixLayered ? CommProtocol::COMM_PROTOCOL_UB_CTP : linkInfo.protocol;
                 channelDesc[channelId].remoteRank = peer;
                 channelDesc[channelId].notifyNum = MOE_CHANNEL_NOTIFY_NUM;
                 channelDesc[channelId].localEndpoint = links->srcEndpointDesc;
@@ -1843,8 +1787,6 @@ private:
         TORCH_CHECK(hcclRet == HCCL_SUCCESS, "Get HCCL rank size per server failed, ret: ", hcclRet);
     }
 
-    const bool closOnly_;
-    std::vector<CommLink> closLinksByRank_;
     MixLayeredInfo mixLayeredInfo_;
     uint32_t rankNumPerServer_ = 2;
     int64_t cclBufferSize_ = 0;
@@ -2092,14 +2034,13 @@ void ElasticBuffer::EnsureMoeContext(int64_t cclBufferSize, int64_t epWorldSize)
                     ", allocated ", moeCclBufferSize_, "; use a new communication group");
         return;
     }
-    const bool closOnly = moeCommAlg_ == MOE_COMM_ALG_CLOS_ONLY;
-    TORCH_CHECK(!closOnly || epWorldSize >= MOE_CLOS_ONLY_MIN_RANK_SIZE, "clos_only requires at least ",
-                MOE_CLOS_ONLY_MIN_RANK_SIZE, " ranks, but got ", epWorldSize);
-    if (closOnly && epWorldSize >= MOE_SHARED_JETTY_MIN_RANK_SIZE) {
+    TORCH_CHECK(epWorldSize >= HCCL_MIN_RANK_SIZE, "MoE requires at least ", HCCL_MIN_RANK_SIZE, " ranks, but got ",
+                epWorldSize);
+    if (moeCommAlg_ == MOE_COMM_ALG_CLOS_ONLY) {
         moeContextTensor_ = BuildMoeSharedJettyContext(*groupName_, static_cast<uint64_t>(cclBufferSize));
         moeCclBufferSize_ = cclBufferSize;
     } else {
-        MoeContextBuilder builder(closOnly);
+        MoeContextBuilder builder;
         MoeContextResources resources = builder.Build(*groupName_, cclBufferSize);
         moeContextTensor_ = resources.contextTensor;
         moeCclBufferSize_ = resources.cclBufferSize;
