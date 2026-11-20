@@ -48,4 +48,4 @@ English | [简体中文](./README.md)
 
 | Calling Method | Calling Sample | Description |
 |----------------|----------------|------------------------------------------------------|
-| aclnn call | [test_aclnn_nsa_compress_grad](./examples/test_aclnn_nsa_compress_grad.cpp) | Non-TND scenario: the NsaCompressGrad operator is called through the [aclnnNsaCompressGrad](docs/aclnnNsaCompressGrad_en.md) API. |
+| aclnn call | [test_aclnn_nsa_compress_grad](./examples/test_aclnn_nsa_compress_grad.cpp) | TND scenario: the NsaCompressGrad operator is called through the [aclnnNsaCompressGrad](docs/aclnnNsaCompressGrad_en.md) API. |

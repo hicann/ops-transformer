@@ -65,4 +65,4 @@
 
 | 调用方式           | 调用样例                                                                                    | 说明                                                                                                  |
 |----------------|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| aclnn调用 | [test_aclnn_nsa_selected_attention](./examples/test_aclnn_nsa_selected_attention.cpp) | 非TND场景，通过[aclnnNsaSelectedAttention](./docs/aclnnNsaSelectedAttention.md)接口方式调用NsaSelectedAttention算子。             |
+| aclnn调用 | [test_aclnn_nsa_selected_attention](./examples/test_aclnn_nsa_selected_attention.cpp) | TND场景，通过[aclnnNsaSelectedAttention](./docs/aclnnNsaSelectedAttention.md)接口方式调用NsaSelectedAttention算子。             |

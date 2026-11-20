@@ -81,4 +81,4 @@ English | [简体中文](./README.md)
 
 | Calling Method           | Calling Sample                                                                                    | Description                                                                                                 |
 |----------------|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| aclnn call | [test_aclnn_nsa_selected_attention_grad](./examples/test_aclnn_nsa_selected_attention_grad.cpp) | In non-TND scenarios, calls the NsaSelectedAttentionGrad operator through the [aclnnNsaSelectedAttentionGrad](docs/aclnnNsaSelectedAttentionGrad_en.md) API.             |
+| aclnn call | [test_aclnn_nsa_selected_attention_grad](./examples/test_aclnn_nsa_selected_attention_grad.cpp) | In TND scenarios, calls the NsaSelectedAttentionGrad operator through the [aclnnNsaSelectedAttentionGrad](docs/aclnnNsaSelectedAttentionGrad_en.md) API.             |

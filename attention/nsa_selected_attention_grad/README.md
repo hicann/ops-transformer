@@ -79,4 +79,4 @@
 
 | 调用方式           | 调用样例                                                                                    | 说明                                                                                                 |
 |----------------|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| aclnn调用 | [test_aclnn_nsa_selected_attention_grad](./examples/test_aclnn_nsa_selected_attention_grad.cpp) | 非TND场景，通过[aclnnNsaSelectedAttentionGrad](./docs/aclnnNsaSelectedAttentionGrad.md)接口方式调用NsaSelectedAttentionGrad算子。             |
+| aclnn调用 | [test_aclnn_nsa_selected_attention_grad](./examples/test_aclnn_nsa_selected_attention_grad.cpp) | TND场景，通过[aclnnNsaSelectedAttentionGrad](./docs/aclnnNsaSelectedAttentionGrad.md)接口方式调用NsaSelectedAttentionGrad算子。             |

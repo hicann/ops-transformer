@@ -67,4 +67,4 @@ English | [简体中文](./README.md)
 
 | Calling Method           | Calling Sample                                                                                    | Description                                                                                                  |
 |----------------|-----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| aclnn call | [test_aclnn_nsa_selected_attention](./examples/test_aclnn_nsa_selected_attention.cpp) | In non-TND scenarios, calls the NsaSelectedAttention operator through the [aclnnNsaSelectedAttention](docs/aclnnNsaSelectedAttention_en.md) API.             |
+| aclnn call | [test_aclnn_nsa_selected_attention](./examples/test_aclnn_nsa_selected_attention.cpp) | In TND scenarios, calls the NsaSelectedAttention operator through the [aclnnNsaSelectedAttention](docs/aclnnNsaSelectedAttention_en.md) API.             |

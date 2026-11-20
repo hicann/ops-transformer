@@ -46,4 +46,4 @@
 
 | 调用方式        | 调用样例        | 说明                                                 |
 |----------------|----------------|------------------------------------------------------|
-| aclnn调用 | [test_aclnn_nsa_compress_grad](./examples/test_aclnn_nsa_compress_grad.cpp) | 非TND场景，通过[aclnnNsaCompressGrad](./docs/aclnnNsaCompressGrad.md)接口方式调用NsaCompressGrad算子。|
+| aclnn调用 | [test_aclnn_nsa_compress_grad](./examples/test_aclnn_nsa_compress_grad.cpp) | TND场景，通过[aclnnNsaCompressGrad](./docs/aclnnNsaCompressGrad.md)接口方式调用NsaCompressGrad算子。|
