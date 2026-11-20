@@ -36,11 +36,11 @@ __aicore__ inline void ExecMoeDistributeDispatchV2A6(GM_ADDR x, GM_ADDR expertId
     int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();
 
     MoeDistributeDispatchV2A6<DISPATCH_V2_A6_TEMPLATE_ARGS> op;
-    GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchV2TilingData, tilingData, tilingGM);
+    GET_TILING_DATA_MEMBER(MoeDistributeDispatchV2TilingData, moeDistributeDispatchV2Info, tilingInfo, tilingGM);
     GM_ADDR commContext = (GM_ADDR)AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
     op.Init(commContext, x, expertIds, scales, xActiveMask, expertScales, elasticInfo, performanceInfo, expandXOut,
             dynamicScalesOut, assistInfoOut, expandScalesOut, expertTokenNumsOut, epSendCountsOut, workspaceGM, pipePtr,
-            &tilingData);
+            &tilingInfo);
     op.Process();
 
     AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(oriOverflowMode);
