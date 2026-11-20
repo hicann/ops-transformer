@@ -90,7 +90,7 @@ cann_ops_transformer.ops.quant_all_reduce(
 
 ### quant_all_reduce
 
-- output（Tensor）：表示最终通信结果，数据类型支持float16、bfloat16、float32，shape为(b*s/world_size, h)，数据格式支持ND。
+- output（Tensor）：表示最终通信结果，数据类型支持float16、bfloat16、float32，shape与输入x相同：当x为二维(bs, h)时，output为(bs, h)；当x为三维(b, s, h)时，output为(b, s, h)，数据格式支持ND。
 
 ## 约束说明
 
