@@ -257,17 +257,17 @@ cann_ops_transformer.sparse_flash_mla_grad(
 
 ### sparse_flash_mla_grad
 
-- **dq**（`Tensor`）：对应公式中的$dQ$，支持非连续，数据格式支持ND，数据类型、shape与输入q保持一致。
+- **dq**（`Tensor`）：对应公式中的$dQ$，不支持非连续，数据格式支持ND，数据类型、shape与输入q保持一致。
 
-- **dori_kv**（`Tensor`）：可选输出，表示输入ori_kv的梯度，支持非连续，数据格式支持ND，数据类型、shape与输入ori_kv保持一致。
+- **dori_kv**（`Tensor`）：可选输出，表示输入ori_kv的梯度，不支持非连续，数据格式支持ND，数据类型、shape与输入ori_kv保持一致。
 
-- **dcmp_kv**（`Tensor`）：可选输出，表示输入cmp_kv的梯度，支持非连续，数据格式支持ND，数据类型、shape与输入cmp_kv保持一致；当cmp_kv为None时，dcmp_kv也为None。
+- **dcmp_kv**（`Tensor`）：可选输出，表示输入cmp_kv的梯度，不支持非连续，数据格式支持ND，数据类型、shape与输入cmp_kv保持一致；当cmp_kv为None时，dcmp_kv也为None。
 
-- **dsinks**（`Tensor`）：可选输出，表示输入sinks的梯度，支持非连续，数据格式支持ND，数据类型支持`float32`，shape与输入sinks保持一致。
+- **dsinks**（`Tensor`）：可选输出，表示输入sinks的梯度，不支持非连续，数据格式支持ND，数据类型支持`float32`，shape与输入sinks保持一致。
 
-- **ori_softmax_l1norm**（`Tensor`）：可选输出，表示q与ori_kv计算得出的softmax的L1Norm结果，公式为reduceG(softmax)/G；数据类型为`float32`。`layout_q`为BSND时shape为`[B,S1,N2,K1]`，当`layout_q`为TND时shape为`[T1,N2,K1]`。当ori_sparse_indices不为None且不是 Atlas A2/A3 的 ori sparse 路径时该输出不为空。Atlas A2/A3 ori sparse 不产出该输出，需传 None。其他场景下输出为None。
+- **ori_softmax_l1norm**（`Tensor`）：可选输出，表示q与ori_kv计算得出的softmax的L1Norm结果，公式为reduceG(softmax)/G；不支持非连续，数据格式支持ND，数据类型为`float32`。`layout_q`为BSND时shape为`[B,S1,N2,K1]`，当`layout_q`为TND时shape为`[T1,N2,K1]`。当ori_sparse_indices不为None且不是 Atlas A2/A3 的 ori sparse 路径时该输出不为空。Atlas A2/A3 ori sparse 不产出该输出，需传 None。其他场景下输出为None。
 
-- **cmp_softmax_l1norm**（`Tensor`）：可选输出，表示q与cmp_kv计算得出的softmax的L1Norm结果，公式为reduceG(softmax)/G；当cmp_sparse_indices不为None时该输出不为空，其他场景下输出为None。
+- **cmp_softmax_l1norm**（`Tensor`）：可选输出，表示q与cmp_kv计算得出的softmax的L1Norm结果，公式为reduceG(softmax)/G；不支持非连续，数据格式支持ND。当cmp_sparse_indices不为None时该输出不为空，其他场景下输出为None。
 
 ### sparse_flash_mla_grad_metadata
 
@@ -279,6 +279,7 @@ cann_ops_transformer.sparse_flash_mla_grad(
 
 - 该接口支持训练场景下使用。
 - 该接口支持单算子模式和aclgraph模式。
+- 本接口不支持非连续输出。
 - 参数q、dout、attn_out、ori_kv、cmp_kv的数据类型必须保持一致。
 - 入参为空的场景处理：q为空Tensor时直接返回。
 - 各个场景关于cmp_kv、cmp_sparse_indices的使用说明如下：

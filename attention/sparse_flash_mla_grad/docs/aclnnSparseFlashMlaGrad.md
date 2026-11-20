@@ -552,7 +552,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
             <td>ND</td>
             <td>(B,S1,N1,D)、(T1,N1,D)<br>
             </td>
-            <td>√</td>
+            <td>×</td>
         </tr>
         <tr>
             <td>dOriKvOutOptional（aclTensor*）</td>
@@ -565,7 +565,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
             <td>ND</td>
             <td>(B,S2,N2,D)、(T2,N2,D)<br>
             </td>
-            <td>√</td>
+            <td>×</td>
         </tr>
         <tr>
             <td>dCmpKvOptional（aclTensor*）</td>
@@ -578,7 +578,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
             <td>ND</td>
             <td>(B,S3,N2,D)、(T3,N2,D)<br>
             </td>
-            <td>√</td>
+            <td>×</td>
         </tr>
         <tr>
             <td>dSinksOutOptional（aclTensor*）</td>
@@ -591,7 +591,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
             <td>ND</td>
             <td>(N1)<br>
             </td>
-            <td>√</td>
+            <td>×</td>
         </tr>
         <tr>
             <td>oriSoftmaxL1NormOptional（aclTensor*）</td>
@@ -604,7 +604,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
             <td>ND</td>
             <td>(B,S1,N2,K1)、(T1,N2,K1)<br>
             </td>
-            <td>√</td>
+            <td>×</td>
         </tr>
         <tr>
             <td>cmpSoftmaxL1NormOptional（aclTensor*）</td>
@@ -617,7 +617,7 @@ aclnnStatus aclnnSparseFlashMlaGrad(
             <td>ND</td>
             <td>(B,S1,N2,K2)、(T1,N2,K2)<br>
             </td>
-            <td>√</td>
+            <td>×</td>
         </tr>
         </tbody>
     </table>

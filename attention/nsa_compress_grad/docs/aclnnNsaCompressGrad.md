@@ -6,7 +6,7 @@
 - <term>Ascend 950PR&950DT系列产品</term>：不支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
-- <term>Atlas A3系列产品</term>：不支持
+- <term>Atlas A3系列产品</term>：支持
 <!-- end id2 -->
 <!-- npu="910b" id3 -->
 - <term>Atlas A2系列产品</term>：支持
@@ -26,15 +26,18 @@
 - 算子功能：aclnnNsaCompress算子的反向计算。
 
 - 计算公式：
-  选择注意力的正向计算公式如下：
+
+  设 \(a_b\) 为 batch \(b\) 在 input 上的起点，\(o_b\) 为该 batch 在 outputGrad 上的起点，\(s\) 为 compressStride，\(L\) 为 compressBlockSize。\(i\) 只遍历该 batch 的完整窗口。
 
     $$
-    \text{dw} = \text{dk\_cmp} \cdot K^\top
+    \text{weightGrad}[r,n] = \sum_{b,i,d} \text{outputGrad}[o_b+i,n,d] \cdot \text{input}[a_b+i\cdot s+r,n,d], \quad 0 \le r < L
     $$
 
     $$
-    \text{dk} = W^\top \cdot \text{dk\_cmp}
+    \text{inputGrad}[a_b+t,n,d] = \sum_{i} \text{outputGrad}[o_b+i,n,d] \cdot \text{weight}[t-i\cdot s,n]
     $$
+
+  inputGrad 只对满足 \(0 \le t-i\cdot s < L\) 的完整窗口求和。权重梯度沿特征维求和后，再跨 batch 和窗口累加。
 
 ## 函数原型
 
@@ -96,7 +99,13 @@ aclnnStatus aclnnNsaCompressGrad(
         <td>outputGrad</td>
         <td>输入</td>
         <td>正向算子输出的反向梯度。</td>
-        <td>-</td>
+        <td>
+          <ul>
+            <li>shape为[T_compressed, N, D]。T_compressed为各batch完整压缩窗数之和：Σ_b max(0, floor((S_b - compressBlockSize) / compressStride) + 1)。</li>
+            <li>S_b为第b个batch的序列长度。actSeqLenType=0时，首个序列取actSeqLenOptionalOptional[0]，后续序列取相邻累计边界之差；actSeqLenType=1时，S_b取对应元素本身。</li>
+            <li>例如actSeqLenOptionalOptional=[0, 128, 272]、compressBlockSize=32、compressStride=16时，T=272，T_compressed=15，outputGrad shape=[15, N, D]，与input首维不相等。</li>
+          </ul>
+        </td>
         <td>BFLOAT16、FLOAT16</td>
         <td>ND</td>
         <td>3</td>
@@ -106,7 +115,7 @@ aclnnStatus aclnnNsaCompressGrad(
         <td>input</td>
         <td>输入</td>
         <td>待压缩张量。</td>
-        <td>-</td>
+        <td>shape为[T, N, D]，T为各batch序列长度之和，与T_compressed不一定相等。</td>
         <td>BFLOAT16、FLOAT16</td>
         <td>ND</td>
         <td>3</td>
@@ -175,7 +184,7 @@ aclnnStatus aclnnNsaCompressGrad(
       <tr>
         <td>inputGradOut</td>
         <td>输出</td>
-        <td>input的梯度，与input shape一致。</td>
+        <td>input的梯度，shape为[T, N, D]，与input保持一致。</td>
         <td>数据类型与input一致。</td>
         <td>BFLOAT16、FLOAT16</td>
         <td>ND</td>
@@ -307,6 +316,7 @@ aclnnStatus aclnnNsaCompressGrad(
   - aclnnNsaCompressGrad默认确定性实现。
 - 本接口不支持非连续输出。
 - compressBlockSize和compressStride必须是16的整数倍，且compressBlockSize >= compressStride。
+- outputGrad与input的末维 D 必须是16的整数倍。
 
 ## 调用示例
 
@@ -467,12 +477,12 @@ int main() {
     aclTensor* inputGradOut = nullptr;
     aclTensor* weightGradOut = nullptr;
 
-    std::vector<float> inputGradOutHostData(seqLensSum * headNum * headDim, 0.0);
-    std::vector<float> weightGradOutHostData(compressBlockSize * headNum, 0.0);
+    std::vector<aclFloat16> inputGradOutHostData(seqLensSum * headNum * headDim, aclFloatToFloat16(0.0));
+    std::vector<aclFloat16> weightGradOutHostData(compressBlockSize * headNum, aclFloatToFloat16(0.0));
 
-    std::vector<float> outputGradHostData(blockNum * headNum * headDim, 1.0);
-    std::vector<float> inputKVHostData(seqLensSum * headNum * headDim, 1.0);
-    std::vector<float> weightHostData(compressBlockSize * headNum, 1.0);
+    std::vector<aclFloat16> outputGradHostData(blockNum * headNum * headDim, aclFloatToFloat16(1.0));
+    std::vector<aclFloat16> inputKVHostData(seqLensSum * headNum * headDim, aclFloatToFloat16(1.0));
+    std::vector<aclFloat16> weightHostData(compressBlockSize * headNum, aclFloatToFloat16(1.0));
     std::vector<int64_t> actSeqLenOptionalOptionalHostData = {0, 128, 272};
 
     aclIntArray *actSeqLenOptionalOptional = aclCreateIntArray(actSeqLenOptionalOptionalHostData.data(),
@@ -520,12 +530,12 @@ int main() {
 
     // 5. 获取输出的值，将device侧内存上的结果拷贝至host侧，需要根据具体API的接口定义修改
     auto size = GetShapeSize(inputGradOutShape);
-    std::vector<float> resultData(size, 0);
+    std::vector<aclFloat16> resultData(size, aclFloatToFloat16(0.0));
     ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), inputGradOutDeviceAddr,
                         size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
     for (int64_t i = 0; i < size; i++) {
-        LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
+        LOG_PRINT("result[%ld] is: %f\n", i, aclFloat16ToFloat(resultData[i]));
     }
 
     // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改

@@ -219,7 +219,7 @@
 |[aclnnNsaCompress](../../attention/nsa_compress/docs/aclnnNsaCompress.md)|训练场景下，使用NSA Compress算法减轻long-context的注意力计算，实现在KV序列维度进行压缩。|默认确定性实现|-|-|
 |[aclnnNsaCompressAttention](../../attention/nsa_compress_attention/docs/aclnnNsaCompressAttention.md)|NSA中compress attention以及select topk索引计算。|默认确定性实现|默认确定性实现|-|
 |[aclnnNsaCompressAttentionInfer](../../attention/nsa_compress_attention_infer/docs/aclnnNsaCompressAttentionInfer.md)|Native Sparse Attention推理过程中，Compress Attention的计算。|默认确定性实现|默认确定性实现|-|
-|[aclnnNsaCompressGrad](../../attention/nsa_compress_grad/docs/aclnnNsaCompressGrad.md)|[aclnnNsaCompress](../../attention/nsa_compress/docs/aclnnNsaCompress.md)算子的反向计算。|默认确定性实现|-|-|
+|[aclnnNsaCompressGrad](../../attention/nsa_compress_grad/docs/aclnnNsaCompressGrad.md)|[aclnnNsaCompress](../../attention/nsa_compress/docs/aclnnNsaCompress.md)算子的反向计算。|默认确定性实现|默认确定性实现|-|
 |[aclnnNsaCompressWithCache](../../attention/nsa_compress_with_cache/docs/aclnnNsaCompressWithCache.md)|实现Native-Sparse-Attention推理阶段的KV压缩。|默认确定性实现|默认确定性实现|-|
 |[aclnnNsaSelectedAttention](../../attention/nsa_selected_attention/docs/aclnnNsaSelectedAttention.md)|训练场景下，实现NativeSparseAttention算法中selected-attention（选择注意力）的计算。|默认确定性实现|-|-|
 |[aclnnNsaSelectedAttentionGrad](../../attention/nsa_selected_attention_grad/docs/aclnnNsaSelectedAttentionGrad.md)|根据topkIndices对key和value选取大小为selectedBlockSize的数据重排，接着进行训练场景下计算注意力的反向输出。|默认非确定性实现，支持配置开启|-|-|
