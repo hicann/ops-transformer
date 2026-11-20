@@ -327,6 +327,10 @@ private:
             nativeInput = stridedInputQueue.template DeQue<outType>();
             CastStridedInput(inLocal, nativeInput, posOffset, currentSp);
             PipeBarrier<PIPE_V>();
+            // Finish native-input reads before a later MTE2 transfer reuses the UB storage.
+            const event_t castEvent = static_cast<event_t>(pipe.FetchEventID(HardEvent::V_MTE2));
+            SetFlag<HardEvent::V_MTE2>(castEvent);
+            WaitFlag<HardEvent::V_MTE2>(castEvent);
             stridedInputQueue.template FreeTensor<outType>(nativeInput);
         }
     }
@@ -344,10 +348,9 @@ private:
             if (curLength % ALIGNED_TO_8 == 0) {
                 DataCopy(inLocalFp16[inOffset], inGm[gmOffset], curLength * hDim);
             } else {
-                uint64_t fp16Offset = static_cast<uint64_t>(posIdx) * curLength * hDim * NUM2;
-                if (fp16Offset % NUM32 == NUM16) {
-                    fp16Offset += NUM16;
-                }
+                // Align each shard's complete DMA span so padding cannot overwrite a preceding Cast source.
+                const uint64_t shardBytes = AlignUbBytes(static_cast<uint64_t>(curLength) * hDim * sizeof(outType));
+                const uint64_t fp16Offset = static_cast<uint64_t>(posIdx) * shardBytes;
                 DataCopyPad(
                     inLocalFp16[fp16Offset / NUM2], inGm[gmOffset],
                     {static_cast<uint16_t>(1), static_cast<uint32_t>(curLength * hDim * sizeof(outType)), 0, 0, 0},
@@ -564,13 +567,19 @@ private:
         } else if constexpr (std::is_same<outType, bfloat16_t>::value) { // 先转fp32，再搬运
             LocalTensor<outType> outLocal16 = outLocal.template ReinterpretCast<outType>();
             Cast(outLocal16, outLocal, RoundMode::CAST_RINT, curLength * hDim);
-            PipeBarrier<PIPE_V>();
+            // Cast writes UB on PIPE_V; wait before PIPE_MTE3 reads it.
+            const event_t castEvent = static_cast<event_t>(pipe.FetchEventID(HardEvent::V_MTE3));
+            SetFlag<HardEvent::V_MTE3>(castEvent);
+            WaitFlag<HardEvent::V_MTE3>(castEvent);
             DataCopyPad(outGm[gmStartOffset * hDim + static_cast<uint64_t>(progress) * tileLength * hDim], outLocal16,
                         {static_cast<uint16_t>(1), static_cast<uint32_t>(curLength * hDim * sizeof(outType)), 0, 0, 0});
         } else {
             LocalTensor<outType> outLocal16 = outLocal.template ReinterpretCast<outType>();
             Cast(outLocal16, outLocal, RoundMode::CAST_NONE, curLength * hDim);
-            PipeBarrier<PIPE_V>();
+            // Cast writes UB on PIPE_V; wait before PIPE_MTE3 reads it.
+            const event_t castEvent = static_cast<event_t>(pipe.FetchEventID(HardEvent::V_MTE3));
+            SetFlag<HardEvent::V_MTE3>(castEvent);
+            WaitFlag<HardEvent::V_MTE3>(castEvent);
             DataCopyPad(outGm[gmStartOffset * hDim + static_cast<uint64_t>(progress) * tileLength * hDim], outLocal16,
                         {static_cast<uint16_t>(1), static_cast<uint32_t>(curLength * hDim * sizeof(outType)), 0, 0, 0});
         }
