@@ -48,7 +48,10 @@ public:
         vector_.Init(pipe, context_.params);
         // 过滤必须在主循环读取 filteredCounts 之前完成；Pre() 末尾的 SyncAll
         // 与 AIC 侧汇聚，天然充当过滤结果的全局屏障。
-        FilterPatterns();
+        // NONE 无因果裁剪：接口要求块索引本身有效，直接消费原始前缀即可，免拷贝。
+        if (context_.tiling->maskType != 0) {
+            FilterPatterns();
+        }
         vector_.Pre(context_);
 #endif
 
@@ -186,15 +189,16 @@ private:
         params.groupCapacity = static_cast<uint32_t>(tiling->gCapacity);
         params.rowCapacityPerAiv = params.groupCapacity / AIV_PER_CUBE;
         params.dTile = static_cast<uint32_t>(tiling->dTile);
-        if (params.groupRows <= LARGE_GROUP_LIMIT) {
-            params.vectorRows = LARGE_GROUP_LIMIT / AIV_PER_CUBE;
-        } else {
-            params.vectorRows = MAX_GROUP_ROWS / AIV_PER_CUBE;
-        }
+        // 只保留本 AIV 实际持有的 padded Q 行；释放的 UB 在 G<=64 时容纳
+        // 半 tile 的 FP32 dK/dV staging。上限与原有分档保持一致兜底。
+        params.vectorRows = Min(params.rowCapacityPerAiv, MAX_GROUP_ROWS / AIV_PER_CUBE);
         params.dCache = static_cast<uint32_t>(Min(params.dTile, params.headDimAligned));
         params.queryBufferSlots = static_cast<uint32_t>(tiling->qDoSlots);
-        params.transferElements = params.groupRows <= LARGE_GROUP_LIMIT ? 4096 : 2048;
-        params.resultSlots = params.kvTileSize > 128 ? 1 : SLOT_COUNT;
+        params.transferElements = params.groupRows <= 64 ? 16384 : params.groupRows <= LARGE_GROUP_LIMIT ? 8192 : 2048;
+        // Two result slots overlap MM4/MM5 with Scatter for short D or larger sparse blocks.
+        // Long D with small blocks keeps one in-flight result to avoid Scatter pressure.
+        params.resultSlots =
+            params.kvTileSize <= 128 || params.headDimAligned <= 128 || params.blockSize >= 32 ? SLOT_COUNT : 1;
 
 #ifdef __DAV_C220_CUBE__
         params.coreIndex = GetBlockIdx();
@@ -232,8 +236,13 @@ private:
         context_.dValue.SetGlobalBuffer((__gm__ T*)dv);
         context_.sparseBlockIdx.SetGlobalBuffer((__gm__ int32_t*)indices);
         context_.sparseBlockCount.SetGlobalBuffer((__gm__ int32_t*)counts);
-        context_.filteredIndices.SetGlobalBuffer((__gm__ int32_t*)(workspace + tiling->filteredIndicesOffset));
-        context_.filteredCounts.SetGlobalBuffer((__gm__ int32_t*)(workspace + tiling->filteredCountsOffset));
+        if (tiling->maskType == 0) {
+            context_.filteredIndices.SetGlobalBuffer((__gm__ int32_t*)indices);
+            context_.filteredCounts.SetGlobalBuffer((__gm__ int32_t*)counts);
+        } else {
+            context_.filteredIndices.SetGlobalBuffer((__gm__ int32_t*)(workspace + tiling->filteredIndicesOffset));
+            context_.filteredCounts.SetGlobalBuffer((__gm__ int32_t*)(workspace + tiling->filteredCountsOffset));
+        }
         context_.cuSeqQ.SetGlobalBuffer((__gm__ int64_t*)cuQ);
         context_.cuSeqKv.SetGlobalBuffer((__gm__ int64_t*)cuK);
         context_.usedQ.SetGlobalBuffer((__gm__ int32_t*)usedQ);

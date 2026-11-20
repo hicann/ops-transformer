@@ -38,8 +38,8 @@ __aicore__ inline void ProbabilityGradRows(LocalTensor<T> score, LocalTensor<T> 
                                            uint32_t count)
 {
     // 1) score = score * scale
+    // 同 PIPE_V 内的向量指令按发射顺序完成且硬件保证依赖，无需 PipeBarrier。
     Muls(score, score, scale, validRows * width);
-    PipeBarrier<PIPE_V>();
     // 2) 逐段：score = exp(score - lse); grad = (grad - di) * score
     //
     // lse/di 每行只占 32B 块的首元素（其余 7 个为 padding 0）。向量指令的一个
@@ -47,24 +47,19 @@ __aicore__ inline void ProbabilityGradRows(LocalTensor<T> score, LocalTensor<T> 
     // 只会重复读取 src1 的首个 32B block——若该 block 是
     // [lse, 0, 0, 0, 0, 0, 0, 0]，则只有前 8 个元素减到 lse，其余元素减 0。
     // 因此先用 Brcb 把标量展开成 8 个相同值，再让 repeat 复用同一 block。
-    const BinaryRepeatParams broadcastParams{1, 1, 0, 0, 0, 0};
+    // width = ktile ∈ {64,128,256}，恒为 VEC_ROW_SEGMENT 的倍数，统一走 repeat 模式：
+    // 每行一条指令，repeat 在行内步进 8 block（64 fp32），lse/di 广播块 rep 步进 0 复用。
+    const BinaryRepeatParams broadcastParams{1, 1, 0, 8, 8, 0};
+    const BinaryRepeatParams elementwiseParams{1, 1, 1, 8, 8, 8};
+    const uint32_t repeats = width / VEC_ROW_SEGMENT;
     for (uint32_t r = 0; r < validRows; ++r) {
         Brcb(lseBrcb, lse[r * VEC_BLOCK_ELEMENTS], 1, BrcbRepeatParams(1, 1));
         Brcb(diBrcb, di[r * VEC_BLOCK_ELEMENTS], 1, BrcbRepeatParams(1, 1));
-        PipeBarrier<PIPE_V>();
-        uint32_t off = r * width;
-        for (uint32_t z = 0; z < width; z += VEC_ROW_SEGMENT) {
-            uint32_t mask = width - z < VEC_ROW_SEGMENT ? width - z : VEC_ROW_SEGMENT;
-            Sub(score[off + z], score[off + z], lseBrcb, mask, 1, broadcastParams);
-            PipeBarrier<PIPE_V>();
-            Exp(score[off + z], score[off + z], mask, 1, {1, 1, 0, 0});
-            PipeBarrier<PIPE_V>();
-            Sub(grad[off + z], grad[off + z], diBrcb, mask, 1, broadcastParams);
-            PipeBarrier<PIPE_V>();
-            // 逐元素相乘，src1 必须按元素步进（不能复用 src1BlkStride=0 的广播语义）。
-            Mul(grad[off + z], grad[off + z], score[off + z], mask);
-            PipeBarrier<PIPE_V>();
-        }
+        const uint32_t offset = r * width;
+        Sub(score[offset], score[offset], lseBrcb, VEC_ROW_SEGMENT, repeats, broadcastParams);
+        Exp(score[offset], score[offset], VEC_ROW_SEGMENT, repeats, {1, 1, 8, 8});
+        Sub(grad[offset], grad[offset], diBrcb, VEC_ROW_SEGMENT, repeats, broadcastParams);
+        Mul(grad[offset], grad[offset], score[offset], VEC_ROW_SEGMENT, repeats, elementwiseParams);
     }
     // 3) 把被 mask 屏蔽的区域 [count, width) 置 0
     if (count < width) {
@@ -75,7 +70,6 @@ __aicore__ inline void ProbabilityGradRows(LocalTensor<T> score, LocalTensor<T> 
             uint64_t maskArr[2] = {((1ULL << VEC_BLOCK_ELEMENTS) - 1) & ~((1ULL << rest) - 1), 0ULL};
             Duplicate(score[z0], 0.0f, maskArr, validRows, 1, width / VEC_BLOCK_ELEMENTS);
             Duplicate(grad[z0], 0.0f, maskArr, validRows, 1, width / VEC_BLOCK_ELEMENTS);
-            PipeBarrier<PIPE_V>();
         }
         // 段2：标量版（COUNT 模式），逐 64 元素段清零
         for (uint32_t z = (count + VEC_BLOCK_ELEMENTS - 1) / VEC_BLOCK_ELEMENTS * VEC_BLOCK_ELEMENTS; z < width;
@@ -83,7 +77,6 @@ __aicore__ inline void ProbabilityGradRows(LocalTensor<T> score, LocalTensor<T> 
             uint32_t mask = width - z < VEC_ROW_SEGMENT ? width - z : VEC_ROW_SEGMENT;
             Duplicate(score[z], 0.0f, mask, validRows, 1, width / VEC_BLOCK_ELEMENTS);
             Duplicate(grad[z], 0.0f, mask, validRows, 1, width / VEC_BLOCK_ELEMENTS);
-            PipeBarrier<PIPE_V>();
         }
     }
 }

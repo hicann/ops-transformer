@@ -51,7 +51,6 @@ public:
             InitConstValue(queryL1_[slot], zeroParams);
             InitConstValue(dOutL1_[slot], zeroParams);
         }
-        PipeBarrier<PIPE_MTE2>();
         pipe->InitBuffer(l0aBuffer_, L0_OPERAND_BYTES);
         pipe->InitBuffer(l0bBuffer_, L0_OPERAND_BYTES);
         pipe->InitBuffer(l0cBuffer_, L0_RESULT_BYTES);
@@ -84,6 +83,8 @@ public:
             Matmul(currentDOutL1_[dStart * params.groupCapacity], valueL1_[slot], params.groupCapacity, width,
                    params.kvTileSize, width, false, false, params.groupCapacity, params.kvTileSize, width, dStart == 0);
         }
+        // Selected K/V in GM are no longer read after the last V slice reaches L1.
+        CrossCoreSetFlag<2, PIPE_MTE2>(KV_FREE);
         StoreL0cToGm(ctx.gradGm[slot], AIV_PER_CUBE * params.rowsPerAiv, params.kvTileSize, params.groupCapacity,
                      params.kvTileSize, false);
         for (uint32_t dStart = 0; dStart < params.headDimAligned; dStart += params.dTile) {
@@ -146,7 +147,6 @@ public:
                          false);
         }
         CrossCoreSetFlag<2, PIPE_FIX>(RESULT_READY);
-        CrossCoreSetFlag<2, PIPE_FIX>(KV_FREE);
     }
 
 private:
@@ -286,7 +286,6 @@ private:
         params.cmatrixInitVal = firstReduction;
         params.unitFlag = 0;
         Mmad(l0c_, l0a_, l0b_, params);
-        PipeBarrier<PIPE_M>();
     }
 
     __aicore__ inline void StoreL0cToGm(GlobalTensor<float> dst, uint32_t rows, uint32_t cols, uint32_t sourceRows,

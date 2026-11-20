@@ -119,10 +119,14 @@ protected:
                             .c_str(),
                         "query,sparse_block_idx,sparse_block_count");
         const uint64_t baseKtile = qsag::BaseKTile(s_.group);
-        // Arch22 UB capacity limits Ktile to 128 even for the small-group case.
-        s_.ktile = s_.dtile = baseKtile;
+        // For short KV sequences and small groups, 256-token tiles amortize per-tile control cost.
+        // Bs is already limited to BaseKTile by the shared validator.
+        const uint64_t kvTokensPerBatch = s_.layout == 0 ? s_.sk / s_.batch : s_.sk;
+        s_.ktile = s_.group <= 16 && kvTokensPerBatch <= 32768 ? 256 : baseKtile;
+        s_.dtile = baseKtile;
         s_.dp = (s_.d + 15) / 16 * 16;
-        s_.gcap = 2 * (((s_.group + 1) / 2 + 15) / 16) * 16;
+        // gcap 只需容纳 2*ceil(G/2) 个有效行并按 16 行 NZ 分形对齐；无需每 AIV 各自 16 行。
+        s_.gcap = ((s_.group + 15) / 16) * 16;
         s_.slots = s_.group <= 64 ? 2 : 1;
         dtype_ = tensors[0].dtype;
         data_.set_batchNum(s_.batch);

@@ -36,9 +36,12 @@ public:
         const uint32_t rowScratchBytes = 2 * inputRowBytes + 2 * floatRowBytes + TRANSFER_ROWS * BLOCK_BYTES;
         const uint32_t stagingBytes = params.transferElements * sizeof(float);
         const uint32_t broadcastBytes = VEC_ROW_SEGMENT * sizeof(float);
-        // 两档容量核算（910B UB 192KiB）：G<=128 约 145KiB，G>128（Ktile=64）约 133KiB。
-        const uint32_t ubBytes = 2 * matrixBytes + SLOT_COUNT * rowStatsBytes + 2 * probabilityBytes + indexBytes +
-                                 rowScratchBytes + 2 * stagingBytes + 2 * broadcastBytes;
+        // 三段流水的 task 槽各自保留索引直到 Scatter 消费；大 G 组退回单槽以守住 192KiB UB。
+        const uint32_t indexSlots = params.groupRows <= 32 ? PIPELINE_STAGES : 1;
+        // 容量核算（910B UB 192KiB）：vectorRows 随 gcap 缩放，G=33~64 档（staging 2x64KiB）
+        // 最紧约 191KiB；G<=32 约 166KiB，G=65~128 约 177KiB，G>128（Ktile=64）约 133KiB。
+        const uint32_t ubBytes = 2 * matrixBytes + SLOT_COUNT * rowStatsBytes + 2 * probabilityBytes +
+                                 indexSlots * indexBytes + rowScratchBytes + 2 * stagingBytes + 2 * broadcastBytes;
         pipe->InitBuffer(ubBuffer_, ubBytes);
         uint32_t offset = 0;
         score_ = TakeUb<float>(matrixBytes, offset);
@@ -48,7 +51,9 @@ public:
         }
         probabilityNd_ = TakeUb<T>(probabilityBytes, offset);
         dsProbabilityNd_ = TakeUb<T>(probabilityBytes, offset);
-        indicesLocal_ = TakeUb<int32_t>(indexBytes, offset);
+        for (uint32_t slot = 0; slot < indexSlots; ++slot) {
+            indicesLocal_[slot] = TakeUb<int32_t>(indexBytes, offset);
+        }
         inputRowLocal_ = TakeUb<T>(inputRowBytes, offset);
         dOutRowLocal_ = TakeUb<T>(inputRowBytes, offset);
         floatRowLocal0_ = TakeUb<float>(floatRowBytes, offset);
@@ -77,9 +82,7 @@ public:
             ReadRow(dOutRowLocal_, ctx.dOut, row * params.headDim, rows, params);
             Cast(floatRowLocal0_, inputRowLocal_, RoundMode::CAST_NONE, rows * params.headDimAligned);
             Cast(floatRowLocal1_, dOutRowLocal_, RoundMode::CAST_NONE, rows * params.headDimAligned);
-            PipeBarrier<PIPE_V>();
             Mul(floatRowLocal0_, floatRowLocal0_, floatRowLocal1_, rows * params.headDimAligned);
-            PipeBarrier<PIPE_V>();
             ReduceDiRows(rows, params);
             SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
             WaitFlag<HardEvent::V_MTE3>(EVENT_ID0);
@@ -119,10 +122,11 @@ public:
     {
         const QsagParams& params = ctx.params;
         const uint32_t slot = task.id % SLOT_COUNT;
+        const uint32_t indexSlot = params.groupRows <= 32 ? task.id % PIPELINE_STAGES : 0;
         // 上一轮同槽的 K/V 已由 Cube 消费完，才允许重新搬入。
         AscendC::WaitEvent(KV_FREE);
         GatherRows(ctx, params, task.sparseBase, task.first, task.selected, task.tail, task.tailStart, task.kbase,
-                   task.kvHead, slot);
+                   task.kvHead, slot, indexSlot);
         // 1:2 模式下同 cube 双 AIV 必须发同一 flag（AIC 端该 flag 需两侧都到达才置位）。
         CrossCoreSetFlag<2, PIPE_MTE3>(GATHER_READY);
     }
@@ -166,11 +170,9 @@ public:
                       (params.rowCapacityPerAiv - validRows) * params.kvTileSize);
             Duplicate(grad_[validRows * params.kvTileSize], 0.0f,
                       (params.rowCapacityPerAiv - validRows) * params.kvTileSize);
-            PipeBarrier<PIPE_V>();
         }
         ProbabilityGradRows(score_, grad_, rowStatsLocal_[0], rowStatsLocal_[1], lseBroadcast_, diBroadcast_,
                             ctx.tiling->softmaxScale, params.kvTileSize, params.rowsPerAiv, validRows, task.selected);
-        PipeBarrier<PIPE_V>();
         // probabilityNd_/dsProbabilityNd_ also source the previous task's UB->GM copy
         // (MTE3). In the drain path two ProcessProbability calls are back-to-back, so
         // wait for that copy before overwriting the buffers.
@@ -191,13 +193,16 @@ public:
     {
         const QsagParams& params = ctx.params;
         const uint32_t slot = task.id % SLOT_COUNT;
+        const uint32_t indexSlot = params.groupRows <= 32 ? task.id % PIPELINE_STAGES : 0;
         AscendC::WaitEvent(RESULT_READY);
-        if (!task.tail) {
+        // 三槽索引：小 G 时 Gather 装入的索引仍在本 task 槽内，Scatter 免重载；
+        // 大 G 单槽已被后续 Gather 覆盖，需重新加载。
+        if (!task.tail && params.groupRows > 32) {
             SetFlag<HardEvent::S_MTE2>(EVENT_ID0);
             WaitFlag<HardEvent::S_MTE2>(EVENT_ID0);
             DataCopyExtParams indexParams{1, static_cast<uint32_t>(task.selected / params.blockSize * sizeof(int32_t)),
                                           0, 0, 0};
-            DataCopyPad(indicesLocal_, ctx.filteredIndices[task.sparseBase + task.first], indexParams,
+            DataCopyPad(indicesLocal_[0], ctx.filteredIndices[task.sparseBase + task.first], indexParams,
                         DataCopyPadExtParams<int32_t>{});
             SetFlag<HardEvent::MTE2_S>(EVENT_ID0);
             WaitFlag<HardEvent::MTE2_S>(EVENT_ID0);
@@ -216,10 +221,10 @@ public:
                 uint32_t run =
                     task.tail ? rows - copied : Min(rows - copied, params.blockSize - BlockOffset(params, position));
                 const uint64_t token =
-                    task.tail ?
-                        task.tailStart + position :
-                        static_cast<uint64_t>(indicesLocal_.GetValue(BlockIndex(params, position))) * params.blockSize +
-                            BlockOffset(params, position);
+                    task.tail ? task.tailStart + position :
+                                static_cast<uint64_t>(indicesLocal_[indexSlot].GetValue(BlockIndex(params, position))) *
+                                        params.blockSize +
+                                    BlockOffset(params, position);
                 const uint64_t offset =
                     Offset(ctx.tiling, task.kbase + token, task.kvHead, false, params.headDimAligned);
                 uint64_t stride = ctx.tiling->inputLayout == 1 ?
@@ -348,14 +353,14 @@ private:
 
     __aicore__ inline void GatherRows(QsagContext<T, Tiling>& ctx, const QsagParams& params, uint64_t sparseBase,
                                       uint64_t first, uint32_t count, bool tail, uint64_t tailStart, uint64_t kbase,
-                                      uint64_t head, uint32_t slot)
+                                      uint64_t head, uint32_t slot, uint32_t indexSlot)
     {
         if (!tail) {
             const uint32_t entries = count / params.blockSize;
             SetFlag<HardEvent::S_MTE2>(EVENT_ID0);
             WaitFlag<HardEvent::S_MTE2>(EVENT_ID0);
             DataCopyExtParams indexParams{1, static_cast<uint32_t>(entries * sizeof(int32_t)), 0, 0, 0};
-            DataCopyPad(indicesLocal_, ctx.filteredIndices[sparseBase + first], indexParams,
+            DataCopyPad(indicesLocal_[indexSlot], ctx.filteredIndices[sparseBase + first], indexParams,
                         DataCopyPadExtParams<int32_t>{});
             SetFlag<HardEvent::MTE2_S>(EVENT_ID0);
             WaitFlag<HardEvent::MTE2_S>(EVENT_ID0);
@@ -376,7 +381,7 @@ private:
                         tail ? rows - copied : Min(rows - copied, params.blockSize - BlockOffset(params, position));
                     const uint64_t token =
                         tail ? tailStart + position :
-                               static_cast<uint64_t>(indicesLocal_.GetValue(BlockIndex(params, position))) *
+                               static_cast<uint64_t>(indicesLocal_[indexSlot].GetValue(BlockIndex(params, position))) *
                                        params.blockSize +
                                    BlockOffset(params, position);
                     const uint64_t offset = Offset(ctx.tiling, kbase + token, head, false, params.headDim);
@@ -429,15 +434,15 @@ private:
 
     __aicore__ inline void ZeroWorkspace(GlobalTensor<float> gm, uint64_t count, const QsagParams& params)
     {
-        constexpr uint32_t zeroElements = TRANSFER_ROWS * MAX_HEAD_DIM;
-        Duplicate(floatRowLocal0_, 0.0f, zeroElements);
+        const uint32_t zeroElements = Min(params.transferElements, 8192U);
+        Duplicate(gatherStaging0_, 0.0f, zeroElements);
         SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
         WaitFlag<HardEvent::V_MTE3>(EVENT_ID0);
         for (uint64_t start = params.globalAivIndex * zeroElements; start < count;
              start += params.cubeCoreNum * AIV_PER_CUBE * zeroElements) {
             const uint32_t length = Min(zeroElements, count - start);
             DataCopyExtParams copyParams{1, static_cast<uint32_t>(length * sizeof(float)), 0, 0, 0};
-            DataCopyPad(gm[start], floatRowLocal0_, copyParams);
+            DataCopyPad(gm[start], gatherStaging0_, copyParams);
         }
         SetFlag<HardEvent::MTE3_V>(EVENT_ID0);
         WaitFlag<HardEvent::MTE3_V>(EVENT_ID0);
@@ -459,7 +464,6 @@ private:
         if (blockCount > 0 && remain > 0) {
             Add(floatRowLocal0_, floatRowLocal0_, floatRowLocal0_[blockCount * FLOATS_PER_BLOCK], remain, rows,
                 repeatParams);
-            PipeBarrier<PIPE_V>();
         }
         // 块对树归约，每轮两两相加，最终每行只剩首块。
         for (uint32_t loopCount = blockCount / 2; loopCount > 0; loopCount = blockCount / 2) {
@@ -468,7 +472,6 @@ private:
                 Add(floatRowLocal0_[block * FLOATS_PER_BLOCK], floatRowLocal0_[block * FLOATS_PER_BLOCK],
                     floatRowLocal0_[(block + blockCount) * FLOATS_PER_BLOCK], FLOATS_PER_BLOCK, rows, repeatParams);
             }
-            PipeBarrier<PIPE_V>();
         }
         // dav_c220 的 dstRepStride 单位为元素、srcRepStride 单位为 32B 块：
         // 每行结果落到 diPerRowLocal_ 的第 r 个 32B 块。
@@ -517,7 +520,6 @@ private:
             SetFlag<HardEvent::MTE2_V>(EVENT_ID0);
             WaitFlag<HardEvent::MTE2_V>(EVENT_ID0);
             Muls(floatRowLocal0_, floatRowLocal0_, scale, batchRows * params.headDimAligned);
-            PipeBarrier<PIPE_V>();
             Cast(inputRowLocal_, floatRowLocal0_, RoundMode::CAST_ROUND, batchRows * params.headDimAligned);
             SetFlag<HardEvent::V_MTE3>(EVENT_ID0);
             WaitFlag<HardEvent::V_MTE3>(EVENT_ID0);
@@ -545,7 +547,7 @@ private:
     LocalTensor<float> rowStatsLocal_[SLOT_COUNT];
     LocalTensor<T> probabilityNd_;
     LocalTensor<T> dsProbabilityNd_;
-    LocalTensor<int32_t> indicesLocal_;
+    LocalTensor<int32_t> indicesLocal_[PIPELINE_STAGES];
     LocalTensor<T> inputRowLocal_;
     LocalTensor<T> dOutRowLocal_;
     LocalTensor<float> floatRowLocal0_;
