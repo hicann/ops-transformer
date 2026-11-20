@@ -80,8 +80,8 @@ CHUNK_SIZE, SUPPORTED_HEAD_DIM, D_HALF = C, D, HALF
 K_RESTORED_OPERAND_INDEX = 1
 K_DECAYED_BETA_OPERAND_INDEX = 2
 V_BETA_OPERAND_INDEX = 3
-# qg/kg plus three BF16 components of weighted K and V.
-RECOMPUTE_OPERAND_PLANES = 8
+# Forward packs qg, kg, weighted K and weighted V once in BF16.
+RECOMPUTE_OPERAND_PLANES = 4
 
 
 def cast_and_pack_bf16(value, lane_mask):
@@ -317,9 +317,7 @@ class _Preprocess:
                     dtypes.float32,
                     mask=beta_mask,
                 )
-            # Raw and activated beta retain their public precision. Only the
-            # stored cache tensors are BF16; Cube operand rounding is recovered
-            # by a second product with the BF16 residual below.
+            # Beta is FP32 until the weighted operand is packed in BF16.
             valid_beta_mask, _ = update_mask(valid_rows, elem_bits=32)
             beta_value = vselect_raw(
                 beta_value,
@@ -329,6 +327,7 @@ class _Preprocess:
             vstore(self.ub_beta, 0, beta_value, beta_mask)
             for row in dsl_range(0, valid_rows, 1):
                 if const_expr(raw_gate.dtype == dtypes.float32):
+                    # Arch35 forward converts g to BF16 before activation.
                     gate_value = vload(raw_gate, row * D_HALF)
                     gate_value = vcast(
                         vcast(gate_value, dtypes.bfloat16, mask=lane_mask),
@@ -505,43 +504,6 @@ class _Preprocess:
                         self.ub_recurrent_operands_nz,
                         (operand_idx * CHUNK_SIZE + row) * 16,
                         operand_bf16,
-                        low_mask,
-                        block_stride=self.ub_recurrent_operands_nz.physical_layout.stride[
-                            0
-                        ]
-                        // 16,
-                    )
-                for operand_idx in (2, 3):
-                    value = operand_values[operand_idx]
-                    high = vcast(
-                        vcast(value, dtypes.bfloat16, mask=lane_mask),
-                        dtypes.float32,
-                        mask=lane_mask,
-                    )
-                    # Two BF16 components retain about 16 mantissa bits. Keep
-                    # the remaining FP32 bits until the W/U cache is rounded.
-                    residual_value = vsub(value, high, mask=lane_mask)
-                    low = vcast(residual_value, dtypes.bfloat16, mask=lane_mask)
-                    residual = cast_and_pack_bf16(residual_value, lane_mask)
-                    vstore_strided(
-                        self.ub_recurrent_operands_nz,
-                        ((operand_idx + 2) * CHUNK_SIZE + row) * 16,
-                        residual,
-                        low_mask,
-                        block_stride=self.ub_recurrent_operands_nz.physical_layout.stride[
-                            0
-                        ]
-                        // 16,
-                    )
-                    remainder = vsub(
-                        residual_value,
-                        vcast(low, dtypes.float32, mask=lane_mask),
-                        mask=lane_mask,
-                    )
-                    vstore_strided(
-                        self.ub_recurrent_operands_nz,
-                        ((operand_idx + 4) * CHUNK_SIZE + row) * 16,
-                        cast_and_pack_bf16(remainder, lane_mask),
                         low_mask,
                         block_stride=self.ub_recurrent_operands_nz.physical_layout.stride[
                             0
@@ -870,6 +832,7 @@ def recompute_tracks(
     fused_beta: dtypes.int64,
     has_initial_state: dtypes.int64,
     gm_owner_schedule,
+    round_u_pre: dtypes.int64 = 0,
 ):
     part = get_subblock_id()
     heads_per_key_head = v.shape[1] // q.shape[1]
@@ -982,8 +945,8 @@ def recompute_tracks(
 class _StagedState:
     """Forward staged recurrence, sharded over independent value rows.
 
-    Subtract the compensated W @ H product from the saved BF16 U in FP32,
-    round v_new, then decay/add the FP32 state.
+    Subtract W @ BF16(H) from the FP32 recomputed U, round v_new, then
+    decay/add the FP32 state.
     The two AIVs split key columns for H and token rows for v_new.
     """
 
@@ -1156,7 +1119,7 @@ class _StagedState:
         mem_copy(destination[:rows, None], source_tile[:rows, None])
 
     @jit
-    def correct_values(self, destination, rows, part):
+    def correct_values(self, destination, rows, part, round_u_pre):
         correction = from_tensor(
             self.correction.next_read(), layout=make_layout((C // 2, self.value_rows))
         )
@@ -1169,6 +1132,13 @@ class _StagedState:
                     value = vdups(0.0, dtypes.float32, mask=mask)
                     if row < live_rows:
                         raw = vload(self.u, offset)
+                        if round_u_pre != 0:
+                            # Staged forward publishes U through BF16 GM.
+                            raw = vcast(
+                                vcast(raw, dtypes.bfloat16, mask=mask),
+                                dtypes.float32,
+                                mask=mask,
+                            )
                         value = vsub(raw, vload(correction, offset), mask=mask)
                     low = vcast(value, dtypes.bfloat16, mask=mask)
                     vstore_pack(
@@ -1237,6 +1207,7 @@ def _recompute_staged_states(
     operands,
     result,
     resources,
+    round_u_pre: dtypes.int64,
 ):
     part = get_subblock_id()
     begin, end, step = grad._metadata._staged_reverse_loop_bounds(
@@ -1332,7 +1303,7 @@ def _recompute_staged_states(
                     (C, recurrence.value_rows),
                     (0, value_part),
                 )
-                recurrence.correct_values(destination, rows, part)
+                recurrence.correct_values(destination, rows, part, round_u_pre)
                 mem_copy(
                     recurrence.new_l0a,
                     from_tensor(
@@ -1391,6 +1362,7 @@ def recompute_staged_tracks(
     fused_beta: dtypes.int64,
     has_initial_state: dtypes.int64,
     gm_owner_schedule,
+    round_u_pre: dtypes.int64 = 0,
 ):
     """Fwd's independent chunk products followed by value-sharded recurrence.
 
@@ -1519,6 +1491,7 @@ def recompute_staged_tracks(
                 operands,
                 result,
                 resources,
+                round_u_pre,
             )
         else:
             _recompute_staged_states(
@@ -1537,4 +1510,5 @@ def recompute_staged_tracks(
                 operands,
                 result,
                 resources,
+                round_u_pre,
             )

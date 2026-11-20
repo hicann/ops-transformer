@@ -48,6 +48,7 @@ from dataclasses import dataclass
 from threading import local
 from typing import Optional, Tuple
 
+import numpy as np
 import torch
 
 # --- causal pair loop ------------------------------------------------------
@@ -130,7 +131,6 @@ except Exception:  # pragma: no cover - keep the inline loop if scripting fails
 
 # Numba is optional. The ordered TorchScript path also works without it.
 try:
-    import numpy as np
     from numba import njit
 except ImportError:
     njit = None
@@ -398,13 +398,20 @@ def _gate_beta(
     allow_neg_eigval: bool,
     use_gate_in_kernel: bool,
     use_beta_sigmoid_in_kernel: bool,
+    emulate_npu_forward: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Return (per-step log decay, effective beta) for one chunk/head."""
     if use_gate_in_kernel:
         alpha = A_log.exp().to(high_dtype)
         biased = raw_g + (0.0 if dt_bias is None else dt_bias.to(high_dtype))
         if gate_mode == "softplus":
-            step_gate = -alpha * F.softplus(biased)
+            if emulate_npu_forward:
+                softplus = biased.clamp_min(0.0) + (1.0 + (-biased.abs()).exp()).log()
+            else:
+                softplus = F.softplus(biased)
+            step_gate = -alpha * softplus
+        elif emulate_npu_forward:
+            step_gate = float(lower_bound) / (1.0 + (-alpha * biased).exp())
         else:
             step_gate = float(lower_bound) * torch.sigmoid(alpha * biased)
     else:
@@ -414,7 +421,11 @@ def _gate_beta(
 
     if use_beta_sigmoid_in_kernel:
         factor = 2.0 if allow_neg_eigval else 1.0
-        beta_effective = torch.sigmoid(beta.to(high_dtype)) * factor
+        beta = beta.to(high_dtype)
+        if emulate_npu_forward:
+            beta_effective = (1.0 / (1.0 + (-beta).exp())) * factor
+        else:
+            beta_effective = torch.sigmoid(beta) * factor
     else:
         beta_effective = beta.to(high_dtype)
     return step_gate, beta_effective
@@ -579,7 +590,6 @@ def _chunk_step(
     persistent_forward=False,
     emit_output=True,
     advance_state=True,
-    persistent_inverse=False,
 ):
     """Chunkwise KDA step; every ABI-stored tensor is rounded to ``low_dtype``.
 
@@ -598,6 +608,7 @@ def _chunk_step(
         allow_neg_eigval=allow_neg_eigval,
         use_gate_in_kernel=use_gate_in_kernel,
         use_beta_sigmoid_in_kernel=use_beta_sigmoid_in_kernel,
+        emulate_npu_forward=emulate_npu_forward,
     )
     if emulate_npu_forward:
         # Vector updates the prefix one token at a time in FP32.
@@ -613,9 +624,14 @@ def _chunk_step(
 
     if emulate_npu_forward and use_gate_in_kernel and gate_mode != "softplus":
         # Bounded-gate Cube scores cast each decay-weighted operand before MMAD.
-        shared = not persistent_forward and not allow_neg_eigval and abs(scale) <= 0.125
+        shared = (
+            not persistent_forward
+            and not allow_neg_eigval
+            and abs(scale) <= 0.125
+            and lower_bound >= -5.0
+        )
         scores, kk_pairs = _forward_cube_scores(Q, K, gate, scale, shared)
-    elif emulate_npu_forward and not use_gate_in_kernel:
+    elif emulate_npu_forward:
         scores, kk_pairs = _forward_safe_cube_scores(Q, K, gate, scale)
     else:
         delta = (gate[:, None, :] - gate[None, :, :]).clamp(max=0.0)
@@ -624,17 +640,15 @@ def _chunk_step(
         kk_pairs = (K[:, None, :] * K[None, :, :] * ratio).sum(-1)
     m = scores.tril().to(low_dtype)
     lower = torch.tril(b_eff[:, None] * kk_pairs, diagonal=-1)
-    if emulate_npu_forward and not use_gate_in_kernel:
-        # The forward kernel stores beta-weighted KKT in FP16 before inversion.
-        lower = lower.to(torch.float16).to(high_dtype)
-
     identity = torch.eye(length, dtype=high_dtype, device=Q.device)
     if length == 1:
         inverse = identity.to(low_dtype)
-    elif persistent_inverse:
+    elif emulate_npu_forward and persistent_forward:
         inverse = _peer_persistent_inverse(lower).to(low_dtype)
-    elif emulate_npu_forward and not use_gate_in_kernel and not persistent_forward:
-        inverse = _forward_staged_inverse(lower).to(low_dtype)
+    elif emulate_npu_forward:
+        # Staged publishes the strict-lower beta-weighted KKT in FP16
+        # before the 16/32/64 Neumann construction.
+        inverse = _forward_staged_inverse(lower.to(torch.float16).to(high_dtype)).to(low_dtype)
     else:
         inverse = torch.linalg.solve_triangular(
             identity + lower, identity, upper=False, unitriangular=True
@@ -861,7 +875,7 @@ def build_cache(
     storage_dtype: Optional[torch.dtype] = None,
     _peer_only: bool = False,
     emulate_npu_forward: bool = False,
-    _persistent_inverse: bool = False,
+    forward_template: Optional[str] = None,
 ) -> Cache:
     """Chunkwise forward producing the backward cache.
 
@@ -912,13 +926,21 @@ def build_cache(
     batch = ctx["batch"]
 
     bounds = sequence_bounds(q, initial_state, layout, cu_seqlens, seqused)
-    # The NPU forward scheduler explicitly selects persistent for short
-    # multi-sequence TND training. The peer uses the staged model otherwise.
+    if forward_template not in (None, "persistent", "staged"):
+        raise ValueError("forward_template must be 'persistent' or 'staged'")
+    # A TTK caller can supply the actual forward metadata template. Otherwise
+    # retain the short multi-sequence TND routing rule for training.
     persistent_forward = (
         emulate_npu_forward
-        and layout == "TND"
-        and len(bounds) > 1
-        and max(end - start for start, end in bounds) <= 2 * chunk_size
+        and (
+            forward_template == "persistent"
+            or (
+                forward_template is None
+                and layout == "TND"
+                and len(bounds) > 1
+                and max(end - start for start, end in bounds) <= 2 * chunk_size
+            )
+        )
     )
     chunk_count = sum(
         (end - start + chunk_size - 1) // chunk_size
@@ -976,7 +998,6 @@ def build_cache(
                 persistent_forward=persistent_forward,
                 emit_output=not _peer_only,
                 advance_state=not _peer_only or local_chunk + 1 < len(chunks),
-                persistent_inverse=_persistent_inverse,
                 **common,
             )
             state = step.state
@@ -1327,6 +1348,7 @@ def staged_backward(
     gate_grad_bf16: bool = False,
     p_scale: str = "none",
     v_path_bf16: bool = False,
+    emulate_npu_gate_backward: bool = False,
 ) -> Tuple[
     torch.Tensor,
     torch.Tensor,
@@ -1575,6 +1597,11 @@ def staged_backward(
                 dk_chunk = g_cumsum.exp() * dk_exp_g + state_decay_to_end * dkg
                 dg_cumsum = qg * dqg + k_exp_g * dk_exp_g - kg * dkg
                 dg_cumsum[-1] += g_cumsum[-1].exp() * dstate_decay + (kg * dkg).sum(0)
+                if emulate_npu_gate_backward:
+                    # The device accumulates pair contributions into a separate
+                    # plane, then adds them to the gate base at each reverse row.
+                    gate_base = dg_cumsum
+                    dg_cumsum = torch.zeros_like(gate_base)
 
                 # The causal pairs are a Vector contraction in the kernel
                 # (``DirectCausalDeltaVector``): ``dAqk``/``d_lower`` reach it
@@ -1635,12 +1662,22 @@ def staged_backward(
 
                 dq_heads[start:end, qk_head] += dq_chunk
                 dk_heads[start:end, qk_head] += dk_chunk
-                dstep_gate = torch.flip(torch.cumsum(torch.flip(dg_cumsum, (0,)), dim=0), (0,))
+                if emulate_npu_gate_backward:
+                    # NumPy's FP32 accumulate is sequential along the token
+                    # axis. The peer runs on the CPU and does not use autograd.
+                    gate_rows = (gate_base + dg_cumsum).detach().numpy()
+                    dstep_gate = torch.from_numpy(
+                        np.add.accumulate(gate_rows[::-1], axis=0)[::-1].copy()
+                    )
+                else:
+                    dstep_gate = torch.flip(torch.cumsum(torch.flip(dg_cumsum, (0,)), dim=0), (0,))
                 if gate_grad_bf16:
                     dstep_gate = _bf16_store(dstep_gate).to(dtype)
 
                 raw_g_chunk = g_tokens[start:end, head].to(dtype)
                 if use_gate_in_kernel:
+                    if emulate_npu_gate_backward:
+                        raw_g_chunk = _bf16_operand(raw_g_chunk)
                     if A_log is None:
                         raise ValueError("A_log is required for fused-gate parameter gradients")
                     dt_bias_head = (
@@ -2112,6 +2149,7 @@ def bf16_peer(
     disable_recompute: bool = False,
     cache: Optional["Cache"] = None,
     cache_source: str = "ref",
+    forward_template: Optional[str] = None,
     **_ignored,
 ):
     """Third-party reference with the operator's BF16 quantization budget.
@@ -2136,7 +2174,7 @@ def bf16_peer(
         use_beta_sigmoid_in_kernel=bool(use_beta_sigmoid_in_kernel),
     )
     # An explicit cache is consumed as supplied. Otherwise the peer builds its
-    # own cache and applies the persistent inverse model for bounded BNSD recompute.
+    # own cache using the precision boundaries of the selected forward template.
     raw_bias = dt_bias
     dt_bias, dht = normalize_backward_optionals(
         q, v, initial_state, dt_bias, dht, layout, cu_seqlens
@@ -2159,13 +2197,7 @@ def bf16_peer(
             storage_dtype=torch.bfloat16,
             _peer_only=True,
             emulate_npu_forward=emulate_npu_forward,
-            _persistent_inverse=(
-                not disable_recompute
-                and emulate_npu_forward
-                and layout == "BNSD"
-                and use_gate_in_kernel
-                and gate_mode == "bounded"
-            ),
+            forward_template=forward_template if not disable_recompute else None,
             **kwargs,
         )
     grads = staged_backward(
@@ -2178,6 +2210,12 @@ def bf16_peer(
         gate_grad_bf16=bool(gate_grad_bf16),
         p_scale=str(p_scale),
         v_path_bf16=bool(v_path_bf16),
+        emulate_npu_gate_backward=(
+            str(cache_source).lower() == "fwd"
+            and not disable_recompute
+            and g.device.type == "cpu"
+            and q.dtype != torch.float64
+        ),
         **kwargs
     )
     return restore_bias_gradient(grads, raw_bias)

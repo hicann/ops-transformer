@@ -138,6 +138,7 @@ def _build_cache(
             device=device,
             cu_seqlens=kwargs.get("cu_seqlens"),
             seqused=kwargs.get("seqused"),
+            forward_template=kwargs.get("forward_template"),
         )
 
     host = {
@@ -216,6 +217,7 @@ def _load_forward():
         device,
         cu_seqlens=None,
         seqused=None,
+        forward_template=None,
     ):
         batch, heads, width = (
             (cu_seqlens.numel() - 1, q.shape[1], q.shape[-1])
@@ -237,6 +239,15 @@ def _load_forward():
             enable_grad=True,
             layout=layout,
         )
+        if forward_template is not None:
+            metadata_module = _dsl_module("flash_kda_metadata", q)
+            selected = metadata_module.decode_metadata(metadata.cpu().tolist())[
+                "template"
+            ]
+            if selected != forward_template:
+                raise ValueError(
+                    f"Expected forward template {forward_template!r}, got {selected!r}"
+                )
         if layout == "BNSD":
             g, beta = g.transpose(1, 2).contiguous(), beta.transpose(1, 2).contiguous()
         outputs = flash_kda_fwd(
@@ -420,6 +431,7 @@ def npu(
     use_gate_in_kernel: bool = True,
     use_beta_sigmoid_in_kernel: bool = True,
     disable_recompute: Optional[bool] = None,
+    forward_template: str | None = None,
 ):
     """FlashKDA backward; device dispatch on ``q.device.type``.
 
@@ -477,7 +489,17 @@ def npu(
     bwd, bwd_metadata = _load_operator()
     use_fwd = str(cache_source).lower() == "fwd"
     cache = _build_cache(
-        q, k, v, g, beta, initial_state, A_log, cache_bias, use_fwd=use_fwd, **common
+        q,
+        k,
+        v,
+        g,
+        beta,
+        initial_state,
+        A_log,
+        cache_bias,
+        use_fwd=use_fwd,
+        forward_template=forward_template,
+        **common,
     )
     # With L2Norm enabled, backward consumes saved normalized Q/K and the
     # inverse norms; it returns gradients of the original raw inputs.
@@ -522,6 +544,8 @@ def npu(
     # In recompute mode retain Aqk/Akk, norm and beta caches, but pass None for
     # the seven tracks the kernel rebuilds from normalized Q/K and initial_state.
     recompute = _RECOMPUTE if disable_recompute is None else not bool(disable_recompute)
+    if recompute and use_fwd and forward_template == "staged":
+        metadata._flash_kda_round_recomputed_u_pre = True
     if layout == "BNSD":
         do = do.transpose(1, 2)
         g, beta = g.transpose(1, 2), beta.transpose(1, 2)

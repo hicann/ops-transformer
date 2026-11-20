@@ -278,6 +278,15 @@ class _FlashKDAEntry(torch.autograd.Function):
                 raise RuntimeError(
                     "saved-cache FlashKDA autograd requires BF16 chunk_states"
                 )
+        else:
+            meta = _dsl_module("flash_kda_metadata", q)
+            schedule = getattr(forward, "_flash_kda_schedule", None)
+            template = (
+                schedule["template"]
+                if schedule is not None
+                else int(forward[meta.HEADER_TEMPLATE].item())
+            )
+            ctx.round_recomputed_u_pre = template == meta.TEMPLATE_STAGED
 
         ctx.save_for_backward(
             v,
@@ -342,6 +351,9 @@ class _FlashKDAEntry(torch.autograd.Function):
             g = g.float()
         if not options.get("use_beta_sigmoid_in_kernel", True):
             beta = beta.float()
+        if getattr(ctx, "round_recomputed_u_pre", False):
+            # This metadata slice belongs to this autograd invocation.
+            metadata._flash_kda_round_recomputed_u_pre = True
         dq, dk, dv, dh0, dg, dbeta, da, dbias = _grad_ops().flash_kda_grad(
             q,
             k,

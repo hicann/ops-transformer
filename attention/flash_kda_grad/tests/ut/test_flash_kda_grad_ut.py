@@ -6871,8 +6871,9 @@ def _make_forward_layout_inputs(
     norm_shape = (storage, nq) if layout == "TND" else (batch, nq, storage)
     capacity = (storage + 63) // 64 + batch if layout == "TND" else (storage + 63) // 64
     chunk_prefix = (capacity, nv) if layout == "TND" else (batch, nv, capacity)
-    matrix = torch.zeros((*chunk_prefix, 64, 64), dtype=torch.bfloat16)
-    state = torch.zeros((*chunk_prefix, width, width))
+    matrix_shape = (nv, storage, 64) if layout == "TND" else (batch, nv, storage, 64)
+    matrix = torch.zeros(matrix_shape, dtype=torch.bfloat16)
+    state = torch.zeros((*chunk_prefix, width, width), dtype=torch.bfloat16)
     token = torch.zeros(token_shape, dtype=torch.bfloat16)
     args = dict(
         q=q,
@@ -6983,6 +6984,8 @@ def test_public_forward_views_and_launch_count(
     spelling,
 ):
     args = _make_forward_layout_inputs(host_sequence_metadata, layout, lengths)
+    round_u_pre = layout == "BSND"
+    args["metadata"]._flash_kda_round_recomputed_u_pre = round_u_pre
     if initial_present:
         args["initial_state"] = torch.full_like(args["dht"], 0.25)
     launched = []
@@ -7000,7 +7003,7 @@ def test_public_forward_views_and_launch_count(
         if layout == "TND":
             assert values["aqk"] is args["Aqk"]
         else:
-            assert values["aqk"].shape == (*args["v"].shape[:-1], 64)
+            assert values["aqk"].shape == args["Aqk"].shape
         if disabled:
             same_storage(values["qg"], args["qg"])
         assert values["qg"].shape == args["v"].shape
@@ -7028,14 +7031,27 @@ def test_public_forward_views_and_launch_count(
             (),
         )
 
-    def recompute(device, tensors, config, scale, core_num, has_initial_state):
+    def recompute(
+        device, tensors, config, scale, core_num, has_initial_state, round_rebuilt_u
+    ):
         launched.append("fused")
         assert has_initial_state == initial_present
+        assert round_rebuilt_u == round_u_pre
+        if round_u_pre:
+            assert config[-2]
         assert tensors[-2] is args.get("initial_state", args["dht"])
         assert tensors[-1].shape[1] == 2
 
     monkeypatch.setattr(integration, "_reap_backward_workspaces", lambda: None)
     monkeypatch.setattr(integration, "_device_block_num", lambda _: 1)
+    empty_strided = torch.empty_strided
+    monkeypatch.setattr(
+        torch,
+        "empty_strided",
+        lambda size, stride, *, dtype, device: empty_strided(
+            size, stride, dtype=dtype, device="cpu"
+        ),
+    )
     monkeypatch.setattr(
         integration._BACKWARD_SCRATCH, "acquire", lambda *a: nullcontext(None)
     )

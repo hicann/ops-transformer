@@ -10514,6 +10514,7 @@ def _recompute_tracks(
     has_initial_state: dtypes.int64,
     gm_owner_schedule,
     staged: Constexpr[bool] = False,
+    round_u_pre: dtypes.int64 = 0,
 ):
     _recompute_implementation(staged)(
         q,
@@ -10541,6 +10542,7 @@ def _recompute_tracks(
         fused_beta,
         has_initial_state,
         gm_owner_schedule,
+        round_u_pre,
     )
 
 
@@ -12558,6 +12560,7 @@ class _RecomputeBackwardKernel:
         staged: Constexpr[bool],
         cube_causal: Constexpr[bool],
         has_initial_state: dtypes.int64,
+        round_u_pre: dtypes.int64,
         stage_two_scale: dtypes.float32,
         stage_one_scale: dtypes.float32,
         stage_one_inverse_factor: dtypes.float32,
@@ -12594,6 +12597,7 @@ class _RecomputeBackwardKernel:
                 has_initial_state,
                 gm_owner_schedule,
                 staged or needs_masked_chunks or not use_full_chunks,
+                round_u_pre,
             )
             # Full, unmasked persistent owners can reconstruct locally.
             # Publish every cache before either backward template changes owners.
@@ -12826,6 +12830,7 @@ class _RecomputeBackward:
         staged: Constexpr[bool],
         cube_causal: Constexpr[bool],
         has_initial_state: dtypes.int64,
+        round_u_pre: dtypes.int64,
         core_num: int,
     ):
         _RecomputeBackwardKernel()[core_num](
@@ -12933,6 +12938,7 @@ class _RecomputeBackward:
             staged,
             cube_causal,
             has_initial_state,
+            round_u_pre,
             stage_two_scale,
             stage_one_scale,
             stage_one_inverse_factor,
@@ -12968,7 +12974,12 @@ def _recompute_dynamic_compile_request(
     u_spec = cannbotdsl.TensorSpec(
         specs[3].shape, dtypes.float32, stride=specs[3].stride
     )
-    return (*specs, specs[8], u_spec), (*scalars[:-1], dtypes.int64, scalars[-1])
+    return (*specs, specs[8], u_spec), (
+        *scalars[:-1],
+        dtypes.int64,
+        dtypes.int64,
+        scalars[-1],
+    )
 
 
 _RECOMPUTE_PROGRAMS = OrderedDict()
@@ -12994,7 +13005,7 @@ atexit.register(_clear_recompute_program_cache)
 
 
 def _launch_recompute_program(
-    device, arguments, config, scale, core_num, has_initial_state
+    device, arguments, config, scale, core_num, has_initial_state, round_u_pre=False
 ):
     beta_fp32, full, masked, staged = config[9], config[11], config[12], config[13]
     cube_causal = bool(config[14])
@@ -13038,6 +13049,7 @@ def _launch_recompute_program(
                 float(scale),
                 *_backward_runtime_config(config),
                 int(has_initial_state),
+                int(round_u_pre),
                 core_num,
             )
             event.record(stream)
@@ -13203,8 +13215,9 @@ def _flash_kda_grad_kernel_entry(
     callers can omit it once metadata derivation lands, but passing None raises.
     Aqk/Akk are required Tensor arguments in both modes; conditional
     normalization/beta caches remain required when their fusion is enabled.
-    g/beta independently accept BF16 or FP32. Reconstruction rounds raw g/beta
-    to BF16 like forward, while retained FP32 beta activations are read directly.
+    g/beta independently accept BF16 or FP32. Recompute uses forward's BF16
+    gate values in the activation and its derivative, and reads FP32 beta
+    activations directly.
     Backward vector epilogues write dg/dbeta
     directly in the corresponding original g/beta dtype, rounding only for BF16.
     With Q/K L2Norm enabled, q/k are the saved normalized forward values;
@@ -13292,6 +13305,9 @@ def _flash_kda_grad_kernel_entry(
     core_num = _device_block_num(q)
     selected_template = _select_backward_template(q, v, layout, metadata, core_num)
     staged = selected_template == "staged"
+    round_u_pre = not disable_recompute and getattr(
+        metadata, "_flash_kda_round_recomputed_u_pre", False
+    )
     # All local causal contractions use direct gate differences. This legacy
     # flag only selects the existing fused bounded-gate epilogue/storage path.
     causal_block_size = (
@@ -13305,10 +13321,11 @@ def _flash_kda_grad_kernel_entry(
         causal_block_size,
         staged,
     )
-    if not disable_recompute and not staged and needs_masked_chunks:
+    if not disable_recompute and not staged and (needs_masked_chunks or round_u_pre):
         # A fused reconstruction followed by the persistent full/tail branches
         # gives channels conditional ownership across phase boundaries. Use the
         # staged backward schedule so every channel has one acquire/release path.
+        # The value-sharded recurrence also reproduces staged forward's BF16 U.
         selected_template = "staged"
         staged = True
         use_full_chunks, needs_masked_chunks = False, True
@@ -13333,12 +13350,17 @@ def _flash_kda_grad_kernel_entry(
             _needs_masked_chunks=needs_masked_chunks,
             _staged=staged,
         )
+        # The forward gate is evaluated on BF16 g. Keep the FP32 storage
+        # contract for dg while evaluating the derivative at the same values.
+        gate_for_recompute = g
+        if not disable_recompute and use_gate_in_kernel and g.dtype == torch.float32:
+            gate_for_recompute = g.to(torch.bfloat16).to(torch.float32)
         stage_one_result, stage_one_arguments, stage_one_specs, stage_one_config = (
             _prepare_stage_one(
                 query=q,
                 key=k,
                 values=v,
-                raw_gate=g,
+                raw_gate=gate_for_recompute,
                 activated_beta=beta_sigmoid if use_beta_sigmoid_in_kernel else beta,
                 saved_inverse=Akk,
                 saved_qg=qg,
@@ -13405,6 +13427,7 @@ def _flash_kda_grad_kernel_entry(
                 float(scale),
                 core_num,
                 initial_state is not None,
+                round_u_pre,
             )
         dq, dk, dv, dg, dbeta, dA, dBias = stage_one_result
         return dq, dk, dv, stage_two.dh0, dg, dbeta, dA, dBias
