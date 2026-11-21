@@ -75,6 +75,8 @@ public:
             .NeedCheckSupportFlag(false)
             .ExtendCfgInfo("opFile.value", "block_attention_residuals_apt");
         this->AICore().AddConfig("ascend950", config_950);
+        this->AICore().AddConfig("ascend960dt", config_950);
+        this->AICore().AddConfig("ascend960pr", config_950);
     }
 };
 

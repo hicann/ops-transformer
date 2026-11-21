@@ -118,6 +118,7 @@ public:
             .ExtendCfgInfo("opFile.value", "scatter_pa_kv_cache_with_k_scale_apt");
         opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_3510, aicoreConfig);
         opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9201, aicoreConfig);
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_9202, aicoreConfig);
     }
 };
 OP_ADD(ScatterPaKvCacheWithKScale);

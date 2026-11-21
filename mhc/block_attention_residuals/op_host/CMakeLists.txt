@@ -15,7 +15,7 @@ if (BUILD_OPEN_PROJECT)
     target_sources(op_host_aclnnExc PRIVATE
         block_attention_residuals_def.cpp
     )
-    if(CONDITION_UNIT STREQUAL "ascend950")
+    if(CONDITION_UNIT STREQUAL "ascend950" OR CONDITION_UNIT STREQUAL "ascend960dt" OR CONDITION_UNIT STREQUAL "ascend960pr")
         add_ops_compile_options(
             OP_NAME BlockAttentionResiduals
             OPTIONS --cce-auto-sync=off

@@ -104,6 +104,8 @@ public:
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("opFile.value", "block_attention_residuals_grad_apt"); // A5 regbase kernel entry.
         this->AICore().AddConfig("ascend950", aicoreConfig950);
+        this->AICore().AddConfig("ascend960dt", aicoreConfig950);
+        this->AICore().AddConfig("ascend960pr", aicoreConfig950);
     }
 };
 

@@ -14,7 +14,8 @@ if (BUILD_OPEN_PROJECT)
         scatter_pa_kv_cache_with_k_scale_def.cpp
     )
     get_npu_arch_by_soc_version("${ASCEND_COMPUTE_UNIT}" kv_cache_npu_arch)
-    if(kv_cache_npu_arch STREQUAL "dav_3510" OR kv_cache_npu_arch STREQUAL "dav_9201")
+    if(kv_cache_npu_arch STREQUAL "dav_3510" OR kv_cache_npu_arch STREQUAL "dav_9201"
+       OR kv_cache_npu_arch STREQUAL "dav_9202")
         add_ops_compile_options(
             OP_NAME ScatterPaKvCacheWithKScale
             COMPUTE_UNIT "${kv_cache_npu_arch}"
