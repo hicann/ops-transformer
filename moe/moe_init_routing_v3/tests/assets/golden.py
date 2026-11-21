@@ -293,12 +293,15 @@ def _moe_init_routing_v3_numpy(
 
     elif quant_mode == 0:
         expanded_scale = None
-        expanded_x = x[sorted_expert_indices[:actual_expert_total_num] // k, :]
-        x_fp16 = expanded_x.astype(numpy.float16)
-        scale_fp16 = scale.astype(numpy.float16)
-        expanded_x = x_fp16 * scale_fp16[0]
-        offset_fp16 = offset.astype(numpy.float16)
-        expanded_x = expanded_x + offset_fp16[0]
+        valid_num = min(actual_expert_total_num, x_out_num)
+        gathered_x = x[sorted_expert_indices[:valid_num] // k, :]
+        x_fp16 = gathered_x.astype(numpy.float16)
+        scale_val = scale.astype(numpy.float16)[0]
+        offset_val = numpy.float16(0)
+        if offset is not None:
+            offset_val = offset.astype(numpy.float16)[0]
+        expanded_x = x_fp16 * scale_val
+        expanded_x = expanded_x + offset_val
         expanded_x = numpy.rint(expanded_x)
         expanded_x = numpy.clip(expanded_x, -128, 127)
         expanded_x = expanded_x.astype(numpy.int8)

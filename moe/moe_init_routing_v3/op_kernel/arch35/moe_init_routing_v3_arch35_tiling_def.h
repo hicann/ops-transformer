@@ -16,6 +16,10 @@
 #ifndef __MOE_INIT_ROUTING_V3_ARCH35_TILING_DEF_H__
 #define __MOE_INIT_ROUTING_V3_ARCH35_TILING_DEF_H__
 
+// FP32 mantissa represents every integer in [-2^24, 2^24] exactly.
+// Shared by host tiling and kernel: do not redefine it on either side.
+constexpr int64_t FP32_EXACT_INT_MAX = 1LL << 24;
+
 // 单核排序阶段
 struct MoeV3Arch35VBSComputeTilingData {
     int64_t needCoreNum{0};
@@ -51,6 +55,9 @@ struct MoeV3Arch35ExpertTokensCountTilingData {
     int64_t lastCoreLoops{0};
     int64_t lastCorePerLoopElements{0};
     int64_t lastCoreLastLoopElements{0};
+    // FP32 vector total-count reduce switch, single truth owned by the host:
+    // enabled only when the precision gate holds AND the reduce buffer fits the UB budget.
+    int64_t expertTokensCountVecReduce{0};
 };
 
 // 拷出阶段

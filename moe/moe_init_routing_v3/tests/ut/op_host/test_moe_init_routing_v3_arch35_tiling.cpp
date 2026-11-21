@@ -528,8 +528,9 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_droppad_cols_z
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_01)
 {
     std::string expectTilingData =
-        "40 1 83 27 180 192 12 -1 0 0 0 0 256 1 1 0 1 27 0 0 0 0 1 27 1 27 27 27 1 27 27 6144 0 1024 27 1 1 1 1 1 1 "
-        "1 1 27 1 1 1 1 1 1 1 1 1 83 83 27 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
+        "40 1 83 27 180 192 12 -1 0 0 0 0 256 1 1 0 1 27 0 0 0 0 1 27 1 27 27 27 1 27 27 6144 0 1024 27 1 1 1 "
+        "1 1 1 1 1 1 27 1 1 1 1 1 1 1 1 1 83 83 27 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 "
+        "0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {16780660};
     RunSuccessTestcase(1, 83, 27, 0, 0, 1, true, QUANT_MODE_UNQUANT, 1, ge::DT_FLOAT, ge::DT_FLOAT, {180, 192},
                        ROW_IDX_TYPE_GATHER, ge::GRAPH_SUCCESS, 200000, expectTilingData, expectWorkspaces);
@@ -539,8 +540,9 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_01)
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_02)
 {
     std::string expectTilingData =
-        "40 1 83 27 180 192 12 -1 1 0 0 0 256 1 1 0 1 27 0 0 0 0 1 27 1 27 27 27 1 27 27 6144 0 1024 27 1 1 1 1 1 1 "
-        "1 1 27 1 1 1 1 1 1 1 1 1 83 83 27 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
+        "40 1 83 27 180 192 12 -1 1 0 0 0 256 1 1 0 1 27 0 0 0 0 1 27 1 27 27 27 1 27 27 6144 0 1024 27 1 1 1 "
+        "1 1 1 1 1 1 27 1 1 1 1 1 1 1 1 1 83 83 27 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 "
+        "0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {16780660};
     RunSuccessTestcase(1, 83, 27, 0, 0, 1, true, QUANT_MODE_UNQUANT, 0, ge::DT_FLOAT, ge::DT_FLOAT, {180, 192},
                        ROW_IDX_TYPE_SCATTER, ge::GRAPH_SUCCESS, 200000, expectTilingData, expectWorkspaces);
@@ -550,9 +552,9 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_02)
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_03)
 {
     std::string expectTilingData =
-        "40 160 96 1450 180 192 12 -1 0 0 0 0 256 1 1 0 1 232000 0 0 0 0 40 5824 1 5824 5824 4864 1 4864 4864 6144 "
-        "10 1024 40 5800 5800 1 5800 5800 1 5800 5800 40 5800 5800 8 744 592 8 744 592 1 96 96 232000 2 0 0 0 0 0 0 0 "
-        "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
+        "40 160 96 1450 180 192 12 -1 0 1 0 0 256 1 1 0 1 232000 0 0 0 0 40 5824 1 5824 5824 4864 1 4864 4864 "
+        "6144 10 1024 40 5800 5800 1 5800 5800 1 5800 5800 1 40 5800 5800 1 5800 5800 1 5800 5800 1 96 96 "
+        "232000 4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {23275904};
     RunSuccessTestcase(160, 96, 1450, 0, 0, 1, true, QUANT_MODE_UNQUANT, 0, ge::DT_INT8, ge::DT_INT8, {180, 192},
                        ROW_IDX_TYPE_GATHER, ge::GRAPH_SUCCESS, 11000000, expectTilingData, expectWorkspaces);
@@ -562,9 +564,9 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_03)
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_04)
 {
     std::string expectTilingData =
-        "40 160 96 1450 180 192 12 -1 1 0 0 0 256 1 1 0 1 232000 0 0 0 0 40 5824 1 5824 5824 4864 1 4864 4864 6144 "
-        "10 1024 40 5800 5800 1 5800 5800 1 5800 5800 40 5800 5800 25 234 184 25 234 184 1 96 96 232000 2 0 0 0 0 0 0 "
-        "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
+        "40 160 96 1450 180 192 12 -1 1 1 0 0 256 1 1 0 1 232000 0 0 0 0 40 5824 1 5824 5824 4864 1 4864 4864 "
+        "6144 10 1024 40 5800 5800 1 5800 5800 1 5800 5800 1 40 5800 5800 1 5800 5800 1 5800 5800 1 96 96 "
+        "232000 4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {23275904};
     RunSuccessTestcase(160, 96, 1450, 0, 0, 1, true, QUANT_MODE_UNQUANT, 0, ge::DT_FLOAT, ge::DT_FLOAT, {180, 192},
                        ROW_IDX_TYPE_SCATTER, ge::GRAPH_SUCCESS, 11001000, expectTilingData, expectWorkspaces);
@@ -574,8 +576,9 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_04)
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_05)
 {
     std::string expectTilingData =
-        "40 1 83 27 180 192 12 1 0 0 0 0 256 1 1 0 1 27 0 0 0 0 1 27 1 27 27 27 1 27 27 6144 0 1024 27 1 1 1 1 1 1 1 "
-        "1 27 1 1 1 1 1 1 1 1 1 83 83 27 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
+        "40 1 83 27 180 192 12 1 0 0 0 0 256 1 1 0 1 27 0 0 0 0 1 27 1 27 27 27 1 27 27 6144 0 1024 27 1 1 1 "
+        "1 1 1 1 1 1 27 1 1 1 1 1 1 1 1 1 83 83 27 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 "
+        "0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {16793940};
     RunSuccessTestcase(1, 83, 27, 0, 0, 1, true, QUANT_MODE_DYNAMIC, 1, ge::DT_FLOAT, ge::DT_INT8, {180, 192},
                        ROW_IDX_TYPE_GATHER, ge::GRAPH_SUCCESS, 220000, expectTilingData, expectWorkspaces);
@@ -585,8 +588,9 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_05)
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_06)
 {
     std::string expectTilingData =
-        "40 1 83 27 180 192 12 1 0 0 0 0 256 1 1 0 1 27 0 0 0 0 1 27 1 27 27 27 1 27 27 6144 0 1024 27 1 1 1 1 1 1 1 "
-        "1 27 1 1 1 1 1 1 1 1 1 83 83 27 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
+        "40 1 83 27 180 192 12 1 0 0 0 0 256 1 1 0 1 27 0 0 0 0 1 27 1 27 27 27 1 27 27 6144 0 1024 27 1 1 1 "
+        "1 1 1 1 1 1 27 1 1 1 1 1 1 1 1 1 83 83 27 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 "
+        "0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {16793940};
     RunSuccessTestcase(1, 83, 27, 0, 0, 1, true, QUANT_MODE_DYNAMIC, 0, ge::DT_FLOAT, ge::DT_INT8, {180, 192},
                        ROW_IDX_TYPE_GATHER, ge::GRAPH_SUCCESS, 220000, expectTilingData, expectWorkspaces);
@@ -596,8 +600,9 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_06)
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_07)
 {
     std::string expectTilingData =
-        "40 8 60 32 0 100 100 1 1 0 0 0 256 1 1 0 1 256 0 0 0 0 1 256 1 256 256 256 1 256 256 6144 0 1024 37 7 4 1 7 "
-        "7 1 4 4 37 7 4 1 7 7 1 4 4 1 60 60 256 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
+        "40 8 60 32 0 100 100 1 1 0 0 0 256 1 1 0 1 256 0 0 0 0 1 256 1 256 256 256 1 256 256 6144 0 1024 37 "
+        "7 4 1 7 7 1 4 4 1 37 7 4 1 7 7 1 4 4 1 60 60 256 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 "
+        "0 0 0 0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {16797376};
     RunSuccessTestcase(8, 60, 32, 0, 0, 1, true, QUANT_MODE_DYNAMIC, 1, ge::DT_FLOAT, ge::DT_INT8, {0, 100},
                        ROW_IDX_TYPE_SCATTER, ge::GRAPH_SUCCESS, 220000, expectTilingData, expectWorkspaces);
@@ -607,8 +612,9 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_07)
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_08)
 {
     std::string expectTilingData =
-        "40 8 60 32 0 100 100 1 1 0 0 0 256 1 1 0 1 256 0 0 0 0 1 256 1 256 256 256 1 256 256 6144 0 1024 37 7 4 1 7 "
-        "7 1 4 4 37 7 4 1 7 7 1 4 4 1 60 60 256 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
+        "40 8 60 32 0 100 100 1 1 0 0 0 256 1 1 0 1 256 0 0 0 0 1 256 1 256 256 256 1 256 256 6144 0 1024 37 "
+        "7 4 1 7 7 1 4 4 1 37 7 4 1 7 7 1 4 4 1 60 60 256 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 "
+        "0 0 0 0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {16797376};
     RunSuccessTestcase(8, 60, 32, 0, 0, 1, true, QUANT_MODE_DYNAMIC, 0, ge::DT_FLOAT, ge::DT_INT8, {0, 100},
                        ROW_IDX_TYPE_SCATTER, ge::GRAPH_SUCCESS, 220000, expectTilingData, expectWorkspaces);
@@ -618,9 +624,9 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_08)
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_09)
 {
     std::string expectTilingData =
-        "40 160 96 1450 180 192 12 1 0 0 0 0 256 1 1 0 1 232000 0 0 0 0 40 5824 1 5824 5824 4864 1 4864 4864 6144 10 "
-        "1024 40 5800 5800 1 5800 5800 1 5800 5800 40 5800 5800 1 5800 5800 1 5800 5800 1 96 96 232000 6 0 0 0 0 0 0 0 "
-        "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
+        "40 160 96 1450 180 192 12 1 0 0 0 0 256 1 1 0 1 232000 0 0 0 0 40 5824 1 5824 5824 4864 1 4864 4864 "
+        "6144 10 1024 40 5800 5800 1 5800 5800 1 5800 5800 1 40 5800 5800 1 5800 5800 1 5800 5800 1 96 96 "
+        "232000 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {23291264};
     RunSuccessTestcase(160, 96, 1450, 0, 0, 1, true, QUANT_MODE_DYNAMIC, 1, ge::DT_FLOAT, ge::DT_INT8, {180, 192},
                        ROW_IDX_TYPE_GATHER, ge::GRAPH_SUCCESS, 11020000, expectTilingData, expectWorkspaces);
@@ -630,9 +636,9 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_09)
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_10)
 {
     std::string expectTilingData =
-        "40 160 96 1450 180 192 12 1 0 0 0 0 256 1 1 0 1 232000 0 0 0 0 40 5824 1 5824 5824 4864 1 4864 4864 6144 10 "
-        "1024 40 5800 5800 1 5800 5800 1 5800 5800 40 5800 5800 1 5800 5800 1 5800 5800 1 96 96 232000 6 0 0 0 0 0 0 0 "
-        "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
+        "40 160 96 1450 180 192 12 1 0 0 0 0 256 1 1 0 1 232000 0 0 0 0 40 5824 1 5824 5824 4864 1 4864 4864 "
+        "6144 10 1024 40 5800 5800 1 5800 5800 1 5800 5800 1 40 5800 5800 1 5800 5800 1 5800 5800 1 96 96 "
+        "232000 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {23291264};
     RunSuccessTestcase(160, 96, 1450, 0, 0, 1, true, QUANT_MODE_DYNAMIC, 0, ge::DT_FLOAT, ge::DT_INT8, {180, 192},
                        ROW_IDX_TYPE_GATHER, ge::GRAPH_SUCCESS, 11020000, expectTilingData, expectWorkspaces);
@@ -642,9 +648,9 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_10)
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_11)
 {
     std::string expectTilingData =
-        "40 160 96 1450 0 100 100 1 1 0 0 0 256 1 1 0 1 232000 0 0 0 0 40 5824 1 5824 5824 4864 1 4864 4864 6144 10 "
-        "1024 40 5800 5800 1 5800 5800 1 5800 5800 40 5800 5800 1 5800 5800 1 5800 5800 1 96 96 232000 6 0 0 0 0 0 0 0 "
-        "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
+        "40 160 96 1450 0 100 100 1 1 0 0 0 256 1 1 0 1 232000 0 0 0 0 40 5824 1 5824 5824 4864 1 4864 4864 "
+        "6144 10 1024 40 5800 5800 1 5800 5800 1 5800 5800 1 40 5800 5800 1 5800 5800 1 5800 5800 1 96 96 "
+        "232000 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {23291968};
     RunSuccessTestcase(160, 96, 1450, 0, 0, 1, true, QUANT_MODE_DYNAMIC, 1, ge::DT_FLOAT, ge::DT_INT8, {0, 100},
                        ROW_IDX_TYPE_SCATTER, ge::GRAPH_SUCCESS, 11021000, expectTilingData, expectWorkspaces);
@@ -654,9 +660,9 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_11)
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_12)
 {
     std::string expectTilingData =
-        "40 160 96 1450 0 100 100 1 1 0 0 0 256 1 1 0 1 232000 0 0 0 0 40 5824 1 5824 5824 4864 1 4864 4864 6144 10 "
-        "1024 40 5800 5800 1 5800 5800 1 5800 5800 40 5800 5800 1 5800 5800 1 5800 5800 1 96 96 232000 6 0 0 0 0 0 0 0 "
-        "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
+        "40 160 96 1450 0 100 100 1 1 0 0 0 256 1 1 0 1 232000 0 0 0 0 40 5824 1 5824 5824 4864 1 4864 4864 "
+        "6144 10 1024 40 5800 5800 1 5800 5800 1 5800 5800 1 40 5800 5800 1 5800 5800 1 5800 5800 1 96 96 "
+        "232000 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {23291968};
     RunSuccessTestcase(160, 96, 1450, 0, 0, 1, true, QUANT_MODE_DYNAMIC, 0, ge::DT_FLOAT, ge::DT_INT8, {0, 100},
                        ROW_IDX_TYPE_SCATTER, ge::GRAPH_SUCCESS, 11021000, expectTilingData, expectWorkspaces);
@@ -666,9 +672,9 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_12)
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_13)
 {
     std::string expectTilingData =
-        "40 160 96 1450 0 100 100 1 1 0 0 0 256 1 1 0 1 232000 0 0 0 0 40 5824 1 5824 5824 4864 1 4864 4864 6144 10 "
-        "1024 40 5800 5800 1 5800 5800 1 5800 5800 40 5800 5800 1 5800 5800 1 5800 5800 1 96 96 232000 6 0 0 0 0 0 0 0 "
-        "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
+        "40 160 96 1450 0 100 100 1 1 0 0 0 256 1 1 0 1 232000 0 0 0 0 40 5824 1 5824 5824 4864 1 4864 4864 "
+        "6144 10 1024 40 5800 5800 1 5800 5800 1 5800 5800 1 40 5800 5800 1 5800 5800 1 5800 5800 1 96 96 "
+        "232000 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {23291968};
     RunSuccessTestcase(160, 96, 1450, 0, 0, 1, true, QUANT_MODE_DYNAMIC, 0, ge::DT_BF16, ge::DT_INT8, {0, 100},
                        ROW_IDX_TYPE_SCATTER, ge::GRAPH_SUCCESS, 11021000, expectTilingData, expectWorkspaces);
@@ -678,9 +684,9 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_13)
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_14)
 {
     std::string expectTilingData =
-        "40 160 96 1450 0 100 100 1 1 0 0 0 256 1 1 0 1 232000 0 0 0 0 40 5824 1 5824 5824 4864 1 4864 4864 6144 10 "
-        "1024 40 5800 5800 1 5800 5800 1 5800 5800 40 5800 5800 1 5800 5800 1 5800 5800 1 96 96 232000 6 0 0 0 0 0 0 0 "
-        "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
+        "40 160 96 1450 0 100 100 1 1 0 0 0 256 1 1 0 1 232000 0 0 0 0 40 5824 1 5824 5824 4864 1 4864 4864 "
+        "6144 10 1024 40 5800 5800 1 5800 5800 1 5800 5800 1 40 5800 5800 1 5800 5800 1 5800 5800 1 96 96 "
+        "232000 6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ";
     std::vector<size_t> expectWorkspaces = {23291968};
     RunSuccessTestcase(160, 96, 1450, 0, 0, 1, true, QUANT_MODE_DYNAMIC, 0, ge::DT_FLOAT16, ge::DT_INT8, {0, 100},
                        ROW_IDX_TYPE_SCATTER, ge::GRAPH_SUCCESS, 11021000, expectTilingData, expectWorkspaces);
@@ -735,10 +741,77 @@ TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_mxfp8_roundsca
 // MXFP4 E2M1 fullload
 TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_mxfp4)
 {
-    int64_t h = 83;
+    int64_t h = 84;
     RunArch35ExtendedTestcase(1, h, 27, 0, 0, EXPERT_TOKENS_TYPE_COUNT, true, QUANT_MODE_MXFP4_E2M1, ge::DT_FLOAT16,
                               {180, 192}, ROW_IDX_TYPE_GATHER, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT, kExpandedXDtypeAuto,
                               ge::GRAPH_SUCCESS);
+}
+
+TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_mxfp4_odd_cols)
+{
+    int64_t h = 83;
+    RunArch35ExtendedTestcase(1, h, 27, 0, 0, EXPERT_TOKENS_TYPE_COUNT, true, QUANT_MODE_MXFP4_E2M1, ge::DT_FLOAT16,
+                              {180, 192}, ROW_IDX_TYPE_GATHER, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT, kExpandedXDtypeAuto,
+                              ge::GRAPH_FAILED);
+}
+
+static void ExpectArch35TokensCountVecReduce(int64_t n, int64_t k, int64_t expertNum,
+                                             const std::vector<int64_t>& aciveExpertRange, int64_t expectedVecReduce)
+{
+    optiling::MoeInitRoutingV3CompileInfo compileInfo = {40, 262144, Ops::Base::DAV_3510};
+    int64_t expertRange = aciveExpertRange[1] - aciveExpertRange[0];
+    gert::TilingContextPara tilingContextPara(
+        "MoeInitRoutingV3",
+        {{{{n, 84}, {n, 84}}, ge::DT_FLOAT, ge::FORMAT_ND}, {{{n, k}, {n, k}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{{{n * k, 84}, {n * k, 84}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{n * k}, {n * k}}, ge::DT_INT32, ge::FORMAT_ND},
+         {{{expertRange}, {expertRange}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{n * k}, {n * k}}, ge::DT_FLOAT, ge::FORMAT_ND}},
+        {
+            {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(n * k)},
+            {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(expertNum)},
+            {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_tokens_num_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(EXPERT_TOKENS_TYPE_COUNT)},
+            {"expert_tokens_num_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+            {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(QUANT_MODE_UNQUANT)},
+            {"acive_expert_range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(aciveExpertRange)},
+            {"row_idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(ROW_IDX_TYPE_GATHER)},
+        },
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
+
+    TilingInfo tilingInfo;
+    ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
+    ASSERT_GE(tilingInfo.tilingDataSize, sizeof(MoeInitRoutingV3Arch35TilingData));
+    const auto* tilingData = reinterpret_cast<const MoeInitRoutingV3Arch35TilingData*>(tilingInfo.tilingData.get());
+    const auto& tokensCountTiling = tilingData->expertTokensCountTilingDataOp;
+    EXPECT_EQ(tokensCountTiling.expertTokensCountVecReduce, expectedVecReduce);
+    EXPECT_GT(tokensCountTiling.perCoreLoops, 0);
+    EXPECT_GT(tokensCountTiling.perCorePerLoopElements, 0);
+    EXPECT_GT(tokensCountTiling.perCoreLastLoopElements, 0);
+}
+
+// The FP32 vector total-count reduce is enabled for a regular COUNT + DROPLESS case within the budget.
+TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_tokens_count_vec_reduce_enabled)
+{
+    ExpectArch35TokensCountVecReduce(1, 27, EXPERT_NUM, {180, 192}, 1);
+}
+
+// The reduce buffer of actualExpertNum floats can overflow the remaining UB budget when the active
+// expert range is close to EXPERT_IDX_MAX; the vector reduce must be disabled and tiling still
+// succeeds, so the kernel falls back to the exact scalar accumulate loop.
+TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_tokens_count_vec_reduce_budget)
+{
+    ExpectArch35TokensCountVecReduce(1, 27, 10240, {0, 9900}, 0);
+}
+
+// Regression of the UB insufficiency window: with the old deduction the per-loop budget went
+// negative here (actualExpertNum = 9900 makes 16*CeilAlign(E,32) + AlignBytes(E,4) + 32 exceed
+// availUbSize), producing perCoreLoops = -2 / perCorePerLoopElements = -500 while tiling still
+// returned SUCCESS. The budget gate must keep every loop field positive.
+TEST_F(MoeInitRoutingV3Tiling, moe_init_routing_v3_tiling_regbase_tokens_count_vec_reduce_budget_large_nk)
+{
+    ExpectArch35TokensCountVecReduce(1000, 40, 10240, {0, 9900}, 0);
 }
 
 // FP8 PerBlock E5M2 fullload

@@ -58,7 +58,7 @@ private:
     constexpr static Reg::CastTrait castTraitF32ToF16 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
                                                          Reg::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
     constexpr static Reg::CastTrait castTraitF16ToI8 = {Reg::RegLayout::ZERO, Reg::SatMode::NO_SAT,
-                                                        Reg::MaskMergeMode::ZEROING, RoundMode::CAST_ROUND};
+                                                        Reg::MaskMergeMode::ZEROING, RoundMode::CAST_RINT};
 };
 
 template <typename T>
@@ -173,7 +173,6 @@ __aicore__ inline void MoeV3FullLoadStaticQuant<T>::ScatterOutXStaticQuant()
             DataCopyPad(inLocal[colsAlign_], xGm_[xSrcOffset], copyInParams, {false, 0, 0, 0});
         }
         inputXInQueue_.EnQue<T>(inLocal);
-
         Compute(1);
         inputXInQueue_.FreeTensor(inLocal);
 
@@ -208,9 +207,8 @@ __aicore__ inline void MoeV3FullLoadStaticQuant<T>::GatherOutXStaticQuant()
     }
 
     inputXInQueue_.EnQue<T>(xLocal);
-    SetWaitFlag<HardEvent::MTE2_V>(HardEvent::MTE2_V);
-
     Compute(rowLength);
+    inputXInQueue_.FreeTensor(xLocal);
 
     LocalTensor<int8_t> outLocal = inputXOutQueue_.DeQue<int8_t>();
     int64_t curIndex = startRowIdx;

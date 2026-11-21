@@ -873,10 +873,10 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::CheckSetInputs()
     tilingDataPtr_->k = k_;
     tilingDataPtr_->cols = cols_;
 
-    // INT4 dynamic quantization packs two values per byte along the H/cols dimension.
-    if (quantMode_ == QUANT_MODE_INT4_DYNAMIC && (cols_ % NUM_TWO != 0)) {
+    // INT4 and MXFP4 quantization pack two values per byte along the H/cols dimension.
+    if ((quantMode_ == QUANT_MODE_INT4_DYNAMIC || quantMode_ == QUANT_MODE_MXFP4_E2M1) && (cols_ % NUM_TWO != 0)) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "cols", std::to_string(cols_).c_str(),
-                                              "For INT4 dynamic quantization, cols must be even.");
+                                              "For INT4 dynamic and MXFP4 quantization, cols must be even.");
         return ge::GRAPH_FAILED;
     }
 
@@ -1338,6 +1338,7 @@ void MoeInitRoutingV3TilingArch35::LogExpertTokensCountTilingData()
     ss << "lastCoreLoops = " << expertTokensCountTiling->lastCoreLoops << "\n";
     ss << "lastCorePerLoopElements = " << expertTokensCountTiling->lastCorePerLoopElements << "\n";
     ss << "lastCoreLastLoopElements = " << expertTokensCountTiling->lastCoreLastLoopElements << "\n";
+    ss << "expertTokensCountVecReduce = " << expertTokensCountTiling->expertTokensCountVecReduce << "\n";
     OP_LOGI(context_, "%s", ss.str().c_str());
 }
 
@@ -1499,11 +1500,24 @@ void MoeInitRoutingV3TilingArch35::Tiling4ExpertTokensCountCompute()
     int64_t expertNumElement = (tilingDataPtr_->expertTokensNumType != EXPERT_TOKENS_TYPE_KEY_VALUE) ?
                                    tilingDataPtr_->actualExpertNum :
                                    (tilingDataPtr_->actualExpertNum + 1) * DIM_VALUE_TWO;
+    int64_t expertBufferBytes =
+        Ops::Base::CeilAlign(expertNumElement, UB_BLOCK_SIZE) *
+        (static_cast<int64_t>(sizeof(int32_t)) * NUM_TWO + static_cast<int64_t>(sizeof(int64_t)));
+    // The FP32 vector reduce path needs one extra buffer of actualExpertNum floats. Its precision is
+    // exact because every per-expert count and every partial sum is a non-negative integer <= 2^24.
+    // Enable it only when the buffer still leaves a positive per-loop budget; otherwise the kernel
+    // falls back to the scalar accumulate loop without this deduction.
+    bool expertTokensCountVecReduce = tilingDataPtr_->expertTokensNumType == EXPERT_TOKENS_TYPE_COUNT &&
+                                      dropPadMode_ == DROP_PAD_MODE_DROPLESS && totalElements <= FP32_EXACT_INT_MAX;
+    int64_t expertTokensCountVecWorkspaceBytes = 0;
+    if (expertTokensCountVecReduce) {
+        int64_t vecWorkspaceBytes = AlignBytes(tilingDataPtr_->actualExpertNum, sizeof(float));
+        expertTokensCountVecReduce = availUbSize_ - expertBufferBytes - vecWorkspaceBytes - UB_BLOCK_SIZE > 0;
+        expertTokensCountVecWorkspaceBytes = expertTokensCountVecReduce ? vecWorkspaceBytes : 0;
+    }
+    tokensCountTiling->expertTokensCountVecReduce = static_cast<int64_t>(expertTokensCountVecReduce);
     int64_t maxElementsPerLoop =
-        (availUbSize_ -
-         Ops::Base::CeilAlign(expertNumElement, UB_BLOCK_SIZE) *
-             (static_cast<int64_t>(sizeof(int32_t)) * NUM_TWO + static_cast<int64_t>(sizeof(int64_t))) -
-         UB_BLOCK_SIZE) /
+        (availUbSize_ - expertBufferBytes - expertTokensCountVecWorkspaceBytes - UB_BLOCK_SIZE) /
         static_cast<int64_t>(sizeof(int32_t));
     int64_t perCoreLoops = Ops::Base::CeilDiv(perCoreElements, maxElementsPerLoop);
     int64_t perCorePerLoopElements = Ops::Base::CeilDiv(perCoreElements, perCoreLoops);
@@ -1603,6 +1617,24 @@ void MoeInitRoutingV3TilingArch35::AlignInt4DynamicQuantPerLoopCols(PerLoopParam
 void MoeInitRoutingV3TilingArch35::SetPerLoopParams4NoQuantDropLess(PerLoopParams& perLoopParams,
                                                                     const int64_t perCoreIndicesElements)
 {
+    if (tilingDataPtr_->useGatherCopy) {
+        // Gather reuses one input row and its scale for all routes of that row.
+        const int64_t ubBytesPerBuffer = availUbSize_ / DOUBLE_BUFFER;
+        const int64_t scaleBytes = AlignBytes(1, sizeof(float));
+        const int64_t maxXBytes = ubBytesPerBuffer - scaleBytes - UB_BLOCK_SIZE;
+        while (AlignBytes(perLoopParams.perLoopCols, inputXDtypeSize_) > maxXBytes) {
+            perLoopParams.perLoopCols = Ops::Base::CeilDiv(perLoopParams.perLoopCols, NUM_TWO);
+        }
+        const int64_t xBytes = AlignBytes(perLoopParams.perLoopCols, inputXDtypeSize_);
+        const int64_t indexBytes = (ubBytesPerBuffer - scaleBytes - xBytes) / UB_BLOCK_SIZE * UB_BLOCK_SIZE;
+        perLoopParams.perLoopMaxIndicesElements =
+            std::min(indexBytes / static_cast<int64_t>(sizeof(int32_t)), perCoreIndicesElements);
+        const int64_t indexBufferBytes = AlignBytes(perLoopParams.perLoopMaxIndicesElements, sizeof(int32_t));
+        const int64_t ubBytesForFourXBuffers = NUM_FOUR * xBytes + DOUBLE_BUFFER * (indexBufferBytes + scaleBytes);
+        perLoopParams.xCopyInQueueBufferNum = ubBytesForFourXBuffers <= availUbSize_ ? NUM_FOUR : DOUBLE_BUFFER;
+        return;
+    }
+
     perLoopParams.perLoopMaxIndicesElements = availUbSize_ / NUM_TWO /
                                               (AlignBytes(perLoopParams.perLoopCols, inputXDtypeSize_) +
                                                AlignBytes(1, sizeof(float)) + static_cast<int64_t>(sizeof(int32_t)));
@@ -1832,6 +1864,8 @@ void MoeInitRoutingV3TilingArch35::Tiling4GatherOutMxQuant()
     int64_t needCoreNum = Ops::Base::CeilDiv(totalLength_, perCoreIndicesElements);
     int64_t lastCoreIndicesElements = totalLength_ - (needCoreNum - 1) * perCoreIndicesElements;
 
+    // In MXFP4 mode, output is packed by two values per byte. MX_QUANT_BLOCK_SIZE is 32 (even), so
+    // with the MXFP4 input cols parity check every column tile, including the tail, remains even.
     int64_t perLoopCols = Ops::Base::CeilAlign(tilingDataPtr_->cols, MX_QUANT_BLOCK_SIZE);
     int64_t perLoopMaxIndicesElements = CalcMaxRowIdxPerLoopMxQuant(perLoopCols);
     while (perLoopMaxIndicesElements <= 0 && perLoopCols > MX_QUANT_BLOCK_SIZE) {
@@ -1846,6 +1880,7 @@ void MoeInitRoutingV3TilingArch35::Tiling4GatherOutMxQuant()
         return;
     }
     int64_t colsLoops = Ops::Base::CeilDiv(tilingDataPtr_->cols, perLoopCols);
+    // In MXFP4 mode, cols and perLoopCols are even, so the tail tile is even as well.
     int64_t lastLoopCols = tilingDataPtr_->cols - (colsLoops - 1) * perLoopCols;
     gatherOutTiling->needCoreNum = needCoreNum; // 没用这个，kernel根据读取到的expertTotalCount重新计算tiling相关值
     gatherOutTiling->perCoreIndicesElements =
@@ -2261,13 +2296,13 @@ bool MoeInitRoutingV3TilingArch35::IsSupportGatherCopyKernels() const
     if (dropPadMode_ == DROP_PAD_MODE_DROPPAD) {
         return false;
     }
-    if (quantMode_ == QUANT_MODE_MXFP8_E5M2 || quantMode_ == QUANT_MODE_MXFP8_E4M3FN ||
+    if (quantMode_ == QUANT_MODE_UNQUANT || quantMode_ == QUANT_MODE_STATIC || quantMode_ == QUANT_MODE_HIF8_CAST ||
+        quantMode_ == QUANT_MODE_MXFP8_E5M2 || quantMode_ == QUANT_MODE_MXFP8_E4M3FN ||
         quantMode_ == QUANT_MODE_MXFP8_ROUNDSCALE_AMAX_E5M2 || quantMode_ == QUANT_MODE_MXFP8_ROUNDSCALE_AMAX_E4M3FN ||
         quantMode_ == QUANT_MODE_FP8_GROUP_E5M2 || quantMode_ == QUANT_MODE_FP8_GROUP_E4M3FN ||
-        quantMode_ == QUANT_MODE_FP8_GROUP_AMAX_E5M2 || quantMode_ == QUANT_MODE_FP8_GROUP_AMAX_E4M3FN) {
-        return true;
-    }
-    if (IsMXFP8NoQuantCase(quantMode_, xDtype_)) {
+        quantMode_ == QUANT_MODE_FP8_GROUP_AMAX_E5M2 || quantMode_ == QUANT_MODE_FP8_GROUP_AMAX_E4M3FN ||
+        quantMode_ == QUANT_MODE_MXFP4_E2M1 || quantMode_ == QUANT_MODE_FP8_PERBLOCK_E5M2 ||
+        quantMode_ == QUANT_MODE_FP8_PERBLOCK_E4M3FN) {
         return true;
     }
     return false;
@@ -2275,7 +2310,7 @@ bool MoeInitRoutingV3TilingArch35::IsSupportGatherCopyKernels() const
 
 void MoeInitRoutingV3TilingArch35::ComputeUseGatherCopy()
 {
-    if (IsSupportGatherCopyKernels()) {
+    if (IsSupportGatherCopyKernels() && !(isFullload_ && IsSupportFullloadQuantMode())) {
         // gather搬运收益与有效专家比例、专家数k成正比，当前阈值取3。
         tilingDataPtr_->useGatherCopy = ((expertEnd_ - expertStart_) * k_ > expertNum_ * NUM_THREE);
     } else {

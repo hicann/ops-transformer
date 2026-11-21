@@ -658,10 +658,19 @@ TEST_F(MoeInitRoutingV4Tiling, moe_init_routing_v4_tiling_mxfp8_roundscale_amax_
 // MXFP4 E2M1 fullload
 TEST_F(MoeInitRoutingV4Tiling, moe_init_routing_v4_tiling_mxfp4)
 {
-    int64_t h = 83;
+    int64_t h = 84;
     RunV4Testcase(1, h, 27, 0, 0, EXPERT_TOKENS_TYPE_COUNT, true, QUANT_MODE_MXFP4_E2M1, ge::DT_FLOAT16, {180, 192},
                   ROW_IDX_TYPE_GATHER, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT, kExpandedXDtypeAuto, false, 0, false,
                   ge::GRAPH_SUCCESS);
+}
+
+// MXFP4 E2M1 packs two values per byte, odd cols must be rejected
+TEST_F(MoeInitRoutingV4Tiling, moe_init_routing_v4_tiling_mxfp4_odd_cols)
+{
+    int64_t h = 83;
+    RunV4Testcase(1, h, 27, 0, 0, EXPERT_TOKENS_TYPE_COUNT, true, QUANT_MODE_MXFP4_E2M1, ge::DT_FLOAT16, {180, 192},
+                  ROW_IDX_TYPE_GATHER, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT, kExpandedXDtypeAuto, false, 0, false,
+                  ge::GRAPH_FAILED);
 }
 
 // FP8 PerBlock E5M2 fullload
@@ -800,7 +809,7 @@ TEST_F(MoeInitRoutingV4Tiling, moe_init_routing_v4_tiling_int4_odd_cols)
 // MXFP4 unsupported x dtype -> fail
 TEST_F(MoeInitRoutingV4Tiling, moe_init_routing_v4_tiling_mxfp4_bad_xdtype)
 {
-    RunV4Testcase(1, 83, 27, 0, 0, EXPERT_TOKENS_TYPE_COUNT, true, QUANT_MODE_MXFP4_E2M1, ge::DT_FLOAT, {180, 192},
+    RunV4Testcase(1, 84, 27, 0, 0, EXPERT_TOKENS_TYPE_COUNT, true, QUANT_MODE_MXFP4_E2M1, ge::DT_FLOAT, {180, 192},
                   ROW_IDX_TYPE_GATHER, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT, kExpandedXDtypeAuto, false, 0, false,
                   ge::GRAPH_FAILED);
 }

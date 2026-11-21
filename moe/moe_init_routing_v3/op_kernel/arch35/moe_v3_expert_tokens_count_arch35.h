@@ -56,6 +56,7 @@ private:
     TQue<QuePosition::VECIN, 1> expertCountTempInQueue_;
     TQue<QuePosition::VECOUT, 1> expertIdxCountOutQueue_;
     TQue<QuePosition::VECOUT, 1> expertTotalCountQueue_;
+    TBuf<TPosition::VECCALC> reduceFloatBuf_;
 
     const MoeV3Arch35ExpertTokensCountTilingData* expertTokensCountTilingData_;
     int64_t blockIdx_;
@@ -70,6 +71,7 @@ private:
     int64_t perCoreLastLoopElements_ = 0;
     int64_t actualExpertTotalNum_ = 0;
     int64_t expertNum_ = 0;
+    int64_t useFp32Vector_ = 0;
     int64_t expertTokensNumType_ = 0;
     int64_t expertCountElements_ = 0;
     int64_t coreNum_ = 0;
@@ -201,6 +203,9 @@ __aicore__ inline void ExpertTokensCount::InitBasicParams(const MoeInitRoutingV3
     totalLength_ = tilingData->n * tilingData->k;
     expertTokensNumFlag_ = tilingData->expertTokensNumFlag;
     needExpertTotalCount_ = static_cast<int64_t>(dropPadMode_ != DROP_PAD_MODE);
+    // Single truth from the host: the FP32 vector reduce is enabled only when the 2^24 precision
+    // gate holds AND the reduce buffer fits the UB budget the host reserved for it.
+    useFp32Vector_ = expertTokensCountTilingData_->expertTokensCountVecReduce;
 
     if (blockIdx_ == needCoreNum_ - 1) {
         curCoreElements_ = expertTokensCountTilingData_->lastCoreElements;
@@ -271,6 +276,9 @@ __aicore__ inline void ExpertTokensCount::Init(GM_ADDR expandedRowIdx, GM_ADDR e
     pipe_->InitBuffer(expertIdxCountOutQueue_, 1, AlignBytes(expertCountElements_, sizeof(int64_t)));
     if (needExpertTotalCount_) {
         pipe_->InitBuffer(expertTotalCountQueue_, 1, AlignBytes(1, sizeof(int32_t)));
+    }
+    if (expertTokensNumType_ == COUNT_MODE && needExpertTotalCount_ && useFp32Vector_) {
+        pipe_->InitBuffer(reduceFloatBuf_, AlignBytes(actualExpertNum_, sizeof(float)));
     }
 }
 
@@ -389,7 +397,19 @@ __aicore__ inline void ExpertTokensCount::expertCountCompute()
     } else if (expertTokensNumType_ == COUNT_MODE) {
         Cast(expertCountOutLocal, expertCountTempInLocal, RoundMode::CAST_NONE, actualExpertNum_);
         PipeBarrier<PIPE_V>();
-        if (needExpertTotalCount_) {
+        if (needExpertTotalCount_ && useFp32Vector_) {
+            // FP32 accumulation is exact on this gated path: every per-expert count and every
+            // partial sum is a non-negative integer <= FP32_EXACT_INT_MAX (2^24), which FP32
+            // represents and adds without rounding error.
+            LocalTensor<float> reduceFloatLocal = reduceFloatBuf_.Get<float>();
+            Cast(reduceFloatLocal, expertCountTempInLocal, RoundMode::CAST_NONE, actualExpertNum_);
+            PipeBarrier<PIPE_V>();
+            ReduceSum(reduceFloatLocal, reduceFloatLocal, reduceFloatLocal, static_cast<int32_t>(actualExpertNum_));
+            event_t eventIDVToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_S));
+            SetFlag<HardEvent::V_S>(eventIDVToS);
+            WaitFlag<HardEvent::V_S>(eventIDVToS);
+            actualExpertTotalNum_ = static_cast<int64_t>(reduceFloatLocal.GetValue(0));
+        } else if (needExpertTotalCount_) {
             for (int64_t i = 0; i < actualExpertNum_; i++) {
                 actualExpertTotalNum_ += static_cast<int64_t>(expertCountTempInLocal.GetValue(i));
             }

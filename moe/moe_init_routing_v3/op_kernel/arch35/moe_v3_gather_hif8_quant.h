@@ -38,6 +38,7 @@ public:
     __aicore__ inline void CopyXIn(int64_t xSrcOffset, int64_t curLoopCols);
     __aicore__ inline void XTransformToHif8(int64_t curLoopCols);
     __aicore__ inline void CopyXOut(int64_t xDstOffset, int64_t curLoopCols);
+    __aicore__ inline void GatherProcess(int64_t curLoopElements, int64_t curExpertLoopOffset);
 
 private:
     TPipe* pipe_;
@@ -77,6 +78,7 @@ private:
     int64_t expertTotalCount_;
 
     int64_t rowIdxType_ = 0;
+    int64_t useGatherCopy_ = 0;
 };
 
 template <typename T>
@@ -92,23 +94,29 @@ __aicore__ inline void MoeGatherOutHif8Quant<T>::Init(GM_ADDR x, GM_ADDR workspa
     k_ = tilingData->k;
 
     rowIdxType_ = tilingData->rowIdxType;
+    useGatherCopy_ = tilingData->useGatherCopy;
 
     colsLoops_ = tilingData->gatherOutComputeParamsOp.colsLoops;
     perLoopCols_ = tilingData->gatherOutComputeParamsOp.perLoopCols;
     lastLoopCols_ = tilingData->gatherOutComputeParamsOp.lastLoopCols;
 
     actualExpertNum_ = tilingData->actualExpertNum;
-    expertTotalCountGm_.SetGlobalBuffer(
-        (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 + Align(actualExpertNum_, sizeof(int32_t)), 1);
-    AscendC::DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE, AscendC::DcciDst::CACHELINE_OUT>(
-        expertTotalCountGm_);
-    expertTotalCount_ = expertTotalCountGm_.GetValue(0);
+    int64_t scanRowCount = n_ * k_;
+    if (!useGatherCopy_) {
+        expertTotalCountGm_.SetGlobalBuffer(
+            (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) * 2 + Align(actualExpertNum_, sizeof(int32_t)),
+            1);
+        AscendC::DataCacheCleanAndInvalid<int32_t, AscendC::CacheLine::SINGLE_CACHE_LINE,
+                                          AscendC::DcciDst::CACHELINE_OUT>(expertTotalCountGm_);
+        expertTotalCount_ = expertTotalCountGm_.GetValue(0);
+        scanRowCount = expertTotalCount_;
+    }
 
     perCorePerLoopIndicesElements_ = tilingData->gatherOutComputeParamsOp.perCorePerLoopIndicesElements;
     lastCorePerLoopIndicesElements_ = tilingData->gatherOutComputeParamsOp.lastCorePerLoopIndicesElements;
-    perCoreIndicesElements_ = Ceil(expertTotalCount_, tilingData->coreNum);
-    needCoreNum_ = Ceil(expertTotalCount_, perCoreIndicesElements_);
-    lastCoreIndicesElements_ = expertTotalCount_ - (needCoreNum_ - 1) * perCoreIndicesElements_;
+    perCoreIndicesElements_ = Ceil(scanRowCount, tilingData->coreNum);
+    needCoreNum_ = Ceil(scanRowCount, perCoreIndicesElements_);
+    lastCoreIndicesElements_ = scanRowCount - (needCoreNum_ - 1) * perCoreIndicesElements_;
 
     if (blockIdx_ == needCoreNum_ - 1) {
         curCoreIndicesElements_ = lastCoreIndicesElements_;
@@ -122,8 +130,12 @@ __aicore__ inline void MoeGatherOutHif8Quant<T>::Init(GM_ADDR x, GM_ADDR workspa
 
     xGm_.SetGlobalBuffer((__gm__ T*)x, n_ * cols_);
 
-    expandedXGm_.SetGlobalBuffer((__gm__ hifloat8_t*)expandedX + blockIdx_ * perCoreIndicesElements_ * cols_,
-                                 curCoreIndicesElements_ * cols_);
+    if (useGatherCopy_) {
+        expandedXGm_.SetGlobalBuffer((__gm__ hifloat8_t*)expandedX);
+    } else {
+        expandedXGm_.SetGlobalBuffer((__gm__ hifloat8_t*)expandedX + blockIdx_ * perCoreIndicesElements_ * cols_,
+                                     curCoreIndicesElements_ * cols_);
+    }
 
     pipe_->InitBuffer(expandedRowIdxCopyInQueue_, GATHER_HIF8_QUANT_BUFFER_NUM,
                       AlignBytes(curCorePerLoopIndicesElements_, sizeof(int32_t)));
@@ -133,13 +145,24 @@ __aicore__ inline void MoeGatherOutHif8Quant<T>::Init(GM_ADDR x, GM_ADDR workspa
     sortedExpertIdxGm_.SetGlobalBuffer((__gm__ int32_t*)workspace + blockIdx_ * perCoreIndicesElements_,
                                        Align(curCoreIndicesElements_, sizeof(int32_t)));
 
-    if (rowIdxType_ == SCATTER) {
-        expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
-                                          Align(curCoreIndicesElements_, sizeof(int32_t)));
+    if (useGatherCopy_) {
+        if (rowIdxType_ == SCATTER) {
+            expandedRowIdxGm_.SetGlobalBuffer(
+                (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreIndicesElements_,
+                Align(curCoreIndicesElements_, sizeof(int32_t)));
+        } else {
+            expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
+                                              Align(curCoreIndicesElements_, sizeof(int32_t)));
+        }
     } else {
-        expandedRowIdxGm_.SetGlobalBuffer(
-            (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreIndicesElements_,
-            Align(curCoreIndicesElements_, sizeof(int32_t)));
+        if (rowIdxType_ == SCATTER) {
+            expandedRowIdxGm_.SetGlobalBuffer((__gm__ int32_t*)expandedRowIdx + blockIdx_ * perCoreIndicesElements_,
+                                              Align(curCoreIndicesElements_, sizeof(int32_t)));
+        } else {
+            expandedRowIdxGm_.SetGlobalBuffer(
+                (__gm__ int32_t*)workspace + Align(n_ * k_, sizeof(int32_t)) + blockIdx_ * perCoreIndicesElements_,
+                Align(curCoreIndicesElements_, sizeof(int32_t)));
+        }
     }
 }
 
@@ -167,17 +190,13 @@ template <typename T>
 __aicore__ inline void MoeGatherOutHif8Quant<T>::XTransformToHif8(int64_t curLoopCols)
 {
     LocalTensor<T> xLocal = xCopyInQueue_.DeQue<T>();
-    LocalTensor<hifloat8_t> xRowLocalHif8;
+    LocalTensor<hifloat8_t> xRowLocalHif8 = xCopyOutQueue_.AllocTensor<hifloat8_t>();
     if constexpr (IsSameType<T, bfloat16_t>::value) {
-        LocalTensor<bfloat16_t> xRowLocal = xLocal[0];
-        xRowLocalHif8 = xRowLocal.ReinterpretCast<hifloat8_t>();
         LocalTensor<float> xLocalFloatTemp = xLocalFloatTempBuf_.Get<float>();
         Cast(xLocalFloatTemp, xLocal, RoundMode::CAST_NONE, curLoopCols);
         Cast(xRowLocalHif8, xLocalFloatTemp, RoundMode::CAST_ROUND, curLoopCols);
     } else if constexpr (IsSameType<T, half>::value) {
-        LocalTensor<half> xRowLocal = xLocal[0];
-        xRowLocalHif8 = xRowLocal.ReinterpretCast<hifloat8_t>();
-        Cast(xRowLocalHif8, xRowLocal, RoundMode::CAST_ROUND, curLoopCols);
+        Cast(xRowLocalHif8, xLocal, RoundMode::CAST_ROUND, curLoopCols);
     }
     xCopyOutQueue_.EnQue(xRowLocalHif8);
     xCopyInQueue_.FreeTensor(xLocal);
@@ -205,27 +224,71 @@ __aicore__ inline void MoeGatherOutHif8Quant<T>::Process()
             SetWaitFlag<HardEvent::S_MTE2>(HardEvent::S_MTE2);
             CopyExpertIn(curExpertLoopOffset, curLoopElements);
 
-            LocalTensor<int32_t> subRowIdxLocal = expandedRowIdxCopyInQueue_.DeQue<int32_t>();
-            SetWaitFlag<HardEvent::MTE2_S>(HardEvent::MTE2_S);
-            for (int64_t indicesIndex = 0; indicesIndex < curLoopElements; indicesIndex++) {
-                int64_t rowIdx = subRowIdxLocal.GetValue(indicesIndex);
-                int64_t xSrcOffset = rowIdx / k_ * cols_;
-                int64_t xDstOffset = (curExpertLoopOffset + indicesIndex) * cols_;
-                SetWaitFlag<HardEvent::S_MTE2>(HardEvent::S_MTE2);
-                int64_t curLoopCols = perLoopCols_;
-                for (int64_t colsLoop = 0; colsLoop < colsLoops_; colsLoop++) {
-                    if (colsLoop == colsLoops_ - 1) {
-                        curLoopCols = lastLoopCols_;
+            if (!useGatherCopy_) {
+                LocalTensor<int32_t> subRowIdxLocal = expandedRowIdxCopyInQueue_.DeQue<int32_t>();
+                SetWaitFlag<HardEvent::MTE2_S>(HardEvent::MTE2_S);
+                for (int64_t indicesIndex = 0; indicesIndex < curLoopElements; indicesIndex++) {
+                    int64_t rowIdx = subRowIdxLocal.GetValue(indicesIndex);
+                    int64_t xSrcOffset = rowIdx / k_ * cols_;
+                    int64_t xDstOffset = (curExpertLoopOffset + indicesIndex) * cols_;
+                    SetWaitFlag<HardEvent::S_MTE2>(HardEvent::S_MTE2);
+                    int64_t curLoopCols = perLoopCols_;
+                    for (int64_t colsLoop = 0; colsLoop < colsLoops_; colsLoop++) {
+                        if (colsLoop == colsLoops_ - 1) {
+                            curLoopCols = lastLoopCols_;
+                        }
+                        int64_t colsLoopOffset = colsLoop * perLoopCols_;
+                        CopyXIn(xSrcOffset + colsLoopOffset, curLoopCols);
+                        XTransformToHif8(curLoopCols);
+                        CopyXOut(xDstOffset + colsLoopOffset, curLoopCols);
                     }
-                    int64_t colsLoopOffset = colsLoop * perLoopCols_;
-                    CopyXIn(xSrcOffset + colsLoopOffset, curLoopCols);
-                    XTransformToHif8(curLoopCols);
-                    CopyXOut(xDstOffset + colsLoopOffset, curLoopCols);
                 }
+                expandedRowIdxCopyInQueue_.FreeTensor(subRowIdxLocal);
+            } else {
+                GatherProcess(curLoopElements, curExpertLoopOffset);
             }
-            expandedRowIdxCopyInQueue_.FreeTensor(subRowIdxLocal);
         }
     }
+}
+
+template <typename T>
+__aicore__ inline void MoeGatherOutHif8Quant<T>::GatherProcess(int64_t curLoopElements, int64_t curExpertLoopOffset)
+{
+    LocalTensor<int32_t> subRowIdxLocal = expandedRowIdxCopyInQueue_.DeQue<int32_t>();
+    SetWaitFlag<HardEvent::MTE2_S>(HardEvent::MTE2_S);
+
+    for (int64_t colsLoop = 0; colsLoop < colsLoops_; colsLoop++) {
+        int64_t curLoopCols = (colsLoop == colsLoops_ - 1) ? lastLoopCols_ : perLoopCols_;
+        int64_t colsLoopOffset = colsLoop * perLoopCols_;
+
+        int64_t globalSortIdx = perCoreIndicesElements_ * blockIdx_ + curExpertLoopOffset;
+        int64_t curLoopRow = 0;
+        int64_t currentLoopStartRow = globalSortIdx / k_;
+        int64_t currentLoopLastRow = (globalSortIdx + curLoopElements - 1) / k_;
+
+        for (int64_t row = currentLoopStartRow; row <= currentLoopLastRow; row++) {
+            // Skip the valid-slot pre-scan; replace the per-slot division with a slot boundary comparison.
+            const int64_t slotEnd = (row + 1) * k_;
+            SetWaitFlag<HardEvent::S_MTE2>(HardEvent::S_MTE2);
+            CopyXIn(row * cols_ + colsLoopOffset, curLoopCols);
+            XTransformToHif8(curLoopCols);
+
+            LocalTensor<hifloat8_t> outLocal = xCopyOutQueue_.DeQue<hifloat8_t>();
+            DataCopyExtParams copyOutParams{1, static_cast<uint32_t>(curLoopCols * sizeof(hifloat8_t)), 0, 0, 0};
+            while (curLoopRow < curLoopElements && globalSortIdx < slotEnd) {
+                int32_t outIndex = subRowIdxLocal.GetValue(curLoopRow);
+                curLoopRow++;
+                globalSortIdx++;
+                if (outIndex < 0) {
+                    continue;
+                }
+                int64_t outOffset = static_cast<int64_t>(outIndex) * cols_ + colsLoopOffset;
+                DataCopyPad(expandedXGm_[outOffset], outLocal, copyOutParams);
+            }
+            xCopyOutQueue_.FreeTensor(outLocal);
+        }
+    }
+    expandedRowIdxCopyInQueue_.FreeTensor(subRowIdxLocal);
 }
 } // namespace MoeInitRoutingV3
 #endif // MOE_V3_GATHER_HIF8_QUANT_H_REGBASE
