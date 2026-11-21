@@ -53,6 +53,10 @@ static constexpr int32_t ALLTOALLV_CREDIT_SENTINEL = -1;
 static constexpr uint32_t ALLTOALLV_MAX_PENDING = 8U; // 每 job 暂存未排空句柄的上限(攒满一批再统一 Drain)
 static constexpr uint32_t ALLTOALLV_MAX_COPY_BYTES = 65504U; // 单次 DataCopy 块上限
 static constexpr uint32_t ALLTOALLV_RETRY_COUNT = 3U;        // NBI 写失败重试
+// a2a job 份额: 每个 rank 1 个 send job, 其余 (rankSize-1) 个 rank 各 1 个 recv job
+static constexpr uint32_t ALLTOALLV_SEND_JOBS_PER_RANK = 1U;
+static constexpr uint32_t ALLTOALLV_RECV_JOBS_PER_PEER = 1U;
+static constexpr uint32_t ALLTOALLV_SELF_RANK_COUNT = 1U;
 
 template <AscendC::HardEvent event>
 __aicore__ inline void AllToAllvSyncFunc(AscendC::TPipe& pipe)
@@ -96,8 +100,11 @@ public:
         jobIndex_ = jobIndex;
         uint32_t maxPipelinesPerRank =
             (config_.numSlots < config_.channelsPerRank) ? config_.numSlots : config_.channelsPerRank;
+        // a2a 总 job 数 = rankSize 个 send job + (rankSize-1) 个 recv job
+        uint32_t totalJobSlots = config_.rankSize * ALLTOALLV_SEND_JOBS_PER_RANK +
+                                 (config_.rankSize - ALLTOALLV_SELF_RANK_COUNT) * ALLTOALLV_RECV_JOBS_PER_PEER;
         // 每 rank 的 核份额 = 预算 / (R + (R-1))
-        pipelinesPerRank_ = jobBudget / (2 * config_.rankSize - 1);
+        pipelinesPerRank_ = jobBudget / totalJobSlots;
         // 控核场景需要，否则例如4send核8rank会出现sendperank为0
         if (pipelinesPerRank_ < 1U) {
             pipelinesPerRank_ = 1U;
@@ -107,7 +114,7 @@ public:
         }
         // 至少需要2个任务，分给send一个，recv一个
         ascendc_assert(jobBudget >= 2U, "invalid jobBudget=%u (need >= 2: 1 send + 1 recv)", jobBudget);
-        uint32_t sendJobs = jobBudget * config_.rankSize / (2 * config_.rankSize - 1);
+        uint32_t sendJobs = jobBudget * config_.rankSize / totalJobSlots;
         // 整除floor，故需要再判断下是否真的大于，否则限制
         if (sendJobs > pipelinesPerRank_ * config_.rankSize) {
             sendJobs = pipelinesPerRank_ * config_.rankSize; // job 多于流水线无意义

@@ -24,6 +24,10 @@ constexpr uint32_t ACCUM_LIST_UB_OFFSET = 4U;
 constexpr uint32_t COMPACT_INDEX_UB_OFFSET = 3U;
 constexpr uint32_t DIRECT_FLAG_UB_OFFSET = 4U;
 constexpr uint32_t UNIQUE_DIFF_UB_OFFSET = 2U;
+// Dup/Run 链表与 CompactIdx、DirectFlag/AccumList 分时复用同一槽位, 槽内再拆前后半槽
+constexpr uint32_t DUP_START_UB_OFFSET = 3U;
+constexpr uint32_t DUP_END_UB_OFFSET = 4U;
+constexpr uint32_t RUN_COMPACT_UB_OFFSET = 4U;
 
 template <AscendC::HardEvent event>
 __aicore__ inline void SyncFunc(AscendC::TPipe& pipe)
@@ -412,19 +416,21 @@ public:
     }
     __aicore__ inline AscendC::LocalTensor<int32_t> DupStartUb()
     {
-        return entryBuf_->Get<int32_t>()[3 * Mc2Kernel::ENTRY_BATCH_CAP];
+        return entryBuf_->Get<int32_t>()[DUP_START_UB_OFFSET * Mc2Kernel::ENTRY_BATCH_CAP];
     }
     __aicore__ inline AscendC::LocalTensor<int32_t> DupCompactUb()
     {
-        return entryBuf_->Get<int32_t>()[3 * Mc2Kernel::ENTRY_BATCH_CAP + Mc2Kernel::ENTRY_BATCH_CAP / 2U];
+        return entryBuf_->Get<int32_t>()[DUP_START_UB_OFFSET * Mc2Kernel::ENTRY_BATCH_CAP +
+                                         Mc2Kernel::ENTRY_BATCH_CAP / ENTRY_BATCH_CAP_HALF];
     }
     __aicore__ inline AscendC::LocalTensor<int32_t> DupEndUb()
     {
-        return entryBuf_->Get<int32_t>()[4 * Mc2Kernel::ENTRY_BATCH_CAP];
+        return entryBuf_->Get<int32_t>()[DUP_END_UB_OFFSET * Mc2Kernel::ENTRY_BATCH_CAP];
     }
     __aicore__ inline AscendC::LocalTensor<int32_t> RunCompactUb()
     {
-        return entryBuf_->Get<int32_t>()[4 * Mc2Kernel::ENTRY_BATCH_CAP + Mc2Kernel::ENTRY_BATCH_CAP / 2U];
+        return entryBuf_->Get<int32_t>()[RUN_COMPACT_UB_OFFSET * Mc2Kernel::ENTRY_BATCH_CAP +
+                                         Mc2Kernel::ENTRY_BATCH_CAP / ENTRY_BATCH_CAP_HALF];
     }
 
 private:
