@@ -147,8 +147,8 @@ private:
     uint64_t combineStateWinOffset_{0};
     uint64_t combineDataWinOffset_{0};
 
-    static constexpr uint32_t kTokenWqebbCount = (HasTopkWeight == 1) ? 2U : 1U;
-    static constexpr uint32_t kPipeAddrElemsPerBatch = METADATA_BATCH_TOKENS * ((HasTopkWeight == 1) ? 3U : 2U);
+    static constexpr uint32_t TOKEN_WQEBB_COUNT = (HasTopkWeight == 1) ? 2U : 1U;
+    static constexpr uint32_t PIPE_ADDR_ELEMS_PER_BATCH = METADATA_BATCH_TOKENS * ((HasTopkWeight == 1) ? 3U : 2U);
 
     uint32_t perSlotBytes_{0};
     uint64_t actualA_{0};
@@ -277,7 +277,7 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::InitMetadata(
         topkWeightsGm_.SetGlobalBuffer((__gm__ float*)topkWeights);
     }
     tpipe_->InitBuffer(metaPipeBuf_, METADATA_BATCH_ELEMS * sizeof(int32_t) * 2U);
-    tpipe_->InitBuffer(addrPipeBuf_, kPipeAddrElemsPerBatch * sizeof(uint64_t) * 2U);
+    tpipe_->InitBuffer(addrPipeBuf_, PIPE_ADDR_ELEMS_PER_BATCH * sizeof(uint64_t) * 2U);
     tpipe_->InitBuffer(readStateBuf_, WIN_ADDR_ALIGN);
     statusTensor_ = readStateBuf_.Get<uint32_t>();
 }
@@ -464,7 +464,7 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::ConsumeBatchA
     if (chunk.count != 0U) {
         BeginPreparedWrites(chunk.rank, jettyIndex_);
         LocalTensor<uint64_t> addrUb = addrPipeBuf_.Get<uint64_t>();
-        const uint32_t regionOff = buffer * kPipeAddrElemsPerBatch;
+        const uint32_t regionOff = buffer * PIPE_ADDR_ELEMS_PER_BATCH;
         GM_ADDR remoteDataBase = GetUrmaWinAddrByRankId(chunk.rank, combineDataWinOffset_);
         GM_ADDR xBase = reinterpret_cast<GM_ADDR>(xGm_.GetPhyAddr(0));
         GM_ADDR weightBase = nullptr;
@@ -474,12 +474,12 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::ConsumeBatchA
         const uint64_t tokenBytes = static_cast<uint64_t>(axisH_) * sizeof(XType);
         uint32_t token = 0U;
         while (token < chunk.count) {
-            ReservePreparedWrites(kTokenWqebbCount);
-            const uint32_t batchCap = (HCOMM_BATCH_CAPACITY - preparedWriteCount_) / kTokenWqebbCount;
+            ReservePreparedWrites(TOKEN_WQEBB_COUNT);
+            const uint32_t batchCap = (HCOMM_BATCH_CAPACITY - preparedWriteCount_) / TOKEN_WQEBB_COUNT;
             // Leave room for one CQE-bearing request before the SQ is exhausted.
             const uint32_t remainingSq = HCOMM_SQ_CAPACITY - sqPendingWqebb_;
             const uint32_t sqCap =
-                remainingSq > HCOMM_MAX_WRITE_WQEBB ? (remainingSq - HCOMM_MAX_WRITE_WQEBB) / kTokenWqebbCount : 0U;
+                remainingSq > HCOMM_MAX_WRITE_WQEBB ? (remainingSq - HCOMM_MAX_WRITE_WQEBB) / TOKEN_WQEBB_COUNT : 0U;
             uint32_t run = chunk.count - token;
             run = run < batchCap ? run : batchCap;
             run = run < sqCap ? run : sqCap;
@@ -489,7 +489,7 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::ConsumeBatchA
                     EmitTokenWrite<DEFAULT_WQE_CONFIG>(regionOff, token, addrUb, remoteDataBase, xBase, weightBase,
                                                        tokenBytes);
                 }
-                const uint32_t used = run * kTokenWqebbCount;
+                const uint32_t used = run * TOKEN_WQEBB_COUNT;
                 preparedWriteCount_ += used;
                 sqPendingWqebb_ += used;
             } else {
@@ -497,7 +497,7 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::ConsumeBatchA
                 EmitTokenWrite<DEFAULT_CQE_WQE_CONFIG>(regionOff, token, addrUb, remoteDataBase, xBase, weightBase,
                                                        tokenBytes);
                 ++token;
-                preparedWriteCount_ += kTokenWqebbCount;
+                preparedWriteCount_ += TOKEN_WQEBB_COUNT;
                 ++preparedCqeCount_;
                 FlushPreparedWrites(true);
                 hcomm_.Drain(activeBatchHandle_.handle);
@@ -558,7 +558,7 @@ __aicore__ inline void MoeEpCombine<TemplateMoeEpCombineTypeFunc>::PrepareBatchA
     if (chunk.count != 0U) {
         WaitFlag<HardEvent::MTE2_V>(evMte2V_[buffer]);
         LocalTensor<int32_t> metaUb = metaPipeBuf_.Get<int32_t>()[buffer * METADATA_BATCH_ELEMS];
-        LocalTensor<uint64_t> addrUb = addrPipeBuf_.Get<uint64_t>()[buffer * kPipeAddrElemsPerBatch];
+        LocalTensor<uint64_t> addrUb = addrPipeBuf_.Get<uint64_t>()[buffer * PIPE_ADDR_ELEMS_PER_BATCH];
         BuildBatchAddrs(chunk.count, (__ubuf__ uint32_t*)metaUb.GetPhyAddr(), (__ubuf__ uint64_t*)addrUb.GetPhyAddr());
         SetFlag<HardEvent::V_S>(evVS_[buffer]);
     }

@@ -254,9 +254,10 @@ private:
     {
         CheckHccl(HcclGetRankIdFunc(comm_, &context_.epRankId), "HcclGetRankId");
         CheckHccl(HcclGetRankSizeFunc(comm_, &rankSize_), "HcclGetRankSize");
-        TORCH_CHECK(rankSize_ >= 2U && rankSize_ <= Mc2Kernel::MOE_SHARED_JETTY_MAX_RANK_SIZE,
-                    "MoE shared Jetty rank size must be in [2, ", Mc2Kernel::MOE_SHARED_JETTY_MAX_RANK_SIZE, "], got ",
-                    rankSize_);
+        TORCH_CHECK(rankSize_ >= Mc2Kernel::MOE_SHARED_JETTY_MIN_RANK_SIZE &&
+                        rankSize_ <= Mc2Kernel::MOE_SHARED_JETTY_MAX_RANK_SIZE,
+                    "MoE shared Jetty rank size must be in [", Mc2Kernel::MOE_SHARED_JETTY_MIN_RANK_SIZE, ", ",
+                    Mc2Kernel::MOE_SHARED_JETTY_MAX_RANK_SIZE, "], got ", rankSize_);
         TORCH_CHECK(context_.epRankId < rankSize_, "Invalid shared Jetty rank ID: ", context_.epRankId);
         context_.epRankSize = rankSize_;
         context_.sharedJettyNum = Mc2Kernel::MOE_SHARED_JETTY_NUM;

@@ -19,6 +19,7 @@ namespace Mc2Kernel {
 constexpr uint32_t MOE_SHARED_JETTY_NUM = 64;
 constexpr uint32_t MOE_SHARED_JETTY_SQ_DEPTH = 4096;
 constexpr uint32_t MOE_SHARED_JETTY_CQ_DEPTH = 64;
+constexpr uint32_t MOE_SHARED_JETTY_MIN_RANK_SIZE = 2;
 constexpr uint32_t MOE_SHARED_JETTY_MAX_RANK_SIZE = 1024;
 
 struct MoeSharedJettyContext {
