@@ -38,7 +38,7 @@ constexpr AscendC::Reg::CastTrait kMxScoreHalfToFloat = {AscendC::Reg::RegLayout
 
 // One page reduction stays in registers until the final FP32 stage scatter.
 // Scatter uses element indices (u32 for FP32); only lane zero is written.
-template <bool FINITE_FILL, bool LEGACY_ADDS>
+template <bool LEGACY_ADDS>
 __simd_vf__ inline void MxReducePagesToStageVf(__ubuf__ half* src, __ubuf__ float* dst, uint32_t rows, uint32_t pages,
                                                uint32_t stageStride, uint32_t srcRowStride)
 {
@@ -56,9 +56,6 @@ __simd_vf__ inline void MxReducePagesToStageVf(__ubuf__ half* src, __ubuf__ floa
             AscendC::Reg::LoadAlign(values, src + row * rowStride + page * MSA_BLOCK_SIZE);
             AscendC::Reg::ReduceMax(maximum, values, allHalf);
             AscendC::Reg::Cast<float, half, kMxScoreHalfToFloat>(fp32, maximum, firstFloat);
-            if constexpr (FINITE_FILL) {
-                AscendC::Reg::Maxs(fp32, fp32, MSA_FILL_VALUE, firstFloat);
-            }
             if constexpr (LEGACY_ADDS) {
                 AscendC::Reg::Adds(fp32, fp32, 0.0F, firstFloat);
             }
@@ -68,7 +65,7 @@ __simd_vf__ inline void MxReducePagesToStageVf(__ubuf__ half* src, __ubuf__ floa
 }
 // Reads only the existing fallback WRM half maxima. No new half-UB round trip.
 // Columns already written by the direct prefix keep exclusive stage ownership.
-template <bool FINITE_FILL, bool LEGACY_ADDS>
+template <bool LEGACY_ADDS>
 __simd_vf__ inline void MxScatterFallbackColumnsVf(__ubuf__ half* src, __ubuf__ float* dst, uint32_t rows,
                                                    uint32_t endCol, uint32_t firstFallbackCol, uint32_t stageStride)
 {
@@ -83,9 +80,6 @@ __simd_vf__ inline void MxScatterFallbackColumnsVf(__ubuf__ half* src, __ubuf__ 
             AscendC::Reg::LoadAlign<half, AscendC::Reg::LoadDist::DIST_BRC_B16>(maximum,
                                                                                 src + row * MSA_BLOCKS_PER_STILE + col);
             AscendC::Reg::Cast<float, half, kMxScoreHalfToFloat>(fp32, maximum, firstFloat);
-            if constexpr (FINITE_FILL) {
-                AscendC::Reg::Maxs(fp32, fp32, MSA_FILL_VALUE, firstFloat);
-            }
             if constexpr (LEGACY_ADDS) {
                 AscendC::Reg::Adds(fp32, fp32, 0.0F, firstFloat);
             }
@@ -437,8 +431,7 @@ public:
                 } else if (nPages == 2U) {
                     MxBatchPageMaxToStageVf<2U>(src, dst, mSub_, nPages * MSA_BLOCK_SIZE, MSA_STAGE_BLOCKS);
                 } else {
-                    MxReducePagesToStageVf<false, false>(src, dst, mSub_, nPages, MSA_STAGE_BLOCKS,
-                                                         nPages * MSA_BLOCK_SIZE);
+                    MxReducePagesToStageVf<false>(src, dst, mSub_, nPages, MSA_STAGE_BLOCKS, nPages * MSA_BLOCK_SIZE);
                 }
                 AscendC::PipeBarrier<PIPE_V>();
                 return nPages;
@@ -459,25 +452,14 @@ public:
                 return 0U;
             }
             const uint32_t directPages = MsaMinU32(nPages, directEnd - blk);
-            const bool needFill = stileEnd > task.visibleEndBlk || stileEnd > task.sBlkEnd;
-            // A partial direct stile bypasses the old col0 setup. Only actual
-            // fallback columns will be read later, so no ubRed16 prefill needed.
-            if (directEnd < stileEnd) {
-                stileNeedFill_ = needFill;
-            }
             AdvanceStageWindow(blk);
             auto page = ubSPing_[ping].template ReinterpretCast<half>();
             auto* src = reinterpret_cast<__ubuf__ half*>(page.GetPhyAddr());
             auto* dst = reinterpret_cast<__ubuf__ float*>(ubStage_.GetPhyAddr()) + blk - stageBlkBase_;
-            if (needFill) {
-                MxReducePagesToStageVf<true, true>(src, dst, mSub_, directPages, MSA_STAGE_BLOCKS,
-                                                   nPages * MSA_BLOCK_SIZE);
-            } else if (directEnd < stileEnd && (mSub_ & 1U) != 0U) {
-                MxReducePagesToStageVf<false, true>(src, dst, mSub_, directPages, MSA_STAGE_BLOCKS,
-                                                    nPages * MSA_BLOCK_SIZE);
+            if (stileEnd > task.visibleEndBlk || stileEnd > task.sBlkEnd || (mSub_ & 1U) != 0U) {
+                MxReducePagesToStageVf<true>(src, dst, mSub_, directPages, MSA_STAGE_BLOCKS, nPages * MSA_BLOCK_SIZE);
             } else {
-                MxReducePagesToStageVf<false, false>(src, dst, mSub_, directPages, MSA_STAGE_BLOCKS,
-                                                     nPages * MSA_BLOCK_SIZE);
+                MxReducePagesToStageVf<false>(src, dst, mSub_, directPages, MSA_STAGE_BLOCKS, nPages * MSA_BLOCK_SIZE);
             }
             AscendC::PipeBarrier<PIPE_V>();
             mxDirectColumnMask_ |= ((1U << directPages) - 1U) << (blk - stileBase);
@@ -511,7 +493,6 @@ public:
                 AscendC::Duplicate(ubRed16_, FILL_VALUE_H, MSA_A5_S_PING_ROWS * MSA_BLOCKS_PER_STILE);
                 AscendC::PipeBarrier<PIPE_V>();
             }
-            stileNeedFill_ = needFill;
         }
         const bool invalid = (blk >= task.visibleEndBlk);
         if (!invalid) {
@@ -574,7 +555,6 @@ public:
                     AscendC::Duplicate(ubRed16_, FILL_VALUE_H, MSA_A5_S_PING_ROWS * MSA_BLOCKS_PER_STILE);
                     AscendC::PipeBarrier<PIPE_V>();
                 }
-                stileNeedFill_ = needFill;
             }
             if (cur < task.visibleEndBlk) {
                 ApplyMaskPageHalf(task, cur, ubPageH, rowStride, i * MSA_BLOCK_SIZE);
@@ -748,8 +728,7 @@ public:
         if (!compact) {
             ReleaseSPing(ping);
         }
-        // 与 block128 的 ReduceStileToStage 同手法：本组没填过 -inf、也没有 local mask 时，下界保护
-        // 和经 ubRowMax_ 的中转搬运都是恒等变换，一条带 stride 的 Cast 直接落 stage，省两道 barrier。
+        // 无 mask 时 Cast 可直接落 stage，写回 GM 前统一做下界保护。
         // ubRed16_ 每行 nBlocks 个 half，不足一个 datablock 时 srcRepStride 表达不出来，故要求整除。
         const bool noLocalMask = (task.initBlocks == 0U) && (task.localBlocks == 0U);
         if (!masked && noLocalMask && ((nBlocks % MSA_HALF_PER_BLOCK) == 0U)) {
@@ -761,9 +740,6 @@ public:
             return true;
         }
         AscendC::Cast(ubRowMax_, ubRed16_, AscendC::RoundMode::CAST_NONE, stageRows_ * nBlocks);
-        AscendC::PipeBarrier<PIPE_V>();
-        // fp16 域的 -inf 填充抬回 fp32 的 MSA_FILL_VALUE，与其他路径一致。
-        AscendC::Maxs<float>(ubRowMax_, ubRowMax_, MSA_FILL_VALUE, static_cast<int32_t>(stageRows_ * nBlocks));
         AscendC::PipeBarrier<PIPE_V>();
         ApplyLocalMaskUb(task, blkBase, stageRows_, mOff_, nWin);
         StageScore(blkBase, 0, stageRows_, nWin);
@@ -1057,6 +1033,24 @@ private:
             firstRow = writeStart > rowInReqBase_ ? MsaMinU32(mSub_, writeStart - rowInReqBase_) : 0U;
             if (firstRow >= mSub_) {
                 return;
+            }
+        }
+        if constexpr (MSA_A5_USE_C2UB && (!IS_BLOCK16 || IS_MXFP4)) {
+            // Both row masking and FP16 overflow can leave -inf in stage.
+            const uint32_t firstStageRow = IS_BLOCK16 ? firstRow / numQHeads_ : firstRow;
+            const uint32_t rows = stageRows_ - firstStageRow;
+            auto dst = ubStage_[firstStageRow * MSA_STAGE_BLOCKS + ubOff];
+            if (count == MSA_STAGE_BLOCKS) {
+                AscendC::Maxs<float>(dst, dst, MSA_FILL_VALUE, static_cast<int32_t>(rows * count));
+            } else {
+                constexpr uint16_t rowStride = MSA_STAGE_BLOCKS / MSA_FP32_PER_BLOCK;
+                for (uint32_t col = 0; col < count; col += MSA_FP32_PER_REPEAT) {
+                    auto slice = dst[col];
+                    const uint32_t width = MsaMinU32(count - col, MSA_FP32_PER_REPEAT);
+                    AscendC::Maxs<float>(slice, slice, MSA_FILL_VALUE, static_cast<uint64_t>(width),
+                                         static_cast<uint8_t>(rows),
+                                         AscendC::UnaryRepeatParams(1, 1, rowStride, rowStride));
+                }
             }
         }
         // Flush 只需 V→MTE3 同步；PIPE_ALL 在消融中无收益且偏重，已去掉。
@@ -1691,6 +1685,8 @@ private:
     /// 注：行距补到 16 half 对齐过（19.45 B1），RV_VSTAI/VSTUI 条数不变，已撤。
     __aicore__ inline void ReduceStileToStage(const MsaTask& task, uint32_t blkBase)
     {
+        const uint32_t stileEnd = blkBase + MSA_BLOCKS_PER_STILE;
+        const bool partialStile = stileEnd > task.visibleEndBlk || stileEnd > task.sBlkEnd;
 #if !defined(__DAV_C310_CUBE__) && !defined(__DAV_310R6_CUBE__)
         if constexpr (IS_MXFP4 && MX_FUSED_STAGE && !IS_BLOCK16 && !IS_QUANT) {
             if (mxDirectStileBase_ == blkBase && mxDirectColumnMask_ != 0U) {
@@ -1707,14 +1703,10 @@ private:
                        (mxDirectColumnMask_ & (1U << firstFallbackCol)) != 0U) {
                     ++firstFallbackCol;
                 }
-                if (stileNeedFill_) {
-                    MxScatterFallbackColumnsVf<true, true>(src, dst, mSub_, endCol, firstFallbackCol, MSA_STAGE_BLOCKS);
-                } else if ((mSub_ & 1U) != 0U) {
-                    MxScatterFallbackColumnsVf<false, true>(src, dst, mSub_, endCol, firstFallbackCol,
-                                                            MSA_STAGE_BLOCKS);
+                if (partialStile || (mSub_ & 1U) != 0U) {
+                    MxScatterFallbackColumnsVf<true>(src, dst, mSub_, endCol, firstFallbackCol, MSA_STAGE_BLOCKS);
                 } else {
-                    MxScatterFallbackColumnsVf<false, false>(src, dst, mSub_, endCol, firstFallbackCol,
-                                                             MSA_STAGE_BLOCKS);
+                    MxScatterFallbackColumnsVf<false>(src, dst, mSub_, endCol, firstFallbackCol, MSA_STAGE_BLOCKS);
                 }
                 AscendC::PipeBarrier<PIPE_V>();
                 return;
@@ -1724,7 +1716,7 @@ private:
         const uint32_t nElem = mSub_ * MSA_BLOCKS_PER_STILE;
         const bool noLocalMask = (task.initBlocks == 0U) && (task.localBlocks == 0U);
         // stage 行数在 block16 下是 token 数，与 mSub_ 不等时这条融合写的行距不成立。
-        if (stageOn_ && !stileNeedFill_ && noLocalMask && (stageRows_ == mSub_) && (mSub_ >= 2U) &&
+        if (stageOn_ && !partialStile && noLocalMask && (stageRows_ == mSub_) && (mSub_ >= 2U) &&
             ((mSub_ & 1U) == 0U)) {
             constexpr uint64_t kMaskTwoRows = static_cast<uint64_t>(2U * MSA_BLOCKS_PER_STILE);           // 16
             constexpr uint8_t kStageRowBlk = static_cast<uint8_t>(MSA_STAGE_BLOCKS / MSA_FP32_PER_BLOCK); // 32
@@ -1738,10 +1730,6 @@ private:
         }
         AscendC::Cast(ubRowMax_, ubRed16_, AscendC::RoundMode::CAST_NONE, nElem);
         AscendC::PipeBarrier<PIPE_V>();
-        if (stileNeedFill_) {
-            AscendC::Maxs<float>(ubRowMax_, ubRowMax_, MSA_FILL_VALUE, static_cast<int32_t>(nElem));
-            AscendC::PipeBarrier<PIPE_V>();
-        }
         ApplyLocalMaskUb(task, blkBase, mSub_, mOff_);
         StageScore(blkBase, 0, mSub_);
     }
@@ -1862,7 +1850,6 @@ private:
     bool needTokenLocalMask_ = false;
     uint32_t mxDirectColumnMask_ = 0U;
     uint32_t mxDirectStileBase_ = ~0U;
-    bool stileNeedFill_ = true; // 当前 stile 是否预填了 -inf（不满/有不可见列）
 
     uint32_t numQHeads_ = 1;
     uint32_t strideOutHead_ = 0;
