@@ -164,7 +164,7 @@ class ElasticBufferOpBuilder(OpBuilder):
         """PyTorch operator signature."""
         return [
             "engram_fetch(Tensor context, Tensor indices, int hidden_size, "
-            "int num_entries, int dtype, Tensor sf_table) -> (Tensor, Tensor)",
+            "int num_entries, int dtype, Tensor sf_table, int hybrid_mode) -> (Tensor, Tensor)",
             "engram_fetch_train(Tensor context, Tensor indices, int hidden_size, "
             "int num_entries, int dtype, Tensor local_storage_addr, "
             "ScalarType sf_dtype, int sf_packs, Tensor sf_table_addr, "
@@ -188,6 +188,7 @@ class ElasticBufferOpBuilder(OpBuilder):
             num_entries,
             dtype,
             sf_table,
+            hybrid_mode,
         ):
             fetched = torch.empty(
                 (indices.size(0), hidden_size),
@@ -330,6 +331,7 @@ def engram_fetch(
     num_entries,
     dtype,
     sf_table,
+    hybrid_mode,
 ):
     op_module = _elastic_buffer_op_builder.load()
     return op_module.ElasticBuffer.engram_fetch(
@@ -339,6 +341,7 @@ def engram_fetch(
         num_entries,
         dtype,
         sf_table,
+        hybrid_mode,
     )
 
 
@@ -715,6 +718,7 @@ class ElasticBuffer:
         explicitly_destroy: bool = False,
         netlayer: str = "auto",
         comm_alg: str = "auto",
+        allow_hybrid_mode: int = 0,
     ):
         """
         Initialize the ElasticBuffer.
@@ -747,7 +751,17 @@ class ElasticBuffer:
                 with 64 Jettys for both dispatch and combine.
                 Empty strings are not supported. Clos-only mode requires
                 direct topology and rejects UBG (UB_RTP) links.
+            allow_hybrid_mode: engram rail-aligned communication switch,
+                When enabled, engram communication
+                builds links along the rail-aligned topology: direct connections within
+                a supernode, and same-rank-number channels across supernodes; topology
+                is auto-detected.
         """
+        if allow_hybrid_mode:
+            _torch_check(
+                group is not None,
+                lambda: "rail_aligned only supports grouped mode (group != None).",
+            )
         moe_args = (num_max_tokens_per_rank, hidden, num_topk)
         self._validate_init_args(group, num_cpu_bytes, moe_args, with_grad)
 
@@ -791,6 +805,7 @@ class ElasticBuffer:
             ),
         )
         self._comm_alg = comm_alg
+        self._allow_hybrid_mode = allow_hybrid_mode
         _elastic_buffer_ops = _elastic_buffer_op_builder.load()
         self._runtime = _elastic_buffer_ops.ElasticBuffer(
             self._group_name,
@@ -800,6 +815,7 @@ class ElasticBuffer:
             self._explicitly_destroy,
             self._netlayer,
             self._comm_alg,
+            self._allow_hybrid_mode,
         )
 
         self._num_max_tokens_per_rank = num_max_tokens_per_rank
@@ -1156,6 +1172,7 @@ class ElasticBuffer:
             self._engram_num_entries,
             _ENGRAM_DTYPE_TO_INT[self._engram_dtype],
             sf if sf is not None else torch.empty(0, device=indices.device),
+            self._allow_hybrid_mode,
         )
 
         def _wait():

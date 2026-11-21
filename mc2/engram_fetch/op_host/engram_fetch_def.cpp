@@ -43,6 +43,7 @@ public:
         this->Attr("num_max_tokens_per_rank").AttrType(OPTIONAL).Int();
         this->Attr("comm_buffer_size").AttrType(OPTIONAL).Int();
         this->Attr("with_grad").AttrType(OPTIONAL).Int();
+        this->Attr("hybrid_mode").AttrType(OPTIONAL).Int();
 
         OpAICoreConfig aicore_config_a5;
         aicore_config_a5.DynamicCompileStaticFlag(true)

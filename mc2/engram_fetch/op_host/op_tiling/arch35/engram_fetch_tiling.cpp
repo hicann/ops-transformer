@@ -43,6 +43,8 @@ constexpr uint32_t ATTR_NUM_ENTRIES_PER_RANK_INDEX = 1U;
 constexpr uint32_t ATTR_NUM_MAX_TOKENS_PER_RANK_INDEX = 2U;
 constexpr uint32_t ATTR_COMM_BUFFER_SIZE_INDEX = 3U;
 constexpr uint32_t ATTR_WITH_GRAD_INDEX = 4U;
+constexpr uint32_t ATTR_HYBRID_MODE_INDEX = 5U;
+constexpr int64_t RAIL_MODE_ALIGNED = 1;
 constexpr uint32_t SF_TABLE_INDEX = 3U;
 
 constexpr uint32_t DIM_ONE = 1U;
@@ -802,7 +804,7 @@ static ge::graphStatus SetTilingData(const gert::TilingContext* context, EngramF
 /**
  * @brief 设置tiling key
  */
-static void SetTilingKey(gert::TilingContext* context, bool isTraining)
+static void SetTilingKey(gert::TilingContext* context, bool isTraining, int64_t hybridMode)
 {
     const char* nodeName = context->GetNodeName();
     bool hasSf = false;
@@ -816,11 +818,13 @@ static void SetTilingKey(gert::TilingContext* context, bool isTraining)
     hasSf = sfTableDesc != nullptr && sfTableShape != nullptr && fetchedSfDesc != nullptr &&
             fetchedSfShape != nullptr && fetchedSfShape->GetStorageShape().GetDimNum() == DIM_TWO &&
             fetchedSfShape->GetStorageShape().GetDim(1) > 0;
-    const uint64_t tilingKey = isTraining ? GET_TPL_TILING_KEY(ENGRAM_FETCH_TRAIN_MODE, hasSf) :
-                                            GET_TPL_TILING_KEY(ENGRAM_FETCH_DEFAULT_MODE, hasSf);
+    const uint64_t tilingKey =
+        isTraining ? GET_TPL_TILING_KEY(ENGRAM_FETCH_TRAIN_MODE, hasSf) :
+                     (hybridMode == RAIL_MODE_ALIGNED ? GET_TPL_TILING_KEY(ENGRAM_FETCH_RAIL_MODE, hasSf) :
+                                                        GET_TPL_TILING_KEY(ENGRAM_FETCH_DEFAULT_MODE, hasSf));
     context->SetTilingKey(tilingKey);
-    OP_LOGD(nodeName, "tilingKey is [%lu] in engram_fetch (isTraining=%d, hasSf=%d).", tilingKey, isTraining,
-            static_cast<int32_t>(hasSf));
+    OP_LOGD(nodeName, "tilingKey is [%lu] in engram_fetch (isTraining=%d, hybridMode=%ld, hasSf=%d).", tilingKey,
+            isTraining, hybridMode, static_cast<int32_t>(hasSf));
 }
 
 /**
@@ -897,9 +901,8 @@ static ge::graphStatus SetWorkSpace(gert::TilingContext* context, const EngramFe
  */
 static ge::graphStatus EngramFetchTilingFunc(gert::TilingContext* context)
 {
-    OP_TILING_CHECK(context == nullptr, OP_LOGE("engram_fetch_tiling", "failed to get tiling context."),
-                    return ge::GRAPH_FAILED);
-    const char* nodeName = context->GetNodeName();
+    const char* nodeName = (context != nullptr) ? context->GetNodeName() : "engram_fetch";
+    OP_TILING_CHECK(context == nullptr, OP_LOGE(nodeName, "failed to get tiling context."), return ge::GRAPH_FAILED);
     OP_TILING_CHECK(nodeName == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "nodeName"), return ge::GRAPH_FAILED);
 
     OP_LOGI(nodeName, "Enter EngramFetch tiling check func.");
@@ -908,13 +911,20 @@ static ge::graphStatus EngramFetchTilingFunc(gert::TilingContext* context)
     OP_TILING_CHECK(tilingData == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "tilingData"), return ge::GRAPH_FAILED);
 
     bool isTraining = false;
+    int64_t hybridMode = 0;
     auto attrs = context->GetAttrs();
     if (attrs != nullptr) {
         auto withGradPtr = attrs->GetAttrPointer<int64_t>(ATTR_WITH_GRAD_INDEX);
         if (withGradPtr != nullptr && *withGradPtr != 0) {
             isTraining = true;
         }
+        auto hybridModePtr = attrs->GetAttrPointer<int64_t>(ATTR_HYBRID_MODE_INDEX);
+        if (hybridModePtr != nullptr) {
+            hybridMode = *hybridModePtr;
+        }
     }
+    OP_TILING_CHECK(hybridMode != 0 && hybridMode != RAIL_MODE_ALIGNED,
+                    OP_LOGE(nodeName, "unsupported hybrid_mode: %ld", hybridMode), return ge::GRAPH_FAILED);
 
     // 1. tensor check (ptr + dtype + shape + format)
     int64_t numTokens = 0;
@@ -953,7 +963,7 @@ static ge::graphStatus EngramFetchTilingFunc(gert::TilingContext* context)
                     OP_LOGE(nodeName, "set tiling data failed."), return ge::GRAPH_FAILED);
 
     // 5. set tiling key
-    SetTilingKey(context, isTraining);
+    SetTilingKey(context, isTraining, hybridMode);
 
     // 6. set workspace
     OP_TILING_CHECK(SetWorkSpace(context, *tilingData, isTraining) != ge::GRAPH_SUCCESS,

@@ -30,6 +30,10 @@
 #include <array>
 #include <mutex>
 #include <unordered_map>
+#include <cerrno>
+#include <cstdlib>
+#include <fcntl.h>
+#include <unistd.h>
 
 // CANN ACL Runtime API
 #include "acl/acl.h"
@@ -74,6 +78,9 @@ constexpr uint32_t MIX_LAYERED = 2U;
 constexpr uint32_t MIX_CLOS_SLOT = 0U;
 constexpr uint32_t MIX_MESH_SLOT = 1U;
 constexpr uint32_t MIX_LAYERED_RANK_SIZE = 8U;
+constexpr uint64_t VMM_RESERVE_MEM_FLAG = 1U;
+constexpr int64_t HYBRID_MODE_DEFAULT = 0;
+constexpr int64_t RAIL_ALIGNED_TOPO = 1;
 
 // RAII guard for multi-step host buffer allocation
 struct HostBufferGuard {
@@ -95,6 +102,24 @@ struct HostBufferGuard {
         hostPtr = nullptr;
         registered = false;
     }
+};
+
+struct FdGuard {
+    int fd = -1;
+
+    explicit FdGuard(int f)
+        : fd(f)
+    {}
+
+    ~FdGuard()
+    {
+        if (fd >= 0) {
+            (void)close(fd);
+        }
+    }
+
+    FdGuard(const FdGuard&) = delete;
+    FdGuard& operator=(const FdGuard&) = delete;
 };
 
 // Helper functions
@@ -178,9 +203,13 @@ static inline void NpuStreamWait(aclrtStream waitStream, aclrtStream recordStrea
 struct EngramCommContext {
     uint32_t rankId = 0;
     uint32_t rankSize = 0;
+    // rail布局：超外按machine粒度，超内按rank粒度依次排布
     uint64_t virtualAddrList[HCCL_MAX_RANK_SIZE] = {};
     uint64_t hcommHandle[HCCL_MAX_RANK_SIZE] = {};
     uint32_t channelsPerRank = 1;
+    uint32_t ranksPerMachine = 0;
+    uint32_t ranksPerSupernode = 0;
+    uint64_t rankSlotStride = 0;
 };
 
 struct MoeCommContext {
@@ -643,8 +672,25 @@ protected:
     uint32_t rankNumPerUbDomain_ = 0;
 };
 
+struct EngramRailStorage {
+    uint32_t ranksPerMachine = 0;
+    uint32_t ranksPerSupernode = 0;
+    uint32_t machineCount = 0;
+    uint32_t machinesPerSupernode = 0;
+    uint32_t supernodeStartRank = 0;
+    uint32_t superStartMachine = 0;
+    void* shareVa = nullptr;
+    void* shareOwnSlotVa = nullptr;
+    uint64_t slotBytes = 0;
+};
+
 class EngramContextBuilder : public HcclContextBuilderBase {
 public:
+    EngramContextBuilder(int64_t hybridMode = 0, aclrtStream commStream = nullptr)
+        : hybridMode_(hybridMode),
+          commStream_(commStream)
+    {}
+
     static EngramContextResources BuildLocal(int64_t numCpuBytes, void* externalHostPtr, int64_t externalBytes)
     {
         TORCH_CHECK(externalHostPtr == nullptr || externalBytes > 0,
@@ -687,16 +733,335 @@ public:
         return resources;
     }
 
+    // rail_aligned推理 交换共享内存句柄
+    static std::vector<aclrtMemFabricHandle> ExchangeRailHandles(const std::string& groupName, HcclComm shareComm,
+                                                                 aclrtStream commStream, uint32_t rankId,
+                                                                 uint32_t rankSize, uint32_t ranksPerMachine,
+                                                                 uint32_t machineStartRank,
+                                                                 aclrtMemFabricHandle& shareBlob)
+    {
+        int32_t bareTgid = 0;
+        aclError ret = aclrtDeviceGetBareTgid(&bareTgid);
+        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtDeviceGetBareTgid failed, ret=", ret);
+        constexpr uint32_t handleBlobU64 = sizeof(aclrtMemFabricHandle) / sizeof(uint64_t);
+        constexpr uint32_t exchangeElems = handleBlobU64 + 1U;
+        constexpr uint64_t exchangeBytes = static_cast<uint64_t>(exchangeElems) * sizeof(uint64_t);
+        std::vector<uint64_t> sendVals(exchangeElems, 0);
+        memcpy(sendVals.data(), shareBlob.data, sizeof(shareBlob.data));
+        sendVals[handleBlobU64] = static_cast<uint64_t>(bareTgid);
+
+        std::string shmName;
+        for (char c : groupName) {
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-') {
+                shmName += c;
+            }
+        }
+        const std::string shmPath = "/dev/shm/engram_rail_" + shmName + ".bin";
+        const int fd = open(shmPath.c_str(), O_RDWR | O_CREAT, 0666);
+        TORCH_CHECK(fd >= 0, "open(", shmPath, ") failed, errno=", errno);
+        FdGuard fdGuard(fd);
+        const int ftRet = ftruncate(fd, static_cast<off_t>(exchangeBytes * rankSize));
+        TORCH_CHECK(ftRet == 0, "ftruncate(", shmPath, ", ", exchangeBytes * rankSize, ") failed, errno=", errno);
+        const ssize_t wRet = pwrite(fd, sendVals.data(), exchangeBytes, static_cast<off_t>(exchangeBytes * rankId));
+        TORCH_CHECK(wRet == static_cast<ssize_t>(exchangeBytes), "pwrite(own slot) failed, errno=", errno);
+
+        auto barrierRet = HcclBarrierFunc(shareComm, commStream);
+        TORCH_CHECK(barrierRet == HCCL_SUCCESS,
+                    "HcclBarrier(handle exchange sync) failed, ret=", static_cast<int>(barrierRet));
+        ret = aclrtSynchronizeStream(commStream);
+        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtSynchronizeStream(handle exchange sync) failed, ret=", ret);
+
+        std::vector<uint64_t> recvVals(static_cast<size_t>(exchangeElems) * rankSize, 0);
+        for (uint32_t g = machineStartRank; g < machineStartRank + ranksPerMachine; ++g) {
+            const ssize_t rRet = pread(fd, &recvVals[static_cast<size_t>(g) * exchangeElems], exchangeBytes,
+                                       static_cast<off_t>(exchangeBytes * g));
+            TORCH_CHECK(rRet == static_cast<ssize_t>(exchangeBytes), "pread(slot=", g, ") failed, errno=", errno);
+        }
+
+        std::vector<aclrtMemFabricHandle> sharePeerBlobs(rankSize, aclrtMemFabricHandle{});
+        std::vector<int32_t> peerPids(rankSize, 0);
+        for (uint32_t rank = 0; rank < rankSize; ++rank) {
+            memcpy(sharePeerBlobs[rank].data, &recvVals[static_cast<size_t>(rank) * exchangeElems],
+                   sizeof(sharePeerBlobs[rank].data));
+            peerPids[rank] = static_cast<int32_t>(recvVals[static_cast<size_t>(rank) * exchangeElems + handleBlobU64]);
+        }
+
+        if (rankId == machineStartRank) {
+            (void)unlink(shmPath.c_str());
+        }
+
+        std::vector<int32_t> peerPidList;
+        peerPidList.reserve(ranksPerMachine - 1U);
+        for (uint32_t rank = machineStartRank; rank < machineStartRank + ranksPerMachine; ++rank) {
+            if (rank != rankId) {
+                peerPidList.push_back(peerPids[rank]);
+            }
+        }
+        std::string pidStr;
+        for (int32_t p : peerPidList) {
+            pidStr += (pidStr.empty() ? "" : ",") + std::to_string(p);
+        }
+        ASCEND_LOGI("rail_aligned collect handle: rank=%u machineStartRank=%u rpm=%u pidNum=%zu pids=[%s]", rankId,
+                    machineStartRank, ranksPerMachine, peerPidList.size(), pidStr.c_str());
+        ret = aclrtMemSetPidToShareableHandleV2(shareBlob.data, ACL_MEM_SHARE_HANDLE_TYPE_DEFAULT, peerPidList.data(),
+                                                peerPidList.size());
+        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMemSetPidToShareableHandleV2(peers=", peerPidList.size(),
+                    ") failed, ret=", ret);
+        barrierRet = HcclBarrierFunc(shareComm, commStream);
+        TORCH_CHECK(barrierRet == HCCL_SUCCESS,
+                    "HcclBarrier(handle whitelist sync) failed, ret=", static_cast<int>(barrierRet));
+        ret = aclrtSynchronizeStream(commStream);
+        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtSynchronizeStream(whitelist sync) failed, ret=", ret);
+        return sharePeerBlobs;
+    }
+
+    // rail_aligned推理 内存映射
+    static void MapRailMemory(uint32_t rankId, uint32_t ranksPerMachine, uint32_t machineStartRank, int32_t deviceId,
+                              uint64_t totalBytes, uint64_t slotBytes, aclrtDrvMemHandle sharePhysHandle,
+                              std::vector<aclrtMemFabricHandle>& sharePeerBlobs, void*& shareVa, void*& shareOwnSlotVa,
+                              std::vector<aclrtDrvMemHandle>& shareImportedHandles)
+    {
+        aclError ret = ACL_SUCCESS;
+        int32_t logicDeviceId = deviceId;
+        {
+            int32_t converted = -1;
+            aclError convRet = aclrtGetLogicDevIdByUserDevId(deviceId, &converted);
+            if (convRet == ACL_SUCCESS && converted >= 0) {
+                logicDeviceId = converted;
+            } else {
+                ASCEND_LOGW("aclrtGetLogicDevIdByUserDevId(dev=%d) failed, ret=%d, fallback to user devid", deviceId,
+                            static_cast<int>(convRet));
+            }
+        }
+        aclrtMemAccessDesc accessDesc = {};
+        accessDesc.flags = ACL_RT_MEM_ACCESS_FLAGS_READWRITE;
+        accessDesc.location.id = static_cast<uint32_t>(logicDeviceId);
+        accessDesc.location.type = ACL_MEM_LOCATION_TYPE_DEVICE;
+
+        shareVa = nullptr;
+        ret = aclrtReserveMemAddress(&shareVa, totalBytes, 0, nullptr, VMM_RESERVE_MEM_FLAG);
+        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtReserveMemAddress(", totalBytes, " B) failed, ret=", ret);
+
+        auto slotVaOf = [&](uint32_t g) {
+            return static_cast<uint8_t*>(shareVa) + static_cast<uint64_t>(g - machineStartRank) * slotBytes;
+        };
+
+        for (uint32_t g = machineStartRank; g < machineStartRank + ranksPerMachine; ++g) {
+            aclrtDrvMemHandle slotHandle = sharePhysHandle;
+            if (g != rankId) {
+                ret = aclrtMemImportFromShareableHandleV2(sharePeerBlobs[g].data, ACL_MEM_SHARE_HANDLE_TYPE_DEFAULT, 0,
+                                                          &slotHandle);
+                TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMemImportFromShareableHandleV2(rank=", g, ") failed, ret=", ret);
+                shareImportedHandles.push_back(slotHandle);
+            }
+            void* slotVa = slotVaOf(g);
+            ret = aclrtMapMem(slotVa, slotBytes, 0, slotHandle, 0);
+            TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMapMem(slot=", g, ") failed, ret=", ret);
+        }
+
+        for (uint32_t g = machineStartRank; g < machineStartRank + ranksPerMachine; ++g) {
+            void* slotVa = slotVaOf(g);
+            ret = aclrtMemSetAccess(slotVa, slotBytes, &accessDesc, 1);
+            TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMemSetAccess(slot=", g, ") failed: va=", slotVa, ", ret=", ret);
+        }
+        shareOwnSlotVa = static_cast<uint8_t*>(shareVa) + static_cast<uint64_t>(rankId - machineStartRank) * slotBytes;
+
+        ret = aclrtMemset(shareOwnSlotVa, slotBytes, 0, slotBytes);
+        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMemset(local slot) failed, ret=", ret);
+    }
+
+    // rail_aligned推理 申请内存
+    void AllocRailMemory(const std::string& memBufferTag, int64_t numCpuBytes, EngramContextResources& resources)
+    {
+        const uint32_t rankId = resources.context.rankId;
+        const uint32_t rankSize = resources.context.rankSize;
+        const uint32_t ranksPerMachine = railStorage_.ranksPerMachine;
+        const uint32_t machineStartRank = (rankId / ranksPerMachine) * ranksPerMachine;
+
+        int32_t deviceId = 0;
+        aclError ret = aclrtGetDevice(&deviceId);
+        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtGetDevice failed, ret=", ret);
+
+        aclrtPhysicalMemProp prop = {};
+        prop.handleType = ACL_MEM_HANDLE_TYPE_NONE;
+        prop.allocationType = ACL_MEM_ALLOCATION_TYPE_PINNED;
+        prop.memAttr = ACL_MEM_P2P_HUGE;
+        prop.location.id = 0;
+        prop.location.type = ACL_MEM_LOCATION_TYPE_HOST;
+        prop.reserve = 0;
+
+        size_t granularity = 0;
+        ret = aclrtMemGetAllocationGranularity(&prop, ACL_RT_MEM_ALLOC_GRANULARITY_RECOMMENDED, &granularity);
+        if (ret != ACL_SUCCESS || granularity == 0) {
+            ASCEND_LOGW("aclrtMemGetAllocationGranularity failed, ret=%d, fallback to 2MB", static_cast<int>(ret));
+            granularity = 2UL * 1024UL * 1024UL;
+        }
+        const uint64_t slotBytes = (static_cast<uint64_t>(numCpuBytes) + granularity - 1U) / granularity * granularity;
+        const uint64_t totalBytes = slotBytes * ranksPerMachine;
+        aclrtDrvMemHandle sharePhysHandle = nullptr;
+        ret = aclrtMallocPhysical(&sharePhysHandle, slotBytes, &prop, 0);
+        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMallocPhysical(ACL_MEM_P2P_HUGE@HOST, ", slotBytes,
+                    " B) failed, ret=", ret);
+
+        aclrtMemFabricHandle shareBlob = {};
+        ret = aclrtMemExportToShareableHandleV2(sharePhysHandle, 0, ACL_MEM_SHARE_HANDLE_TYPE_DEFAULT, shareBlob.data);
+        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMemExportToShareableHandleV2(DEFAULT) failed, ret=", ret);
+
+        std::vector<aclrtMemFabricHandle> sharePeerBlobs =
+            ExchangeRailHandles(groupName_, resources.hcclComm, commStream_, rankId, rankSize, ranksPerMachine,
+                                machineStartRank, shareBlob);
+
+        void* shareVa = nullptr;        // 虚拟映射首地址
+        void* shareOwnSlotVa = nullptr; // 虚拟映射当前分段地址
+        std::vector<aclrtDrvMemHandle> shareImportedHandles;
+        MapRailMemory(rankId, ranksPerMachine, machineStartRank, deviceId, totalBytes, slotBytes, sharePhysHandle,
+                      sharePeerBlobs, shareVa, shareOwnSlotVa, shareImportedHandles);
+        ASCEND_LOGI("rail_aligned alloc: rank=%u va=%p ownSlotVa=%p slotBytes=%lu totalBytes=%lu", rankId, shareVa,
+                    shareOwnSlotVa, slotBytes, totalBytes);
+
+        CommMem mem = {};
+        mem.type = COMM_MEM_TYPE_DEVICE;
+        mem.addr = shareVa;
+        mem.size = slotBytes * ranksPerMachine;
+        auto memRegRet = HcclCommMemRegFunc(resources.hcclComm, memBufferTag.c_str(), &mem, &resources.memHandle);
+        TORCH_CHECK(memRegRet == HCCL_SUCCESS, "HcclCommMemReg(tag='", memBufferTag, "', size=", mem.size,
+                    ") failed, ret=", memRegRet);
+
+        auto barrierRet = HcclBarrierFunc(resources.hcclComm, commStream_);
+        TORCH_CHECK(barrierRet == HCCL_SUCCESS,
+                    "HcclBarrier(rail build reg sync) failed, ret=", static_cast<int>(barrierRet));
+        ret = aclrtSynchronizeStream(commStream_);
+        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtSynchronizeStream(rail build reg sync) failed, ret=", ret);
+
+        railStorage_.shareVa = shareVa;
+        railStorage_.shareOwnSlotVa = shareOwnSlotVa;
+        railStorage_.slotBytes = slotBytes;
+        resources.hostBufPtr = shareOwnSlotVa;
+        resources.deviceBufPtr = shareOwnSlotVa;
+    }
+
+    // rail_aligned推理 通信建链
+    void GetRailCommResource(const HcclComm& commHandle, EngramContextResources& resources,
+                             const std::string& targetTag)
+    {
+        const uint32_t rankId = resources.context.rankId;
+        const uint32_t ranksPerMachine = railStorage_.ranksPerMachine;
+        const uint32_t ranksPerSupernode = railStorage_.ranksPerSupernode;
+        const uint32_t machineCount = railStorage_.machineCount;
+        const uint32_t machinesPerSupernode = railStorage_.machinesPerSupernode;
+        const uint32_t superStartMachine = railStorage_.superStartMachine;
+        const uint64_t slotBytes = railStorage_.slotBytes;
+        EngramCommContext& ctx = resources.context;
+        ctx.channelsPerRank = 1;
+        std::vector<std::pair<uint32_t, bool>> linkedPeers;
+        auto buildOneChannel = [&](uint32_t peer, bool inSuper) -> ChannelHandle {
+            auto linkIter = rankLinkMap_.find(peer);
+            TORCH_CHECK(linkIter != rankLinkMap_.end(), "rail_aligned: no routing info for peer rank ", peer);
+            CommLink* link = nullptr;
+            GetHcclCommLink(commHandle, linkIter->second.layer, rankId, peer, linkIter->second.protocol, link);
+            HcclChannelDesc desc;
+            auto chRet = HcclChannelDescInit(&desc, 1);
+            TORCH_CHECK(chRet == HCCL_SUCCESS, "HcclChannelDescInit(peer=", peer,
+                        ") failed, ret=", static_cast<int>(chRet));
+            desc.remoteRank = peer;
+            desc.channelProtocol = linkIter->second.protocol;
+            desc.localEndpoint = link->srcEndpointDesc;
+            desc.remoteEndpoint = link->dstEndpointDesc;
+            desc.notifyNum = 3;
+            desc.memHandles = &resources.memHandle;
+            desc.memHandleNum = 1;
+            std::vector<HcclChannelDesc> descs{desc};
+            ChannelHandle channel = 0;
+            AcquireChannels(commHandle, CommEngine::COMM_ENGINE_AIV, descs, &channel);
+            linkedPeers.push_back({peer, inSuper});
+            return channel;
+        };
+        auto queryPeerBase = [&](uint32_t peer, ChannelHandle channel) -> uint64_t {
+            uint32_t memNum = 0;
+            CommMem* remoteMems = nullptr;
+            char** memTags = nullptr;
+            auto memRet = HcclChannelGetRemoteMemsFunc(commHandle, channel, &memNum, &remoteMems, &memTags);
+            TORCH_CHECK(memRet == HCCL_SUCCESS, "HcclChannelGetRemoteMems(peer=", peer, ") failed, ret=", memRet);
+            uint64_t peerBase = 0;
+            for (uint32_t j = 0; j < memNum; ++j) {
+                if (memTags != nullptr && remoteMems != nullptr && memTags[j] != nullptr && targetTag == memTags[j]) {
+                    peerBase = reinterpret_cast<uint64_t>(remoteMems[j].addr);
+                }
+            }
+            TORCH_CHECK(peerBase != 0, "remote rail buffer tag '", targetTag, "' not found for peer ", peer);
+            return peerBase;
+        };
+        const uint32_t myMachine = rankId / ranksPerMachine;
+        const uint32_t cardIdx = rankId % ranksPerMachine;
+        auto superSlot = [&](uint32_t ownerRank) {
+            return superStartMachine + ownerRank - railStorage_.supernodeStartRank;
+        };
+        auto outMachineSlot = [&](uint32_t m) {
+            return (m < superStartMachine) ? m : m + ranksPerSupernode - machinesPerSupernode;
+        };
+        for (uint32_t m = 0; m < machineCount; ++m) {
+            if (m == myMachine) {
+                for (uint32_t slot = 0; slot < ranksPerMachine; ++slot) {
+                    const uint32_t ownerRank = m * ranksPerMachine + slot;
+                    ctx.virtualAddrList[superSlot(ownerRank)] =
+                        reinterpret_cast<uint64_t>(railStorage_.shareVa) + static_cast<uint64_t>(slot) * slotBytes;
+                }
+                continue;
+            }
+            const bool inSuper = (m / machinesPerSupernode) == myMachine / machinesPerSupernode;
+            if (inSuper) {
+                for (uint32_t slot = 0; slot < ranksPerMachine; ++slot) {
+                    const uint32_t ownerRank = m * ranksPerMachine + slot;
+                    const ChannelHandle channel = buildOneChannel(ownerRank, true);
+                    const uint32_t slotIdx = superSlot(ownerRank);
+                    ctx.virtualAddrList[slotIdx] = queryPeerBase(ownerRank, channel);
+                    ctx.hcommHandle[slotIdx] = static_cast<uint64_t>(channel);
+                }
+            } else {
+                const uint32_t peer = m * ranksPerMachine + cardIdx;
+                const ChannelHandle channel = buildOneChannel(peer, false);
+                ctx.virtualAddrList[outMachineSlot(m)] = queryPeerBase(peer, channel);
+                ctx.hcommHandle[outMachineSlot(m)] = static_cast<uint64_t>(channel);
+            }
+        }
+        ctx.ranksPerMachine = ranksPerMachine;
+        ctx.ranksPerSupernode = ranksPerSupernode;
+        ctx.rankSlotStride = slotBytes;
+        ASCEND_LOGI("rail_aligned build: rank=%u machine=%u cardIdx=%u machineCount=%u vaBase=%p ownSlotVa=%lld "
+                    "ranksPerMachine=%u",
+                    rankId, myMachine, cardIdx, machineCount, railStorage_.shareVa,
+                    reinterpret_cast<int64_t>(railStorage_.shareOwnSlotVa), ranksPerMachine);
+        {
+            std::string localPeers;
+            for (uint32_t owner = 0; owner < ranksPerSupernode; ++owner) {
+                if (ctx.virtualAddrList[superStartMachine + owner] != 0U) {
+                    localPeers += (localPeers.empty() ? "" : ",") + std::to_string(owner);
+                }
+            }
+            std::string inSuperPeers;
+            std::string outSuperPeers;
+            uint32_t channelCount = 0U;
+            for (const auto& [peer, inSuper] : linkedPeers) {
+                auto& list = inSuper ? inSuperPeers : outSuperPeers;
+                list += (list.empty() ? "" : ",") + std::to_string(peer);
+                ++channelCount;
+            }
+            ASCEND_LOGI("rail_aligned links: rank=%u local=[%s] inSuper=[%s] outSuper=[%s] channels=%u", rankId,
+                        localPeers.c_str(), inSuperPeers.c_str(), outSuperPeers.c_str(), channelCount);
+        }
+    }
+
     EngramContextResources Build(const std::string& groupName, int64_t numCpuBytes, bool withGrad,
                                  void* externalHostPtr = nullptr, int64_t externalBytes = 0, void* sfHostPtr = nullptr,
                                  int64_t sfBytes = 0, const std::string& netLayer = "auto")
     {
         withGrad_ = withGrad;
         netLayer_ = netLayer;
+        groupName_ = groupName;
         EngramContextResources resources;
         AcquireHcclHandle(groupName, resources.hcclComm);
-
-        std::string contextTag = groupName + "engram_embedding";
+        std::string contextTag =
+            groupName + (hybridMode_ == RAIL_ALIGNED_TOPO ? "engram_embedding_rail_aligned" : "engram_embedding");
         CheckContextTag(contextTag);
 
         std::lock_guard<std::mutex> lock(gEngramSharedBufferMutex);
@@ -749,6 +1114,10 @@ public:
     }
 
 private:
+    int64_t hybridMode_ = 0;
+    aclrtStream commStream_ = nullptr;
+    EngramRailStorage railStorage_;
+    std::string groupName_;
     bool withGrad_ = false;
     std::string netLayer_ = "auto";
 
@@ -767,6 +1136,7 @@ private:
             entry.sfExternal = (sfHostPtr != nullptr);
             entry.sfRegisteredBytes = resources.sfHostBufPtr != nullptr ? sfBytes : 0;
         } catch (...) {
+            gEngramSharedBuffers.erase(contextTag);
             ASCEND_LOGW("failed to record engram shared buffer for tag %s, buffer will be rolled back",
                         contextTag.c_str());
             throw;
@@ -813,13 +1183,77 @@ private:
         return std::stoi(netLayer);
     }
 
+    void ProbeRailTopology(const HcclComm& commHandle, uint32_t srcRankId, uint32_t rankSize, const uint32_t* layerList,
+                           uint32_t layerNum)
+    {
+        uint32_t ranksPerMachine = 0;
+        uint32_t ranksPerSupernode = 0;
+        const char* envPerMachine = std::getenv("RANK_SIZE_PER_MACHINE");
+        const char* envPerSupernode = std::getenv("RANK_SIZE_PER_SUPERNODE");
+        TORCH_CHECK((envPerMachine == nullptr) == (envPerSupernode == nullptr),
+                    "RANK_SIZE_PER_MACHINE and RANK_SIZE_PER_SUPERNODE must be set together");
+        if (envPerMachine != nullptr && envPerSupernode != nullptr) {
+            try {
+                ranksPerMachine = static_cast<uint32_t>(std::stoul(envPerMachine));
+                ranksPerSupernode = static_cast<uint32_t>(std::stoul(envPerSupernode));
+            } catch (const std::exception& e) {
+                TORCH_CHECK(false, "RANK_SIZE_PER_MACHINE/RANK_SIZE_PER_SUPERNODE invalid: ", e.what());
+            }
+            ASCEND_LOGI("rail_aligned topo: rank=%u env set ranksPerMachine=%u ranksPerSupernode=%u", srcRankId,
+                        ranksPerMachine, ranksPerSupernode);
+        } else {
+            for (uint32_t li = 0; li < layerNum; ++li) {
+                uint32_t sizeByLayer = 0;
+                HcclResult szRet = HcclRankGraphGetRankSizeByLayerFunc(commHandle, layerList[li], &sizeByLayer);
+                TORCH_CHECK(szRet == HCCL_SUCCESS, "HcclRankGraphGetRankSizeByLayer(layer=", layerList[li],
+                            ") failed, ret=", static_cast<int>(szRet));
+                uint32_t* instSizeList = nullptr;
+                uint32_t instListSize = 0;
+                HcclResult listRet =
+                    HcclRankGraphGetInstSizeListByLayerFunc(commHandle, layerList[li], &instSizeList, &instListSize);
+                TORCH_CHECK(listRet == HCCL_SUCCESS, "HcclRankGraphGetInstSizeListByLayer(layer=", layerList[li],
+                            ") failed, ret=", static_cast<int>(listRet));
+                uint32_t instCnt = (instSizeList != nullptr) ? instListSize : 0U;
+                std::string instSizeStr;
+                for (uint32_t i = 0; i < instCnt; ++i) {
+                    instSizeStr += (i == 0 ? "" : ",") + std::to_string(instSizeList[i]);
+                }
+                ASCEND_LOGI("rail_aligned topo: rank=%u layer=%u size=%u instListSize=%u instSizeList=[%s]", srcRankId,
+                            layerList[li], sizeByLayer, instListSize, instSizeStr.c_str());
+                if (li == 1U) {
+                    TORCH_CHECK(instCnt > 0, "rail_aligned: layer1 instSizeList is empty");
+                    ranksPerSupernode = instSizeList[0];
+                }
+                if (li == 2U) {
+                    TORCH_CHECK(instCnt > 0, "rail_aligned: layer2 instSizeList is empty");
+                    ranksPerMachine = instListSize;
+                }
+            }
+        }
+        railStorage_.ranksPerMachine = ranksPerMachine;
+        railStorage_.ranksPerSupernode = ranksPerSupernode;
+        TORCH_CHECK(ranksPerMachine != 0 && ranksPerSupernode != 0 && ranksPerSupernode <= rankSize &&
+                        rankSize % ranksPerMachine == 0 && ranksPerSupernode % ranksPerMachine == 0 &&
+                        (rankSize / ranksPerMachine) % (ranksPerSupernode / ranksPerMachine) == 0,
+                    "rail_aligned topology invalid: rankSize=", rankSize, " ranksPerMachine=", ranksPerMachine,
+                    " ranksPerSupernode=", ranksPerSupernode);
+
+        railStorage_.machineCount = rankSize / ranksPerMachine;
+        railStorage_.machinesPerSupernode = ranksPerSupernode / ranksPerMachine;
+        railStorage_.supernodeStartRank = (srcRankId / ranksPerSupernode) * ranksPerSupernode;
+        railStorage_.superStartMachine = railStorage_.supernodeStartRank / ranksPerMachine;
+        ASCEND_LOGI("rail_aligned topo: rank=%u ranksPerMachine=%u ranksPerSupernode=%u machineCount=%u "
+                    "machinesPerSupernode=%u",
+                    srcRankId, ranksPerMachine, ranksPerSupernode, railStorage_.machineCount,
+                    railStorage_.machinesPerSupernode);
+    }
+
     // netlayer 选层："auto" 自首个网络分层起逐层探测；数字串（如 "1"）指定分层编号，仅在该分层内
     // 建链（该层所有对端都必须可达），指定分层不存在或该层内建链失败直接报错
     void ResolveRankLinks(const HcclComm& commHandle, uint32_t srcRankId, uint32_t rankSize, const uint32_t* layerList,
                           uint32_t layerNum)
     {
         uint32_t preferIdx = 0;
-        bool singleLayer = false;
         if (netLayer_ != "auto") {
             int32_t netLayerId = ParseNetLayerId(netLayer_);
             bool layerExists = false;
@@ -831,15 +1265,11 @@ private:
                 }
             }
             TORCH_CHECK(layerExists, "netLayer ", netLayer_, " not exist in HCCL net layers");
-            singleLayer = true;
         }
-        uint32_t endLayer = singleLayer ? (preferIdx + 1) : layerNum;
-        for (uint32_t peer = 0; peer < rankSize; ++peer) {
-            if (peer == srcRankId) {
-                continue;
-            }
+
+        auto recordLink = [&](uint32_t peer, uint32_t startLayer, uint32_t endLayer) {
             bool found = false;
-            for (uint32_t li = preferIdx; li < endLayer && !found; ++li) {
+            for (uint32_t li = startLayer; li < endLayer && !found; ++li) {
                 CommLink* links = nullptr;
                 uint32_t linkNum = 0;
                 auto hcclRet = HcclRankGraphGetLinksFunc(commHandle, layerList[li], srcRankId, peer, &links, &linkNum);
@@ -853,7 +1283,40 @@ private:
                     }
                 }
             }
-            TORCH_CHECK(found, "No UBC/UBG link found for peer rank ", peer, " in netLayer ", netLayer_);
+            return found;
+        };
+        if (hybridMode_ == RAIL_ALIGNED_TOPO) {
+            ProbeRailTopology(commHandle, srcRankId, rankSize, layerList, layerNum);
+            const uint32_t ranksPerMachine = railStorage_.ranksPerMachine;
+            const uint32_t machineCount = railStorage_.machineCount;
+            const uint32_t machinesPerSupernode = railStorage_.machinesPerSupernode;
+            const uint32_t myMachine = srcRankId / ranksPerMachine;
+            const uint32_t cardIdx = srcRankId % ranksPerMachine;
+            for (uint32_t m = 0; m < machineCount; ++m) {
+                if (m == myMachine) {
+                    continue;
+                }
+                if ((m / machinesPerSupernode) == myMachine / machinesPerSupernode) {
+                    for (uint32_t slot = 0; slot < ranksPerMachine; ++slot) {
+                        const uint32_t peer = m * ranksPerMachine + slot;
+                        TORCH_CHECK(recordLink(peer, preferIdx, layerNum),
+                                    "rail_aligned: no UBC/UBRTP link between rank ", srcRankId, " and peer ", peer);
+                    }
+                } else {
+                    const uint32_t peer = m * ranksPerMachine + cardIdx;
+                    TORCH_CHECK(recordLink(peer, preferIdx, layerNum), "rail_aligned: no UBC/UBRTP link between rank ",
+                                srcRankId, " and peer ", peer);
+                }
+            }
+            return;
+        }
+        uint32_t endLayer = netLayer_ != "auto" ? (preferIdx + 1) : layerNum;
+        for (uint32_t peer = 0; peer < rankSize; ++peer) {
+            if (peer == srcRankId) {
+                continue;
+            }
+            TORCH_CHECK(recordLink(peer, preferIdx, endLayer), "No UBC/UBG link found for peer rank ", peer,
+                        " in netLayer ", netLayer_);
         }
         ASCEND_LOGI("netLayer %s applied", netLayer_.c_str());
     }
@@ -1128,12 +1591,6 @@ private:
         }
 
         std::string memBufferTag = contextTag + "_buffer";
-        AllocateAndRegisterBuffer(resources.hcclComm, memBufferTag, numCpuBytes, resources, guard, externalHostPtr,
-                                  externalBytes);
-
-        if (sfHostPtr != nullptr && sfBytes > 0) {
-            MapSfTableBuffer(resources, sfHostPtr, sfBytes);
-        }
 
         uint32_t* netLayerList = nullptr;
         uint32_t netLayerNum = 0;
@@ -1143,7 +1600,22 @@ private:
         ResolveRankLinks(resources.hcclComm, resources.context.rankId, resources.context.rankSize, netLayerList,
                          netLayerNum);
 
-        if (withGrad_) {
+        if (hybridMode_ == RAIL_ALIGNED_TOPO) {
+            TORCH_CHECK(externalHostPtr == nullptr,
+                        "rail_aligned does not support zero-copy external storage, use self-allocated buffer");
+            AllocRailMemory(memBufferTag, numCpuBytes, resources);
+        } else {
+            AllocateAndRegisterBuffer(resources.hcclComm, memBufferTag, numCpuBytes, resources, guard, externalHostPtr,
+                                      externalBytes);
+        }
+
+        if (sfHostPtr != nullptr && sfBytes > 0) {
+            MapSfTableBuffer(resources, sfHostPtr, sfBytes);
+        }
+
+        if (hybridMode_ == RAIL_ALIGNED_TOPO) {
+            GetRailCommResource(resources.hcclComm, resources, memBufferTag);
+        } else if (withGrad_) {
             QueryHcclBufferResource(resources.hcclComm, resources);
         } else {
             GetHcclCommResource(resources.hcclComm, resources, memBufferTag);
@@ -1802,7 +2274,7 @@ class ElasticBuffer {
 public:
     ElasticBuffer(const std::optional<std::string>& groupName, int64_t numCpuBytes, int64_t numMaxTokensPerRank = 0,
                   bool withGrad = false, bool explicitlyDestroy = false, const std::string& netLayer = "auto",
-                  const std::string& moeCommAlg = MOE_COMM_ALG_DEFAULT);
+                  const std::string& moeCommAlg = MOE_COMM_ALG_DEFAULT, int64_t allowHybridMode = 0);
     ~ElasticBuffer();
 
     void EngramWrite(const at::Tensor& storage, const c10::optional<at::Tensor>& sf, bool zeroCopy);
@@ -1832,7 +2304,8 @@ public:
 
     using EngramFetchOutput = std::tuple<at::Tensor, at::Tensor>;
     static EngramFetchOutput EngramFetch(const at::Tensor& context, const at::Tensor& indices, int64_t hiddenSize,
-                                         int64_t numEntries, int64_t dtypeEnum, const at::Tensor& sfTable);
+                                         int64_t numEntries, int64_t dtypeEnum, const at::Tensor& sfTable,
+                                         int64_t hybridMode);
     using EngramFetchTrainOutput =
         std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor>;
     static EngramFetchTrainOutput EngramFetchTrain(const at::Tensor& context, const at::Tensor& indices,
@@ -1901,6 +2374,9 @@ private:
     bool withGrad_ = false;
     std::string netLayer_ = "auto";
     std::string moeCommAlg_ = MOE_COMM_ALG_DEFAULT;
+    int64_t hybridMode_ = 0;
+    uint32_t rankId_ = 0;
+    uint32_t rankSize_ = 0;
 
     void* engramHostBufPtr_ = nullptr;
     void* engramDeviceBufPtr_ = nullptr;
@@ -1943,7 +2419,7 @@ private:
 
 ElasticBuffer::ElasticBuffer(const std::optional<std::string>& groupName, int64_t numCpuBytes,
                              int64_t numMaxTokensPerRank, bool withGrad, bool explicitlyDestroy,
-                             const std::string& netLayer, const std::string& moeCommAlg)
+                             const std::string& netLayer, const std::string& moeCommAlg, int64_t allowHybridMode)
     : groupName_(groupName),
       localFullVocab_(!groupName.has_value()),
       engramNumCpuBytes_(numCpuBytes),
@@ -1953,13 +2429,21 @@ ElasticBuffer::ElasticBuffer(const std::optional<std::string>& groupName, int64_
       explicitlyDestroy_(explicitlyDestroy),
       withGrad_(withGrad),
       netLayer_(netLayer),
-      moeCommAlg_(moeCommAlg)
+      moeCommAlg_(moeCommAlg),
+      hybridMode_(allowHybridMode)
 {
     TORCH_CHECK(moeCommAlg_ == MOE_COMM_ALG_AUTO || moeCommAlg_ == MOE_COMM_ALG_CLOS_ONLY,
                 "MoE comm_alg must be 'auto' or 'clos_only', but got '", moeCommAlg_, "'.");
+    TORCH_CHECK(allowHybridMode == HYBRID_MODE_DEFAULT || allowHybridMode == RAIL_ALIGNED_TOPO,
+                "hybrid_mode must be 0 (off) or 1 (rail_aligned), but got ", allowHybridMode, ".");
     if (!localFullVocab_) {
         InitHcclEngineCtxFunctions();
         InitHcclFunctions();
+    }
+    if (hybridMode_ == RAIL_ALIGNED_TOPO) {
+        TORCH_CHECK(!localFullVocab_, "rail_aligned only supports grouped mode (group != None)");
+        TORCH_CHECK(withGrad_ || (engramNumCpuBytes_ > 0 && engramNumCpuBytes_ % BUFFER_ALIGNMENT == 0),
+                    "rail_aligned inference requires explicit 2MB-aligned num_cpu_bytes, got ", engramNumCpuBytes_);
     }
 }
 
@@ -1992,10 +2476,12 @@ void ElasticBuffer::EnsureEngramContext(void* externalHostPtr, int64_t externalB
     } else {
         commStream_ = c10_npu::getNPUStreamFromPool().stream(false);
         TORCH_CHECK(commStream_ != nullptr, "Failed to get NPU stream from pool for comm stream");
-        EngramContextBuilder builder;
+        EngramContextBuilder builder(hybridMode_, commStream_);
         resources = builder.Build(*groupName_, withGrad_ ? 0 : engramNumCpuBytes_, withGrad_, externalHostPtr,
                                   externalBytes, sfHostPtr, sfBytes, netLayer_);
     }
+    rankId_ = resources.context.rankId;
+    rankSize_ = resources.context.rankSize;
     engramHcclComm_ = resources.hcclComm;
     engramMemHandle_ = resources.memHandle;
     engramHostBufPtr_ = resources.hostBufPtr;
@@ -2186,9 +2672,15 @@ void ElasticBuffer::EngramWrite(const at::Tensor& storage, const c10::optional<a
         const uint8_t* src = static_cast<const uint8_t*>(storage.data_ptr());
         while (remaining > 0) {
             size_t chunkSize = std::min(remaining, MEMCPY_MAX_BYTES);
-            errno_t memRet = memcpy_s(dst, chunkSize, src, chunkSize);
-            TORCH_CHECK(memRet == EOK, "memcpy_s failed, ret=", memRet, ", offset=", totalBytes - remaining,
-                        ", chunkSize=", chunkSize);
+            if (hybridMode_ == RAIL_ALIGNED_TOPO) {
+                aclError copyRet = aclrtMemcpy(dst, chunkSize, src, chunkSize, ACL_MEMCPY_HOST_TO_HOST);
+                TORCH_CHECK(copyRet == ACL_SUCCESS, "aclrtMemcpy(rail write) failed, ret=", static_cast<int>(copyRet),
+                            ", chunkSize=", chunkSize);
+            } else {
+                errno_t memRet = memcpy_s(dst, chunkSize, src, chunkSize);
+                TORCH_CHECK(memRet == EOK, "memcpy_s failed, ret=", memRet, ", offset=", totalBytes - remaining,
+                            ", chunkSize=", chunkSize);
+            }
             dst += chunkSize;
             src += chunkSize;
             remaining -= chunkSize;
@@ -2204,7 +2696,7 @@ void ElasticBuffer::EngramWrite(const at::Tensor& storage, const c10::optional<a
 // EngramFetch - stateless static method for torch CustomOp registration (graph-mode compatible).
 ElasticBuffer::EngramFetchOutput ElasticBuffer::EngramFetch(const at::Tensor& context, const at::Tensor& indices,
                                                             int64_t hiddenSize, int64_t numEntries, int64_t dtypeEnum,
-                                                            const at::Tensor& sfTable)
+                                                            const at::Tensor& sfTable, int64_t hybridMode)
 {
     auto dtype = static_cast<at::ScalarType>(dtypeEnum);
     int64_t numTokens = indices.size(0);
@@ -2218,7 +2710,7 @@ ElasticBuffer::EngramFetchOutput ElasticBuffer::EngramFetch(const at::Tensor& co
     aclTensor* nullTensor = nullptr;
     int64_t zero = 0;
     ACLNN_CMD(aclnnEngramFetch, context, indices, nullTensor, sfTable, fetched, nullTensor, nullTensor, nullTensor,
-              nullTensor, nullTensor, fetchedSf, hiddenSize, numEntries, zero, zero, zero);
+              nullTensor, nullTensor, fetchedSf, hiddenSize, numEntries, zero, zero, zero, hybridMode);
     return {fetched, fetchedSf};
 }
 
@@ -2255,7 +2747,7 @@ ElasticBuffer::EngramFetchTrainOutput ElasticBuffer::EngramFetchTrain(
         int64_t zero = 0;
         ACLNN_CMD(aclnnEngramFetch, context, indices, localStorageAddr, sfTableAddr, fetched, perm, sendCounts,
                   recvCounts, recvLocalEntry, numRecv, fetchedSf, hiddenSize, numEntries, numMaxTokensPerRank,
-                  commBufferSize, withGrad);
+                  commBufferSize, withGrad, zero);
     }
     return std::make_tuple(fetched, fetchedSf, perm, sendCounts, recvCounts, recvLocalEntry, numRecv);
 }
@@ -2337,6 +2829,9 @@ void ElasticBuffer::Destroy()
     if (localFullVocab_) {
         aclError syncRet = aclrtSynchronizeDevice();
         TORCH_CHECK(syncRet == ACL_SUCCESS, "aclrtSynchronizeDevice failed during local destroy, ret: ", syncRet);
+    } else if (hybridMode_ == RAIL_ALIGNED_TOPO) {
+        // rail_aligned 模式：注册内存/物理内存/导入句柄均无与正常路径一致的释放通道，按约定不释放
+        ASCEND_LOGI("rail_aligned destroy: leak rail resources by design");
     } else {
         try {
             EngramBarrier(true, true);
@@ -2657,18 +3152,20 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 
     pybind11::class_<Mc2Api::ElasticBuffer>(m, "ElasticBuffer")
         .def(pybind11::init<const std::optional<std::string>&, int64_t, int64_t, bool, bool, const std::string&,
-                            const std::string&>(),
+                            const std::string&, bool>(),
              pybind11::arg("groupName"), pybind11::arg("numCpuBytes"), pybind11::arg("numMaxTokensPerRank") = 0,
              pybind11::arg("withGrad") = false, pybind11::arg("explicitlyDestroy") = false,
-             pybind11::arg("netLayer") = "auto", pybind11::arg("moeCommAlg") = Mc2Api::MOE_COMM_ALG_DEFAULT)
+             pybind11::arg("netLayer") = "auto", pybind11::arg("moeCommAlg") = Mc2Api::MOE_COMM_ALG_DEFAULT,
+             pybind11::arg("allowHybridMode") = 0)
         .def("engram_write", &Mc2Api::ElasticBuffer::EngramWrite, pybind11::arg("storage").noconvert(),
              pybind11::arg("sf") = pybind11::none(), pybind11::arg("zeroCopy"))
         .def_static("engram_fetch",
                     static_cast<Mc2Api::ElasticBuffer::EngramFetchOutput (*)(
-                        const at::Tensor&, const at::Tensor&, int64_t, int64_t, int64_t, const at::Tensor&)>(
+                        const at::Tensor&, const at::Tensor&, int64_t, int64_t, int64_t, const at::Tensor&, int64_t)>(
                         &Mc2Api::ElasticBuffer::EngramFetch),
                     pybind11::arg("context"), pybind11::arg("indices"), pybind11::arg("hidden_size"),
-                    pybind11::arg("num_entries"), pybind11::arg("dtype"), pybind11::arg("sf_table"))
+                    pybind11::arg("num_entries"), pybind11::arg("dtype"), pybind11::arg("sf_table"),
+                    pybind11::arg("hybrid_mode"))
         .def_static("engram_fetch_train", &Mc2Api::ElasticBuffer::EngramFetchTrain, pybind11::arg("context"),
                     pybind11::arg("indices"), pybind11::arg("hidden_size"), pybind11::arg("num_entries"),
                     pybind11::arg("dtype"), pybind11::arg("local_storage_addr"), pybind11::arg("sf_dtype"),

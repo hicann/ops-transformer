@@ -21,6 +21,9 @@
 #else
 #include "kernel_operator.h"
 #endif
+#if __has_include("adv_api/hcomm/hcomm.h")
+#include "adv_api/hcomm/hcomm.h"
+#endif
 
 namespace Mc2Kernel {
 constexpr uint32_t HCCL_MAX_RANK_SIZE = 1024U;
@@ -44,12 +47,35 @@ constexpr uint32_t UB_RESERVED_SIZE = 8U * 1024U;
 constexpr uint32_t MAX_CHANNELS_PER_RANK = 3U;
 constexpr uint32_t HCOMM_SQ_MAX_PENDING = 32767U;
 
+// URMA WQE 配方：中间读 UNORDERED（cqe=0），每个提交序列收尾读带 fence CQE
+// （SQ 内 WQE 有序执行，收尾 CQE 完成 = 整批完成）
+#if __has_include("adv_api/hcomm/hcomm.h")
+constexpr AscendC::UrmaWqeEntry URMA_UNORDERED_CFG = {
+    .odr = 5,
+    .fence = 1,
+    .se = 0,
+    .cqe = 0,
+    .inlineEn = 0,
+};
+
+constexpr AscendC::UrmaWqeEntry URMA_CQE_CFG = {
+    .odr = 6,
+    .fence = 1,
+    .se = 0,
+    .cqe = 1,
+    .inlineEn = 0,
+};
+#endif
+
 struct EngramCommContext {
     uint32_t rankId;
     uint32_t rankSize;
     uint64_t commBuffer[HCCL_MAX_RANK_SIZE];
     uint64_t hcommHandle[HCCL_MAX_RANK_SIZE];
     uint32_t channelsPerRank;
+    uint32_t ranksPerMachine;
+    uint32_t ranksPerSupernode;
+    uint64_t rankSlotStride;
 };
 
 struct CoreAssignment {
@@ -97,6 +123,14 @@ __aicore__ inline CoreAssignment GetCoreAssignment(uint32_t totalBlocks, uint32_
     }
     // 本地核：全部服务本卡，按(aivId-urmaCores)分片本地token
     return CoreAssignment{rankId, aivId - urmaCores, totalBlocks - urmaCores};
+}
+
+template <AscendC::HardEvent event>
+__aicore__ inline void SyncFunc()
+{
+    int32_t eventID = static_cast<int32_t>(GetTPipePtr()->FetchEventID(event));
+    AscendC::SetFlag<event>(eventID);
+    AscendC::WaitFlag<event>(eventID);
 }
 
 } // namespace Mc2Kernel

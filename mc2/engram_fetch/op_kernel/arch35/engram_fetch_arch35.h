@@ -45,30 +45,6 @@ namespace Mc2Kernel {
 
 #if defined(ENABLE_ENGRAM_FETCH_KERNEL)
 
-constexpr AscendC::UrmaWqeEntry URMA_UNORDERED_CFG = {
-    .odr = 5,
-    .fence = 0,
-    .se = 0,
-    .cqe = 0,
-    .inlineEn = 0,
-};
-
-constexpr AscendC::UrmaWqeEntry URMA_CQE_CFG = {
-    .odr = 6,
-    .fence = 1,
-    .se = 0,
-    .cqe = 1,
-    .inlineEn = 0,
-};
-
-template <AscendC::HardEvent event>
-__aicore__ inline void SyncFunc()
-{
-    int32_t eventID = static_cast<int32_t>(GetTPipePtr()->FetchEventID(event));
-    AscendC::SetFlag<event>(eventID);
-    AscendC::WaitFlag<event>(eventID);
-}
-
 // 统一校验 indices 中的条目是否落在合法表范围 [0, totalEntries)
 __aicore__ inline bool IsValidEntry(int32_t idx, int64_t totalEntries)
 {

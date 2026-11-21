@@ -31,6 +31,7 @@
 #include "../engram_fetch_tiling_data.h"
 #include "../engram_fetch_tiling_key.h"
 #include "engram_fetch_arch35.h"
+#include "engram_fetch_rail_arch35.h"
 #include "engram_fetch_train_arch35.h"
 
 using namespace Mc2Kernel;
@@ -45,7 +46,12 @@ __global__ __aicore__ void engram_fetch(GM_ADDR commContext, GM_ADDR indices, GM
     GET_TILING_DATA_WITH_STRUCT(EngramFetchTilingData, tilingData, tilingGM);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIV_ONLY);
 #if defined(ENABLE_ENGRAM_FETCH_KERNEL)
-    if constexpr (EngramFetchMode == ENGRAM_FETCH_DEFAULT_MODE) {
+    if constexpr (EngramFetchMode == ENGRAM_FETCH_RAIL_MODE) {
+        AscendC::TPipe pipe;
+        EngramFetchRailArch35 op;
+        op.Init(commContext, indices, fetched, sfTable, fetchedSf, workspaceGM, &pipe, &tilingData);
+        op.Process<EngramHasSf>();
+    } else if constexpr (EngramFetchMode == ENGRAM_FETCH_DEFAULT_MODE) {
         AscendC::TPipe pipe;
         EngramFetchArch35 op;
         op.Init(commContext, indices, fetched, sfTable, fetchedSf, workspaceGM, &pipe, &tilingData);

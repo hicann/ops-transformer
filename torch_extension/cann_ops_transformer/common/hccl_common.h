@@ -70,6 +70,7 @@ using _HcclRankGraphGetEndpointInfo = HcclResult (*)(HcclComm, uint32_t, const E
 using _HcclRankGraphGetRankSizeByLayer = HcclResult (*)(HcclComm, uint32_t, uint32_t*);
 // 初始化channel描述符
 using _HcclRankGraphGetRanksByLayer = HcclResult (*)(HcclComm, uint32_t, uint32_t**, uint32_t*);
+using _HcclRankGraphGetInstSizeListByLayer = HcclResult (*)(HcclComm, uint32_t, uint32_t**, uint32_t*);
 // 获取channel句柄
 using _HcclChannelAcquire = HcclResult (*)(HcclComm, CommEngine, HcclChannelDesc*, uint32_t, ChannelHandle*);
 // 通过channel获取buffer
@@ -119,6 +120,7 @@ static _HcclRankGraphGetEndpointDesc HcclRankGraphGetEndpointDescFunc = nullptr;
 static _HcclRankGraphGetEndpointInfo HcclRankGraphGetEndpointInfoFunc = nullptr;
 static _HcclRankGraphGetRankSizeByLayer HcclRankGraphGetRankSizeByLayerFunc = nullptr;
 static _HcclRankGraphGetRanksByLayer HcclRankGraphGetRanksByLayerFunc = nullptr;
+static _HcclRankGraphGetInstSizeListByLayer HcclRankGraphGetInstSizeListByLayerFunc = nullptr;
 static _HcclChannelAcquire HcclChannelAcquireFunc = nullptr;
 static _HcclChannelGetHcclBuffer HcclChannelGetHcclBufferFunc = nullptr;
 static _HcclEngineCtxCreate HcclEngineCtxCreateFunc = nullptr;
@@ -235,6 +237,9 @@ static inline void InitHcclRankGraphFunctions()
     HcclRankGraphGetRanksByLayerFunc =
         GetHcclFwkFuncAddr<_HcclRankGraphGetRanksByLayer>("HcclRankGraphGetRanksByLayer");
     TORCH_CHECK(HcclRankGraphGetRanksByLayerFunc != nullptr, "getHcclRankGraphGetRanksByLayer failed.");
+    HcclRankGraphGetInstSizeListByLayerFunc =
+        GetHcclFwkFuncAddr<_HcclRankGraphGetInstSizeListByLayer>("HcclRankGraphGetInstSizeListByLayer");
+    TORCH_CHECK(HcclRankGraphGetInstSizeListByLayerFunc != nullptr, "getHcclRankGraphGetInstSizeListByLayer failed.");
 }
 
 // 初始化新的EngineCtx API (从libhccl_fwk.so加载)
