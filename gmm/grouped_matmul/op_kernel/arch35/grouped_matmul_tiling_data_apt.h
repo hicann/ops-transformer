@@ -162,9 +162,26 @@ struct GMMS8S4BasicApiTilingData {
 #pragma pack(pop)
 
 #pragma pack(push, 8)
+struct GMMNoQuantMMTiling {
+    int32_t M = 0;
+    int32_t N = 0;
+    int32_t Ka = 0;
+    int32_t mL1 = 0;
+    int32_t nL1 = 0;
+    int32_t kL1 = 0;
+    int32_t baseM = 0;
+    int32_t baseN = 0;
+    int32_t baseK = 0;
+    int32_t stepKa = 0;
+    int32_t stepKb = 0;
+    int32_t dbL0C = 0;
+};
+#pragma pack(pop)
+
+#pragma pack(push, 8)
 struct GMMNoQuantTilingData {
     GMMNoQuantBaseParams gmmNoQuantParam;
-    TCubeTiling mmTilingData;
+    GMMNoQuantMMTiling mmTilingData;
 };
 #pragma pack(pop)
 

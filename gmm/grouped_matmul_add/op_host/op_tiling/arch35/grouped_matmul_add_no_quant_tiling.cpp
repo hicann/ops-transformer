@@ -28,7 +28,8 @@ bool GroupedMatmulAddNoQuantTiling::SetTiling(gert::TilingContext* context)
     SetGMMTiling();
     SetMatMulTiling();
     SetTilingKey(context);
-    OP_CHECK_IF(!SetCustomParam(context), OP_LOGE(context->GetNodeName(), "set custom param failed"), return false);
+    OP_CHECK_IF(!SaveTilingData(context, tilingData_), OP_LOGE(context->GetNodeName(), "set custom param failed"),
+                return false);
     PrintTilingResult(context);
     return true;
 }
@@ -120,97 +121,6 @@ bool GroupedMatmulAddNoQuantTiling::GetAttrs(const gert::TilingContext* context)
     return true;
 }
 
-void GroupedMatmulAddNoQuantTiling::FormulateBasicBlock(const GMMCompileInfo* compileInfoPtr, uint32_t remainCoreNum)
-{
-    uint64_t mCnt = CeilDiv(m_, baseM_);
-    uint64_t nCnt = CeilDiv(n_, baseN_);
-    if (mCnt * nCnt >= remainCoreNum) {
-        return;
-    }
-    if (mCnt <= nCnt) {
-        baseM_ = CeilAlign(CeilDiv(m_, mCnt), BASIC_BLOCK_SIZE_16);
-        mCnt = CeilDiv(m_, baseM_);
-        nCnt = remainCoreNum / mCnt;
-        baseN_ = CeilAlign(CeilDiv(n_, nCnt), BASIC_BLOCK_SIZE_16);
-    } else {
-        baseN_ = CeilAlign(CeilDiv(n_, nCnt), BASIC_BLOCK_SIZE_16);
-        nCnt = CeilDiv(n_, baseN_);
-        mCnt = remainCoreNum / nCnt;
-        baseM_ = CeilAlign(CeilDiv(m_, mCnt), BASIC_BLOCK_SIZE_16);
-    }
-
-    while (baseN_ >= baseM_ * NUM_TWO && nCnt < remainCoreNum / NUM_TWO) {
-        nCnt = nCnt * NUM_TWO;
-        mCnt = remainCoreNum / nCnt;
-        baseM_ = CeilAlign(CeilDiv(m_, mCnt), BASIC_BLOCK_SIZE_16);
-        baseN_ = CeilAlign(CeilDiv(n_, nCnt), BASIC_BLOCK_SIZE_16);
-        mCnt = CeilDiv(m_, baseM_);
-        nCnt = CeilDiv(n_, baseN_);
-    }
-
-    while (baseM_ >= baseN_ * NUM_TWO && mCnt < remainCoreNum / NUM_TWO) {
-        mCnt = mCnt * NUM_TWO;
-        nCnt = remainCoreNum / mCnt;
-        baseM_ = CeilAlign(CeilDiv(m_, mCnt), BASIC_BLOCK_SIZE_16);
-        baseN_ = CeilAlign(CeilDiv(n_, nCnt), BASIC_BLOCK_SIZE_16);
-        mCnt = CeilDiv(m_, baseM_);
-        nCnt = CeilDiv(n_, baseN_);
-    }
-    mCnt = CeilDiv(m_, baseM_);
-    nCnt = CeilDiv(n_, baseN_);
-    uint64_t kValueAlign = CeilAlign(k_, BASIC_BLOCK_SIZE_16);
-    uint64_t kValueMax = FloorAlign(static_cast<uint64_t>(compileInfoPtr->l0ASize / DB_SIZE /
-                                                          GetSizeByDataType(xDType_) / std::max(baseM_, baseN_)),
-                                    BASIC_BLOCK_SIZE_16);
-    baseK_ = std::min(kValueAlign, kValueMax);
-    usedCoreNum_ = std::min(static_cast<uint32_t>(mCnt * nCnt * groupNum_), compileInfoPtr->aicNum);
-}
-
-void GroupedMatmulAddNoQuantTiling::CalAswtL1Tiling(const GMMCompileInfo* compileInfoPtr)
-{
-    uint64_t totalL1Size = compileInfoPtr->l1Size;
-    depthA1_ = totalL1Size / NUM_TWO / baseM_ / baseK_ / GetSizeByDataType(xDType_);      // 2: half of l1
-    depthB1_ = totalL1Size / NUM_TWO / baseN_ / baseK_ / GetSizeByDataType(weightDtype_); // 2: half of l1
-
-    uint64_t depthASize = depthA1_ * baseM_ * baseK_ * GetSizeByDataType(xDType_);
-    uint64_t depthBSize = depthB1_ * baseN_ * baseK_ * GetSizeByDataType(weightDtype_);
-    if (depthASize + depthBSize > totalL1Size) {
-        if (baseM_ > baseN_) {
-            depthB1_ = std::max(depthB1_ / NUM_TWO, 1UL); // 2: adjust depthB for l1 buffer
-        } else {
-            depthA1_ = std::max(depthA1_ / NUM_TWO, 1UL); // 2: adjust depthA for l1 buffer
-        }
-    }
-    stepKb_ = std::max(depthB1_ / DB_SIZE, 1UL);
-    stepKa_ = std::max(depthA1_ / DB_SIZE, 1UL);
-    if (stepKa_ >= stepKb_) {
-        stepKa_ = stepKa_ / stepKb_ * stepKb_;
-    } else {
-        stepKb_ = stepKb_ / stepKa_ * stepKa_;
-    }
-    depthA1_ = stepKa_ * DB_SIZE; // depth % (stepKa * stepM) == 0
-    depthB1_ = stepKb_ * DB_SIZE; // depth % (stepKb * stepN) == 0
-    return;
-}
-
-void GroupedMatmulAddNoQuantTiling::CalcTailBasicBlock(const GMMCompileInfo* compileInfoPtr)
-{
-    uint64_t mCnt = CeilDiv(m_, baseM_);
-    uint64_t nCnt = CeilDiv(n_, baseN_);
-    uint64_t mnCnt = mCnt * nCnt;
-    uint64_t tailCnt = mnCnt <= compileInfoPtr->aicNum ? 0UL : mnCnt % compileInfoPtr->aicNum;
-
-    if (tailCnt == 0UL) {
-        return;
-    }
-    while ((mTailCnt_ + 1UL) * nTailCnt_ * tailCnt <= compileInfoPtr->aicNum) {
-        mTailCnt_ += 1UL;
-        if (mTailCnt_ * (nTailCnt_ + 1UL) * tailCnt <= compileInfoPtr->aicNum) {
-            nTailCnt_ += 1UL;
-        }
-    }
-}
-
 bool GroupedMatmulAddNoQuantTiling::CalMatMulTiling(const gert::TilingContext* context,
                                                     const GMMCompileInfo* compileInfoPtr)
 {
@@ -221,12 +131,10 @@ bool GroupedMatmulAddNoQuantTiling::CalMatMulTiling(const gert::TilingContext* c
                                                         1, 1024)
                         .c_str()),
                 return false);
-    uint32_t remainCoreNum = std::max(1U, compileInfoPtr->aicNum / groupNum_);
-    FormulateBasicBlock(compileInfoPtr, remainCoreNum);
-    if (groupNum_ == 1U) {
-        CalcTailBasicBlock(compileInfoPtr);
-        CalAswtL1Tiling(compileInfoPtr);
-    }
+    CalSplitKBasicBlockTiling(compileInfoPtr);
+    mL1_ = baseM_;
+    nL1_ = baseN_;
+    dbL0C_ = 1UL;
     return true;
 }
 
@@ -240,63 +148,7 @@ void GroupedMatmulAddNoQuantTiling::SetGMMTiling()
 
 void GroupedMatmulAddNoQuantTiling::SetMatMulTiling()
 {
-    tilingData_.mmTilingData.isBias = 0;
-    tilingData_.mmTilingData.M = m_;
-    tilingData_.mmTilingData.N = n_;
-    tilingData_.mmTilingData.Ka = k_;
-    tilingData_.mmTilingData.Kb = k_;
-    tilingData_.mmTilingData.singleCoreM = m_;
-    tilingData_.mmTilingData.singleCoreN = baseN_;
-    tilingData_.mmTilingData.singleCoreK = k_;
-    tilingData_.mmTilingData.dbL0A = DB_SIZE;
-    tilingData_.mmTilingData.dbL0B = DB_SIZE;
-    tilingData_.mmTilingData.dbL0C = 1;
-    tilingData_.mmTilingData.baseM = baseM_;
-    tilingData_.mmTilingData.baseN = baseN_;
-    tilingData_.mmTilingData.baseK = baseK_;
-    tilingData_.mmTilingData.stepKa = stepKa_;
-    tilingData_.mmTilingData.stepKb = stepKb_;
-    tilingData_.mmTilingData.depthA1 = depthA1_;
-    tilingData_.mmTilingData.depthB1 = depthB1_;
-    tilingData_.mmTilingData.stepM = 1;
-    tilingData_.mmTilingData.stepN = 1;
-    tilingData_.mmTilingData.usedCoreNum = usedCoreNum_;
-}
-
-/** @brief split K single-single-single
- */
-bool GroupedMatmulAddNoQuantTiling::SplitKSingleXSingleWeightSingleY(const gert::TilingContext* context,
-                                                                     const gert::Shape xShape, const gert::Shape wShape)
-{
-    auto groupListTensor = context->GetDynamicInputTensor(INDEX_GROUPLIST, 0);
-    OP_CHECK_IF(groupListTensor == nullptr, OP_LOGE(context->GetNodeName(), "groupListTensor is nullptr"),
-                return false);
-    gert::Shape groupListShape = groupListTensor->GetStorageShape();
-    groupNum_ = static_cast<uint32_t>(groupListShape.GetDim(0)); // 0: the first dim of groupList is groupNum
-    m_ = static_cast<uint64_t>(xShape.GetDim(1));
-    k_ = static_cast<uint64_t>(xShape.GetDim(xKDim_));
-    n_ = static_cast<uint64_t>(wShape.GetDim(weightNDim_));
-    return true;
-}
-
-bool GroupedMatmulAddNoQuantTiling::SetCustomParam(gert::TilingContext* context)
-{
-    size_t* workspaces = context->GetWorkspaceSizes(1); // get second variable
-    OP_CHECK_IF(workspaces == nullptr, OP_LOGE(context->GetNodeName(), "workspaces is nullptr."),
-                return false); // check workspaces is not null
-    workspaces[0] = 32U;       // 32: default workspace size
-
-    context->SetBlockDim(usedCoreNum_);
-    OP_CHECK_IF(context->GetRawTilingData() == nullptr, OP_LOGE(context->GetNodeName(), "RawTilingData is nullptr."),
-                return false);
-    errno_t ret = memcpy_s(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity(),
-                           reinterpret_cast<void*>(&tilingData_), sizeof(tilingData_));
-    if (ret != EOK) {
-        OP_LOGE(context->GetNodeName(), "memcpy_s failed, ret=%d", ret);
-        return false;
-    }
-    context->GetRawTilingData()->SetDataSize(sizeof(tilingData_));
-    return true;
+    FillMmTilingData(tilingData_.mmTilingData);
 }
 
 void GroupedMatmulAddNoQuantTiling::SetTilingKey(gert::TilingContext* context) const
@@ -315,11 +167,12 @@ void GroupedMatmulAddNoQuantTiling::PrintTilingResult(const gert::TilingContext*
             tilingData_.gmmAddParams.mTailCnt, tilingData_.gmmAddParams.nTailCnt);
 
     OP_LOGI(context->GetNodeName(),
-            "GMM MatMul Tiling result: usedCoreNum: %d, baseM: %d, baseN: %d, baseK: %d, stepKa: %d,"
-            "stepKb: %d, depthA1: %d, depthB1: %d",
-            tilingData_.mmTilingData.usedCoreNum, tilingData_.mmTilingData.baseM, tilingData_.mmTilingData.baseN,
-            tilingData_.mmTilingData.baseK, tilingData_.mmTilingData.stepKa, tilingData_.mmTilingData.stepKb,
-            tilingData_.mmTilingData.depthA1, tilingData_.mmTilingData.depthB1);
+            "GMM MatMul Tiling result: M: %d, N: %d, Ka: %d, mL1: %d, nL1: %d, kL1: %d, baseM: %d, baseN: %d,"
+            " baseK: %d, stepKa: %d, stepKb: %d, dbL0C: %d",
+            tilingData_.mmTilingData.M, tilingData_.mmTilingData.N, tilingData_.mmTilingData.Ka,
+            tilingData_.mmTilingData.mL1, tilingData_.mmTilingData.nL1, tilingData_.mmTilingData.kL1,
+            tilingData_.mmTilingData.baseM, tilingData_.mmTilingData.baseN, tilingData_.mmTilingData.baseK,
+            tilingData_.mmTilingData.stepKa, tilingData_.mmTilingData.stepKb, tilingData_.mmTilingData.dbL0C);
 }
 
 } // namespace optiling

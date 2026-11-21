@@ -71,3 +71,8 @@ else() # custom
         OP_API_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../op_api
         OPTYPE grouped_matmul_add ACLNNTYPE aclnn_exclude)
 endif()
+
+if(TARGET ${OPHOST_NAME}_tiling_obj)
+    target_sources(${OPHOST_NAME}_tiling_obj PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../grouped_matmul/op_host/op_tiling/arch35/grouped_no_quant_tiling_base.cpp)
+endif()

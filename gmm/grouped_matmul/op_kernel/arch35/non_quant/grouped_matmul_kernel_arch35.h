@@ -37,9 +37,9 @@ template <typename LayoutA, typename LayoutB, GmmActMode ActMode = GmmActMode::N
 __aicore__ inline void GroupedMatMulKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR groupList, GM_ADDR y,
                                            GM_ADDR tiling)
 {
-    constexpr bool ENABLE_GELU = (ActMode == GmmActMode::GELU_TANH);
-    constexpr bool ENABLE_RELU = (ActMode == GmmActMode::RELU);
-    constexpr uint64_t FUSED_OP_TYPE = ENABLE_RELU ? Blaze::Gemm::OP_TYPE_RELU : Blaze::Gemm::OP_TYPE_EMPTY;
+    constexpr bool enableGelu = (ActMode == GmmActMode::GELU_TANH);
+    constexpr bool enableRelu = (ActMode == GmmActMode::RELU);
+    constexpr uint64_t fusedOpType = enableRelu ? Blaze::Gemm::OP_TYPE_RELU : Blaze::Gemm::OP_TYPE_EMPTY;
 
     GET_TILING_DATA_MEMBER(GMMNoQuantTilingData, gmmNoQuantParam, gmmBaseParams, tiling);
     GET_TILING_DATA_MEMBER(GMMNoQuantTilingData, mmTilingData, mmTilingData, tiling);
@@ -48,21 +48,21 @@ __aicore__ inline void GroupedMatMulKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR bi
     using BType = DTYPE_X;
     using CType = DTYPE_Y;
     using BiasType = DTYPE_BIAS;
-    using EpilogueInputType = AscendC::Std::conditional_t<ENABLE_GELU, float, CType>;
+    using EpilogueInputType = AscendC::Std::conditional_t<enableGelu, float, CType>;
     using LayoutC = asc::te::nd_ext_layout_ptn;
     using LayoutBias = asc::te::nd_ext_layout_ptn;
     using ProblemShape = asc::te::shape<int64_t, int64_t, int64_t, int64_t>;
     using BasicDispatchPolicy =
-        Blaze::Gemm::MatmulMultiBlockBasic<0, FUSED_OP_TYPE, Blaze::Gemm::KernelGroupedMmadNoQuant, 0,
+        Blaze::Gemm::MatmulMultiBlockBasic<0, fusedOpType, Blaze::Gemm::KernelGroupedMmadNoQuant, 0,
                                            Blaze::Gemm::MatmulOutputMode::OVERWRITE>;
     using GeluDispatchPolicy =
         Blaze::Gemm::MatmulMultiBlockFixpipeOpti<Blaze::Gemm::ND_ALIG_1V2_FIXPIPE, Blaze::Gemm::OP_TYPE_GELU,
                                                  Blaze::Gemm::KernelGroupedMmadNoQuant>;
-    using DispatchPolicy = AscendC::Std::conditional_t<ENABLE_GELU, GeluDispatchPolicy, BasicDispatchPolicy>;
+    using DispatchPolicy = AscendC::Std::conditional_t<enableGelu, GeluDispatchPolicy, BasicDispatchPolicy>;
     using BlockMmad = Blaze::Gemm::Block::BlockMmad<DispatchPolicy, AType, LayoutA, BType, LayoutB, CType, LayoutC,
                                                     BiasType, LayoutBias>;
     using BlockEpilogue =
-        AscendC::Std::conditional_t<ENABLE_GELU,
+        AscendC::Std::conditional_t<enableGelu,
                                     Blaze::Epilogue::Block::BlockEpilogueGeluFixpipe<CType, EpilogueInputType>,
                                     Blaze::Epilogue::Block::BlockEpilogueEmpty>;
     using BlockScheduler = Blaze::Gemm::Block::BlockSchedulerGmmNoQuant;
@@ -72,13 +72,6 @@ __aicore__ inline void GroupedMatMulKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR bi
     using GMMTiling = typename GroupedMatmulKernel::GMMTiling;
     using BlockSchedulerParams = typename BlockScheduler::Params;
 
-    const uint64_t baseM = static_cast<uint64_t>(mmTilingData.baseM);
-    const uint64_t baseN = static_cast<uint64_t>(mmTilingData.baseN);
-    const uint64_t baseK = static_cast<uint64_t>(mmTilingData.baseK);
-    const uint64_t sharedKStep =
-        Blaze::Gemm::Min(static_cast<uint64_t>(mmTilingData.stepKa), static_cast<uint64_t>(mmTilingData.stepKb));
-    const uint64_t kL1 = baseK * Blaze::Gemm::Max(sharedKStep, static_cast<uint64_t>(1));
-
     GMMTiling gmmParams{
         static_cast<uint32_t>(gmmBaseParams.groupNum),      static_cast<int32_t>(gmmBaseParams.groupType),
         static_cast<uint32_t>(gmmBaseParams.groupListType), static_cast<uint64_t>(gmmBaseParams.singleX),
@@ -86,8 +79,10 @@ __aicore__ inline void GroupedMatMulKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR bi
         static_cast<uint32_t>(gmmBaseParams.hasBias),       static_cast<uint32_t>(gmmBaseParams.weightNoL2Cache)};
     constexpr uint32_t nTailAlign =
         BlockMmad::WEIGHT_NZ_FORMAT ? static_cast<uint32_t>(asc::te::c0_element<BType>) : 1U;
-    BlockSchedulerParams schedulerParams{static_cast<int32_t>(baseM),
-                                         static_cast<int32_t>(baseN),
+    // l0cdb判定全部在host侧：mL1/nL1为L1 tile；baseM/baseN为L0块（host使能l0cdb时baseN已减半），
+    // m分组/不分组场景由kernel层按组内真实m是否超baseM(mL1)分组使能
+    BlockSchedulerParams schedulerParams{static_cast<int32_t>(mmTilingData.mL1),
+                                         static_cast<int32_t>(mmTilingData.nL1),
                                          static_cast<uint64_t>(gmmBaseParams.mTailCnt),
                                          static_cast<uint64_t>(gmmBaseParams.nTailCnt),
                                          1U, // mTailAlign
@@ -110,17 +105,18 @@ __aicore__ inline void GroupedMatMulKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR bi
     mmParams.biasGmAddr = gmmBaseParams.hasBias == 0 ? nullptr : bias;
     mmParams.groupListGmAddr = groupList;
     mmParams.workspaceGmAddr = nullptr;
-    mmParams.mL1 = baseM;
-    mmParams.nL1 = baseN;
-    mmParams.kL1 = kL1;
-    mmParams.mL0 = static_cast<uint32_t>(baseM);
-    mmParams.nL0 = static_cast<uint32_t>(baseN);
-    mmParams.kL0 = static_cast<uint32_t>(baseK);
+    mmParams.mL1 = static_cast<uint64_t>(mmTilingData.mL1);
+    mmParams.nL1 = static_cast<uint64_t>(mmTilingData.nL1);
+    mmParams.kL1 = static_cast<uint64_t>(mmTilingData.kL1);
+    mmParams.mL0 = static_cast<uint32_t>(mmTilingData.baseM);
+    mmParams.nL0 = static_cast<uint32_t>(mmTilingData.baseN);
+    mmParams.kL0 = static_cast<uint32_t>(mmTilingData.baseK);
     mmParams.l1Stages = 2U;
     mmParams.l0cStages = static_cast<uint16_t>(mmTilingData.dbL0C);
-    if constexpr (ENABLE_GELU) {
+    if constexpr (enableGelu) {
         // Keep the current grouped GELU path on the single-L0C-stage configuration selected by tiling.
         mmParams.l0cStages = 1U;
+        mmParams.nL0 = static_cast<uint32_t>(mmTilingData.nL1);
         mmParams.oriK = static_cast<uint64_t>(mmTilingData.Ka);
         mmParams.splitM = static_cast<uint64_t>(gmmBaseParams.splitM);
         mmParams.ubDB = BlockEpilogue::UB_BUFFER_DEPTH;

@@ -50,9 +50,6 @@ __aicore__ inline void GroupedMatMulAddKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR
     const uint64_t baseM = static_cast<uint64_t>(mmTilingData.baseM);
     const uint64_t baseN = static_cast<uint64_t>(mmTilingData.baseN);
     const uint64_t baseK = static_cast<uint64_t>(mmTilingData.baseK);
-    const uint64_t sharedKStep =
-        Blaze::Gemm::Min(static_cast<uint64_t>(mmTilingData.stepKa), static_cast<uint64_t>(mmTilingData.stepKb));
-    const uint64_t kL1 = baseK * Blaze::Gemm::Max(sharedKStep, static_cast<uint64_t>(1));
 
     constexpr int32_t groupTypeSplitK = 2;
     GMMTiling gmmParams{static_cast<uint32_t>(gmmAddParams.groupNum),
@@ -65,8 +62,8 @@ __aicore__ inline void GroupedMatMulAddKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR
                         0U}; // weightNoL2Cache
     constexpr uint32_t nTailAlign =
         BlockMmad::WEIGHT_NZ_FORMAT ? static_cast<uint32_t>(asc::te::c0_element<BType>) : 1U;
-    BlockSchedulerParams schedulerParams{static_cast<int32_t>(baseM),
-                                         static_cast<int32_t>(baseN),
+    BlockSchedulerParams schedulerParams{static_cast<int32_t>(mmTilingData.mL1),
+                                         static_cast<int32_t>(mmTilingData.nL1),
                                          static_cast<uint64_t>(gmmAddParams.mTailCnt),
                                          static_cast<uint64_t>(gmmAddParams.nTailCnt),
                                          1U, // mTailAlign
@@ -87,9 +84,9 @@ __aicore__ inline void GroupedMatMulAddKernel(GM_ADDR x, GM_ADDR weight, GM_ADDR
                                         nullptr, // biasGmAddr
                                         groupList,
                                         nullptr, // workspaceGmAddr
-                                        baseM,
-                                        baseN,
-                                        kL1,
+                                        static_cast<uint64_t>(mmTilingData.mL1),
+                                        static_cast<uint64_t>(mmTilingData.nL1),
+                                        static_cast<uint64_t>(mmTilingData.kL1),
                                         static_cast<uint32_t>(baseM),
                                         static_cast<uint32_t>(baseN),
                                         static_cast<uint32_t>(baseK),
