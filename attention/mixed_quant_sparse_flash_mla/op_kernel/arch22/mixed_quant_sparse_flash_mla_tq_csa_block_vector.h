@@ -1281,11 +1281,14 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockVector<SAST>::ProcessInt8Kv(
     uint32_t staged = 0U, loadSlot = 0U, pendingSlot = 0U, pendingRows = 0U;
     uint64_t outOffset = static_cast<uint64_t>(stageRowStart + first) * DIM;
     uint64_t pendingOffset = outOffset;
+    LocalTensor<uint32_t> preparedRows;
+    if (preparedInt8) {
+        preparedRows = v0ValidSizeBuff.Get<uint32_t>();
+    }
     int64_t candidateStart = info.int8Start + (preparedInt8 ? first : 0U);
     for (int64_t candidate = candidateStart; candidate < info.int8End && row < end; ++candidate) {
-        uint32_t physicalRow = preparedInt8 ? v0ValidSizeBuff.Get<uint32_t>().GetValue(
-                                                  static_cast<uint32_t>((info.isOriOnly ? 0U : 512U) + candidate)) :
-                                              0U;
+        uint32_t physicalRow =
+            preparedInt8 ? preparedRows.GetValue(static_cast<uint32_t>((info.isOriOnly ? 0U : 512U) + candidate)) : 0U;
         int64_t offset = preparedInt8 ? static_cast<int64_t>(physicalRow) * RECORD_BYTES :
                                         int8Input.CandidateOffset(info, candidate);
         if (offset < 0) {
@@ -1319,7 +1322,7 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockVector<SAST>::ProcessInt8Kv(
                    staged + 1U < BATCH_ROWS) {
             // ori cache rows must retain logical order, including descending physical-page transitions.
             // Keep arch22 SMLA's paired transfer for compressed KV and original page boundaries.
-            int64_t nextOffset = static_cast<int64_t>(v0ValidSizeBuff.Get<uint32_t>().GetValue(
+            int64_t nextOffset = static_cast<int64_t>(preparedRows.GetValue(
                                      static_cast<uint32_t>((info.isOriOnly ? 0U : 512U) + candidate + 1))) *
                                  RECORD_BYTES;
             int64_t gap = (offset > nextOffset ? offset - nextOffset : nextOffset - offset) - RECORD_BYTES;
@@ -1375,7 +1378,13 @@ __aicore__ inline void KvQuantSparseFlashMlaCsaBlockVector<SAST>::ProcessInt8Kv(
         staged = 0U;
         loadSlot ^= 1U;
         if (wave256 && wave == 0U && row == end) {
-            // Retain one-batch-ahead16-row prefetch across the wave boundary.
+            if constexpr (IsSameType<KV_T, half>::value) {
+                // Submit the first wave's tail and ready flag before prefetching the second wave.
+                ConvertInt8Batch(pendingSlot, pendingRows, pendingOffset, wrapOutput);
+                CrossCoreSetFlag<ConstInfo::SAS_SYNC_MODE2, PIPE_MTE3>(6);
+                pendingRows = 0U;
+                pendingWaveReady = false;
+            }
             wave = 1U;
             first += 256U;
             row = first;
