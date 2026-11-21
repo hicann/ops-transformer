@@ -1,0 +1,688 @@
+[
+  {
+    "id": 0,
+    "name": "smla_CSA_TND_PA_BBND_n16",
+    "api": "pytorch",
+    "api_type": "smla_st",
+    "standard": {
+      "acc": {
+        "smla_pytest": {}
+      },
+      "perf": "not_key"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "CSA"
+      },
+      {
+        "name": "layout_q",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "TND"
+      },
+      {
+        "name": "layout_kv",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "PA_BBND"
+      },
+      {
+        "name": "heads",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 16
+      }
+    ]
+  },
+  {
+    "id": 1,
+    "name": "smla_CSA_TND_PA_BBND_n128",
+    "api": "pytorch",
+    "api_type": "smla_st",
+    "standard": {
+      "acc": {
+        "smla_pytest": {}
+      },
+      "perf": "not_key"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "CSA"
+      },
+      {
+        "name": "layout_q",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "TND"
+      },
+      {
+        "name": "layout_kv",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "PA_BBND"
+      },
+      {
+        "name": "heads",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 128
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "name": "smla_CSA_BSND_BSND_n16",
+    "api": "pytorch",
+    "api_type": "smla_st",
+    "standard": {
+      "acc": {
+        "smla_pytest": {}
+      },
+      "perf": "not_key"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "CSA"
+      },
+      {
+        "name": "layout_q",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "BSND"
+      },
+      {
+        "name": "layout_kv",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "BSND"
+      },
+      {
+        "name": "heads",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 16
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "name": "smla_CSA_BSND_BSND_n128",
+    "api": "pytorch",
+    "api_type": "smla_st",
+    "standard": {
+      "acc": {
+        "smla_pytest": {}
+      },
+      "perf": "not_key"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "CSA"
+      },
+      {
+        "name": "layout_q",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "BSND"
+      },
+      {
+        "name": "layout_kv",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "BSND"
+      },
+      {
+        "name": "heads",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 128
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "name": "smla_HCA_TND_PA_BBND_n16",
+    "api": "pytorch",
+    "api_type": "smla_st",
+    "standard": {
+      "acc": {
+        "smla_pytest": {}
+      },
+      "perf": "not_key"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "HCA"
+      },
+      {
+        "name": "layout_q",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "TND"
+      },
+      {
+        "name": "layout_kv",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "PA_BBND"
+      },
+      {
+        "name": "heads",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 16
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "name": "smla_HCA_TND_PA_BBND_n128",
+    "api": "pytorch",
+    "api_type": "smla_st",
+    "standard": {
+      "acc": {
+        "smla_pytest": {}
+      },
+      "perf": "not_key"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "HCA"
+      },
+      {
+        "name": "layout_q",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "TND"
+      },
+      {
+        "name": "layout_kv",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "PA_BBND"
+      },
+      {
+        "name": "heads",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 128
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "name": "smla_HCA_BSND_BSND_n16",
+    "api": "pytorch",
+    "api_type": "smla_st",
+    "standard": {
+      "acc": {
+        "smla_pytest": {}
+      },
+      "perf": "not_key"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "HCA"
+      },
+      {
+        "name": "layout_q",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "BSND"
+      },
+      {
+        "name": "layout_kv",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "BSND"
+      },
+      {
+        "name": "heads",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 16
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "name": "smla_HCA_BSND_BSND_n128",
+    "api": "pytorch",
+    "api_type": "smla_st",
+    "standard": {
+      "acc": {
+        "smla_pytest": {}
+      },
+      "perf": "not_key"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "HCA"
+      },
+      {
+        "name": "layout_q",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "BSND"
+      },
+      {
+        "name": "layout_kv",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "BSND"
+      },
+      {
+        "name": "heads",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 128
+      }
+    ]
+  },
+  {
+    "id": 8,
+    "name": "smla_SWA_TND_PA_BBND_n16",
+    "api": "pytorch",
+    "api_type": "smla_st",
+    "standard": {
+      "acc": {
+        "smla_pytest": {}
+      },
+      "perf": "not_key"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "SWA"
+      },
+      {
+        "name": "layout_q",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "TND"
+      },
+      {
+        "name": "layout_kv",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "PA_BBND"
+      },
+      {
+        "name": "heads",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 16
+      }
+    ]
+  },
+  {
+    "id": 9,
+    "name": "smla_SWA_TND_PA_BBND_n128",
+    "api": "pytorch",
+    "api_type": "smla_st",
+    "standard": {
+      "acc": {
+        "smla_pytest": {}
+      },
+      "perf": "not_key"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "SWA"
+      },
+      {
+        "name": "layout_q",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "TND"
+      },
+      {
+        "name": "layout_kv",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "PA_BBND"
+      },
+      {
+        "name": "heads",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 128
+      }
+    ]
+  },
+  {
+    "id": 10,
+    "name": "smla_SWA_BSND_BSND_n16",
+    "api": "pytorch",
+    "api_type": "smla_st",
+    "standard": {
+      "acc": {
+        "smla_pytest": {}
+      },
+      "perf": "not_key"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "SWA"
+      },
+      {
+        "name": "layout_q",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "BSND"
+      },
+      {
+        "name": "layout_kv",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "BSND"
+      },
+      {
+        "name": "heads",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 16
+      }
+    ]
+  },
+  {
+    "id": 11,
+    "name": "smla_SWA_BSND_BSND_n128",
+    "api": "pytorch",
+    "api_type": "smla_st",
+    "standard": {
+      "acc": {
+        "smla_pytest": {}
+      },
+      "perf": "not_key"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "SWA"
+      },
+      {
+        "name": "layout_q",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "BSND"
+      },
+      {
+        "name": "layout_kv",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "BSND"
+      },
+      {
+        "name": "heads",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 128
+      }
+    ]
+  },
+  {
+    "id": 12,
+    "name": "smla_DSPARK_TND_PA_BBND_n16",
+    "api": "pytorch",
+    "api_type": "smla_st",
+    "standard": {
+      "acc": {
+        "smla_pytest": {}
+      },
+      "perf": "not_key"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "DSPARK"
+      },
+      {
+        "name": "layout_q",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "TND"
+      },
+      {
+        "name": "layout_kv",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "PA_BBND"
+      },
+      {
+        "name": "heads",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 16
+      }
+    ]
+  },
+  {
+    "id": 13,
+    "name": "smla_DSPARK_TND_PA_BBND_n128",
+    "api": "pytorch",
+    "api_type": "smla_st",
+    "standard": {
+      "acc": {
+        "smla_pytest": {}
+      },
+      "perf": "not_key"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "DSPARK"
+      },
+      {
+        "name": "layout_q",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "TND"
+      },
+      {
+        "name": "layout_kv",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "PA_BBND"
+      },
+      {
+        "name": "heads",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 128
+      }
+    ]
+  },
+  {
+    "id": 14,
+    "name": "smla_DSPARK_TND_PA_BBND_n64_s1",
+    "api": "pytorch",
+    "api_type": "smla_st",
+    "standard": {
+      "acc": {
+        "smla_pytest": {}
+      },
+      "perf": "not_key"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "DSPARK"
+      },
+      {
+        "name": "layout_q",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "TND"
+      },
+      {
+        "name": "layout_kv",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "PA_BBND"
+      },
+      {
+        "name": "heads",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 64
+      },
+      {
+        "name": "query_length",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 1
+      }
+    ]
+  },
+  {
+    "id": 15,
+    "name": "smla_DSPARK_TND_PA_BBND_n64_s4",
+    "api": "pytorch",
+    "api_type": "smla_st",
+    "standard": {
+      "acc": {
+        "smla_pytest": {}
+      },
+      "perf": "not_key"
+    },
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "DSPARK"
+      },
+      {
+        "name": "layout_q",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "TND"
+      },
+      {
+        "name": "layout_kv",
+        "type": "attr",
+        "required": true,
+        "dtype": "string",
+        "range_values": "PA_BBND"
+      },
+      {
+        "name": "heads",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 64
+      },
+      {
+        "name": "query_length",
+        "type": "attr",
+        "required": true,
+        "dtype": "int",
+        "range_values": 4
+      }
+    ]
+  }
+]
