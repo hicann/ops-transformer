@@ -185,7 +185,12 @@ bool KvRmsNormRopeCacheRegbaseRecomputeTiling::CheckInputDtype()
     if (CheckCacheIsQuant(kcacheDtype)) {
         // k_rope_scale
         auto kRopeScaleDesc = context_->GetOptionalInputDesc(K_ROPE_SCALE_IDX);
-        OP_CHECK_NULL_WITH_CONTEXT(context_, kRopeScaleDesc);
+        if (kRopeScaleDesc == nullptr) {
+            // 量化 cache 场景 k_rope_scale 为必选：缺失属于用户参数错误；本函数返回 bool，
+            // 不能用 OP_CHECK_NULL_WITH_CONTEXT（其 return ge::GRAPH_FAILED 转 bool 为 true，会被误判为校验通过）
+            OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "k_rope_scale");
+            return false;
+        }
         ge::DataType kRopeScaleDtype = kRopeScaleDesc->GetDataType();
         if (kRopeScaleDtype != ge::DT_FLOAT) {
             std::string kRopeScaleDtypeStr = ToString(kRopeScaleDtype);
@@ -225,7 +230,12 @@ bool KvRmsNormRopeCacheRegbaseRecomputeTiling::CheckInputDtype()
     if (CheckCacheIsQuant(vcacheDtype)) {
         // c_kv_scale
         auto ckvScaleDesc = context_->GetOptionalInputDesc(C_KV_SCALE_IDX);
-        OP_CHECK_NULL_WITH_CONTEXT(context_, ckvScaleDesc);
+        if (ckvScaleDesc == nullptr) {
+            // 量化 cache 场景 c_kv_scale 为必选：缺失属于用户参数错误；返回 bool 函数不能用
+            // OP_CHECK_NULL_WITH_CONTEXT（return ge::GRAPH_FAILED 转 bool 为 true，会被误判为校验通过）
+            OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "c_kv_scale");
+            return false;
+        }
         ge::DataType ckvScaleDtype = ckvScaleDesc->GetDataType();
         if (ckvScaleDtype != ge::DT_FLOAT) {
             std::string ckvScaleDtypeStr = ToString(ckvScaleDtype);
@@ -278,17 +288,48 @@ ge::graphStatus KvRmsNormRopeCacheRegbaseRecomputeTiling::DoOpTiling()
     auto offset1Shape = context_->GetOptionalInputShape(K_ROPE_OFFSET_IDX);
     auto offset2Shape = context_->GetOptionalInputShape(C_KV_OFFSET_IDX);
 
+    // CheckInputShapeIsEmpty 内部已按输入逐个正式上报，外层仅日志透传
     OP_CHECK_IF(CheckInputShapeIsEmpty() != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "The input param can not be empty"), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "The input param can not be empty"),
+                return ge::GRAPH_FAILED);
 
-    OP_CHECK_IF(!CheckScaleOffsetShape(scale1Shape, dk_, kScaleType_),
-                OP_LOGE(context_->GetNodeName(), "k_rope_scale shape invalid."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(!CheckScaleOffsetShape(scale2Shape, dv_, vScaleType_),
-                OP_LOGE(context_->GetNodeName(), "c_kv_scale shape invalid."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(!CheckScaleOffsetShape(offset1Shape, dk_, kOffsetType_),
-                OP_LOGE(context_->GetNodeName(), "k_rope_offset shape invalid."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(!CheckScaleOffsetShape(offset2Shape, dv_, vOffsetType_),
-                OP_LOGE(context_->GetNodeName(), "c_kv_offset shape invalid."), return ge::GRAPH_FAILED);
+    // CheckScaleOffsetShape 本身不携带参数名，正式上报在本层按参数名落码
+    if (!CheckScaleOffsetShape(scale1Shape, dk_, kScaleType_)) {
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            context_->GetNodeName(), "k_rope_scale",
+            std::to_string((scale1Shape == nullptr) ? 0 : scale1Shape->GetStorageShape().GetShapeSize()).c_str(),
+            ("the total number of elements of k_rope_scale must be dk (" + std::to_string(dk_) +
+             "), or 1 when broadcast is supported on the current SoC")
+                .c_str());
+        return ge::GRAPH_FAILED;
+    }
+    if (!CheckScaleOffsetShape(scale2Shape, dv_, vScaleType_)) {
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            context_->GetNodeName(), "c_kv_scale",
+            std::to_string((scale2Shape == nullptr) ? 0 : scale2Shape->GetStorageShape().GetShapeSize()).c_str(),
+            ("the total number of elements of c_kv_scale must be dv (" + std::to_string(dv_) +
+             "), or 1 when broadcast is supported on the current SoC")
+                .c_str());
+        return ge::GRAPH_FAILED;
+    }
+    if (!CheckScaleOffsetShape(offset1Shape, dk_, kOffsetType_)) {
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            context_->GetNodeName(), "k_rope_offset",
+            std::to_string((offset1Shape == nullptr) ? 0 : offset1Shape->GetStorageShape().GetShapeSize()).c_str(),
+            ("the total number of elements of k_rope_offset must be dk (" + std::to_string(dk_) +
+             "), or 1 when broadcast is supported on the current SoC")
+                .c_str());
+        return ge::GRAPH_FAILED;
+    }
+    if (!CheckScaleOffsetShape(offset2Shape, dv_, vOffsetType_)) {
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            context_->GetNodeName(), "c_kv_offset",
+            std::to_string((offset2Shape == nullptr) ? 0 : offset2Shape->GetStorageShape().GetShapeSize()).c_str(),
+            ("the total number of elements of c_kv_offset must be dv (" + std::to_string(dv_) +
+             "), or 1 when broadcast is supported on the current SoC")
+                .c_str());
+        return ge::GRAPH_FAILED;
+    }
     if ((dk_ % CONST_TWO) != 0) {
         auto cosShape = context_->GetInputShape(COS_INDEX)->GetStorageShape();
         std::string reasonMsg =
@@ -305,18 +346,21 @@ ge::graphStatus KvRmsNormRopeCacheRegbaseRecomputeTiling::DoOpTiling()
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "kv", kvShapeStr.c_str(), reasonMsg.c_str());
         return ge::GRAPH_FAILED;
     }
-    OP_CHECK_IF(!CheckInputDtype(), OP_LOGE(context_->GetNodeName(), "kvrmsnormrope dtype is invalid."),
+    // CheckInputDtype / Check*CacheValid(PA) 失败路径已在内层正式上报，外层仅日志透传
+    OP_CHECK_IF(!CheckInputDtype(), OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "kvrmsnormrope dtype is invalid."),
                 return ge::GRAPH_FAILED);
     if (currentCacheMode_ == CacheMode::Norm) {
         OP_CHECK_IF(!CheckKCacheValid(context_, batchSize, numHead, cacheLength_, dk_),
-                    OP_LOGE(context_->GetNodeName(), "k_cache shape invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "k_cache shape invalid."), return ge::GRAPH_FAILED);
         OP_CHECK_IF(!CheckVCacheValid(context_, batchSize, numHead, cacheLength_, dv_),
-                    OP_LOGE(context_->GetNodeName(), "ckv_cache shape invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "ckv_cache shape invalid."),
+                    return ge::GRAPH_FAILED);
     } else {
         OP_CHECK_IF(!CheckKCacheValidPA(context_, numHead, dk_),
-                    OP_LOGE(context_->GetNodeName(), "k_cache shape invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "k_cache shape invalid."), return ge::GRAPH_FAILED);
         OP_CHECK_IF(!CheckVCacheValidPA(context_, numHead, dv_),
-                    OP_LOGE(context_->GetNodeName(), "ckv_cache shape invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "ckv_cache shape invalid."),
+                    return ge::GRAPH_FAILED);
     }
     // NZ 下 dk/2 非对齐(dk1 奇数)已由 kernel 逐 dk0 子块写 + back 半区右移 r=dk0/2 重排接管(量化与非量化，
     // 逐子块且无跨 tile 携带，泛化到任意 dk / 多 tile，见 ScatterKNzOddDk1)，故 tiling 不再对 dk/2 对齐做限制。

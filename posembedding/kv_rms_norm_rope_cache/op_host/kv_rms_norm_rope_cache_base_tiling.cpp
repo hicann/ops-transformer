@@ -101,7 +101,17 @@ bool KvRmsNormRopeCacheTilingBase::CheckVValid(const gert::TilingContext* contex
     isValid = isValid && (std::get<SHAPE_IDX_N>(vShapeTuple) == numHead);
     isValid = isValid && (std::get<SHAPE_IDX_S>(vShapeTuple) == seqLen);
     isValid = isValid && (std::get<SHAPE_IDX_D>(vShapeTuple) == headSize);
-
+    if (!isValid) {
+        std::string reasonMsg =
+            "the B, N, S and D dimensions of v must match input kv (B=" + std::to_string(batchSize) +
+            ", N=" + std::to_string(numHead) + ", S=" + std::to_string(seqLen) + ", D=" + std::to_string(headSize) +
+            ")";
+        std::string shapesMsg = "(" + std::to_string(std::get<SHAPE_IDX_B>(vShapeTuple)) + ", " +
+                                std::to_string(std::get<SHAPE_IDX_N>(vShapeTuple)) + ", " +
+                                std::to_string(std::get<SHAPE_IDX_S>(vShapeTuple)) + ", " +
+                                std::to_string(std::get<SHAPE_IDX_D>(vShapeTuple)) + ")";
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "v", shapesMsg.c_str(), reasonMsg.c_str());
+    }
     return isValid;
 }
 
@@ -119,10 +129,13 @@ bool KvRmsNormRopeCacheTilingBase::GetCacheRowLimit(int64_t& cacheRowLimit)
     OP_CHECK_IF(kCacheShapePtr == nullptr, OP_LOGE(context_->GetNodeName(), "shape of k_cache is nullptr."),
                 return false);
     int64_t blockNum = kCacheShapePtr->GetStorageShape().GetDim(SHAPE_IDX_B);
-    OP_CHECK_IF(
-        blockNum <= 0 || blockSize_ <= 0,
-        OP_LOGE(context_->GetNodeName(), "invalid BlockNum(%ld) or BlockSize(%ld) of k_cache.", blockNum, blockSize_),
-        return false);
+    if (blockNum <= 0 || blockSize_ <= 0) {
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            context_->GetNodeName(), "block_num, block_size",
+            ("(" + std::to_string(blockNum) + ", " + std::to_string(blockSize_) + ") of k_cache").c_str(),
+            "the block_num and block_size dimensions of k_cache must be positive");
+        return false;
+    }
     cacheRowLimit = blockNum * blockSize_;
     return true;
 }
@@ -147,6 +160,11 @@ bool KvRmsNormRopeCacheTilingBase::CheckCosSinValid(const gert::TilingContext* c
         if (cosSeq == 1) {
             cosSinNeedBrc_ = 1;
         } else {
+            std::string reasonMsg = "the S dimension of cos must be seqLen (" + std::to_string(seqLen) +
+                                    ") or 1 (broadcast), got " + std::to_string(cosSeq);
+            auto cosShape = context->GetInputShape(COS_INDEX)->GetStorageShape();
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "cos", ToString(cosShape).c_str(),
+                                                  reasonMsg.c_str());
             return false;
         }
     }
@@ -171,10 +189,27 @@ bool KvRmsNormRopeCacheTilingBase::CheckCosSinValid(const gert::TilingContext* c
                         " when the dtype of input k_cache is FLOAT16 or BF16, where D is the 3rd axis";
         }
         if (!isValidAlign) {
+            // 对齐失败已按参数正式上报，直接返回，避免落入尾部汇总二次上报（reason 与本失败无关，会误导排查）
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "sin", ToString(sinShape).c_str(),
                                                   reasonMsg.c_str());
+            return false;
         }
-        isValid = isValidAlign && isValid;
+    }
+    if (!isValid) {
+        std::string reasonMsg =
+            "the B, N and D dimensions of cos and sin must match input kv (B=" + std::to_string(batchSize) +
+            ", N=" + std::to_string(numHead) + ", D=" + std::to_string(headSize) +
+            "), and the S dimensions of cos and sin must be the same";
+        std::string shapesMsg = "cos (" + std::to_string(std::get<SHAPE_IDX_B>(cosShapeTuple)) + ", " +
+                                std::to_string(std::get<SHAPE_IDX_N>(cosShapeTuple)) + ", " +
+                                std::to_string(std::get<SHAPE_IDX_S>(cosShapeTuple)) + ", " +
+                                std::to_string(std::get<SHAPE_IDX_D>(cosShapeTuple)) + "), sin (" +
+                                std::to_string(std::get<SHAPE_IDX_B>(sinShapeTuple)) + ", " +
+                                std::to_string(std::get<SHAPE_IDX_N>(sinShapeTuple)) + ", " +
+                                std::to_string(std::get<SHAPE_IDX_S>(sinShapeTuple)) + ", " +
+                                std::to_string(std::get<SHAPE_IDX_D>(sinShapeTuple)) + ")";
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "cos and sin", shapesMsg.c_str(),
+                                               reasonMsg.c_str());
     }
     return isValid;
 }
@@ -205,11 +240,18 @@ bool KvRmsNormRopeCacheTilingBase::CheckGammaValid(const gert::TilingContext* co
                         std::to_string(FP16_BLOCK_ALIGN_NUM) + " when the dtype of input ckv_cache is FLOAT16 or BF16";
         }
         if (!isValidAlign) {
+            // 对齐失败已按参数正式上报，直接返回，避免落入尾部汇总二次上报（reason 与本失败无关，会误导排查）
             OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "gamma",
                                                   ToString(gammaShapePtr->GetStorageShape()).c_str(),
                                                   reasonMsg.c_str());
+            return false;
         }
-        isValid = isValidAlign && isValid;
+    }
+    if (!isValid) {
+        std::string gammaShapeStr = (gammaShapePtr == nullptr) ? "nullptr" : ToString(gammaShapePtr->GetStorageShape());
+        std::string reasonMsg = "gamma must be a 1D tensor of size headDim (dv=" + std::to_string(headSize) + ")";
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "gamma", gammaShapeStr.c_str(),
+                                              reasonMsg.c_str());
     }
     return isValid;
 }
@@ -244,6 +286,14 @@ bool KvRmsNormRopeCacheTilingBase::CheckCacheValid(const gert::TilingContext* co
     bool isValid = true;
     isValid = isValid && (std::get<SHAPE_IDX_S>(cacheShapeTuple) == cacheLen);
     isValid = isValid && (std::get<SHAPE_IDX_D>(cacheShapeTuple) == headSize);
+    if (!isValid) {
+        const gert::StorageShape* cacheShapePtr = context->GetInputShape(cacheIndex);
+        std::string cacheShapeStr = (cacheShapePtr == nullptr) ? "nullptr" : ToString(cacheShapePtr->GetStorageShape());
+        std::string reasonMsg = "the S dimension of " + std::string(cacheName) + " must be " +
+                                std::to_string(cacheLen) + " and the D dimension must be " + std::to_string(headSize);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), cacheName, cacheShapeStr.c_str(),
+                                              reasonMsg.c_str());
+    }
     return isValid;
 }
 
@@ -315,6 +365,12 @@ bool KvRmsNormRopeCacheTilingBase::CheckKCacheValidPA(const gert::TilingContext*
     bool isValid = true;
     isValid = isValid && (std::get<SHAPE_IDX_S>(kCacheShapeTuple) == numHead);
     isValid = isValid && (std::get<SHAPE_IDX_D>(kCacheShapeTuple) == headSize);
+    if (!isValid) {
+        std::string reasonMsg = "the N dimension of k_cache must be num_heads of kv (" + std::to_string(numHead) +
+                                ") and the D dimension must be " + std::to_string(headSize);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "k_cache", ToString(kCacheShape).c_str(),
+                                              reasonMsg.c_str());
+    }
 
     auto kcacheDesc = context_->GetInputDesc(K_CACHE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, kcacheDesc);
@@ -350,6 +406,12 @@ bool KvRmsNormRopeCacheTilingBase::CheckVCacheValidPA(const gert::TilingContext*
     bool isValid = true;
     isValid = isValid && (std::get<SHAPE_IDX_S>(vCacheShapeTuple) == numHead);
     isValid = isValid && (std::get<SHAPE_IDX_D>(vCacheShapeTuple) == headSize);
+    if (!isValid) {
+        std::string reasonMsg = "the N dimension of ckv_cache must be num_heads of kv (" + std::to_string(numHead) +
+                                ") and the D dimension must be " + std::to_string(headSize);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "ckv_cache", ToString(vCacheShape).c_str(),
+                                              reasonMsg.c_str());
+    }
 
     auto vcacheDesc = context_->GetInputDesc(V_CACHE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, vcacheDesc);
@@ -387,15 +449,30 @@ bool KvRmsNormRopeCacheTilingBase::CheckIndexValid(const gert::TilingContext* co
     auto shapeSize = indexShapePtr->GetStorageShape().GetShapeSize();
     if (mode == CacheMode::Norm || mode == CacheMode::PA || mode == CacheMode::PA_NZ) {
         isValid = isValid && (shapeSize == batchSize * seqLen);
-        OP_CHECK_IF(!isValid, OP_LOGE(context, "Index's shape size must equal with B*S."), return false);
+        if (!isValid) {
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context->GetNodeName(), "index",
+                                                      std::to_string(shapeSize).c_str(),
+                                                      ("the total number of elements of index must be B * S (" +
+                                                       std::to_string(batchSize) + " * " + std::to_string(seqLen) + ")")
+                                                          .c_str());
+            return false;
+        }
     } else {
         OP_CHECK_IF(pageSize <= 0,
-                    OP_LOGE(context, "invalid BlockSize(%ld) of k_cache for PA_BLK cache mode.", pageSize),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        context->GetNodeName(), "block_size", std::to_string(pageSize).c_str(),
+                        "the block_size dimension of k_cache must be positive in PA_BLK cache mode"),
                     return false);
         int64_t page_num = (seqLen + pageSize - 1) / pageSize;
         isValid = isValid && (shapeSize == batchSize * page_num);
-        OP_CHECK_IF(!isValid, OP_LOGE(context, "Index's shape size must equal with batchSize * page_num."),
-                    return false);
+        if (!isValid) {
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                context->GetNodeName(), "index", std::to_string(shapeSize).c_str(),
+                ("the total number of elements of index must be B * page_num (" + std::to_string(batchSize) + " * " +
+                 std::to_string(page_num) + ")")
+                    .c_str());
+            return false;
+        }
     }
     return isValid;
 }
@@ -550,11 +627,13 @@ ge::graphStatus KvRmsNormRopeCacheTilingBase::GetShapeAttrsInfo()
     if (methodMode_ == 1) {
         auto vShape = GetOptionalShapeTuple(context_, V_IDX);
         vlen_ = std::get<SHAPE_IDX_D>(vShape);
+        // CheckVValid 失败路径已在内层正式上报，外层仅日志透传
         OP_CHECK_IF(!CheckVValid(context_, batchSize, numHead, seqLen, vlen_),
-                    OP_LOGE(context_->GetNodeName(), "v shape is invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "v shape is invalid."), return ge::GRAPH_FAILED);
     }
+    // 注：CheckKvValid 的四个实参均取自 kv 自身 shape，恒为真（历史防御检查），保留控制流仅降级为日志透传
     OP_CHECK_IF(!CheckKvValid(context_, batchSize, numHead, seqLen, kv_),
-                OP_LOGE(context_->GetNodeName(), "kv shape is invalid."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "kv shape is invalid."), return ge::GRAPH_FAILED);
     // Attrs info
     // cache_mode 必须在 CheckCosSinValid / CheckGammaValid 之前解析：这两个函数里按
     // currentCacheMode_ 分支做 NZ 尾轴 C0 对齐校验(sin 的 D 维即 dk、gamma 的 0 轴即 dv)，
@@ -585,12 +664,14 @@ ge::graphStatus KvRmsNormRopeCacheTilingBase::GetShapeAttrsInfo()
     const bool* isOutputKv = attrs->GetBool(IS_OUTPUT_KV_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, isOutputKv);
     isOutputKv_ = *isOutputKv;
+    // CheckCosSinValid / CheckGammaValid / CheckIndexValid 失败路径已在内层正式上报，外层仅日志透传
     OP_CHECK_IF(!CheckCosSinValid(context_, batchSize, numHead, seqLen, dk_),
-                OP_LOGE(context_->GetNodeName(), "cos or sin shape is invalid."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(!CheckGammaValid(context_, dv_), OP_LOGE(context_->GetNodeName(), "gamma shape is invalid."),
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "cos or sin shape is invalid."),
                 return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!CheckGammaValid(context_, dv_),
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "gamma shape is invalid."), return ge::GRAPH_FAILED);
     OP_CHECK_IF(!CheckIndexValid(context_, batchSize, seqLen, blockSize_, currentCacheMode_),
-                OP_LOGE(context_->GetNodeName(), "index shape is invalid."), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "index shape is invalid."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

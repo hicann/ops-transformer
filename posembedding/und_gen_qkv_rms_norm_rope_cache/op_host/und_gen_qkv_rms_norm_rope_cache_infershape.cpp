@@ -139,8 +139,9 @@ inline ge::graphStatus CheckInputRanks(gert::InferShapeContext* context)
             continue;
         }
         OP_CHECK_IF(shape->GetDimNum() != spec.expectDimNum,
-                    OP_LOGE(context, "%s must be a %zuD tensor, but got %zuD.", spec.name, spec.expectDimNum,
-                            shape->GetDimNum()),
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                        context->GetNodeName(), spec.name, std::to_string(shape->GetDimNum()).c_str(),
+                        ("must be a " + std::to_string(spec.expectDimNum) + "D tensor").c_str()),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -233,8 +234,9 @@ graphStatus InferShape4UndGenQkvRmsNormRopeCache(gert::InferShapeContext* contex
     OP_CHECK_NULL_WITH_CONTEXT(context, vCacheOutShape);
 
     // 非未知 rank 的输入，rank 必须与 IR 定义一致，不一致直接判失败，不能当成"这个来源用不了"跳过
-    OP_CHECK_IF(CheckInputRanks(context) != ge::GRAPH_SUCCESS, OP_LOGE(context, "input rank check failed."),
-                return ge::GRAPH_FAILED);
+    // CheckInputRanks 失败路径已在内层正式上报，外层仅日志透传
+    OP_CHECK_IF(CheckInputRanks(context) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context, "input rank check failed."), return ge::GRAPH_FAILED);
 
     auto attrs = context->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context, attrs);

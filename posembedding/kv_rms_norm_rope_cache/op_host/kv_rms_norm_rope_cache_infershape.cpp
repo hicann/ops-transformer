@@ -85,7 +85,8 @@ graphStatus InferShape4KvRmsNormRopeCache(gert::InferShapeContext* context)
         // 非-2场景校验输入shape为4维
     } else {
         if (kvDimSize != EXPECT_DIM_NUM) {
-            OP_LOGE(context, "don't support kv dimSize != 4, infershape failed");
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "kv", std::to_string(kvDimSize).c_str(),
+                                                     "infershape only supports 4D input kv");
             return ge::GRAPH_FAILED;
         }
     }

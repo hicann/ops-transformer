@@ -55,6 +55,14 @@ bool KvRmsNormRopeCacheTilingDs::CheckScaleValid(const gert::TilingContext* cont
     isValid = isValid && (((scale1Shape != nullptr) && (scale1Shape->GetStorageShape().GetDimNum() <= DIM_TWO)) ||
                           ((scale2Shape != nullptr) && (scale2Shape->GetStorageShape().GetDimNum() <= DIM_TWO)));
     if (!isValid) {
+        std::string shapesMsg =
+            "k_rope_scale " +
+            ((scale1Shape == nullptr) ? std::string("not provided") : ToString(scale1Shape->GetStorageShape())) +
+            ", c_kv_scale " +
+            ((scale2Shape == nullptr) ? std::string("not provided") : ToString(scale2Shape->GetStorageShape()));
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "k_rope_scale, c_kv_scale", shapesMsg.c_str(),
+                                               "the ranks of k_rope_scale and c_kv_scale must be the same and must not "
+                                               "exceed 2");
         return false;
     }
     if (methodMode_ == 0) {
@@ -86,7 +94,25 @@ bool KvRmsNormRopeCacheTilingDs::CheckScaleValid(const gert::TilingContext* cont
             isValid = isValid && (scale2Shape->GetStorageShape().GetDim(1) == V_LENGTH);
         }
     }
-
+    if (!isValid) {
+        std::string shapesMsg =
+            "k_rope_scale " +
+            ((scale1Shape == nullptr) ? std::string("not provided") : ToString(scale1Shape->GetStorageShape())) +
+            ", c_kv_scale " +
+            ((scale2Shape == nullptr) ? std::string("not provided") : ToString(scale2Shape->GetStorageShape()));
+        std::string reasonMsg =
+            (methodMode_ == 0) ?
+                ("the shape of k_rope_scale must be [" + std::to_string(ROPE_LENGTH) + "] or [1, " +
+                 std::to_string(ROPE_LENGTH) + "], and the shape of c_kv_scale must be [" +
+                 std::to_string(RMS_NORM_LENGTH) + "] or [1, " + std::to_string(RMS_NORM_LENGTH) + "]") :
+                ("the shape of k_rope_scale must be [" + std::to_string(RMS_NORM_LENGTH) + "], [1, " +
+                 std::to_string(RMS_NORM_LENGTH) + "], [" + std::to_string(tilingData_.get_numHead()) + ", " +
+                 std::to_string(RMS_NORM_LENGTH) + "], and the shape of c_kv_scale must be [" +
+                 std::to_string(V_LENGTH) + "], [1, " + std::to_string(V_LENGTH) + "], [" +
+                 std::to_string(tilingData_.get_numHead()) + ", " + std::to_string(V_LENGTH) + "]");
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "k_rope_scale, c_kv_scale", shapesMsg.c_str(),
+                                               reasonMsg.c_str());
+    }
     return isValid;
 }
 
@@ -104,6 +130,14 @@ bool KvRmsNormRopeCacheTilingDs::CheckOffsetValid(const gert::TilingContext* con
     isValid = isValid && (((offset1Shape != nullptr) && (offset1Shape->GetStorageShape().GetDimNum() <= DIM_TWO)) ||
                           ((offset2Shape != nullptr) && (offset2Shape->GetStorageShape().GetDimNum() <= DIM_TWO)));
     if (!isValid) {
+        std::string shapesMsg =
+            "k_rope_offset " +
+            ((offset1Shape == nullptr) ? std::string("not provided") : ToString(offset1Shape->GetStorageShape())) +
+            ", c_kv_offset " +
+            ((offset2Shape == nullptr) ? std::string("not provided") : ToString(offset2Shape->GetStorageShape()));
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "k_rope_offset, c_kv_offset", shapesMsg.c_str(),
+                                               "the ranks of k_rope_offset and c_kv_offset must be the same and must "
+                                               "not exceed 2");
         return false;
     }
     if (methodMode_ == 0) {
@@ -134,6 +168,25 @@ bool KvRmsNormRopeCacheTilingDs::CheckOffsetValid(const gert::TilingContext* con
             isValid = isValid && (offset2Shape->GetStorageShape().GetDim(0) == tilingData_.get_numHead());
             isValid = isValid && (offset2Shape->GetStorageShape().GetDim(1) == V_LENGTH);
         }
+    }
+    if (!isValid) {
+        std::string shapesMsg =
+            "k_rope_offset " +
+            ((offset1Shape == nullptr) ? std::string("not provided") : ToString(offset1Shape->GetStorageShape())) +
+            ", c_kv_offset " +
+            ((offset2Shape == nullptr) ? std::string("not provided") : ToString(offset2Shape->GetStorageShape()));
+        std::string reasonMsg =
+            (methodMode_ == 0) ?
+                ("the shape of k_rope_offset must be [" + std::to_string(ROPE_LENGTH) + "] or [1, " +
+                 std::to_string(ROPE_LENGTH) + "], and the shape of c_kv_offset must be [" +
+                 std::to_string(RMS_NORM_LENGTH) + "] or [1, " + std::to_string(RMS_NORM_LENGTH) + "]") :
+                ("the shape of k_rope_offset must be [" + std::to_string(RMS_NORM_LENGTH) + "], [1, " +
+                 std::to_string(RMS_NORM_LENGTH) + "], [" + std::to_string(tilingData_.get_numHead()) + ", " +
+                 std::to_string(RMS_NORM_LENGTH) + "], and the shape of c_kv_offset must be [" +
+                 std::to_string(V_LENGTH) + "], [1, " + std::to_string(V_LENGTH) + "], [" +
+                 std::to_string(tilingData_.get_numHead()) + ", " + std::to_string(V_LENGTH) + "]");
+        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "k_rope_offset, c_kv_offset", shapesMsg.c_str(),
+                                               reasonMsg.c_str());
     }
     return isValid;
 }
@@ -232,17 +285,19 @@ ge::graphStatus KvRmsNormRopeCacheTilingDs::DoOpTiling()
         return ge::GRAPH_FAILED;
     }
 
-    // Validate cache shapes
+    // Validate cache shapes；Check*Valid(PA) 失败路径已在内层正式上报，外层仅日志透传
     if (currentCacheMode_ == CacheMode::Norm) {
         OP_CHECK_IF(!CheckKCacheValid(context_, batchSize, numHead, seqLength, hDimKCache),
-                    OP_LOGE(context_->GetNodeName(), "k_cache shape invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "k_cache shape invalid."), return ge::GRAPH_FAILED);
         OP_CHECK_IF(!CheckVCacheValid(context_, batchSize, numHead, seqLength, hDimVCache),
-                    OP_LOGE(context_->GetNodeName(), "ckv_cache shape invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "ckv_cache shape invalid."),
+                    return ge::GRAPH_FAILED);
     } else {
         OP_CHECK_IF(!CheckCacheValidPA(context_, hDimKCache, K_CACHE_INDEX, "k_cache"),
-                    OP_LOGE(context_->GetNodeName(), "k_cache shape invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "k_cache shape invalid."), return ge::GRAPH_FAILED);
         OP_CHECK_IF(!CheckCacheValidPA(context_, hDimVCache, V_CACHE_INDEX, "ckv_cache"),
-                    OP_LOGE(context_->GetNodeName(), "ckv_cache shape invalid."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "ckv_cache shape invalid."),
+                    return ge::GRAPH_FAILED);
     }
 
     if (isOutputKv_) {
@@ -252,12 +307,16 @@ ge::graphStatus KvRmsNormRopeCacheTilingDs::DoOpTiling()
     }
 
     if ((!isRegbase_) && (quantMode_ == QUANT_MODE)) {
-        OP_CHECK_IF(!CheckScaleValid(context_), OP_LOGE(context_->GetNodeName(), "quant scale shape check failed."),
+        // CheckScaleValid 失败路径已在内层正式上报，外层仅日志透传
+        OP_CHECK_IF(!CheckScaleValid(context_),
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "quant scale shape check failed."),
                     return ge::GRAPH_FAILED);
     }
 
     if (((!isRegbase_) && (quantMode_ > 1))) {
-        OP_CHECK_IF(!CheckOffsetValid(context_), OP_LOGE(context_->GetNodeName(), "quant offset shape check failed."),
+        // CheckOffsetValid 失败路径已在内层正式上报，外层仅日志透传
+        OP_CHECK_IF(!CheckOffsetValid(context_),
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "quant offset shape check failed."),
                     return ge::GRAPH_FAILED);
     }
     if ((!isRegbase_) && (dk_ != ROPE_LENGTH)) {
@@ -278,7 +337,11 @@ ge::graphStatus KvRmsNormRopeCacheTilingDs::DoOpTiling()
 
     if (methodMode_ == 0) {
         OP_CHECK_IF((!isRegbase_) && (currentCacheMode_ == CacheMode::Norm) && (quantMode_ == QUANT_MODE),
-                    OP_LOGE(context_->GetNodeName(), "CacheMode::Norm do not support quant!"), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        context_->GetNodeName(), "cache_mode", "Norm",
+                        "CacheMode::Norm does not support quant inputs (k_rope_scale/c_kv_scale must not be provided "
+                        "in Norm cache mode)"),
+                    return ge::GRAPH_FAILED);
 
         if ((!isRegbase_) && (kv_ != D_LENGTH)) {
             auto kvShape = context_->GetInputShape(KV_INDEX)->GetStorageShape();
@@ -298,8 +361,11 @@ ge::graphStatus KvRmsNormRopeCacheTilingDs::DoOpTiling()
             return ge::GRAPH_FAILED;
         }
 
+        // quantMode_ 只可能取 NON_QUANT_MODE(0)/QUANT_MODE(1)（GetQuantMode 仅返回二者），本检查历史上不可达，
+        // 保留控制流，降级为仅日志透传
         OP_CHECK_IF((!isRegbase_) && (quantMode_ != NON_QUANT_MODE && quantMode_ != QUANT_MODE),
-                    OP_LOGE(context_->GetNodeName(), "Only Support QUANT or NON_QUANT."), return ge::GRAPH_FAILED);
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "Only Support QUANT or NON_QUANT."),
+                    return ge::GRAPH_FAILED);
     }
 
     auto scale1Shape = context_->GetOptionalInputShape(K_ROPE_SCALE_IDX);
