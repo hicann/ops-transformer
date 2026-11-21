@@ -133,9 +133,8 @@ protected:
                                                uint32_t columnCount, uint32_t actualColumnCount);
     __aicore__ inline void DealInvalidRows(const RunInfo& info, LocalTensor<MM2_OUT_T>& attenOutUb, uint32_t wsMStart,
                                            uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount);
-    __aicore__ inline void Vec1SinkCompute(const RunInfo& info, uint32_t idx, uint32_t wsMStart, uint32_t dealRowCount);
-    __aicore__ inline void Vec1SinkSoftmaxProc(const RunInfo& info, LocalTensor<COMPUTE_T>& tmpSinkResUbBrcb,
-                                               uint32_t offset, uint32_t dealRowCountBrcb);
+    __aicore__ inline bool IsSinkOwner(const RunInfo& info) const;
+    __aicore__ inline void InitSoftmaxSink(const RunInfo& info);
     __aicore__ inline void Vec1GetSinkValue(const RunInfo& info, LocalTensor<COMPUTE_T>& tmpSinkResUbBrcb,
                                             uint32_t wsMStart, uint32_t dealRowCount);
     __aicore__ inline void SinkCopyIn(const RunInfo& info, LocalTensor<COMPUTE_T>& sinkBuf);
@@ -479,6 +478,9 @@ __aicore__ inline void FiaBlockVecNonQuant<FIAT, ENABLE_COMPACT_GQA_PIPELINE>::P
     if (mSplitInfo.vecDealM == 0) {
         return;
     }
+    if (unlikely(learnableSinkFlag) && info.isFirstSInnerLoop) {
+        InitSoftmaxSink(info);
+    }
     constexpr uint32_t vec1BlockMaxElems = ENABLE_COMPACT_GQA_PIPELINE ?
                                                3 * ConstInfo::BUFFER_SIZE_BYTE_16K / sizeof(MM1_OUT_T) :
                                                BASE_BLOCK_MAX_ELEMENT_NUM;
@@ -520,10 +522,6 @@ __aicore__ inline void FiaBlockVecNonQuant<FIAT, ENABLE_COMPACT_GQA_PIPELINE>::P
     if constexpr (!ENABLE_COMPACT_GQA_PIPELINE) {
         if (info.isLastS2Loop) {
             uint32_t outIdx = info.loop % constInfo.preLoadNum;
-            if (unlikely(learnableSinkFlag)) {
-                Vec1SinkCompute(info, outIdx, mSplitInfo.nBufferStartM + mSplitInfo.vecStartM, mSplitInfo.vecDealM);
-            }
-
             auto sumTensor = softmaxSumUb[outIdx * SOFTMAX_TMP_BUFFER_SIZE / sizeof(COMPUTE_T)];
             auto maxTensor = softmaxMaxUb[outIdx * SOFTMAX_TMP_BUFFER_SIZE / sizeof(COMPUTE_T)];
             if (info.tndIsS2SplitCore) {
@@ -788,6 +786,9 @@ __aicore__ inline void FiaBlockVecNonQuant<FIAT, ENABLE_COMPACT_GQA_PIPELINE>::S
     if (info.isFirstSInnerLoop) {
         inMaxTensor = softmaxMaxDefaultUb;
         inSumTensor = softmaxSumDefaultUb;
+        if (IsSinkOwner(info)) {
+            inMaxTensor = softmaxMaxDefaultUb[startRow * (SOFTMAX_WITH_BRC ? brcbNum : 1)];
+        }
     } else {
         uint32_t inIdx = (info.loop - 1) % constInfo.preLoadNum;
         inMaxTensor = softmaxMaxUb[inIdx * SOFTMAX_TMP_BUFFER_SIZE / sizeof(COMPUTE_T) + baseOffset];
@@ -1260,19 +1261,6 @@ __aicore__ inline void FiaBlockVecNonQuant<FIAT, ENABLE_COMPACT_GQA_PIPELINE>::V
 }
 
 template <typename FIAT, bool ENABLE_COMPACT_GQA_PIPELINE>
-__aicore__ inline void FiaBlockVecNonQuant<FIAT, ENABLE_COMPACT_GQA_PIPELINE>::Vec1SinkSoftmaxProc(
-    const RunInfo& info, LocalTensor<COMPUTE_T>& tmpSinkResUbBrcb, uint32_t offset, uint32_t dealRowCountBrcb)
-{
-    AscendC::PipeBarrier<PIPE_V>();
-    Sub(tmpSinkResUbBrcb, tmpSinkResUbBrcb, softmaxMaxUb[offset], dealRowCountBrcb);
-    AscendC::PipeBarrier<PIPE_V>();
-    Exp(tmpSinkResUbBrcb, tmpSinkResUbBrcb, dealRowCountBrcb);
-    AscendC::PipeBarrier<PIPE_V>();
-    Add(softmaxSumUb[offset], softmaxSumUb[offset], tmpSinkResUbBrcb, dealRowCountBrcb);
-    AscendC::PipeBarrier<PIPE_V>();
-}
-
-template <typename FIAT, bool ENABLE_COMPACT_GQA_PIPELINE>
 __aicore__ inline void FiaBlockVecNonQuant<FIAT, ENABLE_COMPACT_GQA_PIPELINE>::SinkValueNoBrc(
     LocalTensor<COMPUTE_T> tmpSinkResUb, LocalTensor<COMPUTE_T> tmpSinkResUbBrcb, uint32_t dealRowCount)
 {
@@ -1292,31 +1280,46 @@ __aicore__ inline void FiaBlockVecNonQuant<FIAT, ENABLE_COMPACT_GQA_PIPELINE>::S
 }
 
 template <typename FIAT, bool ENABLE_COMPACT_GQA_PIPELINE>
-__aicore__ inline void FiaBlockVecNonQuant<FIAT, ENABLE_COMPACT_GQA_PIPELINE>::Vec1SinkCompute(const RunInfo& info,
-                                                                                               uint32_t idx,
-                                                                                               uint32_t wsMStart,
-                                                                                               uint32_t dealRowCount)
+__aicore__ inline bool FiaBlockVecNonQuant<FIAT, ENABLE_COMPACT_GQA_PIPELINE>::IsSinkOwner(const RunInfo& info) const
 {
+    if (!learnableSinkFlag) {
+        return false;
+    }
     if constexpr (FLASH_DECODE) {
-        if (info.tndIsS2SplitCore) { // sink叠加FD规约场景，在FD规约流程中处理，该处不处理
-            return;
-        }
+        // Only split-KV tasks leave the sink contribution to the FD reduction.
+        return !info.tndIsS2SplitCore;
+    }
+    return true;
+}
+
+template <typename FIAT, bool ENABLE_COMPACT_GQA_PIPELINE>
+__aicore__ inline void FiaBlockVecNonQuant<FIAT, ENABLE_COMPACT_GQA_PIPELINE>::InitSoftmaxSink(const RunInfo& info)
+{
+    const bool sinkOwner = IsSinkOwner(info);
+    // Treat sink as a zero-value token: initial max = sink, sum = 1, numerator = 0.
+    Duplicate(softmaxSumDefaultUb, sinkOwner ? (COMPUTE_T)1.0 : (COMPUTE_T)0.0,
+              SOFTMAX_TMP_BUFFER_SIZE / sizeof(COMPUTE_T));
+    if (!sinkOwner) {
+        // A core may process both split and non-split tasks; reset its defaults.
+        Duplicate(softmaxMaxDefaultUb, SOFTMAX_MIN_NUM, SOFTMAX_TMP_BUFFER_SIZE / sizeof(COMPUTE_T));
+        AscendC::PipeBarrier<PIPE_V>();
+        return;
     }
 
-    LocalTensor<COMPUTE_T> tmpSinkResUb = tmpBuff1.GetWithOffset<COMPUTE_T>(BUFFER_SIZE_BYTE_8K, 0);
     LocalTensor<COMPUTE_T> tmpSinkResUbBrcb =
         tmpBuff1.GetWithOffset<COMPUTE_T>(BUFFER_SIZE_BYTE_8K, BUFFER_SIZE_BYTE_8K);
-
-    Vec1GetSinkValue(info, tmpSinkResUbBrcb, wsMStart, dealRowCount);
-
-    uint32_t offset = idx * SOFTMAX_TMP_BUFFER_SIZE / sizeof(COMPUTE_T) + mSplitInfo.nBufferStartM / 2;
-    if constexpr (SOFTMAX_WITH_BRC) {
-        uint32_t dealRowCountBrcb = dealRowCount * brcbNum;
-        Vec1SinkSoftmaxProc(info, tmpSinkResUbBrcb, offset, dealRowCountBrcb);
-    } else {
+    constexpr uint32_t MAX_SINK_ROWS = BUFFER_SIZE_BYTE_8K / (brcbNum * sizeof(COMPUTE_T));
+    for (uint32_t row = 0; row < mSplitInfo.vecDealM; row += MAX_SINK_ROWS) {
+        uint32_t rows = mSplitInfo.vecDealM - row;
+        rows = rows > MAX_SINK_ROWS ? MAX_SINK_ROWS : rows;
+        Vec1GetSinkValue(info, tmpSinkResUbBrcb, mSplitInfo.nBufferStartM + mSplitInfo.vecStartM + row, rows);
         AscendC::PipeBarrier<PIPE_V>();
-        SinkValueNoBrc(tmpSinkResUb, tmpSinkResUbBrcb, dealRowCount);
-        Vec1SinkSoftmaxProc(info, tmpSinkResUb, offset, dealRowCount);
+        if constexpr (SOFTMAX_WITH_BRC) {
+            Adds(softmaxMaxDefaultUb[row * brcbNum], tmpSinkResUbBrcb, (COMPUTE_T)0.0, rows * brcbNum);
+        } else {
+            SinkValueNoBrc(softmaxMaxDefaultUb[row], tmpSinkResUbBrcb, rows);
+        }
+        AscendC::PipeBarrier<PIPE_V>();
     }
 }
 
