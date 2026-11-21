@@ -403,8 +403,7 @@ static bool IsFirstAxisOnlyNonContiguous(const aclTensor* tensor, const char* na
     return true;
 }
 
-// CreateView + SetStorageShape(viewShape): InferShape/GetInputShape often reads storage;
-// forcing storage==view keeps ND dims for tiling while preserving view strides (zero-copy).
+// Preserve the backing storage extent calculated by CreateView for this strided view.
 static const aclTensor* CreateStrideAwareView(const aclTensor* tensor, const char* name, aclOpExecutor* executor)
 {
     auto strideView = executor->CreateView(tensor, tensor->GetViewShape(), tensor->GetStorageShape(),
@@ -413,7 +412,6 @@ static const aclTensor* CreateStrideAwareView(const aclTensor* tensor, const cha
         OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "CreateStrideAwareView for %s failed.", name);
         return nullptr;
     }
-    const_cast<aclTensor*>(strideView)->SetStorageShape(tensor->GetViewShape());
     return strideView;
 }
 
