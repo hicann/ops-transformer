@@ -10,9 +10,10 @@
 
 #pragma once
 #include "hc_forward_mul_sum_kernel.hpp"
+#include "../block/block_mmad_hc_c0_merged.hpp"
 namespace Catlass::Gemm::Kernel {
 template <class Element, uint32_t C1SwizzleDir, class ArchTag_ = Arch::AtlasA2,
-          class Tiling = HcForwardMulSumTilingData>
+          class Tiling = HcForwardMulSumTilingData, bool MergeC0 = false>
 struct HcForwardLargeKernel : HcForwardCommon<Element, C1SwizzleDir, false, ArchTag_, Tiling> {
     using Base = HcForwardCommon<Element, C1SwizzleDir, false, ArchTag_, Tiling>;
     using Params = typename Base::Params;
@@ -33,23 +34,41 @@ struct HcForwardLargeKernel : HcForwardCommon<Element, C1SwizzleDir, false, Arch
                                           uint32_t actualM, uint32_t rDim, uint32_t channels, uint32_t kDim,
                                           bool useCombine, uint32_t rowC0 = 0)
     {
-        // BlockMmad 把整块 actualN 放进一块 L0C。L0C 只按 L1N0 分配，N 超过 L1N0 时 FIXP 读越界。
-        // rowC0：down 输出张量的行偏移（c0dp 时 down 直写 down_pre_act 全区域张量，按任务行寻址）。
-        // gate 恒写槽内（mTask, channels）张量，坐标保持槽内 mOff，不吃 rowC0。
-        BlockMmadC0 mmad(resource);
-        for (uint32_t mOff = 0; mOff < actualM; mOff += L1M0) {
-            uint32_t tileM = actualM - mOff < L1M0 ? actualM - mOff : L1M0;
-            auto tileA = GetTile(tensorA, tla::MakeCoord(row + mOff, 0), tla::MakeShape(tileM, kDim));
-            for (uint32_t nOff = 0; nOff < rDim; nOff += L1N0) {
-                uint32_t tileN = rDim - nOff < L1N0 ? rDim - nOff : L1N0;
-                auto tileB = GetTile(tensorBDown, tla::MakeCoord(0, nOff), tla::MakeShape(kDim, tileN));
-                auto tileC = GetTile(tensorC0, tla::MakeCoord(rowC0 + mOff, nOff), tla::MakeShape(tileM, tileN));
-                mmad(tileA, tileB, tileC, GemmCoord{tileM, tileN, kDim});
+        if constexpr (MergeC0) {
+            using Policy = Gemm::MmadHcC0Merged<ArchTag, false, false, 1, false, 2, 2, 2, 2>;
+            using L1 = tla::Shape<tla::Int<64>, tla::Int<512>, tla::Int<128>>;
+            using L0 = tla::Shape<tla::Int<64>, tla::Int<512>, tla::Int<32>>;
+            using Mmad =
+                Gemm::Block::BlockMmadTla<Policy, L1, L0, Element, Element, Element, void, typename Base::TileCopyC0>;
+            Mmad block(resource);
+            for (uint32_t mo = 0; mo < actualM; mo += 64u) {
+                const uint32_t rows = actualM - mo < 64u ? actualM - mo : 64u;
+                auto a = GetTile(tensorA, tla::MakeCoord(row + mo, 0), tla::MakeShape(rows, kDim));
+                auto b = GetTile(tensorBDown, tla::MakeCoord(0, 0), tla::MakeShape(kDim, rDim));
+                auto g = GetTile(tensorBGate, tla::MakeCoord(0, 0), tla::MakeShape(kDim, channels));
+                auto d = GetTile(tensorC0, tla::MakeCoord(rowC0 + mo, 0), tla::MakeShape(rows, rDim));
+                auto o = GetTile(tensorGate, tla::MakeCoord(mo, 0), tla::MakeShape(rows, channels));
+                block(a, b, d, GemmCoord{rows, rDim + channels, kDim}, EmptyClass{}, g, o, rDim);
             }
-            if (useCombine && channels > 0) {
-                auto tileBg = GetTile(tensorBGate, tla::MakeCoord(0, 0), tla::MakeShape(kDim, channels));
-                auto tileCi = GetTile(tensorGate, tla::MakeCoord(mOff, 0), tla::MakeShape(tileM, channels));
-                mmad(tileA, tileBg, tileCi, GemmCoord{tileM, channels, kDim});
+        } else {
+            // BlockMmad 把整块 actualN 放进一块 L0C。L0C 只按 L1N0 分配，N 超过 L1N0 时 FIXP 读越界。
+            // rowC0：down 输出张量的行偏移（c0dp 时 down 直写 down_pre_act 全区域张量，按任务行寻址）。
+            // gate 恒写槽内（mTask, channels）张量，坐标保持槽内 mOff，不吃 rowC0。
+            BlockMmadC0 mmad(resource);
+            for (uint32_t mOff = 0; mOff < actualM; mOff += L1M0) {
+                uint32_t tileM = actualM - mOff < L1M0 ? actualM - mOff : L1M0;
+                auto tileA = GetTile(tensorA, tla::MakeCoord(row + mOff, 0), tla::MakeShape(tileM, kDim));
+                for (uint32_t nOff = 0; nOff < rDim; nOff += L1N0) {
+                    uint32_t tileN = rDim - nOff < L1N0 ? rDim - nOff : L1N0;
+                    auto tileB = GetTile(tensorBDown, tla::MakeCoord(0, nOff), tla::MakeShape(kDim, tileN));
+                    auto tileC = GetTile(tensorC0, tla::MakeCoord(rowC0 + mOff, nOff), tla::MakeShape(tileM, tileN));
+                    mmad(tileA, tileB, tileC, GemmCoord{tileM, tileN, kDim});
+                }
+                if (useCombine && channels > 0) {
+                    auto tileBg = GetTile(tensorBGate, tla::MakeCoord(0, 0), tla::MakeShape(kDim, channels));
+                    auto tileCi = GetTile(tensorGate, tla::MakeCoord(mOff, 0), tla::MakeShape(tileM, channels));
+                    mmad(tileA, tileBg, tileCi, GemmCoord{tileM, channels, kDim});
+                }
             }
         }
     }
@@ -140,7 +159,7 @@ struct HcForwardLargeKernel : HcForwardCommon<Element, C1SwizzleDir, false, Arch
                                      static_cast<int64_t>(wave % 3u) * xnSlotBytes) /
                                     static_cast<int64_t>(sizeof(Element));
                     int64_t offInv = static_cast<int64_t>(row) * channels;
-                    blockV0(resource, offX, offXn, actualM, d, channels, hidden, eps, useCombine, false, offInv);
+                    blockV0(resource, offX, offXn, actualM, d, channels, hidden, eps, useCombine, false, offInv, mTask);
                     HcAivSet(FLAG_V0);
                 }
                 if ASCEND_IS_AIC {
@@ -208,8 +227,8 @@ struct HcForwardLargeKernel : HcForwardCommon<Element, C1SwizzleDir, false, Arch
                     int64_t offXn = (static_cast<int64_t>(blockIdx) * 3u * xnSlotBytes +
                                      static_cast<int64_t>((wave - 2) % 3u) * xnSlotBytes) /
                                     static_cast<int64_t>(sizeof(Element));
-                    blockV2(resource, offX, offXn, static_cast<int64_t>(row) * hidden, actualM, channels, hidden,
-                            false);
+                    blockV2(resource, offX, offXn, static_cast<int64_t>(row) * hidden, actualM, channels, hidden, false,
+                            mTask);
                 }
             }
         }

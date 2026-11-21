@@ -363,11 +363,9 @@ struct HcForwardCommon {
         gmC0.SetGlobalBuffer(reinterpret_cast<__gm__ Element*>(ptrC0Core));
         GlobalTensor<Element> gmUp;
         gmUp.SetGlobalBuffer(reinterpret_cast<__gm__ Element*>(ptrUp));
-        // up_pre_act 是反向专属保存：C1 写入后仅 V2 两 wave 后流式读一次，无前向复用，
-        // 大 shape 不占 L2（与 x / down_pre_act / xn 同策略），把容量留给权重。
-        // 仅大 shape 关闭：小 shape 的 up_pre_act 只有 KB~10MiB，对 L2 无压力，
-        // 实测 M=32~512 全档噪声内（m128 +3.4% 偏劣），smallN 路径不设置。
-        if (params.ptrUpPreAct != nullptr && td->smallN == 0u) {
+        // 大 shape 的 up 写入后仅由 V2 流式读一次；workspace 和 up_pre_act 均不占 L2。
+        // 小 shape 保持原缓存策略。
+        if constexpr (!SmallN) {
             gmUp.SetL2CacheHint(CacheMode::CACHE_MODE_DISABLE);
         }
 
@@ -397,7 +395,7 @@ struct HcForwardCommon {
         Epilogue::BlockEpilogueHcV2<Element> blockV2;
         blockV0.Init(params.ptrX, ptrXn, hasGamma ? params.ptrGamma : nullptr, params.ptrInvRms, !SmallN, !SmallN);
         blockV1.Init(ptrC0Core, ptrDown, params.ptrInject, params.ptrDownPreAct, !SmallN, channels, r);
-        blockV2.Init(ptrUp, ptrXn, params.ptrMixed, params.ptrUpPreAct != nullptr && !SmallN, !SmallN);
+        blockV2.Init(ptrUp, ptrXn, params.ptrMixed, !SmallN, !SmallN);
 
         const uint32_t nSliceC1 = (d + L1N1 - 1) / L1N1;
 

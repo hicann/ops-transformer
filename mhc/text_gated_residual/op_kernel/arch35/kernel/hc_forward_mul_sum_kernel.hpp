@@ -37,6 +37,7 @@
 #include "tla/tensor.hpp"
 
 #include "../block/block_epilogue_hc_v0.hpp"
+#include "../block/block_epilogue_hc_v0_large_onevf.hpp"
 #include "../block/block_epilogue_hc_v1.hpp"
 #include "../block/block_epilogue_hc_v2.hpp"
 #include "../../catlass_hc_forward_mul_sum_tiling_data.h"
@@ -50,7 +51,8 @@ constexpr uint32_t HC_A5_L0_A_STAGES = 2;
 constexpr uint32_t HC_A5_C1_L0_K = 32;
 constexpr uint32_t HC_A5_PIPELINE_DRAIN_WAVES = 2;
 
-constexpr uint64_t HC_SYNC_MODE = 4;
+// Single-AIV key uses FFTS notifications; paired keys retain intra-block notifications.
+constexpr uint64_t HC_SYNC_MODE = (TILING_KEY_IS(21) || TILING_KEY_IS(14)) ? 2u : 4u;
 constexpr uint64_t FLAG_V0 = 0;
 constexpr uint64_t FLAG_C0_0 = 1;
 constexpr uint64_t FLAG_C0_1 = 2;
@@ -81,7 +83,7 @@ void HcAivSet(uint64_t base)
 {
     AscendC::PipeBarrier<PIPE_ALL>();
     AscendC::CrossCoreSetFlag<HC_SYNC_MODE, PIPE_MTE3>(base);
-    if (HcNeedDummyPair()) {
+    if (!(TILING_KEY_IS(21) || TILING_KEY_IS(14)) && HcNeedDummyPair()) {
         AscendC::CrossCoreSetFlag<HC_SYNC_MODE, PIPE_MTE3>(base + HC_FLAG_PAIR);
     }
 }
@@ -90,7 +92,7 @@ CATLASS_DEVICE
 void HcAivWait(uint64_t base)
 {
     AscendC::CrossCoreWaitFlag<HC_SYNC_MODE, PIPE_V>(base);
-    if (HcNeedDummyPair()) {
+    if (!(TILING_KEY_IS(21) || TILING_KEY_IS(14)) && HcNeedDummyPair()) {
         AscendC::CrossCoreWaitFlag<HC_SYNC_MODE, PIPE_V>(base + HC_FLAG_PAIR);
     }
 }
@@ -99,14 +101,18 @@ CATLASS_DEVICE
 void HcAicSet(uint64_t base)
 {
     AscendC::CrossCoreSetFlag<HC_SYNC_MODE, PIPE_FIX>(base);
-    AscendC::CrossCoreSetFlag<HC_SYNC_MODE, PIPE_FIX>(base + HC_FLAG_PAIR);
+    if constexpr (!(TILING_KEY_IS(21) || TILING_KEY_IS(14))) {
+        AscendC::CrossCoreSetFlag<HC_SYNC_MODE, PIPE_FIX>(base + HC_FLAG_PAIR);
+    }
 }
 
 CATLASS_DEVICE
 void HcAicWait(uint64_t base)
 {
     AscendC::CrossCoreWaitFlag<HC_SYNC_MODE, PIPE_MTE1>(base);
-    AscendC::CrossCoreWaitFlag<HC_SYNC_MODE, PIPE_MTE1>(base + HC_FLAG_PAIR);
+    if constexpr (!(TILING_KEY_IS(21) || TILING_KEY_IS(14))) {
+        AscendC::CrossCoreWaitFlag<HC_SYNC_MODE, PIPE_MTE1>(base + HC_FLAG_PAIR);
+    }
 }
 
 // 仅 AIV 调用。硬同步占 flagId=14，禁止 AIC / SyncAll<false>。
@@ -135,7 +141,7 @@ void HcAivRowRange(uint32_t actualM, uint32_t rowBytes, uint32_t usedAic, uint32
     end = end < actualM ? end : actualM;
 }
 
-template <class Element, uint32_t C1SwizzleDir, class Tiling = HcForwardMulSumTilingData>
+template <class Element, uint32_t C1SwizzleDir, class Tiling = HcForwardMulSumTilingData, bool MergeC0 = false>
 struct HcForwardMulSumKernel {
     using ArchTag = Arch::Ascend950;
     // Retain the existing large-path tile configuration and resident policy.
@@ -180,6 +186,10 @@ struct HcForwardMulSumKernel {
     using BlockMmadC1 =
         Gemm::Block::BlockMmadTla<DispatchPolicyC1, L1C1, L0C1, Element, Element, Element, void, TileCopyC1>;
     using BlockSchedulerC1 = Gemm::Block::GemmIdentityBlockSwizzle<HC_A5_SWIZZLE_TILE_GROUP, C1SwizzleDir>;
+    using BlockMmadC0Merged =
+        Gemm::Block::BlockMmadTla<DispatchPolicyC0Final, tla::Shape<tla::Int<128>, tla::Int<512>, tla::Int<128>>,
+                                  tla::Shape<tla::Int<128>, tla::Int<512>, tla::Int<32>>, Element, Element, Element,
+                                  void, TileCopyC0FinalPacked>;
 
     struct Params {
         GM_ADDR ptrX;
@@ -207,17 +217,26 @@ struct HcForwardMulSumKernel {
                                       bool useCombine)
     {
         auto tileA = GetTile(tensorA, tla::MakeCoord(row, 0), tla::MakeShape(actualM, kDim));
-        BlockMmadC0Final mmad(resource);
-        for (uint32_t no = 0; no < rDim; no += L1N0) {
-            uint32_t an = rDim - no < L1N0 ? rDim - no : L1N0;
-            auto tileB = GetTile(tensorBDown, tla::MakeCoord(0, no), tla::MakeShape(kDim, an));
-            auto tileC = GetTile(tensorCDown, tla::MakeCoord(0, no), tla::MakeShape(actualM, an));
-            mmad(tileA, tileB, tileC, GemmCoord{actualM, an, kDim});
-        }
-        if (useCombine && channels > 0) {
+        if constexpr (MergeC0) {
+            auto tileB = GetTile(tensorBDown, tla::MakeCoord(0, 0), tla::MakeShape(kDim, rDim));
             auto tileBg = GetTile(tensorBGate, tla::MakeCoord(0, 0), tla::MakeShape(kDim, channels));
+            auto tileC = GetTile(tensorCDown, tla::MakeCoord(0, 0), tla::MakeShape(actualM, rDim));
             auto tileCg = GetTile(tensorCGate, tla::MakeCoord(0, 0), tla::MakeShape(actualM, channels));
-            mmad(tileA, tileBg, tileCg, GemmCoord{actualM, channels, kDim});
+            BlockMmadC0Merged merged(resource);
+            merged(tileA, tileB, tileC, GemmCoord{actualM, rDim + channels, kDim}, {}, {}, {}, &tileBg, &tileCg, rDim);
+        } else {
+            BlockMmadC0Final mmad(resource);
+            for (uint32_t no = 0; no < rDim; no += L1N0) {
+                uint32_t an = rDim - no < L1N0 ? rDim - no : L1N0;
+                auto tileB = GetTile(tensorBDown, tla::MakeCoord(0, no), tla::MakeShape(kDim, an));
+                auto tileC = GetTile(tensorCDown, tla::MakeCoord(0, no), tla::MakeShape(actualM, an));
+                mmad(tileA, tileB, tileC, GemmCoord{actualM, an, kDim});
+            }
+            if (useCombine && channels > 0) {
+                auto tileBg = GetTile(tensorBGate, tla::MakeCoord(0, 0), tla::MakeShape(kDim, channels));
+                auto tileCg = GetTile(tensorCGate, tla::MakeCoord(0, 0), tla::MakeShape(actualM, channels));
+                mmad(tileA, tileBg, tileCg, GemmCoord{actualM, channels, kDim});
+            }
         }
     }
 
@@ -339,12 +358,34 @@ struct HcForwardMulSumKernel {
                     GM_ADDR xnTask = xnCoreBase + static_cast<int64_t>(wave % 3u) * xnSlotBytes;
                     GM_ADDR injTask =
                         params.ptrInject + static_cast<int64_t>(row) * channels * static_cast<int64_t>(sizeof(Element));
-                    blockV0(resource, xTask, xnTask, injTask, params.ptrWGate, params.ptrGamma, actualM, d, channels,
-                            hidden, eps, useCombine, hasGamma, false,
-                            params.ptrInvRms == nullptr ? nullptr :
-                                                          params.ptrInvRms + static_cast<int64_t>(row) * channels *
-                                                                                 static_cast<int64_t>(sizeof(float)),
-                            true, true);
+                    if constexpr (std::is_same_v<Element, half> || std::is_same_v<Element, bfloat16_t>) {
+                        if (channels == 4u && r == 320u && (hidden == 2560u || hidden == 8192u) &&
+                            d == channels * hidden) {
+                            Epilogue::LargeV0OneVf::BlockV0<Element> regV0;
+                            regV0(resource, xTask, xnTask, params.ptrGamma, actualM, d, channels, hidden, eps, hasGamma,
+                                  false,
+                                  params.ptrInvRms == nullptr ?
+                                      nullptr :
+                                      params.ptrInvRms + static_cast<int64_t>(row) * channels * sizeof(float),
+                                  true, mTask);
+                        } else {
+                            blockV0(resource, xTask, xnTask, injTask, params.ptrWGate, params.ptrGamma, actualM, d,
+                                    channels, hidden, eps, useCombine, hasGamma, false,
+                                    params.ptrInvRms == nullptr ?
+                                        nullptr :
+                                        params.ptrInvRms +
+                                            static_cast<int64_t>(row) * channels * static_cast<int64_t>(sizeof(float)),
+                                    true, true, mTask);
+                        }
+                    } else {
+                        blockV0(resource, xTask, xnTask, injTask, params.ptrWGate, params.ptrGamma, actualM, d,
+                                channels, hidden, eps, useCombine, hasGamma, false,
+                                params.ptrInvRms == nullptr ?
+                                    nullptr :
+                                    params.ptrInvRms +
+                                        static_cast<int64_t>(row) * channels * static_cast<int64_t>(sizeof(float)),
+                                true, true, mTask);
+                    }
                     HcAivSet(FLAG_V0);
                 }
                 if ASCEND_IS_AIC {
@@ -448,12 +489,7 @@ struct HcForwardMulSumKernel {
                     GM_ADDR upTask = ptrUp + static_cast<int64_t>(row) * d * static_cast<int64_t>(sizeof(Element));
                     GM_ADDR mixedTask =
                         params.ptrMixed + static_cast<int64_t>(row) * hidden * static_cast<int64_t>(sizeof(Element));
-                    blockV2(
-                        resource, upTask, xnTask, mixedTask, actualM, channels, hidden, false,
-                        params.ptrUpPreAct == nullptr ?
-                            nullptr :
-                            params.ptrUpPreAct + static_cast<int64_t>(row) * d * static_cast<int64_t>(sizeof(Element)),
-                        true);
+                    blockV2(resource, upTask, xnTask, mixedTask, actualM, channels, hidden, mTask);
                 }
             }
         }

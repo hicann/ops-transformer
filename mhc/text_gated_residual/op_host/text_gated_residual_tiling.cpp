@@ -44,6 +44,8 @@ constexpr uint32_t SMALL_M_THRESH = HC_SMALL_M_THRESH;
 // A2：行任务 128 之后，小路径约 0.42µs/行，大路径在核没铺满时停在 430–450µs。
 // M=896 小路径更快（407 vs 443），M=1024 大路径更快（433 vs 461）。
 constexpr uint32_t SMALL_M_THRESH_A2 = 1024;
+constexpr uint32_t A2_MODEL_FULL_B_M_MAX = 384;
+constexpr uint32_t A2_MODEL_SMALL_M_MAX = 8192;
 constexpr uint32_t L1_N0_LARGE = HC_L1N0_LARGE;
 constexpr uint32_t L1_N0_LARGE_A2 = 256;
 constexpr uint32_t L1_N1 = HC_L1N1;
@@ -227,7 +229,21 @@ ge::graphStatus Tiling4TextGatedResidual(gert::TilingContext* context)
     if (xDesc->GetDataType() == ge::DT_BF16) {
         dtypeId = HC_DTYPE_BF16;
     }
-    const uint32_t smallThresh = isDav2201 ? SMALL_M_THRESH_A2 : SMALL_M_THRESH;
+    auto platformInfo = context->GetPlatformInfo();
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
+    uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
+    const bool a2FullBModel = isDav2201 && aicNum >= 16u && D == 10240u && R == 320u && C == 4u && H == 2560u;
+    const bool a2TunedModel = a2FullBModel && dtypeId == HC_DTYPE_BF16 && hasWGate;
+    const bool a5TunedModel = ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510 && aicNum >= 16u &&
+                              dtypeId == HC_DTYPE_BF16 && D == 10240u && R == 320u && C == 4u && H == 2560u;
+    uint32_t smallThresh = isDav2201 ? SMALL_M_THRESH_A2 : SMALL_M_THRESH;
+    if (a2TunedModel) {
+        smallThresh = A2_MODEL_SMALL_M_MAX + 1u;
+    }
+    if (a5TunedModel) {
+        const uint32_t maxModelSmallM = hasWGate ? (needBackward == 0u ? 1216u : 1152u) : 1280u;
+        smallThresh = maxModelSmallM + 1u;
+    }
     const uint32_t smallN = (M < smallThresh) ? 1u : 0u;
     uint32_t mTask = smallN ? M_TASK_SMALL : M_TASK_LARGE;
     if (smallN != 0u) {
@@ -242,9 +258,11 @@ ge::graphStatus Tiling4TextGatedResidual(gert::TilingContext* context)
             }
         }
     }
-    auto platformInfo = context->GetPlatformInfo();
-    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
-    uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
+    const uint32_t fullBMaxM = a2TunedModel ? A2_MODEL_FULL_B_M_MAX : (needBackward == 0u ? 512u : 256u);
+    const bool a2FullB = a2FullBModel && M >= 1u && M <= fullBMaxM;
+    if (a2FullB)
+        mTask = M > 128u ? 128u : 64u;
+
     // 大路径 128 行任务不足以覆盖 AIC 时，降到 64 行提高并行度。
     if (smallN == 0u && (M / mTask + (M % mTask != 0u)) < aicNum) {
         mTask = 64u;
@@ -287,6 +305,10 @@ ge::graphStatus Tiling4TextGatedResidual(gert::TilingContext* context)
     } else if (smallN == 0u) {
         usedAic = aicNum < taskNum ? aicNum : taskNum;
     }
+    if (a2FullB) {
+        usedAic = aicNum;
+        splitkFactor = 10u;
+    }
     if (usedAic == 0) {
         usedAic = 1;
     }
@@ -313,6 +335,48 @@ ge::graphStatus Tiling4TextGatedResidual(gert::TilingContext* context)
         mTask = M;
         usedAic = aicNum;
         splitkFactor = 14u;
+    }
+
+    const bool a1b4SmallModel =
+        fusedSmall && aicNum >= 16u && usedAic >= 16u &&
+        (M >= 1u && (M <= 512u || (!useCombine && xDesc->GetDataType() == ge::DT_BF16 && M < SMALL_M_THRESH))) &&
+        D == 10240u && R == 320u && C == 4u && H == 2560u && needBackward == 0u;
+    if (a1b4SmallModel) {
+        tilingKey = M > 128u ? 7u : (M > 64u ? 6u : 4u);
+    }
+
+    if (isDav2201 && smallN == 0u && useCombine && R > 0u && R % 16u == 0u && C > 0u && C <= 16u &&
+        R <= 512u - HcAlignUp(C, 16u)) {
+        tilingKey = 8u + c1Swizzle;
+    }
+    if (a2FullB)
+        tilingKey = M > 128u ? 7u : (M > 64u ? 6u : 4u);
+
+    // A5 merged C0: one 128-row FP32 accumulator and two BF16 L0B slots.
+    // Down and gate start at aligned column boundaries; unsupported shapes keep keys 0/1.
+    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510 && smallN == 0u && useCombine && R > 0u && R % 16u == 0u &&
+        C > 0u && C <= 16u && R <= 512u - HcAlignUp(C, 16u)) {
+        tilingKey = 8u + c1Swizzle;
+    }
+    if (M < usedAic) {
+        if (tilingKey == 4u && isDav2201) {
+            tilingKey = 14u;
+        }
+    }
+    if (a2FullB && needBackward != 0u) {
+        tilingKey = tilingKey == 14u ? 21u : (tilingKey == 4u ? 20u : tilingKey + 11u);
+    }
+    if (fusedSmall && needBackward != 0u && xDesc->GetDataType() == ge::DT_BF16 && M >= 1u && M <= 128u && C == 4u &&
+        H == 2560u && R == 320u && usedAic >= 16u) {
+        tilingKey = M > 64u ? 17u : (M < usedAic ? 21u : 20u);
+    }
+    if (a1b4SmallModel && M <= 64u) {
+        const uint32_t reserve = useCombine && usedAic >= 24u ? usedAic / 4u : 0u;
+        const uint32_t split = (usedAic - reserve) / 4u;
+        if (split >= 4u) {
+            tilingKey = M < usedAic ? 14u : 4u;
+            splitkFactor = split;
+        }
     }
 
     TextGatedResidualTilingData tiling;

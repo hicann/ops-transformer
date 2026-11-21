@@ -323,7 +323,8 @@ CATLASS_DEVICE void HcC1TileEpilogue(GM_ADDR act, GM_ADDR wu, GM_ADDR up, GM_ADD
         id = GetBlockIdx() / HcSubBlockNum();
     }
     Arch::Resource<ArchTag> resource;
-    using P = Gemm::MmadPingpongPreLoad<ArchTag, false, false, Resident ? 2 : 1, Resident, 2, Resident ? 1 : 2, 2, 2>;
+    // The next K tile is prefetched before consuming the current tile; B needs two slots.
+    using P = Gemm::MmadPingpongPreLoad<ArchTag, false, false, Resident ? 2 : 1, Resident, 2, 2, 2, 2>;
     using L1 = tla::Shape<tla::Int<TM>, tla::Int<NH>, tla::Int<LK>>;
     using L0 = tla::Shape<tla::Int<TM>, tla::Int<NH>, tla::Int<L0K>>;
     using Copy = Gemm::Tile::PackedTileCopyTla<ArchTag, Element, LA, Element, LB, Element, LC, void>;

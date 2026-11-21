@@ -258,11 +258,28 @@ public:
         }
     }
 
+    template <class Copy, class Dst, class Src, class Gate>
+    CATLASS_DEVICE void CopyB(Copy& copy, Dst& dst, Src& src, Gate const* gateB, uint32_t kOffset, uint32_t kActual,
+                              uint32_t downCols, uint32_t gateCols)
+    {
+        if constexpr (L1_TILE_N == 512) {
+            auto downDst = GetTile(dst, tla::MakeCoord(0, 0), tla::MakeShape(kActual, downCols));
+            auto downSrc = GetTile(src, tla::MakeCoord(0, 0), tla::MakeShape(kActual, downCols));
+            auto gateDst = GetTile(dst, tla::MakeCoord(0, downCols), tla::MakeShape(kActual, gateCols));
+            auto gateSrc = GetTile(*gateB, tla::MakeCoord(kOffset, 0), tla::MakeShape(kActual, gateCols));
+            copy(downDst, downSrc);
+            copy(gateDst, gateSrc);
+        } else {
+            copy(dst, src);
+        }
+    }
+
     /// Perform a block-scoped matrix multiply-accumulate
     template <class TensorA, class TensorB, class TensorC, class TensorBias = EmptyClass>
     CATLASS_DEVICE void operator()(TensorA& tensorA, TensorB& tensorB, TensorC& tensorC, GemmCoord const& actualShape,
                                    TensorBias const& tensorBias = {}, Callback const& callbackBeforeFixpipe = {},
-                                   Callback const& callbackAfterFixpipe = {})
+                                   Callback const& callbackAfterFixpipe = {}, TensorB const* gateB = nullptr,
+                                   TensorC const* gateC = nullptr, uint32_t downCols = 0u)
     {
         // Check L1TileShape
         if constexpr (HAS_BIAS) {
@@ -328,14 +345,14 @@ public:
             if (lastAddrB[l1BListId] != tensorTileB.data().GetPhyAddr() ||
                 tla::get<0>(tensorTileB.coord()) != lastCoordB[l1BListId].row() ||
                 tla::get<1>(tensorTileB.coord()) != lastCoordB[l1BListId].column()) {
-                copyGmToL1B(tensorL1B, tensorTileB);
+                CopyB(copyGmToL1B, tensorL1B, tensorTileB, gateB, 0u, kL1Actual, downCols, nBlockActual - downCols);
                 lastCoordB[l1BListId] = MatrixCoord{static_cast<uint32_t>(tla::get<0>(tensorTileB.coord())),
                                                     static_cast<uint32_t>(tla::get<1>(tensorTileB.coord()))};
                 lastAddrB[l1BListId] = const_cast<__gm__ typename AscendC::GlobalTensor<ElementB>::PrimType*>(
                     tensorTileB.data().GetPhyAddr());
             }
         } else {
-            copyGmToL1B(tensorL1B, tensorTileB);
+            CopyB(copyGmToL1B, tensorL1B, tensorTileB, gateB, 0u, kL1Actual, downCols, nBlockActual - downCols);
         }
         AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventList[l1BListId]);
 
@@ -402,7 +419,8 @@ public:
                     if (lastAddrB[l1BListIdNext] != tensorTileB.data().GetPhyAddr() ||
                         tla::get<0>(tensorTileB.coord()) != lastCoordB[l1BListIdNext].row() ||
                         tla::get<1>(tensorTileB.coord()) != lastCoordB[l1BListIdNext].column()) {
-                        copyGmToL1B(tensorL1B, tensorTileB);
+                        CopyB(copyGmToL1B, tensorL1B, tensorTileB, gateB, kL1IdxNext * L1_TILE_K, kL1ActualNext,
+                              downCols, nBlockActual - downCols);
                         lastCoordB[l1BListIdNext] =
                             MatrixCoord{static_cast<uint32_t>(tla::get<0>(tensorTileB.coord())),
                                         static_cast<uint32_t>(tla::get<1>(tensorTileB.coord()))};
@@ -411,7 +429,8 @@ public:
                                 tensorTileB.data().GetPhyAddr());
                     }
                 } else {
-                    copyGmToL1B(tensorL1B, tensorTileB);
+                    CopyB(copyGmToL1B, tensorL1B, tensorTileB, gateB, kL1IdxNext * L1_TILE_K, kL1ActualNext, downCols,
+                          nBlockActual - downCols);
                 }
                 AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventList[l1BListIdNext]);
             }
@@ -549,7 +568,15 @@ public:
             AscendC::SetFlag<AscendC::HardEvent::M_FIX>(l0CEventList[l0CListId]);
             AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(l0CEventList[l0CListId]);
             callbackBeforeFixpipe();
-            copyL0CToDst(tensorC, tensorL0C);
+            if constexpr (L1_TILE_N == 512) {
+                auto down = GetTile(tensorL0C, tla::MakeCoord(0, 0), tla::MakeShape(mBlockActual, downCols));
+                auto gate = GetTile(tensorL0C, tla::MakeCoord(0, downCols),
+                                    tla::MakeShape(mBlockActual, nBlockActual - downCols));
+                copyL0CToDst(tensorC, down);
+                copyL0CToDst(*gateC, gate);
+            } else {
+                copyL0CToDst(tensorC, tensorL0C);
+            }
             callbackAfterFixpipe();
             AscendC::SetFlag<AscendC::HardEvent::FIX_M>(l0CEventList[l0CListId]);
             l0CListId = (l0CListId + 1 < L0C_STAGES) ? (l0CListId + 1) : 0;

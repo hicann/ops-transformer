@@ -41,7 +41,8 @@ public:
     CATLASS_DEVICE void operator()(Resource& resource, GM_ADDR gmX, GM_ADDR gmXn, GM_ADDR gmInject, GM_ADDR gmWGate,
                                    GM_ADDR gmGamma, uint32_t actualM, uint32_t d, uint32_t channels, uint32_t hidden,
                                    float eps, bool useCombine, bool hasGamma, bool disableSubSplit = false,
-                                   GM_ADDR gmInvRms = nullptr, bool preferDoubleBuffer = true, bool xnL2Disable = false)
+                                   GM_ADDR gmInvRms = nullptr, bool preferDoubleBuffer = true, bool xnL2Disable = false,
+                                   uint32_t taskRows = 0)
     {
         const uint64_t gammaAll = hasGamma ? static_cast<uint64_t>(channels) * hidden * sizeof(float) : 0u;
         const uint64_t gammaBytes = gammaAll <= 65536u ? gammaAll : (hasGamma ? hidden * sizeof(float) : 0u);
@@ -49,12 +50,13 @@ public:
             static_cast<uint64_t>(d) * (2u * sizeof(Element) + sizeof(float)) + 8256u + gammaBytes;
         if (singleBytes <= ArchTag::UB_SIZE && channels == 4u && hidden == 2560u) {
             ProcessRows(resource, gmX, gmXn, gmInject, gmWGate, gmGamma, actualM, d, channels, hidden, eps, useCombine,
-                        hasGamma, disableSubSplit, gmInvRms, preferDoubleBuffer, xnL2Disable);
+                        hasGamma, disableSubSplit, gmInvRms, preferDoubleBuffer, xnL2Disable, taskRows);
             return;
         }
         using namespace AscendC;
         const uint32_t subNum = GetSubBlockNum() == 0 ? 1 : GetSubBlockNum();
-        const uint32_t per = (actualM + subNum - 1u) / subNum;
+        const uint32_t splitRows = taskRows == 0 ? actualM : taskRows;
+        const uint32_t per = (splitRows + subNum - 1u) / subNum;
         const uint32_t begin = disableSubSplit ? 0u : GetSubBlockIdx() * per;
         const uint32_t end = disableSubSplit ? actualM : (begin + per < actualM ? begin + per : actualM);
         for (uint32_t row = begin; row < end; ++row) {
@@ -80,7 +82,7 @@ public:
                                     GM_ADDR gmGamma, uint32_t actualM, uint32_t d, uint32_t channels, uint32_t hidden,
                                     float eps, bool useCombine, bool hasGamma, bool disableSubSplit = false,
                                     GM_ADDR gmInvRms = nullptr, bool preferDoubleBuffer = true,
-                                    bool xnL2Disable = false)
+                                    bool xnL2Disable = false, uint32_t taskRows = 0)
     {
         using namespace AscendC;
         if (actualM == 0) {
@@ -88,7 +90,8 @@ public:
         }
         const uint32_t subNum = GetSubBlockNum() == 0 ? 1 : GetSubBlockNum();
         const uint32_t subIdx = GetSubBlockIdx();
-        const uint32_t row0 = (actualM + subNum - 1) / subNum;
+        const uint32_t splitRows = taskRows == 0 ? actualM : taskRows;
+        const uint32_t row0 = (splitRows + subNum - 1) / subNum;
         uint32_t rowStart = subIdx * row0;
         uint32_t rowEnd = rowStart + row0 < actualM ? rowStart + row0 : actualM;
         if (disableSubSplit) {

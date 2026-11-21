@@ -46,7 +46,8 @@ public:
 
     template <class Resource>
     CATLASS_DEVICE void operator()(Resource& resource, int64_t offUp, int64_t offXn, int64_t offMixed, uint32_t actualM,
-                                   uint32_t channels, uint32_t hidden, bool disableSubSplit = false)
+                                   uint32_t channels, uint32_t hidden, bool disableSubSplit = false,
+                                   uint32_t taskRows = 0)
     {
         using namespace AscendC;
         if (actualM == 0 || hidden == 0 || channels == 0) {
@@ -54,7 +55,8 @@ public:
         }
         const uint32_t subNum = GetSubBlockNum() == 0 ? 1 : GetSubBlockNum();
         const uint32_t subIdx = GetSubBlockIdx();
-        const uint32_t row0 = (actualM + subNum - 1) / subNum;
+        const uint32_t splitRows = taskRows == 0 ? actualM : taskRows;
+        const uint32_t row0 = (splitRows + subNum - 1) / subNum;
         uint32_t rowStart = subIdx * row0;
         uint32_t rowEnd = rowStart + row0 < actualM ? rowStart + row0 : actualM;
         if (disableSubSplit) {
@@ -178,6 +180,7 @@ public:
                 PipeBarrier<PIPE_V>();
             }
             Muls(ubTmp, ubUp, -1.0f, d);
+            PipeBarrier<PIPE_V>();
             if (hasNext) {
                 SetFlag<HardEvent::V_MTE2>(EVENT_ID0);
                 WaitFlag<HardEvent::V_MTE2>(EVENT_ID0);
