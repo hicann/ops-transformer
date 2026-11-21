@@ -135,6 +135,13 @@ English | [简体中文](./README.md)
         <td>-</td>
       </tr>
       <tr>
+        <td>op_impl_mode</td>
+        <td>Attribute</td>
+        <td>Available only in the V2 API on Ascend 950PR&950DT products, corresponding to the opImplMode API parameter. 0 indicates that the Cube uses FP32 mode for computation, and 1 indicates that the Cube uses HF32 mode for computation.</td>
+        <td>INT64</td>
+        <td>-</td>
+      </tr>
+      <tr>
         <td>grad_x</td>
         <td>Output</td>
         <td>Gradient of x.</td>
@@ -177,7 +184,7 @@ English | [简体中文](./README.md)
 - <term>Ascend 950PR&950DT products</term>:
   - N currently supports 4, 6, and 8.
   - D must be in the range of 1 to 16384 and aligned to 64 elements.
-- <term>Atlas A2 products</term>:
+- <term>Atlas A3 products</term> and <term>Atlas A2 products</term>:
   - N currently supports 4.
   - D must be in the range of 1 to 100000 and aligned to 128 elements.
 
@@ -185,5 +192,5 @@ English | [简体中文](./README.md)
 
 | Calling Method | Calling Sample | Description |
 | :--- | :--- | :--- |
-| aclnn invocation | [test_aclnn_mhc_pre_backward.cpp](examples/test_aclnn_mhc_pre_backward.cpp) | Calls the MhcPreBackward operator through the [aclnnMhcPreBackward](docs/aclnnMhcPreBackward_en.md) API. |
-| aclnn invocation | [test_aclnn_mhc_pre_backward_v2.cpp](examples/test_aclnn_mhc_pre_backward_v2.cpp) | Calls the MhcPreBackward operator through the [aclnnMhcPreBackwardV2](docs/aclnnMhcPreBackwardV2_en.md) API and specifies the Cube computation mode. |
+| aclnn invocation | [test_aclnn_mhc_pre_backward.cpp](examples/test_aclnn_mhc_pre_backward.cpp) | Calls the MhcPreBackward operator through the [aclnnMhcPreBackward](docs/aclnnMhcPreBackward_en.md) API. The Cube uses FP32 by default. |
+| aclnn invocation | [test_aclnn_mhc_pre_backward_v2.cpp](examples/test_aclnn_mhc_pre_backward_v2.cpp) | Calls the MhcPreBackward operator through the [aclnnMhcPreBackwardV2](docs/aclnnMhcPreBackwardV2_en.md) API, and selects the FP32 or HF32 computation mode of the Cube through opImplMode. |

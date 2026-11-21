@@ -34,6 +34,7 @@ const constexpr uint32_t GRAD_H_RES_INDEX = 5;
 const constexpr int64_t INDEX_B = 0;
 const constexpr int64_t INDEX_S = 1;
 const constexpr int64_t INDEX_D = 2;
+const constexpr int64_t INDEX_D_TAIL = 3;
 
 const constexpr int64_t INDEX_T = 0;
 const constexpr int64_t INDEX_N = 1;
@@ -50,11 +51,13 @@ const constexpr float DEFAULT_HC_EPS = 1e-6f;
 const constexpr int64_t IMPL_MODE_FP32 = 0;
 const constexpr int64_t IMPL_MODE_HF32 = 1;
 const constexpr uint32_t IMPL_MODE_ATTR_INDEX = 1;
+const constexpr uint32_t HMIX_LINEAR_TERM = 2U;
 
 const constexpr uint32_t ALPHA_GRAD_CORE_FACTOR = 24;
 const constexpr uint32_t BUFFER_NUM = 2;
 const constexpr uint32_t EXTRA_BUFFER_SIZE = 2 * 1024 * 1024;
 const constexpr uint32_t WORKSPACE_ALIGN_SIZE = 32;
+const constexpr uint32_t MAX_PHI_ACCUMULATION_SLICES = 512U;
 const constexpr uint64_t SYSTEM_WORKSPACE_SIZE = 40 * 1024 * 1024;
 const constexpr int32_t SCHEDULE_MODE = 1;
 
@@ -76,8 +79,8 @@ const constexpr uint32_t C0_DB_L0C = 2U;
 
 const constexpr uint32_t C1_BASE_M = 128U;
 const constexpr uint32_t C1_BASE_N = 128U;
-const constexpr uint32_t C1_BASE_K = 32U;
-const constexpr uint32_t C1_L1_K = 64U;
+const constexpr uint32_t C1_BASE_K = 64U;
+const constexpr uint32_t C1_L1_K = 128U;
 const constexpr uint32_t C1_DEPTH_A1 = 2U;
 const constexpr uint32_t C1_DEPTH_B1 = 2U;
 const constexpr uint32_t C1_DB_L0A = 2U;
@@ -278,6 +281,19 @@ ge::graphStatus MhcPreBackwardTiling::ValidateShapeParams()
 
 void MhcPreBackwardTiling::SetMmConfig()
 {
+    // 根据工作集选择更大的 K 分块，同时计入共享的 V2→C1 分块。
+    constexpr uint64_t elementBytes = sizeof(float);
+    constexpr uint64_t fastL1Bytes =
+        (C1_DEPTH_A1 + C1_DEPTH_B1) * static_cast<uint64_t>(C1_BASE_M) * C1_L1_K * elementBytes;
+    constexpr uint64_t sharedL1Bytes = static_cast<uint64_t>(C1_SET_SHAPE_K) * C1_BASE_N * elementBytes;
+    constexpr uint64_t fastL0ABytes = static_cast<uint64_t>(C1_DB_L0A) * C1_BASE_M * C1_BASE_K * elementBytes;
+    constexpr uint64_t fastL0BBytes = static_cast<uint64_t>(C1_DB_L0B) * C1_BASE_N * C1_BASE_K * elementBytes;
+    constexpr uint64_t fastL0CBytes = static_cast<uint64_t>(C1_DB_L0C) * C1_BASE_M * C1_BASE_N * elementBytes;
+    // 根据精度对应的 D 阈值选择 K64。现有的 L1/L0
+    // 容量检查仍然是最终的安全保护。
+    bool k64Workload = (implMode_ == IMPL_MODE_HF32 && D_ >= 1024U) || (implMode_ != IMPL_MODE_HF32 && D_ >= 2560U);
+    bool fastC1 = fusionSize_ <= C1_BASE_M && k64Workload && fastL1Bytes + sharedL1Bytes <= l1Size_ &&
+                  fastL0ABytes <= l0ASize_ && fastL0BBytes <= l0BSize_ && fastL0CBytes <= l0CSize_;
     tilingData_.mmConfigC0.set_baseM(C0_BASE_M);
     tilingData_.mmConfigC0.set_baseN(C0_BASE_N);
     tilingData_.mmConfigC0.set_baseK(C0_BASE_K);
@@ -290,8 +306,8 @@ void MhcPreBackwardTiling::SetMmConfig()
 
     tilingData_.mmConfigC1.set_baseM(C1_BASE_M);
     tilingData_.mmConfigC1.set_baseN(C1_BASE_N);
-    tilingData_.mmConfigC1.set_baseK(C1_BASE_K);
-    tilingData_.mmConfigC1.set_l1K(C1_L1_K);
+    tilingData_.mmConfigC1.set_baseK(fastC1 ? C1_BASE_K : C0_BASE_K);
+    tilingData_.mmConfigC1.set_l1K(fastC1 ? C1_L1_K : C0_L1_K);
     tilingData_.mmConfigC1.set_depthA1(C1_DEPTH_A1);
     tilingData_.mmConfigC1.set_depthB1(C1_DEPTH_B1);
     tilingData_.mmConfigC1.set_dbL0A(C1_DB_L0A);
@@ -340,6 +356,26 @@ ge::graphStatus MhcPreBackwardTiling::ValidateMmConfig()
     uint64_t l1UsedBytes = (depthA1 + depthB1) * l1SingleBufferBytes;
     uint64_t l0ABUsedBytes = dbL0 * l0ABSingleBufferBytes;
     uint64_t l0CUsedBytes = dbL0C * l0CSingleBufferBytes;
+    // 保留 C0 原有的双缓冲，并为 C1 预留独立的归约分块。
+    // 当平台容量允许时，每个 ND 结果在多个 BS 分块之间保留在 L0C 中。
+    if (fusionSize_ <= mmConfigC1_.get_baseM() && totalLength_ > C1_SET_SHAPE_K &&
+        l0CUsedBytes + l0CSingleBufferBytes <= l0CSize_) {
+        l0CUsedBytes += l0CSingleBufferBytes;
+    }
+    // 以 BS 为主序的 wave 会先访问多个 ND 输出，再回到同一输出。
+    // 按实际 M 行数为 C1 累加器分配紧凑且互不重叠的空间。
+    if (implMode_ == IMPL_MODE_FP32 && totalLength_ > C1_SET_SHAPE_K && totalLength_ % C1_SET_SHAPE_K == 0U &&
+        fusionSize_ <= mmConfigC1_.get_baseM() && blockDim_ > 0U) {
+        constexpr uint64_t cubeAlign = 16U;
+        constexpr uint64_t ndAlign = C0_BASE_N / 2U;
+        uint64_t ndPerCore = ((N_ * D_ / blockDim_ + ndAlign - 1U) / ndAlign) * ndAlign;
+        uint64_t ndTiles = (ndPerCore + C1_BASE_N - 1U) / C1_BASE_N;
+        uint64_t compactRows = ((fusionSize_ + cubeAlign - 1U) / cubeAlign) * cubeAlign;
+        uint64_t waveBytes = dbL0C * l0CSingleBufferBytes + compactRows * C1_BASE_N * elementSize * ndTiles;
+        if (ndTiles > 0U && waveBytes <= l0CSize_) {
+            l0CUsedBytes = std::max(l0CUsedBytes, waveBytes);
+        }
+    }
     OP_CHECK_IF(l1UsedBytes > l1Size_ || l0ABUsedBytes > l0ASize_ || l0ABUsedBytes > l0BSize_ ||
                     l0CUsedBytes > l0CSize_ || l1UsedBytes > UINT32_MAX || l0ABUsedBytes > UINT32_MAX ||
                     l0CUsedBytes > UINT32_MAX,
@@ -393,7 +429,7 @@ ge::graphStatus MhcPreBackwardTiling::GetInputShape()
         return ret;
     }
 
-    fusionSize_ = (2 * N_) + (N_ * N_);
+    fusionSize_ = (HMIX_LINEAR_TERM * N_) + (N_ * N_);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -415,8 +451,7 @@ ge::graphStatus MhcPreBackwardTiling::ParseInputAndAttr()
     auto implModePtr = attrs->GetAttrPointer<int64_t>(IMPL_MODE_ATTR_INDEX);
     int64_t implMode = (implModePtr != nullptr) ? *implModePtr : IMPL_MODE_FP32;
     if (implMode != IMPL_MODE_FP32 && implMode != IMPL_MODE_HF32) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "op_impl_mode", std::to_string(implMode).c_str(),
-                                              "op_impl_mode must be 0 (FP32) or 1 (HF32)");
+        OP_LOGE(context_->GetNodeName(), "inner_precise must be 0 (FP32) or 1 (HF32), got %ld", implMode);
         return ge::GRAPH_FAILED;
     }
     implMode_ = static_cast<uint32_t>(implMode);
@@ -424,7 +459,7 @@ ge::graphStatus MhcPreBackwardTiling::ParseInputAndAttr()
     return ge::GRAPH_SUCCESS;
 }
 
-void MhcPreBackwardTiling::SetCommonTilingParams()
+void MhcPreBackwardTiling::FillTilingData()
 {
     tilingData_.set_coreNum(blockDim_);
     tilingData_.set_vecCoreNum(vecCoreNum_);
@@ -450,11 +485,6 @@ void MhcPreBackwardTiling::SetCommonTilingParams()
     tilingData_.set_v2ToC1Rows(V2_TO_C1_ROWS);
 }
 
-void MhcPreBackwardTiling::FillTilingData()
-{
-    SetCommonTilingParams();
-}
-
 uint64_t MhcPreBackwardTiling::CalculateWorkspaceSize(uint64_t totalLength, uint64_t fusionSize, uint64_t cubeCoreNum,
                                                       uint64_t vecCoreNum, uint64_t elementSize)
 {
@@ -475,6 +505,14 @@ ge::graphStatus MhcPreBackwardTiling::TilingProcess()
 {
     size_t userWorkspaceSize = CalculateWorkspaceSize(totalLength_, fusionSize_, blockDim_, vecCoreNum_, sizeof(float));
     size_t systemWorkspaceSize = SYSTEM_WORKSPACE_SIZE;
+    if (implMode_ != IMPL_MODE_HF32) {
+        const uint64_t planes =
+            (totalLength_ + tilingData_.mmConfigC1.get_l1K() - 1U) / tilingData_.mmConfigC1.get_l1K();
+        if (planes > MAX_PHI_ACCUMULATION_SLICES) {
+            // 累加链超过阈值时改为独立部分和，避免超长序列的原子加舍入误差。
+            userWorkspaceSize += planes * fusionSize_ * N_ * D_ * sizeof(float);
+        }
+    }
     workspaceSize_ = userWorkspaceSize + systemWorkspaceSize;
     return ge::GRAPH_SUCCESS;
 }
@@ -500,6 +538,7 @@ ge::graphStatus MhcPreBackwardTiling::DoOpTiling()
     }
 
     FillTilingData();
+    c1TilingMode_ = SelectC1TilingMode(tilingData_.mmConfigC1.get_l1K());
 
     PrintTilingData();
 
@@ -526,9 +565,21 @@ void MhcPreBackwardTiling::PrintTilingData()
             tilingData_.get_v2ToC1Rows());
 }
 
+uint64_t MhcPreBackwardTiling::SelectC1TilingMode(uint32_t c1L1K) const
+{
+    // 完整 ND 分块使每个 K 分片上的两个 AIV 就绪计数保持一致。
+    if (c1L1K != C1_L1_K || (N_ * D_) % C1_BASE_N != 0U || totalLength_ < C0_SET_SHAPE_M) {
+        return MHC_PRE_BACKWARD_DEFAULT;
+    }
+    if (totalLength_ % C0_SET_SHAPE_M >= C0_TO_V2_ROWS) {
+        return MHC_PRE_BACKWARD_C1_STREAM_TAIL;
+    }
+    return MHC_PRE_BACKWARD_C1_STREAM;
+}
+
 uint64_t MhcPreBackwardTiling::GetTilingKey() const
 {
-    return GET_TPL_TILING_KEY(static_cast<uint64_t>(MHC_PRE_BACKWARD_DEFAULT));
+    return GET_TPL_TILING_KEY(c1TilingMode_, implMode_ == IMPL_MODE_HF32);
 }
 
 ge::graphStatus MhcPreBackwardTiling::PostTiling()
@@ -543,7 +594,7 @@ ge::graphStatus MhcPreBackwardTiling::PostTiling()
     context_->SetBlockDim(tilingData_.get_coreNum());
     context_->SetScheduleMode(SCHEDULE_MODE);
 
-    size_t* workspaces = context_->GetWorkspaceSizes(1); // set workspace
+    size_t* workspaces = context_->GetWorkspaceSizes(1); // 设置 workspace
     OP_CHECK_IF(workspaces == nullptr, OPS_REPORT_CUBE_INNER_ERR(context_->GetNodeName(), "workspaces is null"),
                 return ge::GRAPH_FAILED);
 

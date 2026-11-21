@@ -19,11 +19,18 @@
 #include "ascendc/host_api/tiling/template_argument.h"
 
 #define MHC_PRE_BACKWARD_DEFAULT 0
+#define MHC_PRE_BACKWARD_C1_STREAM 2
+#define MHC_PRE_BACKWARD_C1_STREAM_TAIL 3
 
-ASCENDC_TPL_ARGS_DECL(MhcPreBackward, ASCENDC_TPL_UINT_DECL(TILING_MODE, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST,
-                                                            MHC_PRE_BACKWARD_DEFAULT));
+ASCENDC_TPL_ARGS_DECL(MhcPreBackward,
+                      ASCENDC_TPL_UINT_DECL(TILING_MODE, ASCENDC_TPL_4_BW, ASCENDC_TPL_UI_LIST,
+                                            MHC_PRE_BACKWARD_DEFAULT, MHC_PRE_BACKWARD_C1_STREAM,
+                                            MHC_PRE_BACKWARD_C1_STREAM_TAIL),
+                      ASCENDC_TPL_BOOL_DECL(USE_HF32, 0, 1));
 
 ASCENDC_TPL_SEL(ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_KERNEL_TYPE_SEL(ASCENDC_TPL_MIX_AIC_1_2),
-                                     ASCENDC_TPL_UINT_SEL(TILING_MODE, ASCENDC_TPL_UI_LIST, MHC_PRE_BACKWARD_DEFAULT)));
+                                     ASCENDC_TPL_UINT_SEL(TILING_MODE, ASCENDC_TPL_UI_LIST, MHC_PRE_BACKWARD_DEFAULT,
+                                                          MHC_PRE_BACKWARD_C1_STREAM, MHC_PRE_BACKWARD_C1_STREAM_TAIL),
+                                     ASCENDC_TPL_BOOL_SEL(USE_HF32, 0, 1)));
 
 #endif

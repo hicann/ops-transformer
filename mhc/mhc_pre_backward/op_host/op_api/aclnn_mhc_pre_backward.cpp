@@ -283,6 +283,16 @@ static bool CheckShapeDim(const gert::Shape& shape, uint64_t index, uint64_t exp
     return true;
 }
 
+static bool CheckShapeDims(const gert::Shape& shape, const uint64_t* expectedDims, uint64_t dimCount, const char* msg)
+{
+    for (uint64_t index = 0; index < dimCount; ++index) {
+        if (!CheckShapeDim(shape, index, expectedDims[index], msg)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static uint64_t Factorial(uint64_t n)
 {
     if (n <= 1) {
@@ -305,16 +315,14 @@ static bool MhcPreBackwardCheckBSNDShape(const AclnnMhcPreBackwardParams& params
                                          uint64_t dimen, uint64_t numsResidual)
 {
     auto& xShape = params.x->GetViewShape();
-    if (!CheckShapeDim(xShape, 0, batch, "x tensor shape must be [B, S, N, D]") ||
-        !CheckShapeDim(xShape, 1, sequence, "x tensor shape must be [B, S, N, D]") ||
-        !CheckShapeDim(xShape, 2, numsResidual, "x tensor shape must be [B, S, N, D]") ||
-        !CheckShapeDim(xShape, 3, dimen, "x tensor shape must be [B, S, N, D]")) {
+    const uint64_t xDims[] = {batch, sequence, numsResidual, dimen};
+    if (!CheckShapeDims(xShape, xDims, 4, "x tensor shape must be [B, S, N, D]")) {
         return false;
     }
 
     auto& gradHPostShape = params.gradHPost->GetViewShape();
-    if (!CheckShapeDim(gradHPostShape, 0, batch, "gradHPost shape must align with gradHIn on B and S dims") ||
-        !CheckShapeDim(gradHPostShape, 1, sequence, "gradHPost shape must align with gradHIn on B and S dims")) {
+    const uint64_t gradHPostDims[] = {batch, sequence};
+    if (!CheckShapeDims(gradHPostShape, gradHPostDims, 2, "gradHPost shape must align with gradHIn on B and S dims")) {
         return false;
     }
 
@@ -324,10 +332,8 @@ static bool MhcPreBackwardCheckBSNDShape(const AclnnMhcPreBackwardParams& params
     auto& gradHResShape = params.gradHRes->GetViewShape();
     if (gradHResShape.GetDimNum() == 4) {
         // [B, S, N, N] (BSNN 形式) - 所有平台都支持, factN = N²
-        if (!CheckShapeDim(gradHResShape, 0, batch, "gradHRes shape must be [B, S, N, N]") ||
-            !CheckShapeDim(gradHResShape, 1, sequence, "gradHRes shape must be [B, S, N, N]") ||
-            !CheckShapeDim(gradHResShape, 2, numsResidual, "gradHRes shape must be [B, S, N, N]") ||
-            !CheckShapeDim(gradHResShape, 3, numsResidual, "gradHRes shape must be [B, S, N, N]")) {
+        const uint64_t gradHResDims[] = {batch, sequence, numsResidual, numsResidual};
+        if (!CheckShapeDims(gradHResShape, gradHResDims, 4, "gradHRes shape must be [B, S, N, N]")) {
             return false;
         }
     } else if (gradHResShape.GetDimNum() == 3) {
@@ -336,9 +342,8 @@ static bool MhcPreBackwardCheckBSNDShape(const AclnnMhcPreBackwardParams& params
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "gradHRes shape [B, S, N!] (BSN!) is only supported on A2 platform");
             return false;
         }
-        if (!CheckShapeDim(gradHResShape, 0, batch, "gradHRes shape must be [B, S, N, N] or [B, S, N!]") ||
-            !CheckShapeDim(gradHResShape, 1, sequence, "gradHRes shape must be [B, S, N, N] or [B, S, N!]") ||
-            !CheckShapeDim(gradHResShape, 2, factN, "gradHRes shape must be [B, S, N, N] or [B, S, N!]")) {
+        const uint64_t gradHResDims[] = {batch, sequence, factN};
+        if (!CheckShapeDims(gradHResShape, gradHResDims, 3, "gradHRes shape must be [B, S, N, N] or [B, S, N!]")) {
             return false;
         }
     } else {
@@ -348,46 +353,38 @@ static bool MhcPreBackwardCheckBSNDShape(const AclnnMhcPreBackwardParams& params
     }
 
     auto& invRmsShape = params.invRms->GetViewShape();
-    if (!CheckShapeDim(invRmsShape, 0, batch, "invRms shape must be [B, S]") ||
-        !CheckShapeDim(invRmsShape, 1, sequence, "invRms shape must be [B, S]")) {
+    const uint64_t invRmsDims[] = {batch, sequence};
+    if (!CheckShapeDims(invRmsShape, invRmsDims, 2, "invRms shape must be [B, S]")) {
         return false;
     }
 
     auto& hMixShape = params.hMix->GetViewShape();
-    if (!CheckShapeDim(hMixShape, 0, batch, "hMix shape must be [B, S, fusionSize]") ||
-        !CheckShapeDim(hMixShape, 1, sequence, "hMix shape must be [B, S, fusionSize]") ||
-        !CheckShapeDim(hMixShape, 2, fusionSize, "hMix shape must be [B, S, fusionSize]")) {
+    const uint64_t hMixDims[] = {batch, sequence, fusionSize};
+    if (!CheckShapeDims(hMixShape, hMixDims, 3, "hMix shape must be [B, S, fusionSize]")) {
         return false;
     }
 
     auto& hPreShape = params.hPre->GetViewShape();
-    if (!CheckShapeDim(hPreShape, 0, batch, "hPre shape must be [B, S, N]") ||
-        !CheckShapeDim(hPreShape, 1, sequence, "hPre shape must be [B, S, N]") ||
-        !CheckShapeDim(hPreShape, 2, numsResidual, "hPre shape must be [B, S, N]")) {
+    const uint64_t hPreDims[] = {batch, sequence, numsResidual};
+    if (!CheckShapeDims(hPreShape, hPreDims, 3, "hPre shape must be [B, S, N]")) {
         return false;
     }
 
     auto& hPostShape = params.hPost->GetViewShape();
-    if (!CheckShapeDim(hPostShape, 0, batch, "hPost shape must be [B, S, N]") ||
-        !CheckShapeDim(hPostShape, 1, sequence, "hPost shape must be [B, S, N]") ||
-        !CheckShapeDim(hPostShape, 2, numsResidual, "hPost shape must be [B, S, N]")) {
+    const uint64_t hPostDims[] = {batch, sequence, numsResidual};
+    if (!CheckShapeDims(hPostShape, hPostDims, 3, "hPost shape must be [B, S, N]")) {
         return false;
     }
 
     auto& gradXShape = params.gradX->GetViewShape();
-    if (!CheckShapeDim(gradXShape, 0, batch, "gradX shape must be [B, S, N, D]") ||
-        !CheckShapeDim(gradXShape, 1, sequence, "gradX shape must be [B, S, N, D]") ||
-        !CheckShapeDim(gradXShape, 2, numsResidual, "gradX shape must be [B, S, N, D]") ||
-        !CheckShapeDim(gradXShape, 3, dimen, "gradX shape must be [B, S, N, D]")) {
+    const uint64_t gradXDims[] = {batch, sequence, numsResidual, dimen};
+    if (!CheckShapeDims(gradXShape, gradXDims, 4, "gradX shape must be [B, S, N, D]")) {
         return false;
     }
 
     if (params.gradXPostOptional != nullptr) {
         auto& gradXPostShape = params.gradXPostOptional->GetViewShape();
-        if (!CheckShapeDim(gradXPostShape, 0, batch, "gradXPostOptional shape must be [B, S, N, D]") ||
-            !CheckShapeDim(gradXPostShape, 1, sequence, "gradXPostOptional shape must be [B, S, N, D]") ||
-            !CheckShapeDim(gradXPostShape, 2, numsResidual, "gradXPostOptional shape must be [B, S, N, D]") ||
-            !CheckShapeDim(gradXPostShape, 3, dimen, "gradXPostOptional shape must be [B, S, N, D]")) {
+        if (!CheckShapeDims(gradXPostShape, gradXDims, 4, "gradXPostOptional shape must be [B, S, N, D]")) {
             return false;
         }
     }
@@ -398,14 +395,14 @@ static bool MhcPreBackwardCheckTNDShape(const AclnnMhcPreBackwardParams& params,
                                         uint64_t numsResidual)
 {
     auto& xShape = params.x->GetViewShape();
-    if (!CheckShapeDim(xShape, 0, t, "x tensor shape must be [T, N, D]") ||
-        !CheckShapeDim(xShape, 1, numsResidual, "x tensor shape must be [T, N, D]") ||
-        !CheckShapeDim(xShape, 2, dimen, "x tensor shape must be [T, N, D]")) {
+    const uint64_t xDims[] = {t, numsResidual, dimen};
+    if (!CheckShapeDims(xShape, xDims, 3, "x tensor shape must be [T, N, D]")) {
         return false;
     }
 
     auto& gradHPostShape = params.gradHPost->GetViewShape();
-    if (!CheckShapeDim(gradHPostShape, 0, t, "gradHPost shape must align with gradHIn on T dim")) {
+    const uint64_t gradHPostDims[] = {t};
+    if (!CheckShapeDims(gradHPostShape, gradHPostDims, 1, "gradHPost shape must align with gradHIn on T dim")) {
         return false;
     }
 
@@ -415,9 +412,8 @@ static bool MhcPreBackwardCheckTNDShape(const AclnnMhcPreBackwardParams& params,
     auto& gradHResShape = params.gradHRes->GetViewShape();
     if (gradHResShape.GetDimNum() == 3) {
         // [T, N, N] (BSNN 形式) - 所有平台都支持, factN = N²
-        if (!CheckShapeDim(gradHResShape, 0, t, "gradHRes shape must be [T, N, N]") ||
-            !CheckShapeDim(gradHResShape, 1, numsResidual, "gradHRes shape must be [T, N, N]") ||
-            !CheckShapeDim(gradHResShape, 2, numsResidual, "gradHRes shape must be [T, N, N]")) {
+        const uint64_t gradHResDims[] = {t, numsResidual, numsResidual};
+        if (!CheckShapeDims(gradHResShape, gradHResDims, 3, "gradHRes shape must be [T, N, N]")) {
             return false;
         }
     } else {
@@ -426,47 +422,45 @@ static bool MhcPreBackwardCheckTNDShape(const AclnnMhcPreBackwardParams& params,
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "gradHRes shape [T, N!] (BSN!) is only supported on A2 platform");
             return false;
         }
-        if (!CheckShapeDim(gradHResShape, 0, t, "gradHRes shape must be [T, N, N] or [T, N!]") ||
-            !CheckShapeDim(gradHResShape, 1, factN, "gradHRes shape must be [T, N, N] or [T, N!]")) {
+        const uint64_t gradHResDims[] = {t, factN};
+        if (!CheckShapeDims(gradHResShape, gradHResDims, 2, "gradHRes shape must be [T, N, N] or [T, N!]")) {
             return false;
         }
     }
 
     auto& invRmsShape = params.invRms->GetViewShape();
-    if (!CheckShapeDim(invRmsShape, 0, t, "invRms shape must be [T]")) {
+    const uint64_t invRmsDims[] = {t};
+    if (!CheckShapeDims(invRmsShape, invRmsDims, 1, "invRms shape must be [T]")) {
         return false;
     }
 
     auto& hMixShape = params.hMix->GetViewShape();
-    if (!CheckShapeDim(hMixShape, 0, t, "hMix shape must be [T, fusionSize]") ||
-        !CheckShapeDim(hMixShape, 1, fusionSize, "hMix shape must be [T, fusionSize]")) {
+    const uint64_t hMixDims[] = {t, fusionSize};
+    if (!CheckShapeDims(hMixShape, hMixDims, 2, "hMix shape must be [T, fusionSize]")) {
         return false;
     }
 
     auto& hPreShape = params.hPre->GetViewShape();
-    if (!CheckShapeDim(hPreShape, 0, t, "hPre shape must be [T, N]") ||
-        !CheckShapeDim(hPreShape, 1, numsResidual, "hPre shape must be [T, N]")) {
+    const uint64_t hPreDims[] = {t, numsResidual};
+    if (!CheckShapeDims(hPreShape, hPreDims, 2, "hPre shape must be [T, N]")) {
         return false;
     }
 
     auto& hPostShape = params.hPost->GetViewShape();
-    if (!CheckShapeDim(hPostShape, 0, t, "hPost shape must be [T, N]") ||
-        !CheckShapeDim(hPostShape, 1, numsResidual, "hPost shape must be [T, N]")) {
+    const uint64_t hPostDims[] = {t, numsResidual};
+    if (!CheckShapeDims(hPostShape, hPostDims, 2, "hPost shape must be [T, N]")) {
         return false;
     }
 
     auto& gradXShape = params.gradX->GetViewShape();
-    if (!CheckShapeDim(gradXShape, 0, t, "gradX shape must be [T, N, D]") ||
-        !CheckShapeDim(gradXShape, 1, numsResidual, "gradX shape must be [T, N, D]") ||
-        !CheckShapeDim(gradXShape, 2, dimen, "gradX shape must be [T, N, D]")) {
+    const uint64_t gradXDims[] = {t, numsResidual, dimen};
+    if (!CheckShapeDims(gradXShape, gradXDims, 3, "gradX shape must be [T, N, D]")) {
         return false;
     }
 
     if (params.gradXPostOptional != nullptr) {
         auto& gradXPostShape = params.gradXPostOptional->GetViewShape();
-        if (!CheckShapeDim(gradXPostShape, 0, t, "gradXPostOptional shape must be [T, N, D]") ||
-            !CheckShapeDim(gradXPostShape, 1, numsResidual, "gradXPostOptional shape must be [T, N, D]") ||
-            !CheckShapeDim(gradXPostShape, 2, dimen, "gradXPostOptional shape must be [T, N, D]")) {
+        if (!CheckShapeDims(gradXPostShape, gradXDims, 3, "gradXPostOptional shape must be [T, N, D]")) {
             return false;
         }
     }

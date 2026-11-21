@@ -71,6 +71,7 @@ constexpr uint32_t FP32_BUF_SIZE =
     UB_USABLE_SIZE - MAIN_QUEUE_COUNT * DOUBLE_BUFFER * INOUT_QUEUE_SIZE - SMALL_QUEUE_SIZE;
 constexpr uint32_t PROCESS_V2_CHUNK_SIZE = 128U;
 constexpr uint32_t BS_BLOCK_SIZE = 512U;
+constexpr uint32_t MAX_PHI_ACCUMULATION_SLICES = 512U;
 constexpr uint32_t ND_BLOCK_SIZE = 128U;
 constexpr uint32_t ALPHA_GRAD_LAST_DIM_SIZE = 3;
 constexpr uint32_t ALPHA_GRAD_PADDING = 24;
@@ -94,6 +95,71 @@ constexpr uint32_t MATMUL_WRITE_OFFSET_N = 128;
 constexpr uint32_t CROSS_CORE_FLAG_INDEX = NUMBER_TWO;
 constexpr uint32_t CROSS_CORE_WAIT_FLAG_C0 = 0x9;
 constexpr uint32_t CROSS_CORE_WAIT_FLAG_C1 = 0x8;
+constexpr uint32_t C1_L1_FREE_FLAG = 4U;
+constexpr uint32_t C0_UB_FREE = 5U;
+constexpr uint32_t C0_UB_LAST_FREE = 10U;
+// V0/V1 之后，4-buffer V2 路径使用 UB 的 64:192 KiB 区间。
+constexpr uint32_t C0_UB_ROW_STEP = 64U;
+constexpr uint32_t C0_UB_SLOT_COUNT = BS_BLOCK_SIZE / MATMUL_WRITE_OFFSET_M;
+__aicore__ inline uint32_t C0UbTileRows()
+{
+    // 每个槽位容纳完整的 128 行 Cube 结果。
+    return MATMUL_WRITE_OFFSET_M;
+}
+__aicore__ inline uint32_t C0UbSlotBytes()
+{
+    return C0UbTileRows() * (ND_BLOCK_SIZE / NUMBER_TWO) * sizeof(float);
+}
+__aicore__ inline uint32_t C0UbSlotCount()
+{
+    return C0_UB_SLOT_COUNT;
+}
+__aicore__ inline uint32_t C0UbFreeFlag(uint32_t slot)
+{
+    // 5/6/7/10 与 C1 的 0..4、8、C0 ready 的 9 以及 SDK 屏障的 11..14 分离。
+    return slot == C0_UB_SLOT_COUNT - 1U ? C0_UB_LAST_FREE : C0_UB_FREE + slot;
+}
+// 模式 4 保持两个 AIV 确认彼此独立，与 FlashMLA 一致。
+// AIV 访问自己的通道；AIC 显式访问两个半区。
+template <pipe_t pipe>
+__aicore__ inline void C0WaitFreeSlot(uint32_t slot)
+{
+    if ASCEND_IS_AIC {
+        CrossCoreWaitFlag<4, pipe>(C0UbFreeFlag(slot));
+        CrossCoreWaitFlag<4, pipe>(C0UbFreeFlag(slot) + 16U);
+    }
+}
+template <pipe_t pipe>
+__aicore__ inline void C0PublishReady()
+{
+    if ASCEND_IS_AIC {
+        CrossCoreSetFlag<4, pipe>(CROSS_CORE_WAIT_FLAG_C0);
+        CrossCoreSetFlag<4, pipe>(CROSS_CORE_WAIT_FLAG_C0 + 16U);
+    }
+}
+template <pipe_t pipe>
+__aicore__ inline void C1PublishL1Free()
+{
+    if ASCEND_IS_AIC {
+        CrossCoreSetFlag<4, pipe>(C1_L1_FREE_FLAG);
+        CrossCoreSetFlag<4, pipe>(C1_L1_FREE_FLAG + 16U);
+    }
+}
+// 四个 128 行分片复用已有的 512x128 共享 L1 分配。
+// 标志 0..3 与 C0 ready/free 以及旧 C1 整分块标志分离。
+constexpr uint32_t C1_L1_SLICE_COUNT = BS_BLOCK_SIZE / MATMUL_WRITE_OFFSET_M;
+template <pipe_t pipe>
+__aicore__ inline void C1PublishSliceFree(uint32_t slice)
+{
+    if ASCEND_IS_AIC {
+        CrossCoreSetFlag<4, pipe>(slice);
+        CrossCoreSetFlag<4, pipe>(slice + 16U);
+    }
+}
+__aicore__ inline uint32_t C0UbSlotOffset(uint32_t slot)
+{
+    return 64U * KIBIBYTE + slot * C0UbSlotBytes();
+}
 constexpr uint32_t VEC_DEAL_VECIDX_DIV = NUMBER_TWO;
 
 constexpr Reg::CastTrait ctHalf2Fp32Zero = {Reg::RegLayout::ZERO, Reg::SatMode::UNKNOWN, Reg::MaskMergeMode::ZEROING,
@@ -122,12 +188,6 @@ struct InitParams {
     const MhcPreBackwardTilingData* tilingData;
 };
 
-struct OpRunInfo {
-    uint64_t totalLength_ = 0; // 总长度 (batch * sequence 或 T)
-    uint64_t nD = 0;           // n * D
-    uint64_t fusionSize = 0;   // 2N + N^2
-};
-
 template <class P>
 struct V0V1Buffers {
     LocalTensor<P> hPreGradBuf;
@@ -149,18 +209,19 @@ struct V0V1Buffers {
  * @brief Workspace buffer管理结构体
  * 内存布局：
  * 1. h_mix_grad: [B, S, 2N + N*N] = [totalLength * fusionSize]
- * 2. alpha_grad: [ALPHA_GRAD_PADDING, vecCoreNum] = [24 * vecCoreNum]
+ * 2. alpha_grad: [vecCoreNum, ALPHA_GRAD_PADDING] = [24 * vecCoreNum]
  * 3. bias_grad: [vecCoreNum, 2N + N*N] = [vecCoreNum * fusionSize]
  * 4. inv_rms_grad: [B, S] = [totalLength]
  * 5. x_rs_grad_mm: [cubeCoreNum * DOUBLE_BUFFER, BS_BLOCK_SIZE * ND_BLOCK_SIZE]
  * 6. x_rs: [cubeCoreNum *
  * DOUBLE_BUFFER, BS_BLOCK_SIZE * ND_BLOCK_SIZE]
+ * 7. grad_gamma 的成对 AIV 部分和: [2, nD]
+ * 8. 可选 grad_phi 部分和: [ceil(totalLength / C1.l1K), fusionSize, nD]；
+ *    仅 FP32 且 K 分片数超过 512 时启用，由 Host 追加分配。
  */
-template <class P>
 struct WorkspaceBuffer {
     uint64_t totalLength; // B * S
     uint64_t fusionSize;  // 2N + N*N
-    uint64_t coreNum;     // vecCoreNum (AIV核数)
 
     // 各区域的起始偏移（以元素为单位）
     uint64_t hMixGradOffset;
@@ -168,12 +229,12 @@ struct WorkspaceBuffer {
     uint64_t biasGradOffset;
     uint64_t invRmsGradOffset;
     uint64_t xRsGradOffset;
-    uint64_t xRsOffset; // V2输出，C1输入
+    uint64_t xRsOffset;          // V2输出，C1输入
+    uint64_t gammaPartialOffset; // 两个 AIV 分开保存 grad_gamma 部分和
     __aicore__ inline void Init(uint64_t bs, uint64_t fs, uint64_t vecCoreNum, uint64_t cubeCoreNum)
     {
         totalLength = bs;
         fusionSize = fs;
-        coreNum = vecCoreNum;
 
         uint64_t alphaGradSize = ALPHA_GRAD_PADDING * vecCoreNum;
         uint64_t biasGradRows = vecCoreNum;
@@ -185,6 +246,8 @@ struct WorkspaceBuffer {
         invRmsGradOffset = biasGradOffset + biasGradRows * fusionSize;
         xRsGradOffset = invRmsGradOffset + totalLength;
         xRsOffset = xRsGradOffset + BS_BLOCK_SIZE * ND_BLOCK_SIZE * DOUBLE_BUFFER * cubeCoreNum;
+        gammaPartialOffset = CeilAlign(xRsOffset, uint64_t(CEIL_ALIGN_DEFAULT)) +
+                             BS_BLOCK_SIZE * ND_BLOCK_SIZE * DOUBLE_BUFFER * cubeCoreNum;
     }
 
     /**
@@ -198,9 +261,8 @@ struct WorkspaceBuffer {
     }
 
     /**
-     * @brief 获取alpha_grad在指定(alphaIdx, coreId)位置的偏移
-     * @param alphaIdx alpha索引 [0, 2]，对应3个alpha值
-     * @param coreId 核心ID索引 [0, coreNum-1]
+     * @brief 获取指定AIV核心的alpha_grad区域起始偏移
+     * @param coreId AIV核心ID索引 [0, vecCoreNum-1]
      * @return uint64_t 偏移值（以元素为单位）
      */
     __aicore__ inline uint64_t GetAlphaGradOffset(uint32_t coreId)
@@ -210,7 +272,7 @@ struct WorkspaceBuffer {
 
     /**
      * @brief 获取bias_grad在指定coreId的偏移
-     * @param coreId 核心ID索引 [0, coreNum-1]
+     * @param coreId AIV核心ID索引 [0, vecCoreNum-1]
      * @return uint64_t 偏移值（以元素为单位）
      */
     __aicore__ inline uint64_t GetBiasGradOffset(uint32_t coreId)
@@ -238,6 +300,15 @@ struct WorkspaceBuffer {
     {
         return CeilAlign(xRsOffset, uint64_t(CEIL_ALIGN_DEFAULT)) +
                (coreId * DOUBLE_BUFFER + buffId) * BS_BLOCK_SIZE * ND_BLOCK_SIZE;
+    }
+
+    __aicore__ inline uint64_t GetPhiPartialBaseOffset(uint32_t nD) const
+    {
+        return gammaPartialOffset + NUMBER_TWO * nD;
+    }
+    __aicore__ inline uint64_t GetGammaPartialOffset(uint32_t vecIdx, uint64_t nd, uint64_t nD)
+    {
+        return gammaPartialOffset + vecIdx * nD + nd;
     }
 };
 } // namespace MhcPreBackwardUtils

@@ -133,6 +133,13 @@
         <td>-</td>
       </tr>
       <tr>
+        <td>op_impl_mode</td>
+        <td>属性</td>
+        <td>仅适用于Ascend 950PR&950DT系列产品的V2接口，对应接口参数opImplMode。0表示Cube使用FP32模式计算，1表示Cube使用HF32模式计算。</td>
+        <td>INT64</td>
+        <td>-</td>
+      </tr>
+      <tr>
         <td>grad_x</td>
         <td>输出</td>
         <td>x的梯度。</td>
@@ -175,7 +182,7 @@
 - <term>Ascend 950PR&950DT系列产品</term>：
   - N目前支持4、6、8。
   - D支持1~16384，需满足64元素对齐。
-- <term>Atlas A2系列产品</term>：
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - N目前支持4。
   - D支持1~100000，需满足128元素对齐。
 
@@ -183,5 +190,5 @@
 
 | 调用方式 | 调用样例 | 说明 |
 | :--- | :--- | :--- |
-| aclnn调用 | [test_aclnn_mhc_pre_backward.cpp](examples/test_aclnn_mhc_pre_backward.cpp) | 通过[aclnnMhcPreBackward](docs/aclnnMhcPreBackward.md)接口方式调用MhcPreBackward算子。 |
-| aclnn调用 | [test_aclnn_mhc_pre_backward_v2.cpp](examples/test_aclnn_mhc_pre_backward_v2.cpp) | 通过[aclnnMhcPreBackwardV2](docs/aclnnMhcPreBackwardV2.md)接口指定Cube计算模式并调用MhcPreBackward算子。 |
+| aclnn调用 | [test_aclnn_mhc_pre_backward.cpp](examples/test_aclnn_mhc_pre_backward.cpp) | 通过[aclnnMhcPreBackward](docs/aclnnMhcPreBackward.md)接口调用MhcPreBackward算子，Cube默认使用FP32计算。 |
+| aclnn调用 | [test_aclnn_mhc_pre_backward_v2.cpp](examples/test_aclnn_mhc_pre_backward_v2.cpp) | 通过[aclnnMhcPreBackwardV2](docs/aclnnMhcPreBackwardV2.md)接口方式调用MhcPreBackward算子，并通过opImplMode选择Cube的FP32或HF32计算模式。 |

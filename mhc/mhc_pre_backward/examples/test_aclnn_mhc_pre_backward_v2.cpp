@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file test_aclnn_mhc_pre_backward.cpp
+ * \file test_aclnn_mhc_pre_backward_v2.cpp
  * \brief
  */
 

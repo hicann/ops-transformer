@@ -12,8 +12,8 @@
  * \file mhc_pre_backward_tiling.h
  * \brief
  */
-#ifndef __OP_HOST_MHC_PRE_GRAD_H__
-#define __OP_HOST_MHC_PRE_GRAD_H__
+#ifndef MHC_PRE_BACKWARD_ARCH35_TILING_H_
+#define MHC_PRE_BACKWARD_ARCH35_TILING_H_
 
 #include <tiling/tiling_api.h>
 #include "register/tilingdata_base.h"
@@ -116,13 +116,14 @@ protected:
     void PrintTilingData();
     ge::graphStatus ParseInputAndAttr();
     void FillTilingData();
-    void SetCommonTilingParams();
     ge::graphStatus TilingProcess();
 
     static uint64_t CalculateWorkspaceSize(uint64_t totalLength, uint64_t fusionSize, uint64_t cubeCoreNum,
                                            uint64_t vecCoreNum, uint64_t elementSize);
 
 private:
+    uint64_t SelectC1TilingMode(uint32_t c1L1K) const;
+
     MhcPreBackwardTilingData tilingData_;
     uint32_t blockDim_{0};   // AIC
     uint32_t vecCoreNum_{0}; // AIV
@@ -132,6 +133,7 @@ private:
     float hcEps_{0.0f};
     uint32_t implMode_{0U};
     uint64_t fusionSize_{0};
+    uint64_t c1TilingMode_{0U};
     uint64_t ubSize_{0};
     uint64_t l1Size_{0};
     uint64_t l2Size_{0};
@@ -149,4 +151,4 @@ private:
 };
 
 } // namespace optiling
-#endif // __OP_HOST_MHC_PRE_GRAD_H__
+#endif // MHC_PRE_BACKWARD_ARCH35_TILING_H_

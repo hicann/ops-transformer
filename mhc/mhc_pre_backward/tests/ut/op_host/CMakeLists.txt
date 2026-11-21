@@ -23,3 +23,25 @@ foreach(SUB_DIR ${CURRENT_DIRS})
         add_subdirectory(${SUB_DIR})
     endif()
 endforeach()
+
+# 覆盖率插桩时保留函数调用，避免优化内联导致独立函数计数为零。
+if(ENABLE_GCOV AND (UT_TEST_ALL OR OP_HOST_UT))
+    set_source_files_properties(
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../op_host/mhc_pre_backward_infershape.cpp
+        TARGET_DIRECTORY ophost_transformer_infer_obj
+        PROPERTIES COMPILE_FLAGS "-O0 -fno-inline"
+    )
+    set_source_files_properties(
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../op_host/op_tiling/arch35/mhc_pre_backward_tiling.cpp
+        TARGET_DIRECTORY ophost_transformer_tiling_obj
+        PROPERTIES COMPILE_FLAGS "-O0 -fno-inline"
+    )
+endif()
+
+if(ENABLE_GCOV AND (UT_TEST_ALL OR OP_HOST_UT))
+    set_source_files_properties(
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_mhc_pre_backward_a5_coverage_tiling.cpp
+        TARGET_DIRECTORY ${OP_TILING_MODULE_NAME}_cases_obj
+        PROPERTIES COMPILE_FLAGS "-O0 -fno-inline"
+    )
+endif()
