@@ -889,17 +889,19 @@ def test_dsl_local_pa_multiple_groups():
 
 
 @pytest.mark.parametrize(
-    "pages,query_rows,page_padding,expected",
+    "pages,query_rows,page_padding,table_width,expected",
     (
-        (65536, 1024, 0, "pipe_rows"),
-        (65536, 128, 0, "local"),
-        (65536, 1024, 64, "off"),
-        (1 << 24, 1024, 0, "off"),
+        (65536, 1024, 0, 256, "pipe_rows"),
+        (65536, 128, 0, 256, "local"),
+        (65536, 1024, 64, 256, "v0"),
+        (1 << 24, 1024, 0, 256, "v0_wide"),
+        (1 << 24, 1024, 0, 11000, "off"),
     ),
 )
-def test_dsl_large_pa_address_dispatch(pages, query_rows, page_padding, expected):
-    # Meta tensors exercise the 2-GiB byte boundary and INT32 row bound without
-    # allocating the corresponding physical pool. Numerical coverage is above.
+def test_dsl_large_pa_address_dispatch(
+    pages, query_rows, page_padding, table_width, expected
+):
+    # Meta tensors exercise address and staging bounds without allocating the pool.
     dsl = import_module(
         f"{OPS.__name__}.ops.attention.mixed_quant_sparse_flash_mla.op_dsl.mixed_quant_sparse_flash_mla"
     )
@@ -910,7 +912,7 @@ def test_dsl_large_pa_address_dispatch(pages, query_rows, page_padding, expected
         device="meta",
     )
     ori = torch.empty((256, 128, 1, 544), dtype=torch.uint8, device="meta")
-    bt = torch.empty((256, 256), dtype=torch.int32, device="meta")
+    bt = torch.empty((256, table_width), dtype=torch.int32, device="meta")
     idx = torch.empty((query_rows, 1, 128), dtype=torch.int32, device="meta")
     idx_cmp = torch.empty((query_rows, 1, 512), dtype=torch.int32, device="meta")
     assert dsl._select_addr_mode(ori, bt, idx, kv, bt, idx_cmp) == expected
@@ -925,8 +927,52 @@ def test_dsl_large_pa_pipe_rows_fd_boundary(topk):
         used=[63, 0, 64],
         require_fd=True,
         address_mode="pipe_rows",
-        high_offset_cmp=True,
+        cmp_min_byte_offset=1 << 31,
         data_params=dict(s_cmp=521, k_cmp=topk, vary_lengths=True, block_size_cmp=256),
+    )
+
+
+@pytest.mark.parametrize(
+    "byte_offset,address_mode", ((1 << 31, "v0"), (1 << 32, "v0_wide"))
+)
+def test_dsl_vec0_real_pa_offsets(byte_offset, address_mode):
+    _check_layout(
+        "TND",
+        "PA_BBND",
+        heads=33,
+        spans=[4, 0, 5],
+        used=[3, 0, 4],
+        require_fd=True,
+        address_mode=address_mode,
+        cmp_min_byte_offset=byte_offset,
+        data_params=dict(
+            s_cmp=521,
+            k_cmp=300,
+            block_size_ori=17,
+            block_size_cmp=31,
+            vary_lengths=True,
+        ),
+    )
+
+
+@pytest.mark.parametrize("has_cmp", (False, True))
+def test_dsl_vec0_windowed_topk(has_cmp):
+    _check_layout(
+        "TND",
+        "PA_BBND",
+        heads=17,
+        has_cmp=has_cmp,
+        spans=[4],
+        axis0_noncontiguous=True,
+        address_mode="v0",
+        data_params=dict(
+            k_ori=12001,
+            k_cmp=11001,
+            s_cmp=1031,
+            block_size_ori=17,
+            block_size_cmp=31,
+            vary_lengths=True,
+        ),
     )
 
 
@@ -1074,7 +1120,7 @@ def _check_layout(
     address_mode=None,
     data_params=None,
     pa_table_width=None,
-    high_offset_cmp=False,
+    cmp_min_byte_offset=0,
     return_lse=True,
 ):
     pytest.importorskip("torch_npu")
@@ -1133,10 +1179,10 @@ def _check_layout(
                     dim=1,
                 )
             kwargs[f"{side}_block_table"] = table.npu()
-            if side == "cmp" and high_offset_cmp:
-                # Initialize only the pages the case references, all above 2 GiB.
+            if side == "cmp" and cmp_min_byte_offset:
+                # Initialize only the referenced pages above the tested boundary.
                 kv = kwargs["cmp_kv"]
-                page_offset = (1 << 31) // kv.stride(0) + 1
+                page_offset = cmp_min_byte_offset // kv.stride(0) + 1
                 pool = kv.new_empty((page_offset + kv.shape[0], *kv.shape[1:]))
                 pool[page_offset:].copy_(kv)
                 kwargs["cmp_kv"] = pool

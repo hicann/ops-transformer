@@ -238,6 +238,20 @@ _ADDR_PIPE_INPUT_ELEMS = 21504
 _ADDR_BATCH_DEPTH = 2
 
 
+# Port of PR !15841's Vec0 PA byte-offset prepass. MQSMLA keeps its
+# 248-KiB SIMD staging budget: two 82-KiB inputs and two 42-KiB outputs.
+_ADDR_V0_INPUT_ELEMS = 20992
+_ADDR_V0_OUTPUT_ELEMS = 5376  # int64 elements; uint32 uses twice as many.
+_ADDR_V0_ROWS_NARROW = 18
+_ADDR_V0_ROWS_WIDE = 9
+
+
+def _addr_v0_view(slot, begin, count):
+    return from_tensor(slot, layout=make_layout((1, _ADDR_V0_INPUT_ELEMS)))[
+        0:1, begin : begin + count
+    ]
+
+
 # Compile-time shape contract.
 D = 512  # Logical head dimension: nope[448] followed by rope[64].
 N1 = 64  # Maximum Q heads; also the fixed FD workspace slot stride.
@@ -1603,7 +1617,7 @@ class MqsmlaKernel:
         if const_expr(_avec != "off"):
             self._avec_bs_ori = pa_phys_gm.shape[1]
             self._avec_k1 = ori_idx_gm.shape[1]
-            if const_expr(_avec == "local"):
+            if const_expr(_avec in ("local", "v0", "v0_wide")):
                 tab_width = _addr_local_tab_w
             elif const_expr(_avec in ("pipe", "pipe_rows")):
                 tab_width = _addr_pipe_tab_w
@@ -1622,6 +1636,8 @@ class MqsmlaKernel:
                 self._addr_local_output = Buffer(
                     MemLoc.UB, dtypes.int32, make_layout((1, _ADDR_LOCAL_OUTPUT_ELEMS))
                 )
+            elif const_expr(_avec in ("v0", "v0_wide")):
+                self._addr_init_v0()
             elif const_expr(_avec == "arena"):
                 self._addr_ub = Buffer(
                     MemLoc.UB,
@@ -1687,10 +1703,17 @@ class MqsmlaKernel:
                     make_layout((1, _ADDR_COMPACT_K)),
                 )
             tab_cols = self._avec_k1_tab + (self._avec_k2_tab if self.has_cmp else 0)
-            self._addr_tab = addr_ws_gm.view(dtypes.int32).view(
-                addr_ws_gm.shape[0] // 4 // tab_cols, tab_cols
+            tab_dtype = dtypes.int32
+            tab_bytes = 4
+            if const_expr(_avec == "v0"):
+                tab_dtype = dtypes.uint32
+            elif const_expr(_avec == "v0_wide"):
+                tab_dtype = dtypes.int64
+                tab_bytes = 8
+            self._addr_tab = addr_ws_gm.view(tab_dtype).view(
+                addr_ws_gm.shape[0] // tab_bytes // tab_cols, tab_cols
             )
-            if const_expr(_avec in ("local", "pipe_rows")):
+            if const_expr(_avec in ("local", "pipe_rows", "v0", "v0_wide")):
                 # Split boundaries can duplicate a query on adjacent cores.
                 # Give each core a distinct row for those independent writes.
                 self._addr_tab = self._addr_tab[
@@ -1745,6 +1768,8 @@ class MqsmlaKernel:
                 else:
                     self._addr_precompute_batched(row_count)
                 self._pipe_active_queries = active_queries
+            elif const_expr(_addr_vec_mode() in ("v0", "v0_wide")):
+                self._addr_precompute_v0(row_count)
             else:
                 self._addr_precompute(row_count)
             # AIC waits for both AIV writes before releasing the block.
@@ -2221,8 +2246,16 @@ class MqsmlaKernel:
                 ):
                     for lane in range_constexpr(2):
                         pair = group * 2 + lane
-                        addr0 = _i64(tab, idx_row, index_base + pair * 2)
-                        addr1 = _i64(tab, idx_row, index_base + pair * 2 + 1)
+                        if const_expr(_mode == "v0"):
+                            # Load both offsets together and zero-extend each uint32.
+                            packed = tab.view(dtypes.uint64).view(
+                                tab.shape[0], tab.shape[1] // 2
+                            )[idx_row, index_base // 2 + pair]
+                            addr0 = dtypes.int64(dtypes.uint32(packed))
+                            addr1 = dtypes.int64(packed // dtypes.uint64(1 << 32))
+                        else:
+                            addr0 = _i64(tab, idx_row, index_base + pair * 2)
+                            addr1 = _i64(tab, idx_row, index_base + pair * 2 + 1)
                         if const_expr(_mode in ("local", "pipe_rows")):
                             # Widen physical rows before converting them to bytes.
                             addr0 = addr0 * row_bytes
@@ -2625,6 +2658,336 @@ class MqsmlaKernel:
             current = current + nr
         # 每个 AIV 仅消费自己的地址区，S 等待本地 MTE3 完成后才回收预处理存储。
         vec_sync_all()
+
+    @jit
+    def _addr_init_v0(self):
+        self._v0_narrow = _addr_vec_mode() == "v0"
+        self._v0_bt1 = max(64, (self._pa_bt.shape[1] + 7) // 8 * 8)
+        self._v0_bt2 = 0
+        k2 = 0
+        if const_expr(self.has_cmp):
+            self._v0_bt2 = max(64, (self._pa_bt_cmp.shape[1] + 7) // 8 * 8)
+            k2 = self._avec_k2
+        self._v0_i1 = self._v0_bt1 + self._v0_bt2
+        output_elems = _ADDR_V0_OUTPUT_ELEMS * (2 if self._v0_narrow else 1)
+        cols = self._avec_k1_tab + (self._avec_k2_tab if self.has_cmp else 0)
+        rows = min(
+            _ADDR_V0_ROWS_NARROW if self._v0_narrow else _ADDR_V0_ROWS_WIDE,
+            (_ADDR_V0_INPUT_ELEMS - self._v0_i1 - 64) // (self._avec_k1 + k2),
+            output_elems // cols,
+        )
+        w1, w2 = self._avec_k1, k2
+        if rows < 1:
+            sides = 2 if const_expr(self.has_cmp) else 1
+            window = (
+                min(
+                    (_ADDR_V0_INPUT_ELEMS - self._v0_i1 - 64) // sides,
+                    output_elems // sides,
+                )
+                // 128
+                * 128
+            )
+            w1 = min(self._avec_k1, window)
+            w2 = min(k2, window)
+        self._v0_w1, self._v0_w2 = w1, w2
+        self._v0_rows = max(1, rows)
+        self._v0_i2 = self._v0_i1 + (self._v0_rows * self._v0_w1 + 7) // 8 * 8
+        self._v0_l1 = self._v0_i2 + (self._v0_rows * self._v0_w2 + 7) // 8 * 8
+        self._v0_l2 = self._v0_l1 + 24
+        self._v0_cols = (self._v0_w1 + 127) // 128 * 128 + (
+            self._v0_w2 + 127
+        ) // 128 * 128
+        self._v0_input = RingBuffer(
+            MemLoc.UB, dtypes.int32, make_layout((1, _ADDR_V0_INPUT_ELEMS)), depth=2
+        )
+        self._v0_output = RingBuffer(
+            MemLoc.UB, dtypes.int64, make_layout((1, _ADDR_V0_OUTPUT_ELEMS)), depth=2
+        )
+
+    @jit
+    def _addr_v0_load(self, first, batch, nr, col1, col2):
+        slot = self._v0_input.next_write()
+        _copy_addr_elements_from_gm(
+            _addr_v0_view(slot, 0, self._v0_bt1),
+            self._pa_bt,
+            batch * self._pa_bt.shape[1],
+            self._pa_bt.shape[1],
+        )
+        if self._v0_w1 == self._avec_k1:
+            _copy_addr_elements_from_gm(
+                _addr_v0_view(slot, self._v0_i1, self._v0_rows * self._v0_w1),
+                self._ori_idx,
+                first * self._avec_k1,
+                nr * self._avec_k1,
+            )
+        if const_expr(self.has_cmp):
+            _copy_addr_elements_from_gm(
+                _addr_v0_view(slot, self._v0_bt1, self._v0_bt2),
+                self._pa_bt_cmp,
+                batch * self._pa_bt_cmp.shape[1],
+                self._pa_bt_cmp.shape[1],
+            )
+            if self._v0_w2 == self._avec_k2:
+                _copy_addr_elements_from_gm(
+                    _addr_v0_view(slot, self._v0_i2, self._v0_rows * self._v0_w2),
+                    self._cmp_idx,
+                    first * self._avec_k2,
+                    nr * self._avec_k2,
+                )
+        lens1 = _addr_v0_view(slot, self._v0_l1, 24)
+        lens2 = _addr_v0_view(slot, self._v0_l2, 24)
+        for row in range(nr):
+            query = first + row
+            valid = dtypes.int32(1)
+            if self._has_seqused_q != 0:
+                valid = dtypes.int32(
+                    query - _i64(self._cu_q, 0, batch) < _i64(self._seqused_q, batch)
+                )
+            n1 = (
+                max(0, min(self._v0_w1, self._ori_valid_w(query) - col1))
+                if valid != 0
+                else 0
+            )
+            lens1[0, row] = dtypes.int32(n1)
+            if self._v0_w1 != self._avec_k1 and n1 > 0:
+                count = min(self._v0_w1, self._avec_k1 - col1)
+                _copy_addr_elements_from_gm(
+                    _addr_v0_view(slot, self._v0_i1 + row * self._v0_w1, self._v0_w1),
+                    self._ori_idx,
+                    query * self._avec_k1 + col1,
+                    count,
+                )
+            if const_expr(self.has_cmp):
+                n2 = (
+                    max(0, min(self._v0_w2, self._cmp_topk_len(query) - col2))
+                    if valid != 0
+                    else 0
+                )
+                lens2[0, row] = dtypes.int32(n2)
+                if self._v0_w2 != self._avec_k2 and n2 > 0:
+                    count = min(self._v0_w2, self._avec_k2 - col2)
+                    _copy_addr_elements_from_gm(
+                        _addr_v0_view(
+                            slot, self._v0_i2 + row * self._v0_w2, self._v0_w2
+                        ),
+                        self._cmp_idx,
+                        query * self._avec_k2 + col2,
+                        count,
+                    )
+
+    @jit
+    def _addr_v0_store_offsets(
+        self,
+        out,
+        offset,
+        page,
+        in_page,
+        stride_low,
+        stride_high,
+        mask,
+        narrow,
+        row_bytes,
+    ):
+        page = rr.vreinterpret(page, dtypes.uint32)
+        row_offset = rr.vmuls(in_page, row_bytes, mask=mask)
+        if const_expr(narrow):
+            low = rr.vadd(rr.vmul(page, stride_low, mask=mask), row_offset, mask=mask)
+            rr.vstore(out, offset, low, mask)
+        else:
+            low, high = rr.vmull(page, stride_low, dtypes.uint32, mask=mask)
+            carry, low = rr.vaddco(low, row_offset, mask=mask)
+            unused, high = rr.vaddc(
+                high, rr.vmul(page, stride_high, mask=mask), carry, mask=mask
+            )
+            rr.vstore_interleave(out, offset * 2, low, high)
+
+    @jit
+    def _addr_v0_compute_side(
+        self,
+        sp,
+        lens,
+        bt,
+        out,
+        nr,
+        width,
+        cols,
+        col0,
+        page_size,
+        reciprocal,
+        page_stride_low,
+        page_stride_high,
+        narrow,
+        row_bytes,
+    ):
+        mask = rr.full_mask(elem_bits=32)
+        lane = rr.varange(0, dtypes.uint32)
+        stride_low = rr.vdups(page_stride_low, dtypes.uint32)
+        stride_high = rr.vdups(page_stride_high, dtypes.uint32)
+        use_page_shift = page_size == 128
+        for row in cannbotdsl.range(
+            dtypes.int32(0), dtypes.int32(nr), dtypes.int32(1), unroll=1
+        ):
+            length = rr.vload_broadcast(lens, row)
+            active = rr.vgts(length, 0, mask=mask)
+            last = rr.vreinterpret(
+                rr.vadds(rr.vmaxs(length, 1, mask=mask), -1, mask=mask), dtypes.uint32
+            )
+            for chunk in cannbotdsl.range(
+                dtypes.int32(0),
+                dtypes.int32((width + 127) // 128 * 2),
+                dtypes.int32(1),
+                unroll=1,
+            ):
+                column = rr.vmin(rr.vadds(lane, chunk * 64, mask=mask), last, mask=mask)
+                source = rr.vadds(column, row * width, mask=mask)
+                raw = rr.vgather(sp, source, mask=active)
+                logical = rr.vreinterpret(rr.vmaxs(raw, 0, mask=mask), dtypes.uint32)
+                page = logical
+                in_page = rr.vdups(0, dtypes.uint32, mask=mask)
+                if use_page_shift:
+                    page = rr.vshr(logical, 7, mask=mask)
+                    in_page = rr.vbitwise_and(
+                        logical,
+                        rr.vdups(128 - 1, dtypes.uint32),
+                        mask=mask,
+                    )
+                elif page_size != 1:
+                    unused, page = rr.vmull(
+                        logical,
+                        rr.vdups(reciprocal, dtypes.uint32),
+                        dtypes.uint32,
+                        mask=mask,
+                    )
+                    product = rr.vmuls(page, page_size, mask=mask)
+                    page = rr.vselect(
+                        rr.vsub(page, rr.vdups(1, dtypes.uint32), mask=mask),
+                        page,
+                        cond_mask=rr.vgt(product, logical, mask=mask),
+                    )
+                    in_page = rr.vsub(
+                        logical, rr.vmuls(page, page_size, mask=mask), mask=mask
+                    )
+                physical = rr.vgather(bt, page, mask=active)
+                self._addr_v0_store_offsets(
+                    out,
+                    row * cols + col0 + chunk * 64,
+                    physical,
+                    in_page,
+                    stride_low,
+                    stride_high,
+                    mask,
+                    narrow,
+                    row_bytes,
+                )
+
+    @jit
+    def _addr_v0_compute_store(self, first, nr, col1, col2):
+        slot = self._v0_input.next_read()
+        out = self._v0_output.next_write()
+        words = from_tensor(
+            out, dtype=dtypes.uint32, layout=make_layout((1, _ADDR_V0_OUTPUT_ELEMS * 2))
+        )
+        sp1 = _addr_v0_view(slot, self._v0_i1, self._v0_rows * self._v0_w1)
+        lens1 = _addr_v0_view(slot, self._v0_l1, 24)
+        bt1 = _addr_v0_view(slot, 0, self._v0_bt1)
+        bs1 = self._avec_bs_ori
+        stride1 = self._ori_page_stride
+        recip1 = (4294967296 + bs1 - 1) // bs1
+        if const_expr(self.has_cmp):
+            sp2 = _addr_v0_view(slot, self._v0_i2, self._v0_rows * self._v0_w2)
+            lens2 = _addr_v0_view(slot, self._v0_l2, 24)
+            bt2 = _addr_v0_view(slot, self._v0_bt1, self._v0_bt2)
+            bs2 = self._avec_bs_cmp
+            stride2 = self._cmp_page_stride
+            recip2 = (4294967296 + bs2 - 1) // bs2
+        with vf(mode="simd"):
+            self._addr_v0_compute_side(
+                sp1,
+                lens1,
+                bt1,
+                words,
+                nr,
+                self._v0_w1,
+                self._v0_cols,
+                0,
+                bs1,
+                dtypes.uint32(recip1),
+                dtypes.uint32(stride1),
+                dtypes.uint32(stride1 // 4294967296),
+                self._v0_narrow,
+                KV_ROW_BYTES_ORI,
+            )
+            if const_expr(self.has_cmp):
+                self._addr_v0_compute_side(
+                    sp2,
+                    lens2,
+                    bt2,
+                    words,
+                    nr,
+                    self._v0_w2,
+                    self._v0_cols,
+                    (self._v0_w1 + 127) // 128 * 128,
+                    bs2,
+                    dtypes.uint32(recip2),
+                    dtypes.uint32(stride2),
+                    dtypes.uint32(stride2 // 4294967296),
+                    self._v0_narrow,
+                    KV_ROW_BYTES_CMP,
+                )
+        ready = self._v0_output.next_read()
+        dtype = dtypes.uint32 if const_expr(self._v0_narrow) else dtypes.int64
+        source = from_tensor(
+            ready, dtype=dtype, layout=make_layout((nr, self._v0_cols))
+        )
+        cols = self._avec_k1_tab + (self._avec_k2_tab if self.has_cmp else 0)
+        if self._v0_w1 == self._avec_k1 and self._v0_w2 == (
+            self._avec_k2 if self.has_cmp else 0
+        ):
+            mem_copy(self._addr_tab[first : first + nr, 0:cols], source)
+        else:
+            count = min((self._v0_w1 + 127) // 128 * 128, self._avec_k1_tab - col1)
+            if count > 0:
+                mem_copy(
+                    self._addr_tab[first : first + nr, col1 : col1 + count],
+                    source[0:nr, 0:count],
+                )
+            if const_expr(self.has_cmp):
+                start = (self._v0_w1 + 127) // 128 * 128
+                count = min((self._v0_w2 + 127) // 128 * 128, self._avec_k2_tab - col2)
+                if count > 0:
+                    mem_copy(
+                        self._addr_tab[
+                            first : first + nr,
+                            self._avec_k1_tab + col2 : self._avec_k1_tab + col2 + count,
+                        ],
+                        source[0:nr, start : start + count],
+                    )
+
+    @jit
+    def _addr_precompute_v0(self, m_count):
+        # The two AIVs own query groups. AIC relays both MTE3 completions
+        # before either AIV consumes the shared narrow/wide address table.
+        worker = dtypes.int64(self.subblock_idx)
+        per, tail = m_count // 2, m_count % 2
+        current = per * worker + min(worker, tail)
+        end = current + per + (dtypes.int64(1) if worker < tail else dtypes.int64(0))
+        batch = self._batch_of(self._m_idx(current))
+        bound = self._bound_after(batch, dtypes.int64(self._b_rt))
+        while current < end:
+            first = self._m_idx(current)
+            while first >= bound:
+                batch = batch + 1
+                bound = self._bound_after(batch, dtypes.int64(self._b_rt))
+            nr = min(self._v0_rows, min(end - current, bound - first))
+            col1, col2 = dtypes.int64(0), dtypes.int64(0)
+            while col1 < self._avec_k1 or col2 < (self._avec_k2 if self.has_cmp else 0):
+                self._addr_v0_load(first, batch, nr, col1, col2)
+                self._addr_v0_compute_store(first, nr, col1, col2)
+                col1 = col1 + self._v0_w1
+                col2 = col2 + self._v0_w2
+            current = current + nr
+        vec_sync_intra_arrive(PIPE.MTE3, self._addr_bar_sid)
+        vec_sync_block_wait(PIPE.S, self._addr_bar_flag, mode=2)
 
     @jit
     def _addr_load_group(self, batch, first, nr):
@@ -4015,6 +4378,38 @@ def _run_mqsmla(
     )
 
 
+def _addr_v0_mode(ori, bt, idx, cmp, btc, idxc):
+    """Size Vec0 staging and choose byte offsets for the physical PA span."""
+    tables, span, reserve = 0, 0, 64
+    for kv, table, indices, row_bytes in (
+        (ori, bt, idx, KV_ROW_BYTES_ORI),
+        (cmp, btc, idxc, KV_ROW_BYTES_CMP),
+    ):
+        if kv is None:
+            continue
+        if table is None or indices is None:
+            return "off"
+        pages, page_size, table_width, k, page_stride = (
+            kv.shape[0],
+            kv.shape[1],
+            table.shape[1],
+            indices.shape[2],
+            kv.stride(0),
+        )
+        if not all(
+            isinstance(n, int) and n > 0
+            for n in (pages, page_size, table_width, k, page_stride)
+        ):
+            return "off"
+        tables += max(64, (table_width + 7) // 8 * 8)
+        span = max(span, (pages - 1) * page_stride + page_size * row_bytes)
+        reserve += TILE_N
+    # Leave room for the aligned length arrays and one window per live side.
+    if tables + reserve > _ADDR_V0_INPUT_ELEMS or span >= 1 << 63:
+        return "off"
+    return "v0" if span <= 1 << 32 else "v0_wide"
+
+
 def _select_addr_mode(
     ori_kv,
     ori_bt,
@@ -4026,7 +4421,7 @@ def _select_addr_mode(
     num_heads=64,
 ):
     """Select staging and address units; K/page widths remain dynamic in AOT."""
-    if ori_kv is None:
+    if ori_kv is None or layout_kv != "PA_BBND":
         return "off"
     # The local prepass avoids an AIC/AIV relay and supports wider page
     # tables and physical pools than the byte-addressed compact path.
@@ -4065,7 +4460,7 @@ def _select_addr_mode(
     ):
         return "local"
     if not _addr_vec_eligible(ori_kv, ori_bt, ori_idx, cmp_kv, cmp_bt, cmp_idx):
-        return "off"
+        return _addr_v0_mode(ori_kv, ori_bt, ori_idx, cmp_kv, cmp_bt, cmp_idx)
     compact = (
         ori_bt.shape[1] <= _ADDR_COMPACT_BT
         and ori_idx.shape[2] <= _ADDR_COMPACT_K
@@ -4158,7 +4553,16 @@ def _get_compiled_variant(
     has_ori=True,
 ):
     """Share compilation, caching and address-mode lifetime with AOT export."""
-    if addr_mode not in ("pre", "off", "arena", "pipe", "pipe_rows", "local"):
+    if addr_mode not in (
+        "pre",
+        "off",
+        "arena",
+        "pipe",
+        "pipe_rows",
+        "local",
+        "v0",
+        "v0_wide",
+    ):
         raise ValueError(f"Unsupported address mode: {addr_mode}")
     if pa_fast and layout_kv != "PA_BBND":
         raise ValueError("PA specialization cannot be used for a dense KV layout")
@@ -4166,6 +4570,8 @@ def _get_compiled_variant(
         layout_kv != "PA_BBND" or head_bucket != 64
     ):
         raise ValueError("Batched PA addressing requires full heads and PA layout")
+    if addr_mode in ("v0", "v0_wide") and (layout_kv != "PA_BBND" or pa_fast):
+        raise ValueError("Vec0 requires the generic PA layout")
     if head_bucket not in (32, 63, 64):
         raise ValueError(f"Unsupported head bucket: {head_bucket}")
     if not has_ori and (not has_cmp or addr_mode != "off" or pa_fast):
@@ -4467,7 +4873,7 @@ def _mixed_quant_sparse_flash_mla_out(
         n1,
     )
     if addr_mode != "off":
-        if addr_mode == "local":
+        if addr_mode in ("local", "v0", "v0_wide"):
             tab_width = _addr_local_tab_w
         elif addr_mode in ("pipe", "pipe_rows"):
             tab_width = _addr_pipe_tab_w
@@ -4477,9 +4883,9 @@ def _mixed_quant_sparse_flash_mla_out(
         if cmp_kv is not None:
             columns += tab_width(cmp_sparse_indices.shape[2])
         rows = q.shape[0]
-        if addr_mode in ("local", "pipe_rows"):
+        if addr_mode in ("local", "pipe_rows", "v0", "v0_wide"):
             rows += _get_cube_core_num(q.device)
-        addr_bytes = rows * columns * 4
+        addr_bytes = rows * columns * (8 if addr_mode == "v0_wide" else 4)
     # Allocate FD staging and the address table together.
     workspace_full = construct_workspace(metadata, addr_bytes)
     if addr_bytes:
@@ -4657,6 +5063,8 @@ def _variant_calls():
                         (*args, addr_mode),
                         dict(layout_kv="PA_BBND", pa_fast=True, **options),
                     )
+            for addr_mode in ("v0", "v0_wide"):
+                yield (*args, addr_mode), dict(layout_kv="PA_BBND", **options)
             if head_bucket == 64:
                 yield (*args, "pipe"), dict(layout_kv="PA_BBND", **options)
                 yield (*args, "pipe_rows"), dict(layout_kv="PA_BBND", **options)
