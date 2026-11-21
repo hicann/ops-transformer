@@ -89,6 +89,7 @@ constexpr uint32_t HCOMM_SGE_BYTES = 16U;
 constexpr uint32_t HCOMM_SQE_BYTES = 48U;
 constexpr uint32_t HCOMM_WQE_BYTES = 64U;
 constexpr struct UrmaWqeEntry DATA_CFG = {.odr = 5, .fence = 1, .se = 0, .cqe = 0, .inlineEn = 0};
+constexpr struct UrmaWqeEntry LAST_DATA_CFG = {.odr = 5, .fence = 1, .se = 0, .cqe = 1, .inlineEn = 0};
 constexpr struct UrmaWqeEntry NOTIFY_CFG = {.odr = 6, .fence = 1, .se = 0, .cqe = 0, .inlineEn = 0};
 
 template <TemplateMoeEpDispatchTypeClass>
@@ -1275,7 +1276,12 @@ __aicore__ inline void MoeEpDispatch<TemplateMoeEpDispatchTypeFunc>::SendTokenBy
                 localDescs[j + 1].addr = metaStashAddr;
                 srcIdx++;
             }
-            hcomm_.WriteNbi<DATA_CFG>(batchHandle, remoteWinAddr, localDescs, sgePerSqe);
+            // 最后一批 token 的末笔写生成 CQE，epilogue 末尾等待发送完成
+            if (processed + batchCnt == tokenNum && i + 1U == batchGroup) {
+                hcomm_.WriteNbi<LAST_DATA_CFG>(batchHandle, remoteWinAddr, localDescs, sgePerSqe);
+            } else {
+                hcomm_.WriteNbi<DATA_CFG>(batchHandle, remoteWinAddr, localDescs, sgePerSqe);
+            }
             commCnt++;
             if (commCnt == HCOMM_BATCH_CAPACITY) {
                 hcomm_.BatchCommit(batchHandle);
