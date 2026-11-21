@@ -273,6 +273,7 @@ aclnnStatus aclnnMoeTokenUnpermuteGrad(
 <!-- end id7 -->
 <!-- npu="950" id8 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
+  当 `probsOptional` 为 `nullptr` 时，`permuteTokensOptional` 可以为 `nullptr`。传入 `probsOptional` 时，必须同时传入 `permuteTokensOptional`。
   在调用本接口时，框架内部会转调用[aclnnMoeFinalizeRoutingV2Grad](../../moe_finalize_routing_v2_grad/docs/aclnnMoeFinalizeRoutingV2Grad.md)接口，如果出现参数错误提示，请参考以下参数映射关系：
   - permuteTokensOptional输入等同于aclnnMoeFinalizeRoutingV2Grad接口的expandedXOptional输入。
   - unpermutedTokensGrad输入等同于aclnnMoeFinalizeRoutingV2Grad接口的gradY输入。

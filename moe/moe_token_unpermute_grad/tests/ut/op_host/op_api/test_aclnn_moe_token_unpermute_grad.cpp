@@ -125,18 +125,32 @@ TEST_F(l2_moe_token_unpermute_grad_test, Ascend950_moe_token_unpermute_grad_with
     EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
 }
 
-TEST_F(l2_moe_token_unpermute_grad_test, Ascend950_moe_token_unpermute_grad_permute_tokens_nullptr)
+TEST_F(l2_moe_token_unpermute_grad_test, Ascend950_moe_token_unpermute_grad_both_optional_inputs_nullptr)
+{
+    auto unpermutedTokensGrad = TensorDesc({4, 32}, ACL_FLOAT, ACL_FORMAT_ND);
+    auto sortedIndices = TensorDesc({4}, ACL_INT32, ACL_FORMAT_ND);
+    auto permutedTokensGradOut = TensorDesc({4, 32}, ACL_FLOAT, ACL_FORMAT_ND);
+    auto probsGradOut = TensorDesc({4, 1}, ACL_FLOAT, ACL_FORMAT_ND);
+
+    auto ut = OP_API_UT(aclnnMoeTokenUnpermuteGrad,
+                        INPUT(nullptr, unpermutedTokensGrad, sortedIndices, nullptr, false, nullptr),
+                        OUTPUT(permutedTokensGradOut, probsGradOut));
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+    aclnnStatus getWorkspaceResult = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
+    EXPECT_EQ(getWorkspaceResult, ACLNN_SUCCESS);
+}
+
+TEST_F(l2_moe_token_unpermute_grad_test, Ascend950_moe_token_unpermute_grad_permute_tokens_nullptr_with_probs)
 {
     auto unpermutedTokensGrad = TensorDesc({2, 5}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-10, 10);
     auto sortedIndices = TensorDesc({6}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 2);
+    auto probsOptional = TensorDesc({2, 3}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(0, 1);
     auto permutedTokensGradOut = TensorDesc({6, 5}, ACL_FLOAT16, ACL_FORMAT_ND);
-    auto probsGradOut = TensorDesc({6}, ACL_FLOAT16, ACL_FORMAT_ND);
-    bool paddedMode = false;
-    std::vector<int64_t> restoreShape = {2, 5};
-    auto restoreShapeOptional = aclCreateIntArray(restoreShape.data(), restoreShape.size());
+    auto probsGradOut = TensorDesc({2, 3}, ACL_FLOAT16, ACL_FORMAT_ND);
 
     auto ut = OP_API_UT(aclnnMoeTokenUnpermuteGrad,
-                        INPUT(nullptr, unpermutedTokensGrad, sortedIndices, nullptr, paddedMode, restoreShapeOptional),
+                        INPUT(nullptr, unpermutedTokensGrad, sortedIndices, probsOptional, false, nullptr),
                         OUTPUT(permutedTokensGradOut, probsGradOut));
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor = nullptr;

@@ -36,9 +36,11 @@ static const std::initializer_list<op::DataType> MOE_GRAD_DTYPE_SUPPORT_LIST_ROW
 
 static inline bool CheckNotNull(const aclTensor* unpermutedTokensGrad, const aclTensor* sortedIndices,
                                 const aclTensor* permutedTokensGradOut, const aclTensor* probsGradOut,
-                                const aclTensor* permuteTokens)
+                                const aclTensor* permuteTokens, const aclTensor* probsOptional)
 {
-    OP_CHECK_NULL(permuteTokens, return false);
+    if (probsOptional != nullptr) {
+        OP_CHECK_NULL(permuteTokens, return false);
+    }
     OP_CHECK_NULL(unpermutedTokensGrad, return false);
     OP_CHECK_NULL(sortedIndices, return false);
     OP_CHECK_NULL(permutedTokensGradOut, return false);
@@ -146,7 +148,7 @@ static bool CheckInputShape(const aclTensor* unpermutedTokensGrad, const aclTens
                                                       std::to_string(indicesRank), "Expected a 1D tensor"),
              return false);
     const int64_t indexCount = indicesShape.GetDim(0);
-    return CheckPermuteTokensShape(permuteTokens, indexCount, hiddenSize) &&
+    return (permuteTokens == nullptr || CheckPermuteTokensShape(permuteTokens, indexCount, hiddenSize)) &&
            CheckProbsShapeAndIndexCount(probsOptional, rows, indexCount);
 }
 
@@ -154,7 +156,8 @@ static aclnnStatus CheckParams(const aclTensor* unpermutedTokensGrad, const aclT
                                const aclTensor* permuteTokens, const aclTensor* probsOptional,
                                const aclTensor* permutedTokensGradOut, const aclTensor* probsGradOut)
 {
-    CHECK_RET(CheckNotNull(unpermutedTokensGrad, sortedIndices, permutedTokensGradOut, probsGradOut, permuteTokens),
+    CHECK_RET(CheckNotNull(unpermutedTokensGrad, sortedIndices, permutedTokensGradOut, probsGradOut, permuteTokens,
+                           probsOptional),
               ACLNN_ERR_PARAM_NULLPTR);
     CHECK_RET(CheckDtypeValid(unpermutedTokensGrad, sortedIndices, permuteTokens, probsOptional, permutedTokensGradOut,
                               probsGradOut),
@@ -209,8 +212,11 @@ aclnnStatus aclnnMoeTokenUnpermuteGradGetWorkspaceSize(const aclTensor* permuteT
     auto sortedIndicesContiguous = l0op::Contiguous(sortedIndices, uniqueExecutor.get());
     CHECK_RET(sortedIndicesContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    const aclTensor* permuteTokensContiguous = l0op::Contiguous(permuteTokensOptional, uniqueExecutor.get());
-    CHECK_RET(permuteTokensContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    const aclTensor* permuteTokensContiguous = nullptr;
+    if (permuteTokensOptional != nullptr) {
+        permuteTokensContiguous = l0op::Contiguous(permuteTokensOptional, uniqueExecutor.get());
+        CHECK_RET(permuteTokensContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    }
 
     const aclTensor* probsContiguous = nullptr;
     if (probsOptional != nullptr) {

@@ -62,7 +62,7 @@ Each operator uses a [two-phase API](../../../docs/en/context/two_phase_api.md).
 
 ```c++
 aclnnStatus aclnnMoeTokenUnpermuteGradGetWorkspaceSize(
-  const aclTensor   *permutedTokensOptional,
+  const aclTensor   *permuteTokensOptional,
   const aclTensor   *unpermutedTokensGrad,
   const aclTensor   *sortedIndices,
   const aclTensor   *probsOptional,
@@ -109,7 +109,7 @@ aclnnStatus aclnnMoeTokenUnpermuteGrad(
     </tr></thead>
   <tbody>
     <tr>
-      <td>permutedTokensOptional(aclTensor)</td>
+      <td>permuteTokensOptional(aclTensor)</td>
       <td>Input</td>
       <td>Indicates input tokens.</td>
       <td>-</td>
@@ -275,8 +275,9 @@ aclnnStatus aclnnMoeTokenUnpermuteGrad(
 <!-- end id7 -->
 <!-- npu="950" id8 -->
 - <term>Ascend 950PR&950DT products</term>:
+  `permuteTokensOptional` may be `nullptr` when `probsOptional` is `nullptr`. When you provide `probsOptional`, you must also provide `permuteTokensOptional`.
   When this API is called, the framework internally calls [aclnnMoeFinalizeRoutingV2Grad](../../moe_finalize_routing_v2_grad/docs/aclnnMoeFinalizeRoutingV2Grad_en.md). If a parameter error occurs, refer to the following parameter mappings:
-  - permutedTokensOptional input is equivalent to the expandedXOptional input of the aclnnMoeFinalizeRoutingV2Grad API.
+  - permuteTokensOptional input is equivalent to the expandedXOptional input of the aclnnMoeFinalizeRoutingV2Grad API.
   - The unpermutedTokensGrad input is equivalent to the gradY input of the aclnnMoeFinalizeRoutingV2Grad API.
   - The sortedIndices input is equivalent to the expandedRowIdx input of the aclnnMoeFinalizeRoutingV2Grad API.
   - The probsOptional input is equivalent to the scalesOptional input of the aclnnMoeFinalizeRoutingV2Grad API.
