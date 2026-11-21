@@ -667,7 +667,17 @@ ge::graphStatus RopeGradRegBaseTilingClass::SetTilingKeyBlockDim(uint32_t dxTili
     if (rotaryMode_ == RotaryPosEmbeddingMode::DEEPSEEK_INTERLEAVE) {
         usrWorkSpaceSize = usrWorkSpaceSize * INPUT_OUTPUT_NUM; // 需要两块workspace大小
     }
-    workspaces[0] = workspaces[0] + usrWorkSpaceSize;
+    size_t sysWorkSpaceSize = 0;
+    if (dCosFlag_ == 1) {
+        // kernel 的 dcos/dsin 分支用 AscendC::GetUserWorkspace 取用户 workspace（= 系统 workspace + 平台预留），
+        // 不能只依赖 reduce tiling 写入的 base：普通 reduce 场景 base 已降为 32B（opbase 消除 16M 分配），
+        // 会少分配平台预留空间，用户 workspace 指针越界，触发 507035 / MTE invalid GM。
+        auto platformInfo = context_->GetPlatformInfo();
+        if (platformInfo != nullptr) {
+            sysWorkSpaceSize = platform_ascendc::PlatformAscendC(platformInfo).GetLibApiWorkSpaceSize();
+        }
+    }
+    workspaces[0] = std::max(workspaces[0], sysWorkSpaceSize) + usrWorkSpaceSize;
     if (dCosFlag_ == 1) {
         context_->SetScheduleMode(1); // 设置为batch mode模式，所有核同时启动
     }
