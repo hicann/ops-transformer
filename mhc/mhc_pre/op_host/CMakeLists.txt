@@ -13,18 +13,9 @@ if (BUILD_OPEN_PROJECT)
         mhc_pre_def.cpp
     )
 
-    add_ops_compile_options(
-        OP_NAME MhcPre
-        COMPUTE_UNIT Ascend950PR_9599
-        OPTIONS -DMHC_PRE_ENABLE_ASCEND950=1
-    )
-
+    set(_mhc_pre_950_compile_options -DMHC_PRE_ENABLE_ASCEND950=1)
     if("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend950")
-        add_ops_compile_options(
-            OP_NAME MhcPre
-            COMPUTE_UNIT Ascend950PR_9599
-            OPTIONS -mllvm -cce-aicore-dcci-before-kernel-end=false
-        )
+        list(APPEND _mhc_pre_950_compile_options -mllvm -cce-aicore-dcci-before-kernel-end=false)
     elseif("${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend350")
         add_ops_compile_options(
             OP_NAME MhcPre
@@ -39,6 +30,13 @@ if (BUILD_OPEN_PROJECT)
                     -Werror
         )
     endif()
+
+    # The option parser keeps only the last entry for an operator and SoC.
+    add_ops_compile_options(
+        OP_NAME MhcPre
+        COMPUTE_UNIT Ascend950PR_9599
+        OPTIONS ${_mhc_pre_950_compile_options}
+    )
 endif()
 
 if(NOT BUILD_OPS_RTY_KERNEL)
