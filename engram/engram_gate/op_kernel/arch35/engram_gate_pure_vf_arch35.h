@@ -16,6 +16,59 @@
 #define ENGRAM_GATE_PURE_VF_ARCH35_H
 #include "engram_gate_arch35.h"
 namespace EngramGateOps {
+// Preserve both multiplication roundings and the addition rounding for one
+// vector lane. The accumulator and its low-part channel are updated together;
+// callers provide independent channels to hide the loop-carried dependency.
+__simd_callee__ inline void AccumulateCompensatedDot(RegTensor<float>& acc, RegTensor<float>& error,
+                                                     RegTensor<float>& x, RegTensor<float>& w, RegTensor<float>& k,
+                                                     RegTensor<float>& t, RegTensor<float>& productError,
+                                                     RegTensor<float>& product, RegTensor<float>& productLow,
+                                                     RegTensor<float>& next, RegTensor<float>& delta,
+                                                     RegTensor<float>& aLow, MaskReg& mask)
+{
+    // Residual of t = x * w.
+    Muls(productError, t, -1.0F, mask);
+    MulAddDst(productError, x, w, mask);
+    // Residual of product = t * k, including the error propagated from t.
+    Mul(product, t, k, mask);
+    Muls(productLow, product, -1.0F, mask);
+    MulAddDst(productLow, t, k, mask);
+    MulAddDst(productLow, productError, k, mask);
+
+    // TwoSum(acc, product): the accumulator carries the rounded sum while the
+    // low-part channel carries both the addition residual and product residual.
+    Add(next, acc, product, mask);
+    Sub(delta, next, acc, mask);
+    Sub(aLow, next, delta, mask);
+    Sub(aLow, acc, aLow, mask);
+    // Reuse product as bLow after the rounded product has been consumed.
+    Sub(product, product, delta, mask);
+    Add(aLow, aLow, product, mask);
+    Add(aLow, aLow, productLow, mask);
+    Add(error, error, aLow, mask);
+    acc = next;
+}
+
+// TwoSum merge of two compensated channels: acc/error absorbs otherAcc/
+// otherError along with the rounding residual of the high-part addition, so
+// cross-channel cancellation cannot drop low-order terms before the final
+// split reduction.
+__simd_callee__ inline void MergeCompensatedChannel(RegTensor<float>& acc, RegTensor<float>& error,
+                                                    RegTensor<float>& otherAcc, RegTensor<float>& otherError,
+                                                    RegTensor<float>& next, RegTensor<float>& delta,
+                                                    RegTensor<float>& low, MaskReg& mask)
+{
+    Add(next, acc, otherAcc, mask);
+    Sub(delta, next, acc, mask);
+    Sub(low, next, delta, mask);
+    Sub(low, acc, low, mask);
+    Sub(otherAcc, otherAcc, delta, mask);
+    Add(low, low, otherAcc, mask);
+    Add(error, error, otherError, mask);
+    Add(error, error, low, mask);
+    acc = next;
+}
+
 template <typename TIn, typename TOut, int32_t HEADS, bool SAVE>
 __simd_vf__ inline void EngramGatePureFullRowVF(__ubuf__ TOut* outUb, __ubuf__ TIn* xUb, __ubuf__ TIn* kUb,
                                                 __ubuf__ TIn* vUb, __ubuf__ float* wUb, __ubuf__ float* dotUb,
@@ -31,7 +84,6 @@ __simd_vf__ inline void EngramGatePureFullRowVF(__ubuf__ TOut* outUb, __ubuf__ T
     MaskReg fullMask = CreateMask<float, MaskPattern::ALL>();
     MaskReg lane0Mask = CreateMask<float, MaskPattern::VL1>();
 
-    RegTensor<float> dAcc; // sum(xwk)
     RegTensor<float> xAccA;
     RegTensor<float> xAccB;
     RegTensor<float> kAccA;
@@ -40,17 +92,20 @@ __simd_vf__ inline void EngramGatePureFullRowVF(__ubuf__ TOut* outUb, __ubuf__ T
     RegTensor<float> dAccB;
     RegTensor<float> dAccC;
     RegTensor<float> dAccD;
-    RegTensor<float> dAccE;
-    RegTensor<float> dAccF;
-    RegTensor<float> dAccG;
-    RegTensor<float> dAccH;
+    RegTensor<float> dErrA;
+    RegTensor<float> dErrB;
+    RegTensor<float> dErrC;
+    RegTensor<float> dErrD;
     RegTensor<float> x;
     RegTensor<float> w;
     RegTensor<float> k;
     RegTensor<float> t;
+    RegTensor<float> dotProductError;
     RegTensor<float> dotProduct;
-    RegTensor<float> dotPositive;
-    RegTensor<float> dotNegative;
+    RegTensor<float> dotProductLow;
+    RegTensor<float> dotNext;
+    RegTensor<float> dotDelta;
+    RegTensor<float> dotLow;
     RegTensor<float> zero;
     RegTensor<float> sumX;
     RegTensor<float> sumK;
@@ -87,10 +142,10 @@ __simd_vf__ inline void EngramGatePureFullRowVF(__ubuf__ TOut* outUb, __ubuf__ T
             Duplicate(dAccB, 0.0F, fullMask);
             Duplicate(dAccC, 0.0F, fullMask);
             Duplicate(dAccD, 0.0F, fullMask);
-            Duplicate(dAccE, 0.0F, fullMask);
-            Duplicate(dAccF, 0.0F, fullMask);
-            Duplicate(dAccG, 0.0F, fullMask);
-            Duplicate(dAccH, 0.0F, fullMask);
+            Duplicate(dErrA, 0.0F, fullMask);
+            Duplicate(dErrB, 0.0F, fullMask);
+            Duplicate(dErrC, 0.0F, fullMask);
+            Duplicate(dErrD, 0.0F, fullMask);
             Duplicate(signMask, 0x80000000U, lane0Mask);
             const uint16_t numVec8 = static_cast<uint16_t>(numFull & 0xFFF8U);
             const uint32_t headBase = h * stride;
@@ -104,11 +159,8 @@ __simd_vf__ inline void EngramGatePureFullRowVF(__ubuf__ TOut* outUb, __ubuf__ T
                 MulAddDst(xAccA, x, x, fullMask);
                 MulAddDst(kAccA, k, k, fullMask);
                 Mul(t, x, w, fullMask);
-                Mul(dotProduct, t, k, fullMask);
-                Max(dotPositive, dotProduct, zero, fullMask);
-                Min(dotNegative, dotProduct, zero, fullMask);
-                Add(dAccA, dAccA, dotPositive, fullMask);
-                Add(dAccE, dAccE, dotNegative, fullMask);
+                AccumulateCompensatedDot(dAccA, dErrA, x, w, k, t, dotProductError, dotProduct, dotProductLow, dotNext,
+                                         dotDelta, dotLow, fullMask);
 
                 const uint32_t off1 = headBase + static_cast<uint32_t>(seg + 1U) * VL;
                 LoadAlign<TIn, LoadDist::DIST_UNPACK_B16>(xBf, xUb + off1);
@@ -119,11 +171,8 @@ __simd_vf__ inline void EngramGatePureFullRowVF(__ubuf__ TOut* outUb, __ubuf__ T
                 MulAddDst(xAccB, x, x, fullMask);
                 MulAddDst(kAccB, k, k, fullMask);
                 Mul(t, x, w, fullMask);
-                Mul(dotProduct, t, k, fullMask);
-                Max(dotPositive, dotProduct, zero, fullMask);
-                Min(dotNegative, dotProduct, zero, fullMask);
-                Add(dAccB, dAccB, dotPositive, fullMask);
-                Add(dAccF, dAccF, dotNegative, fullMask);
+                AccumulateCompensatedDot(dAccB, dErrB, x, w, k, t, dotProductError, dotProduct, dotProductLow, dotNext,
+                                         dotDelta, dotLow, fullMask);
 
                 const uint32_t off2 = headBase + static_cast<uint32_t>(seg + 2U) * VL;
                 LoadAlign<TIn, LoadDist::DIST_UNPACK_B16>(xBf, xUb + off2);
@@ -134,11 +183,8 @@ __simd_vf__ inline void EngramGatePureFullRowVF(__ubuf__ TOut* outUb, __ubuf__ T
                 MulAddDst(xAccA, x, x, fullMask);
                 MulAddDst(kAccA, k, k, fullMask);
                 Mul(t, x, w, fullMask);
-                Mul(dotProduct, t, k, fullMask);
-                Max(dotPositive, dotProduct, zero, fullMask);
-                Min(dotNegative, dotProduct, zero, fullMask);
-                Add(dAccC, dAccC, dotPositive, fullMask);
-                Add(dAccG, dAccG, dotNegative, fullMask);
+                AccumulateCompensatedDot(dAccC, dErrC, x, w, k, t, dotProductError, dotProduct, dotProductLow, dotNext,
+                                         dotDelta, dotLow, fullMask);
 
                 const uint32_t off3 = headBase + static_cast<uint32_t>(seg + 3U) * VL;
                 LoadAlign<TIn, LoadDist::DIST_UNPACK_B16>(xBf, xUb + off3);
@@ -149,11 +195,8 @@ __simd_vf__ inline void EngramGatePureFullRowVF(__ubuf__ TOut* outUb, __ubuf__ T
                 MulAddDst(xAccB, x, x, fullMask);
                 MulAddDst(kAccB, k, k, fullMask);
                 Mul(t, x, w, fullMask);
-                Mul(dotProduct, t, k, fullMask);
-                Max(dotPositive, dotProduct, zero, fullMask);
-                Min(dotNegative, dotProduct, zero, fullMask);
-                Add(dAccD, dAccD, dotPositive, fullMask);
-                Add(dAccH, dAccH, dotNegative, fullMask);
+                AccumulateCompensatedDot(dAccD, dErrD, x, w, k, t, dotProductError, dotProduct, dotProductLow, dotNext,
+                                         dotDelta, dotLow, fullMask);
 
                 const uint32_t off4 = headBase + static_cast<uint32_t>(seg + 4U) * VL;
                 LoadAlign<TIn, LoadDist::DIST_UNPACK_B16>(xBf, xUb + off4);
@@ -164,11 +207,8 @@ __simd_vf__ inline void EngramGatePureFullRowVF(__ubuf__ TOut* outUb, __ubuf__ T
                 MulAddDst(xAccA, x, x, fullMask);
                 MulAddDst(kAccA, k, k, fullMask);
                 Mul(t, x, w, fullMask);
-                Mul(dotProduct, t, k, fullMask);
-                Max(dotPositive, dotProduct, zero, fullMask);
-                Min(dotNegative, dotProduct, zero, fullMask);
-                Add(dAccA, dAccA, dotPositive, fullMask);
-                Add(dAccE, dAccE, dotNegative, fullMask);
+                AccumulateCompensatedDot(dAccA, dErrA, x, w, k, t, dotProductError, dotProduct, dotProductLow, dotNext,
+                                         dotDelta, dotLow, fullMask);
 
                 const uint32_t off5 = headBase + static_cast<uint32_t>(seg + 5U) * VL;
                 LoadAlign<TIn, LoadDist::DIST_UNPACK_B16>(xBf, xUb + off5);
@@ -179,11 +219,8 @@ __simd_vf__ inline void EngramGatePureFullRowVF(__ubuf__ TOut* outUb, __ubuf__ T
                 MulAddDst(xAccB, x, x, fullMask);
                 MulAddDst(kAccB, k, k, fullMask);
                 Mul(t, x, w, fullMask);
-                Mul(dotProduct, t, k, fullMask);
-                Max(dotPositive, dotProduct, zero, fullMask);
-                Min(dotNegative, dotProduct, zero, fullMask);
-                Add(dAccB, dAccB, dotPositive, fullMask);
-                Add(dAccF, dAccF, dotNegative, fullMask);
+                AccumulateCompensatedDot(dAccB, dErrB, x, w, k, t, dotProductError, dotProduct, dotProductLow, dotNext,
+                                         dotDelta, dotLow, fullMask);
 
                 const uint32_t off6 = headBase + static_cast<uint32_t>(seg + 6U) * VL;
                 LoadAlign<TIn, LoadDist::DIST_UNPACK_B16>(xBf, xUb + off6);
@@ -194,11 +231,8 @@ __simd_vf__ inline void EngramGatePureFullRowVF(__ubuf__ TOut* outUb, __ubuf__ T
                 MulAddDst(xAccA, x, x, fullMask);
                 MulAddDst(kAccA, k, k, fullMask);
                 Mul(t, x, w, fullMask);
-                Mul(dotProduct, t, k, fullMask);
-                Max(dotPositive, dotProduct, zero, fullMask);
-                Min(dotNegative, dotProduct, zero, fullMask);
-                Add(dAccC, dAccC, dotPositive, fullMask);
-                Add(dAccG, dAccG, dotNegative, fullMask);
+                AccumulateCompensatedDot(dAccC, dErrC, x, w, k, t, dotProductError, dotProduct, dotProductLow, dotNext,
+                                         dotDelta, dotLow, fullMask);
 
                 const uint32_t off7 = headBase + static_cast<uint32_t>(seg + 7U) * VL;
                 LoadAlign<TIn, LoadDist::DIST_UNPACK_B16>(xBf, xUb + off7);
@@ -209,11 +243,8 @@ __simd_vf__ inline void EngramGatePureFullRowVF(__ubuf__ TOut* outUb, __ubuf__ T
                 MulAddDst(xAccB, x, x, fullMask);
                 MulAddDst(kAccB, k, k, fullMask);
                 Mul(t, x, w, fullMask);
-                Mul(dotProduct, t, k, fullMask);
-                Max(dotPositive, dotProduct, zero, fullMask);
-                Min(dotNegative, dotProduct, zero, fullMask);
-                Add(dAccD, dAccD, dotPositive, fullMask);
-                Add(dAccH, dAccH, dotNegative, fullMask);
+                AccumulateCompensatedDot(dAccD, dErrD, x, w, k, t, dotProductError, dotProduct, dotProductLow, dotNext,
+                                         dotDelta, dotLow, fullMask);
             }
 
             for (uint16_t seg = numVec8; seg < numFull; ++seg) {
@@ -226,11 +257,8 @@ __simd_vf__ inline void EngramGatePureFullRowVF(__ubuf__ TOut* outUb, __ubuf__ T
                 MulAddDst(xAccA, x, x, fullMask);
                 MulAddDst(kAccA, k, k, fullMask);
                 Mul(t, x, w, fullMask);
-                Mul(dotProduct, t, k, fullMask);
-                Max(dotPositive, dotProduct, zero, fullMask);
-                Min(dotNegative, dotProduct, zero, fullMask);
-                Add(dAccA, dAccA, dotPositive, fullMask);
-                Add(dAccE, dAccE, dotNegative, fullMask);
+                AccumulateCompensatedDot(dAccA, dErrA, x, w, k, t, dotProductError, dotProduct, dotProductLow, dotNext,
+                                         dotDelta, dotLow, fullMask);
             }
 
             Add(xAccA, xAccA, xAccB, fullMask);
@@ -241,38 +269,28 @@ __simd_vf__ inline void EngramGatePureFullRowVF(__ubuf__ TOut* outUb, __ubuf__ T
             RegTensor<uint32_t> dotHighBits;
             Duplicate(mantissaMask, 0xFFFFF000U, fullMask);
 
-            // Merge same-sign channels first. Positive and negative products
-            // are split independently so near-zero rows never discard the low
-            // component while the opposite-sign sums cancel.
-            Add(dAccA, dAccA, dAccB, fullMask);
-            Add(dAccC, dAccC, dAccD, fullMask);
-            Add(dAccE, dAccE, dAccF, fullMask);
-            Add(dAccG, dAccG, dAccH, fullMask);
-            Add(dAccA, dAccA, dAccC, fullMask);
-            Add(dAccE, dAccE, dAccG, fullMask);
+            // Merge the four compensated accumulators and their low parts as
+            // binary trees. Each high-part merge keeps its rounding residual in
+            // the error channel, so cross-channel cancellation cannot drop
+            // low-order terms before the final split reduction.
+            MergeCompensatedChannel(dAccA, dErrA, dAccB, dErrB, dotNext, dotDelta, dotLow, fullMask);
+            MergeCompensatedChannel(dAccC, dErrC, dAccD, dErrD, dotNext, dotDelta, dotLow, fullMask);
+            MergeCompensatedChannel(dAccA, dErrA, dAccC, dErrC, dotNext, dotDelta, dotLow, fullMask);
 
-            RegTensor<float> lowPositive = dAccA;
-            RegTensor<float> lowNegative = dAccE;
-            And(dotHighBits, (RegTensor<uint32_t>&)lowPositive, mantissaMask, fullMask);
+            RegTensor<float> low = dAccA;
+            And(dotHighBits, (RegTensor<uint32_t>&)low, mantissaMask, fullMask);
             dAccA = (RegTensor<float>&)dotHighBits;
-            Sub(lowPositive, lowPositive, dAccA, fullMask);
-            And(dotHighBits, (RegTensor<uint32_t>&)lowNegative, mantissaMask, fullMask);
-            dAccE = (RegTensor<float>&)dotHighBits;
-            Sub(lowNegative, lowNegative, dAccE, fullMask);
+            Sub(low, low, dAccA, fullMask);
+            Add(low, low, dErrA, fullMask);
             // Inf - Inf has no finite low part. Keep the high Inf (or NaN)
             // and discard only the NaN introduced by the low-part subtraction.
             MaskReg validLow;
-            Compare<float, CMPMODE::EQ>(validLow, lowPositive, lowPositive, fullMask);
-            Select(lowPositive, lowPositive, zero, validLow);
-            Compare<float, CMPMODE::EQ>(validLow, lowNegative, lowNegative, fullMask);
-            Select(lowNegative, lowNegative, zero, validLow);
-            Add(dAcc, dAccA, dAccE, fullMask);
-            RegTensor<float> lowA;
-            Add(lowA, lowPositive, lowNegative, fullMask);
+            Compare<float, CMPMODE::EQ>(validLow, low, low, fullMask);
+            Select(low, low, zero, validLow);
             RegTensor<float> highSum;
             RegTensor<float> lowSum;
-            ReduceSum(highSum, dAcc, fullMask);
-            ReduceSum(lowSum, lowA, fullMask);
+            ReduceSum(highSum, dAccA, fullMask);
+            ReduceSum(lowSum, low, fullMask);
             Add(sumD, highSum, lowSum, lane0Mask);
 
             // ---- finalize (lane0, 与 EngramGateFinalizeVF 同构, 寄存器直通) ----

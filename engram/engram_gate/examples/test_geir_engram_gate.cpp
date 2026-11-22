@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 #include <cmath>
+#include <cstdlib>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
@@ -161,8 +162,14 @@ void RunCase(ge::Session& session, uint32_t id, int64_t heads, int64_t dim, ge::
 
 int main()
 {
-    const std::map<ge::AscendString, ge::AscendString> options = {
+    std::map<ge::AscendString, ge::AscendString> options = {
         {"ge.exec.deviceId", "0"}, {"ge.graphRunMode", "1"}, {"ge.jit_compile", "0"}};
+    // Reuse the test-kit fusion switch so platform-specific built-in passes
+    // cannot fail while lowering this standalone custom-op graph.
+    const char* fusionSwitchFile = std::getenv("TTK_GE_FUSION_SWITCH_FILE");
+    if (fusionSwitchFile != nullptr && fusionSwitchFile[0] != '\0') {
+        options["ge.fusionSwitchFile"] = fusionSwitchFile;
+    }
     if (ge::GEInitialize(options) != ge::SUCCESS) {
         std::cerr << "GEInitialize failed: " << ge::GEGetErrorMsgV2().GetString() << '\n';
         return 1;
