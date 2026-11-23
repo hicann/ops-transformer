@@ -30,7 +30,7 @@
   $$
 
   未传入`initial_state`时，$H_0$为零。启用归一化时，Q/K按最后一维进行L2归一化；GQA按连续分组将value head映射到对应的Q/K head。
-- 实现说明：以64个token为一个chunk组织计算，Host根据有效序列长度、head数和设备核数选择staged或persistent调度。状态递推使用FLOAT32，矩阵计算使用BFLOAT16。`flash_kda`返回三项结果，`flash_kda_fwd`额外提供训练反向需要的缓存。
+- 实现说明：以64个token为一个chunk组织计算，Host根据有效序列长度、head数和设备核数选择staged或persistent调度。状态递推使用FLOAT32，矩阵计算使用BFLOAT16。`flash_kda`返回前向输出、可选的最终状态和分块入口状态。
 
 ## 参数说明
 
@@ -49,7 +49,7 @@
 | dt_bias | 可选输入 | gate偏置，形状为`(Nv,128)`或`(Nv*128,)`；默认`None`，按零偏置处理。 | FLOAT32 | ND |
 | cu_seqlens | 可选输入 | 序列长度的累积和，形状为`(B+1,)`；默认`None`，TND布局下必传。 | INT32 | ND |
 | cu_seqlens_cpu | 可选输入 | 保留参数，当前仅支持默认值`None`。 | INT列表 | - |
-| seqused | 可选输入 | 每条序列参与计算的有效长度，形状为`(B,)`；默认`None`，使用存储范围内的完整序列。 | INT32 | ND |
+| seqused | 可选输入 | 每条序列参与计算的有效长度，形状为`(B,)`；默认`None`，使用`cu_seqlens`指定的长度；两者均未传入时使用存储长度`S`。 | INT32 | ND |
 | scale | 可选属性 | 输出缩放系数，默认`128**(-0.5)`；支持有限数值或`None`，`None`使用默认缩放。 | FLOAT | - |
 | output_final_state | 可选属性 | 是否返回最终状态，取`True`或`False`，默认`False`。 | BOOL | - |
 | return_intermediate_states | 可选属性 | 推理时是否返回chunk入口状态，取`True`或`False`，默认`False`。 | BOOL | - |
@@ -76,20 +76,21 @@
 
 - `B`、`S`或`T`为正数；head数满足`1 <= Nqk <= Nv <= 96`且`Nv % Nqk == 0`，Q/K和V的head维度均为128。
 - 输入张量须连续。实际计算在NPU上执行，Meta张量仅用于输出规格推导。
-- TND布局中，`cu_seqlens`从0开始、单调不减，末项等于`T`。定长布局中若提供`cu_seqlens`，相邻差值不超过`S`。`seqused`取非负值，不能超过对应序列的存储长度。
+- TND布局中，`cu_seqlens`从0开始、严格递增，末项等于`T`。定长布局中若提供`cu_seqlens`，相邻差值必须大于0且不超过`S`。`seqused`必须大于0且不超过存储长度；与`cu_seqlens`同时提供时，须等于对应的相邻差值。
 - metadata必须与本次调用的布局、存储维度、head数及有效长度一致；输入规格或长度改变后需要重新生成。
-- 训练或推理由`torch.is_inference_mode_enabled()`决定。使用`torch.inference_mode()`进入推理；`torch.no_grad()`仍采用训练输出协议。`flash_kda_fwd`的缓存与返回条件见[PyTorch接口说明](torch_extension/README.md)。
+- 训练或推理由`torch.is_inference_mode_enabled()`决定。使用`torch.inference_mode()`进入推理；`torch.no_grad()`仍采用训练输出协议。`flash_kda`的返回条件见[PyTorch接口说明](docs/torchapi_flash_kda.md)。
 - 未融合gate时，`g`直接表示单步log gate，`A_log`、`dt_bias`和`lower_bound`不参与计算。未融合beta sigmoid时，`beta`直接表示更新系数。
 
 ## 调用说明
 
 | 调用方式 | 样例代码 | 说明 |
 | --- | --- | --- |
-| PyTorch API | [推理示例](torch_extension/README.md#调用示例) | 通过[flash_kda、flash_kda_fwd和flash_kda_metadata](torch_extension/README.md)调用。 |
+| PyTorch API | [推理示例](docs/torchapi_flash_kda.md#调用示例) | 通过[flash_kda](docs/torchapi_flash_kda.md)调用。 |
 
 构建与安装方式参见[PyTorch扩展说明](../../torch_extension/README.md)。该算子的DSL实现还需要匹配的CANN、torch_npu和CANNBot DSL运行环境。
 
 ## 参考资源
 
-- [测试用例与性能测量脚本](tests/)
+- [测试用例](tests/ttk/kda_cases.py)
+- [性能测量指南](tests/ttk/PERFORMANCE.md)
 - [FlashKDAGrad反向算子](../flash_kda_grad/README.md)

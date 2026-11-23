@@ -25,6 +25,7 @@
 - [ffn_worker_batching](../../ffn/ffn_worker_batching/docs/torchapi_ffn_worker_batching.md)
 - [flash_attn](../../attention/flash_attn/docs/torchapi_flash_attn.md)
 - [flash_attn_grad](../../attention/flash_attn_grad/docs/torchapi_flash_attn_grad.md)
+- [flash_kda](../../attention/flash_kda/docs/torchapi_flash_kda.md)
 - [flash_kda_grad](../../attention/flash_kda_grad/docs/torchapi_flash_kda_grad.md)
 - [fused_causal_conv1d](../../attention/fused_causal_conv1d/docs/torchapi_fused_causal_conv1d.md)
 - [fused_causal_conv1d_](../../attention/inplace_fused_causal_conv1d/docs/torchapi_fused_causal_conv1d_.md)

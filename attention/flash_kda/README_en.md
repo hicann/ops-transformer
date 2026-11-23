@@ -32,7 +32,7 @@ $$
 
 The initial state $H_0$ is zero when `initial_state` is omitted. When enabled, L2 normalization applies to the last dimension of Q and K. In GQA, each consecutive group of value heads shares a Q/K head.
 
-The operator processes chunks of 64 tokens. The host selects a staged or persistent schedule using the effective sequence lengths, head counts, and available device cores. The recurrence uses FLOAT32 and matrix computation uses BFLOAT16. `flash_kda` returns three results, while `flash_kda_fwd` also provides caches used by the backward pass.
+The operator processes chunks of 64 tokens. The host selects a staged or persistent schedule using the effective sequence lengths, head counts, and available device cores. The recurrence uses FLOAT32 and matrix computation uses BFLOAT16. `flash_kda` returns the output, optional final state, and optional chunk entry states.
 
 ## Parameters
 
@@ -51,7 +51,7 @@ The PyTorch parameters are listed in the order defined in `torch_extension/flash
 | dt_bias | Optional input | Gate bias of shape `(Nv,128)` or `(Nv*128,)`. Defaults to `None`, which uses zero bias. | FLOAT32 | ND |
 | cu_seqlens | Optional input | Cumulative sequence lengths of shape `(B+1,)`. Defaults to `None`. Required for TND. | INT32 | ND |
 | cu_seqlens_cpu | Optional input | Reserved parameter. Only the default value `None` is supported. | INT list | - |
-| seqused | Optional input | Effective length of each sequence, of shape `(B,)`. Defaults to `None`, which uses the full stored sequence. | INT32 | ND |
+| seqused | Optional input | Effective length of each sequence, of shape `(B,)`. Defaults to `None`, using lengths from `cu_seqlens`, or storage length `S` when both length tensors are omitted. | INT32 | ND |
 | scale | Optional attribute | Output scale. Defaults to `128**(-0.5)`. Accepts a finite number or `None` to use the default. | FLOAT | - |
 | output_final_state | Optional attribute | Whether to return the final state. Accepts `True` or `False`, and defaults to `False`. | BOOL | - |
 | return_intermediate_states | Optional attribute | Whether to return chunk entry states during inference. Accepts `True` or `False`, and defaults to `False`. | BOOL | - |
@@ -78,16 +78,16 @@ For fixed-length layouts, the sequence dimension of `g` and `beta` precedes the 
 
 - `B` and the applicable storage length `S` or `T` are positive. Head counts satisfy `1 <= Nqk <= Nv <= 96` and `Nv % Nqk == 0`. The Q/K and V head dimensions are both 128.
 - Input tensors must be contiguous. Compute runs on an NPU. Meta tensors are used only for output specification inference.
-- For TND, `cu_seqlens` starts at zero, is nondecreasing, and ends at `T`. In fixed-length layouts, when `cu_seqlens` is supplied, consecutive differences cannot exceed `S`. Each `seqused` value is nonnegative and is bounded by the corresponding sequence's storage length.
+- For TND, `cu_seqlens` starts at zero, is strictly increasing, and ends at `T`. In fixed-length layouts, when `cu_seqlens` is supplied, consecutive differences must be positive and at most `S`. Each `seqused` value must be positive and at most the storage length; if `cu_seqlens` is also supplied, it must equal the corresponding adjacent difference.
 - Metadata must match the layout, storage dimensions, head counts, and effective lengths of the current call. Regenerate metadata when these change.
-- `torch.is_inference_mode_enabled()` determines training or inference behavior. Use `torch.inference_mode()` for inference. `torch.no_grad()` still uses the training output contract. See the [PyTorch API reference](torch_extension/README_en.md) for `flash_kda_fwd` caches and return conditions.
+- `torch.is_inference_mode_enabled()` determines training or inference behavior. Use `torch.inference_mode()` for inference. `torch.no_grad()` still uses the training output contract. See the [PyTorch API reference](docs/torchapi_flash_kda_en.md) for the return conditions of `flash_kda`.
 - With gate fusion disabled, `g` provides the per-token log gate and the operator ignores `A_log`, `dt_bias`, and `lower_bound`. With beta sigmoid fusion disabled, `beta` provides the update coefficient directly.
 
 ## Invocation
 
 | Interface | Example | Description |
 | --- | --- | --- |
-| PyTorch API | [Inference example](torch_extension/README_en.md#example) | Call [flash_kda, flash_kda_fwd, or flash_kda_metadata](torch_extension/README_en.md). |
+| PyTorch API | [Inference example](docs/torchapi_flash_kda_en.md#examples) | Call [flash_kda](docs/torchapi_flash_kda_en.md). |
 
 See the [PyTorch extension guide](../../torch_extension/README_en.md) for build and installation instructions. This DSL implementation also requires compatible versions of CANN, torch_npu, and the CANNBot DSL runtime.
 

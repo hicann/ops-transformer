@@ -235,6 +235,16 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/flash_kda/README.md">flash_kda</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>✓</td>
+    <td>AI Core</td>
+    <td>计算Kimi Delta Attention（KDA）的前向输出，以逐通道门控衰减和增量更新维护注意力状态，支持变长序列、分组查询注意力（GQA）、Q/K的L2归一化、gate激活和beta sigmoid融合。基于CANNBot DSL实现，通过PyTorch接口调用。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/fused_causal_conv1d/README.md">fused_causal_conv1d</a></td>
     <td>✓</td>
     <td>✓</td>
