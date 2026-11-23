@@ -12,6 +12,8 @@
 #define MEGA_MOE_KERNEL_A2_BF16_W4A8_HPP
 #include <limits>
 #include "kernel_operator.h"
+// A2 跨 server：flag 等待按经过时间限界，需要 GetSystemCycle()
+#include "basic_api/kernel_operator_sys_var_intf.h"
 
 #include "utils/copy_l0c_to_gm_custom.hpp"
 
@@ -325,6 +327,17 @@ private:
                                                             hiddenSize, aStride, coreNum);
     }
 
+    // cumsumMM 由 core 0 用 MTE3 写、其他核用标量读，标量读会命中本核 D-Cache。
+    // 该 workspace 地址在不同 layer 复用，cache line 可能仍保留上一层的前缀和，
+    // 累计后会把 rowStart 推过 maxOutputSize，发送侧丢弃接收侧仍在等待的 rows。
+    // 因此每次标量读前先 dcci，确保读到本轮值。
+    CATLASS_DEVICE int32_t ReadCumsum(int64_t idx)
+    {
+        __gm__ int32_t* p = const_cast<__gm__ int32_t*>(cumsumMM.GetPhyAddr()) + idx;
+        gm_dcci(reinterpret_cast<__gm__ uint8_t*>(p));
+        return gm_load(p);
+    }
+
     CATLASS_DEVICE
     void GetCumsumForMMAIV(AscendC::GlobalTensor<int32_t>& tokenPerExpert, AscendC::GlobalTensor<int32_t>& result,
                            uint32_t expertPerRank, uint32_t EP)
@@ -339,8 +352,13 @@ private:
             return;
         }
         const int32_t rank = RuntimeRank(params);
-        // 发送视图：本 rank 的路由表（winIn TPE 的 srcRank=rank 槽，flat [dstEpIdx][g]，连续 EP*epr）
-        AscendC::DataCopyPad(ubTpeSendCache, tokenPerExpert[tokenPerExpertLayout(rank, 0, 0)],
+        // 发送视图：本 rank 的路由表。直接取 windowsOut（allgather 广播的数据源），
+        // 不再依赖 winIn 的 self-copy：全模型下观测到 self-copy 与广播值不一致，
+        // 发送侧会对 rows==0 的 cell 不发 flag，而接收侧 allgather 仍显示 rows>0。
+        AscendC::GlobalTensor<int32_t> tpeSendSrc;
+        tpeSendSrc.SetGlobalBuffer(
+            reinterpret_cast<__gm__ int32_t*>(shmem.windowsOutAddr() + peermemInfo.offsetPeerTokenPerExpert));
+        AscendC::DataCopyPad(ubTpeSendCache, tpeSendSrc[tokenPerExpertLayout(rank, 0, 0)],
                              {1, static_cast<uint16_t>(routeCacheNum * sizeof(int32_t)), 0, 0}, {});
         // 接收视图：[srcEpIdx][g] = 各源 rank 发给本 rank 的计数（跨 srcEpIdx 取 rank 平面，
         // 与 A3 CacheRouteTablesToUb 相同的 2D DataCopyPad）
@@ -577,6 +595,59 @@ private:
                                           params.expertPerRank, num);
     }
 
+    // 跨 server 时 flag 的 32B 源数据来自 winOut 的暂存区。每个 (dst, group) 使用
+    // 独立槽位：正常路径写 MAGIC、跳过路径写 MAGIC+1，若共用槽位，同组其它 dst 的
+    // 并发 post 会在 NIC 读取前覆盖内容，导致对端读到错误标记。暂存区放在 flag 区第
+    // EP*expertPerRank 个槽之后；chunk 末尾的 ResetTokenPerExpert 只清零前
+    // EP*expertPerRank 个槽，不会覆盖这里。
+    CATLASS_DEVICE int64_t FlagStagingSlot(int32_t dstEpIdx, int32_t groupIdx, Params const& params) const
+    {
+        return static_cast<int64_t>(params.EP * params.expertPerRank) +
+               static_cast<int64_t>(dstEpIdx * params.expertPerRank + groupIdx);
+    }
+
+    // rows == 0（或 rowStart 超过 maxOutputSize）时给对端写一个跳过标记 MAGIC+1，
+    // 避免接收侧按 allgather 计数继续等待一个永远不会发送的 flag。
+    CATLASS_DEVICE void PostSkipFlag(int32_t dstEpIdx, int32_t groupIdx, Params const& params)
+    {
+        const int32_t rank = RuntimeRank(params);
+        if (dstEpIdx == rank) {
+            return;
+        }
+        __gm__ int32_t* remoteFlag = reinterpret_cast<__gm__ int32_t*>(shmem(0, dstEpIdx) + peermemInfo.offsetFlag) +
+                                     (rank * params.expertPerRank + groupIdx) * PeermemInfo::kFlagSlotI32;
+        if ((dstEpIdx / SERVER_RANK_SIZE_A2) == serverId_) {
+            AscendC::PipeBarrier<PIPE_ALL>();
+            gm_store(remoteFlag, FLAG_VALUE_MAGIC + 1);
+            gm_dcci(reinterpret_cast<__gm__ uint8_t*>(remoteFlag));
+            return;
+        }
+        uint32_t copyInNum = params.problemShape.k() + ALIGN_512;
+        uint64_t ubRdmaOffset = 2ULL * copyInNum * sizeof(uint32_t);
+        AscendC::LocalTensor<uint64_t> rdmaUbLocal = resource.ubBuf.template GetBufferByByte<uint64_t>(ubRdmaOffset);
+        AscendC::LocalTensor<uint32_t> rdmaUbLocalHead =
+            resource.ubBuf.template GetBufferByByte<uint32_t>(ubRdmaOffset + UB_ALIGN);
+        AscendC::LocalTensor<int32_t> flagUb =
+            resource.ubBuf.template GetBufferByByte<int32_t>(ubRdmaOffset + 2 * UB_ALIGN);
+        AscendC::Duplicate<int32_t>(flagUb, 0, PeermemInfo::kFlagPayloadI32);
+        AscendC::SetFlag<AscendC::HardEvent::V_S>(EVENT_ID0);
+        AscendC::WaitFlag<AscendC::HardEvent::V_S>(EVENT_ID0);
+        flagUb.SetValue(0, FLAG_VALUE_MAGIC + 1);
+        AscendC::SetFlag<AscendC::HardEvent::S_MTE3>(EVENT_ID0);
+        AscendC::WaitFlag<AscendC::HardEvent::S_MTE3>(EVENT_ID0);
+        AscendC::GlobalTensor<int32_t> localFlagGm;
+        localFlagGm.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(shmem.windowsOutAddr() + peermemInfo.offsetFlag) +
+                                    FlagStagingSlot(dstEpIdx, groupIdx, params) * PeermemInfo::kFlagSlotI32);
+        AscendC::DataCopy(localFlagGm, flagUb, PeermemInfo::kFlagPayloadI32);
+        // 保证 32B 暂存写已落到 GM，NIC 读取源地址时才不会拿到旧内容
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(EVENT_ID0);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(EVENT_ID0);
+        AscendC::PipeBarrier<PIPE_ALL>();
+        AIVRDMAPostSend((GM_ADDR)localFlagGm.GetPhyAddr(), (GM_ADDR)remoteFlag, static_cast<uint64_t>(dstEpIdx),
+                        PeermemInfo::kFlagPayloadI32 * sizeof(int32_t), qp_info_, rdmaUbLocal, rdmaUbLocalHead);
+        AscendC::PipeBarrier<PIPE_ALL>();
+    }
+
     // ============================================================
     // SendTokensV3：发送侧，三路径（self-rank / 同server / 跨server）
     //   - rows == 0 时提前 return（不写 flag，避免对端死等）
@@ -589,9 +660,11 @@ private:
                                      uint32_t hiddenSize, int32_t dstEpIdx, int32_t groupIdx, int32_t rowStart,
                                      Params const& params, uint64_t gmOffsetA)
     {
-        // rows == 0：无 token 可发，不写 flag，对端 RecvTokensV3 同样 rows2==0 会提前 return
-        if (rows == 0)
+        // rows == 0：无 token 可发。给对端写跳过标记，避免接收侧按 allgather 计数继续等待。
+        if (rows == 0) {
+            PostSkipFlag(dstEpIdx, groupIdx, params);
             return;
+        }
         uint32_t copyInNum = hiddenSize + ALIGN_512;
 
         // UB layout:
@@ -675,8 +748,11 @@ private:
             AscendC::GlobalTensor<int32_t> localFlagGm;
             localFlagGm.SetGlobalBuffer(
                 reinterpret_cast<__gm__ int32_t*>(shmem.windowsOutAddr() + peermemInfo.offsetFlag) +
-                (RuntimeRank(params) * params.expertPerRank + groupIdx) * PeermemInfo::kFlagSlotI32);
+                FlagStagingSlot(dstEpIdx, groupIdx, params) * PeermemInfo::kFlagSlotI32);
             AscendC::DataCopy(localFlagGm, flagUb, PeermemInfo::kFlagPayloadI32);
+            // 保证 32B 暂存写已落到 GM，NIC 读取源地址时才不会拿到旧内容
+            AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(EVENT_ID0);
+            AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(EVENT_ID0);
             AscendC::PipeBarrier<PIPE_ALL>();
 
             // 4. RDMA 32B 到对端同槽（同 QP 顺序保证 flag 在数据之后到达接收侧）
@@ -716,13 +792,36 @@ private:
         //   每槽 16 个 int32（= 64B = 一个 cache line）
         __gm__ int32_t* flagAddr = reinterpret_cast<__gm__ int32_t*>(shmem() + peermemInfo.offsetFlag) +
                                    (srcEpIdx * params.expertPerRank + groupIdx) * PeermemInfo::kFlagSlotI32;
-        // 该 flag 由对端核（同 server gm_store / 跨 server RDMA）写入本 rank GM，属"数据被其他核修改"场景。
-        // Scalar 访问 GM 经过本核 D-Cache，存在与 GM 的一致性问题：
-        // 故每轮先 gm_dcci 失效本核 D-Cache，再 scalar 读单个 4B int32，确保取到 GM 最新值。
+        // flag 由对端核（同 server gm_store / 跨 server RDMA）写入本 rank GM。
+        // 这里用 MTE2 DMA 读轮询，而不是 scalar dcci+load：后者会在 NIC 正在写的
+        // 同一条 cache line 上持续做 clean/invalidate，A2 跨 server 场景下会把发送端
+        // AI-RDMA QP 的完成拖住（HW tail 长时间不推进，flag WQE 一直不执行）。
+        // 产品 A2 dispatch 算子（moe_distribute_dispatch_a2_layered.h）的 flag 等待
+        // 同样使用 MTE2 读。
+        // 等待按经过时间设上限，不用轮询次数：A2 的 GetSystemCycle() 为 50 cycles/us，
+        // 5s 远大于正常 flag 到达延迟，且远小于 234s 设备看门狗；每 1024 轮检查一次。
+        constexpr uint32_t kFlagWaitCheckMask = 1024U - 1U;
+        constexpr uint64_t kFlagWaitTimeoutCycles = 5ULL * 1000ULL * 1000ULL * 50ULL;
+        const int64_t flagWaitStart = AscendC::GetSystemCycle();
+        uint32_t flagWaitPoll = 0;
+        AscendC::LocalTensor<int32_t> flagPollUb = resource.ubBuf.template GetBufferByByte<int32_t>(4 * UB_ALIGN);
+        AscendC::GlobalTensor<int32_t> flagSlotGm;
+        flagSlotGm.SetGlobalBuffer(flagAddr);
         while (true) {
-            gm_dcci(flagAddr);
-            if (gm_load(flagAddr) == FLAG_VALUE_MAGIC) {
+            AscendC::DataCopy(flagPollUb, flagSlotGm, PeermemInfo::kFlagPayloadI32);
+            AscendC::SetFlag<AscendC::HardEvent::MTE2_S>(EVENT_ID0);
+            AscendC::WaitFlag<AscendC::HardEvent::MTE2_S>(EVENT_ID0);
+            const int32_t flagVal = flagPollUb.GetValue(0);
+            if (flagVal == FLAG_VALUE_MAGIC) {
                 break;
+            }
+            if (flagVal == FLAG_VALUE_MAGIC + 1) {
+                return;
+            }
+            if ((++flagWaitPoll & kFlagWaitCheckMask) == 0U &&
+                static_cast<uint64_t>(AscendC::GetSystemCycle() - flagWaitStart) >= kFlagWaitTimeoutCycles) {
+                AscendC::Trap();
+                return;
             }
         }
 
@@ -874,8 +973,8 @@ private:
             icache_preload(ICACHE_PRELOAD_LINES);
             exceptionDump_.UpdateStage(MC2MegaMoeAdump::Stage::DISPATCH);
             for (int32_t groupIdx = 0; groupIdx < params.expertPerRank; ++groupIdx) {
-                uint32_t currentMRecv =
-                    static_cast<uint32_t>(cumsumMM(tokenPerExpertLayout(params.EP - 1, RuntimeRank(params), groupIdx)));
+                uint32_t currentMRecv = static_cast<uint32_t>(
+                    ReadCumsum(tokenPerExpertLayout(params.EP - 1, RuntimeRank(params), groupIdx)));
                 uint32_t currentMSend = 0;
                 uint32_t copyInNum = params.problemShape.k() + ALIGN_512;
                 for (int32_t dstEpIdx = static_cast<int32_t>(coreIdx); dstEpIdx < static_cast<int32_t>(params.EP);
@@ -884,10 +983,14 @@ private:
                     uint32_t rowStart =
                         prevGroupSum1Arr[arrIdx] + ((RuntimeRank(params) == 0) ?
                                                         0u :
-                                                        static_cast<uint32_t>(cumsumMM(tokenPerExpertLayout(
+                                                        static_cast<uint32_t>(ReadCumsum(tokenPerExpertLayout(
                                                             RuntimeRank(params) - 1, dstEpIdx, groupIdx))));
                     currentMSend =
-                        static_cast<uint32_t>(cumsumMM(tokenPerExpertLayout(params.EP - 1, dstEpIdx, groupIdx)));
+                        static_cast<uint32_t>(ReadCumsum(tokenPerExpertLayout(params.EP - 1, dstEpIdx, groupIdx)));
+                    if (rowStart >= params.maxOutputSize) {
+                        // 该 cell 已被 maxOutputSize 截断，给对端写跳过标记
+                        PostSkipFlag(dstEpIdx, groupIdx, params);
+                    }
                     if (rowStart < params.maxOutputSize) {
                         // chunk 模式：路由表读走本核 UB 缓存（CacheRouteTablesToUb 每 chunk 刷新）
                         uint32_t rows =
@@ -920,7 +1023,7 @@ private:
                      srcEpIdx += static_cast<int32_t>(coreNum)) {
                     uint32_t rowStart2 =
                         prevGroupSum2 + ((srcEpIdx == 0) ? 0u :
-                                                           static_cast<uint32_t>(cumsumMM(tokenPerExpertLayout(
+                                                           static_cast<uint32_t>(ReadCumsum(tokenPerExpertLayout(
                                                                srcEpIdx - 1, RuntimeRank(params), groupIdx))));
                     if (rowStart2 < params.maxOutputSize) {
                         uint32_t rows2 =
@@ -999,9 +1102,9 @@ private:
 
             CombineV2(params, blockEpilogue2);
             AscendC::SyncAll<true>();
-            exceptionDump_.UpdateStage(MC2MegaMoeAdump::Stage::RESET_TOKEN_PER_EXPERT);
-            ResetTokenPerExpert(params, params.EP * paddedExpertNumAligned);
-            AscendC::SyncAll<true>();
+            // 先屏障再清零：屏障写与 dispatch flag 走同一个 QP、且排在其后，
+            // 屏障通过即表示本 chunk 对端的所有 flag（含跳过标记）都已执行完，
+            // 之后的清零不会和迟到的旧标记竞争。
             exceptionDump_.UpdateStage(MC2MegaMoeAdump::Stage::CROSS_RANK_SYNC);
             {
                 // 3 * UB_ALIGN scratch: payload + rdma doorbell + rdma head.
@@ -1028,6 +1131,15 @@ private:
 
             // chunk 边界：unpermute 读完 D/expandedRowIdx 后才允许下一 chunk 覆盖
             AscendC::SyncAll<true>();
+            exceptionDump_.UpdateStage(MC2MegaMoeAdump::Stage::RESET_TOKEN_PER_EXPERT);
+            ResetTokenPerExpert(params, params.EP * paddedExpertNumAligned);
+            AscendC::SyncAll<true>();
+            // 第二次屏障：所有 rank 都清零完成后才允许进入下一 chunk 的发送，
+            // 避免下一 chunk 的 flag 在别人清零前写入、又被那次清零抹掉。
+            {
+                AscendC::LocalTensor<int32_t> ctrBuffer = resource.ubBuf.template GetBufferByByte<int32_t>(0);
+                shmem.CrossRankSync(ctrBuffer);
+            }
         } // for chunkIdx
     }
 
