@@ -23,15 +23,6 @@
 #include "graph/ascend_string.h"
 
 namespace ops {
-const std::string COMM_ALG_FULLMESH_V1 = "fullmesh_v1";
-const std::string COMM_ALG_FULLMESH_V2 = "fullmesh_v2";
-const std::string COMM_ALG_MTE = "mte";
-const std::string COMM_ALG_CCU = "ccu";
-
-const std::string MOE_DISTRIBUTE_DISPATCH_OP_TYPE = "MoeDistributeDispatch";
-const std::string MOE_DISTRIBUTE_COMBINE_OP_TYPE = "MoeDistributeCombine";
-const std::string MOE_DISTRIBUTE_DISPATCH_V2_OP_TYPE = "MoeDistributeDispatchV2";
-const std::string MOE_DISTRIBUTE_COMBINE_V2_OP_TYPE = "MoeDistributeCombineV2";
 const std::string ALL_TO_ALLV_GROUPED_MM_OP_TYPE = "AlltoAllvGroupedMatMul";
 const std::string GROUPED_MM_ALL_TO_ALLV_OP_TYPE = "GroupedMatMulAlltoAllv";
 const std::string ALL_TO_ALLV_QUANT_GROUPED_MM_OP_TYPE = "AlltoAllvQuantGroupedMatMul";
@@ -42,7 +33,6 @@ const std::string MM_ALL_REDUCE_OP_TYPE = "MatmulAllReduce";
 const std::string MM_ALLTO_ALL_OP_TYPE = "MatmulAlltoAll";
 const std::string ALLTO_ALL_MATMUL_OP_TYPE = "AlltoAllMatmul";
 const std::string ATTR_NAME_GROUP = "group";
-const std::string ATTR_NAME_GROUP_EP = "group_ep";
 const int32_t MAX_GROUP_CNT = 16;
 
 struct GroupInfo {
@@ -61,10 +51,6 @@ static const std::map<const std::string, const GroupInfo> GROUP_INFO_MAP_ARCH35{
     {GROUPED_MM_ALL_TO_ALLV_OP_TYPE, {1, {ATTR_NAME_GROUP}}},
     {ALL_TO_ALLV_QUANT_GROUPED_MM_OP_TYPE, {1, {ATTR_NAME_GROUP}}},
     {QUANT_GROUPED_MM_ALL_TO_ALLV_OP_TYPE, {1, {ATTR_NAME_GROUP}}},
-    {MOE_DISTRIBUTE_DISPATCH_OP_TYPE, {2, {ATTR_NAME_GROUP_EP}}},
-    {MOE_DISTRIBUTE_COMBINE_OP_TYPE, {2, {ATTR_NAME_GROUP_EP}}},
-    {MOE_DISTRIBUTE_DISPATCH_V2_OP_TYPE, {2, {ATTR_NAME_GROUP_EP}}},
-    {MOE_DISTRIBUTE_COMBINE_V2_OP_TYPE, {2, {ATTR_NAME_GROUP_EP}}},
 };
 
 class Mc2Arch35GenTaskOpsUtils {
@@ -72,26 +58,6 @@ public:
     static ge::Status CreateCCUFusionTask(const gert::ExeResGenerationContext* context,
                                           std::vector<std::vector<uint8_t>>& tasks);
 
-    static const std::string GetCommAlg(const gert::ExeResGenerationContext* context, const size_t commAlgIdx)
-    {
-        auto* attrs = context->GetAttrs();
-        if (attrs == nullptr) {
-            OPS_LOG_E(context->GetNodeName(), "Attrs pointer is null.");
-            return "";
-        }
-        const char* commAlgPtr = attrs->GetStr(commAlgIdx);
-        if (commAlgPtr == nullptr) {
-            OPS_LOG_E(context->GetNodeName(), "Comm alg pointer is null.");
-            return "";
-        }
-        const std::string commAlg = commAlgPtr;
-        if (commAlg.empty()) {
-            OPS_LOG_W(context->GetNodeName(), "Comm alg is empty, will use mte alg.");
-            return "mte";
-        }
-        OPS_LOG_D(context->GetNodeName(), "Comm alg is %s.", commAlg.c_str());
-        return commAlg;
-    }
     static ge::Status Mc2Arch35GenTaskCallBack(const gert::ExeResGenerationContext* context,
                                                std::vector<std::vector<uint8_t>>& tasks)
     {

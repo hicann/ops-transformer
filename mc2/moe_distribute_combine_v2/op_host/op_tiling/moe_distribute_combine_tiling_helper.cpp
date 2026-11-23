@@ -135,46 +135,16 @@ bool MoeDistributeCombineTilingHelper::CheckTensorDim(gert::TilingContext* conte
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "inputs/outputs", "", "Input/output param shape is invalid."),
         return false);
 
-    // x_active_mask当前不支持传入
-    // A3/A5 v1接口的x_active_mask不支持传入
-    if (OpVersionManager::GetInstance().GetVersion() == OP_VERSION_1) {
+    // A5 v1接口的x_active_mask不支持传入
+    auto platformInfo = context->GetPlatformInfo();
+    platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
+    NpuArch npuArch = ascendcPlatform.GetCurNpuArch();
+    if (npuArch != Ops::Base::DAV_2201) {
         const gert::StorageShape* xActiveMaskStorageShape = context->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
         OP_TILING_CHECK(xActiveMaskStorageShape != nullptr,
                         OP_LOGE_FOR_INVALID_VALUE(nodeName, "x_active_mask", "present", "should be None"),
                         return false);
     }
-
-    OP_TILING_CHECK(!CheckOutputTensorDim(context, nodeName),
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "x(output)", "", "Output param shape is invalid."),
-                    return false);
-
-    return true;
-}
-
-inline bool MoeDistributeCombineTilingHelper::CheckActiveMask(const gert::TilingContext* context, const char* nodeName)
-{
-    // Check Dim/DType/Format
-    const gert::StorageShape* xActiveMaskStorageShape = context->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
-    OP_TILING_CHECK(xActiveMaskStorageShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xActiveMaskStorageShape"),
-                    return false);
-    const int64_t xActiveMaskDimNums = xActiveMaskStorageShape->GetStorageShape().GetDimNum();
-    OP_TILING_CHECK(
-        xActiveMaskDimNums != ONE_DIM,
-        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(nodeName, "xActiveMask", std::to_string(xActiveMaskDimNums).c_str(),
-                                                 "The shape dim of xActiveMask must be 1D."),
-        return false);
-    auto xActiveMaskDesc = context->GetOptionalInputDesc(X_ACTIVE_MASK_INDEX);
-    OP_TILING_CHECK(xActiveMaskDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xActiveMaskDesc"), return false);
-    OP_TILING_CHECK(xActiveMaskDesc->GetDataType() != ge::DT_BOOL,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "xActiveMask",
-                                                          Ops::Base::ToString(xActiveMaskDesc->GetDataType()).c_str(),
-                                                          "The dtype of xActiveMask must be bool."),
-                    return false);
-    auto xActiveMaskFmt = static_cast<ge::Format>(ge::GetPrimaryFormat(xActiveMaskDesc->GetStorageFormat()));
-    OP_TILING_CHECK(
-        xActiveMaskFmt == ge::FORMAT_FRACTAL_NZ,
-        OP_LOGE_FOR_INVALID_FORMAT(nodeName, "xActiveMask", Ops::Base::ToString(xActiveMaskFmt).c_str(), "FRACTAL_NZ"),
-        return false);
 
     return true;
 }
@@ -295,30 +265,4 @@ ge::graphStatus MoeDistributeCombineTilingHelper::TilingCheckMoeDistributeCombin
                     return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
-
-ge::graphStatus MoeDistributeCombineTilingHelper::TilingCheckMoeDistributeCombineA5(gert::TilingContext* context,
-                                                                                    const char* nodeName,
-                                                                                    const bool isTokenMask)
-{
-    // 检查参数shape信息
-    OP_TILING_CHECK(!CheckTensorDim(context, nodeName),
-                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "tensor dims", "", "param shape is invalid"),
-                    return ge::GRAPH_FAILED);
-    // 检查参数dataType信息
-    OP_TILING_CHECK(!CheckTensorDataType(context, nodeName),
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "tensor", "", "param dataType is invalid"),
-                    return ge::GRAPH_FAILED);
-    // 检查参数format信息
-    OP_TILING_CHECK(!CheckTensorFormat(context, nodeName),
-                    OP_LOGE_FOR_INVALID_FORMAT(nodeName, "tensor", "", "param Format is invalid"),
-                    return ge::GRAPH_FAILED);
-    // 检查ActiveMask信息
-    if ((OpVersionManager::GetInstance().GetVersion() != OP_VERSION_1) && isTokenMask) {
-        OP_TILING_CHECK(!CheckActiveMask(context, nodeName),
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(nodeName, "xActiveMask", "", "xActiveMask is invalid."),
-                        return ge::GRAPH_FAILED);
-    }
-    return ge::GRAPH_SUCCESS;
-}
-
 } // namespace optiling

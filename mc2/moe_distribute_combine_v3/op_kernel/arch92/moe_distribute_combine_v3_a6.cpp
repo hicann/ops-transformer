@@ -13,7 +13,7 @@
  * \brief A6 (arch92) kernel entry for MoeDistributeCombineV3.
  *        Dedicated entry so that Ascend960 (NPU_ARCH 9201/9202) builds a source compiled with its own
  *        __NPU_ARCH__, keeping it separated from the Ascend950 (NPU_ARCH 3510, arch35) entry.
- *        Reuses combine_v2's arch92 RSW MTE combine implementation (no CCU/ROCE on arch92).
+ *        Reuses combine_v2's arch92 RSW MTE combine implementation (MTE only on arch92).
  */
 #if ASC_DEVKIT_MAJOR >= 9
 #include "basic_api/kernel_basic_intf.h"

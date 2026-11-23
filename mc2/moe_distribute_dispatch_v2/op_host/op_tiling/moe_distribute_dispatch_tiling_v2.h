@@ -17,7 +17,6 @@
 #define MOE_DISTRIBUTE_DISPATCH_TILING_V2
 
 #include <cstdint>
-#include "op_host/op_tiling/mc2_opversion_manager.h"
 #include "register/tilingdata_base.h"
 #include "tiling/tiling_api.h"
 #include "mc2_log.h"

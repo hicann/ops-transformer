@@ -15,7 +15,6 @@
 #include "kernel_operator.h"
 #include "lib/matmul_intf.h"
 #include "moe_distribute_combine_v2_apt_tiling_key.h"
-#include "moe_distribute_combine_v2_a5_ccu.h"
 #include "moe_distribute_combine_v2_a5_mte.h"
 
 using namespace MoeDistributeCombineV2A5MteImpl;
@@ -40,7 +39,7 @@ __global__ __aicore__ void moe_distribute_combine_v2(GM_ADDR expandX, GM_ADDR ex
 
 #if ((ORIG_DTYPE_EXPAND_X == DT_BF16) || (ORIG_DTYPE_EXPAND_X == DT_FLOAT16))
     int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();
-    if constexpr ((ArchTag == TILINGKEY_TPL_A5) && (LayeredMode == TILINGKEY_TPL_MTE)) {
+    if constexpr (LayeredMode == TILINGKEY_TPL_MTE) {
         GM_ADDR contextGM0 = (GM_ADDR)AscendC::GetHcclContext<HCCL_GROUP_ID_0>();
         MoeDistributeCombineV2A5Mte<DTYPE_EXPAND_X, DTYPE_X, int32_t, QuantMode, false> op;
         op.Init(contextGM0, expandX, expertIds, assistInfoForCombine, epSendCount, nullptr, nullptr, scales,

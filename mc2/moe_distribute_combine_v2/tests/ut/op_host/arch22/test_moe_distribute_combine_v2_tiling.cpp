@@ -1962,7 +1962,7 @@ TEST_F(MoeDistributeCombineV2Arch22TilingTest, A3HierarchyVariableBsSuccess)
          {"const_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
         &compileInfo, "Ascend910_93", coreNum, ubSize);
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 32}};
-    uint64_t expectTilingKey = 76UL; // no quant + hierarchy + A3, ep=32 keeps hierarchy
+    uint64_t expectTilingKey = 72UL; // no quant + hierarchy + A3, ep=32 keeps hierarchy
     Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, expectTilingKey);
 
     if (originalEnv.empty()) {

@@ -10,7 +10,7 @@
 
 /*!
  * \file moe_distribute_combine_v2_a6_tiling_key.h
- * \brief A6 (arch92) tiling key selections. Only MTE is supported on arch92 (no CCU/ROCE).
+ * \brief A6 (arch92) tiling key selections. Only MTE is supported on arch92 (no ROCE).
  *        Shared macros/DECL live in the outer moe_distribute_combine_v2_tiling_key_decl.h.
  */
 

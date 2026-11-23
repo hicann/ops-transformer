@@ -5236,7 +5236,7 @@ static void CheckA2CommAlg(const std::string& commAlg, int64_t epWorldSize, ge::
 
 TEST_F(MoeDistributeDispatchV2Arch22TilingTest, A2CommAlgRejectsUnsupportedValues)
 {
-    for (const std::string commAlg : {"bad", "fullmeshh", "0", "fullmesh_v1", "fullmesh_v2", "ccu"}) {
+    for (const std::string commAlg : {"bad", "fullmeshh", "0", "fullmesh_v1", "fullmesh_v2", "fullmesh_v100"}) {
         SCOPED_TRACE(commAlg);
         for (int64_t epWorldSize : {2, 8, 16}) {
             SCOPED_TRACE(epWorldSize);

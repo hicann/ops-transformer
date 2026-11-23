@@ -29,17 +29,16 @@ namespace Mc2Tiling {
 #define TILINGKEY_MXFP8_E4M3_QUANT 4
 #define TILINGKEY_TPL_MTE 0
 #define TILINGKEY_TPL_AICPU 1
-#define TILINGKEY_TPL_CCU 2
-#define TILINGKEY_TPL_HIERARCHY 3
-#define TILINGKEY_TPL_ROCE 4
+#define TILINGKEY_TPL_HIERARCHY 2
+#define TILINGKEY_TPL_ROCE 3
 
 ASCENDC_TPL_ARGS_DECL(MoeDistributeCombineV2,
                       ASCENDC_TPL_UINT_DECL(TILINGKEY_QUANT_MODE, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST,
                                             TILINGKEY_NO_QUANT, TILINGKEY_INT8_QUANT, TILINGKEY_MXFP8_E5M2_QUANT,
                                             TILINGKEY_MXFP8_E4M3_QUANT),
                       ASCENDC_TPL_UINT_DECL(TILINGKEY_LAYERED_MODE, ASCENDC_TPL_4_BW, ASCENDC_TPL_UI_LIST,
-                                            TILINGKEY_TPL_MTE, TILINGKEY_TPL_AICPU, TILINGKEY_TPL_CCU,
-                                            TILINGKEY_TPL_HIERARCHY, TILINGKEY_TPL_ROCE),
+                                            TILINGKEY_TPL_MTE, TILINGKEY_TPL_AICPU, TILINGKEY_TPL_HIERARCHY,
+                                            TILINGKEY_TPL_ROCE),
                       ASCENDC_TPL_UINT_DECL(ARCH_TAG, ASCENDC_TPL_2_BW, ASCENDC_TPL_UI_LIST, TILINGKEY_TPL_A2,
                                             TILINGKEY_TPL_A3, TILINGKEY_TPL_A5, TILINGKEY_TPL_A6), );
 } // namespace Mc2Tiling

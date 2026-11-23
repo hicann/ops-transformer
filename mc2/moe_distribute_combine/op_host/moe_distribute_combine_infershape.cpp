@@ -17,13 +17,11 @@
 #include "platform/platform_info.h"
 using namespace ge;
 namespace ops {
-static constexpr size_t DIM_ONE = 1UL;
 static constexpr size_t DIM_TWO = 2UL;
-static constexpr int64_t NEG_ONE = -1;
 static constexpr int64_t RANK_NUM_PER_NODE = 8;
 
-static constexpr size_t COMBINE_INPUT_EXPERT_X_INDEX = 0;
-static constexpr size_t COMBINE_INPUT_EXPERT_IDX_INDEX = 1;
+static constexpr size_t COMBINE_INPUT_EXPAND_X_INDEX = 0;
+static constexpr size_t COMBINE_INPUT_EXPERT_IDS_INDEX = 1;
 static constexpr size_t COMBINE_OUTPUT_X_INDEX = 0;
 
 static ge::graphStatus InferShapeMoeDistributeCombine(gert::InferShapeContext* context)
@@ -33,15 +31,23 @@ static ge::graphStatus InferShapeMoeDistributeCombine(gert::InferShapeContext* c
     }
     OP_LOGD(context->GetNodeName(), "Begin to do InferShapeMoeDistributeCombine.");
     // 获取输入shape
-    const gert::Shape* expandXShape = context->GetInputShape(COMBINE_INPUT_EXPERT_X_INDEX);
+    const gert::Shape* expandXShape = context->GetInputShape(COMBINE_INPUT_EXPAND_X_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, expandXShape);
-    const gert::Shape* expandIdsShape = context->GetInputShape(COMBINE_INPUT_EXPERT_IDX_INDEX);
-    OPS_CHECK_NULL_WITH_CONTEXT(context, expandIdsShape);
+    const gert::Shape* expertIdsShape = context->GetInputShape(COMBINE_INPUT_EXPERT_IDS_INDEX);
+    OPS_CHECK_NULL_WITH_CONTEXT(context, expertIdsShape);
     gert::Shape* xShape = context->GetOutputShape(COMBINE_OUTPUT_X_INDEX);
     OPS_CHECK_NULL_WITH_CONTEXT(context, xShape);
 
-    int64_t bs = expandIdsShape->GetDimNum() == 1U ? NEG_ONE : expandIdsShape->GetDim(0);
-    int64_t h = expandXShape->GetDimNum() == 1U ? NEG_ONE : expandXShape->GetDim(1);
+    OP_CHECK_IF(expertIdsShape->GetDimNum() != 2U,
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "expertIdsShape",
+                                             std::to_string(expertIdsShape->GetDimNum()).c_str(), "= 2"),
+                return ge::GRAPH_FAILED);
+    int64_t bs = expertIdsShape->GetDim(0);
+    OP_CHECK_IF(expandXShape->GetDimNum() != 2U,
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), "expandXShape",
+                                             std::to_string(expandXShape->GetDimNum()).c_str(), "= 2"),
+                return ge::GRAPH_FAILED);
+    int64_t h = expandXShape->GetDim(1);
 
     xShape->SetDimNum(DIM_TWO);
     xShape->SetDim(0U, bs);
@@ -55,7 +61,7 @@ static ge::graphStatus InferShapeMoeDistributeCombine(gert::InferShapeContext* c
 static ge::graphStatus InferDataTypeMoeDistributeCombine(gert::InferDataTypeContext* context)
 {
     OP_LOGD(context->GetNodeName(), "Begin to do InferDataTypeMoeDistributeCombine.");
-    auto xDtype = context->GetInputDataType(COMBINE_INPUT_EXPERT_X_INDEX);
+    auto xDtype = context->GetInputDataType(COMBINE_INPUT_EXPAND_X_INDEX);
     context->SetOutputDataType(COMBINE_OUTPUT_X_INDEX, xDtype);
     OP_LOGD(context->GetNodeName(), "End to do InferDataTypeMoeDistributeCombine.");
     return ge::GRAPH_SUCCESS;

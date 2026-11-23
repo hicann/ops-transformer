@@ -76,7 +76,7 @@ void RunRoceCombineCase(bool preReduce, int64_t quantMode, int64_t ranksPerServe
                                    GetRoceCombineAttrs(preReduce, quantMode, ranksPerServer), &compileInfo, "3510", 48,
                                    256U * 1024U);
     const uint64_t quantKey = quantMode == 0 ? 0U : static_cast<uint64_t>(quantMode - 1);
-    Mc2ExecuteTestCase(params, {{"rankNum", 8}}, expected, 144U + quantKey);
+    Mc2ExecuteTestCase(params, {{"rankNum", 8}}, expected, 140U + quantKey);
 }
 
 TEST(MoeDistributeCombineV3RoceTiling, PreReduceAndForwardQuantModes)

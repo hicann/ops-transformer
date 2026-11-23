@@ -12,12 +12,27 @@
 #include "mc2_infer_shape_case_executor.h"
 #include "base/registry/op_impl_space_registry_v2.h"
 #include "infer_datatype_context_faker.h"
+#include "rt_soc_spec_mocker.h"
 #define private public
 #include "platform/platform_info.h"
 #undef private
 
 namespace MoeDistributeDispatchV2 {
-class MoeDistributeDispatchV2Infershape : public testing::Test {};
+// 默认平台为 A2/A3（arch22）：NpuArch 置 2201，使 IsTargetNpuArchInfershape(NPUARCH_22)
+// 与真实 A2/A3 环境一致；A5 用例在测试体内自行 SetRtSocSpecNpuArch("3510") 覆盖。
+class MoeDistributeDispatchV2Infershape : public testing::Test {
+protected:
+    void SetUp() override
+    {
+        SetRtSocSpecShortVersion("Ascend910B");
+        SetRtSocSpecNpuArch("2201");
+    }
+    void TearDown() override
+    {
+        SetRtSocSpecShortVersion("Ascend910B");
+        SetRtSocSpecNpuArch("");
+    }
+};
 
 // infer shape with bias, success
 TEST_F(MoeDistributeDispatchV2Infershape, inferShape0)
@@ -145,9 +160,8 @@ TEST_F(MoeDistributeDispatchV2Infershape, inferShape_SharedExpertLowRankId)
 }
 
 // ============================================
-// rtGetSocSpec mock 控制（在 mc2_tiling_ut_stub 中提供实现）
+// rtGetSocSpec mock 控制（在 mc2_tiling_ut_stub 中提供实现），头文件已移至文件顶部
 // ============================================
-#include "rt_soc_spec_mocker.h"
 
 // ============================================
 // A2 平台补充测试
@@ -238,8 +252,7 @@ TEST_F(MoeDistributeDispatchV2Infershape, InferShape_WithExpertScales)
     Mc2ExecuteTestCase(infershapeContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, expectedOutputShape);
 }
 
-// globalBs < 0：globalBsReal 钳制为 -1，最终 a = -1
-// 覆盖 line 251
+// globalBs < 0：不允许传入负值，直接返回失败
 TEST_F(MoeDistributeDispatchV2Infershape, InferShape_NegativeGlobalBs)
 {
     gert::StorageShape xShape = {{32, 7168}, {}};
@@ -274,8 +287,7 @@ TEST_F(MoeDistributeDispatchV2Infershape, InferShape_NegativeGlobalBs)
          {"const_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}});
 
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
-    std::vector<std::vector<int64_t>> expectedOutputShape = {{-1, 7168}};
-    Mc2ExecuteTestCase(infershapeContextPara, hcomTopologyMockValues, ge::GRAPH_SUCCESS, expectedOutputShape);
+    Mc2ExecuteTestCase(infershapeContextPara, hcomTopologyMockValues, ge::GRAPH_FAILED);
 }
 
 // InferDtype MX 量化 + scales 输入：覆盖 InferDataTypeDynamicScales MX 分支
@@ -1180,7 +1192,7 @@ INSTANTIATE_TEST_SUITE_P(ExpertIdsBatch, MoeDistributeDispatchV2BatchInfershape,
 TEST_F(MoeDistributeDispatchV2Infershape, InferShape_A3_NoExpertScalesEpRecv)
 {
     SetRtSocSpecShortVersion("Ascend910_93");
-    SetRtSocSpecNpuArch("");
+    SetRtSocSpecNpuArch("2201");
     fe::PlatformInfo platformInfo;
     fe::OptionalInfo optiCompilationInfo;
     optiCompilationInfo.soc_version = "Ascend910_93";

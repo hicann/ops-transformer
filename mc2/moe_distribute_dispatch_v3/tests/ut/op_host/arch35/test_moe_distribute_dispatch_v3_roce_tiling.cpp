@@ -57,7 +57,7 @@ void RunRoceDispatchCase(int64_t ranksPerServer, int64_t assistSize, int64_t win
     gert::TilingContextPara params("MoeDistributeDispatchV3", inputs, outputs,
                                    GetRoceDispatchAttrs(ranksPerServer, windowBytes), &compileInfo, "3510", 48,
                                    256U * 1024U);
-    Mc2ExecuteTestCase(params, {{"rankNum", 8}}, expected, 1472U);
+    Mc2ExecuteTestCase(params, {{"rankNum", 8}}, expected, 1344U);
 }
 
 TEST(MoeDistributeDispatchV3RoceTiling, Topk16AndCompactAssist)

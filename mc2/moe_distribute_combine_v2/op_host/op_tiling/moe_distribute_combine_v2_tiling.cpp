@@ -47,7 +47,6 @@ using namespace ge;
 
 namespace {
 constexpr uint32_t RANK_NUM_PER_NODE_A2 = 8;
-constexpr uint32_t OP_VERSION_2 = 2;
 constexpr uint32_t EXPAND_X_INDEX = 0;
 constexpr uint32_t EXPERT_IDS_INDEX = 1;
 constexpr uint32_t ASSIST_INFO_INDEX = 2;

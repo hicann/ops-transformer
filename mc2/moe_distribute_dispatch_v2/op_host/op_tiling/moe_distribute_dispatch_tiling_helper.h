@@ -22,7 +22,6 @@
 #include "tiling/tiling_api.h"
 #include "graph/utils/type_utils.h"
 #include "op_host/tiling_base.h"
-#include "op_host/op_tiling/mc2_opversion_manager.h"
 #include "common/include/op_host/op_const_def_transformer.h"
 
 namespace optiling {
@@ -35,12 +34,9 @@ constexpr uint32_t OUTPUT_DYNAMIC_SCALES_INDEX = 1U;
 constexpr uint32_t OUTPUT_EXPAND_IDX_INDEX = 2U;
 constexpr uint32_t OUTPUT_EXPERT_TOKEN_NUMS_INDEX = 3U;
 constexpr uint32_t OUTPUT_EP_RECV_COUNTS_INDEX = 4U;
-constexpr uint32_t OUTPUT_TP_RECV_COUNTS_INDEX = 5U;
 
 constexpr uint32_t TWO_DIMS = 2;
 constexpr uint32_t ONE_DIM = 1;
-
-constexpr uint32_t OP_VERSION_1 = 1U;
 
 enum class RealModeA5 : uint32_t {
     NO_SCALES = 0,
@@ -102,18 +98,14 @@ class MoeDistributeDispatchTilingHelper {
 public:
     static ge::graphStatus TilingCheckMoeDistributeDispatch(gert::TilingContext* context, const char* nodeName,
                                                             const bool isScales, const uint32_t quantMode);
-    static ge::graphStatus TilingCheckMoeDistributeDispatchA5(gert::TilingContext* context, const bool isScales,
-                                                              const uint32_t quantMode, const bool isTokenMask);
     static bool CheckScaleTensorDim(const gert::TilingContext* context, const char* nodeName, const bool isScales,
                                     const uint32_t quantMode, const uint32_t scalesIndex);
 
 protected:
     static bool CheckTensorDim(gert::TilingContext* context, const char* nodeName, const bool isScales,
-                               const uint32_t quantMode, const uint32_t opVersion);
+                               const uint32_t quantMode);
     static bool CheckTensorDataType(gert::TilingContext* context, const char* nodeName, const bool isScales,
                                     const uint32_t quantMode);
-    static bool CheckTensorDataTypeA5(gert::TilingContext* context, const char* nodeName, const bool isScales,
-                                      const uint32_t quantMode);
     static bool CheckTensorFormat(const gert::TilingContext* context, const char* nodeName, const bool isScales,
                                   const uint32_t quantMode);
 
@@ -128,14 +120,6 @@ private:
     inline static bool CheckCommonOutputTensorDataType(const gert::TilingContext* context, const char* nodeName);
     inline static bool CheckInputTensorDataType(const gert::TilingContext* context, const char* nodeName,
                                                 const bool isScales);
-    inline static bool CheckTensorDataTypeNoScales(const gert::TilingContext* context, const char* nodeName,
-                                                   const bool isScales);
-    inline static bool CheckTensorDataTypeStaticOrDynamic(const gert::TilingContext* context, const char* nodeName,
-                                                          bool isScales);
-    inline static bool CheckTensorDataTypeMxfp8(const gert::TilingContext* context, const char* nodeName);
-    inline static bool CheckDistinctTensorDataType(gert::TilingContext* context, const char* nodeName,
-                                                   const bool isScales, const uint32_t quantMode);
-    inline static bool CheckTokenMask(const gert::TilingContext* context, const char* nodeName);
 };
 } // namespace optiling
 #endif // MOE_DISTRIBUTE_DISPATCH_TILING_HELPER_H

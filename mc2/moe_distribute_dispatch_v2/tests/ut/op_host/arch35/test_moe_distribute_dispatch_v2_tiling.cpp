@@ -116,56 +116,6 @@ INSTANTIATE_TEST_SUITE_P(
     testing::ValuesIn(GetCasesFromCsv<MoeDistributeDispatchV2TilingUtParam>(ReplaceFileExtension2Csv(__FILE__))),
     PrintCaseInfoString<MoeDistributeDispatchV2TilingUtParam>);
 
-TEST_F(MoeDistributeDispatchV2Arch35TilingTest, A5SmallWindowCcuFailed)
-{
-    const char* envValue = getenv("HCCL_BUFFSIZE");
-    std::string originalEnv = envValue != nullptr ? envValue : "";
-    setenv("HCCL_BUFFSIZE", "1", 1);
-
-    struct MoeDistributeDispatchV2CompileInfo {};
-    MoeDistributeDispatchV2CompileInfo compileInfo;
-    gert::TilingContextPara tilingContextPara(
-        "MoeDistributeDispatchV2",
-        {
-            {{{16, 7168}, {16, 7168}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{16, 7}, {16, 7}}, ge::DT_INT32, ge::FORMAT_ND},
-        },
-        {
-            {{{896, 7168}, {896, 7168}}, ge::DT_FLOAT16, ge::FORMAT_ND},
-            {{{896}, {896}}, ge::DT_FLOAT, ge::FORMAT_ND},
-            {{{8192}, {8192}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{1}, {1}}, ge::DT_INT64, ge::FORMAT_ND},
-            {{{8}, {8}}, ge::DT_INT32, ge::FORMAT_ND},
-            {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},
-        },
-        {{"group_ep", Ops::Transformer::AnyValue::CreateFrom<std::string>("ep_group")},
-         {"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
-         {"ep_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(56)},
-         {"group_tp", Ops::Transformer::AnyValue::CreateFrom<std::string>("tp_group")},
-         {"tp_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-         {"tp_rank_id", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"expert_shard_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"shared_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-         {"shared_expert_rank_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-         {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"global_bs", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"expert_token_nums_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
-         {"comm_alg", Ops::Transformer::AnyValue::CreateFrom<std::string>("ccu")},
-         {"zero_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"copy_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-         {"const_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)}},
-        &compileInfo, "3510", 20, 196608);
-    Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 8}};
-    Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, ge::GRAPH_FAILED);
-
-    if (originalEnv.empty()) {
-        unsetenv("HCCL_BUFFSIZE");
-    } else {
-        setenv("HCCL_BUFFSIZE", originalEnv.c_str(), 1);
-    }
-}
-
 // A5 MTE fullmesh_v2 + STATIC 1D scales：覆盖 FillOneDimScalesInfo
 TEST_F(MoeDistributeDispatchV2Arch35TilingTest, A5MteStaticHif8OneDimScales)
 {

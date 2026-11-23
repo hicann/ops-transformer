@@ -41,8 +41,6 @@ extern "C" {
 #endif
 
 extern "C" void __attribute__((weak)) NnopbaseSetHcclServerType(void* executor, NnopbaseHcclServerType sType);
-extern "C" void NnopbaseSetUserHandle(void* executor, void* handle);
-extern "C" void* NnopbaseGetUserHandle(void* executor);
 
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
 extern aclnnStatus aclnnInnerMoeDistributeCombineV3GetWorkspaceSize(
@@ -60,11 +58,6 @@ extern aclnnStatus aclnnInnerMoeDistributeCombineV3GetWorkspaceSize(
 
 extern aclnnStatus aclnnInnerMoeDistributeCombineV3(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                                     aclrtStream stream);
-
-enum class CommType : uint64_t {
-    AIV = 0, // AIV通信设置为0
-    CCU = 1  // ccu通信设置为1
-};
 #endif
 
 bool CombineCheckNotNull(const aclTensor* expandX, const aclTensor* expertIds, const aclTensor* assistInfoForCombine,
@@ -121,53 +114,21 @@ static inline void SafeCopyGroupBuf(char* dst, size_t dstSize, const char* src, 
     }
 }
 
-static void SetCommArgs(aclOpExecutor** executor, const bool is910B, const bool isA5OrA6, const char* commAlg)
+static void SetCommArgs(aclOpExecutor** executor)
 {
-#if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
-    if (isA5OrA6) {
-        CommType type = CommType::AIV;
-        if (commAlg != nullptr && std::strcmp(commAlg, "ccu") == 0) {
-            type = CommType::CCU;
-        }
-        void* args = reinterpret_cast<void*>(static_cast<uint64_t>(type));
-        NnopbaseSetUserHandle(*executor, args);
-    }
-#endif
-
     if (NnopbaseSetHcclServerType) {
-        if (is910B) {
+        if (GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B) {
             NnopbaseSetHcclServerType(*executor, NNOPBASE_HCCL_SERVER_TYPE_AICPU);
-        } else if (isA5OrA6 && commAlg != nullptr && std::strcmp(commAlg, "ccu") == 0) {
-            NnopbaseSetHcclServerType(*executor, NNOPBASE_HCCL_SERVER_TYPE_CCU);
         } else {
             NnopbaseSetHcclServerType(*executor, NNOPBASE_HCCL_SERVER_TYPE_MTE);
         }
     }
 }
 
-static void PrepareCommBuffers(const char* groupEp, const char* groupTp, const char* commAlg, bool is910B,
-                               char* groupEpBuf, char* groupTpBuf, char* commAlgBuf)
+static void PrepareCommBuffers(const char* groupEp, const char* commAlg, char* groupEpBuf, char* commAlgBuf)
 {
-    const char* groupTpCombineV2Temp = groupTp;
-    if (is910B) {
-        groupTpCombineV2Temp = "";
-    }
     SafeCopyGroupBuf(groupEpBuf, HCCL_GROUP_NAME_MAX, groupEp, HCCL_GROUP_NAME_MAX - 1);
-    SafeCopyGroupBuf(groupTpBuf, HCCL_GROUP_NAME_MAX, groupTpCombineV2Temp, HCCL_GROUP_NAME_MAX - 1);
     SafeCopyGroupBuf(commAlgBuf, HCCL_GROUP_NAME_MAX, commAlg, HCCL_GROUP_NAME_MAX - 1);
-}
-
-static aclnnStatus CheckCcuWorkspaceParams(const aclTensor* performanceInfoOptional, const char* commAlg)
-{
-    // ccu暂时不支持performanceInfo
-    if (commAlg != nullptr && std::strcmp(commAlg, "ccu") == 0) {
-        if (performanceInfoOptional != nullptr) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("MoeDistributeCombineV2", "performanceInfo", "not nullptr",
-                                                  "performanceInfo not supported in ccu");
-            return ACLNN_ERR_PARAM_NULLPTR;
-        }
-    }
-    return ACLNN_SUCCESS;
 }
 
 static aclnnStatus ResolveInnerWorkspaceSize(
@@ -181,12 +142,12 @@ static aclnnStatus ResolveInnerWorkspaceSize(
     char* groupEpBuf, char* groupTpBuf, const char* commAlg, char* commAlgBuf, int64_t epWorldSize, int64_t epRankId,
     int64_t moeExpertNum, int64_t tpWorldSize, int64_t tpRankId, int64_t expertShardType, int64_t sharedExpertNum,
     int64_t sharedExpertRankNum, int64_t globalBs, int64_t outDtype, int64_t commQuantMode, int64_t groupListType,
-    int64_t zeroExpertNum, int64_t copyExpertNum, int64_t constExpertNum, bool enablePreReduce, bool is910B,
-    bool isA5OrA6, aclTensor* xOut, uint64_t* workspaceSize, aclOpExecutor** executor)
+    int64_t zeroExpertNum, int64_t copyExpertNum, int64_t constExpertNum, bool enablePreReduce, aclTensor* xOut,
+    uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     aclnnStatus getWorkspaceSizesRes = ACLNN_ERR_INNER;
-    // ccu暂时不支持mc2Context，回退到V2接口
-    if (!isA5OrA6 || (commAlg != nullptr && std::strcmp(commAlg, "ccu") == 0)) {
+    // a2 a3走aclnninnerv2
+    if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_2201) {
         getWorkspaceSizesRes = aclnnInnerMoeDistributeCombineV2GetWorkspaceSize(
             expandX, expertIds, assistInfoForCombine, epSendCounts, expertScales, tpSendCountsOptional,
             xActiveMaskOptional, activationScaleOptional, weightScaleOptional, groupListOptional, expandScalesOptional,
@@ -218,7 +179,7 @@ static aclnnStatus ResolveInnerWorkspaceSize(
 #endif
     }
     CHECK_RET(getWorkspaceSizesRes == ACLNN_SUCCESS, getWorkspaceSizesRes);
-    SetCommArgs(executor, is910B, isA5OrA6, commAlg);
+    SetCommArgs(executor);
     return getWorkspaceSizesRes;
 }
 
@@ -237,32 +198,36 @@ aclnnStatus aclnnMoeDistributeCombineBaseGetWorkspaceSize(
     aclOpExecutor** executor)
 {
     OP_LOGD("enter to the  aclnnMoeDistributeCombineBaseGetWorkspaceSize\n");
-    auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
-    const static bool is910B = GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B;
-    const static bool isA5OrA6 =
-        (npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202);
     auto retParam = CombineCheckParams(expandX, expertIds, assistInfoForCombine, epSendCounts, expertScales, groupEp,
                                        groupTp, xOut);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
-    if (!enablePreReduce &&
-        (npuArch != Ops::Base::DAV_3510 || commAlg == nullptr || std::strcmp(commAlg, "hierarchy") != 0)) {
-        OP_LOGE_LIBOPAPI_REPORT("MoeDistributeCombineV2", "enablePreReduce=false requires A5 hierarchy");
+    if ((HCOMM_VERSION_NUM < HCCL_CHANNEL_SUPPORT_VERSION) &&
+        (GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_2201)) {
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("MoeDistributeCombineV3", "HCOMM_VERSION_NUM",
+                                              std::to_string(HCOMM_VERSION_NUM).c_str(),
+                                              std::string("should be >= ")
+                                                  .append(std::to_string(HCCL_CHANNEL_SUPPORT_VERSION))
+                                                  .append(" for A5 and later chip version")
+                                                  .c_str());
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (!enablePreReduce && (GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510 || commAlg == nullptr ||
+                             std::strcmp(commAlg, "hierarchy") != 0)) {
+        OP_LOGE_LIBOPAPI_REPORT("MoeDistributeCombineV3", "enablePreReduce=false requires A5 hierarchy");
         return ACLNN_ERR_PARAM_INVALID;
     }
     char groupEpBuf[HCCL_GROUP_NAME_MAX] = {0};
-    char groupTpBuf[HCCL_GROUP_NAME_MAX] = {0};
+    char groupTpBuf[HCCL_GROUP_NAME_MAX] = {0}; // tp is unused
     char commAlgBuf[HCCL_GROUP_NAME_MAX] = {0};
-    PrepareCommBuffers(groupEp, groupTp, commAlg, is910B, groupEpBuf, groupTpBuf, commAlgBuf);
-    auto retCcu = CheckCcuWorkspaceParams(performanceInfoOptional, commAlg);
-    CHECK_RET(retCcu == ACLNN_SUCCESS, retCcu);
+    PrepareCommBuffers(groupEp, commAlg, groupEpBuf, commAlgBuf);
     return ResolveInnerWorkspaceSize(
         expandX, expertIds, assistInfoForCombine, epSendCounts, expertScales, tpSendCountsOptional, xActiveMaskOptional,
         activationScaleOptional, weightScaleOptional, groupListOptional, expandScalesOptional, sharedExpertXOptional,
         elasticInfoOptional, oriXOptional, constExpertAlpha1Optional, constExpertAlpha2Optional, constExpertVOptional,
         performanceInfoOptional, groupEp, groupEpBuf, groupTpBuf, commAlg, commAlgBuf, epWorldSize, epRankId,
         moeExpertNum, tpWorldSize, tpRankId, expertShardType, sharedExpertNum, sharedExpertRankNum, globalBs, outDtype,
-        commQuantMode, groupListType, zeroExpertNum, copyExpertNum, constExpertNum, enablePreReduce, is910B, isA5OrA6,
-        xOut, workspaceSize, executor);
+        commQuantMode, groupListType, zeroExpertNum, copyExpertNum, constExpertNum, enablePreReduce, xOut,
+        workspaceSize, executor);
 }
 
 // aclnn二段式接口
@@ -270,17 +235,9 @@ aclnnStatus aclnnMoeDistributeCombineBase(void* workspace, uint64_t workspaceSiz
                                           aclrtStream stream)
 {
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
-    auto npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
-    const static bool isA5OrA6 =
-        (npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201 || npuArch == Ops::Base::DAV_9202);
-    if (isA5OrA6) {
-        void* arg = NnopbaseGetUserHandle(executor);
-        uintptr_t handleVal = reinterpret_cast<uintptr_t>(arg);
-        CommType commType = static_cast<CommType>(handleVal);
-        if (commType == CommType::AIV) {
-            OP_LOGD("aclnn_combine inner v3 start");
-            return aclnnInnerMoeDistributeCombineV3(workspace, workspaceSize, executor, stream);
-        }
+    if (GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_2201) {
+        OP_LOGD("aclnn_combine inner v3 start");
+        return aclnnInnerMoeDistributeCombineV3(workspace, workspaceSize, executor, stream);
     }
 #endif
     OP_LOGD("aclnn_combine inner v2 start");

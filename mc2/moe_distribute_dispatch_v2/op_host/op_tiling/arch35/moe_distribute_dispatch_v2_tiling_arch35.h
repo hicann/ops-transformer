@@ -16,25 +16,10 @@
 #ifndef MOE_DISTRIBUTE_DISPATCH_V2_TILING_ARCH35_H
 #define MOE_DISTRIBUTE_DISPATCH_V2_TILING_ARCH35_H
 
-#include "op_host/op_tiling/moe_tiling_base.h"
 #include "../moe_distribute_dispatch_tiling_helper.h"
 #include "../moe_distribute_dispatch_tiling_v2.h"
 
 namespace optiling {
-
-ge::graphStatus MoeDistributeDispatchTilingImpl(gert::TilingContext* context, uint32_t opVersion);
-
-class MoeDistributeDispatchTilingA5 : public MoeTilingBase {
-public:
-    explicit MoeDistributeDispatchTilingA5(gert::TilingContext* context)
-        : MoeTilingBase(context) {};
-
-protected:
-    ge::graphStatus DoOpTiling() override;
-    uint64_t GetTilingKey() const override;
-    bool IsCapable() override;
-};
-
 class MoeDistributeDispatchV2TilingFuncA5 : public MoeDistributeDispatchV2TilingFuncBase {
 public:
     ge::graphStatus MoeDistributeDispatchV2TilingFunc(gert::TilingContext* context) override;

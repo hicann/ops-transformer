@@ -29,7 +29,6 @@ static constexpr int32_t DISPATCH_DYNAMIC_QUANT_MODE = 2;
 enum NnopbaseHcclServerType {
     NNOPBASE_HCCL_SERVER_TYPE_AICPU = 0,
     NNOPBASE_HCCL_SERVER_TYPE_MTE,
-    NNOPBASE_HCCL_SERVER_TYPE_CCU,
     NNOPBASE_HCCL_SERVER_TYPE_END
 };
 
@@ -121,8 +120,7 @@ aclnnStatus MoeDistributeDispatchGetWorkspaceSize(
 
     char groupEpBuf[HCCL_GROUP_NAME_MAX] = {0};
     CHECK_RET(SafeCopyGroupBuf(groupEpBuf, HCCL_GROUP_NAME_MAX, groupEp, HCCL_GROUP_NAME_MAX - 1), ACLNN_ERR_INNER);
-    char groupTpBuf[HCCL_GROUP_NAME_MAX] = {0};
-    CHECK_RET(SafeCopyGroupBuf(groupTpBuf, HCCL_GROUP_NAME_MAX, groupTp, HCCL_GROUP_NAME_MAX - 1), ACLNN_ERR_INNER);
+    char groupTpBuf[HCCL_GROUP_NAME_MAX] = {0}; // TP group is unused.
 
     aclnnStatus ret = aclnnInnerMoeDistributeDispatchGetWorkspaceSize(
         x, expertIds, scales, xActiveMask, expertScales, groupEpBuf, epWorldSize, epRankId, moeExpertNum, groupTpBuf,
@@ -140,21 +138,13 @@ aclnnStatus aclnnMoeDistributeDispatchGetWorkspaceSize(
     aclTensor* dynamicScales, aclTensor* expandIdx, aclTensor* expertTokenNums, aclTensor* epRecvCounts,
     aclTensor* tpRecvCounts, aclTensor* expandScales, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    if (GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B) {
-        const char* groupTpEmptyWord = "";
-        aclnnStatus distributeDispatchRet = MoeDistributeDispatchGetWorkspaceSize(
-            x, expertIds, scales, xActiveMask, expertScales, groupEp, epWorldSize, epRankId, moeExpertNum,
-            groupTpEmptyWord, tpWorldSize, tpRankId, expertShardType, sharedExpertNum, sharedExpertRankNum, quantMode,
-            globalBs, expertTokenNumsType, expandX, dynamicScales, expandIdx, expertTokenNums, epRecvCounts,
-            tpRecvCounts, expandScales, workspaceSize, executor);
-        return distributeDispatchRet;
-    }
-    aclnnStatus ret = MoeDistributeDispatchGetWorkspaceSize(
-        x, expertIds, scales, xActiveMask, expertScales, groupEp, epWorldSize, epRankId, moeExpertNum, groupTp,
+    const char* groupTpEmptyWord = ""; // TP group is unused.
+    aclnnStatus distributeDispatchRet = MoeDistributeDispatchGetWorkspaceSize(
+        x, expertIds, scales, xActiveMask, expertScales, groupEp, epWorldSize, epRankId, moeExpertNum, groupTpEmptyWord,
         tpWorldSize, tpRankId, expertShardType, sharedExpertNum, sharedExpertRankNum, quantMode, globalBs,
         expertTokenNumsType, expandX, dynamicScales, expandIdx, expertTokenNums, epRecvCounts, tpRecvCounts,
         expandScales, workspaceSize, executor);
-    return ret;
+    return distributeDispatchRet;
 }
 aclnnStatus aclnnMoeDistributeDispatch(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                        aclrtStream stream)

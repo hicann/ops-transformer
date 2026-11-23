@@ -69,17 +69,6 @@ aclnnStatus CallBaseGetWorkspaceSize(const char* groupTp, const char* commAlg)
 }
 } // namespace
 
-TEST(MoeDistributeCombineV2BaseCoverageTest, TestBaseGetWorkspaceSizeA5Ccu)
-{
-    EXPECT_EXIT(
-        {
-            op::SetPlatformNpuArch(Ops::Base::DAV_3510);
-            (void)CallBaseGetWorkspaceSize("test_moe_distribute_combine_tp", "ccu");
-            std::exit(0);
-        },
-        testing::ExitedWithCode(0), "");
-}
-
 TEST(MoeDistributeCombineV2BaseCoverageTest, TestBaseGetWorkspaceSizeNon910B)
 {
     EXPECT_EXIT(

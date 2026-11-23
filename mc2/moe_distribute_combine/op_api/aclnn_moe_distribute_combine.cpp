@@ -28,7 +28,6 @@ extern "C" {
 enum NnopbaseHcclServerType {
     NNOPBASE_HCCL_SERVER_TYPE_AICPU = 0,
     NNOPBASE_HCCL_SERVER_TYPE_MTE,
-    NNOPBASE_HCCL_SERVER_TYPE_CCU,
     NNOPBASE_HCCL_SERVER_TYPE_END
 };
 
@@ -116,21 +115,13 @@ aclnnStatus aclnnMoeDistributeCombineGetWorkspaceSize(
     int64_t sharedExpertRankNum, int64_t globalBs, int64_t outDtype, int64_t commQuantMode, int64_t groupListType,
     aclTensor* x, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    if (GetCurrentPlatformInfo().GetSocVersion() == SocVersion::ASCEND910B) {
-        const char* groupTpEmptyWord = "";
-        aclnnStatus distributeCombineRet = MoeDistributeCombineGetWorkspaceSize(
-            expandX, expertIds, expandIdx, epSendCounts, expertScales, tpSendCounts, xActiveMask, activationScale,
-            weightScale, groupList, expandScales, groupEp, epWorldSize, epRankId, moeExpertNum, groupTpEmptyWord,
-            tpWorldSize, tpRankId, expertShardType, sharedExpertNum, sharedExpertRankNum, globalBs, outDtype,
-            commQuantMode, groupListType, x, workspaceSize, executor);
-        return distributeCombineRet;
-    }
-    aclnnStatus ret = MoeDistributeCombineGetWorkspaceSize(
+    const char* groupTpEmptyWord = ""; // TP group is unused.
+    aclnnStatus distributeCombineRet = MoeDistributeCombineGetWorkspaceSize(
         expandX, expertIds, expandIdx, epSendCounts, expertScales, tpSendCounts, xActiveMask, activationScale,
-        weightScale, groupList, expandScales, groupEp, epWorldSize, epRankId, moeExpertNum, groupTp, tpWorldSize,
-        tpRankId, expertShardType, sharedExpertNum, sharedExpertRankNum, globalBs, outDtype, commQuantMode,
+        weightScale, groupList, expandScales, groupEp, epWorldSize, epRankId, moeExpertNum, groupTpEmptyWord,
+        tpWorldSize, tpRankId, expertShardType, sharedExpertNum, sharedExpertRankNum, globalBs, outDtype, commQuantMode,
         groupListType, x, workspaceSize, executor);
-    return ret;
+    return distributeCombineRet;
 }
 
 aclnnStatus aclnnMoeDistributeCombine(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,

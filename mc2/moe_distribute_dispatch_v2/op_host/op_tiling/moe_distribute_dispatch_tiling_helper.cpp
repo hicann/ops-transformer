@@ -186,8 +186,7 @@ inline bool MoeDistributeDispatchTilingHelper::CheckEpTpRecvTensorDim(const gert
 }
 
 bool MoeDistributeDispatchTilingHelper::CheckTensorDim(gert::TilingContext* context, const char* nodeName,
-                                                       const bool isScales, const uint32_t quantMode,
-                                                       const uint32_t opVersion)
+                                                       const bool isScales, const uint32_t quantMode)
 {
     if (!CheckInputTensorDim(context, nodeName, isScales, quantMode)) {
         OP_LOGE_LIBOPAPI_REPORT(nodeName, "CheckInputTensorDim failed; propagate lower-layer error");
@@ -195,13 +194,11 @@ bool MoeDistributeDispatchTilingHelper::CheckTensorDim(gert::TilingContext* cont
     }
 
     // A3/A5 v1接口的x_active_mask不支持传入
-    if (opVersion == OP_VERSION_1) {
-        const gert::StorageShape* xActiveMaskStorageShape = context->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
-        if (xActiveMaskStorageShape != nullptr) {
-            OP_LOGE_FOR_INVALID_VALUE(nodeName, "x_active_mask", "provided",
-                                      "only None is supported on this interface version");
-            return false;
-        }
+    const gert::StorageShape* xActiveMaskStorageShape = context->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
+    if (xActiveMaskStorageShape != nullptr) {
+        OP_LOGE_FOR_INVALID_VALUE(nodeName, "x_active_mask", "provided",
+                                  "only None is supported on this interface version");
+        return false;
     }
 
     if ((!CheckOutputTensorDim(context, nodeName, quantMode)) || (!CheckEpTpRecvTensorDim(context, nodeName))) {
@@ -329,148 +326,6 @@ bool MoeDistributeDispatchTilingHelper::CheckTensorDataType(gert::TilingContext*
     return true;
 }
 
-inline bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeNoScales(const gert::TilingContext* context,
-                                                                           const char* nodeName, const bool isScales)
-{
-    auto xDesc = context->GetInputDesc(X_INDEX);
-    OP_TILING_CHECK(xDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xDesc"), return false);
-    auto expandXDesc = context->GetOutputDesc(OUTPUT_EXPAND_X_INDEX);
-    OP_TILING_CHECK(expandXDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "expandXDesc"), return false);
-    OP_TILING_CHECK((NON_QUANT_DTYPE.find(static_cast<ge::DataType>(xDesc->GetDataType())) == NON_QUANT_DTYPE.end()),
-                    OP_LOGE_FOR_INVALID_DTYPE(nodeName, "x", Ops::Base::ToString(xDesc->GetDataType()).c_str(),
-                                              "BF16, FLOAT16, FLOAT8_E5M2, FLOAT8_E4M3FN, or HIFLOAT8"),
-                    return false);
-    // ExpandX: the same as X
-    if (expandXDesc->GetDataType() != xDesc->GetDataType()) {
-        std::string dtypeStr = Ops::Base::ToString(expandXDesc->GetDataType());
-        std::string xDtypeStr = Ops::Base::ToString(xDesc->GetDataType());
-        std::string reason = "The dtype of expandX must be the same as that of x";
-        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(nodeName, "expandX", dtypeStr.c_str(), reason.c_str());
-        return false;
-    }
-    // Scales: bf16/fp16: nullptr; hif8: fp32; e5m2/e4m3fn: float/e8m0
-    // Dynamic scales: the same as scales, and no validations for bf16/fp16
-    // If X is bf16/fp16, the scales must be nullptr, which is validated in CheckQuantModeAndScales
-    // Hence the datatype of X must be e5m2/e4m3fn/hif8 when isScales is true
-    if (isScales) {
-        auto scalesDesc = context->GetOptionalInputDesc(SCALES_INDEX);
-        OP_TILING_CHECK(scalesDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "scalesDesc"), return false);
-        auto dynamicScalesDesc = context->GetOutputDesc(OUTPUT_DYNAMIC_SCALES_INDEX);
-        OP_TILING_CHECK(dynamicScalesDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "dynamicScalesDesc"),
-                        return false);
-        OP_TILING_CHECK((xDesc->GetDataType() == ge::DT_HIFLOAT8) && (scalesDesc->GetDataType() != ge::DT_FLOAT),
-                        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "scales",
-                                                  Ops::Base::ToString(scalesDesc->GetDataType()).c_str(), "FLOAT"),
-                        return false);
-        OP_TILING_CHECK(
-            (scalesDesc->GetDataType() != ge::DT_FLOAT) && (scalesDesc->GetDataType() != ge::DT_FLOAT8_E8M0),
-            OP_LOGE_FOR_INVALID_DTYPE(nodeName, "scales", Ops::Base::ToString(scalesDesc->GetDataType()).c_str(),
-                                      "FLOAT or FLOAT8_E8M0"),
-            return false);
-        OP_TILING_CHECK(
-            dynamicScalesDesc->GetDataType() != scalesDesc->GetDataType(),
-            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                nodeName, "dynamic_scales", Ops::Base::ToString(dynamicScalesDesc->GetDataType()).c_str(),
-                (std::string("must match scales dtype ") + Ops::Base::ToString(scalesDesc->GetDataType())).c_str()),
-            return false);
-    }
-    return true;
-}
-
-inline bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeStaticOrDynamic(const gert::TilingContext* context,
-                                                                                  const char* nodeName, bool isScales)
-{
-    auto xDesc = context->GetInputDesc(X_INDEX);
-    OP_TILING_CHECK(xDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xDesc"), return false);
-    auto dynamicScalesDesc = context->GetOutputDesc(OUTPUT_DYNAMIC_SCALES_INDEX);
-    OP_TILING_CHECK(dynamicScalesDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "dynamicScalesDesc"),
-                    return false);
-    OP_TILING_CHECK(
-        (xDesc->GetDataType() != ge::DT_BF16) && (xDesc->GetDataType() != ge::DT_FLOAT16),
-        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "x", Ops::Base::ToString(xDesc->GetDataType()).c_str(), "BF16 or FLOAT16"),
-        return false);
-    // Scales: fp32, optional for dynamic/pertoken/pertile, required for static/hif8
-    // isScales has been checked in CheckQuantModeAndScales
-    if (isScales) {
-        auto scalesDesc = context->GetOptionalInputDesc(SCALES_INDEX);
-        OP_TILING_CHECK(scalesDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "scalesDesc"), return false);
-        OP_TILING_CHECK((scalesDesc->GetDataType() != ge::DT_FLOAT),
-                        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "scales",
-                                                  Ops::Base::ToString(scalesDesc->GetDataType()).c_str(), "FLOAT"),
-                        return false);
-    }
-    OP_TILING_CHECK(dynamicScalesDesc->GetDataType() != ge::DT_FLOAT,
-                    OP_LOGE_FOR_INVALID_DTYPE(nodeName, "dynamic_scales",
-                                              Ops::Base::ToString(dynamicScalesDesc->GetDataType()).c_str(), "FLOAT"),
-                    return false);
-    return true;
-}
-
-inline bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeMxfp8(const gert::TilingContext* context,
-                                                                        const char* nodeName)
-{
-    auto xDesc = context->GetInputDesc(X_INDEX);
-    OP_TILING_CHECK(xDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "xDesc"), return false);
-    auto dynamicScalesDesc = context->GetOutputDesc(OUTPUT_DYNAMIC_SCALES_INDEX);
-    OP_TILING_CHECK(dynamicScalesDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(nodeName, "dynamicScalesDesc"),
-                    return false);
-    OP_TILING_CHECK(
-        (xDesc->GetDataType() != ge::DT_BF16) && (xDesc->GetDataType() != ge::DT_FLOAT16),
-        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "x", Ops::Base::ToString(xDesc->GetDataType()).c_str(), "BF16 or FLOAT16"),
-        return false);
-    // No Scales input
-    OP_TILING_CHECK(
-        dynamicScalesDesc->GetDataType() != ge::DT_FLOAT8_E8M0,
-        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "dynamic_scales",
-                                  Ops::Base::ToString(dynamicScalesDesc->GetDataType()).c_str(), "FLOAT8_E8M0"),
-        return false);
-    return true;
-}
-
-inline bool MoeDistributeDispatchTilingHelper::CheckDistinctTensorDataType(gert::TilingContext* context,
-                                                                           const char* nodeName, const bool isScales,
-                                                                           const uint32_t quantMode)
-{
-    if (quantMode == static_cast<uint32_t>(QuantModeA5::NON_QUANT)) {
-        OP_TILING_CHECK(!CheckTensorDataTypeNoScales(context, nodeName, isScales),
-                        OP_LOGE_WITHOUT_REPORT(nodeName, "CheckTensorDataType for nonquant mode failed."),
-                        return false);
-    } else if ((quantMode == static_cast<uint32_t>(QuantModeA5::MX_QUANT)) ||
-               (quantMode == static_cast<uint32_t>(QuantModeA5::MX_QUANT_CLIP))) {
-        OP_TILING_CHECK(!CheckTensorDataTypeMxfp8(context, nodeName),
-                        OP_LOGE_WITHOUT_REPORT(nodeName, "CheckTensorDataType for mx quant mode failed."),
-                        return false);
-    } else {
-        // static/dynamic/pertolen/pertile/hif8
-        OP_TILING_CHECK(!CheckTensorDataTypeStaticOrDynamic(context, nodeName, isScales),
-                        OP_LOGE_WITHOUT_REPORT(nodeName, "CheckTensorDataType for quantMode %u failed.", quantMode),
-                        return false);
-    }
-    return true;
-}
-
-bool MoeDistributeDispatchTilingHelper::CheckTensorDataTypeA5(gert::TilingContext* context, const char* nodeName,
-                                                              const bool isScales, const uint32_t quantMode)
-{
-    auto expertIdDesc = context->GetInputDesc(EXPERT_IDS_INDEX);
-    if (expertIdDesc == nullptr) {
-        OP_LOGE_WITH_INVALID_INPUT(nodeName, "expertIdDesc");
-        return false;
-    }
-    if (expertIdDesc->GetDataType() != ge::DT_INT32) {
-        std::string dtypeStr = Ops::Base::ToString(expertIdDesc->GetDataType());
-        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "expert_ids", dtypeStr.c_str(), "INT32");
-        return false;
-    }
-
-    OP_TILING_CHECK(!CheckDistinctTensorDataType(context, nodeName, isScales, quantMode),
-                    OP_LOGE_WITHOUT_REPORT(nodeName, "CheckDistinctTensorDataType failed."), return false);
-
-    OP_TILING_CHECK(!CheckCommonOutputTensorDataType(context, nodeName),
-                    OP_LOGE_WITHOUT_REPORT(nodeName, "CheckCommonOutputTensorDataType failed."), return false);
-    return true;
-}
-
 bool MoeDistributeDispatchTilingHelper::CheckTensorFormat(const gert::TilingContext* context, const char* nodeName,
                                                           const bool isScales, const uint32_t quantMode)
 {
@@ -581,7 +436,7 @@ ge::graphStatus MoeDistributeDispatchTilingHelper::TilingCheckMoeDistributeDispa
                                                                                     const bool isScales,
                                                                                     const uint32_t quantMode)
 {
-    OP_TILING_CHECK(!CheckTensorDim(context, nodeName, isScales, quantMode, OP_VERSION_1),
+    OP_TILING_CHECK(!CheckTensorDim(context, nodeName, isScales, quantMode),
                     OP_LOGE_LIBOPAPI_REPORT(nodeName, "CheckTensorDim failed; propagate lower-layer error"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(!CheckTensorDataType(context, nodeName, isScales, quantMode),
@@ -594,60 +449,4 @@ ge::graphStatus MoeDistributeDispatchTilingHelper::TilingCheckMoeDistributeDispa
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MoeDistributeDispatchTilingHelper::TilingCheckMoeDistributeDispatchA5(gert::TilingContext* context,
-                                                                                      const bool isScales,
-                                                                                      const uint32_t quantMode,
-                                                                                      const bool isTokenMask)
-{
-    // nodeName已在调用处判空
-    const char* nodeName = context->GetNodeName();
-    auto opVersion = OpVersionManager::GetInstance().GetVersion();
-    OP_TILING_CHECK(!CheckTensorDim(context, nodeName, isScales, quantMode, opVersion),
-                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "CheckTensorDim failed; propagate lower-layer error"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(!CheckTensorDataTypeA5(context, nodeName, isScales, quantMode),
-                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "CheckTensorDataType failed; propagate lower-layer error"),
-                    return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(!CheckTensorFormat(context, nodeName, isScales, quantMode),
-                    OP_LOGE_LIBOPAPI_REPORT(nodeName, "CheckTensorFormat failed; propagate lower-layer error"),
-                    return ge::GRAPH_FAILED);
-    if ((opVersion != OP_VERSION_1) && isTokenMask) {
-        OP_TILING_CHECK(!CheckTokenMask(context, nodeName), OP_LOGE_WITHOUT_REPORT(nodeName, "xActiveMask is invalid."),
-                        return ge::GRAPH_FAILED);
-    }
-    return ge::GRAPH_SUCCESS;
-}
-
-bool MoeDistributeDispatchTilingHelper::CheckTokenMask(const gert::TilingContext* context, const char* nodeName)
-{
-    // Check Dim/DType/Format
-    const gert::StorageShape* xActiveMaskStorageShape = context->GetOptionalInputShape(X_ACTIVE_MASK_INDEX);
-    if (xActiveMaskStorageShape == nullptr) {
-        OP_LOGE_WITH_INVALID_INPUT(nodeName, "xActiveMaskStorageShape");
-        return false;
-    }
-    if (xActiveMaskStorageShape->GetStorageShape().GetDimNum() != ONE_DIM) {
-        std::string dimStr = std::to_string(xActiveMaskStorageShape->GetStorageShape().GetDimNum()) + "D";
-        OP_LOGE_FOR_INVALID_SHAPEDIM(nodeName, "xActiveMask", dimStr.c_str(), "1D");
-        return false;
-    }
-    auto xActiveMaskDesc = context->GetOptionalInputDesc(X_ACTIVE_MASK_INDEX);
-    if (xActiveMaskDesc == nullptr) {
-        OP_LOGE_WITH_INVALID_INPUT(nodeName, "xActiveMaskDesc");
-        return false;
-    }
-    if (xActiveMaskDesc->GetDataType() != ge::DT_BOOL) {
-        std::string dtypeStr = Ops::Base::ToString(xActiveMaskDesc->GetDataType());
-        OP_LOGE_FOR_INVALID_DTYPE(nodeName, "xActiveMask", dtypeStr.c_str(), "BOOL");
-        return false;
-    }
-    auto xActiveMaskDescFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(xActiveMaskDesc->GetStorageFormat()));
-    if (xActiveMaskDescFormat == ge::FORMAT_FRACTAL_NZ) {
-        std::string fmtStr = Ops::Base::ToString(xActiveMaskDescFormat);
-        OP_LOGE_FOR_INVALID_FORMAT(nodeName, "xActiveMask", fmtStr.c_str(), "ND");
-        return false;
-    }
-
-    return true;
-}
 } // namespace optiling

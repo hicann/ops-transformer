@@ -16,24 +16,9 @@
 #ifndef MOE_DISTRIBUTE_COMBINE_TILING_A5_H
 #define MOE_DISTRIBUTE_COMBINE_TILING_A5_H
 
-#include "op_host/op_tiling/moe_tiling_base.h"
 #include "../moe_distribute_combine_v2_tiling_base.h"
 
 namespace optiling {
-
-ge::graphStatus MoeDistributeCombineTilingImpl(gert::TilingContext* context, const uint32_t opVersion);
-
-class MoeDistributeCombineTilingA5 : public MoeTilingBase {
-public:
-    explicit MoeDistributeCombineTilingA5(gert::TilingContext* context)
-        : MoeTilingBase(context) {};
-
-protected:
-    ge::graphStatus DoOpTiling() override;
-    uint64_t GetTilingKey() const override;
-    bool IsCapable() override;
-};
-
 class MoeDistributeCombineV2TilingFuncA5 : public MoeDistributeCombineV2TilingFuncBase {
 public:
     ge::graphStatus MoeDistributeCombineTilingFuncImpl(gert::TilingContext* context,
