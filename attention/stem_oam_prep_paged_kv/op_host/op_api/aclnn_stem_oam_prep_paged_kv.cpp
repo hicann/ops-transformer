@@ -28,6 +28,7 @@
 #include "opdev/tensor_view_utils.h"
 #include "opdev/platform.h"
 #include "aclnn_util.h"
+#include <limits>
 
 using namespace op;
 
@@ -239,11 +240,11 @@ inline static bool CheckAttr(int64_t stemBlockSize, int64_t stemStride, double l
                 stemBlockSize, stemStride);
         return false;
     }
-    if ((lambdaMag < 0) || (lambdaMag > 1)) {
+    if (!(lambdaMag >= 0 && lambdaMag <= 1)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "lambdaMag must be greater than 0 ans less than or equal to 1, "
-                "got lambdaMag=%f",
-                lambdaMag);
+                "lambdaMag must be in range [0, 1], "
+                "got lambdaMag=%.*g",
+                std::numeric_limits<double>::max_digits10, lambdaMag);
         return false;
     }
 

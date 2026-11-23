@@ -14,6 +14,7 @@
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
 #include "op_common/op_host/util/op_const_def.h"
+#include "experiment/metadef/common/util/error_manager/error_manager.h"
 
 using namespace std;
 using namespace optiling;
@@ -71,4 +72,32 @@ TEST_F(MhcPostTiling, test_mhc_post_950_regbase_4d_fp16)
     string expectTilingDataStr = "8 128 64 2 64 2 8 1 8 128 1 128 ";
     std::vector<size_t> expectWorkspaces = {0};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingDataStr, expectWorkspaces);
+}
+
+TEST_F(MhcPostTiling, test_mhc_post_950_3d_fp16_invalid_hout_shape)
+{
+    MhcPostCompileInfo compileInfo = {64, 64, platform_ascendc::SocVersion::ASCEND950, NpuArch::DAV_3510};
+    gert::TilingContextPara tilingContextPara("MhcPost",
+                                              {
+                                                  {{{1024, 4, 5120}, {1024, 4, 5120}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                  {{{1024, 4, 4}, {1024, 4, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                                  {{{1024, 5121}, {1024, 5121}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                                  {{{1024, 4}, {1024, 4}}, ge::DT_FLOAT, ge::FORMAT_ND},
+                                              },
+                                              {
+                                                  {{{1024, 4, 5120}, {1024, 4, 5120}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+                                              },
+                                              {}, &compileInfo, kSocVersion950);
+    auto& errors = ErrorManager::GetInstance();
+    ASSERT_EQ(errors.Init(), 0);
+    errors.GetRawErrorMessages();
+    std::vector<size_t> expectWorkspaces = {0};
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 0, "", expectWorkspaces);
+    const auto reports = errors.GetRawErrorMessages();
+    ASSERT_EQ(reports.size(), 1U);
+    EXPECT_EQ(reports[0].error_id, "EZ0008");
+    ASSERT_EQ(reports[0].args_map.at("param_name"), "h_out");
+    ASSERT_EQ(reports[0].args_map.at("op_name"), "MhcPost");
+    ASSERT_EQ(reports[0].args_map.at("incorrect_shape"), "[1024, 5121]");
+    ASSERT_EQ(reports[0].args_map.at("correct_shape"), "[1024, 5120]");
 }

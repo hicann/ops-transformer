@@ -10,10 +10,13 @@
 
 #include <gtest/gtest.h>
 #include <iostream>
+#include <cmath>
+#include <limits>
 #include <string>
 #include <vector>
 
 #include "tiling_case_executor.h"
+#include "experiment/metadef/common/util/error_manager/error_manager.h"
 #include "tiling_context_faker.h"
 
 class StemOamPrepPagedKvTilingArch35 : public testing::Test {
@@ -123,7 +126,71 @@ void ExpectTilingResult(const gert::TilingContextPara& para, bool expectSuccess)
         EXPECT_GT(tilingInfo.tilingDataSize, 0U);
     }
 }
+
+void ExpectLambdaError(const gert::TilingContextPara& para, const char* actual)
+{
+    auto& errors = ErrorManager::GetInstance();
+    ASSERT_EQ(errors.Init(), 0);
+    errors.GetRawErrorMessages();
+    TilingInfo tilingInfo;
+    EXPECT_FALSE(ExecuteTiling(para, tilingInfo));
+    const auto reports = errors.GetRawErrorMessages();
+    ASSERT_EQ(reports.size(), 1U);
+    ASSERT_EQ(reports[0].error_id, "EZ0026");
+    ASSERT_EQ(reports[0].args_map.at("param_name"), "lambdaMag");
+    ASSERT_EQ(reports[0].args_map.at("op_name"), "StemOamPrepPagedKv");
+    ASSERT_EQ(reports[0].args_map.at("incorrect_value"), actual);
+    ASSERT_EQ(reports[0].args_map.at("reason"), "lambdaMag must be in range [0, 1].");
+}
 } // namespace
+
+TEST_F(StemOamPrepPagedKvTilingArch35, lambda_zero_boundary)
+{
+    auto inputBundle = MakeInputs(8, 64, 4, 1, 2, "BBND", {128});
+    auto outputs = MakeOutputs(1, 4, 1, 16);
+    auto attrs = MakeAttrs(0.0f, "BBND", 128, 16);
+    ExpectTilingResult(BuildTilingPara(inputBundle.descs, outputs, attrs), true);
+}
+
+TEST_F(StemOamPrepPagedKvTilingArch35, lambda_negative_rejected)
+{
+    auto inputBundle = MakeInputs(8, 64, 4, 1, 2, "BBND", {128});
+    auto outputs = MakeOutputs(1, 4, 1, 16);
+    auto attrs = MakeAttrs(-0.1f, "BBND", 128, 16);
+    ExpectLambdaError(BuildTilingPara(inputBundle.descs, outputs, attrs), "-0.100000001");
+}
+
+TEST_F(StemOamPrepPagedKvTilingArch35, lambda_above_one_rejected)
+{
+    auto inputBundle = MakeInputs(8, 64, 4, 1, 2, "BBND", {128});
+    auto outputs = MakeOutputs(1, 4, 1, 16);
+    auto attrs = MakeAttrs(1.1f, "BBND", 128, 16);
+    ExpectLambdaError(BuildTilingPara(inputBundle.descs, outputs, attrs), "1.10000002");
+}
+
+TEST_F(StemOamPrepPagedKvTilingArch35, lambda_one_boundary)
+{
+    auto inputs = MakeInputs(8, 64, 4, 1, 2, "BBND", {128});
+    auto outputs = MakeOutputs(1, 4, 1, 16);
+    ExpectTilingResult(BuildTilingPara(inputs.descs, outputs, MakeAttrs(1.0f, "BBND", 128, 16)), true);
+}
+
+TEST_F(StemOamPrepPagedKvTilingArch35, lambda_nan_rejected)
+{
+    auto inputs = MakeInputs(8, 64, 4, 1, 2, "BBND", {128});
+    auto outputs = MakeOutputs(1, 4, 1, 16);
+    ExpectLambdaError(
+        BuildTilingPara(inputs.descs, outputs, MakeAttrs(std::numeric_limits<float>::quiet_NaN(), "BBND", 128, 16)),
+        "nan");
+}
+
+TEST_F(StemOamPrepPagedKvTilingArch35, lambda_nextafter_one_rejected_precisely)
+{
+    auto inputs = MakeInputs(8, 64, 4, 1, 2, "BBND", {128});
+    auto outputs = MakeOutputs(1, 4, 1, 16);
+    ExpectLambdaError(BuildTilingPara(inputs.descs, outputs, MakeAttrs(std::nextafter(1.0f, 2.0f), "BBND", 128, 16)),
+                      "1.00000012");
+}
 
 TEST_F(StemOamPrepPagedKvTilingArch35, basic_layout0)
 {

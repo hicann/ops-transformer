@@ -24,7 +24,7 @@ namespace optiling {
 inline void ReportTilingFailure(const char* opName, const char* reason)
 {
     OP_LOGE_WITHOUT_REPORT(opName, "%s\n", reason);
-    const std::vector<const char*> msgKey = {"op_name", "reason"};
+    const std::vector<const char*> msgKey = {"opName", "reason"};
     const std::vector<const char*> msgvalue = {opName, reason};
     REPORT_PREDEFINED_ERR_MSG("EZ1008", msgKey, msgvalue);
 }

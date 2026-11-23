@@ -296,7 +296,11 @@ static ge::graphStatus CheckDRQKOutputShapes(gert::TilingContext* context, const
     }
     if (info.ifKVout == 0) {
         OP_CHECK_IF(kShape->GetStorageShape().GetShapeSize() != 0 || vShape->GetStorageShape().GetShapeSize() != 0,
-                    OP_LOGE(nodeName, "kOut and vOut should be empty tensors when kv_output is false."),
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        nodeName, "kOut, vOut",
+                        Shape2String(kShape->GetStorageShape()) + ", " + Shape2String(vShape->GetStorageShape()),
+                        "kOut and vOut should be empty tensors when kv_output "
+                        "is false"),
                     return ge::GRAPH_FAILED);
         return ge::GRAPH_SUCCESS;
     }

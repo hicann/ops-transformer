@@ -9,6 +9,8 @@
  */
 
 #include <iostream>
+#include <map>
+#include "err_mgr.h"
 #include <gtest/gtest.h>
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
@@ -295,4 +297,83 @@ TEST_F(NormRopeConcatGradTiling, NormRopeConcatGrad_norm_type_combinations)
         auto tilingContextPara = MakeTilingPara(4, 8, 0, 0, false, normTypes[0], normTypes[1]);
         ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, UINT64_MAX);
     }
+}
+
+TEST_F(NormRopeConcatGradTiling, NormRopeConcatGrad_ub_failure_reports_ez1008)
+{
+    optiling::NormRopeConcatGradCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "NormRopeConcatGrad",
+        {
+            // input info
+            {{{2, 32, 20, 64}, {2, 32, 20, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2, 32, 40, 64}, {2, 32, 40, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2, 32, 40, 64}, {2, 32, 40, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2, 4, 32, 64}, {2, 4, 32, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2, 8, 32, 64}, {2, 8, 32, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2, 16, 32, 64}, {2, 16, 32, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2, 32, 32, 64}, {2, 32, 32, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{64}, {64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2, 4, 32, 1}, {2, 4, 32, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 4, 32, 1}, {2, 4, 32, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{64}, {64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2, 8, 32, 1}, {2, 8, 32, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 8, 32, 1}, {2, 8, 32, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{64}, {64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2, 16, 32, 1}, {2, 16, 32, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 16, 32, 1}, {2, 16, 32, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{64}, {64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2, 32, 32, 1}, {2, 32, 32, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2, 32, 32, 1}, {2, 32, 32, 1}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{8, 64}, {8, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{8, 64}, {8, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            // output info
+            {{{2, 4, 32, 64}, {2, 4, 32, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2, 8, 32, 64}, {2, 8, 32, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2, 8, 32, 64}, {2, 8, 32, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2, 16, 32, 64}, {2, 16, 32, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2, 32, 32, 64}, {2, 32, 32, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{2, 32, 32, 64}, {2, 32, 32, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{64}, {64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{64}, {64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{64}, {64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{64}, {64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{64}, {64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{64}, {64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{64}, {64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{64}, {64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            // attr
+            {"norm_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"norm_added_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+            {"rope_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"concat_order", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo);
+    uint64_t expectTilingKey = 200200100;
+    string expectTilingData = "200200100 2 4 8 8 16 32 32 20 40 40 8 1 32 32 64 64 32 64 32 4359484440219993516 ";
+    std::vector<size_t> expectWorkspaces = {37814272};
+    // FP16, D=64: rope=1024, norm=2048, reserved=1024, one head=1936.
+    // Include the platform reservation (256): (6288-256-4096)/1936 = 1.
+    tilingContextPara.ubSize_ = 6288;
+    ASSERT_EQ(error_message::ErrMgrInit(error_message::ErrorMessageMode::INTERNAL_MODE), 0);
+    error_message::GetErrMgrRawErrorMessages();
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
+    auto reports = error_message::GetErrMgrRawErrorMessages();
+    ASSERT_EQ(reports.size(), 1U);
+    ASSERT_NE(reports[0].error_id.get(), nullptr);
+    EXPECT_STREQ(reports[0].error_id.get(), "EZ1008");
+    ASSERT_EQ(reports[0].args_key.size(), 2U);
+    ASSERT_EQ(reports[0].args_value.size(), 2U);
+    std::map<std::string, std::string> args;
+    for (size_t i = 0; i < reports[0].args_key.size(); ++i) {
+        ASSERT_NE(reports[0].args_key[i].get(), nullptr);
+        ASSERT_NE(reports[0].args_value[i].get(), nullptr);
+        args.emplace(reports[0].args_key[i].get(), reports[0].args_value[i].get());
+    }
+    EXPECT_EQ(args.at("opName"), "NormRopeConcatGrad");
+    EXPECT_EQ(args.at("reason"), "the input dim is too large to be tiled, avgHeads should be >= 2");
 }

@@ -14,6 +14,9 @@
  */
 #include "stem_oam_prep_paged_kv_tiling_simd.h"
 #include <string>
+#include <iomanip>
+#include <limits>
+#include <sstream>
 #include "register/op_def_registry.h"
 #include "tiling/tiling_api.h"
 #include "tiling/platform/platform_ascendc.h"
@@ -44,9 +47,11 @@ ge::graphStatus StemOamPrepPagedKvTilingSimd::CheckParams()
         return ge::GRAPH_FAILED;
     }
 
-    if ((lambdaMag_ < 0) || (lambdaMag_ > 1)) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "lambdaMag", std::to_string(lambdaMag_).c_str(),
-                                              "lambdaMag must be greater than 0 ans less than or equal to 1.");
+    if (!(lambdaMag_ >= 0 && lambdaMag_ <= 1)) {
+        std::ostringstream actual;
+        actual << std::setprecision(std::numeric_limits<float>::max_digits10) << lambdaMag_;
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "lambdaMag", actual.str().c_str(),
+                                              "lambdaMag must be in range [0, 1].");
         return ge::GRAPH_FAILED;
     }
 
@@ -346,7 +351,8 @@ ge::graphStatus StemOamPrepPagedKvTilingSimd::GetShapeAttrsInfo()
         kvBlockSize_ = kcacheShape_.GetDim(DIM_2);
     }
 
-    OP_CHECK_IF(CheckParams() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CheckParams failed."),
+    OP_CHECK_IF(CheckParams() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "CheckParams failed; preserve inner first error"),
                 return ge::GRAPH_FAILED);
     dimQk_ = kcacheShape_.GetDim(DIM_3);
     const gert::StorageShape* kvIndicesShape = context_->GetInputShape(INPUT_KV_INDICES_INDEX);
