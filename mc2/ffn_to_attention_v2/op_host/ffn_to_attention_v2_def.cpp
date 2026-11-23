@@ -18,8 +18,7 @@
 namespace ops {
 class FFNToAttentionV2 : public OpDef {
 public:
-    explicit FFNToAttentionV2(const char *name)
-        : OpDef(name)
+    explicit FFNToAttentionV2(const char* name) : OpDef(name)
     {
         this->Input("context")
             .ParamType(REQUIRED)
@@ -77,7 +76,6 @@ public:
             .ExtendCfgInfo("jitCompile.flag", "static_true")
             .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
         this->AICore().AddConfig("ascend950", aicore_config);
-        // this->MC2().HcclGroup({"group"});
     }
 };
 

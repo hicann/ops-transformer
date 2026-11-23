@@ -1358,7 +1358,6 @@ private:
             // 屏障通过即表示本 chunk 对端的所有 flag（含跳过标记）都已执行完，
             // 之后的清零不会和迟到的旧标记竞争。
             exceptionDump_.UpdateStage(MC2MegaMoeAdump::Stage::CROSS_RANK_SYNC);
-            // shmem.InitStatusTargetSum();
             {
                 // 3 * UB_ALIGN scratch: payload + rdma doorbell + rdma head.
                 // UB at offset 0 is unused at this point in the kernel.

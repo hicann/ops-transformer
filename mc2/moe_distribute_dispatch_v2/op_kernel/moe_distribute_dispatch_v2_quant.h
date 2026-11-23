@@ -201,8 +201,14 @@ public:
     __aicore__ inline void QuantDynamicPerToken(LocalTensor<XOutType>& outLocal, LocalTensor<XInType>& inLocal,
                                                 uint32_t expertIndex, GlobalTensor<float>& scalesGMTensor_)
     {
-        float dynamicScale = 0.0;
-        float maxVal = INT8_MAX_VALUE; // 获取输出类型的最大值（AscendC未提供相关接口）
+        const float dynamicScale =
+            PrepareDynamicQuant(inLocal, expertIndex, scalesGMTensor_, GetDynamicQuantMaxValue());
+        StoreDynamicQuantOutput(outLocal, dynamicScale);
+    }
+
+    __aicore__ inline float GetDynamicQuantMaxValue()
+    {
+        float maxVal = INT8_MAX_VALUE;
 #if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
         if constexpr (Std::IsSame<ExpandXOutType, fp8_e5m2_t>::value) {
             maxVal = FP8_E5M2_MAX_VALUE;
@@ -210,36 +216,43 @@ public:
             maxVal = FP8_E4M3_MAX_VALUE;
         }
 #endif
+        return maxVal;
+    }
+
+    __aicore__ inline float PrepareDynamicQuant(LocalTensor<XInType>& inLocal, uint32_t expertIndex,
+                                                GlobalTensor<float>& scalesGMTensor_, float maxVal)
+    {
         Cast(floatLocalTemp_, inLocal, RoundMode::CAST_NONE, axisH_);
         PipeBarrier<PIPE_V>();
-        if constexpr (IsSmoothScaleExist) { // 平滑系数
+        if constexpr (IsSmoothScaleExist) {
             DataCopyPad(smoothScalesTensor_, scalesGMTensor_[expertIndex * axisH_], scalesInParams_, scalesPadParams_);
             SyncFunc<AscendC::HardEvent::MTE2_V>();
             Mul(floatLocalTemp_, floatLocalTemp_, smoothScalesTensor_, axisH_);
             PipeBarrier<PIPE_V>();
-            // 独立 scratch 时 smooth 缓冲不再被覆写，V_MTE2 只需等 Cast+Mul，可在 Mul 后提前释放；
-            // 复用 smooth 缓冲作 scratch 时，必须等 Abs/ReduceMax 读完后再放行下一轮 smooth 搬入。
             if (useAbsScratch_) {
-                SyncFunc<AscendC::HardEvent::V_MTE2>(); // ub复用，循环同步
+                SyncFunc<AscendC::HardEvent::V_MTE2>();
             }
         }
         LocalTensor<float> floatLocalAbsTemp = absScratchTensor_;
         Abs(floatLocalAbsTemp, floatLocalTemp_, axisH_);
         PipeBarrier<PIPE_V>();
-        ReduceMaxInplace(floatLocalAbsTemp, axisH_); // 获取最大值
+        ReduceMaxInplace(floatLocalAbsTemp, axisH_);
         if constexpr (IsSmoothScaleExist) {
             if (!useAbsScratch_) {
-                SyncFunc<AscendC::HardEvent::V_MTE2>(); // absScratch 复用 smooth 缓冲，读完再放行
+                SyncFunc<AscendC::HardEvent::V_MTE2>();
             }
         }
         SyncFunc<AscendC::HardEvent::V_S>();
-        dynamicScale = maxVal / floatLocalAbsTemp.GetValue(0);
+        return maxVal / floatLocalAbsTemp.GetValue(0);
+    }
+
+    __aicore__ inline void StoreDynamicQuantOutput(LocalTensor<XOutType>& outLocal, float dynamicScale)
+    {
         Muls(floatLocalTemp_, floatLocalTemp_, dynamicScale, axisH_);
         PipeBarrier<PIPE_V>();
 #if defined(__NPU_ARCH__) && ((__NPU_ARCH__ != 2201) && (__NPU_ARCH__ != 3510))
         LocalTensor<float> tokenF32Tmp = outLocal.template ReinterpretCast<float>();
-        tokenF32Tmp.SetValue((Ceil(axisH_, UB_ALIGN) * UB_ALIGN) / sizeof(float),
-                             float(1.0) / dynamicScale); // int8->float32
+        tokenF32Tmp.SetValue((Ceil(axisH_, UB_ALIGN) * UB_ALIGN) / sizeof(float), float(1.0) / dynamicScale);
         SyncFunc<AscendC::HardEvent::S_V>();
 #endif
         if constexpr (Std::IsSame<ExpandXOutType, int8_t>::value) {
@@ -261,8 +274,7 @@ public:
 #endif
 #if !defined(__NPU_ARCH__) || ((__NPU_ARCH__ == 2201) || (__NPU_ARCH__ == 3510))
         LocalTensor<float> tokenF32Tmp = outLocal.template ReinterpretCast<float>();
-        tokenF32Tmp.SetValue((Ceil(axisH_, UB_ALIGN) * UB_ALIGN) / sizeof(float),
-                             float(1.0) / dynamicScale); // int8->float32
+        tokenF32Tmp.SetValue((Ceil(axisH_, UB_ALIGN) * UB_ALIGN) / sizeof(float), float(1.0) / dynamicScale);
         SyncFunc<AscendC::HardEvent::S_MTE3>();
 #endif
     }

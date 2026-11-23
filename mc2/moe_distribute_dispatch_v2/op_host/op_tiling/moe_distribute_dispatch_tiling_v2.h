@@ -66,11 +66,33 @@ struct DispatchV2Config {
     bool isRoce = false;
     uint32_t roceServerNum = 0;
 };
+
+struct A3TilingState {
+    std::string groupEp;
+    std::string groupTp;
+    uint32_t quantMode = static_cast<uint32_t>(QuantModeA5::NON_QUANT);
+    bool isScales = false;
+    bool isActiveMask = false;
+    bool hasElasticInfo = false;
+    bool isPerformance = false;
+    bool isSetFullMeshV2 = false;
+    bool isLayered = false;
+    uint32_t localMoeExpertNum = 1;
+};
 using namespace Ops::Transformer::OpTiling;
 
 class MoeDistributeDispatchV2TilingFuncBase {
 public:
     ge::graphStatus MoeDistributeDispatchA3TilingFuncImplPublic(gert::TilingContext* context, DispatchV2Config& config);
+    ge::graphStatus PrepareA3Tiling(gert::TilingContext* context, const char* nodeName,
+                                    MoeDistributeDispatchV2TilingData& tilingData, DispatchV2Config& config,
+                                    A3TilingState& state);
+    ge::graphStatus CheckA3TilingInputs(gert::TilingContext* context, const char* nodeName,
+                                        MoeDistributeDispatchV2TilingData& tilingData, DispatchV2Config& config,
+                                        A3TilingState& state);
+    ge::graphStatus FinalizeA3Tiling(gert::TilingContext* context, const char* nodeName,
+                                     MoeDistributeDispatchV2TilingData& tilingData, DispatchV2Config& config,
+                                     const A3TilingState& state);
     ge::graphStatus TilingCheckMoeDistributeDispatch(gert::TilingContext* context, const char* nodeName,
                                                      const bool isActiveMask, const bool isScales,
                                                      const bool hasElasticInfo, const bool isPerformance,
