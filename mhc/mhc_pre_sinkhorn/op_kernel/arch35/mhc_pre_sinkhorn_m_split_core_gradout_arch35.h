@@ -62,9 +62,8 @@ public:
         xL1_ = l1Buffer.Get<float>();
         wL1_ = l1Buffer.Get<float>()[L1_BUF_NUM * L1_BUF_OFFSET];
 
-        pipe->InitBufPool(tbufPool0, tilingData->bufferPool0Size);
-        tbufPool0.InitBuffer(
-            mmXBuf, CeilDiv(tilingData->mL1Size, CV_RATIO) * RoundUp<float>(tilingData->hcMix) * sizeof(float));
+        pipe->InitBuffer(mmXBuf,
+                         CeilDiv(tilingData->mL1Size, CV_RATIO) * RoundUp<float>(tilingData->hcMix) * sizeof(float));
         mmXLocal = mmXBuf.Get<float>();
 
         if ASCEND_IS_AIC {
@@ -78,12 +77,13 @@ public:
                 CrossCoreSetFlag<SYNC_MODE4, PIPE_MTE1>(SYNC_AIC_AIV_FLAG + FLAG_ID_MAX);
             }
         } else {
-            tbufPool0.InitBuffer(rmsNormBuf, RoundUp<float>(CeilDiv(tilingData->mL1Size, CV_RATIO)) * sizeof(float));
-            tbufPool0.InitBufPool(tbufPool1, tilingData->bufferPool1Size);
+            pipe->InitBuffer(rmsNormBuf, RoundUp<float>(CeilDiv(tilingData->mL1Size, CV_RATIO)) * sizeof(float));
+            pipe->InitBufPool(tbufPool0, tilingData->bufferPool1Size);
+            pipe->InitBufPool(tbufPool1, tilingData->bufferPool1Size, tbufPool0);
 
-            tbufPool0.InitBuffer(hcBaseBuf0, tilingData->hcMultAlign * sizeof(float));
-            tbufPool0.InitBuffer(hcBaseBuf1, tilingData->hcMultAlign * sizeof(float));
-            tbufPool0.InitBuffer(hcBaseBuf2, tilingData->hcMult * tilingData->hcMultAlign * sizeof(float));
+            pipe->InitBuffer(hcBaseBuf0, tilingData->hcMultAlign * sizeof(float));
+            pipe->InitBuffer(hcBaseBuf1, tilingData->hcMultAlign * sizeof(float));
+            pipe->InitBuffer(hcBaseBuf2, tilingData->hcMult * tilingData->hcMultAlign * sizeof(float));
 
             hcBase0Local = hcBaseBuf0.Get<float>();
             hcBase1Local = hcBaseBuf1.Get<float>();
@@ -325,7 +325,7 @@ public:
                 }
                 CrossCoreWaitFlag<SYNC_MODE4, PIPE_V>(SYNC_AIC_AIV_PRE_POST_FLAG);
                 // mm计算结果存入mmXLocal，mmXLocal每轮循环需要累加;
-                tbufPool1.Reset();
+                Stage1::ResetBuffers(*this);
                 if (!hasPremix_) {
                     tbufPool1.InitBuffer(
                         xQue, 2,
@@ -597,6 +597,7 @@ private:
     uint64_t cvLoopIdx_ = 0;
     uint8_t aL1BufferID_{0};
 
+    // Keep the backing pool unused so the working pool can reuse its buffer IDs each stage.
     TBufPool<QuePosition::VECCALC, 16> tbufPool0;
     TBufPool<QuePosition::VECCALC, 16> tbufPool1;
 };

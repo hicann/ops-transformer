@@ -26,11 +26,20 @@ template <typename T, uint64_t CV_RATIO>
 class MhcPreSinkhornMSplitStage1 {
 public:
     template <typename Core>
+    __aicore__ inline static void ResetBuffers(Core& core)
+    {
+        core.tbufPool1.Reset();
+        // Reset drains the previous stage but does not restore UB buffer IDs on arch35.
+        // Rebind to the unused backing pool so every stage reuses the same IDs and UB range.
+        core.pipe->InitBufPool(core.tbufPool1, core.tilingData->bufferPool1Size, core.tbufPool0);
+    }
+
+    template <typename Core>
     __aicore__ inline static void InitBuffers(Core& core)
     {
         const auto* tilingData = core.tilingData;
         const uint64_t nd2NzBufSize = CeilAlign(tilingData->mUbSize, C0_SIZE) * RoundUp<float>(tilingData->kUbSize);
-        core.tbufPool1.Reset();
+        ResetBuffers(core);
         core.tbufPool1.InitBuffer(core.xQue, 2, tilingData->mUbSize * RoundUp<T>(tilingData->kUbSize) * sizeof(T));
         core.tbufPool1.InitBuffer(core.castBuf, (core.premixCastSegments_ ? tilingData->hcMult : 1) *
                                                     tilingData->mUbSize *
