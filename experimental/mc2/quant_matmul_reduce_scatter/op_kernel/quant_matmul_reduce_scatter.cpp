@@ -35,7 +35,7 @@
 // 注：不包含 blaze/gemm/kernel/kernel_universal.h——新版 ops-tensor 会经它引入
 // stock kernel_qbmm_mx.h 的 GemmUniversal 特化，与 apace 的 Mc2QbmmMxUniversal 冲突
 #include "apace/block/epilogue/block_epilogue_all_to_all.h"
-#include "apace/kernel/fusions/quant_matmul_reduce_scatter/quant_matmul_reduce_scatter_impl.h"
+#include "apace/kernel/fusions/matmul_reduce_scatter/quant_matmul_reduce_scatter_ubmem_impl.h"
 #include "apace/tiling/matmul_tiling/quant_matmul_tiling_data.h"
 #include "quant_matmul_reduce_scatter_tiling_key.h"
 

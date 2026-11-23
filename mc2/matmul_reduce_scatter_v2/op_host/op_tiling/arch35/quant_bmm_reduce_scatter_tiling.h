@@ -23,7 +23,7 @@
 #include "op_host/op_tiling/mc2_tiling_utils.h"
 #include "op_kernel/mc2_tiling_struct.h"
 #include "op_kernel/apace/tiling/matmul_tiling/quant_matmul_tiling.h"
-#include "op_kernel/apace/kernel/fusions/matmul_reduce_scatter_v2/matmul_reduce_scatter_v2_tiling_data.h"
+#include "op_kernel/apace/kernel/fusions/matmul_reduce_scatter/quant_matmul_reduce_scatter_tiling_data.h"
 
 namespace optiling {
 

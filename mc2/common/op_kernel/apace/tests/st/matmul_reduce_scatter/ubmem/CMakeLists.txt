@@ -26,6 +26,7 @@ set(KERNEL_INCLUDES
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../utils
     ${BLAZE_COMMON}
+    ${BLAZE_COMMON}/tensor_api/include
     ${ASCEND_DIR}/${SYSTEM_PREFIX}/asc/include
     ${ASCEND_DIR}/${SYSTEM_PREFIX}/ascendc/include/highlevel_api
     ${ASCEND_DIR}/compiler/tikcpp/tikcfw
@@ -43,6 +44,8 @@ set(HOST_INCLUDES
 
 set(KERNEL_OPTS "-xasc" "--npu-arch=dav-3510" "-DASC_DEVKIT_MAJOR=9" "-D_GLIBCXX_USE_CXX11_ABI=0" "-w" "-O3")
 set(HOST_OPTS "-std=c++17" "-w" "-O2")
+# 引号 include 优先搜索 third_party 的 tensor_api 头文件与实现
+set(KERNEL_OPTS "${KERNEL_OPTS}" "-iquote" "${BLAZE_COMMON}/tensor_api/include" "-iquote" "${BLAZE_COMMON}/tensor_api")
 
 set(COMMON_LIBS dl platform tiling_api register ascendcl runtime hccl stdc++ pthread)
 

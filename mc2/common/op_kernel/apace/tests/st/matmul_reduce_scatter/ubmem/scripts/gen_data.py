@@ -16,7 +16,7 @@ Generate MX test data for QuantMatmulReduceScatter operator (dtype 泛化版).
 
 Operator semantics: MX MatMul + AlltoAll + ReduceAdd.
 
-dtype 泛化（对齐 experimental/mc2/quant_matmul_reduce_scatter）：
+dtype 泛化（ubmem 通路）:
   - x1/x2: fp8_e4m3 | fp8_e5m2 | fp4_e2m1（fp8 可异构；fp4 仅 fp4+fp4 且仅 DN/ND）
   - y: bf16 | fp16
   - x2 layout: dn | nd | zn | nz（DN/ZN 转置 B [N,K]；ND/NZ 非转置 [K,N]）
@@ -214,11 +214,11 @@ def dequant_with_scale(data_bytes, dtype, scale_u8, is_trans_b):
         # A：[M, kd, 2] → [M, K]（沿 K 展开）
         sf_full = np.repeat(sf, MX_GROUP_SIZE, axis=-1).reshape(sf.shape[0], -1)[:, :k]
         return dq * sf_full
-    # B 非转置：[kd, n, 2] → 沿 K（dim0）展开 → [K, N]
+    # B 非转置: [kd, n, 2] 沿 K(dim0) 展开 -> [K, N], 行方向取 dq 的行数(K)
     sf_full = (
         np.repeat(sf, MX_GROUP_SIZE, axis=-1)
         .transpose(0, 2, 1)
-        .reshape(-1, dq.shape[1])[:k, :]
+        .reshape(-1, dq.shape[1])[: dq.shape[0], :]
     )
     return dq * sf_full
 

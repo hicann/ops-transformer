@@ -36,6 +36,17 @@
 #include <unistd.h>
 #include <cstdlib>
 
+// tensor_api impl(3510 适配段)引用不带 asc_ 前缀的类型名, 此处补齐别名保持兼容
+#include "c_api/defs/enum.h"
+namespace asc {
+namespace te {
+using saturation_mode = asc_saturation_mode;
+using override_strategy = asc_override_strategy;
+using load_l2_cache_mode = asc_load_l2_cache_mode;
+using store_l2_cache_mode = asc_store_l2_cache_mode;
+} // namespace te
+} // namespace asc
+
 #include "kernel_basic_intf.h"
 #include "acl/acl.h"
 #include "hccl/hccl.h"
@@ -56,7 +67,7 @@ extern "C" HcclResult HcomGetCommHandleByGroup(const char* groupName, void** com
 extern "C" HcclResult HcclAllocComResourceByTiling(HcclComm comm, void* stream, void* mc2Tiling, void** commContext);
 
 static constexpr int32_t BENCHMARK_ITERATIONS = 20;
-static constexpr int64_t MAX_RANK_NUM = 64;
+static constexpr int64_t UBMEM_MAX_RANK_NUM = 64;
 
 static std::mutex gSetupMtx;
 static std::condition_variable gSetupCv;
@@ -145,7 +156,7 @@ void ParseArgs(int argc, char* argv[], int* m, int* k, int* n, int* rankNum, STX
     if (*m <= 0 || *k <= 0 || *n <= 0 || *rankNum <= 0) {
         throw std::invalid_argument("ERROR: m k n rankNum must be positive");
     }
-    if (static_cast<int64_t>(*rankNum) > MAX_RANK_NUM) {
+    if (static_cast<int64_t>(*rankNum) > UBMEM_MAX_RANK_NUM) {
         throw std::invalid_argument("ERROR: rankNum exceeds MAX_RANK_NUM");
     }
     if (*m % *rankNum != 0) {
@@ -466,7 +477,6 @@ int main(int argc, char* argv[])
     INFO_LOG("Config: DEV_NUM=%d, M=%d, N=%d, K=%d, x1=%s x2=%s y=%s layout=%s mode=%s", rankNum, m, n, k,
              xdNames[static_cast<int>(xa)], xdNames[static_cast<int>(xb)], ydNames[static_cast<int>(yt)],
              lyNames[static_cast<int>(ly)], mode.c_str());
-    // (Config 已在 ParseArgs 后打印)
 
     int ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, ERROR_LOG("aclInit failed. ret = %d", ret); return ret);

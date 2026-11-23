@@ -19,11 +19,17 @@
 #include "tensor_api/tensor.h"
 
 // func for cast
+
+// tensor_api 要求显式传入 cast_options 模板参数, 选项含义为最近偶舍入 (与 reduce_sum 语义一致)
+static constexpr asc::te::experimental::cast_options kDefaultCastOps{asc::te::experimental::cast_layout::zero,
+                                                                     asc::te::experimental::cast_round_mode::rint,
+                                                                     asc::te::experimental::cast_sat_mode::not_sat};
+
 template <typename DstT, typename SrcT>
 __simd_callee__ inline asc::te::experimental::reg_tensor<DstT> cast_register(
     asc::te::experimental::reg_tensor<SrcT> src)
 {
-    return asc::te::experimental::cast<DstT>(src);
+    return asc::te::experimental::cast<DstT, kDefaultCastOps>(src);
 }
 
 template <typename SrcTensor, typename DstTensor>

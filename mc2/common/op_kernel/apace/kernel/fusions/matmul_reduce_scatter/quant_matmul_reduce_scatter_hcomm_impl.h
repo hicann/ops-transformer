@@ -12,13 +12,13 @@
 
 #include "lib/hccl/hccl.h"
 #if MMRS_APACE_FP16_BF16_DTYPE
-#include "../../matmul/batch_matmul/matmul_reduce_scatter_v2_kernel.h"
+#include "../../matmul/batch_matmul/bmm_reduce_scatter_hcomm_kernel.h"
 #endif
 
 #if MMRS_APACE_MX_DTYPE
-#include "../../matmul/quant_batch_matmul/matmul_reduce_scatter_v2_mx_kernel.h"
+#include "../../matmul/quant_batch_matmul/qbmm_reduce_scatter_hcomm_kernel.h"
 #endif
-#include "matmul_reduce_scatter_v2_tiling_data.h"
+#include "quant_matmul_reduce_scatter_tiling_data.h"
 
 namespace Apace {
 

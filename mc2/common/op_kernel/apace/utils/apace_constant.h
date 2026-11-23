@@ -65,6 +65,17 @@ constexpr int32_t MXFP_DIVISOR_SIZE = 64;
 constexpr int32_t MXFP_MULTI_BASE_SIZE = 2;
 constexpr int64_t DOUBLE_BUFFER_COUNT = 2LL;
 
+// URMA win 数据区对齐粒度
+constexpr uint64_t WIN_DATA_ALIGN = 128UL;
+// win 前缀屏障标志大小
+constexpr uint32_t WIN_BARRIER_FLAG_SIZE = 32U;
+// win 前缀保留量, 按两个 rankSize×32B 区域计算
+constexpr uint32_t WIN_BARRIER_REGION_NUM = 2U;
+// URMA 通路参与通信的 rank 数上限
+constexpr uint32_t QMRS_URMA_MAX_RANK_NUM = 16U;
+// MRS win 通信槽数上限
+constexpr uint32_t QMRS_MAX_COMM_SLOT_NUM = 3U;
+
 // Shared constants used by the host-side tiling engine.
 //
 // These values describe hardware granularity, cache-line alignment, buffering

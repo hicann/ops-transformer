@@ -9,7 +9,7 @@
  */
 
 /*!
- * \file quant_matmul_reduce_scatter_impl.h
+ * \file quant_matmul_reduce_scatter_ubmem_impl.h
  * \brief ReduceScatter post-processing for QuantMatmulReduceScatter.
  */
 
@@ -19,7 +19,7 @@
 #include "apace/utils/apace_constant.h"
 #include "../../matmul/quant_batch_matmul/mc2_kernel_qbmm_mx_mix.h"
 #include "tensor_api/experimental/vector_ops.h"
-#include "apace/utils/asc_tensor_api_vector_compute.h"
+#include "apace/core/aiv_compute/asc_tensor_api_vector_compute.h"
 
 namespace Apace {
 

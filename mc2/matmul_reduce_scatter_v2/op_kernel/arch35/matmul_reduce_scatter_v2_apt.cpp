@@ -44,7 +44,7 @@
 #endif
 
 #if MMRS_APACE_FP16_BF16_DTYPE || MMRS_APACE_MX_DTYPE
-#include "../../../common/op_kernel/apace/kernel/fusions/matmul_reduce_scatter_v2/matmul_reduce_scatter_v2_hcomm_impl.h"
+#include "../../../common/op_kernel/apace/kernel/fusions/matmul_reduce_scatter/quant_matmul_reduce_scatter_hcomm_impl.h"
 #endif
 
 #if ((ORIG_DTYPE_X1 == ORIG_DTYPE_X2) && ((ORIG_DTYPE_X1 == DT_FLOAT16) || (ORIG_DTYPE_X1 == DT_BF16)))

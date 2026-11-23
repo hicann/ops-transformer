@@ -26,7 +26,7 @@
 #include "adv_api/hccl/hccl.h"
 #include "apace/core/aiv_comm/collective_comm_context.h"
 #include "apace/utils/apace_constant.h"
-#include "apace/utils/asc_tensor_api_vector_compute.h"
+#include "apace/core/aiv_compute/asc_tensor_api_vector_compute.h"
 #include "blaze/gemm/utils/sync.h"
 #include "blaze/gemm/utils/common_utils.h"
 #include "blaze/gemm/policy/dispatch_policy.h"

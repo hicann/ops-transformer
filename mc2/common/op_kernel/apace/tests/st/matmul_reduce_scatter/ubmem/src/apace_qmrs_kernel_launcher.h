@@ -15,7 +15,7 @@
  * The HCCL context device pointer is obtained on the host side via
  * HcclAllocComResourceByTiling and passed as the first kernel parameter.
  *
- * dtype 泛化（对齐 experimental/mc2/quant_matmul_reduce_scatter）：
+ * dtype 泛化（ubmem 通路）:
  *   TypeA/TypeB: fp8_e4m3fn_t / fp8_e5m2_t / fp4x2_e2m1_t（fp8 可异构，fp4 仅 fp4+fp4）
  *   TypeC: bfloat16_t / half（y dtype）
  *   LayoutB: DNExt(转置 B [N,K]) / NDExt(非转置 [K,N]) / ZN(转置 NZ) / NZ(非转置 NZ)
@@ -37,9 +37,9 @@
 #include "blaze/gemm/block/block_mmad.h"
 #include "blaze/gemm/block/block_mmad_qbmm_mx.h"
 #include "apace/block/epilogue/block_epilogue_all_to_all.h"
-#include "apace/kernel/fusions/quant_matmul_reduce_scatter/quant_matmul_reduce_scatter_impl.h"
-// 注：不包含 blaze/gemm/kernel/kernel_universal.h——新版 ops-tensor 会经它引入
-// stock kernel_qbmm_mx.h 的 GemmUniversal 特化，与 apace 的 Mc2QbmmMxUniversal 冲突
+#include "apace/kernel/fusions/matmul_reduce_scatter/quant_matmul_reduce_scatter_ubmem_impl.h"
+// 注: 不包含 blaze/gemm/kernel/kernel_universal.h, ops-tensor 会经它引入
+// stock kernel_qbmm_mx.h 的 GemmUniversal 特化, 与 apace 的 Mc2QbmmMxUniversal 冲突
 
 using namespace AscendC;
 using namespace Blaze::Gemm;

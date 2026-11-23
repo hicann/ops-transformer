@@ -9,7 +9,8 @@ apace/
 ├── kernel/                       # Communication-computation fusion operator implementations
 │   ├── fusions/                  #   Communication + Matmul fusion operators
 │   │   ├── all_gather_quant_matmul/
-│   │   └── all_to_all_quant_matmul/
+│   │   ├── all_to_all_quant_matmul/
+│   │   └── matmul_reduce_scatter/
 │   └── matmul/                   #   Matmul kernels
 │       ├── grouped_matmul/
 │       └── quant_batch_matmul/
@@ -46,7 +47,7 @@ Implementation of communication-computation fusion operators. The kernel layer p
 
 | Subdirectory | Description |
 |:---|:---|
-| `fusions` | Complete kernel implementations that fuse communication with Matmul (for example, AllGather/AllToAll + quantization Matmul). |
+| `fusions` | Complete kernel implementations that fuse communication with Matmul (for example, AllGather/AllToAll + quantization Matmul, and Matmul + ReduceScatter). |
 | `matmul` | Standalone Matmul kernels, including Grouped Matmul and quantization Batch Matmul. |
 
 ### block Interface Layer

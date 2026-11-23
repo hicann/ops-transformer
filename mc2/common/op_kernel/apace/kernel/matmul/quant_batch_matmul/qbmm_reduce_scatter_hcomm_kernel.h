@@ -9,8 +9,8 @@
  */
 
 /*!
- * \file matmul_reduce_scatter_v2_mx_kernel.h
- * \brief MatmulReduceScatterV2 的 APACE MXFP8、MXFP4 和 HiFP4 计算实现。
+ * \file qbmm_reduce_scatter_hcomm_kernel.h
+ * \brief MatmulReduceScatter hcomm 通路的 APACE MXFP8/MXFP4/HiFP4 计算实现.
  */
 
 #pragma once
