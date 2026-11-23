@@ -20,14 +20,21 @@
 #elif defined(V310_QGMM_QUANT_MX_HIF4)
 #include "arch35/qgmm_inplace_add_mx_basic_api.h"
 #elif defined(V310_QGMM_QUANT_MX)
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#include "arch35/qgmm_inplace_add_mx_blaze.h"
+#endif
 #include "arch35/qgmm_inplace_add_cube_on_the_fly.h"
+#else
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+#include "arch35/qgmm_inplace_add_pertensor_blaze.h"
+#include "arch35/qgmm_inplace_add_mix_blaze.h"
 #else
 #include "arch35/qgmm_inplace_add_mix_online_dynamic.h"
 #include "arch35/qgmm_inplace_add_cube_basic_api.h"
 #endif
+#endif
 
 using namespace AscendC;
-using namespace matmul;
 
 #if (defined(__CCE_AICORE__) && __CCE_AICORE__ == 310) || \
     (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
@@ -60,7 +67,8 @@ __global__ __aicore__ void quant_grouped_matmul_inplace_add(GM_ADDR x1, GM_ADDR 
     GM_ADDR user1 = GetUserWorkspace(workspace);
 
 #ifndef __CCE_KT_TEST__
-#if defined(QGMM_INPLACE_ADD_USE_BLAZE_MX) || defined(V310_QGMM_QUANT_MX_HIF4) || defined(V310_QGMM_QUANT_MX)
+#if defined(QGMM_INPLACE_ADD_USE_BLAZE_MX) || defined(V310_QGMM_QUANT_MX_HIF4) || \
+    (defined(V310_QGMM_QUANT_MX) && (!defined(__NPU_ARCH__) || __NPU_ARCH__ != 3510))
     GET_TILING_DATA_MEMBER(QuantGroupedMatmulInplaceAdd::QGmmInplaceAddTilingDataParams, mmTilingData, emptyCheck,
                            tiling);
     if (emptyCheck.M == 0 || emptyCheck.N == 0 || emptyCheck.Ka == 0) {
@@ -101,23 +109,36 @@ __global__ __aicore__ void quant_grouped_matmul_inplace_add(GM_ADDR x1, GM_ADDR 
     }
     if constexpr (QUANT_B_TRANS == QGMM_INPLACE_ADD_NO_TRANS && QUANT_A_TRANS == QGMM_INPLACE_ADD_TRANS &&
                   KERNEL_TYPE == QGMM_INPLACE_ADD_DEQUANT_FIXP) { // transX = true, transW = false
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+        GET_TILING_DATA_WITH_STRUCT(QuantGroupedMatmulInplaceAdd::QGmmInplaceAddBasicApiTilingData, tilingData, tiling);
+        QGmmInplaceAddTensorApi<DTYPE_X1, DTYPE_X2>(x1, x2, scale2, groupList, scale1, y, tiling);
+#else
         GET_TILING_DATA_WITH_STRUCT(QuantGroupedMatmulInplaceAdd::QGmmInplaceAddTilingDataParams, tilingData, tiling);
         QGmmInplaceAddAswt<Cgmct::Gemm::layout::ColumnMajor, Cgmct::Gemm::layout::RowMajor>(x1, x2, scale2, groupList,
                                                                                             scale1, y, tiling);
+#endif
     }
 #else
     if constexpr (QUANT_B_TRANS == QGMM_INPLACE_ADD_NO_TRANS && QUANT_A_TRANS == QGMM_INPLACE_ADD_TRANS &&
                   KERNEL_TYPE == QGMM_INPLACE_ADD_DEQUANT_VECTOR) { // transX = true, transW = false, T-C
-        TPipe tPipe;
         GET_TILING_DATA_WITH_STRUCT(QuantGroupedMatmulInplaceAdd::QGmmInplaceAddTilingDataParams, tilingData, tiling);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+        QGmmInplaceAddMixTensorApi(x1, x2, scale2, groupList, scale1, y, tiling);
+#else
+        TPipe tPipe;
         QGmmInplaceAddMixAswt<Cgmct::Gemm::layout::ColumnMajor, Cgmct::Gemm::layout::RowMajor>(
             x1, x2, scale2, groupList, scale1, y, tiling);
+#endif
     }
     if constexpr (QUANT_B_TRANS == QGMM_INPLACE_ADD_NO_TRANS && QUANT_A_TRANS == QGMM_INPLACE_ADD_TRANS &&
                   KERNEL_TYPE == QGMM_INPLACE_ADD_DEQUANT_FIXP) { // transX = true, transW = false, T-T
         GET_TILING_DATA_WITH_STRUCT(QuantGroupedMatmulInplaceAdd::QGmmInplaceAddBasicApiTilingData, tilingData, tiling);
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+        QGmmInplaceAddPerTensorTensorApi(x1, x2, scale2, groupList, scale1, y, tiling);
+#else
         QGmmInplaceAddCubeBasicAPI<Cgmct::Gemm::layout::ColumnMajor, Cgmct::Gemm::layout::RowMajor>(
             x1, x2, scale2, groupList, scale1, y, tiling);
+#endif
     }
 #endif
 

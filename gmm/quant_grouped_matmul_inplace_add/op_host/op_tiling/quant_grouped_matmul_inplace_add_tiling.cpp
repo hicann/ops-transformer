@@ -17,10 +17,8 @@
 #include "register/op_impl_registry.h"
 #include "quant_grouped_matmul_inplace_add_tiling.h"
 #include "quant_grouped_matmul_inplace_add_basic_api_tiling.h"
-#include "quant_grouped_matmul_inplace_add_tiling_utils.h"
-#include "../../../common/cgmct/utils/grouped_matmul_constant.h"
 #include "../../op_kernel/arch35/qgmm_inplace_add_tiling_key.h"
-#include "../../op_kernel/arch35/qgmm_mx_ub_output_policy.h"
+#include "quant_grouped_matmul_inplace_add_tiling_utils.h"
 using namespace Ops::Transformer::OpTiling;
 using namespace QuantGroupedMatmulInplaceAdd;
 using namespace optiling::GmmConstant;
@@ -184,49 +182,13 @@ ge::graphStatus QuantGroupedInplaceAddTiling::DoLibApiTiling()
         basicTiling_.baseM = std::min(basicTiling_.baseM, static_cast<uint64_t>(GmmConstant::BASIC_BLOCK_SIZE_128));
         basicTiling_.baseN = std::min(basicTiling_.baseN, static_cast<uint64_t>(GmmConstant::BASIC_BLOCK_SIZE_128));
     }
-    // Admit only the calibrated DAV3510 shape domain and complete output tiles.
-    // The kernel checks actual group K values; totalK / groupNum is not enough.
-    // Transposed-A L0C tails still require a different split-M source stride.
-    constexpr auto splitMParts = Cgmct::Gemm::GroupedMatmul::GMMIA_UB_SPLIT_M_PARTS;
-    constexpr auto oldYChunkRows = Cgmct::Gemm::GroupedMatmul::GMMIA_OLD_Y_CHUNK_ROWS;
-    const auto* compileInfo = context_->GetCompileInfo<GMMCompileInfo>();
-    const uint64_t deltaRows = (static_cast<uint64_t>(basicTiling_.baseM) + splitMParts - 1) / splitMParts;
-    const uint64_t mxUbBytes = (deltaRows + oldYChunkRows) * basicTiling_.baseN * sizeof(float);
-    if (IsMicroScaling() && QGmmMxUbPolicy::IsTotalKCandidate(inputParams_.kSize, inputParams_.groupNum) &&
-        compileInfo != nullptr && compileInfo->npuArch == NpuArch::DAV_3510 &&
-        QGmmMxUbPolicy::IsShapeCandidate(inputParams_.mSize, inputParams_.nSize, basicTiling_.baseM, basicTiling_.baseN,
-                                         inputParams_.groupNum, aicoreParams_.aicNum) &&
-        mxUbBytes <= aicoreParams_.ubSize) {
-        inputParams_.kernelType = static_cast<decltype(inputParams_.kernelType)>(QGMM_INPLACE_ADD_MX_UB_ADD);
+    const bool isDav3510 = npuArch_ == NpuArch::DAV_3510;
+    if (isDav3510 && IsMxUbCandidateForInplaceAdd(inputParams_, basicTiling_, aicoreParams_, npuArch_)) {
+        inputParams_.kernelType = QGMM_INPLACE_ADD_MX_UB_ADD;
     }
     OP_CHECK_IF(CalL1Tiling() != ge::GRAPH_SUCCESS, OP_LOGE(context_->GetNodeName(), "CalL1Tiling failed"),
                 return ge::GRAPH_FAILED);
-    // Select aligned shapes for the 256 x 256 UB accumulation path.
-    constexpr uint64_t minUbGroupK = 2048;
-    constexpr uint64_t maxUbGroupK = 16384;
-    constexpr uint64_t ubTileSize = 256;
-    // Heuristically selected candidate ranges for UB accumulation.
-    constexpr uint64_t ubSmallMLower = 1792;
-    constexpr uint64_t ubSmallMUpper = 2048;
-    constexpr uint64_t ubLargeDimLower = 4864;
-    constexpr uint64_t ubLargeDimUpper = 5120;
-    constexpr uint64_t ubMediumNLower = 3584;
-    constexpr uint64_t ubMediumNUpper = 3840;
-    constexpr uint64_t ubBufferCount = 4;   // Two result slots and two old-C chunks.
-    constexpr uint64_t ubRowAlignment = 64; // FP32 UB row pitch, in elements.
-    const bool inUbShapeRange = (inputParams_.mSize >= ubSmallMLower && inputParams_.mSize <= ubSmallMUpper &&
-                                 inputParams_.nSize >= ubLargeDimLower && inputParams_.nSize <= ubLargeDimUpper) ||
-                                (inputParams_.mSize >= ubLargeDimLower && inputParams_.mSize <= ubLargeDimUpper &&
-                                 inputParams_.nSize >= ubMediumNLower && inputParams_.nSize <= ubMediumNUpper);
-    // A6 uses two result slots and two old-C chunks. Automatic panel sizing needs at least four padded rows.
-    const uint64_t minUbBytes =
-        ubBufferCount * GroupedMatmul::CeilAlign(basicTiling_.baseN, ubRowAlignment) * sizeof(float);
-    if ((npuArch_ == NpuArch::DAV_9201 || npuArch_ == NpuArch::DAV_9202) && IsMxFp8Fp4() && inUbShapeRange &&
-        basicTiling_.baseM == ubTileSize && basicTiling_.baseN == ubTileSize && inputParams_.mSize % ubTileSize == 0 &&
-        inputParams_.nSize % ubTileSize == 0 && inputParams_.groupNum > 0 && aicoreParams_.aicNum > 0 &&
-        inputParams_.kSize >= minUbGroupK &&
-        GroupedMatmul::CeilDiv(inputParams_.kSize, maxUbGroupK) <= inputParams_.groupNum &&
-        minUbBytes <= aicoreParams_.ubSize) {
+    if (!isDav3510 && IsMxUbCandidateForInplaceAdd(inputParams_, basicTiling_, aicoreParams_, npuArch_)) {
         inputParams_.kernelType = QGMM_INPLACE_ADD_MX_UB_ADD;
     }
     tilingData_.mmTilingData.M = inputParams_.mSize;

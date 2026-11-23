@@ -85,6 +85,10 @@ bool CheckShapeForMxFp8Fp4Quant(const gert::Shape& x1ScaleShape, const gert::Sha
 bool CheckMxFp8Fp4InputDim(const gert::Shape& xShape, const gert::Shape& wShape,
                            const optiling::GQmmInputInfo& inputParams);
 
+bool IsMxUbCandidateForInplaceAdd(const optiling::GQmmInputInfo& inputParams,
+                                  const optiling::GQmmBasicTiling& basicTiling,
+                                  const Ops::Transformer::OpTiling::AiCoreParams& aicoreParams, NpuArch npuArch);
+
 // 由 (transB, transA, kernelType) 三元组生成 tiling key，BasicApi 与 普通路径共用
 uint64_t GetTilingKeyForInplaceAdd(const optiling::GQmmInputInfo& inputParams);
 

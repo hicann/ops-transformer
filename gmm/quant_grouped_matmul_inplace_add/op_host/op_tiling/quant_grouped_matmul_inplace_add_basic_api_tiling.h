@@ -58,7 +58,6 @@ private:
     bool AnalyzeAttrs() override;
     bool AnalyzeDtype() override;
     bool AnalyzeInputs() override;
-    bool SetQuantModeForQGmmInplaceAdd();
     bool CheckCoreNum() const override;
     int64_t LogQuantParams() const;
 

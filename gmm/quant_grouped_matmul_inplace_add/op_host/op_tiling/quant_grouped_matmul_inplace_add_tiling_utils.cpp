@@ -17,7 +17,9 @@
 
 #include <graph/utils/type_utils.h>
 
+#include "../../../common/cgmct/utils/grouped_matmul_constant.h"
 #include "../../op_kernel/arch35/qgmm_inplace_add_tiling_key.h"
+#include "../../op_kernel/arch35/qgmm_mx_ub_output_policy.h"
 #include "../quant_grouped_matmul_inplace_add_host_utils.h"
 #include "log/log.h"
 
@@ -468,6 +470,40 @@ bool CheckMxFp8Fp4InputDim(const gert::Shape& xShape, const gert::Shape& wShape,
                                                                         "] must be a multiple of ", MXFP_BASEK_FACTOR)),
                 return false);
     return true;
+}
+
+bool IsMxUbCandidateForInplaceAdd(const GQmmInputInfo& inputParams, const GQmmBasicTiling& basicTiling,
+                                  const Ops::Transformer::OpTiling::AiCoreParams& aicoreParams, NpuArch npuArch)
+{
+    const auto isFp8 = [](ge::DataType dtype) { return dtype == ge::DT_FLOAT8_E4M3FN || dtype == ge::DT_FLOAT8_E5M2; };
+    // DAV3510 MXFP4 uses GM AtomicAdd because UB regresses at short group K.
+    const bool isDav3510MxFp8 = npuArch == NpuArch::DAV_3510 && inputParams.scaleDtype == ge::DT_FLOAT8_E8M0 &&
+                                isFp8(inputParams.aDtype) && isFp8(inputParams.bDtype);
+    const bool isDav92MixedMx = (npuArch == NpuArch::DAV_9201 || npuArch == NpuArch::DAV_9202) &&
+                                inputParams.aDtype == ge::DT_FLOAT8_E4M3FN &&
+                                (inputParams.bDtype == ge::DT_FLOAT4_E2M1 || IsHif4WeightForInplaceAdd(inputParams));
+    if ((!isDav3510MxFp8 && !isDav92MixedMx) ||
+        !QGmmMxUbPolicy::IsShapeCandidate(inputParams.mSize, inputParams.nSize, basicTiling.baseM, basicTiling.baseN,
+                                          inputParams.groupNum, aicoreParams.aicNum)) {
+        return false;
+    }
+    if (isDav3510MxFp8) {
+        constexpr uint64_t splitMParts = Cgmct::Gemm::GroupedMatmul::GMMIA_UB_SPLIT_M_PARTS;
+        constexpr auto oldYChunkRows = Cgmct::Gemm::GroupedMatmul::GMMIA_OLD_Y_CHUNK_ROWS;
+        const uint64_t deltaRows = GroupedMatmul::CeilDiv(basicTiling.baseM, splitMParts);
+        const uint64_t mxUbBytes = (deltaRows + oldYChunkRows) * basicTiling.baseN * sizeof(float);
+        // The kernel also checks each group's actual K.
+        return QGmmMxUbPolicy::IsTotalKCandidate(inputParams.kSize, inputParams.groupNum) &&
+               mxUbBytes <= aicoreParams.ubSize;
+    }
+    constexpr uint64_t ubBufferCount = 4UL;   // Two result slots and two old-C chunks.
+    constexpr uint64_t ubRowAlignment = 64UL; // FP32 UB row pitch, in elements.
+    constexpr uint64_t maxUbGroupK = QGmmMxUbPolicy::MAX_GROUP_K;
+    const uint64_t minUbBytes =
+        ubBufferCount * GroupedMatmul::CeilAlign(basicTiling.baseN, ubRowAlignment) * sizeof(float);
+    return inputParams.kSize >= QGmmMxUbPolicy::MIN_GROUP_K &&
+           GroupedMatmul::CeilDiv(inputParams.kSize, maxUbGroupK) <= inputParams.groupNum &&
+           minUbBytes <= aicoreParams.ubSize;
 }
 
 uint64_t GetTilingKeyForInplaceAdd(const GQmmInputInfo& inputParams)

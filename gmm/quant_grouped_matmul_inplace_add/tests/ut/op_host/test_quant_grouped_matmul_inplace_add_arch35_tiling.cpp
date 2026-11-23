@@ -15,11 +15,13 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -34,13 +36,41 @@ using namespace ge;
 
 namespace {
 
+using BasicTilingData = QuantGroupedMatmulInplaceAdd::QGmmInplaceAddBasicApiTilingData;
+using LegacyTilingData = QuantGroupedMatmulInplaceAdd::QGmmInplaceAddTilingDataParams;
 using ops::ut::ParseBool;
 using ops::ut::SplitStr2Vec;
 using ops::ut::Trim;
 
+constexpr uint64_t MX_L1_BUFFER_COUNT = 2UL;
+constexpr uint64_t MX_SCALE_PACK_K = 64UL;
+constexpr uint64_t MX_SCALE_PAIR_BYTES = 2UL;
+constexpr uint64_t MX_FP4_A_M_ALIGN = 64UL;
+constexpr uint64_t MX_FP4_VALUES_PER_BYTE = 2UL;
+constexpr uint64_t MX_FP8_VALUES_PER_BYTE = 1UL;
+constexpr int64_t TN_FIXPIPE_TILING_KEY = 4;
+constexpr size_t CSV_COLUMN_COUNT = 19;
+constexpr size_t CSV_SHAPE_OVERRIDE_COLUMN_COUNT = 2;
+constexpr char ASCEND_950[] = "Ascend950";
+constexpr char ASCEND_960DT[] = "Ascend960DT";
+
+uint64_t AlignUp(uint64_t value, uint64_t alignment)
+{
+    return (value + alignment - 1UL) / alignment * alignment;
+}
+
 gert::StorageShape MakeShape(const vector<int64_t>& dims)
 {
     return ops::ut::MakeGertStorageShape(dims);
+}
+
+DataType ParseCsvDtype(const string& value, const char* column)
+{
+    const auto dtype = ops::ut::ParseGeDtype(value);
+    if (dtype == ge::DT_UNDEFINED && Trim(value) != "UNDEFINED") {
+        throw std::invalid_argument(string(column) + " contains an unknown dtype '" + value + "'");
+    }
+    return dtype;
 }
 
 struct QGmmInplaceAddArch35Param {
@@ -60,44 +90,94 @@ struct QGmmInplaceAddArch35Param {
     int64_t groupListType = 0;
     bool expectSuccess = false;
     bool checkTilingKey = false;
-    uint64_t expectTilingKey = 0;
+    int64_t expectTilingKey = 0;
     vector<int64_t> scale2Shape;
     vector<int64_t> scale1Shape;
     uint64_t tilingDataSize = 0;
     vector<int64_t> xShapeOverride;
     vector<int64_t> weightShapeOverride;
 
+    void CheckMxL1(const BasicTilingData& data, uint64_t l1Size) const
+    {
+        const auto& mm = data.mmTilingData;
+        ASSERT_GT(mm.kAL1, 0U);
+        ASSERT_GT(mm.kBL1, 0U);
+        ASSERT_GT(mm.scaleKAL1, 0U);
+        EXPECT_EQ(mm.scaleKAL1, mm.scaleKBL1);
+
+        const bool isFp4 = xDtype == ge::DT_FLOAT4_E2M1;
+        // The TN kernel pads the M dimension of transposed FP4 A. B uses baseN.
+        const uint64_t dataM = isFp4 ? AlignUp(mm.baseM, MX_FP4_A_M_ALIGN) : mm.baseM;
+        const uint64_t valuesPerByte = isFp4 ? MX_FP4_VALUES_PER_BYTE : MX_FP8_VALUES_PER_BYTE;
+        const uint64_t dataBytes =
+            (dataM * AlignUp(mm.kAL1, MX_SCALE_PACK_K) + mm.baseN * AlignUp(mm.kBL1, MX_SCALE_PACK_K)) / valuesPerByte;
+        // InplaceAdd reloads the shared scale window on complete outer K strips.
+        const uint64_t outerK = std::max(mm.kAL1, mm.kBL1);
+        const uint64_t scaleK = std::min(std::max<uint64_t>(mm.scaleKAL1 / outerK, 1UL) * outerK, uint64_t{mm.k});
+        const uint64_t scaleBytes = (uint64_t{mm.baseM} + mm.baseN) *
+                                    (AlignUp(scaleK, MX_SCALE_PACK_K) / MX_SCALE_PACK_K) * MX_SCALE_PAIR_BYTES;
+        EXPECT_LE(dataBytes + scaleBytes, l1Size / MX_L1_BUFFER_COUNT);
+    }
+
+    void CheckTilingData(const TilingInfo& info, uint64_t l1Size) const
+    {
+        const bool expectCubeBasicApi = socVersion == ASCEND_950 && info.tilingKey == TN_FIXPIPE_TILING_KEY;
+        if (!expectCubeBasicApi) {
+            ASSERT_EQ(info.tilingDataSize, sizeof(LegacyTilingData));
+            const auto& data = *reinterpret_cast<const LegacyTilingData*>(info.tilingData.get());
+            EXPECT_EQ(data.quantGmmInplaceAddParams.groupNum, groupNum);
+            EXPECT_EQ(data.quantGmmInplaceAddParams.groupListType, groupListType);
+            EXPECT_EQ(data.mmTilingData.Ka, k);
+            return;
+        }
+
+        ASSERT_EQ(info.tilingDataSize, sizeof(BasicTilingData));
+        const auto& data = *reinterpret_cast<const BasicTilingData*>(info.tilingData.get());
+        const bool isMx = scale2Dtype == ge::DT_FLOAT8_E8M0;
+        const auto mode = isMx ? optiling::QuantMode::MX_PERGROUP_MODE : optiling::QuantMode::PERTENSOR_MODE;
+        EXPECT_EQ(data.gmmQuantParams.groupNum, groupNum);
+        EXPECT_EQ(data.gmmQuantParams.groupListType, groupListType);
+        EXPECT_EQ(data.gmmQuantParams.aQuantMode, static_cast<uint32_t>(mode));
+        EXPECT_EQ(data.gmmQuantParams.bQuantMode, static_cast<uint32_t>(mode));
+        EXPECT_EQ(data.mmTilingData.m, m);
+        EXPECT_EQ(data.mmTilingData.n, n);
+        EXPECT_EQ(data.mmTilingData.k, k);
+        EXPECT_GT(data.mmTilingData.baseM, 0U);
+        EXPECT_GT(data.mmTilingData.baseN, 0U);
+        if (isMx) {
+            CheckMxL1(data, l1Size);
+            return;
+        }
+
+        EXPECT_EQ(data.mmTilingData.scaleKAL1, 0U);
+        EXPECT_EQ(data.mmTilingData.scaleKBL1, 0U);
+        if (k == 0) {
+            // The empty T-T reduction skips the product and leaves the existing yRef intact.
+            EXPECT_EQ(data.mmTilingData.baseK, 0U);
+            EXPECT_EQ(data.mmTilingData.kAL1, 0U);
+            EXPECT_EQ(data.mmTilingData.kBL1, 0U);
+        }
+    }
+
     void Test() const
     {
-        optiling::GMMCompileInfo compileInfo;
-        string archStr;
-        if (socVersion == "Ascend960DT") {
-            compileInfo = {32,
-                           32,
-                           262144,
-                           524288,
-                           134217728,
-                           262144,
-                           65536,
-                           65536,
-                           platform_ascendc::SocVersion::ASCEND950,
-                           NpuArch::DAV_9201,
-                           true};
-            archStr = "9201";
-        } else {
-            compileInfo = {32,
-                           64,
-                           262144,
-                           524288,
-                           134217728,
-                           262144,
-                           65536,
-                           65536,
-                           platform_ascendc::SocVersion::ASCEND950,
-                           NpuArch::DAV_3510,
-                           false};
-            archStr = "3510";
-        }
+        SCOPED_TRACE(caseName);
+        const bool isAscend950 = socVersion == ASCEND_950;
+        const NpuArch npuArch = isAscend950 ? NpuArch::DAV_3510 : NpuArch::DAV_9201;
+        constexpr uint32_t aicNum = 32;
+        constexpr uint32_t dav3510AivRatio = 2;
+        optiling::GMMCompileInfo compileInfo = {aicNum,
+                                                isAscend950 ? aicNum * dav3510AivRatio : aicNum,
+                                                262144,
+                                                524288,
+                                                134217728,
+                                                262144,
+                                                65536,
+                                                65536,
+                                                {},
+                                                npuArch,
+                                                npuArch == NpuArch::DAV_9201};
+        const string archStr = to_string(static_cast<uint32_t>(npuArch));
 
         gert::StorageShape xShape = MakeShape(xShapeOverride.empty() ? vector<int64_t>{k, m} : xShapeOverride);
         gert::StorageShape weightShape =
@@ -124,43 +204,25 @@ struct QGmmInplaceAddArch35Param {
 
         TilingInfo tilingInfo;
         bool tilingResult = ExecuteTiling(tilingContextPara, tilingInfo);
-        ASSERT_EQ(tilingResult, expectSuccess) << "case=" << caseName;
+        ASSERT_EQ(tilingResult, expectSuccess);
         if (!expectSuccess) {
             return;
         }
 
         ASSERT_GT(tilingInfo.blockNum, 0U) << "case=" << caseName;
-        ASSERT_TRUE(tilingInfo.tilingDataSize == sizeof(QuantGroupedMatmulInplaceAdd::QGmmInplaceAddTilingDataParams) ||
-                    tilingInfo.tilingDataSize == sizeof(QuantGroupedMatmulInplaceAdd::QGmmInplaceAddBasicApiTilingData))
-            << "case=" << caseName << " tilingDataSize=" << tilingInfo.tilingDataSize;
+        if (!isAscend950) {
+            ASSERT_TRUE(tilingInfo.tilingDataSize == sizeof(LegacyTilingData) ||
+                        tilingInfo.tilingDataSize == sizeof(BasicTilingData))
+                << "case=" << caseName << " tilingDataSize=" << tilingInfo.tilingDataSize;
+        }
         if (checkTilingKey) {
             ASSERT_EQ(tilingInfo.tilingKey, expectTilingKey) << "case=" << caseName;
         }
-        // Additional tiling invariants apply only to the new mixed-input cases.
-        if (xDtype == ge::DT_FLOAT8_E4M3FN &&
-            (wDtype == ge::DT_FLOAT4_E2M1 || wDtype == Ops::Transformer::DT_HIFLOAT4)) {
+        if (isAscend950) {
+            CheckTilingData(tilingInfo, compileInfo.l1Size);
+        } else if (xDtype == ge::DT_FLOAT8_E4M3FN &&
+                   (wDtype == ge::DT_FLOAT4_E2M1 || wDtype == Ops::Transformer::DT_HIFLOAT4)) {
             CheckPerGroupTiling(tilingInfo, compileInfo.l1Size);
-        }
-        if (k == 0 && xDtype == ge::DT_HIFLOAT8 &&
-            (scale2Shape.size() == 1U || (scale2Shape.size() == 2U && scale2Shape[1] == 1))) {
-            // The empty T-T reduction must still serialize the BasicApi layout;
-            // the kernel skips the product and leaves the existing yRef intact.
-            ASSERT_EQ(tilingInfo.tilingDataSize,
-                      sizeof(QuantGroupedMatmulInplaceAdd::QGmmInplaceAddBasicApiTilingData));
-            const auto* data = reinterpret_cast<const QuantGroupedMatmulInplaceAdd::QGmmInplaceAddBasicApiTilingData*>(
-                tilingInfo.tilingData.get());
-            EXPECT_EQ(data->gmmQuantParams.groupNum, groupNum);
-            EXPECT_EQ(data->gmmQuantParams.groupListType, groupListType);
-            EXPECT_EQ(data->gmmQuantParams.aQuantMode, static_cast<uint32_t>(optiling::QuantMode::PERTENSOR_MODE));
-            EXPECT_EQ(data->gmmQuantParams.bQuantMode, static_cast<uint32_t>(optiling::QuantMode::PERTENSOR_MODE));
-            EXPECT_EQ(data->mmTilingData.m, m);
-            EXPECT_EQ(data->mmTilingData.n, n);
-            EXPECT_GT(data->mmTilingData.baseM, 0U);
-            EXPECT_GT(data->mmTilingData.baseN, 0U);
-            EXPECT_EQ(data->mmTilingData.k, 0U);
-            EXPECT_EQ(data->mmTilingData.baseK, 0U);
-            EXPECT_EQ(data->mmTilingData.kAL1, 0U);
-            EXPECT_EQ(data->mmTilingData.kBL1, 0U);
         }
     }
 
@@ -235,12 +297,15 @@ vector<QGmmInplaceAddArch35Param> GetParams(const string& socVersion)
         }
         vector<string> items;
         SplitStr2Vec(line, ",", items);
-        if (items.empty() || items[0] == "socVersion" || items.size() < 19U) {
+        if (items.empty() || items[0] == "socVersion") {
             continue;
         }
 
         const string caseName = items.size() > 1U ? Trim(items[1]) : "";
         try {
+            if (items.size() < CSV_COLUMN_COUNT || items.size() > CSV_COLUMN_COUNT + CSV_SHAPE_OVERRIDE_COLUMN_COUNT) {
+                throw std::invalid_argument("expected 19 base columns and up to two shape override columns");
+            }
             size_t idx = 0;
             QGmmInplaceAddArch35Param p;
             p.socVersion = Trim(items[idx++]);
@@ -257,16 +322,24 @@ vector<QGmmInplaceAddArch35Param> GetParams(const string& socVersion)
             p.m = stoll(Trim(items[idx++]));
             p.k = stoll(Trim(items[idx++]));
             p.n = stoll(Trim(items[idx++]));
-            p.xDtype = ops::ut::ParseGeDtype(items[idx++]);
-            p.wDtype = ops::ut::ParseGeDtype(items[idx++]);
-            p.scale2Dtype = ops::ut::ParseGeDtype(items[idx++]);
-            p.scale1Dtype = ops::ut::ParseGeDtype(items[idx++]);
-            p.yDtype = ops::ut::ParseGeDtype(items[idx++]);
+            p.xDtype = ParseCsvDtype(items[idx++], "xDtype");
+            p.wDtype = ParseCsvDtype(items[idx++], "wDtype");
+            p.scale2Dtype = ParseCsvDtype(items[idx++], "scale2Dtype");
+            p.scale1Dtype = ParseCsvDtype(items[idx++], "scale1Dtype");
+            p.yDtype = ParseCsvDtype(items[idx++], "yDtype");
             p.groupListType = stoll(Trim(items[idx++]));
             p.expectSuccess = ParseBool(items[idx++]);
-            string keyField = Trim(items[idx++]);
+            const string keyField = Trim(items[idx++]);
             p.checkTilingKey = !keyField.empty() && keyField != "NONE";
-            p.expectTilingKey = p.checkTilingKey ? static_cast<uint64_t>(stoull(keyField)) : 0;
+            if (p.expectSuccess && p.checkTilingKey) {
+                size_t parsed = 0;
+                p.expectTilingKey = stoll(keyField, &parsed);
+                if (parsed != keyField.size() || p.expectTilingKey < 0) {
+                    throw std::invalid_argument("expected a nonnegative tilingKey");
+                }
+            } else if (!p.expectSuccess && keyField != "NONE") {
+                throw std::invalid_argument("failed tiling must use NONE for tilingKey");
+            }
             p.scale2Shape = ops::ut::ParseDims(items[idx++]);
             p.scale1Shape = ops::ut::ParseDims(items[idx++]);
             p.tilingDataSize = static_cast<uint64_t>(stoull(Trim(items[idx++])));
@@ -293,13 +366,13 @@ string MakeParamName(const testing::TestParamInfo<QGmmInplaceAddArch35Param>& in
 namespace QuantGroupedMatmulInplaceAddArch35TilingUT {
 const vector<QGmmInplaceAddArch35Param>& GetAscend950Params()
 {
-    static const vector<QGmmInplaceAddArch35Param> params = GetParams("Ascend950");
+    static const vector<QGmmInplaceAddArch35Param> params = GetParams(ASCEND_950);
     return params;
 }
 
 const vector<QGmmInplaceAddArch35Param>& GetAscend960DTParams()
 {
-    static const vector<QGmmInplaceAddArch35Param> params = GetParams("Ascend960DT");
+    static const vector<QGmmInplaceAddArch35Param> params = GetParams(ASCEND_960DT);
     return params;
 }
 
