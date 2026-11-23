@@ -119,8 +119,9 @@ int RunExample(aclrtStream stream, int& cleanupRet)
     uint64_t metadataWorkspaceSize = 0;
     aclOpExecutor* metadataExecutor = nullptr;
     CHECK_RET(aclnnQuantLightningIndexerV3MetadataGetWorkspaceSize(
-        cuQ, nullptr, nullptr, usedK, nullptr, queryHeads, keyHeads, headDim, topk, 2, batch, 1, keyLength, layoutQ,
-        layoutK, 0, 1, candidateCapacity, candidateBlockSize, metadata, &metadataWorkspaceSize, &metadataExecutor));
+        cuQ, nullptr, nullptr, usedK, nullptr, nullptr, queryHeads, keyHeads, headDim, topk, 2, batch, 1, keyLength,
+        layoutQ, layoutK, 0, 1, candidateCapacity, candidateBlockSize, nullptr, metadata, &metadataWorkspaceSize,
+        &metadataExecutor));
     void* metadataWorkspace = nullptr;
     if (metadataWorkspaceSize != 0) {
         CHECK_RET(resources.Allocate(metadataWorkspaceSize, &metadataWorkspace));
@@ -172,9 +173,9 @@ int RunExample(aclrtStream stream, int& cleanupRet)
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor = nullptr;
     CHECK_RET(aclnnQuantLightningIndexerV3GetWorkspaceSize(
-        q, k, w, qScale, kScale, cuQ, nullptr, nullptr, usedK, nullptr, blockTable, nullptr, metadata, topk, 2, 1,
-        layoutQ, layoutK, 0, 1, 0, candidateCapacity, candidateBlockSize, sparseIndices, sparseValues, candidateIndices,
-        candidateLength, &workspaceSize, &executor));
+        q, k, w, qScale, kScale, cuQ, nullptr, nullptr, usedK, nullptr, blockTable, nullptr, metadata, nullptr, topk, 2,
+        1, layoutQ, layoutK, 0, 1, 0, candidateCapacity, candidateBlockSize, nullptr, sparseIndices, sparseValues,
+        candidateIndices, candidateLength, &workspaceSize, &executor));
     void* workspace = nullptr;
     if (workspaceSize != 0) {
         CHECK_RET(resources.Allocate(workspaceSize, &workspace));

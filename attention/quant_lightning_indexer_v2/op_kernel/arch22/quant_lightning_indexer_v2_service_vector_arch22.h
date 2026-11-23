@@ -79,7 +79,7 @@ public:
                                                   GlobalTensor<int32_t> outputIdxOffsetGm, bool outputIdxOffsetValid);
     __aicore__ inline void InitVecInputTensor(GlobalTensor<half> weightsGm, GlobalTensor<half> qScaleGm,
                                               GlobalTensor<half> kScaleGm, GlobalTensor<int32_t> indiceOutGm,
-                                              GlobalTensor<int32_t> blockTableGm);
+                                              GlobalTensor<int32_t> blockTableGm, GlobalTensor<bfloat16_t> valueOutGm);
     __aicore__ inline void CleanInvalidOutput(int64_t invalidS1offset);
     __aicore__ inline int32_t AlignS2(int32_t cuS2Len);
     __aicore__ inline void AllocEventID();
@@ -95,6 +95,7 @@ protected:
     GlobalTensor<half> kScaleGm;
     GlobalTensor<half> vec0OutGm;
     GlobalTensor<int32_t> indiceOutGm;
+    GlobalTensor<bfloat16_t> valueOutGm; // return_value: BF16 score 输出（与 arch35 对齐）
     GlobalTensor<int32_t> candidateTopkIndexOutGm;
     GlobalTensor<int32_t> candidateBlockLengthGm;
     GlobalTensor<int32_t> blockTableGm;
@@ -135,12 +136,14 @@ private:
     TBuf<TPosition::VECCALC> sortOutBuf_;
     TBuf<TPosition::VECCALC> indexBuf_;
     TBuf<TPosition::VECCALC> tmpBuf_;
+    TBuf<TPosition::VECCALC> valueOutBuf_; // return_value: BF16 score 输出中转
 
     // tmp buff for LD
     TBuf<> ldToBeMrgBuf_;
     TBuf<> ldTmpBuf_;
     TBuf<> ldOutValueBuf_;
     TBuf<> ldOutIdxBuf_;
+    TBuf<> ldOutBf16Buf_; // DCP LD: 归并后 BF16 sparse_values 输出中转
 
     // tmp buff for candidate (two-level topk)
     TBuf<TPosition::VECCALC> blockSortOutBuf_; // candidate 开启: 块级 topk 累加器 [CeilDiv(s1BaseSize,2), 2048, 2]
@@ -251,6 +254,10 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::InitBuffers(TPipe* pipe)
     pipe->InitBuffer(tmpBuf_, TMP_BUF_BYTES);
     // P3: 累加器按 topk 宽度分配 (topk<2048 时省 UB; 2048 时与原一致)
     pipe->InitBuffer(sortOutBuf_, CeilDiv(s1BaseSize_, 2) * topkPairWidth_ * sizeof(float));
+    // return_value: FP32 分数抽取中转（写出前再 Cast 成 BF16；仅 return_value=1 时分配）
+    if (constInfo_.returnValue != 0U) {
+        pipe->InitBuffer(valueOutBuf_, topkWidth_ * sizeof(float));
+    }
 
     globalTopkIndice_ = indexBuf_.Get<int32_t>();
     globalTopkUb_ = sortOutBuf_.Get<float>();
@@ -285,6 +292,9 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::InitLDBuffers(TPipe* pipe)
     pipe->InitBuffer(ldTmpBuf_, mrgPairWidth * mrgListNum_ * sizeof(float));
     pipe->InitBuffer(ldOutValueBuf_, mrgWidth * sizeof(float));
     pipe->InitBuffer(ldOutIdxBuf_, mrgWidth * sizeof(int32_t));
+    if (constInfo_.returnValue != 0U) {
+        pipe->InitBuffer(ldOutBf16Buf_, mrgWidth * sizeof(bfloat16_t));
+    }
 }
 
 template <typename QLIV2T>
@@ -319,12 +329,14 @@ template <typename QLIV2T>
 __aicore__ inline void QLIV2Vector<QLIV2T>::InitVecInputTensor(GlobalTensor<half> weightsGm,
                                                                GlobalTensor<half> qScaleGm, GlobalTensor<half> kScaleGm,
                                                                GlobalTensor<int32_t> indiceOutGm,
-                                                               GlobalTensor<int32_t> blockTableGm)
+                                                               GlobalTensor<int32_t> blockTableGm,
+                                                               GlobalTensor<bfloat16_t> valueOutGm)
 {
     this->weightsGm = weightsGm;
     this->qScaleGm = qScaleGm;
     this->kScaleGm = kScaleGm;
     this->indiceOutGm = indiceOutGm;
+    this->valueOutGm = valueOutGm;
     this->blockTableGm = blockTableGm;
 }
 
@@ -371,6 +383,18 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::CleanInvalidOutput(int64_t invalidS1
     valueULocal = outQueue_.DeQue<float>();
     QLIV2ServiceVec::CopyOut(indiceOutGm[invalidS1offset], idxULocal1, constInfo_.sparseCount);
     outQueue_.FreeTensor(valueULocal);
+    // return_value: 无效行同步输出 BF16 -inf（与 arch35 对齐）
+    if (constInfo_.returnValue != 0U) {
+        LocalTensor<float> valF32 = valueOutBuf_.Get<float>();
+        Duplicate(valF32.template ReinterpretCast<int32_t>(), QLIV2ServiceVec::NEG_INF,
+                  static_cast<int32_t>(constInfo_.sparseCount));
+        LocalTensor<bfloat16_t> valBf16 = outQueue_.AllocTensor<bfloat16_t>();
+        AscendC::Cast(valBf16, valF32, AscendC::RoundMode::CAST_RINT, static_cast<int32_t>(constInfo_.sparseCount));
+        SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
+        QLIV2ServiceVec::CopyOut(valueOutGm[invalidS1offset], valBf16, static_cast<int64_t>(constInfo_.sparseCount));
+        SetWaitFlag<HardEvent::MTE3_V>(HardEvent::MTE3_V);
+        outQueue_.FreeTensor(valBf16);
+    }
     // candidate 开启: candidate_topk_index 同步填 -1 (行偏移 = sparse 偏移 / sparseCount * candidateTopkBlocks)
     if (constInfo_.candidateOn) {
         uint64_t candOffset =
@@ -875,8 +899,17 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::ProcessVec1(const QLIV2Common::RunIn
             cuRealAcSeqCount += 1;
             cuRealAcSeq = (cuRealAcSeqCount + cuRealAcSeqIni) / static_cast<int32_t>(constInfo_.cmpRatio);
         }
-        int32_t cuS2Len = cuBaseS2Idx + s2BaseSize_ >= cuRealAcSeq ? cuRealAcSeq - cuBaseS2Idx : s2BaseSize_;
         int32_t cuS1Idx = cuS1BeginIdxPerAiv + innerS1Idx;
+        if (constInfo_.dcpEnable) {
+            // DCP: 全局可见上界 u = C - Q_len + row + 1, 再映射成本地可见前缀
+            int64_t uSigned = static_cast<int64_t>(info.causalGlobalLen) - static_cast<int64_t>(info.actS1Size) +
+                              static_cast<int64_t>(cuS1Idx) + 1;
+            uint32_t u = (uSigned <= 0) ? 0U : static_cast<uint32_t>(uSigned);
+            cuRealAcSeq = static_cast<int32_t>(QLIV2Common::CalcDcpVisibleLen(u, static_cast<uint32_t>(info.actS2Size),
+                                                                              constInfo_.cpWorld, constInfo_.cpRank,
+                                                                              constInfo_.cpInterleaveSize));
+        }
+        int32_t cuS2Len = cuBaseS2Idx + s2BaseSize_ >= cuRealAcSeq ? cuRealAcSeq - cuBaseS2Idx : s2BaseSize_;
         // 当前vec1ResGm对应S1的位置
         // LD 布局 = 每核 s1Base 行预留区 (起点 = saveWorkSpaceIdx * s1Base * pairW)。
         // 槽内行号必须用**块内相对行号** blockRowIdx (= cuS1Idx - cuBaseS1Idx)：
@@ -957,12 +990,31 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::ProcessVec1(const QLIV2Common::RunIn
                 ExtractIndex(idxULocal, globalTopkUb_[innerS1Idx * topkPairWidth_].template ReinterpretCast<uint32_t>(),
                              topkWidth_);
                 PipeBarrier<PIPE_V>();
+                // return_value: 先从排序缓冲抽取偶数 lane 的分数（此时缓冲未被清空）
+                LocalTensor<float> valueUb;
+                if (constInfo_.returnValue != 0U) {
+                    valueUb = valueOutBuf_.Get<float>();
+                    ExtractValue(valueUb.template ReinterpretCast<uint32_t>(),
+                                 globalTopkUb_[innerS1Idx * topkPairWidth_].template ReinterpretCast<uint32_t>(),
+                                 topkWidth_);
+                }
                 InitSortOutBuf(globalTopkUb_[innerS1Idx * topkPairWidth_], topkPairWidth_);
                 outQueue_.EnQue<uint32_t>(idxULocal);
                 idxULocal = outQueue_.DeQue<uint32_t>();
                 QLIV2ServiceVec::CopyOut(indiceOutGm[info.indiceOutOffset + cuS1Idx * constInfo_.sparseCount],
                                          idxULocal.template ReinterpretCast<int32_t>(), constInfo_.sparseCount);
                 outQueue_.FreeTensor(idxULocal);
+                // return_value: FP32 分数 Cast 成 BF16 写出（与 arch35 输出 dtype 对齐）
+                if (constInfo_.returnValue != 0U) {
+                    LocalTensor<bfloat16_t> valBf16 = outQueue_.AllocTensor<bfloat16_t>();
+                    AscendC::Cast(valBf16, valueUb, AscendC::RoundMode::CAST_RINT,
+                                  static_cast<int32_t>(constInfo_.sparseCount));
+                    SetWaitFlag<HardEvent::V_MTE3>(HardEvent::V_MTE3);
+                    QLIV2ServiceVec::CopyOut(valueOutGm[info.indiceOutOffset + cuS1Idx * constInfo_.sparseCount],
+                                             valBf16, static_cast<int64_t>(constInfo_.sparseCount));
+                    SetWaitFlag<HardEvent::MTE3_V>(HardEvent::MTE3_V);
+                    outQueue_.FreeTensor(valBf16);
+                }
                 // candidate 开启: 块级 topk 直出 candidate_topk_index
                 if (constInfo_.candidateOn) {
                     CopyOutCandTopkIndex(info, cuS1Idx, innerS1Idx);
@@ -1187,6 +1239,13 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::ProcessLD()
         // 搬出 (P3: Extract repeat = topkWidth_/32, 每 repeat 消费 32 对)
         Extract(outValueUb, outIdxUb, curValueIdxUb, (topkWidth_ / 32));
         PipeBarrier<PIPE_V>();
+        if (constInfo_.returnValue != 0U) {
+            // DCP: LD 归并后的分数同步转 BF16，与 ProcessVec1 直出路径保持同一 dtype。
+            LocalTensor<bfloat16_t> outValBf16 = ldOutBf16Buf_.Get<bfloat16_t>();
+            AscendC::Cast(outValBf16, outValueUb, AscendC::RoundMode::CAST_RINT,
+                          static_cast<int32_t>(constInfo_.sparseCount));
+            PipeBarrier<PIPE_V>();
+        }
         InitSortOutBuf(curValueIdxUb, topkPairWidth_);
         LocalTensor<int32_t> idxULocal1 = outIdxUb.template ReinterpretCast<int32_t>();
         // A15: output_idx_offset 已在 ProcessVec 的索引成形阶段施加, LD 归并只做 (value,index) 合并,
@@ -1195,6 +1254,10 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::ProcessLD()
         uint64_t outOffset =
             ldInfo_.indiceOutCoreOffset + (ldInfo_.mStart + j) * constInfo_.kHeadNum * constInfo_.sparseCount;
         AscendC::DataCopyPad(indiceOutGm[outOffset], idxULocal1, copyOutParams);
+        if (constInfo_.returnValue != 0U) {
+            LocalTensor<bfloat16_t> outValBf16 = ldOutBf16Buf_.Get<bfloat16_t>();
+            QLIV2ServiceVec::CopyOut(valueOutGm[outOffset], outValBf16, static_cast<int64_t>(constInfo_.sparseCount));
+        }
         SetWaitFlag<HardEvent::MTE3_V>(HardEvent::MTE3_V);
     }
     SetWaitFlag<HardEvent::MTE3_V>(HardEvent::MTE3_V);

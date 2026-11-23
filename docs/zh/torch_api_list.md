@@ -100,8 +100,8 @@
 |[quant_compressor](../../attention/quant_compressor/docs/torchapi_quant_compressor.md)|Compressor的量化版本，将每4或128个token的KV cache压缩成一个，然后每个token与这些压缩的KV cache进行DSA计算。|-|默认支持确定性计算|
 |[quant_flash_attn](../../attention/quant_flash_attn/docs/torchapi_quant_flash_attn.md)| 调用`QuantFlashAttn`算子完成MxFP8/HiF8/MxFP4量化场景下的全量化注意力计算，训练推理归一化。|-|默认支持确定性计算|
 |[quant_flash_attn_grad](../../attention/quant_flash_attn_grad/docs/torchapi_quant_flash_attn_grad.md)| 调用`QuantFlashAttnGrad`算子完成HiF8量化场景下的全量化注意力计算，训练推理归一化。|-|默认支持确定性计算|
-|[quant_lightning_indexer](../../attention/quant_lightning_indexer_v2/docs/torchapi_quant_lightning_indexer.md)| 基于量化输入得到每个token对应的TopK位置，并支持输出候选逻辑块及每行有效候选数。|默认支持确定性计算。|默认支持确定性计算。|
-|[quant_lightning_indexer_metadata](../../attention/quant_lightning_indexer_v2/docs/torchapi_quant_lightning_indexer.md#quant_lightning_indexer_metadata)| 生成quant_lightning_indexer所需的任务划分信息，支持候选配置。|默认支持确定性计算。|默认支持确定性计算。|
+|[quant_lightning_indexer](../../attention/quant_lightning_indexer_v2/docs/torchapi_quant_lightning_indexer.md)| 基于量化输入得到每个token对应的TopK位置，并支持输出候选逻辑块及每行有效候选数；DCP（cpWorld>1）场景返回位置级TopK两输出。|默认支持确定性计算。|默认支持确定性计算。|
+|[quant_lightning_indexer_metadata](../../attention/quant_lightning_indexer_v2/docs/torchapi_quant_lightning_indexer.md#quant_lightning_indexer_metadata)| 生成quant_lightning_indexer所需的任务划分信息，支持候选配置与DCP参数。|默认支持确定性计算。|默认支持确定性计算。|
 |[quant_mla_prolog](../../attention/quant_mla_prolog/docs/torchapi_quant_mla_prolog.md)|量化输入的MLA前处理。|-|默认支持确定性计算|
 |[quant_reduce_scatter](../../mc2/quant_reduce_scatter/docs/torchapi_quant_reduce_scatter.md)|实现quant + reduceScatter融合计算。|-|-|
 |[quant_sparse_flash_mla](../../attention/quant_sparse_flash_mla/docs/torchapi_quant_sparse_flash_mla.md)|调用`QuantSparseFlashMla`算子完成共享KV（Key和Value使用同一份输入）的稀疏注意力计算。|-|默认支持确定性计算|

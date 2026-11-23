@@ -31,7 +31,17 @@
   2. 将任务分配到可用计算核，生成各核的任务起止信息。
   3. 输出各AIC核基本块的起止位置及AIV核的FD任务信息，并将metadata传入aclnnQuantLightningIndexerV3，用于后续计算。
 
-- 与V2Metadata的关系：在[aclnnQuantLightningIndexerV2Metadata](aclnnQuantLightningIndexerV2Metadata.md)的参数基础上，新增candidateTopkBlocks、candidateBlockSize两个属性。两项仅支持(-1,-1)和(2048,8)，必须与V3计算接口一致。即使关闭候选选择，也必须使用本接口生成的metadata。
+- DCP（Decode Context Parallel，解码上下文并行）模式：
+
+  `cpWorld > 1` 时启用。metadata 需要感知 DCP 才能正确切分 S2 和判定 FD/LD：本接口读取每个请求的全局 exclusive 因果上界 `causalSeqlensKvGlobalOptional`（shape (B,)，值为该请求本次最后一个 query 的全局位置 + 1），并结合 `cpWorld/cpRank/cpKvCacheInterleaveSize` 计算每个 S1 组的可见本地 KV 前缀：
+
+  $$
+  visible = \min\left(L,\ \left\lfloor \frac{u}{P \times S} \right\rfloor S + \mathrm{clamp}\left(u \bmod (P \times S) - rS,\ 0,\ S\right)\right)
+  $$
+
+  其中 `u = C - Q_len + i + 1`，P/r/S 对应 dcpParams 中的 [cpWorld, cpRank, cpKvCacheInterleaveSize]，L 为本地有效 key 长度。DCP 场景下 `maskMode` 为 3（rightDownCausal模式）。DCP 与 candidate 互斥：启用 DCP 时 candidateTopkBlocks、candidateBlockSize 必须均为 -1。
+
+- 与V2Metadata的关系：在[aclnnQuantLightningIndexerV2Metadata](aclnnQuantLightningIndexerV2Metadata.md)的参数基础上，新增candidateTopkBlocks、candidateBlockSize两个属性。两项仅支持(-1,-1)和(2048,8)，必须与V3计算接口一致。即使关闭候选选择，也必须使用本接口生成的metadata。DCP参数（causalSeqlensKvGlobalOptional与dcpParams）仅在V3Metadata提供，V2Metadata没有这些参数；DCP场景必须使用本接口，且参数与aclnnQuantLightningIndexerV3完全一致。
 
 ## 函数原型
 
@@ -44,6 +54,7 @@ aclnnStatus aclnnQuantLightningIndexerV3MetadataGetWorkspaceSize(
     const aclTensor   *sequsedQOptional,
     const aclTensor   *sequsedKOptional,
     const aclTensor   *cmpResidualKOptional,
+    const aclTensor   *causalSeqlensKvGlobalOptional,
     int64_t            numHeadsQ,
     int64_t            numHeadsK,
     int64_t            headDim,
@@ -58,6 +69,7 @@ aclnnStatus aclnnQuantLightningIndexerV3MetadataGetWorkspaceSize(
     int64_t            cmpRatio,
     int64_t            candidateTopkBlocks,
     int64_t            candidateBlockSize,
+    const aclIntArray  *dcpParams,
     const aclTensor   *metadata,
     uint64_t          *workspaceSize,
     aclOpExecutor    **executor)
@@ -142,6 +154,16 @@ aclnnStatus aclnnQuantLightningIndexerV3Metadata(
       <td>输入</td>
       <td>表示不同Batch中k压缩前Sequence Length除以cmpRatio的余数，配合cmpRatio还原压缩前长度。</td>
       <td><ul><li>支持空Tensor。</li><li>cmpRatio不为1，且mask为3场景下必传。</li><li>shape固定为(B, )。</li></ul></td>
+      <td>INT32</td>
+      <td>ND</td>
+      <td>1维</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>causalSeqlensKvGlobalOptional（aclTensor*）</td>
+      <td>输入</td>
+      <td>DCP场景下每个请求的全局exclusive因果上界C（该请求本次最后一个query的全局位置+1）。</td>
+      <td><ul><li>cpWorld>1时必须传入，shape固定为(B, )；cpWorld为1时必须传nullptr。</li><li>仅支持INT32。</li><li>必须与aclnnQuantLightningIndexerV3传入的值完全一致。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维</td>
@@ -271,7 +293,7 @@ aclnnStatus aclnnQuantLightningIndexerV3Metadata(
       <td>candidateTopkBlocks（int64_t）</td>
       <td>输入</td>
       <td>两级TopK候选源(source)模式的候选块数量，即块级Top-k需要保留的候选块个数。</td>
-      <td><ul><li>-1表示关闭candidate模式。</li><li>开启时仅支持2048。</li></ul></td>
+      <td><ul><li>-1表示关闭candidate模式。</li><li>开启时仅支持2048。</li><li>cpWorld>1（DCP）时必须为-1。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -281,7 +303,23 @@ aclnnStatus aclnnQuantLightningIndexerV3Metadata(
       <td>candidateBlockSize（int64_t）</td>
       <td>输入</td>
       <td>候选块大小，即压缩后K空间中每个候选块包含的位置数。</td>
-      <td><ul><li>candidateTopkBlocks为-1时，必须为-1。</li><li>candidateTopkBlocks为2048时，必须为8。</li><li>需与aclnnQuantLightningIndexerV3的配置保持一致。</li></ul></td>
+      <td><ul><li>candidateTopkBlocks为-1时，必须为-1。</li><li>candidateTopkBlocks为2048时，必须为8。</li><li>cpWorld>1（DCP）时必须为-1。</li><li>需与aclnnQuantLightningIndexerV3的配置保持一致。</li></ul></td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>dcpParams（aclIntArray*）</td>
+      <td>输入</td>
+      <td>DCP 参数列表，固定顺序 [cpWorld, cpRank, cpKvCacheInterleaveSize]：
+          <ul>
+                <li>cpWorld：CP 组大小，即全局 KV 被切分的份数，大于 1 时启用 DCP。</li>
+                <li>cpRank：当前 rank 在 CP 组内的编号，需满足 0 &lt;= cpRank &lt; cpWorld。</li>
+                <li>cpKvCacheInterleaveSize：KV cache 的交错粒度，每 S 个 token 轮换一次 rank，需大于等于 1。</li>
+          </ul>
+      </td>
+      <td><ul><li>传 nullptr 表示非 DCP（等价于 {1, 0, 1}）。</li><li>非空时长度必须为 3；cpWorld>1 启用 DCP，且 0 <= cpRank < cpWorld、cpKvCacheInterleaveSize >= 1。</li></ul></td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -355,7 +393,7 @@ aclnnStatus aclnnQuantLightningIndexerV3Metadata(
       <tr>
         <td>ACLNN_ERR_PARAM_INVALID</td>
         <td>161002</td>
-        <td>参数cuSeqlensQOptional、cuSeqlensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional、numHeadsQ、numHeadsK、headDim、topk、quantMode、batchSize、maxSeqlenQ、maxSeqlenK、layoutQOptional、layoutKOptional、maskMode、cmpRatio、candidateTopkBlocks、candidateBlockSize、metadata的规格不在支持范围内。</td>
+        <td>参数cuSeqlensQOptional、cuSeqlensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional、causalSeqlensKvGlobalOptional、numHeadsQ、numHeadsK、headDim、topk、quantMode、batchSize、maxSeqlenQ、maxSeqlenK、layoutQOptional、layoutKOptional、maskMode、cmpRatio、candidateTopkBlocks、candidateBlockSize、dcpParams、metadata的规格不在支持范围内。</td>
       </tr>
     </tbody>
     </table>
@@ -423,13 +461,16 @@ aclnnStatus aclnnQuantLightningIndexerV3Metadata(
     - layoutQOptional为BSND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过maxSeqlenQ获取seqlen。
     - layoutQOptional为TND时，优先通过sequsedQOptional中的元素获取seqlen，sequsedQOptional未传入则通过cuSeqlensQOptional中相邻元素的差值获取seqlen。
   - candidateTopkBlocks、candidateBlockSize只支持(-1, -1)或(2048, 8)，需与aclnnQuantLightningIndexerV3接口的配置保持一致。
-  - 序列信息、head配置、topk、quantMode、布局、maskMode、cmpRatio或candidate参数变化后，需重新生成metadata。candidate关闭时也需使用本接口生成的metadata。
+  - DCP：cpWorld>1时启用；cpRank范围[0, cpWorld)，cpKvCacheInterleaveSize>=1；causalSeqlensKvGlobalOptional必传（INT32，shape (B, )），candidateTopkBlocks/candidateBlockSize必须为(-1, -1)。
+  - DCP与candidate互斥；cpWorld<=1时必须传causalSeqlensKvGlobalOptional=nullptr、cpRank=0、cpKvCacheInterleaveSize=1。
+  - DCP场景下，causalSeqlensKvGlobalOptional与dcpParams必须与aclnnQuantLightningIndexerV3完全一致。
+  - 序列信息、head配置、topk、quantMode、布局、maskMode、cmpRatio、candidate参数或DCP参数变化后，需重新生成metadata。candidate关闭时也需使用本接口生成的metadata。
 
   - 所有输入、输出Tensor须位于同一NPU。
 
 ## 调用示例
 
-Q使用TND布局，K使用PA_BBND布局，quantMode=2，candidateTopkBlocks=2048，candidateBlockSize=8。生成的metadata可直接用于具有相同序列信息和计算属性的QLI V3调用。
+Q使用TND布局，K使用PA_BBND布局，quantMode=2，candidateTopkBlocks=2048，candidateBlockSize=8。生成的metadata可直接用于具有相同序列信息和计算属性的QLI V3调用。示例为非DCP场景（cpWorld=1，causal传nullptr）；DCP场景把candidateTopkBlocks/candidateBlockSize改为-1、传入实际causal张量、cpWorld>1，并与QLI V3的DCP参数保持一致。
 
 ```cpp
 #include <algorithm>
@@ -530,9 +571,9 @@ int RunExample(aclrtStream stream)
     uint64_t metadataWorkspaceSize = 0;
     aclOpExecutor *metadataExecutor = nullptr;
     CHECK_RET(aclnnQuantLightningIndexerV3MetadataGetWorkspaceSize(
-        cuQ, nullptr, nullptr, usedK, nullptr, queryHeads, keyHeads, headDim,
+        cuQ, nullptr, nullptr, usedK, nullptr, nullptr, queryHeads, keyHeads, headDim,
         topk, 2, batch, 1, keyLength, layoutQ, layoutK, 0, 1,
-        candidateCapacity, candidateBlockSize, metadata, &metadataWorkspaceSize, &metadataExecutor));
+        candidateCapacity, candidateBlockSize, nullptr, metadata, &metadataWorkspaceSize, &metadataExecutor));
     void *metadataWorkspace = nullptr;
     if (metadataWorkspaceSize != 0) {
         CHECK_RET(resources.Allocate(metadataWorkspaceSize, &metadataWorkspace));

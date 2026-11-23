@@ -97,8 +97,8 @@ TEST_F(quant_lightning_indexer_v2_opapi_ut, quant_lightning_indexer_v3_aclnn_nul
 
     aclnnStatus aclRet = aclnnQuantLightningIndexerV3GetWorkspaceSize(
         nullptr, key.get(), weights.get(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-        nullptr, nullptr, 2048, 2, -1, layoutQuery, layoutKey, 0, 1, 0, -1, -1, sparseIndicesOut.get(),
-        sparseValuesOut.get(), nullptr, nullptr, &workspaceSize, &executor);
+        nullptr, nullptr, nullptr, 2048, 2, -1, layoutQuery, layoutKey, 0, 1, 0, -1, -1, nullptr,
+        sparseIndicesOut.get(), sparseValuesOut.get(), nullptr, nullptr, &workspaceSize, &executor);
 
     EXPECT_NE(aclRet, ACL_SUCCESS);
     EXPECT_EQ(executor, nullptr);
@@ -132,8 +132,9 @@ TEST_F(quant_lightning_indexer_v2_opapi_ut, quant_lightning_indexer_v3_aclnn_bad
 
     aclnnStatus aclRet = aclnnQuantLightningIndexerV3GetWorkspaceSize(
         query.get(), key.get(), weights.get(), qScale.get(), kScale.get(), nullptr, nullptr, nullptr, nullptr, nullptr,
-        nullptr, nullptr, nullptr, 2048, 2, -1, layoutQuery, layoutKey, 0, 1, 0, -1, 8, sparseIndicesOut.get(),
-        sparseValuesOut.get(), candidateIndices.get(), candidateLength.get(), &workspaceSize, &executor);
+        nullptr, nullptr, nullptr, nullptr, 2048, 2, -1, layoutQuery, layoutKey, 0, 1, 0, -1, 8, nullptr,
+        sparseIndicesOut.get(), sparseValuesOut.get(), candidateIndices.get(), candidateLength.get(), &workspaceSize,
+        &executor);
 
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
     EXPECT_EQ(executor, nullptr);
@@ -163,8 +164,8 @@ TEST_F(quant_lightning_indexer_v2_opapi_ut, quant_lightning_indexer_v3_aclnn_mis
 
     aclnnStatus aclRet = aclnnQuantLightningIndexerV3GetWorkspaceSize(
         query.get(), key.get(), weights.get(), qScale.get(), kScale.get(), nullptr, nullptr, nullptr, nullptr, nullptr,
-        nullptr, nullptr, nullptr, 2048, 2, -1, layoutQuery, layoutKey, 0, 1, 0, 2048, 8, sparseIndicesOut.get(),
-        sparseValuesOut.get(), nullptr, nullptr, &workspaceSize, &executor);
+        nullptr, nullptr, nullptr, nullptr, 2048, 2, -1, layoutQuery, layoutKey, 0, 1, 0, 2048, 8, nullptr,
+        sparseIndicesOut.get(), sparseValuesOut.get(), nullptr, nullptr, &workspaceSize, &executor);
 
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
     EXPECT_EQ(executor, nullptr);

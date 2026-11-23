@@ -34,6 +34,7 @@ extern "C" {
  * @param [in] blockTableOptional: PageAttention中KV存储使用的block映射表。
  * @param [in] outputIdxOffsetOptional: 预留的输出索引偏移量，当前须传入nullptr。
  * @param [in] metadataOptional: 由aclnnQuantLightningIndexerV3Metadata生成的分核信息。
+ * @param [in] causalSeqlensKvGlobalOptional: DCP 每请求全局 exclusive 因果上界 C（[B] int32）。
  * @param [in] topk: 每个q token选取的k token数量。
  * @param [in] quantMode: 量化模式。
  * @param [in] maxSeqlenQ: Query的最大序列长度。
@@ -44,6 +45,8 @@ extern "C" {
  * @param [in] returnValue: 是否输出sparseValuesOut，当前仅支持0，表示不输出。
  * @param [in] candidateTopkBlocks: 候选逻辑块数量，-1表示关闭候选选择，启用时为2048。
  * @param [in] candidateBlockSize: 压缩后Key空间中的候选块大小，与candidateTopkBlocks配对为(-1, -1)或(2048, 8)。
+ * @param [in] dcpParams: DCP（Decode Context Parallel，解码上下文并行）参数列表，固定顺序
+ *            [cpWorld, cpRank, cpKvCacheInterleaveSize]；传 nullptr 表示非 DCP（等价于 {1, 0, 1}）。
  * @param [out] sparseIndicesOut: TopK位置索引输出，INT32类型。
  * @param [out] sparseValuesOut: TopK索引对应的分数，BFLOAT16类型；returnValue为0时为空Tensor。
  * @param [out] candidateBlockIndicesOut: 候选逻辑块索引输出，INT32类型，块号相对于当前Batch的压缩Key空间。
@@ -56,10 +59,11 @@ __attribute__((visibility("default"))) aclnnStatus aclnnQuantLightningIndexerV3G
     const aclTensor* q, const aclTensor* k, const aclTensor* w, const aclTensor* qDescale, const aclTensor* kDescale,
     const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
     const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional, const aclTensor* blockTableOptional,
-    const aclTensor* outputIdxOffsetOptional, const aclTensor* metadataOptional, int64_t topk, int64_t quantMode,
-    int64_t maxSeqlenQ, char* layoutQOptional, char* layoutKOptional, int64_t maskMode, int64_t cmpRatio,
-    int64_t returnValue, int64_t candidateTopkBlocks, int64_t candidateBlockSize, const aclTensor* sparseIndicesOut,
-    const aclTensor* sparseValuesOut, const aclTensor* candidateBlockIndicesOut,
+    const aclTensor* outputIdxOffsetOptional, const aclTensor* metadataOptional,
+    const aclTensor* causalSeqlensKvGlobalOptional, int64_t topk, int64_t quantMode, int64_t maxSeqlenQ,
+    char* layoutQOptional, char* layoutKOptional, int64_t maskMode, int64_t cmpRatio, int64_t returnValue,
+    int64_t candidateTopkBlocks, int64_t candidateBlockSize, const aclIntArray* dcpParams,
+    const aclTensor* sparseIndicesOut, const aclTensor* sparseValuesOut, const aclTensor* candidateBlockIndicesOut,
     const aclTensor* candidateBlockLengthOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**

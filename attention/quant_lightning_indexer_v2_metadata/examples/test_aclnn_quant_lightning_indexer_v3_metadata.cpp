@@ -118,8 +118,9 @@ int RunExample(aclrtStream stream, int& cleanupRet)
     uint64_t metadataWorkspaceSize = 0;
     aclOpExecutor* metadataExecutor = nullptr;
     CHECK_RET(aclnnQuantLightningIndexerV3MetadataGetWorkspaceSize(
-        cuQ, nullptr, nullptr, usedK, nullptr, queryHeads, keyHeads, headDim, topk, 2, batch, 1, keyLength, layoutQ,
-        layoutK, 0, 1, candidateCapacity, candidateBlockSize, metadata, &metadataWorkspaceSize, &metadataExecutor));
+        cuQ, nullptr, nullptr, usedK, nullptr, nullptr, queryHeads, keyHeads, headDim, topk, 2, batch, 1, keyLength,
+        layoutQ, layoutK, 0, 1, candidateCapacity, candidateBlockSize, nullptr, metadata, &metadataWorkspaceSize,
+        &metadataExecutor));
     void* metadataWorkspace = nullptr;
     if (metadataWorkspaceSize != 0) {
         CHECK_RET(resources.Allocate(metadataWorkspaceSize, &metadataWorkspace));

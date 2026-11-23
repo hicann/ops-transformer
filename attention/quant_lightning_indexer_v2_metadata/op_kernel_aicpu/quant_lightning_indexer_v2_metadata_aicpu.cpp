@@ -10,8 +10,10 @@
 
 #include "quant_lightning_indexer_v2_metadata_aicpu.h"
 #include <cstdio>
+#include <cstdint>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include "status.h"
 
 using namespace optiling;
@@ -24,6 +26,26 @@ constexpr uint32_t A5_FAST_QUERY_TILE_SIZE = 16U;
 constexpr uint32_t A5_FAST_KEY_TILE_SIZE = 2048U;
 constexpr uint32_t A5_FAST_MIN_KEY_SIZE = 16384U;
 constexpr uint64_t A5_FAST_MIN_TOTAL_QUERY_SIZE = 1024U;
+// dcp_params 固定为 [cp_world, cp_rank, cp_kv_cache_interleave_size]
+constexpr uint32_t DCP_PARAMS_SIZE = 3U;
+
+// DCP（Decode Context Parallel，解码上下文并行）：由全局可见上界 u 计算本地可见长度。
+// 分片规则：全局第 t 个 token 属于 rank (t / S) % P，其中 P=cpWorld、S=cpInterleaveSize。
+uint32_t CalcDcpVisibleLen(uint32_t u, uint32_t localS2Len, uint32_t cpWorld, uint32_t cpRank,
+                           uint32_t cpInterleaveSize)
+{
+    if (u == 0U || cpWorld == 0U || cpInterleaveSize == 0U) {
+        return 0U;
+    }
+    uint64_t period = static_cast<uint64_t>(cpWorld) * static_cast<uint64_t>(cpInterleaveSize);
+    uint64_t fullRounds = (static_cast<uint64_t>(u) / period) * static_cast<uint64_t>(cpInterleaveSize);
+    int64_t rem = static_cast<int64_t>(static_cast<uint64_t>(u) % period) -
+                  static_cast<int64_t>(cpRank) * static_cast<int64_t>(cpInterleaveSize);
+    uint64_t remU = (rem <= 0) ? 0U : static_cast<uint64_t>(rem);
+    uint64_t tail = (remU < static_cast<uint64_t>(cpInterleaveSize)) ? remU : static_cast<uint64_t>(cpInterleaveSize);
+    uint64_t visible = fullRounds + tail;
+    return (visible < static_cast<uint64_t>(localS2Len)) ? static_cast<uint32_t>(visible) : localS2Len;
+}
 } // namespace
 uint32_t QuantLightningIndexerV2MetadataCpuKernel::Compute(CpuKernelContext& ctx)
 {
@@ -49,6 +71,9 @@ bool QuantLightningIndexerV2MetadataCpuKernel::Prepare(CpuKernelContext& ctx)
     sequsedQ_ = ctx.Input(static_cast<uint32_t>(ParamId::seqUsedQ));
     sequsedK_ = ctx.Input(static_cast<uint32_t>(ParamId::seqUsedK));
     cmpResidualK_ = ctx.Input(static_cast<uint32_t>(ParamId::cmpResidualK));
+    // causal_seqlens_kv_global 仅 V3 metadata 包装传入；V2 包装只有 5 个输入。
+    constexpr uint32_t causalInputIdx = static_cast<uint32_t>(ParamId::causalSeqLensKvGlobal);
+    causalSeqLensKvGlobal_ = (ctx.GetInputsSize() > causalInputIdx) ? ctx.Input(causalInputIdx) : nullptr;
     // output
     metadata_ = ctx.Output(static_cast<uint32_t>(ParamId::metadata));
 
@@ -71,6 +96,22 @@ bool QuantLightningIndexerV2MetadataCpuKernel::Prepare(CpuKernelContext& ctx)
     GetAttrValueOpt(ctx, "cmp_ratio", cmpRatio_);
     // candidate 属性仅 V3 metadata 包装注册；V2 包装缺失时保持默认 -1
     GetAttrValueOpt(ctx, "candidate_topk_blocks", candidateTopkBlocks_);
+    // DCP 单属性 dcp_params=[cp_world, cp_rank, cp_kv_cache_interleave_size]：
+    // 可选属性，缺省时保持 {1, 0, 1}（非 DCP）；出现则必须严格 3 元素。
+    auto dcpAttr = ctx.GetAttr("dcp_params");
+    if (dcpAttr != nullptr) {
+        const std::vector<int64_t> dcpParams = dcpAttr->GetListInt();
+        if (dcpParams.size() != DCP_PARAMS_SIZE) {
+            KERNEL_LOG_ERROR("dcp_params must contain exactly 3 elements [cp_world, cp_rank, "
+                             "cp_kv_cache_interleave_size], got size=%zu",
+                             dcpParams.size());
+            return false;
+        }
+        cpWorld_ = static_cast<int32_t>(dcpParams[0]);
+        cpRank_ = static_cast<int32_t>(dcpParams[1]);
+        cpInterleaveSize_ = static_cast<int32_t>(dcpParams[2]);
+    }
+    dcpEnable_ = (cpWorld_ > 1);
 
     return (ParamsCheck() && ParamsInit());
 }
@@ -86,7 +127,7 @@ bool QuantLightningIndexerV2MetadataCpuKernel::ParamsCheck()
     }
     const int32_t batchSize = GetQueryBatchSize();
     return CheckCuSeqlensQ(batchSize) && CheckCuSeqlensK(batchSize) && CheckSequsedQ(batchSize) &&
-           CheckSequsedK(batchSize) && CheckCmpResidualK(batchSize);
+           CheckSequsedK(batchSize) && CheckCmpResidualK(batchSize) && CheckDcpParams(batchSize);
 }
 
 bool QuantLightningIndexerV2MetadataCpuKernel::CheckCuSeqlensQ(int32_t batchSize) const
@@ -235,7 +276,7 @@ int32_t QuantLightningIndexerV2MetadataCpuKernel::GetQueryBatchSize()
     return batchSize_;
 }
 
-ValidSocVersion QuantLightningIndexerV2MetadataCpuKernel::ProcessSocVersion()
+ValidSocVersion QuantLightningIndexerV2MetadataCpuKernel::ProcessSocVersion() const
 {
     const std::string ascend950 = "Ascend950";
     const std::string ascend960 = "Ascend960";
@@ -320,6 +361,80 @@ uint32_t QuantLightningIndexerV2MetadataCpuKernel::GetS2SeqSize(uint32_t bIdx)
     }
     // 使用 max_seqlen_k
     return static_cast<uint32_t>(maxSeqlenK_);
+}
+
+uint32_t QuantLightningIndexerV2MetadataCpuKernel::GetGlobalCausalLen(uint32_t bIdx)
+{
+    if (!dcpEnable_ || causalSeqLensKvGlobal_ == nullptr || causalSeqLensKvGlobal_->GetData() == nullptr) {
+        return 0U;
+    }
+    const int32_t* causalPtr = static_cast<const int32_t*>(causalSeqLensKvGlobal_->GetData());
+    int32_t value = causalPtr[bIdx];
+    return (value <= 0) ? 0U : static_cast<uint32_t>(value);
+}
+
+bool QuantLightningIndexerV2MetadataCpuKernel::CheckDcpParams(int32_t batchSize) const
+{
+    if ((cpWorld_ < 1) || (cpRank_ < 0) || (cpRank_ >= cpWorld_) || (cpInterleaveSize_ < 1)) {
+        KERNEL_LOG_ERROR("Invalid DCP params: cp_world=%d cp_rank=%d cp_interleave_size=%d", cpWorld_, cpRank_,
+                         cpInterleaveSize_);
+        return false;
+    }
+    // DCP 可见长度公式按 int32 计算轮换周期 cp_world * cp_interleave_size，
+    // 乘积超出 int32 时取模结果会溢出，必须在进入切分前拒绝。
+    if ((static_cast<int64_t>(cpWorld_) * static_cast<int64_t>(cpInterleaveSize_)) >
+        static_cast<int64_t>(std::numeric_limits<int32_t>::max())) {
+        KERNEL_LOG_ERROR("cp_world * cp_interleave_size overflows int32");
+        return false;
+    }
+    if (!dcpEnable_) {
+        if (causalSeqLensKvGlobal_ != nullptr && causalSeqLensKvGlobal_->GetData() != nullptr) {
+            KERNEL_LOG_ERROR("causal_seqlens_kv_global must be null when cp_world <= 1");
+            return false;
+        }
+        if ((cpRank_ != 0) || (cpInterleaveSize_ != 1)) {
+            KERNEL_LOG_ERROR("cp_rank/cp_interleave_size must be defaults when cp_world <= 1");
+            return false;
+        }
+        return true;
+    }
+    // DCP 分核仅 arch22（Ascend910B/Ascend910_93）支持，与 V3 计算接口 tiling 校验保持一致。
+    if (ProcessSocVersion() != ValidSocVersion::ASCEND910B) {
+        KERNEL_LOG_ERROR("DCP only supports Ascend910B/Ascend910_93");
+        return false;
+    }
+    if (causalSeqLensKvGlobal_ == nullptr || causalSeqLensKvGlobal_->GetData() == nullptr) {
+        KERNEL_LOG_ERROR("causal_seqlens_kv_global is required when cp_world > 1");
+        return false;
+    }
+    if (causalSeqLensKvGlobal_->GetDataType() != DT_INT32) {
+        KERNEL_LOG_ERROR("causal_seqlens_kv_global must be INT32, but got data type %d",
+                         static_cast<int32_t>(causalSeqLensKvGlobal_->GetDataType()));
+        return false;
+    }
+    const auto causalShape = causalSeqLensKvGlobal_->GetTensorShape();
+    if (causalShape == nullptr || causalShape->GetDims() != 1 || causalShape->GetDimSize(0) != batchSize) {
+        KERNEL_LOG_ERROR("The shape of causal_seqlens_kv_global must be (batch=%d,)", batchSize);
+        return false;
+    }
+    if (causalSeqLensKvGlobal_->GetDataSize() < static_cast<uint64_t>(batchSize) * sizeof(int32_t)) {
+        KERNEL_LOG_ERROR("causal_seqlens_kv_global data size is smaller than batch size %d", batchSize);
+        return false;
+    }
+    if (maskMode_ != static_cast<int32_t>(SparseMode::RIGHT_DOWN_CAUSAL)) {
+        KERNEL_LOG_ERROR("DCP requires mask_mode=3, but got %d", maskMode_);
+        return false;
+    }
+    if (cmpRatio_ != 1) {
+        KERNEL_LOG_ERROR("DCP requires cmp_ratio=1, but got %d", cmpRatio_);
+        return false;
+    }
+    if (candidateTopkBlocks_ != -1) {
+        KERNEL_LOG_ERROR("DCP is mutually exclusive with candidate, but candidate_topk_blocks=%ld",
+                         static_cast<long>(candidateTopkBlocks_));
+        return false;
+    }
+    return true;
 }
 
 uint64_t QuantLightningIndexerV2MetadataCpuKernel::GetRevertS2Size(uint32_t bIdx)
@@ -484,7 +599,15 @@ void QuantLightningIndexerV2MetadataCpuKernel::CalcSplitInfo(SplitContext& split
     for (uint32_t bIdx = 0; bIdx < static_cast<uint32_t>(batchSize_); bIdx++) {
         uint32_t s1Size = GetS1SeqSize(bIdx);
         uint32_t s2Size = GetS2SeqSize(bIdx);
-        maxS2Size_ = std::max(maxS2Size_, s2Size);
+        // DCP: 用每请求最大可见本地前缀参与与非 DCP 相同的 FD/LD 阈值判断；
+        // 小 S2（可见前缀短）不开启 LD，避免跨核切分与归约的固定开销。
+        uint32_t effectiveS2Size = s2Size;
+        if (dcpEnable_) {
+            effectiveS2Size =
+                CalcDcpVisibleLen(GetGlobalCausalLen(bIdx), s2Size, static_cast<uint32_t>(cpWorld_),
+                                  static_cast<uint32_t>(cpRank_), static_cast<uint32_t>(cpInterleaveSize_));
+        }
+        maxS2Size_ = std::max(maxS2Size_, effectiveS2Size);
         splitInfo.s1GBaseNum[bIdx] = (static_cast<uint64_t>(s1Size) * groupSize_ + (mBaseSize_ - 1U)) / mBaseSize_;
         splitInfo.s1GTailSize[bIdx] = (static_cast<uint64_t>(s1Size) * groupSize_) % mBaseSize_;
         splitInfo.s2BaseNum[bIdx] = (s2Size + s2BaseSize_ - 1U) / s2BaseSize_;
@@ -493,8 +616,8 @@ void QuantLightningIndexerV2MetadataCpuKernel::CalcSplitInfo(SplitContext& split
             splitInfo.isKvSeqAllZero = false;
         }
     }
-    // LD（跨核 S2 切分 + AIV 归约）不再按 SoC 版本限制：
-    // 所有支持的芯片统一按 S2 规模决定是否启用 supportFd_。
+    // LD（跨核 S2 切分 + AIV 归约）与非 DCP 使用同一套阈值判断。
+    // DCP 的 maxS2Size_ 已按可见本地前缀统计，不会因 padding 后的本地 L 误开。
     if (maxS2Size_ < static_cast<uint32_t>(topk_)) {
         supportFd_ = false;
         return;
@@ -581,6 +704,24 @@ Range<int64_t> QuantLightningIndexerV2MetadataCpuKernel::CalcS2TokenRange(uint32
         }
     }
 
+    // DCP: 行组最后一行的全局 exclusive 上界 u = C - Q_len + lastRow + 1，
+    // 映射成本地可见前缀后作为该组的 S2 上界（metadata 与 kernel 用同一闭式）。
+    if (dcpEnable_) {
+        int64_t uSigned = static_cast<int64_t>(batchCache.causalGlobalLen) - static_cast<int64_t>(batchCache.s1Size) +
+                          s1LastToken + 1;
+        uint32_t u = (uSigned <= 0) ? 0U : static_cast<uint32_t>(uSigned);
+        uint32_t visible =
+            CalcDcpVisibleLen(u, static_cast<uint32_t>(batchCache.revertS2Size), static_cast<uint32_t>(cpWorld_),
+                              static_cast<uint32_t>(cpRank_), static_cast<uint32_t>(cpInterleaveSize_));
+        if ((visible == 0U) && (batchCache.revertS2Size > 0U)) {
+            visible = 1U; // 与 kernel 的“至少 1 块”不变量保持一致
+        }
+        if (visible == 0U) {
+            return std::make_pair(0, static_cast<int64_t>(-1));
+        }
+        return std::make_pair(0, static_cast<int64_t>(visible - 1U));
+    }
+
     int64_t s2FirstToken = s1FirstToken - batchCache.preTokenLeftUp;
     int64_t s2LastToken = s1LastToken + batchCache.nextTokenLeftUp;
 
@@ -595,6 +736,7 @@ void QuantLightningIndexerV2MetadataCpuKernel::CalcBatchCache(uint32_t bIdx, con
     batchCache.bIdx = bIdx;
     batchCache.s1Size = GetS1SeqSize(bIdx);
     batchCache.revertS2Size = GetRevertS2Size(bIdx);
+    batchCache.causalGlobalLen = dcpEnable_ ? GetGlobalCausalLen(bIdx) : 0U;
     batchCache.preTokenLeftUp = CalcPreTokenLeftUp(batchCache.s1Size, batchCache.revertS2Size);
     batchCache.nextTokenLeftUp = CalcNextTokenLeftUp(batchCache.s1Size, batchCache.revertS2Size);
 }
@@ -1089,9 +1231,10 @@ bool QuantLightningIndexerV2MetadataCpuKernel::IsFastTemplate()
     // 此处只判 gSize/sparse_mode/cmp_ratio；layout/dtype/return_value 等其余条件由
     // 主算子 host tiling（IsFastTemplateEligible）统一校验
     const int32_t gSize = (numHeadsK_ == 0) ? 0 : numHeadsQ_ / numHeadsK_;
-    // candidate 开启时 g=32 走慢路径内核，metadata 必须用通用 BalanceSchedule
-    return (candidateTopkBlocks_ == -1) && (maskMode_ == QLI_FAST_SPARSE_MODE_LOWER) && (cmpRatio_ == 1) &&
-           ((gSize == QLI_FAST_GSIZE_24) || (gSize == QLI_FAST_GSIZE_32));
+    // candidate 开启时 g=32 走慢路径内核，metadata 必须用通用 BalanceSchedule；
+    // DCP 同样强制走慢路径，避免 fast 模板不感知 DCP 可见前缀。
+    return (candidateTopkBlocks_ == -1) && !dcpEnable_ && (maskMode_ == QLI_FAST_SPARSE_MODE_LOWER) &&
+           (cmpRatio_ == 1) && ((gSize == QLI_FAST_GSIZE_24) || (gSize == QLI_FAST_GSIZE_32));
 }
 
 uint32_t QuantLightningIndexerV2MetadataCpuKernel::FastGetS1SeqSize(uint32_t bIdx) const

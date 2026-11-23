@@ -236,9 +236,9 @@
 |[aclnnQuantLightningIndexer](../../attention/quant_lightning_indexer/docs/aclnnQuantLightningIndexer.md)|QuantLightningIndexer在LightningIndexer的基础上支持了Per-Token-Head量化输入。|默认确定性实现|默认确定性实现|默认确定性实现|
 |[aclnnQuantGroupedMatmulInplaceAdd](../../gmm/quant_grouped_matmul_inplace_add/docs/aclnnQuantGroupedMatmulInplaceAdd.md)|实现分组矩阵乘计算和加法计算，基本功能为矩阵乘和加法的组合。|-|-|默认确定性实现|
 |[aclnnQuantLightningIndexerV2](../../attention/quant_lightning_indexer_v2/docs/aclnnQuantLightningIndexerV2.md)|稀疏attention前处理的计算，选出关键的稀疏token，支持KV压缩和量化输入。|默认确定性实现|默认确定性实现|默认确定性实现|
-|[aclnnQuantLightningIndexerV3](../../attention/quant_lightning_indexer_v2/docs/aclnnQuantLightningIndexerV3.md)|基于量化输入选择TopK位置，并输出候选逻辑块及每行有效候选数。|默认确定性实现|默认确定性实现|-|
+|[aclnnQuantLightningIndexerV3](../../attention/quant_lightning_indexer_v2/docs/aclnnQuantLightningIndexerV3.md)|基于量化输入选择TopK位置，并输出候选逻辑块及每行有效候选数；支持DCP（cpWorld>1）两输出。|默认确定性实现|默认确定性实现|-|
 |[aclnnQuantLightningIndexerV2Metadata](../../attention/quant_lightning_indexer_v2_metadata/docs/aclnnQuantLightningIndexerV2Metadata.md)|aclnnQuantLightningIndexerV2接口的前置接口，用于计算aclnnQuantLightningIndexerV2的负载均衡。|默认确定性实现|默认确定性实现|默认确定性实现|
-|[aclnnQuantLightningIndexerV3Metadata](../../attention/quant_lightning_indexer_v2_metadata/docs/aclnnQuantLightningIndexerV3Metadata.md)|生成aclnnQuantLightningIndexerV3所需的任务划分信息，支持候选配置。|默认确定性实现|默认确定性实现|-|
+|[aclnnQuantLightningIndexerV3Metadata](../../attention/quant_lightning_indexer_v2_metadata/docs/aclnnQuantLightningIndexerV3Metadata.md)|生成aclnnQuantLightningIndexerV3所需的任务划分信息，支持候选配置与DCP参数。|默认确定性实现|默认确定性实现|-|
 |[aclnnQuantSparseLightningIndexer](../../attention/quant_sparse_lightning_indexer/docs/aclnnQuantSparseLightningIndexer.md)|aclnnQuantLightningIndexerV2候选模式（candidateTopkBlocks开启）的consumer侧算子，消费source输出的候选块索引，只在候选块范围内做token级TopK，选取每个token的Top-k稀疏位置。|默认确定性实现|默认确定性实现|-|
 |[aclnnQuantSparseLightningIndexerMetadata](../../attention/quant_sparse_lightning_indexer_metadata/docs/aclnnQuantSparseLightningIndexerMetadata.md)|aclnnQuantSparseLightningIndexer接口的前置接口，用于计算aclnnQuantSparseLightningIndexer的负载均衡。|默认确定性实现|默认确定性实现|默认确定性实现|
 |[aclnnQuantMatmulAllReduce](../../mc2/matmul_all_reduce/docs/aclnnQuantMatmulAllReduce.md)|对量化后的入参x1、x2进行MatMul计算后，接着进行Dequant计算，接着与x3进行Add操作，最后做AllReduce计算。|默认非确定性实现，支持配置开启|-|默认确定性实现|

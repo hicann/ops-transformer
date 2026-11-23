@@ -14,7 +14,8 @@ from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
 
 QLI_METADATA_EXTENSION_SIZE = 256
-QLI_CANDIDATE_METADATA_SIZE = 1024
+# V3 metadata（candidate 与 DCP 共用）固定输出 1024 个 int32
+QLI_V3_METADATA_SIZE = 1024
 KEY_HEAD_DIM_TND = 1
 KEY_HEAD_DIM_BSND = 2
 
@@ -30,6 +31,8 @@ def _calculate_metadata_size(device=None):
 QLI_METADATA_OP_NAME = "quant_lightning_indexer_metadata"
 QLI_CANDIDATE_OP_NAME = "quant_lightning_indexer.candidate"
 QLI_METADATA_CANDIDATE_OP_NAME = "quant_lightning_indexer_metadata.candidate"
+QLI_DCP_OP_NAME = "quant_lightning_indexer.dcp"
+QLI_METADATA_DCP_OP_NAME = "quant_lightning_indexer_metadata.dcp"
 
 
 def _validate_candidate_parameters(candidate_topk_blocks, candidate_block_size):
@@ -141,6 +144,23 @@ class QuantLightningIndexerOpBuilder(OpBuilder):
             "max_seqlen_q=None, int? max_seqlen_k=None, str? layout_q=None, str? layout_k=None, int? "
             "mask_mode=None, int? cmp_ratio=None, int candidate_topk_blocks, int candidate_block_size) -> "
             "Tensor",
+            # DCP（Decode Context Parallel）：两输出，cp_world>1 启用；与 candidate 互斥
+            "quant_lightning_indexer.dcp(Tensor query, Tensor key, Tensor weights, "
+            "Tensor query_dequant_scale, Tensor key_dequant_scale, int topk, int quant_mode, *, "
+            "Tensor? cu_seqlens_q=None, Tensor? cu_seqlens_k=None, "
+            "Tensor? seqused_q=None, Tensor? seqused_k=None, Tensor? cmp_residual_k=None, Tensor? block_table=None, "
+            "Tensor? output_idx_offset=None, Tensor? metadata=None, Tensor? causal_seqlens_kv_global=None, "
+            "int max_seqlen_q=-1, str layout_q='TND', "
+            "str layout_k='PA_BBND', int mask_mode=3, int cmp_ratio=1, "
+            "int return_value=1, int? cp_world=None, int? cp_rank=None, "
+            "int? cp_kv_cache_interleave_size=None) -> (Tensor, Tensor)",
+            "quant_lightning_indexer_metadata.dcp(int num_heads_q, int num_heads_k, int head_dim, int topk, "
+            "int quant_mode, *, Tensor? cu_seqlens_q=None, "
+            "Tensor? cu_seqlens_k=None, Tensor? seqused_q=None, Tensor? seqused_k=None, "
+            "Tensor? cmp_residual_k=None, Tensor? causal_seqlens_kv_global=None, "
+            "int? batch_size=None, int? max_seqlen_q=None, int? max_seqlen_k=None, "
+            "str? layout_q='TND', str? layout_k='PA_BBND', int? mask_mode=3, int? cmp_ratio=1, int? cp_world=None, "
+            "int? cp_rank=None, int? cp_kv_cache_interleave_size=None) -> Tensor",
         ]
 
     def register_meta(self):
@@ -239,6 +259,80 @@ class QuantLightningIndexerOpBuilder(OpBuilder):
 # Instantiate the builder
 quant_lightning_indexer_op_builder = QuantLightningIndexerOpBuilder()
 quant_lightning_indexer_op_builder._ensure_initialized()
+
+
+@torch.library.register_fake("cann_ops_transformer::" + QLI_METADATA_DCP_OP_NAME)
+def quant_lightning_indexer_metadata_dcp_meta(
+    num_heads_q: int,
+    num_heads_k: int,
+    head_dim: int,
+    topk: int,
+    quant_mode: int,
+    *,
+    cu_seqlens_q=None,
+    cu_seqlens_k=None,
+    seqused_q=None,
+    seqused_k=None,
+    cmp_residual_k=None,
+    causal_seqlens_kv_global=None,
+    batch_size=None,
+    max_seqlen_q=None,
+    max_seqlen_k=None,
+    layout_q="TND",
+    layout_k="PA_BBND",
+    mask_mode=3,
+    cmp_ratio=1,
+    cp_world: Optional[int] = None,
+    cp_rank: Optional[int] = None,
+    cp_kv_cache_interleave_size: Optional[int] = None,
+):
+    # 上游 V3Metadata 按 1024 元素校验输出，DCP 复用 V3 metadata 接口
+    return torch.empty((QLI_V3_METADATA_SIZE), dtype=torch.int32, device="npu")
+
+
+@torch.library.register_fake("cann_ops_transformer::" + QLI_DCP_OP_NAME)
+def quant_lightning_indexer_dcp_meta(
+    query,
+    key,
+    weights,
+    query_dequant_scale,
+    key_dequant_scale,
+    topk,
+    quant_mode,
+    *,
+    cu_seqlens_q=None,
+    cu_seqlens_k=None,
+    seqused_q=None,
+    seqused_k=None,
+    cmp_residual_k=None,
+    block_table=None,
+    output_idx_offset=None,
+    metadata=None,
+    causal_seqlens_kv_global=None,
+    max_seqlen_q=-1,
+    layout_q="TND",
+    layout_k="PA_BBND",
+    mask_mode=3,
+    cmp_ratio=1,
+    return_value=1,
+    cp_world: Optional[int] = None,
+    cp_rank: Optional[int] = None,
+    cp_kv_cache_interleave_size: Optional[int] = None,
+):
+    # DCP 仅支持 TND + PA_BBND，score 输出 BF16（与 arch35 对齐）
+    key_head_num = (
+        key.shape[KEY_HEAD_DIM_TND]
+        if layout_k == "TND"
+        else key.shape[KEY_HEAD_DIM_BSND]
+    )
+    out_shape = (query.shape[0], key_head_num, topk)
+    indices = query.new_empty(out_shape, dtype=torch.int32)
+    values = (
+        query.new_empty(out_shape, dtype=torch.bfloat16)
+        if return_value
+        else query.new_empty((0,), dtype=torch.bfloat16)
+    )
+    return indices, values
 
 
 @impl(get_as_library(), QLI_METADATA_OP_NAME, "PrivateUse1")
@@ -615,7 +709,7 @@ def _quant_lightning_indexer_metadata_candidate_meta(
     device = _get_metadata_device(
         cu_seqlens_q, cu_seqlens_k, seqused_q, seqused_k, cmp_residual_k
     )
-    size = QLI_CANDIDATE_METADATA_SIZE if enabled else _calculate_metadata_size(device)
+    size = QLI_V3_METADATA_SIZE if enabled else _calculate_metadata_size(device)
     return torch.empty((size,), dtype=torch.int32, device=device)
 
 
@@ -730,6 +824,209 @@ def _quant_lightning_indexer_metadata_candidate_npu(
         )
 
 
+@impl(get_as_library(), QLI_METADATA_DCP_OP_NAME, "PrivateUse1")
+def _quant_lightning_indexer_metadata_dcp_npu(
+    num_heads_q: int,
+    num_heads_k: int,
+    head_dim: int,
+    topk: int,
+    quant_mode: int,
+    *,
+    cu_seqlens_q: Optional[torch.Tensor] = None,
+    cu_seqlens_k: Optional[torch.Tensor] = None,
+    seqused_q: Optional[torch.Tensor] = None,
+    seqused_k: Optional[torch.Tensor] = None,
+    cmp_residual_k: Optional[torch.Tensor] = None,
+    causal_seqlens_kv_global: Optional[torch.Tensor] = None,
+    batch_size: Optional[int] = None,
+    max_seqlen_q: Optional[int] = None,
+    max_seqlen_k: Optional[int] = None,
+    layout_q: Optional[str] = None,
+    layout_k: Optional[str] = None,
+    mask_mode: Optional[int] = None,
+    cmp_ratio: Optional[int] = None,
+    cp_world: Optional[int] = None,
+    cp_rank: Optional[int] = None,
+    cp_kv_cache_interleave_size: Optional[int] = None,
+):
+    if causal_seqlens_kv_global is None:
+        raise ValueError("DCP requires causal_seqlens_kv_global")
+    if cp_world is None or cp_world <= 1:
+        raise ValueError(f"DCP requires cp_world > 1, got {cp_world}")
+    if cp_rank is None:
+        raise ValueError("DCP requires cp_rank")
+    if cp_kv_cache_interleave_size is None:
+        raise ValueError("DCP requires cp_kv_cache_interleave_size")
+    if cp_rank < 0 or cp_rank >= cp_world:
+        raise ValueError(
+            f"DCP requires 0 <= cp_rank < cp_world, got rank={cp_rank}, world={cp_world}"
+        )
+    if cp_kv_cache_interleave_size < 1:
+        raise ValueError("DCP requires cp_kv_cache_interleave_size >= 1")
+    batch_size = 0 if batch_size is None else batch_size
+    max_seqlen_q = -1 if max_seqlen_q is None else max_seqlen_q
+    max_seqlen_k = -1 if max_seqlen_k is None else max_seqlen_k
+    layout_q = "TND" if layout_q is None else layout_q
+    layout_k = "PA_BBND" if layout_k is None else layout_k
+    mask_mode = 3 if mask_mode is None else mask_mode
+    cmp_ratio = 1 if cmp_ratio is None else cmp_ratio
+    op_module = quant_lightning_indexer_op_builder.load()
+    return op_module.quant_lightning_indexer_metadata_dcp(
+        num_heads_q,
+        num_heads_k,
+        head_dim,
+        topk,
+        quant_mode,
+        causal_seqlens_kv_global,
+        cu_seqlens_q,
+        cu_seqlens_k,
+        seqused_q,
+        seqused_k,
+        cmp_residual_k,
+        batch_size,
+        max_seqlen_q,
+        max_seqlen_k,
+        layout_q,
+        layout_k,
+        mask_mode,
+        cmp_ratio,
+        QLI_V3_METADATA_SIZE,
+        cp_world,
+        cp_rank,
+        cp_kv_cache_interleave_size,
+    )
+
+
+def _resolve_dcp_common_attrs(layout_q, layout_k, mask_mode, cmp_ratio):
+    """DCP 分支的参数默认值与显式校验。
+
+    cp_world>1 时，未显式传入的参数使用 DCP 语义默认值：
+    layout_q=TND、layout_k=PA_BBND、mask_mode=3、cmp_ratio=1；
+    显式传入非法值直接报错，不静默改写。
+    """
+    layout_q = "TND" if layout_q is None else layout_q
+    layout_k = "PA_BBND" if layout_k is None else layout_k
+    mask_mode = 3 if mask_mode is None else mask_mode
+    cmp_ratio = 1 if cmp_ratio is None else cmp_ratio
+    if layout_q != "TND":
+        raise ValueError(f"DCP requires layout_q=TND, got {layout_q!r}")
+    if layout_k != "PA_BBND":
+        raise ValueError(f"DCP requires layout_k=PA_BBND, got {layout_k!r}")
+    if mask_mode != 3:
+        raise ValueError(f"DCP requires mask_mode=3, got {mask_mode}")
+    if cmp_ratio != 1:
+        raise ValueError(f"DCP requires cmp_ratio=1, got {cmp_ratio}")
+    return layout_q, layout_k, mask_mode, cmp_ratio
+
+
+def _resolve_dcp_return_value(return_value):
+    """DCP 的 return_value 默认 1；显式传 0 等非 1 值直接报错。"""
+    value = 1 if return_value is None else return_value
+    if value != 1:
+        raise ValueError(f"DCP requires return_value=1, got {value}")
+    return value
+
+
+def _reject_dcp_params_without_cp_world(
+    causal_seqlens_kv_global, cp_rank, cp_kv_cache_interleave_size
+):
+    """cp_world 未启用时，DCP 专属参数只能保持默认值。"""
+    message = (
+        "DCP parameters require cp_world > 1; when cp_world is default, "
+        "causal_seqlens_kv_global must be None, cp_rank must be 0 and "
+        "cp_kv_cache_interleave_size must be 1"
+    )
+    if causal_seqlens_kv_global is not None:
+        raise ValueError(message)
+    if cp_rank is not None and cp_rank != 0:
+        raise ValueError(message)
+    if cp_kv_cache_interleave_size is not None and cp_kv_cache_interleave_size != 1:
+        raise ValueError(message)
+
+
+def _require_dcp_rank_and_interleave(cp_rank, cp_kv_cache_interleave_size):
+    """DCP 启用时，rank 和 KV cache 交错粒度必须显式传入。"""
+    if cp_rank is None:
+        raise ValueError("DCP requires cp_rank")
+    if cp_kv_cache_interleave_size is None:
+        raise ValueError("DCP requires cp_kv_cache_interleave_size")
+
+
+@impl(get_as_library(), QLI_DCP_OP_NAME, "PrivateUse1")
+def _quant_lightning_indexer_dcp_npu(
+    query,
+    key,
+    weights,
+    query_dequant_scale,
+    key_dequant_scale,
+    topk,
+    quant_mode,
+    *,
+    cu_seqlens_q=None,
+    cu_seqlens_k=None,
+    seqused_q=None,
+    seqused_k=None,
+    cmp_residual_k=None,
+    block_table=None,
+    output_idx_offset=None,
+    metadata=None,
+    causal_seqlens_kv_global=None,
+    max_seqlen_q=-1,
+    layout_q="TND",
+    layout_k="PA_BBND",
+    mask_mode=3,
+    cmp_ratio=1,
+    return_value=1,
+    cp_world: Optional[int] = None,
+    cp_rank: Optional[int] = None,
+    cp_kv_cache_interleave_size: Optional[int] = None,
+):
+    if causal_seqlens_kv_global is None:
+        raise ValueError("DCP requires causal_seqlens_kv_global")
+    if cp_world is None or cp_world <= 1:
+        raise ValueError(f"DCP requires cp_world > 1, got {cp_world}")
+    if cp_rank is None:
+        raise ValueError("DCP requires cp_rank")
+    if cp_kv_cache_interleave_size is None:
+        raise ValueError("DCP requires cp_kv_cache_interleave_size")
+    if cp_rank < 0 or cp_rank >= cp_world:
+        raise ValueError(
+            f"DCP requires 0 <= cp_rank < cp_world, got rank={cp_rank}, world={cp_world}"
+        )
+    if cp_kv_cache_interleave_size < 1:
+        raise ValueError("DCP requires cp_kv_cache_interleave_size >= 1")
+    if output_idx_offset is not None:
+        raise ValueError("DCP requires output_idx_offset to be None")
+    op_module = quant_lightning_indexer_op_builder.load()
+    return op_module.quant_lightning_indexer_dcp(
+        query,
+        key,
+        weights,
+        query_dequant_scale,
+        key_dequant_scale,
+        topk,
+        quant_mode,
+        causal_seqlens_kv_global,
+        cu_seqlens_q,
+        cu_seqlens_k,
+        seqused_q,
+        seqused_k,
+        cmp_residual_k,
+        block_table,
+        output_idx_offset,
+        metadata,
+        max_seqlen_q,
+        layout_q,
+        layout_k,
+        mask_mode,
+        cmp_ratio,
+        return_value,
+        cp_world,
+        cp_rank,
+        cp_kv_cache_interleave_size,
+    )
+
+
 _CANDIDATE_UNSET = object()
 
 
@@ -750,6 +1047,8 @@ def quant_lightning_indexer(
     block_table=None,
     output_idx_offset=None,
     metadata=None,
+    # 保持既有默认值；DCP 场景需显式传 layout_q="TND"、layout_k="PA_BBND"、
+    # mask_mode=3、return_value=1，避免按 V2 默认值静默路由。
     max_seqlen_q=-1,
     layout_q="BSND",
     layout_k="BSND",
@@ -758,8 +1057,71 @@ def quant_lightning_indexer(
     return_value=0,
     candidate_topk_blocks=_CANDIDATE_UNSET,
     candidate_block_size=_CANDIDATE_UNSET,
+    causal_seqlens_kv_global=None,
+    cp_world: Optional[int] = None,
+    cp_rank: Optional[int] = None,
+    cp_kv_cache_interleave_size: Optional[int] = None,
 ):
-    """Select the legacy or candidate overload by argument presence."""
+    """按 cp_world / candidate 参数路由到 DCP / V2 / V3 接口。"""
+    op = torch.ops.cann_ops_transformer.quant_lightning_indexer
+    if (cp_world is not None) and (cp_world < 1):
+        raise ValueError(f"cp_world must be >= 1, got {cp_world}")
+    if (cp_world is not None) and (cp_world > 1):
+        if (
+            candidate_topk_blocks is not _CANDIDATE_UNSET
+            or candidate_block_size is not _CANDIDATE_UNSET
+        ):
+            raise ValueError("DCP is mutually exclusive with candidate")
+        if causal_seqlens_kv_global is None:
+            raise ValueError("DCP requires causal_seqlens_kv_global")
+        if output_idx_offset is not None:
+            raise ValueError("DCP requires output_idx_offset to be None")
+        if int(quant_mode) != 2:
+            raise ValueError(f"DCP requires quant_mode=2 on arch22, got {quant_mode}")
+        layout_q, layout_k, mask_mode, cmp_ratio = _resolve_dcp_common_attrs(
+            layout_q, layout_k, mask_mode, cmp_ratio
+        )
+        return_value = _resolve_dcp_return_value(return_value)
+        max_seqlen_q = -1 if max_seqlen_q is None else max_seqlen_q
+        _require_dcp_rank_and_interleave(cp_rank, cp_kv_cache_interleave_size)
+        return op.dcp(
+            query,
+            key,
+            weights,
+            query_dequant_scale,
+            key_dequant_scale,
+            topk,
+            quant_mode,
+            cu_seqlens_q=cu_seqlens_q,
+            cu_seqlens_k=cu_seqlens_k,
+            seqused_q=seqused_q,
+            seqused_k=seqused_k,
+            cmp_residual_k=cmp_residual_k,
+            block_table=block_table,
+            output_idx_offset=output_idx_offset,
+            metadata=metadata,
+            causal_seqlens_kv_global=causal_seqlens_kv_global,
+            max_seqlen_q=max_seqlen_q,
+            layout_q=layout_q,
+            layout_k=layout_k,
+            mask_mode=mask_mode,
+            cmp_ratio=cmp_ratio,
+            return_value=return_value,
+            cp_world=cp_world,
+            cp_rank=cp_rank,
+            cp_kv_cache_interleave_size=cp_kv_cache_interleave_size,
+        )
+    # 非 DCP 场景：DCP 参数不是“禁止出现”，而是“只能是默认值”
+    _reject_dcp_params_without_cp_world(
+        causal_seqlens_kv_global, cp_rank, cp_kv_cache_interleave_size
+    )
+    # 非 DCP 路由恢复 V2 语义默认值
+    max_seqlen_q = -1 if max_seqlen_q is None else max_seqlen_q
+    layout_q = "BSND" if layout_q is None else layout_q
+    layout_k = "BSND" if layout_k is None else layout_k
+    mask_mode = 0 if mask_mode is None else mask_mode
+    cmp_ratio = 1 if cmp_ratio is None else cmp_ratio
+    return_value = 0 if return_value is None else return_value
     options = dict(
         cu_seqlens_q=cu_seqlens_q,
         cu_seqlens_k=cu_seqlens_k,
@@ -776,7 +1138,6 @@ def quant_lightning_indexer(
         cmp_ratio=cmp_ratio,
         return_value=return_value,
     )
-    op = torch.ops.cann_ops_transformer.quant_lightning_indexer
     if (
         candidate_topk_blocks is _CANDIDATE_UNSET
         and candidate_block_size is _CANDIDATE_UNSET
@@ -834,8 +1195,55 @@ def quant_lightning_indexer_metadata(
     *,
     candidate_topk_blocks=_CANDIDATE_UNSET,
     candidate_block_size=_CANDIDATE_UNSET,
+    causal_seqlens_kv_global: Optional[torch.Tensor] = None,
+    cp_world: Optional[int] = None,
+    cp_rank: Optional[int] = None,
+    cp_kv_cache_interleave_size: Optional[int] = None,
 ):
-    """Select the legacy or candidate overload by argument presence."""
+    """按 cp_world / candidate 参数路由到 DCP / V2 / V3 metadata 接口。"""
+    op = torch.ops.cann_ops_transformer.quant_lightning_indexer_metadata
+    if (cp_world is not None) and (cp_world < 1):
+        raise ValueError(f"cp_world must be >= 1, got {cp_world}")
+    if (cp_world is not None) and (cp_world > 1):
+        if (
+            candidate_topk_blocks is not _CANDIDATE_UNSET
+            or candidate_block_size is not _CANDIDATE_UNSET
+        ):
+            raise ValueError("DCP is mutually exclusive with candidate")
+        if causal_seqlens_kv_global is None:
+            raise ValueError("DCP requires causal_seqlens_kv_global")
+        if int(quant_mode) != 2:
+            raise ValueError(f"DCP requires quant_mode=2 on arch22, got {quant_mode}")
+        layout_q, layout_k, mask_mode, cmp_ratio = _resolve_dcp_common_attrs(
+            layout_q, layout_k, mask_mode, cmp_ratio
+        )
+        _require_dcp_rank_and_interleave(cp_rank, cp_kv_cache_interleave_size)
+        return op.dcp(
+            num_heads_q,
+            num_heads_k,
+            head_dim,
+            topk,
+            quant_mode,
+            cu_seqlens_q=cu_seqlens_q,
+            cu_seqlens_k=cu_seqlens_k,
+            seqused_q=seqused_q,
+            seqused_k=seqused_k,
+            cmp_residual_k=cmp_residual_k,
+            causal_seqlens_kv_global=causal_seqlens_kv_global,
+            batch_size=batch_size,
+            max_seqlen_q=max_seqlen_q,
+            max_seqlen_k=max_seqlen_k,
+            layout_q=layout_q,
+            layout_k=layout_k,
+            mask_mode=mask_mode,
+            cmp_ratio=cmp_ratio,
+            cp_world=cp_world,
+            cp_rank=cp_rank,
+            cp_kv_cache_interleave_size=cp_kv_cache_interleave_size,
+        )
+    _reject_dcp_params_without_cp_world(
+        causal_seqlens_kv_global, cp_rank, cp_kv_cache_interleave_size
+    )
     options = dict(
         cu_seqlens_q=cu_seqlens_q,
         cu_seqlens_k=cu_seqlens_k,
@@ -850,7 +1258,6 @@ def quant_lightning_indexer_metadata(
         mask_mode=mask_mode,
         cmp_ratio=cmp_ratio,
     )
-    op = torch.ops.cann_ops_transformer.quant_lightning_indexer_metadata
     if (
         candidate_topk_blocks is _CANDIDATE_UNSET
         and candidate_block_size is _CANDIDATE_UNSET

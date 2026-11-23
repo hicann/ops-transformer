@@ -13,6 +13,7 @@
  * \brief
  */
 
+#include <iterator>
 #include <torch/extension.h>
 #include "aclnn_common.h"
 
@@ -22,6 +23,12 @@ using namespace at_npu::native;
 inline TensorWrapper MakeWrapper(const at::Tensor& tensor)
 {
     return {tensor, ConvertToAclDataType(tensor.scalar_type())};
+}
+
+inline aclIntArray* MakeDcpParamsArray(int64_t cpWorld, int64_t cpRank, int64_t cpInterleaveSize)
+{
+    const int64_t data[] = {cpWorld, cpRank, cpInterleaveSize};
+    return ::ConvertType(at::IntArrayRef(data, std::size(data)));
 }
 
 inline bool IsMxQuantMode(int64_t quantMode)
@@ -39,8 +46,10 @@ inline bool IsFp4CompatibleTensor(const at::Tensor& tensor)
     return tensor.scalar_type() == at::kFloat4_e2m1fn_x2 || tensor.scalar_type() == at::kByte;
 }
 
-constexpr int64_t QLI_CANDIDATE_METADATA_SIZE = 1024;
+// V3 metadata（candidate 与 DCP 共用）固定输出 1024 个 int32
+constexpr int64_t QLI_V3_METADATA_SIZE = 1024;
 constexpr int64_t E8M0_SCALE_PACK_NUM = 2;
+constexpr int64_t MASK_MODE_RIGHT_DOWN_CAUSAL = 3;
 constexpr uint32_t QUANT_MODE_HIFLOAT8 = 4;
 constexpr uint32_t QUANT_MODE_MXFP4 = 5;
 constexpr uint32_t QUANT_MODE_HIFLOAT4 = 6;
@@ -238,14 +247,17 @@ at::Tensor QuantLightningIndexerMetadataCandidate(int64_t numHeadsQ, int64_t num
         outputDevice = cmpResidualK.value().device();
     }
 
-    at::Tensor output = torch::empty({QLI_CANDIDATE_METADATA_SIZE}, torch::dtype(torch::kInt32).device(outputDevice));
+    at::Tensor output = torch::empty({QLI_V3_METADATA_SIZE}, torch::dtype(torch::kInt32).device(outputDevice));
 
     std::string layoutQStr = std::string(layoutQ);
     std::string layoutKStr = std::string(layoutK);
 
-    ACLNN_CMD(aclnnQuantLightningIndexerV3Metadata, cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, numHeadsQ,
-              numHeadsK, headDim, topk, quantMode, batchSize, maxSeqlenQ, maxSeqlenK, layoutQStr, layoutKStr, maskMode,
-              cmpRatio, candidateTopkBlocks, candidateBlockSize, output);
+    c10::optional<at::Tensor> causalSeqlensKvGlobalNull = c10::nullopt;
+    const aclIntArray* dcpParamsNone = nullptr;
+    ACLNN_CMD(aclnnQuantLightningIndexerV3Metadata, cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK,
+              causalSeqlensKvGlobalNull, numHeadsQ, numHeadsK, headDim, topk, quantMode, batchSize, maxSeqlenQ,
+              maxSeqlenK, layoutQStr, layoutKStr, maskMode, cmpRatio, candidateTopkBlocks, candidateBlockSize,
+              dcpParamsNone, output);
     return output;
 }
 
@@ -289,12 +301,127 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor> QuantLightningIndexer
     auto keyScaleWrapper = MakeWrapper(keyDequantScale);
     FixQLIV2AclDtypes(quantMode, queryWrapper, keyWrapper, queryScaleWrapper, keyScaleWrapper);
 
+    c10::optional<at::Tensor> causalSeqlensKvGlobalNull = c10::nullopt;
+    const aclIntArray* dcpParamsNone = nullptr;
     ACLNN_CMD(aclnnQuantLightningIndexerV3, queryWrapper, keyWrapper, weights, queryScaleWrapper, keyScaleWrapper,
-              cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, blockTable, outputIdxOffset, metadata, topk,
-              quantMode, maxSeqlenQ, queryLayoutStr, keyLayoutStr, maskMode, cmpRatio, returnValue, candidateTopkBlocks,
-              candidateBlockSize, sparseIndicesOut, sparseValuesOut, candidateBlockIndicesOut, candidateBlockLengthOut);
+              cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, blockTable, outputIdxOffset, metadata,
+              causalSeqlensKvGlobalNull, topk, quantMode, maxSeqlenQ, queryLayoutStr, keyLayoutStr, maskMode, cmpRatio,
+              returnValue, candidateTopkBlocks, candidateBlockSize, dcpParamsNone, sparseIndicesOut, sparseValuesOut,
+              candidateBlockIndicesOut, candidateBlockLengthOut);
 
     return std::make_tuple(sparseIndicesOut, sparseValuesOut, candidateBlockIndicesOut, candidateBlockLengthOut);
+}
+
+std::tuple<at::Tensor, at::Tensor> ConstructDcpOutputTensor(const at::Tensor& query, const at::Tensor& key,
+                                                            int64_t sparseCount, std::string queryLayoutStr,
+                                                            std::string keyLayoutStr, int64_t returnValue)
+{
+    int64_t keyHeadNum = (keyLayoutStr == "TND") ? key.size(DIM_1) : key.size(DIM_2);
+    at::SmallVector<int64_t, SIZE> outputSize;
+    if (queryLayoutStr == "BSND") {
+        outputSize = {query.size(DIM_0), query.size(DIM_1), keyHeadNum, sparseCount};
+    } else {
+        outputSize = {query.size(DIM_0), keyHeadNum, sparseCount};
+    }
+    at::Tensor sparseIndicesOut = at::empty(outputSize, query.options().dtype(at::kInt));
+    at::Tensor sparseValuesOut;
+    if (returnValue != 0) {
+        // DCP score 输出 BF16（与 arch35 对齐，跨 rank 合并前由框架按 BF16 处理）
+        sparseValuesOut = at::empty(outputSize, query.options().dtype(at::kBFloat16));
+    } else {
+        sparseValuesOut = at::empty({0}, query.options().dtype(at::kBFloat16));
+    }
+    return std::tuple<at::Tensor, at::Tensor>(sparseIndicesOut, sparseValuesOut);
+}
+
+std::tuple<at::Tensor, at::Tensor> QuantLightningIndexerDcp(
+    const at::Tensor& query, const at::Tensor& key, const at::Tensor& weights, const at::Tensor& queryDequantScale,
+    const at::Tensor& keyDequantScale, int64_t topk, int64_t quantMode,
+    const c10::optional<at::Tensor>& causalSeqlensKvGlobal, const c10::optional<at::Tensor>& cuSeqlensQ,
+    const c10::optional<at::Tensor>& cuSeqlensK, const c10::optional<at::Tensor>& sequsedQ,
+    const c10::optional<at::Tensor>& sequsedK, const c10::optional<at::Tensor>& cmpResidualK,
+    const c10::optional<at::Tensor>& blockTable, const c10::optional<at::Tensor>& outputIdxOffset,
+    const c10::optional<at::Tensor>& metadata, int64_t maxSeqlenQ, c10::string_view layoutQ, c10::string_view layoutK,
+    int64_t maskMode, int64_t cmpRatio, int64_t returnValue, int64_t cpWorld, int64_t cpRank, int64_t cpInterleaveSize)
+{
+    TORCH_CHECK(query.numel() > 0, "Tensor query is empty.")
+    TORCH_CHECK(key.numel() > 0, "Tensor key is empty.")
+    TORCH_CHECK(cpWorld > 1, "DCP requires cp_world > 1, but got ", cpWorld)
+    TORCH_CHECK(cpRank >= 0 && cpRank < cpWorld, "DCP requires 0 <= cp_rank < cp_world, but got ", cpRank)
+    TORCH_CHECK(cpInterleaveSize >= 1, "DCP requires cp_kv_cache_interleave_size >= 1")
+    TORCH_CHECK(causalSeqlensKvGlobal.has_value(), "DCP requires causal_seqlens_kv_global")
+    TORCH_CHECK(maskMode == MASK_MODE_RIGHT_DOWN_CAUSAL, "DCP requires mask_mode=3, but got ", maskMode)
+    TORCH_CHECK(outputIdxOffset == c10::nullopt, "DCP requires output_idx_offset to be null")
+    TORCH_CHECK(returnValue == 1, "DCP requires return_value=1")
+
+    std::string queryLayoutStr = std::string(layoutQ);
+    std::string keyLayoutStr = std::string(layoutK);
+    std::tuple<at::Tensor, at::Tensor> output =
+        ConstructDcpOutputTensor(query, key, topk, queryLayoutStr, keyLayoutStr, returnValue);
+    at::Tensor sparseIndicesOut = std::get<0>(output);
+    at::Tensor sparseValuesOut = std::get<1>(output);
+
+    auto queryWrapper = MakeWrapper(query);
+    auto keyWrapper = MakeWrapper(key);
+    auto queryScaleWrapper = MakeWrapper(queryDequantScale);
+    auto keyScaleWrapper = MakeWrapper(keyDequantScale);
+    FixQLIV2AclDtypes(quantMode, queryWrapper, keyWrapper, queryScaleWrapper, keyScaleWrapper);
+
+    // candidate 关闭：candidate_topk_blocks / candidate_block_size 固定 -1，
+    // 两个候选输出传 nullptr（V3 aclnn 关闭态允许为空）
+    int64_t candidateTopkBlocksOff = -1;
+    int64_t candidateBlockSizeOff = -1;
+    // 候选输出传空 optional（ConvertType 对空 optional 生成 nullptr）
+    c10::optional<at::Tensor> candidateBlockIndicesNull = c10::nullopt;
+    c10::optional<at::Tensor> candidateBlockLengthNull = c10::nullopt;
+    aclIntArray* dcpParams = MakeDcpParamsArray(cpWorld, cpRank, cpInterleaveSize);
+    TORCH_CHECK(dcpParams != nullptr, "Failed to create dcp_params array.")
+    const aclIntArray* dcpParamsArg = dcpParams;
+    ACLNN_CMD(aclnnQuantLightningIndexerV3, queryWrapper, keyWrapper, weights, queryScaleWrapper, keyScaleWrapper,
+              cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, blockTable, outputIdxOffset, metadata,
+              causalSeqlensKvGlobal, topk, quantMode, maxSeqlenQ, queryLayoutStr, keyLayoutStr, maskMode, cmpRatio,
+              returnValue, candidateTopkBlocksOff, candidateBlockSizeOff, dcpParamsArg, sparseIndicesOut,
+              sparseValuesOut, candidateBlockIndicesNull, candidateBlockLengthNull);
+    ::Release(dcpParams);
+    return std::tuple<at::Tensor, at::Tensor>(sparseIndicesOut, sparseValuesOut);
+}
+
+at::Tensor QuantLightningIndexerMetadataDcp(
+    int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, int64_t topk, int64_t quantMode,
+    const c10::optional<at::Tensor>& causalSeqlensKvGlobal, const c10::optional<at::Tensor>& cuSeqlensQ,
+    const c10::optional<at::Tensor>& cuSeqlensK, const c10::optional<at::Tensor>& sequsedQ,
+    const c10::optional<at::Tensor>& sequsedK, const c10::optional<at::Tensor>& cmpResidualK, int64_t batchSize,
+    int64_t maxSeqlenQ, int64_t maxSeqlenK, c10::string_view layoutQ, c10::string_view layoutK, int64_t maskMode,
+    int64_t cmpRatio, int64_t metadataSize, int64_t cpWorld, int64_t cpRank, int64_t cpInterleaveSize)
+{
+    TORCH_CHECK(cpWorld > 1, "DCP requires cp_world > 1, but got ", cpWorld)
+    TORCH_CHECK(causalSeqlensKvGlobal.has_value(), "DCP requires causal_seqlens_kv_global")
+    TORCH_CHECK(maskMode == MASK_MODE_RIGHT_DOWN_CAUSAL, "DCP requires mask_mode=3, but got ", maskMode)
+    at::Device outputDevice = at::Device(std::string("npu"));
+    if (cuSeqlensQ.has_value()) {
+        outputDevice = cuSeqlensQ.value().device();
+    } else if (sequsedK.has_value()) {
+        outputDevice = sequsedK.value().device();
+    } else if (causalSeqlensKvGlobal.has_value()) {
+        outputDevice = causalSeqlensKvGlobal.value().device();
+    }
+    at::Tensor output = torch::empty({metadataSize}, torch::dtype(torch::kInt32).device(outputDevice));
+    std::string layoutQStr = std::string(layoutQ);
+    std::string layoutKStr = std::string(layoutK);
+
+    int64_t candidateTopkBlocksOff = -1;
+    int64_t candidateBlockSizeOff = -1;
+    aclIntArray* dcpParams = MakeDcpParamsArray(cpWorld, cpRank, cpInterleaveSize);
+    TORCH_CHECK(dcpParams != nullptr, "Failed to create dcp_params array.")
+    const aclIntArray* dcpParamsArg = dcpParams;
+    // 可选输入保持 nullopt：上游 V3Metadata 会显式拒绝非空的 cu_seqlens_k 等参数，
+    // 不能像 V2 那样用空 tensor 兜底（空 tensor 指针非空）。
+    ACLNN_CMD(aclnnQuantLightningIndexerV3Metadata, cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK,
+              causalSeqlensKvGlobal, numHeadsQ, numHeadsK, headDim, topk, quantMode, batchSize, maxSeqlenQ, maxSeqlenK,
+              layoutQStr, layoutKStr, maskMode, cmpRatio, candidateTopkBlocksOff, candidateBlockSizeOff, dcpParamsArg,
+              output);
+    ::Release(dcpParams);
+    return output;
 }
 
 // Bind the C++ function to Python module
@@ -305,5 +432,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
     m.def("quant_lightning_indexer_candidate", &QuantLightningIndexerCandidate, "quant_lightning_indexer_candidate");
     m.def("quant_lightning_indexer_metadata_candidate", &QuantLightningIndexerMetadataCandidate,
           "quant_lightning_indexer_metadata_candidate");
+    m.def("quant_lightning_indexer_dcp", &QuantLightningIndexerDcp, "quant_lightning_indexer_dcp");
+    m.def("quant_lightning_indexer_metadata_dcp", &QuantLightningIndexerMetadataDcp,
+          "quant_lightning_indexer_metadata_dcp");
 }
 } // namespace op_api

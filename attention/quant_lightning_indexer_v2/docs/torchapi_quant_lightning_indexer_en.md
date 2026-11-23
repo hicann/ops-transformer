@@ -35,6 +35,12 @@
   2. The relevance results are multiplied by the dequantization scales `q_descale` ($Scale_Q$) and `k_descale` ($Scale_K^T$) corresponding to `q` and `k`. After the invalid negative relevance signals are filtered out through the activation function $ReLU$, the relevance score vector between the current token and all preceding tokens is obtained.
   3. After being multiplied by the weight coefficient `w` ($W$), the top $Top-k$ index values are selected along the g dimension to obtain the output $sparseIndices$, and the corresponding $sparseValues$ are output as the input to Attention.
 
+  DCP (Decode Context Parallel) is enabled when `cp_world > 1` and is exposed through the `.dcp` overloads.
+  `causal_seqlens_kv_global` (INT32, shape `(B,)`) is required. Only TND/PA_BBND and `mask_mode=3` are supported,
+  `cmp_ratio=1`, `return_value=1`, and `quant_mode=2`, with candidate disabled. `sparse_values` is BF16;
+  invalid slots use `indices=-1` and `values=-inf`. The unified entry routes to `.dcp` automatically when
+  `cp_world > 1`; otherwise DCP parameters must keep their default values.
+
 - **Formula**:
 
   $$
@@ -64,7 +70,11 @@ cann_ops_transformer.quant_lightning_indexer_metadata(
   layout_q="BSND",
   layout_k="BSND",
   mask_mode=0,
-  cmp_ratio=1
+  cmp_ratio=1,
+  causal_seqlens_kv_global=None,
+  cp_world=None,
+  cp_rank=None,
+  cp_kv_cache_interleave_size=None
 ) -> Tensor
 ```
 
@@ -91,9 +101,31 @@ cann_ops_transformer.quant_lightning_indexer(
   layout_k="BSND",
   mask_mode=0,
   cmp_ratio=1,
-  return_value=0
+  return_value=0,
+  causal_seqlens_kv_global=None,
+  cp_world=None,
+  cp_rank=None,
+  cp_kv_cache_interleave_size=None
 ) -> (Tensor, Tensor)
 ```
+
+### candidate overload (Ascend910B/Ascend910_93)
+
+`quant_lightning_indexer` and `quant_lightning_indexer_metadata` each provide a `.candidate` overload:
+
+- Main operator: `quant_lightning_indexer.candidate(..., int candidate_topk_blocks, int candidate_block_size)
+  -> (Tensor, Tensor, Tensor, Tensor)`. The two candidate parameters are required keyword arguments (no default).
+  The 3rd element is `candidate_block_indices` (logical block numbers, invalid slots -1); the 4th element
+  `candidate_block_length` is a reserved output that is always an empty tensor.
+- metadata: `quant_lightning_indexer_metadata.candidate(..., int candidate_topk_blocks,
+  int candidate_block_size) -> Tensor`, whose output is bit-identical to the default metadata overload.
+- The unified Python entry routes by whether candidate parameters are passed: passing neither uses the default
+  overload (2 outputs / one Tensor); passing both uses the candidate overload (4 outputs / one Tensor), where
+  `(-1, -1)` disables candidate and `(2048, 8)` enables it; passing only one raises an error.
+- Only `(-1, -1)` and `(2048, 8)` are accepted; other combinations raise an error. When candidate is enabled,
+  `g = N1/N2` may be 64 or 32 (64 is required when disabled); `layout_q` supports BSND/TND (TND requires
+  `cu_seqlens_q`); candidate outputs are not offset by `output_idx_offset`.
+- candidate is supported only on Ascend910B/910_93; enabling it on Ascend950/960 raises an error.
 
 ## Parameters
 
@@ -122,6 +154,10 @@ cann_ops_transformer.quant_lightning_indexer(
 | layout_k | str | Optional | Layout of k. Supports BSND, TND, and PA_BBND. The default value is BSND. | string | - |
 | mask_mode | int | Optional | Sparse mode. 0 indicates No mask, and 3 indicates rightDownCausal mode. The default value is 0. | int64 | - |
 | cmp_ratio | int | Optional | Compression ratio of k. Value range: [1, 128]. The default value is 1, indicating no compression. | int64 | - |
+| causal_seqlens_kv_global | Tensor | Optional | Global exclusive causal upper bound C for each request in DCP (Decode Context Parallel). Required when cp_world > 1; must be None for non-DCP. Data format: ND. | int32 | (b,) |
+| cp_world | int | Optional | CP group size for DCP. Values greater than 1 enable DCP. The default value is None (non-DCP). | int64 | - |
+| cp_rank | int | Optional | Current DCP rank. Must satisfy 0 \<= cp_rank \< cp_world. Must be explicitly provided when cp_world > 1; it cannot be None. | int64 | - |
+| cp_kv_cache_interleave_size | int | Optional | DCP KV cache interleave size. Must be greater than or equal to 1. Must be explicitly provided when cp_world > 1; it cannot be None. | int64 | - |
 
 ### quant_lightning_indexer
 
@@ -148,6 +184,10 @@ cann_ops_transformer.quant_lightning_indexer(
 | mask_mode | int | Optional | Mask mode. 0 indicates the defaultMask mode, and 3 indicates the rightDownCausal mode. Default value is 0. | int64 | - |
 | cmp_ratio | int | Optional | Used for sparse computation, indicating the compression ratio of k. Default value is 1, indicating no compression. | int64 | - |
 | return_value | int | Optional | Whether to return the sparseValues corresponding to sparseIndices. 0 indicates not returning, and 1 indicates returning. Default value is 0. | int64 | - |
+| causal_seqlens_kv_global | Tensor | Optional | Global exclusive causal upper bound C for each request in DCP (Decode Context Parallel). Required when cp_world > 1; must be None for non-DCP. Data format: ND. | int32 | (b,) |
+| cp_world | int | Optional | CP group size for DCP. Values greater than 1 enable DCP. The default value is None (non-DCP). | int64 | - |
+| cp_rank | int | Optional | Current DCP rank. Must satisfy 0 \<= cp_rank \< cp_world. Must be explicitly provided when cp_world > 1; it cannot be None. | int64 | - |
+| cp_kv_cache_interleave_size | int | Optional | DCP KV cache interleave size. Must be greater than or equal to 1. Must be explicitly provided when cp_world > 1; it cannot be None. | int64 | - |
 
 ## Return Values
 
@@ -217,6 +257,7 @@ cann_ops_transformer.quant_lightning_indexer(
 |   SeqLens parameter group   | cu_seqlens_q, cu_seqlens_k, seqused_q, seqused_k, max_seqlen_q |
 |   Sparse compression parameter group    | cmp_ratio, cmp_residual_k |
 | Paged Attention parameter group | block_table |
+| DCP parameter group | causal_seqlens_kv_global, cp_world, cp_rank, cp_kv_cache_interleave_size |
 
 ### Baseline Information
 

@@ -81,6 +81,11 @@ public:
             .DataTypeList({Ops::Transformer::DT_INT32})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
+        this->Input("causal_seqlens_kv_global")
+            .ParamType(OPTIONAL)
+            .DataTypeList({Ops::Transformer::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
+            .AutoContiguous();
         this->Output("sparse_indices").ParamType(REQUIRED).DataTypeList({Ops::Transformer::DT_INT32}).FormatList({ge::FORMAT_ND});
         this->Output("sparse_values").ParamType(REQUIRED).DataTypeList({Ops::Transformer::DT_BF16}).FormatList({ge::FORMAT_ND});
         this->Output("candidate_block_indices")
@@ -101,6 +106,9 @@ public:
         this->Attr("return_value").AttrType(OPTIONAL).Int(0); //  0: 默认值
         this->Attr("candidate_topk_blocks").AttrType(OPTIONAL).Int(-1);
         this->Attr("candidate_block_size").AttrType(OPTIONAL).Int(-1);
+        // DCP（Decode Context Parallel，解码上下文并行）：固定顺序
+        // [cp_world, cp_rank, cp_kv_cache_interleave_size]，size 必须为 3；默认 {1, 0, 1} 表示关闭，cp_world>1 时启用。
+        this->Attr("dcp_params").AttrType(OPTIONAL).ListInt({1, 0, 1});
         OpAICoreConfig aicore_config;
         aicore_config.DynamicCompileStaticFlag(true)
             .DynamicFormatFlag(true)

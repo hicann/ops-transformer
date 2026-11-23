@@ -41,8 +41,8 @@ using namespace QLIV2Kernel;
     do { \
         templateClass<QLIV2Type<__VA_ARGS__>> op; \
         op.Init(query, key, weights, queryScale, keyScale, cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, \
-                blockTable, outputIdxOffset, metadata, sparseIndices, sparseValues, candidateBlockIndices, \
-                candidateBlockLength, user, tiling_data, &tPipe); \
+                blockTable, outputIdxOffset, metadata, causalSeqlensKvGlobal, sparseIndices, sparseValues, \
+                candidateBlockIndices, candidateBlockLength, user, tiling_data, &tPipe); \
         op.Process(); \
     } while (0)
 
@@ -60,9 +60,9 @@ __global__ __aicore__ void quant_lightning_indexer_v2(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* weights, __gm__ uint8_t* queryScale,
     __gm__ uint8_t* keyScale, __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensK, __gm__ uint8_t* sequsedQ,
     __gm__ uint8_t* sequsedK, __gm__ uint8_t* cmpResidualK, __gm__ uint8_t* blockTable, __gm__ uint8_t* outputIdxOffset,
-    __gm__ uint8_t* metadata, __gm__ uint8_t* sparseIndices, __gm__ uint8_t* sparseValues,
-    __gm__ uint8_t* candidateBlockIndices, __gm__ uint8_t* candidateBlockLength, __gm__ uint8_t* workspace,
-    __gm__ uint8_t* tiling)
+    __gm__ uint8_t* metadata, __gm__ uint8_t* causalSeqlensKvGlobal, __gm__ uint8_t* sparseIndices,
+    __gm__ uint8_t* sparseValues, __gm__ uint8_t* candidateBlockIndices, __gm__ uint8_t* candidateBlockLength,
+    __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     __gm__ uint8_t* user = GetUserWorkspace(workspace);
 #if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))

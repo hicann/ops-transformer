@@ -59,29 +59,37 @@ const aclTensor* QuantLightningIndexerV2Metadata(
 
 const aclTensor* QuantLightningIndexerV3Metadata(
     const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
-    const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional, int64_t numHeadsQ, int64_t numHeadsK,
-    int64_t headDim, int64_t topk, int64_t quantMode, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenK,
-    const std::string& layoutQOptional, const std::string& layoutKOptional, int64_t maskMode, int64_t cmpRatio,
-    int64_t candidateTopkBlocks, int64_t candidateBlockSize, int64_t aicCoreNum, int64_t aivCoreNum,
-    const std::string& socVersion, const aclTensor* metadata, aclOpExecutor* executor)
+    const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional,
+    const aclTensor* causalSeqlensKvGlobalOptional, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, int64_t topk,
+    int64_t quantMode, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenK, const std::string& layoutQOptional,
+    const std::string& layoutKOptional, int64_t maskMode, int64_t cmpRatio, int64_t candidateTopkBlocks,
+    int64_t candidateBlockSize, int64_t aicCoreNum, int64_t aivCoreNum, const std::string& socVersion,
+    const aclIntArray* dcpParams, const aclTensor* metadata, aclOpExecutor* executor)
 {
     L0_DFX(QuantLightningIndexerV3Metadata, cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional,
-           cmpResidualKOptional, numHeadsQ, numHeadsK, headDim, topk, quantMode, batchSize, maxSeqlenQ, maxSeqlenK,
-           layoutQOptional, layoutKOptional, maskMode, cmpRatio, candidateTopkBlocks, candidateBlockSize, metadata);
+           cmpResidualKOptional, causalSeqlensKvGlobalOptional, numHeadsQ, numHeadsK, headDim, topk, quantMode,
+           batchSize, maxSeqlenQ, maxSeqlenK, layoutQOptional, layoutKOptional, maskMode, cmpRatio, candidateTopkBlocks,
+           candidateBlockSize, aicCoreNum, aivCoreNum, socVersion, dcpParams, metadata);
+
+    // 复用 V2 metadata 的 AICPU 内核（kernel 按属性名取值，多余属性忽略）
     static internal::AicpuTaskSpace space("QuantLightningIndexerV2Metadata");
+
     auto ret = ADD_TO_LAUNCHER_LIST_AICPU(
         QuantLightningIndexerV2Metadata,
         OP_ATTR_NAMES({"num_heads_q", "num_heads_k", "head_dim", "topk", "quant_mode", "batch_size", "max_seqlen_q",
                        "max_seqlen_k", "layout_q", "layout_k", "mask_mode", "cmp_ratio", "candidate_topk_blocks",
-                       "candidate_block_size", "aic_core_num", "aiv_core_num", "soc_version"}),
-        OP_INPUT(cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional, cmpResidualKOptional),
+                       "candidate_block_size", "aic_core_num", "aiv_core_num", "soc_version", "dcp_params"}),
+        OP_INPUT(cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional, cmpResidualKOptional,
+                 causalSeqlensKvGlobalOptional),
         OP_OUTPUT(metadata),
-        OP_ATTR(numHeadsQ, numHeadsK, headDim, topk, quantMode, batchSize, maxSeqlenQ, maxSeqlenK,
-                layoutQOptional.c_str(), layoutKOptional.c_str(), maskMode, cmpRatio, candidateTopkBlocks,
-                candidateBlockSize, aicCoreNum, aivCoreNum, socVersion.c_str()));
-    OP_CHECK(ret == ACL_SUCCESS,
-             OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "QuantLightningIndexerV2Metadata AICPU launch creation failed."),
-             return nullptr);
+        OP_ATTR(numHeadsQ, numHeadsK, headDim, topk, quantMode, batchSize, maxSeqlenQ, maxSeqlenK, layoutQOptional,
+                layoutKOptional, maskMode, cmpRatio, candidateTopkBlocks, candidateBlockSize, aicCoreNum, aivCoreNum,
+                socVersion, dcpParams));
+
+    OP_CHECK(
+        ret == ACL_SUCCESS,
+        OP_LOGE_WITHOUT_REPORT(ret, "QuantLightningIndexerV3Metadata ADD_TO_LAUNCHER_LIST_AICPU failed, ret=%d.", ret),
+        return nullptr);
     return metadata;
 }
 } // namespace l0op

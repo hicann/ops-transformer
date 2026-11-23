@@ -37,6 +37,12 @@
 
   候选输出包括逻辑块索引`candidate_block_indices`和每行实际有效候选数`candidate_block_length`，供`quant_sparse_lightning_indexer`使用。
 
+  DCP（Decode Context Parallel，解码上下文并行）由 `cp_world > 1` 启用，提供 `.dcp` 重载；
+  须传 `causal_seqlens_kv_global`（INT32，shape `(B,)`），只支持 TND/PA_BBND、mask_mode=3、
+  cmp_ratio=1、return_value=1、quant_mode=2，且 candidate 关闭。`sparse_values` 为 BF16，
+  无效槽 `indices=-1`、`values=-inf`。统一入口在 `cp_world > 1` 时自动路由，非 DCP 时
+  DCP 参数只能取默认值。
+
 - **计算公式**：
 
   $$
@@ -69,6 +75,10 @@ cann_ops_transformer.quant_lightning_indexer_metadata(
   *,
   candidate_topk_blocks=...,
   candidate_block_size=...,
+  causal_seqlens_kv_global=None,
+  cp_world=None,
+  cp_rank=None,
+  cp_kv_cache_interleave_size=None,
 ) -> Tensor
 ```
 
@@ -98,6 +108,10 @@ cann_ops_transformer.quant_lightning_indexer(
   return_value=0,
   candidate_topk_blocks=...,
   candidate_block_size=...,
+  causal_seqlens_kv_global=None,
+  cp_world=None,
+  cp_rank=None,
+  cp_kv_cache_interleave_size=None,
 ) -> (Tensor, Tensor) 或 (Tensor, Tensor, Tensor, Tensor)
 ```
 
@@ -134,6 +148,10 @@ cann_ops_transformer.quant_lightning_indexer(
 | cmp_ratio | int | 可选 | 表示key的压缩率，取值范围[1, 128]，1表示无压缩，默认值为None。 | int64 | - |
 | candidate_topk_blocks | int | 可选 | 候选块数量。与candidate_block_size同时按关键字提供；两项均为-1时关闭候选选择，开启时仅支持2048。 | int64 | - |
 | candidate_block_size | int | 可选 | 每个候选块包含的逻辑Key位置数。candidate_topk_blocks为-1时必须为-1，为2048时必须为8；与后续quant_sparse_lightning_indexer使用相同配置。 | int64 | - |
+| causal_seqlens_kv_global | Tensor | 可选 | DCP（Decode Context Parallel，解码上下文并行）每个请求的全局exclusive因果上界C。cp_world>1时必传，非DCP时必须为空。数据格式为ND。 | int32 | (b,) |
+| cp_world | int | 可选 | DCP的CP组大小，>1时启用DCP。默认值为None，表示非DCP。 | int64 | - |
+| cp_rank | int | 可选 | DCP当前rank，需满足0 \<= cp_rank \< cp_world。cp_world>1时必须显式传入，不能为None。 | int64 | - |
+| cp_kv_cache_interleave_size | int | 可选 | DCP KV cache的交错粒度，需满足>=1。cp_world>1时必须显式传入，不能为None。 | int64 | - |
 
 ### quant_lightning_indexer
 
@@ -164,6 +182,10 @@ cann_ops_transformer.quant_lightning_indexer(
 | return_value | int | 可选 | 代表是否需要返回sparse_indices对应的sparse_values值。0代表不返回，1代表返回值，默认值为0。 | int64 | - |
 | candidate_topk_blocks | int | 可选 | 候选块数量。与candidate_block_size同时按关键字提供；两项均为-1时关闭候选选择，开启时仅支持2048。 | int64 | - |
 | candidate_block_size | int | 可选 | 每个候选块包含的逻辑Key位置数。candidate_topk_blocks为-1时必须为-1，为2048时必须为8；与后续quant_sparse_lightning_indexer使用相同配置。 | int64 | - |
+| causal_seqlens_kv_global | Tensor | 可选 | DCP（Decode Context Parallel，解码上下文并行）每个请求的全局exclusive因果上界C。cp_world>1时必传，非DCP时必须为空。数据格式为ND。 | int32 | (b,) |
+| cp_world | int | 可选 | DCP的CP组大小，>1时启用DCP。默认值为None，表示非DCP。 | int64 | - |
+| cp_rank | int | 可选 | DCP当前rank，需满足0 \<= cp_rank \< cp_world。cp_world>1时必须显式传入，不能为None。 | int64 | - |
+| cp_kv_cache_interleave_size | int | 可选 | DCP KV cache的交错粒度，需满足>=1。cp_world>1时必须显式传入，不能为None。 | int64 | - |
 
 ## 返回值说明
 
@@ -240,6 +262,7 @@ cann_ops_transformer.quant_lightning_indexer(
 |   稀疏压缩参数组    | cmp_ratio、cmp_residual_k |
 | Paged Attention参数组 | block_table |
 | 两级TopK候选源(source)模式参数组 | candidate_topk_blocks、candidate_block_size、candidate_block_indices、candidate_block_length |
+| DCP参数组 | causal_seqlens_kv_global、cp_world、cp_rank、cp_kv_cache_interleave_size |
 
 ### 基准信息说明
 

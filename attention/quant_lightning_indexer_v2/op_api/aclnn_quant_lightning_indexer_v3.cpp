@@ -16,10 +16,11 @@ aclnnStatus aclnnInnerQuantLightningIndexerV2GetWorkspaceSize(
     const aclTensor* q, const aclTensor* k, const aclTensor* w, const aclTensor* qDescale, const aclTensor* kDescale,
     const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
     const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional, const aclTensor* blockTableOptional,
-    const aclTensor* outputIdxOffsetOptional, const aclTensor* metadataOptional, int64_t topk, int64_t quantMode,
-    int64_t maxSeqlenQ, char* layoutQOptional, char* layoutKOptional, int64_t maskMode, int64_t cmpRatio,
-    int64_t returnValue, int64_t candidateTopkBlocks, int64_t candidateBlockSize, const aclTensor* sparseIndicesOut,
-    const aclTensor* sparseValuesOut, const aclTensor* candidateBlockIndicesOut,
+    const aclTensor* outputIdxOffsetOptional, const aclTensor* metadataOptional,
+    const aclTensor* causalSeqlensKvGlobalOptional, int64_t topk, int64_t quantMode, int64_t maxSeqlenQ,
+    char* layoutQOptional, char* layoutKOptional, int64_t maskMode, int64_t cmpRatio, int64_t returnValue,
+    int64_t candidateTopkBlocks, int64_t candidateBlockSize, const aclIntArray* dcpParams,
+    const aclTensor* sparseIndicesOut, const aclTensor* sparseValuesOut, const aclTensor* candidateBlockIndicesOut,
     const aclTensor* candidateBlockLengthOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 aclnnStatus aclnnInnerQuantLightningIndexerV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                               aclrtStream stream);
@@ -63,10 +64,11 @@ aclnnStatus aclnnQuantLightningIndexerV3GetWorkspaceSize(
     const aclTensor* q, const aclTensor* k, const aclTensor* w, const aclTensor* qDescale, const aclTensor* kDescale,
     const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
     const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional, const aclTensor* blockTableOptional,
-    const aclTensor* outputIdxOffsetOptional, const aclTensor* metadataOptional, int64_t topk, int64_t quantMode,
-    int64_t maxSeqlenQ, char* layoutQOptional, char* layoutKOptional, int64_t maskMode, int64_t cmpRatio,
-    int64_t returnValue, int64_t candidateTopkBlocks, int64_t candidateBlockSize, const aclTensor* sparseIndicesOut,
-    const aclTensor* sparseValuesOut, const aclTensor* candidateBlockIndicesOut,
+    const aclTensor* outputIdxOffsetOptional, const aclTensor* metadataOptional,
+    const aclTensor* causalSeqlensKvGlobalOptional, int64_t topk, int64_t quantMode, int64_t maxSeqlenQ,
+    char* layoutQOptional, char* layoutKOptional, int64_t maskMode, int64_t cmpRatio, int64_t returnValue,
+    int64_t candidateTopkBlocks, int64_t candidateBlockSize, const aclIntArray* dcpParams,
+    const aclTensor* sparseIndicesOut, const aclTensor* sparseValuesOut, const aclTensor* candidateBlockIndicesOut,
     const aclTensor* candidateBlockLengthOut, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (q == nullptr || k == nullptr || w == nullptr || qDescale == nullptr || kDescale == nullptr) {
@@ -87,6 +89,16 @@ aclnnStatus aclnnQuantLightningIndexerV3GetWorkspaceSize(
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "Both candidate outputs are required when candidate mode is enabled.");
         return ACLNN_ERR_PARAM_NULLPTR;
     }
+    if (dcpParams != nullptr) {
+        uint64_t dcpParamsSize = 0U;
+        aclGetIntArraySize(dcpParams, &dcpParamsSize);
+        if (dcpParamsSize != 3U) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "dcpParams must contain exactly 3 elements: [cpWorld, cpRank, cpInterleaveSize].");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
+    // dcpParams 的具体取值（cpWorld/cpRank/cpInterleaveSize）及 DCP 组合约束由算子 tiling 统一校验。
 
     CandidateOutputHolder indicesHolder(candidateBlockIndicesOut);
     CandidateOutputHolder lengthHolder(candidateBlockLengthOut);
@@ -95,12 +107,13 @@ aclnnStatus aclnnQuantLightningIndexerV3GetWorkspaceSize(
         return ACLNN_ERR_INNER_NULLPTR;
     }
 
-    return aclnnInnerQuantLightningIndexerV2GetWorkspaceSize(
+    aclnnStatus ret = aclnnInnerQuantLightningIndexerV2GetWorkspaceSize(
         q, k, w, qDescale, kDescale, cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional,
-        cmpResidualKOptional, blockTableOptional, outputIdxOffsetOptional, metadataOptional, topk, quantMode,
-        maxSeqlenQ, layoutQOptional, layoutKOptional, maskMode, cmpRatio, returnValue, candidateTopkBlocks,
-        candidateBlockSize, sparseIndicesOut, sparseValuesOut, candidateBlockIndicesOut, candidateBlockLengthOut,
-        workspaceSize, executor);
+        cmpResidualKOptional, blockTableOptional, outputIdxOffsetOptional, metadataOptional,
+        causalSeqlensKvGlobalOptional, topk, quantMode, maxSeqlenQ, layoutQOptional, layoutKOptional, maskMode,
+        cmpRatio, returnValue, candidateTopkBlocks, candidateBlockSize, dcpParams, sparseIndicesOut, sparseValuesOut,
+        candidateBlockIndicesOut, candidateBlockLengthOut, workspaceSize, executor);
+    return ret;
 }
 
 aclnnStatus aclnnQuantLightningIndexerV3(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,

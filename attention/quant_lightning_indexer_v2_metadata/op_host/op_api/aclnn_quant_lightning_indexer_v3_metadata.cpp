@@ -33,6 +33,8 @@ constexpr int64_t CMP_RATIO_MAX = 128;
 constexpr int64_t METADATA_SIZE = 1024;
 constexpr int64_t CANDIDATE_TOPK_BLOCKS = 2048;
 constexpr int64_t CANDIDATE_BLOCK_SIZE = 8;
+// dcp_params 固定为 [cpWorld, cpRank, cpKvCacheInterleaveSize]
+constexpr uint64_t DCP_PARAMS_SIZE = 3U;
 
 bool IsInt32Tensor(const aclTensor* tensor)
 {
@@ -51,10 +53,11 @@ bool IsSequenceTensor(const aclTensor* tensor, int64_t size)
 extern "C" {
 aclnnStatus aclnnQuantLightningIndexerV3MetadataGetWorkspaceSize(
     const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
-    const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional, int64_t numHeadsQ, int64_t numHeadsK,
-    int64_t headDim, int64_t topk, int64_t quantMode, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenK,
-    char* layoutQOptional, char* layoutKOptional, int64_t maskMode, int64_t cmpRatio, int64_t candidateTopkBlocks,
-    int64_t candidateBlockSize, const aclTensor* metadata, uint64_t* workspaceSize, aclOpExecutor** executor)
+    const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional,
+    const aclTensor* causalSeqlensKvGlobalOptional, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, int64_t topk,
+    int64_t quantMode, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenK, char* layoutQOptional,
+    char* layoutKOptional, int64_t maskMode, int64_t cmpRatio, int64_t candidateTopkBlocks, int64_t candidateBlockSize,
+    const aclIntArray* dcpParams, const aclTensor* metadata, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     if (layoutQOptional == nullptr || layoutKOptional == nullptr || metadata == nullptr || workspaceSize == nullptr ||
         executor == nullptr) {
@@ -84,8 +87,8 @@ aclnnStatus aclnnQuantLightningIndexerV3MetadataGetWorkspaceSize(
     }
     if (!IsSequenceTensor(cuSeqlensQOptional, batchSize + 1) || !IsSequenceTensor(sequsedQOptional, batchSize) ||
         !IsSequenceTensor(sequsedKOptional, batchSize) || !IsSequenceTensor(cmpResidualKOptional, batchSize) ||
-        !IsInt32Tensor(metadata) || metadata->GetViewShape().GetDimNum() != 1 ||
-        metadata->GetViewShape().GetDim(0) != METADATA_SIZE) {
+        !IsSequenceTensor(causalSeqlensKvGlobalOptional, batchSize) || !IsInt32Tensor(metadata) ||
+        metadata->GetViewShape().GetDimNum() != 1 || metadata->GetViewShape().GetDim(0) != METADATA_SIZE) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Invalid sequence tensor or metadata output descriptor.");
         return ACLNN_ERR_PARAM_INVALID;
     }
@@ -94,13 +97,23 @@ aclnnStatus aclnnQuantLightningIndexerV3MetadataGetWorkspaceSize(
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Candidate attributes must be (-1, -1) or (2048, 8).");
         return ACLNN_ERR_PARAM_INVALID;
     }
+    if (dcpParams != nullptr) {
+        uint64_t dcpParamsSize = 0U;
+        aclGetIntArraySize(dcpParams, &dcpParamsSize);
+        if (dcpParamsSize != DCP_PARAMS_SIZE) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "dcpParams must contain exactly 3 elements: [cpWorld, cpRank, cpInterleaveSize].");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
+    // dcpParams 的具体取值（cpWorld/cpRank/cpInterleaveSize）及 DCP 组合约束由 AICPU 内核统一校验。
 
-    L2_DFX_PHASE_1(
-        aclnnQuantLightningIndexerV3Metadata,
-        DFX_IN(cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional, cmpResidualKOptional,
-               numHeadsQ, numHeadsK, headDim, topk, quantMode, batchSize, maxSeqlenQ, maxSeqlenK, layoutQOptional,
-               layoutKOptional, maskMode, cmpRatio, candidateTopkBlocks, candidateBlockSize),
-        DFX_OUT(metadata));
+    L2_DFX_PHASE_1(aclnnQuantLightningIndexerV3Metadata,
+                   DFX_IN(cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional,
+                          cmpResidualKOptional, causalSeqlensKvGlobalOptional, numHeadsQ, numHeadsK, headDim, topk,
+                          quantMode, batchSize, maxSeqlenQ, maxSeqlenK, layoutQOptional, layoutKOptional, maskMode,
+                          cmpRatio, candidateTopkBlocks, candidateBlockSize, dcpParams),
+                   DFX_OUT(metadata));
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
     const auto& npuInfo = op::GetCurrentPlatformInfo();
@@ -113,11 +126,25 @@ aclnnStatus aclnnQuantLightningIndexerV3MetadataGetWorkspaceSize(
         aivCoreNum = npuInfo.GetVectorCoreNum();
     }
     const std::string socVersion = npuInfo.GetSocLongVersion();
+    const aclIntArray* dcpParamsArg = dcpParams;
+    aclIntArray* dcpParamsLocal = nullptr;
+    if (dcpParamsArg == nullptr) {
+        const int64_t dcpParamsDefault[DCP_PARAMS_SIZE] = {1, 0, 1};
+        dcpParamsLocal = aclCreateIntArray(dcpParamsDefault, DCP_PARAMS_SIZE);
+        if (dcpParamsLocal == nullptr) {
+            OP_LOGE_WITHOUT_REPORT(ACLNN_ERR_INNER_NULLPTR, "failed to create dcp_params array");
+            return ACLNN_ERR_INNER_NULLPTR;
+        }
+        dcpParamsArg = dcpParamsLocal;
+    }
     auto output = l0op::QuantLightningIndexerV3Metadata(
-        cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional, cmpResidualKOptional, numHeadsQ,
-        numHeadsK, headDim, topk, quantMode, batchSize, maxSeqlenQ, maxSeqlenK, layoutQOptional, layoutKOptional,
-        maskMode, cmpRatio, candidateTopkBlocks, candidateBlockSize, aicCoreNum, aivCoreNum, socVersion.c_str(),
-        metadata, uniqueExecutor.get());
+        cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional, cmpResidualKOptional,
+        causalSeqlensKvGlobalOptional, numHeadsQ, numHeadsK, headDim, topk, quantMode, batchSize, maxSeqlenQ,
+        maxSeqlenK, layoutQOptional, layoutKOptional, maskMode, cmpRatio, candidateTopkBlocks, candidateBlockSize,
+        aicCoreNum, aivCoreNum, socVersion.c_str(), dcpParamsArg, metadata, uniqueExecutor.get());
+    if (dcpParamsLocal != nullptr) {
+        aclDestroyIntArray(dcpParamsLocal);
+    }
     CHECK_RET(output != nullptr, ACLNN_ERR_INNER_NULLPTR);
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();
     uniqueExecutor.ReleaseTo(executor);

@@ -60,6 +60,7 @@ constexpr uint32_t CMP_RESIDUAL_K_INDEX = 9;
 constexpr uint32_t BLOCK_TABLE_INDEX = 10;
 constexpr uint32_t OUTPUT_IDX_OFFSET_INDEX = 11;
 constexpr uint32_t METADATA_INDEX = 12;
+constexpr uint32_t CAUSAL_SEQLENS_KV_GLOBAL_INDEX = 13;
 constexpr uint32_t SPARSE_INDICES_INDEX = 0;
 constexpr uint32_t SPARSE_VALUES_INDEX = 1;
 constexpr uint32_t CANDIDATE_BLOCK_INDICES_OUTPUT_INDEX = 2;
@@ -76,6 +77,13 @@ constexpr uint32_t ATTR_RETURN_VALUE_INDEX = 7;
 // candidate（两级 TopK source 模式）属性索引
 constexpr uint32_t ATTR_CANDIDATE_TOPK_BLOCKS_INDEX = 8;
 constexpr uint32_t ATTR_CANDIDATE_BLOCK_SIZE_INDEX = 9;
+// DCP（Decode Context Parallel）属性索引：单 ListInt，固定顺序
+// [cp_world, cp_rank, cp_kv_cache_interleave_size]，size 必须为 3
+constexpr uint32_t ATTR_DCP_PARAMS_INDEX = 10;
+constexpr uint32_t DCP_PARAMS_SIZE = 3;
+constexpr size_t DCP_PARAM_CP_WORLD = 0;
+constexpr size_t DCP_PARAM_CP_RANK = 1;
+constexpr size_t DCP_PARAM_INTERLEAVE = 2;
 
 // Dim Index
 constexpr uint32_t DIM_IDX_ZERO = 0;
@@ -139,6 +147,10 @@ TILING_DATA_FIELD_DEF(uint32_t, quantMode)
 // ---- candidate（两级 TopK source 模式）----
 TILING_DATA_FIELD_DEF(int32_t, candidateTopkBlocks) // -1=关闭
 TILING_DATA_FIELD_DEF(uint32_t, candidateBlockSize) // 当前仅 8
+// DCP（Decode Context Parallel）：cpWorld>1 时启用
+TILING_DATA_FIELD_DEF(uint32_t, cpWorld)
+TILING_DATA_FIELD_DEF(uint32_t, cpRank)
+TILING_DATA_FIELD_DEF(uint32_t, cpInterleaveSize)
 
 // fast 模板专用字段，追加在末尾以保持既有字段的二进制布局不变
 TILING_DATA_FIELD_DEF(uint32_t, fastUsedCoreNum)
@@ -164,6 +176,7 @@ struct QLIV2ParaInfo {
     TilingOptionalParaInfo blockTable = {nullptr, nullptr};
     TilingOptionalParaInfo outputIdxOffset = {nullptr, nullptr};
     TilingOptionalParaInfo metadata = {nullptr, nullptr};
+    TilingOptionalParaInfo causalSeqLensKvGlobal = {nullptr, nullptr};
     TilingRequiredParaInfo attenOut = {nullptr, nullptr};
     TilingRequiredParaInfo sparseValues = {nullptr, nullptr};
 
@@ -178,6 +191,8 @@ struct QLIV2ParaInfo {
     const int32_t* returnValue = nullptr;
     const int64_t* candidateTopkBlocks = nullptr;
     const int64_t* candidateBlockSize = nullptr;
+    // DCP: 单 ListInt 属性 [cp_world, cp_rank, cp_kv_cache_interleave_size]（cp_world>1 时启用）
+    const gert::TypedContinuousVector<int64_t>* dcpParams = nullptr;
 };
 
 // -----------算子Tiling入参信息类---------------
@@ -218,6 +233,12 @@ public:
     // candidate（两级 TopK source 模式）
     int32_t candidateTopkBlocks = CANDIDATE_TOPK_BLOCKS_OFF;
     uint32_t candidateBlockSize = CANDIDATE_BLOCK_SIZE_DEFAULT;
+    // DCP（Decode Context Parallel）：cpWorld>1 时启用，不单独设 enable 开关
+    bool dcpEnable = false;
+    uint32_t cpWorld = 1;
+    uint32_t cpRank = 0;
+    uint32_t cpInterleaveSize = 1;
+    bool causalSeqLensKvGlobalPresent = false;
     // DType
     ge::DataType inputQType = Ops::Transformer::DT_FLOAT16;
     ge::DataType inputKType = Ops::Transformer::DT_FLOAT16;
@@ -255,6 +276,7 @@ public:
     ge::graphStatus GetBatchSize();
     ge::graphStatus GetS1Size();
     ge::graphStatus GetAndCheckOptionalInput();
+    ge::graphStatus CheckDcpParams();
     ge::graphStatus CheckShapeDim();
     ge::graphStatus GetAndCheckBlockSize();
     ge::graphStatus GetQueryKeyAndOutLayout();
@@ -305,6 +327,12 @@ public:
     ge::DataType valuesOutType_ = Ops::Transformer::DT_BF16;
     std::vector<uint32_t> keyStridesVec_;
     std::vector<uint32_t> keyDequantScaleStridesVec_;
+    // DCP（Decode Context Parallel）解析结果：cp_world>1 时启用
+    bool dcpEnable_ = false;
+    uint32_t cpWorld_ = 1;
+    uint32_t cpRank_ = 0;
+    uint32_t cpInterleave_ = 1;
+    bool causalPresent_ = false;
 };
 
 // ---------------算子Tiling类---------------

@@ -26,6 +26,7 @@ extern "C" {
  * @param [in] sequsedQOptional: 各Batch中q实际参与运算的Sequence Length，INT32类型，shape为(B,)。
  * @param [in] sequsedKOptional: 各Batch中k实际参与运算的Sequence Length，INT32类型，shape为(B,)。
  * @param [in] cmpResidualKOptional: 各Batch中k压缩前Sequence Length除以cmpRatio的余数，INT32类型，shape为(B,)。
+ * @param [in] causalSeqlensKvGlobalOptional: DCP 每请求全局 exclusive 因果上界 C（[B] int32）。
  * @param [in] numHeadsQ: q的head个数。
  * @param [in] numHeadsK: k的head个数。
  * @param [in] headDim: 每个head的维度。
@@ -40,16 +41,19 @@ extern "C" {
  * @param [in] cmpRatio: k的压缩率，1表示不压缩。
  * @param [in] candidateTopkBlocks: 候选逻辑块数量，-1表示关闭候选选择，启用时为2048。
  * @param [in] candidateBlockSize: 候选逻辑块大小，与candidateTopkBlocks配对为(-1, -1)或(2048, 8)。
+ * @param [in] dcpParams: DCP（Decode Context Parallel，解码上下文并行）参数列表，固定顺序
+ *            [cpWorld, cpRank, cpKvCacheInterleaveSize]；传 nullptr 表示非 DCP（等价于 {1, 0, 1}）。
  * @param [out] metadata: 分核信息输出，INT32类型，shape为(1024,)，供aclnnQuantLightningIndexerV3使用。
  * @param [out] workspaceSize: 返回需要在Device侧申请的workspace大小。
  * @param [out] executor: 返回op执行器，包含算子计算流程。
  */
 __attribute__((visibility("default"))) aclnnStatus aclnnQuantLightningIndexerV3MetadataGetWorkspaceSize(
     const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
-    const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional, int64_t numHeadsQ, int64_t numHeadsK,
-    int64_t headDim, int64_t topk, int64_t quantMode, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenK,
-    char* layoutQOptional, char* layoutKOptional, int64_t maskMode, int64_t cmpRatio, int64_t candidateTopkBlocks,
-    int64_t candidateBlockSize, const aclTensor* metadata, uint64_t* workspaceSize, aclOpExecutor** executor);
+    const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional,
+    const aclTensor* causalSeqlensKvGlobalOptional, int64_t numHeadsQ, int64_t numHeadsK, int64_t headDim, int64_t topk,
+    int64_t quantMode, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenK, char* layoutQOptional,
+    char* layoutKOptional, int64_t maskMode, int64_t cmpRatio, int64_t candidateTopkBlocks, int64_t candidateBlockSize,
+    const aclIntArray* dcpParams, const aclTensor* metadata, uint64_t* workspaceSize, aclOpExecutor** executor);
 
 /**
  * @brief 执行QuantLightningIndexerV3Metadata计算。

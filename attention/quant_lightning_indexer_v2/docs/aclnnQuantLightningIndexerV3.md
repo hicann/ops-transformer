@@ -43,7 +43,17 @@
   2. 相关性结果与`q`和`k`对应的反量化系数`qDescale`（$Scale_Q$）和`kDescale`（$Scale_K^T$）相乘，通过激活函数$ReLU$过滤无效负相关信号后，得到当前Token与所有前序Token的相关性分数向量。
   3. 将其与权重系数`w`（$W$）相乘后，沿g方向求和，按分数选取前$Top-k$个位置，得到位置索引及可选的对应分数，作为Attention的输入。
 
-- 与V2的关系：candidateTopkBlocks、candidateBlockSize均为-1时，关闭候选选择。在本接口支持的规格范围内，位置级计算与V2一致，两个候选输出均为空Tensor，shape为(0,)；也可传入nullptr，由接口内部创建空Tensor。关闭候选选择后，metadata仍必须由配套的aclnnQuantLightningIndexerV3Metadata生成。无需候选输出时，可直接使用V2接口。
+- DCP（Decode Context Parallel，解码上下文并行）模式：
+
+  `cpWorld`、`cpRank`、`cpKvCacheInterleaveSize` 组合为 `dcpParams`，固定顺序 `[cpWorld, cpRank, cpKvCacheInterleaveSize]`；`cpWorld > 1` 时启用。每个rank只持有全局KV的1/cpWorld，按`cpKvCacheInterleaveSize`个token为一段轮换rank，`cpRank`为当前rank编号（满足0 <= cpRank < cpWorld）。`causalSeqlensKvGlobalOptional`给出每个请求的全局exclusive因果上界C（该请求本次最后一个query的全局位置+1），shape为(B,)。算子按如下闭式计算每行可见的本地KV前缀：
+
+  $$
+  visible = \min\left(L,\ \left\lfloor \frac{u}{P \times S} \right\rfloor S + \mathrm{clamp}\left(u \bmod (P \times S) - rS,\ 0,\ S\right)\right)
+  $$
+
+  其中 `u = C - Q_len + i + 1`（Q_len为当前请求本次query数，i为请求内行号），P/r/S分别对应cpWorld/cpRank/cpKvCacheInterleaveSize，L为本地有效key长度。DCP场景下`maskMode`为3（rightDownCausal模式）；DCP与candidate互斥：启用DCP时candidateTopkBlocks、candidateBlockSize必须均为-1，两个候选输出传nullptr或空Tensor。DCP场景returnValue必须为1，sparseValuesOut为BF16（与arch35对齐），供跨rank合并；无效槽indices=-1、values=-inf。
+
+- 与V2的关系：candidateTopkBlocks、candidateBlockSize均为-1时，关闭候选选择。在本接口支持的规格范围内，位置级计算与V2一致，两个候选输出均为空Tensor，shape为(0,)；也可传入nullptr，由接口内部创建空Tensor。关闭候选选择后，metadata仍必须由配套的aclnnQuantLightningIndexerV3Metadata生成。无需候选输出时，可直接使用V2接口。DCP参数仅在V3提供：V2接口没有causalSeqlensKvGlobalOptional与dcpParams，DCP场景必须使用V3（candidate关闭态）。
 
 ## 函数原型
 
@@ -64,6 +74,7 @@ aclnnStatus aclnnQuantLightningIndexerV3GetWorkspaceSize(
     const aclTensor *blockTableOptional,
     const aclTensor *outputIdxOffsetOptional,
     const aclTensor *metadataOptional,
+    const aclTensor *causalSeqlensKvGlobalOptional,
     int64_t          topk,
     int64_t          quantMode,
     int64_t          maxSeqlenQ,
@@ -74,6 +85,7 @@ aclnnStatus aclnnQuantLightningIndexerV3GetWorkspaceSize(
     int64_t          returnValue,
     int64_t          candidateTopkBlocks,
     int64_t          candidateBlockSize,
+    const aclIntArray *dcpParams,
     const aclTensor *sparseIndicesOut,
     const aclTensor *sparseValuesOut,
     const aclTensor *candidateBlockIndicesOut,
@@ -93,7 +105,6 @@ aclnnStatus aclnnQuantLightningIndexerV3(
 ## aclnnQuantLightningIndexerV3GetWorkspaceSize
 
 - **参数说明：**
-
   > [!NOTE]
   >
   > - q、k、w参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、N（Head Num）表示多头数、D（Head Dim）表示hidden层最小的单元尺寸，且满足D=H/N、T表示所有Batch输入样本序列长度的累加和。
@@ -292,6 +303,22 @@ aclnnStatus aclnnQuantLightningIndexerV3(
       <td>x</td>
     </tr>
     <tr>
+      <td>causalSeqlensKvGlobalOptional</td>
+      <td>输入</td>
+      <td>DCP场景下每个请求的全局exclusive因果上界C（该请求本次最后一个query的全局位置+1）。</td>
+      <td>
+          <ul>
+                <li>cpWorld>1时必须传入，shape为(B,)；cpWorld为1时必须传nullptr。</li>
+                <li>值必须包含当前这段Q的token（即先写KV再传C），否则最后一行看不到自己。</li>
+                <li>仅支持INT32。</li>
+          </ul>
+      </td>
+      <td>INT32</td>
+      <td>ND</td>
+      <td>(B,)</td>
+      <td>x</td>
+    </tr>
+    <tr>
       <td>topk</td>
       <td>输入</td>
       <td>topK阶段需要保留的Key token索引数量。</td>
@@ -384,7 +411,7 @@ aclnnStatus aclnnQuantLightningIndexerV3(
       <td>表示是否输出sparseValuesOut。</td>
       <td>
           <ul>
-                <li>1表示输出，0表示不输出，当前仅支持0。</li>
+                <li>1表示输出，0表示不输出。</li><li>非DCP场景仅支持0；DCP场景（cpWorld>1）必须为1。</li>
           </ul>
       </td>
       <td>INT64</td>
@@ -396,7 +423,7 @@ aclnnStatus aclnnQuantLightningIndexerV3(
       <td>candidateTopkBlocks</td>
       <td>输入</td>
       <td>两级TopK候选源(source)模式的候选块数量，即块级Top-k需要保留的候选块个数。</td>
-      <td><ul><li>-1表示关闭candidate模式。</li><li>开启时仅支持2048。</li></ul></td>
+      <td><ul><li>-1表示关闭candidate模式。</li><li>开启时仅支持2048。</li><li>cpWorld>1（DCP）时必须为-1。</li></ul></td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -406,8 +433,24 @@ aclnnStatus aclnnQuantLightningIndexerV3(
       <td>candidateBlockSize</td>
       <td>输入</td>
       <td>候选块大小，即压缩后K空间中每个候选块包含的位置数。</td>
-      <td><ul><li>candidateTopkBlocks为-1时，必须为-1。</li><li>candidateTopkBlocks为2048时，必须为8。</li><li>需与下游消费算子quant_sparse_lightning_indexer的配置保持一致。</li></ul></td>
+      <td><ul><li>candidateTopkBlocks为-1时，必须为-1。</li><li>candidateTopkBlocks为2048时，必须为8。</li><li>cpWorld>1（DCP）时必须为-1。</li><li>需与下游消费算子quant_sparse_lightning_indexer的配置保持一致。</li></ul></td>
       <td>INT64</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>dcpParams</td>
+      <td>输入</td>
+      <td>DCP 参数列表，固定顺序 [cpWorld, cpRank, cpKvCacheInterleaveSize]：
+          <ul>
+                <li>cpWorld：CP 组大小，即全局 KV 被切分的份数，大于 1 时启用 DCP。</li>
+                <li>cpRank：当前 rank 在 CP 组内的编号，需满足 0 &lt;= cpRank &lt; cpWorld。</li>
+                <li>cpKvCacheInterleaveSize：KV cache 的交错粒度，每 S 个 token 轮换一次 rank，需大于等于 1。</li>
+          </ul>
+      </td>
+      <td><ul><li>传 nullptr 表示非 DCP（等价于 {1, 0, 1}）。</li><li>非空时长度必须为 3；cpWorld>1 启用 DCP，且 0 <= cpRank < cpWorld、cpKvCacheInterleaveSize >= 1。</li></ul></td>
+      <td>INT64（列表）</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>
@@ -431,10 +474,10 @@ aclnnStatus aclnnQuantLightningIndexerV3(
       <td>sparseValuesOut</td>
       <td>输出</td>
       <td>公式中的Indices输出对应的value值。</td>
-      <td>当前returnValue仅支持0，输出shape为(0,)的空tensor。</td>
+      <td><ul><li>非DCP：returnValue=0时输出shape为(0,)的空tensor。</li><li>DCP：returnValue=1时shape与sparseIndicesOut一致。</li></ul></td>
       <td>BFLOAT16</td>
       <td>ND</td>
-      <td>(0,)</td>
+      <td>returnValue=1时与sparseIndicesOut一致；returnValue=0时为(0,)。</td>
       <td>x</td>
     </tr>
     <tr>
@@ -505,7 +548,7 @@ aclnnStatus aclnnQuantLightningIndexerV3(
             <tr>
                 <td>ACLNN_ERR_PARAM_INVALID</td>
                 <td>161002</td>
-                <td>q、k、w、qDescale、kDescale、cuSeqlensQOptional、cuSeqlensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional、blockTableOptional、metadataOptional、layoutQOptional、layoutKOptional、topk、quantMode、maskMode、cmpRatio、returnValue、candidateTopkBlocks、candidateBlockSize、sparseIndicesOut、sparseValuesOut、candidateBlockIndicesOut、candidateBlockLengthOut的数据类型、数据格式、shape或属性取值不在支持的范围内。</td>
+                <td>q、k、w、qDescale、kDescale、cuSeqlensQOptional、cuSeqlensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional、blockTableOptional、metadataOptional、causalSeqlensKvGlobalOptional、layoutQOptional、layoutKOptional、topk、quantMode、maskMode、cmpRatio、returnValue、candidateTopkBlocks、candidateBlockSize、dcpParams、sparseIndicesOut、sparseValuesOut、candidateBlockIndicesOut、candidateBlockLengthOut的数据类型、数据格式、shape或属性取值不在支持的范围内。</td>
             </tr>
         </tbody>
     </table>
@@ -561,6 +604,9 @@ aclnnStatus aclnnQuantLightningIndexerV3(
 - 确定性说明： aclnnQuantLightningIndexerV3默认确定性实现。
 - Batch一致性说明： <term>Atlas A3系列产品</term>默认支持Batch一致性。
 
+- DCP：cpWorld>1时启用；cpRank范围[0, cpWorld)，cpKvCacheInterleaveSize>=1；causalSeqlensKvGlobalOptional必传（INT32，shape (B,)），returnValue必须为1，candidateTopkBlocks/candidateBlockSize必须为(-1, -1)，outputIdxOffsetOptional必须为nullptr。
+- DCP与candidate互斥；cpWorld<=1时必须传causalSeqlensKvGlobalOptional=nullptr、cpRank=0、cpKvCacheInterleaveSize=1。
+- DCP场景metadata必须由配套aclnnQuantLightningIndexerV3Metadata生成，且其dcpParams/causalSeqlensKvGlobalOptional必须与本接口完全一致。aclnnQuantLightningIndexerV3Metadata同步新增causalSeqlensKvGlobalOptional输入与dcpParams参数。
 - candidateTopkBlocks、candidateBlockSize只支持(-1, -1)或(2048, 8)，需与配套aclnnQuantLightningIndexerV3Metadata接口的配置保持一致。
 - candidate 开启时 g = N1/N2 允许 64 或 32（g=32 使用 4 行基本块的块级候选慢路径）；candidate 关闭时 g 仍要求 64（fast 模板的 24/32 除外）。
 - metadataOptional必须由配套aclnnQuantLightningIndexerV3Metadata接口生成，序列信息、head配置、topk、quantMode、布局、maskMode、cmpRatio及candidate参数必须与本接口一致。
@@ -570,7 +616,7 @@ aclnnStatus aclnnQuantLightningIndexerV3(
 
 ## 调用示例
 
-Q使用TND布局，K使用PA_BBND布局，quantMode=2，candidateTopkBlocks=2048，candidateBlockSize=8。先生成metadata，再在同一Stream中执行QLI V3；returnValue=0。
+Q使用TND布局，K使用PA_BBND布局，quantMode=2，candidateTopkBlocks=2048，candidateBlockSize=8。先生成metadata，再在同一Stream中执行QLI V3；returnValue=0，非DCP场景（cpWorld=1，causal传nullptr）。DCP场景的差异见上方功能说明：candidateTopkBlocks/candidateBlockSize改为-1、causal传实际张量、cpWorld>1、returnValue=1、sparseValues使用BF16。
 
 ```cpp
 #include <algorithm>
@@ -671,9 +717,9 @@ int RunExample(aclrtStream stream)
     uint64_t metadataWorkspaceSize = 0;
     aclOpExecutor *metadataExecutor = nullptr;
     CHECK_RET(aclnnQuantLightningIndexerV3MetadataGetWorkspaceSize(
-        cuQ, nullptr, nullptr, usedK, nullptr, queryHeads, keyHeads, headDim,
+        cuQ, nullptr, nullptr, usedK, nullptr, nullptr, queryHeads, keyHeads, headDim,
         topk, 2, batch, 1, keyLength, layoutQ, layoutK, 0, 1,
-        candidateCapacity, candidateBlockSize, metadata, &metadataWorkspaceSize, &metadataExecutor));
+        candidateCapacity, candidateBlockSize, nullptr, metadata, &metadataWorkspaceSize, &metadataExecutor));
     void *metadataWorkspace = nullptr;
     if (metadataWorkspaceSize != 0) {
         CHECK_RET(resources.Allocate(metadataWorkspaceSize, &metadataWorkspace));
@@ -727,8 +773,8 @@ int RunExample(aclrtStream stream)
     aclOpExecutor *executor = nullptr;
     CHECK_RET(aclnnQuantLightningIndexerV3GetWorkspaceSize(
         q, k, w, qScale, kScale, cuQ, nullptr, nullptr, usedK, nullptr, blockTable,
-        nullptr, metadata, topk, 2, 1, layoutQ, layoutK, 0, 1, 0,
-        candidateCapacity, candidateBlockSize, sparseIndices, sparseValues,
+        nullptr, metadata, nullptr, topk, 2, 1, layoutQ, layoutK, 0, 1, 0,
+        candidateCapacity, candidateBlockSize, nullptr, sparseIndices, sparseValues,
         candidateIndices, candidateLength, &workspaceSize, &executor));
     void *workspace = nullptr;
     if (workspaceSize != 0) {

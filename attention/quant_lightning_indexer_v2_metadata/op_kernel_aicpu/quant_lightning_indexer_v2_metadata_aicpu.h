@@ -183,6 +183,7 @@ struct BatchCache {
     uint64_t revertS2Size{0U};
     int64_t preTokenLeftUp{0};
     int64_t nextTokenLeftUp{0};
+    uint32_t causalGlobalLen{0U}; // DCP: 当前请求全局 exclusive 上界 C
     BlockCost<int64_t> typeCost{};
 };
 
@@ -238,8 +239,9 @@ private:
     bool CheckSequsedQ(int32_t batchSize) const;
     bool CheckSequsedK(int32_t batchSize) const;
     bool CheckCmpResidualK(int32_t batchSize) const;
+    bool CheckDcpParams(int32_t batchSize) const;
     int32_t GetQueryBatchSize();
-    ValidSocVersion ProcessSocVersion();
+    ValidSocVersion ProcessSocVersion() const;
     bool ParamsInit();
     bool BalanceSchedule(SplitResult& splitRes);
     bool GenMetadata(SplitResult& splitRes);
@@ -254,6 +256,7 @@ private:
     uint32_t GetS1SeqSize(uint32_t bIdx);
     uint32_t GetS2SeqSize(uint32_t bIdx);
     uint64_t GetRevertS2Size(uint32_t bIdx);
+    uint32_t GetGlobalCausalLen(uint32_t bIdx);
     // fast准入统计只服务于metadata，不传递到Host或Kernel
     struct A5FastWorkload {
         uint64_t totalQ{0U};
@@ -310,6 +313,7 @@ private:
     Tensor* sequsedQ_ = nullptr;
     Tensor* sequsedK_ = nullptr;
     Tensor* cmpResidualK_ = nullptr;
+    Tensor* causalSeqLensKvGlobal_ = nullptr;
     // output
     Tensor* metadata_ = nullptr;
     // attributes
@@ -329,6 +333,11 @@ private:
     std::string layoutK_ = "BSND";
     int32_t maskMode_ = 0;
     int32_t cmpRatio_ = 1;
+    // DCP（Decode Context Parallel）：cpWorld>1 时启用
+    int32_t cpWorld_ = 1;
+    int32_t cpRank_ = 0;
+    int32_t cpInterleaveSize_ = 1;
+    bool dcpEnable_ = false;
     // candidate（两级 TopK source 模式）开关：仅 V3 metadata L0 包装会下发该属性；
     // V2 包装未注册该属性时保持 -1（关闭）
     int64_t candidateTopkBlocks_ = -1;
@@ -356,6 +365,7 @@ private:
         seqUsedQ = 2,
         seqUsedK = 3,
         cmpResidualK = 4,
+        causalSeqLensKvGlobal = 5,
         // output
         metadata = 0,
     };

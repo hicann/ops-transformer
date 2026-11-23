@@ -54,6 +54,7 @@ struct TempLoopInfo {
     uint32_t mBasicSizeTail = 0U;         // gS1方向循环的尾基本块大小
     uint32_t s2BasicSizeTail = 0U;        // S2方向循环的尾基本块大小
     uint32_t validS2Len = 0U;
+    uint32_t causalGlobalLen = 0U; // DCP: 当前请求本次 Q 片段的全局 exclusive 上界 C
 };
 
 template <typename QLIV2T>
@@ -65,9 +66,10 @@ public:
                                 __gm__ uint8_t* cuSeqlensK, __gm__ uint8_t* sequsedQ, __gm__ uint8_t* sequsedK,
                                 __gm__ uint8_t* cmpResidualK, __gm__ uint8_t* blockTable,
                                 __gm__ uint8_t* outputIdxOffset, __gm__ uint8_t* metadata,
-                                __gm__ uint8_t* sparseIndices, __gm__ uint8_t* sparseValues,
-                                __gm__ uint8_t* candidateTopkIndexOut, __gm__ uint8_t* candidateBlockLength,
-                                __gm__ uint8_t* workspace, const QLIV2TilingData* __restrict tiling, TPipe* tPipe);
+                                __gm__ uint8_t* causalSeqlensKvGlobal, __gm__ uint8_t* sparseIndices,
+                                __gm__ uint8_t* sparseValues, __gm__ uint8_t* candidateTopkIndexOut,
+                                __gm__ uint8_t* candidateBlockLength, __gm__ uint8_t* workspace,
+                                const QLIV2TilingData* __restrict tiling, TPipe* tPipe);
     __aicore__ inline void Process();
 
     // =================================类型定义区=================================
@@ -91,6 +93,8 @@ public:
     // 关闭态沿用上游 M_BASE_SIZE=256 推导 s1BaseSize = ceil(256/gSize)
     static constexpr uint32_t M_BASE_SIZE = 256;
     static constexpr uint32_t S1_BASE_SIZE_CANDIDATE = 4;
+    // DCP g=32 与 candidate 一样限制为 4 行基本块，避免 UB 超限
+    static constexpr uint32_t G_SIZE_DCP_LIMITED = 32;
     static constexpr uint32_t S2_BASE_SIZE = 2048;
     static constexpr uint32_t HEAD_DIM = 128;
     static constexpr uint32_t K_HEAD_NUM = 1;
@@ -121,7 +125,9 @@ protected:
     GlobalTensor<K_T> keyGm;
     GlobalTensor<half> weightsGm;
     GlobalTensor<uint32_t> metadataGm;
+    GlobalTensor<int32_t> causalSeqLensKvGlobalGm; // DCP: 每请求全局 exclusive 上界 C
     GlobalTensor<int32_t> indiceOutGm;
+    __gm__ uint8_t* sparseValuesPtr = nullptr; // return_value 输出基址（ProcessInvalid 清理用）
     GlobalTensor<int32_t> candidateTopkIndexOutGm;
     GlobalTensor<int32_t> candidateBlockLengthGm;
     GlobalTensor<int32_t> blockTableGm;
@@ -145,11 +151,12 @@ protected:
     __aicore__ inline void InitBuffers();
     __aicore__ inline void InitActualSeqLen(__gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensK,
                                             __gm__ uint8_t* sequsedQ, __gm__ uint8_t* sequsedK,
-                                            __gm__ uint8_t* cmpResidualK);
+                                            __gm__ uint8_t* cmpResidualK, __gm__ uint8_t* causalSeqlensKvGlobal);
+    __aicore__ inline uint32_t GetGlobalCausalLen(uint32_t bIdx);
     // ================================Split Core================================
     __aicore__ inline void SplitCore();
     __aicore__ inline uint32_t GetS2BaseBlockNumOnMask(uint32_t s1gIdx, uint32_t actS1Size, uint32_t actS2SizeOrig,
-                                                       uint32_t& validS2Len);
+                                                       uint32_t causalGlobalLen, uint32_t& validS2Len);
     __aicore__ inline uint32_t GetTotalBaseBlockNum();
     // ================================Process functions================================
     __aicore__ inline void ProcessMain();
@@ -196,6 +203,14 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::InitTilingData(const QLIV2TilingDat
     constInfo.kHeadNum = K_HEAD_NUM;
     constInfo.headDim = HEAD_DIM;
 
+    // return_value: 1 表示输出 sparse_values（DCP 场景，BF16 与 arch35 对齐）
+    constInfo.returnValue = tilingData->returnValue;
+    // DCP: 由 cpWorld 推导启用状态（>1 启用），不再单独传 enable_dcp
+    constInfo.cpWorld = (tilingData->cpWorld == 0U) ? 1U : tilingData->cpWorld;
+    constInfo.cpRank = tilingData->cpRank;
+    constInfo.cpInterleaveSize = (tilingData->cpInterleaveSize == 0U) ? 1U : tilingData->cpInterleaveSize;
+    constInfo.dcpEnable = (constInfo.cpWorld > 1U);
+
     // A11: key 0 轴非连续（stride 由 tiling 传入；0 表示回退紧凑布局）
     constInfo.keyStride0 = tilingData->keyStride0;
     if (constInfo.keyStride0 == 0) {
@@ -215,8 +230,8 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::InitTilingData(const QLIV2TilingDat
     constInfo.candidateOn = (tilingData->candidateTopkBlocks != -1);
 
     constInfo.s2BaseSize = S2_BASE_SIZE;
-    if (constInfo.candidateOn) {
-        // 候选块形态强制 4 行基本块，保证 UB 预算（块级累加器）不超限
+    if (constInfo.candidateOn || (constInfo.dcpEnable && constInfo.gSize == G_SIZE_DCP_LIMITED)) {
+        // candidate 或 DCP g=32：强制 4 行基本块，保证 UB 预算不超限
         constInfo.s1BaseSize = S1_BASE_SIZE_CANDIDATE;
         constInfo.mBaseSize = constInfo.s1BaseSize * constInfo.gSize;
     } else {
@@ -238,7 +253,8 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::InitBuffers()
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Preload<QLIV2T>::InitActualSeqLen(__gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensK,
                                                               __gm__ uint8_t* sequsedQ, __gm__ uint8_t* sequsedK,
-                                                              __gm__ uint8_t* cmpResidualK)
+                                                              __gm__ uint8_t* cmpResidualK,
+                                                              __gm__ uint8_t* causalSeqlensKvGlobal)
 {
     // Q side: cu_seqlens (TND) or seqused (non-TND)
     if constexpr (Q_LAYOUT_T == LI_LAYOUT::TND) {
@@ -279,6 +295,17 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::InitActualSeqLen(__gm__ uint8_t* cu
     } else {
         constInfo.cmpResiduaKLenDims = 0;
     }
+    // DCP: 全局 exclusive 上界 C（[B] device tensor，cpWorld>1 时必传）
+    if (causalSeqlensKvGlobal != nullptr) {
+        causalSeqLensKvGlobalGm.SetGlobalBuffer((__gm__ int32_t*)causalSeqlensKvGlobal, constInfo.batchSize);
+    }
+}
+
+template <typename QLIV2T>
+__aicore__ inline uint32_t QLIV2Preload<QLIV2T>::GetGlobalCausalLen(uint32_t bIdx)
+{
+    int32_t causalLen = causalSeqLensKvGlobalGm.GetValue(bIdx);
+    return (causalLen <= 0) ? 0U : static_cast<uint32_t>(causalLen);
 }
 
 template <typename QLIV2T>
@@ -334,13 +361,27 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::GetS1S2ActualSeqLen(uint32_t bIdx, 
 
 template <typename QLIV2T>
 __aicore__ inline uint32_t QLIV2Preload<QLIV2T>::GetS2BaseBlockNumOnMask(uint32_t s1gIdx, uint32_t actS1Size,
-                                                                         uint32_t actS2SizeOrig, uint32_t& validS2Len)
+                                                                         uint32_t actS2SizeOrig,
+                                                                         uint32_t causalGlobalLen, uint32_t& validS2Len)
 {
-    if (actS2SizeOrig / constInfo.cmpRatio == 0) {
+    uint32_t actS2Size = actS2SizeOrig / constInfo.cmpRatio;
+    if (actS2Size == 0) {
         validS2Len = 0;
         return 0;
     }
     uint32_t s1Offset = constInfo.s1BaseSize * s1gIdx;
+    if (constInfo.dcpEnable) {
+        // DCP: 行组最后一行的全局 exclusive 上界 u = C - Q_len + lastRowCount。
+        // 可见长度随行号单调不减，取组内最后一个实际 Q 行即可覆盖整组。
+        uint32_t lastRowCount = Min(s1Offset + constInfo.s1BaseSize, actS1Size);
+        int64_t uSigned = static_cast<int64_t>(causalGlobalLen) - static_cast<int64_t>(actS1Size) +
+                          static_cast<int64_t>(lastRowCount);
+        uint32_t u = (uSigned <= 0) ? 0U : static_cast<uint32_t>(uSigned);
+        validS2Len = QLIV2Common::CalcDcpVisibleLen(u, actS2Size, constInfo.cpWorld, constInfo.cpRank,
+                                                    constInfo.cpInterleaveSize);
+        validS2Len = Max(validS2Len, 1U); // 保持“至少 1 块”的既有不变量
+        return (validS2Len + constInfo.s2BaseSize - 1) / constInfo.s2BaseSize;
+    }
     int32_t validS2LenBase =
         static_cast<int32_t>(actS2SizeOrig) - static_cast<int32_t>(actS1Size); // 压缩前的validS2LenBase
     validS2Len = (static_cast<int32_t>(s1Offset) + validS2LenBase + static_cast<int32_t>(constInfo.s1BaseSize)) /
@@ -366,7 +407,8 @@ __aicore__ inline uint32_t QLIV2Preload<QLIV2T>::GetTotalBaseBlockNum()
             continue;
         }
         for (uint32_t s1gIdx = 0; s1gIdx < s1GBaseNum; s1gIdx++) {
-            s2BaseNum = GetS2BaseBlockNumOnMask(s1gIdx, actS1Size, actS2SizeOrig, validS2Len);
+            s2BaseNum = GetS2BaseBlockNumOnMask(s1gIdx, actS1Size, actS2SizeOrig,
+                                                constInfo.dcpEnable ? GetGlobalCausalLen(bIdx) : 0U, validS2Len);
             totalBlockNum += s2BaseNum * constInfo.kHeadNum;
         }
     }
@@ -488,9 +530,9 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::Init(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* weights, __gm__ uint8_t* queryScale,
     __gm__ uint8_t* keyScale, __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensK, __gm__ uint8_t* sequsedQ,
     __gm__ uint8_t* sequsedK, __gm__ uint8_t* cmpResidualK, __gm__ uint8_t* blockTable, __gm__ uint8_t* outputIdxOffset,
-    __gm__ uint8_t* metadata, __gm__ uint8_t* sparseIndices, __gm__ uint8_t* sparseValues,
-    __gm__ uint8_t* candidateTopkIndexOut, __gm__ uint8_t* candidateBlockLength, __gm__ uint8_t* workspace,
-    const QLIV2TilingData* __restrict tiling, TPipe* tPipe)
+    __gm__ uint8_t* metadata, __gm__ uint8_t* causalSeqlensKvGlobal, __gm__ uint8_t* sparseIndices,
+    __gm__ uint8_t* sparseValues, __gm__ uint8_t* candidateTopkIndexOut, __gm__ uint8_t* candidateBlockLength,
+    __gm__ uint8_t* workspace, const QLIV2TilingData* __restrict tiling, TPipe* tPipe)
 {
     if ASCEND_IS_AIV {
         tmpBlockIdx = GetBlockIdx(); // vec:0-47
@@ -501,7 +543,8 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::Init(
     }
 
     InitTilingData(tiling);
-    InitActualSeqLen(cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK);
+    sparseValuesPtr = sparseValues;
+    InitActualSeqLen(cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, causalSeqlensKvGlobal);
 
     if (metadata != nullptr) {
         metadataGm.SetGlobalBuffer((__gm__ uint32_t*)metadata);
@@ -559,7 +602,11 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::Init(
         }
         // A15: 有效标志须与 tensor 一并传给 vector (InitParams 已先值拷贝 constInfo, 此处再改标志不生效)
         bool outputIdxOffsetValid = (outputIdxOffset != nullptr);
-        vectorService.InitVecInputTensor(weightsGm, qScaleGm, kScaleGm, indiceOutGm, blockTableGm);
+        GlobalTensor<bfloat16_t> valueOutGm;
+        if (constInfo.returnValue != 0U) {
+            valueOutGm.SetGlobalBuffer((__gm__ bfloat16_t*)sparseValues);
+        }
+        vectorService.InitVecInputTensor(weightsGm, qScaleGm, kScaleGm, indiceOutGm, blockTableGm, valueOutGm);
         vectorService.InitVecCandidateTensor(candidateTopkIndexOutGm, candidateBlockLengthGm, outputIdxOffsetGm,
                                              outputIdxOffsetValid);
         vectorService.InitVecWorkspaceTensor(weightWorkspaceGm, mm1ResGm, vec1ResGm, candidateResGm);
@@ -596,15 +643,26 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::CalcS2LoopParams(uint32_t bN2LoopId
     bool isEnd = (bN2LoopIdx + 1 == constInfo.bN2End) && (gS1LoopIdx + 1 == tempLoopInfo.gS1LoopEnd);
     uint32_t s2BlockNum;
     uint32_t validS2Len = 0;
+    // DCP: 每个 bIdx 的全局 exclusive 上界 C 只读一次，供行组/行级可见长度计算复用
+    tempLoopInfo.causalGlobalLen = constInfo.dcpEnable ? GetGlobalCausalLen(tempLoopInfo.bIdx) : 0U;
     if (constInfo.attenMaskFlag) {
         s2BlockNum = GetS2BaseBlockNumOnMask(gS1LoopIdx, tempLoopInfo.actS1Size, tempLoopInfo.actS2SizeOrig,
-                                             tempLoopInfo.validS2Len);
+                                             tempLoopInfo.causalGlobalLen, tempLoopInfo.validS2Len);
     } else {
         s2BlockNum = (tempLoopInfo.actS2Size + constInfo.s2BaseSize - 1) / constInfo.s2BaseSize;
         tempLoopInfo.validS2Len = tempLoopInfo.actS2Size;
     }
+    // DCP + LD: metadata 的 S2 切分与 kernel 的可见长度使用同一闭式，允许跨核归约。
+    // 兼容两种边界：首片 s2End 可能等于可见块数；尾片 s2End==0 表示开区间。
+    // 若分片起点已越过可见上界（旧版 metadata 或非 DCP 切分），回退到本地完整 L 的块数，
+    // 保证该分片仍会写出 workspace partial，供 LD 核归并。
+    uint32_t metaS2BlockNum = (tempLoopInfo.actS2Size + constInfo.s2BaseSize - 1) / constInfo.s2BaseSize;
+    bool dcpLdSplit = constInfo.dcpEnable && isEnd && ((constInfo.s2Start > 0) || (constInfo.s2End != 0));
     tempLoopInfo.s2LoopEnd = (isEnd && constInfo.s2End != 0) ? constInfo.s2End : s2BlockNum;
-    if (constInfo.s2Start > 0 || tempLoopInfo.s2LoopEnd < s2BlockNum) {
+    if (dcpLdSplit && constInfo.s2End == 0) {
+        tempLoopInfo.s2LoopEnd = (constInfo.s2Start >= s2BlockNum) ? metaS2BlockNum : s2BlockNum;
+    }
+    if ((constInfo.s2Start > 0) || (tempLoopInfo.s2LoopEnd < s2BlockNum) || dcpLdSplit) {
         tempLoopInfo.isNeedLD = true;
     } else {
         tempLoopInfo.isNeedLD = false;
@@ -649,6 +707,7 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::CalcRunInfo(uint32_t loop, uint32_t
     runInfo.bN2Idx = tempLoopInfo.bN2Idx;
     runInfo.isValid = s2LoopIdx < tempLoopInfo.s2LoopEnd;
     runInfo.isNeedLD = tempLoopInfo.isNeedLD;
+    runInfo.causalGlobalLen = tempLoopInfo.causalGlobalLen;
     if (runInfo.isNeedLD && s2LoopIdx + 1 == tempLoopInfo.s2LoopEnd) {
         runInfo.saveWorkSpaceIdx = ldInfo.saveWorkSpaceIdx;
         ldInfo.saveWorkSpaceIdx++;
@@ -730,8 +789,13 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::ProcessInvalid()
 {
     if ASCEND_IS_AIV {
         uint32_t aivCoreNum = GetBlockNum() * 2; // 2 means c:v = 1:2
-        uint64_t totalOutputSize =
-            constInfo.batchSize * constInfo.qSeqSize * constInfo.kHeadNum * constInfo.sparseCount;
+        uint64_t totalOutputSize;
+        if constexpr (Q_LAYOUT_T == LI_LAYOUT::TND) {
+            // TND: qSeqSize 已是总行数 T，不能再乘 batchSize
+            totalOutputSize = constInfo.qSeqSize * constInfo.kHeadNum * constInfo.sparseCount;
+        } else {
+            totalOutputSize = constInfo.batchSize * constInfo.qSeqSize * constInfo.kHeadNum * constInfo.sparseCount;
+        }
         uint64_t singleCoreSize =
             QLIV2Common::Align((totalOutputSize + aivCoreNum - 1) / aivCoreNum, GM_ALIGN_BYTES / sizeof(OUT_T));
         uint64_t baseSize = tmpBlockIdx * singleCoreSize;
@@ -740,6 +804,13 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::ProcessInvalid()
                 (baseSize + singleCoreSize <= totalOutputSize) ? singleCoreSize : totalOutputSize - baseSize;
             GlobalTensor<OUT_T> output = indiceOutGm[baseSize];
             AscendC::InitGlobalMemory(output, dealSize, constInfo.INVALID_IDX);
+            // return_value: sparse_values 同步填 BF16 -inf（与 arch35 对齐）
+            if (constInfo.returnValue != 0U) {
+                GlobalTensor<uint16_t> valueOutput;
+                valueOutput.SetGlobalBuffer((__gm__ uint16_t*)(sparseValuesPtr) + baseSize);
+                AscendC::InitGlobalMemory(valueOutput, dealSize,
+                                          static_cast<uint16_t>(QLIV2ServiceVec::NEG_INF_BFLOAT));
+            }
         }
         if (constInfo.candidateOn) {
             // candidate 全量无效时同步清理候选块索引与每行有效候选数

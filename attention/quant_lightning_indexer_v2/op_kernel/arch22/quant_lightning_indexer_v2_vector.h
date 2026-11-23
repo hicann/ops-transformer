@@ -22,6 +22,7 @@ namespace QLIV2ServiceVec {
 using namespace AscendC;
 
 constexpr int32_t NEG_INF = 0xFF800000;
+constexpr uint16_t NEG_INF_BFLOAT = 0xFF80;  // -inf (bfloat16 bits, 与 arch35 对齐)
 constexpr int32_t POS_INF_F32 = 0x7F800000;  // +inf (fp32 bits)
 constexpr int32_t NEG_HUGE_F32 = 0xF14A3E31; // -1e30 (fp32 bits)
 constexpr int32_t INVALID_INDEX = -1;
@@ -224,6 +225,24 @@ __aicore__ inline void ExtractIndex(const LocalTensor<uint32_t>& idxULocal, cons
     uint64_t rsvdCnt = 0;    // 用于保存筛选后保留下来的元素个数
     uint8_t src1Pattern = 2; // 固定模式2,表示筛选出奇数索引的数
     AscendC::GatherMask(idxULocal, sortLocal, src1Pattern, false, static_cast<uint32_t>(0), gatherMaskParams, rsvdCnt);
+    AscendC::PipeBarrier<PIPE_V>();
+}
+
+/**
+  return_value: 从排序后的 (value, index) 交错序列中抽取偶数 lane 的分数。
+  src/dst 均按 uint32 视图操作, 调用方按 float 解释 dst。
+ */
+__aicore__ inline void ExtractValue(const LocalTensor<uint32_t>& valULocal, const LocalTensor<uint32_t>& sortLocal,
+                                    int64_t extractNum)
+{
+    AscendC::GatherMaskParams gatherMaskParams;
+    gatherMaskParams.repeatTimes = Ceil(extractNum * sizeof(float) * VALUE_AND_INDEX_NUM, VEC_REPEAT_BYTES);
+    gatherMaskParams.src0BlockStride = 1;
+    gatherMaskParams.src0RepeatStride = B32_VEC_REPEAT_STRIDE;
+    gatherMaskParams.src1RepeatStride = 0;
+    uint64_t rsvdCnt = 0;
+    uint8_t src1Pattern = 1; // 固定模式1, 表示筛选出偶数索引的数 (value)
+    AscendC::GatherMask(valULocal, sortLocal, src1Pattern, false, static_cast<uint32_t>(0), gatherMaskParams, rsvdCnt);
     AscendC::PipeBarrier<PIPE_V>();
 }
 

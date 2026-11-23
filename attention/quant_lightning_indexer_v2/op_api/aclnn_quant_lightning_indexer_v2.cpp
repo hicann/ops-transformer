@@ -16,10 +16,11 @@ aclnnStatus aclnnInnerQuantLightningIndexerV2GetWorkspaceSize(
     const aclTensor* q, const aclTensor* k, const aclTensor* w, const aclTensor* qDescale, const aclTensor* kDescale,
     const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
     const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional, const aclTensor* blockTableOptional,
-    const aclTensor* outputIdxOffsetOptional, const aclTensor* metadataOptional, int64_t topk, int64_t quantMode,
-    int64_t maxSeqlenQ, char* layoutQOptional, char* layoutKOptional, int64_t maskMode, int64_t cmpRatio,
-    int64_t returnValue, int64_t candidateTopkBlocks, int64_t candidateBlockSize, const aclTensor* sparseIndicesOut,
-    const aclTensor* sparseValuesOut, const aclTensor* candidateBlockIndicesOut,
+    const aclTensor* outputIdxOffsetOptional, const aclTensor* metadataOptional,
+    const aclTensor* causalSeqlensKvGlobalOptional, int64_t topk, int64_t quantMode, int64_t maxSeqlenQ,
+    char* layoutQOptional, char* layoutKOptional, int64_t maskMode, int64_t cmpRatio, int64_t returnValue,
+    int64_t candidateTopkBlocks, int64_t candidateBlockSize, const aclIntArray* dcpParams,
+    const aclTensor* sparseIndicesOut, const aclTensor* sparseValuesOut, const aclTensor* candidateBlockIndicesOut,
     const aclTensor* candidateBlockLengthOut, uint64_t* workspaceSize, aclOpExecutor** executor);
 aclnnStatus aclnnInnerQuantLightningIndexerV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
                                               aclrtStream stream);
@@ -84,11 +85,21 @@ aclnnStatus aclnnQuantLightningIndexerV2GetWorkspaceSize(
         return ACLNN_ERR_INNER_NULLPTR;
     }
 
-    return aclnnInnerQuantLightningIndexerV2GetWorkspaceSize(
+    // V2 兼容门面不支持 DCP：dcp_params 固定 {1, 0, 1}，causal 传空。
+    constexpr int64_t dcpParamsData[3] = {1, 0, 1};
+    aclIntArray* dcpParams = aclCreateIntArray(dcpParamsData, 3);
+    if (dcpParams == nullptr) {
+        OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "Failed to create dcp_params array.");
+        return ACLNN_ERR_INNER_NULLPTR;
+    }
+    aclnnStatus ret = aclnnInnerQuantLightningIndexerV2GetWorkspaceSize(
         q, k, w, qDescale, kDescale, cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional,
-        cmpResidualKOptional, blockTableOptional, outputIdxOffsetOptional, metadataOptional, topk, quantMode,
-        maxSeqlenQ, layoutQOptional, layoutKOptional, maskMode, cmpRatio, returnValue, CANDIDATE_OFF, CANDIDATE_OFF,
-        sparseIndicesOut, sparseValuesOut, candidateBlockIndicesOut, candidateBlockLengthOut, workspaceSize, executor);
+        cmpResidualKOptional, blockTableOptional, outputIdxOffsetOptional, metadataOptional,
+        /*causalSeqlensKvGlobal=*/nullptr, topk, quantMode, maxSeqlenQ, layoutQOptional, layoutKOptional, maskMode,
+        cmpRatio, returnValue, CANDIDATE_OFF, CANDIDATE_OFF, dcpParams, sparseIndicesOut, sparseValuesOut,
+        candidateBlockIndicesOut, candidateBlockLengthOut, workspaceSize, executor);
+    aclDestroyIntArray(dcpParams);
+    return ret;
 }
 
 aclnnStatus aclnnQuantLightningIndexerV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,

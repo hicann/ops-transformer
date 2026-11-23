@@ -66,6 +66,7 @@ struct RunInfo {
     bool isValid = false;
     bool isNeedLD = false;
     uint32_t saveWorkSpaceIdx = 0;
+    uint32_t causalGlobalLen = 0; // DCP: 当前请求本次 Q 片段的全局 exclusive 上界 C
 };
 
 struct ConstInfo {
@@ -123,6 +124,15 @@ struct ConstInfo {
     uint32_t candidateTopkBlocks = 2048U;
     uint32_t candidateBlockSize = 8U;
 
+    // return_value: 1 表示输出 sparse_values (DCP 场景, BF16 与 arch35 对齐)
+    uint32_t returnValue = 0U;
+
+    // DCP（Decode Context Parallel，解码上下文并行）：cpWorld > 1 时启用
+    bool dcpEnable = false;
+    uint32_t cpWorld = 1U;          // P: CP 组大小
+    uint32_t cpRank = 0U;           // r: 当前 rank
+    uint32_t cpInterleaveSize = 1U; // S: 每 S 个 token 轮换 rank
+
     uint32_t s2Start = 0U;
     uint32_t s2End = 0U;
     uint32_t bN2Start = 0U;
@@ -131,6 +141,24 @@ struct ConstInfo {
     uint32_t gS1End = 0U;
     uint32_t coreEnable = 0U;
 };
+
+// DCP: 由全局可见上界 u 算本地可见长度。
+// u = max(C - Q_len + rowIdx + 1, 0)，分片规则: 全局第 t 个 token 属于 rank (t / S) % P。
+__aicore__ inline uint32_t CalcDcpVisibleLen(uint32_t u, uint32_t localS2Len, uint32_t cpWorld, uint32_t cpRank,
+                                             uint32_t cpInterleaveSize)
+{
+    if (u == 0U || cpWorld == 0U || cpInterleaveSize == 0U) {
+        return 0U;
+    }
+    uint64_t period = static_cast<uint64_t>(cpWorld) * static_cast<uint64_t>(cpInterleaveSize);
+    uint64_t fullRounds = (static_cast<uint64_t>(u) / period) * static_cast<uint64_t>(cpInterleaveSize);
+    int64_t rem = static_cast<int64_t>(static_cast<uint64_t>(u) % period) -
+                  static_cast<int64_t>(cpRank) * static_cast<int64_t>(cpInterleaveSize);
+    uint64_t remU = (rem <= 0) ? 0U : static_cast<uint64_t>(rem);
+    uint64_t tail = (remU < static_cast<uint64_t>(cpInterleaveSize)) ? remU : static_cast<uint64_t>(cpInterleaveSize);
+    uint64_t visible = fullRounds + tail;
+    return (visible < static_cast<uint64_t>(localS2Len)) ? static_cast<uint32_t>(visible) : localS2Len;
+}
 
 struct LdSplitCoreInfo {
     bool isLdCoreEnable = false;    // 当前核是否参与规约任务
