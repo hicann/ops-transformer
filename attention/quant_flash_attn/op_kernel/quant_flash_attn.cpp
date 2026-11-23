@@ -16,6 +16,8 @@
 #include "kernel_operator.h"
 #include "kernel_operator_list_tensor_intf.h"
 
+#define GLOBAL_OVERFLOW_MODE_CTRL 60
+
 // The compiler encodes the Atlas A2/A3 architecture as __NPU_ARCH__ == 2201.
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 2201)
 
@@ -319,12 +321,16 @@ __global__ __aicore__ void quant_flash_attn(
     GET_TILING_DATA(tilingData, tiling);
     __gm__ uint8_t* user = GetUserWorkspace(workspace);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+    // cast 饱和模式: 保存原始溢出模式并切换为饱和模式, 结束后恢复
+    int64_t globalOriOverflowMode = AscendC::GetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>();
+    AscendC::SetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>(0);
 #if (ORIG_DTYPE_Q == DT_FLOAT8_E4M3FN)
     if constexpr (quantMode == QFA_MXFP8_FP32_PREFILL) {
         quant_flash_attn_mxfp8_dn<inOutLayoutType, config, quantMode, hasAttenMask, KvLayoutType, isFd, hasVTail>(
             query, key, value, dequantScaleQuery, dequantScaleKey, dequantScaleValue, blockTable, pScale, cuSeqLensQ,
             cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata, vTail, blockTableTail, sequsedVTail, attnOut,
             softmaxLse, user, tilingData);
+        AscendC::SetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>(globalOriOverflowMode);
         return;
     }
     if constexpr (quantMode == QFA_MXFP8_FP32_DECODE) {
@@ -334,6 +340,7 @@ __global__ __aicore__ void quant_flash_attn(
             cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata, vTail, blockTableTail, sequsedVTail, attnOut,
             softmaxLse, user, tilingData);
         PipeBarrier<PIPE_ALL>();
+        AscendC::SetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>(globalOriOverflowMode);
         return;
     }
 #endif
@@ -344,6 +351,7 @@ __global__ __aicore__ void quant_flash_attn(
         cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata, attnOut, softmaxLse, user, tiling);
     PipeBarrier<PIPE_ALL>();
 #endif
+    AscendC::SetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>(globalOriOverflowMode);
 }
 
 #elif defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9202)
@@ -431,6 +439,9 @@ __global__ __aicore__ void quant_flash_attn(
     GET_TILING_DATA(tilingData, tiling);
     __gm__ uint8_t* user = GetUserWorkspace(workspace);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
+    // cast 饱和模式: 保存原始溢出模式并切换为饱和模式, 结束后恢复
+    int64_t globalOriOverflowMode = AscendC::GetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>();
+    AscendC::SetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>(0);
 #if (ORIG_DTYPE_Q == DT_HIFLOAT4)
     if constexpr (quantMode == QFA_HIF4_LEVEL1_FP16_PREFILL) {
         InitSocState();
@@ -440,6 +451,7 @@ __global__ __aicore__ void quant_flash_attn(
         PipeBarrier<PIPE_ALL>();
     }
 #endif
+    AscendC::SetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>(globalOriOverflowMode);
 }
 #else /* arch35 及历史平台 */
 
@@ -675,6 +687,9 @@ __global__ __aicore__ void quant_flash_attn(
     GET_TILING_DATA(tilingData, tiling);
     __gm__ uint8_t* user = GetUserWorkspace(workspace);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+    // cast 饱和模式: 保存原始溢出模式并切换为饱和模式, 结束后恢复
+    int64_t globalOriOverflowMode = AscendC::GetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>();
+    AscendC::SetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>(0);
 #if (ORIG_DTYPE_Q == DT_FLOAT8_E4M3FN)
     if constexpr (quantMode == QFA_MXFP8_FP32_PREFILL || quantMode == QFA_MXFP8_FP32_DECODE) {
         quant_flash_attn_mxfp8<inOutLayoutType, config, quantMode, hasAttenMask, KvLayoutType, isFd, hasVTail, hasSink>(
@@ -695,6 +710,7 @@ __global__ __aicore__ void quant_flash_attn(
             cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata, attnOut, softmaxLse, workspace, tilingData);
     }
 #endif
+    AscendC::SetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>(globalOriOverflowMode);
 }
 
 #endif

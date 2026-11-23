@@ -23,6 +23,8 @@
 
 using namespace regbaseutil;
 
+#define GLOBAL_OVERFLOW_MODE_CTRL 60
+
 #define INVOKE_MLA_FULLQUANT_GENERAL_OP_IMPL_ASCEND950_FA_BASEAPI(templateClass, vec1ResultSize, qkvSize, ...) \
     do { \
         if (query == nullptr) { \
@@ -64,6 +66,9 @@ inline __aicore__ void fia_fullquant_regbase(
 
     KERNEL_TASK_TYPE_DEFAULT(FIA_ARCH35_TASK_TYPE);
     constexpr bool isPa = KvLayoutType != 0;
+    // cast 饱和模式: 保存原始溢出模式并切换为饱和模式, 结束后恢复
+    int64_t globalOriOverflowMode = AscendC::GetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>();
+    AscendC::SetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>(0);
 #if (ORIG_DTYPE_QUERY == DT_FLOAT8_E4M3FN && ORIG_DTYPE_KEY == DT_FLOAT8_E4M3FN && \
      ORIG_DTYPE_ATTENTION_OUT == DT_FLOAT16)
     if constexpr (isReconstructTemp == true) {
@@ -164,6 +169,7 @@ inline __aicore__ void fia_fullquant_regbase(
             enableKVPrefix);
     }
 #endif
+    AscendC::SetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>(globalOriOverflowMode);
 }
 
 #endif // FIA_ARCH35_FULLQUANT_H_

@@ -16,6 +16,8 @@
 #include "kernel_operator.h"
 #include "kernel_operator_list_tensor_intf.h"
 #include "util.h"
+
+#define GLOBAL_OVERFLOW_MODE_CTRL 60
 // arch35 公共头含 vector_common.h 的 using namespace AttentionCommon（全局污染），
 // 与 arch22 收编链路引入的 IFA 全局常量(FP32_BLOCK_ELEMENT_NUM/BYTE_BLOCK)二义冲突，
 // 且 arch22 分支不使用这些头，故仅 arch92/arch35 构建时引入
@@ -111,6 +113,9 @@ __global__ __aicore__ void quant_flash_mla(__gm__ uint8_t* query, __gm__ uint8_t
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
     (void)qRope; // arch22 int8专用输入, arch92不使用
     (void)kRope;
+    // cast 饱和模式: 保存原始溢出模式并切换为饱和模式, 结束后恢复
+    int64_t globalOriOverflowMode = AscendC::GetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>();
+    AscendC::SetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>(0);
 #if (ORIG_DTYPE_Q == DT_FLOAT8_E4M3FN)
     if constexpr (quantMode == A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR) {
         quant_flash_mla_fp8<fp8_e4m3fn_t, bfloat16_t, inOutLayoutType, KvLayoutType, hasAttenMask, config, isFd>(
@@ -124,6 +129,7 @@ __global__ __aicore__ void quant_flash_mla(__gm__ uint8_t* query, __gm__ uint8_t
             softmaxLse, workspace, tiling);
     }
 #endif
+    AscendC::SetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>(globalOriOverflowMode);
 }
 #elif (__NPU_ARCH__ == 2201) /* arch22: 910B/910_93, int8全量化(quant_mode=2) */
 
@@ -222,6 +228,9 @@ __global__ __aicore__ void quant_flash_mla(__gm__ uint8_t* query, __gm__ uint8_t
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     (void)qRope; // arch22 int8专用输入, arch35不使用
     (void)kRope;
+    // cast 饱和模式: 保存原始溢出模式并切换为饱和模式, 结束后恢复
+    int64_t globalOriOverflowMode = AscendC::GetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>();
+    AscendC::SetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>(0);
 #if (ORIG_DTYPE_Q == DT_FLOAT8_E4M3FN)
     if constexpr (quantMode == A8C8_Q_FP8_E4M3_PER_TOKEN_HEAD_KV_FP8_E4M3_PER_TENSOR) {
         quant_flash_mla_fp8<fp8_e4m3fn_t, bfloat16_t, inOutLayoutType, KvLayoutType, hasAttenMask, config, isFd>(
@@ -236,5 +245,6 @@ __global__ __aicore__ void quant_flash_mla(__gm__ uint8_t* query, __gm__ uint8_t
             softmaxLse, workspace, tiling);
     }
 #endif
+    AscendC::SetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>(globalOriOverflowMode);
 }
 #endif
