@@ -10,9 +10,9 @@
 
 /*!
  * \file fusion_pass_common.cpp
- * \brief FE 兼容融合注册适配层（预埋）。当前生产注册名单为空：不满足条件时
- *        本编译单元经预处理不产生任何符号引用；构建入口由 OP_GRAPH_FE_REGISTRY
- *        选项门控（默认 ON）。
+ * \brief FE 兼容融合注册适配层。登记 ops-transformer 融合 pass 名字占住 fe 表；
+ *        不满足条件时本编译单元经预处理不产生任何符号引用；构建入口由
+ *        OP_GRAPH_FE_REGISTRY 选项门控（默认 ON）。
  */
 
 // 仅当编译 soc 为 ascend950 时，当前 cpp 中的桩注册内容才编入
@@ -22,14 +22,38 @@
 // version/ge-compiler_version.h —— 后者的守卫宏 "#define GE-COMPILER_VERSION_H"
 // 实为定义名为 GE 的宏，一旦先包含会污染 log_types.h 的 GE 枚举导致编译错误。
 #include "fe_fusion_pass_registry_stub.h"
+#include "version/cann_version.h"
 #include "version/ge-compiler_version.h"
 
 #define GE_COMPILER_VERSION_900 90000000
 // 编译期保护：构建环境 ge_compiler >= 9.0.0 才编入（运行时检查在 STUB_REG_PASS 宏内）
 #if GE_COMPILER_VERSION_NUM >= GE_COMPILER_VERSION_900
 
-// 生产注册名单（当前为空）。登记时名字/类型/attr 照抄 canndev 原
-// REG_PASS/REGISTER_PASS，且须与同名真实实现在相同构建条件下编译。
+// 沿用旧 FE 注册表中的 pass 名字、类型和属性。
+#if CANN_VERSION_NUM >= 90000000
+STUB_REG_PASS("RotaryMul2RotaryPositionEmbeddingFusionPass", fe::BUILT_IN_GRAPH_PASS, 0x00);
+STUB_REG_PASS("RotaryMulGrad2RotaryPositionEmbeddingGradFusionPass", fe::BUILT_IN_GRAPH_PASS, 0x00);
+STUB_REG_PASS("InterleaveRope2RotaryPositionEmbeddingFusionPass", fe::BUILT_IN_GRAPH_PASS, 0x00);
+STUB_REG_PASS("ApplyRotaryPosEmbTensorMoveFusionPass", fe::BUILT_IN_GRAPH_PASS, 0x01);
+#endif
+
+STUB_REG_PASS("AllGatherMatmulV2TransposeA5FusionPass", fe::BUILT_IN_GRAPH_PASS, 0x04);
+STUB_REG_PASS("AllToAllMatmulTransposeA5FusionPass", fe::BUILT_IN_GRAPH_PASS, 0x04);
+STUB_REG_PASS("AlltoAllvQuantGroupedMatMulTransposeFusionPass", fe::BUILT_IN_GRAPH_PASS, 0x04);
+STUB_REG_PASS("MatmulAllToAllTransposeA5FusionPass", fe::BUILT_IN_GRAPH_PASS, 0x04);
+// MatmulAllReduceTransposeFusionPass 已登记但当前不生效：不在 OPP 白名单 3510(ascend950) 内，待 OPP 补名单
+STUB_REG_PASS("MatmulAllReduceTransposeFusionPass", fe::BUILT_IN_GRAPH_PASS, 0x04);
+STUB_REG_PASS("MatmulAllReduceTransposeA5FusionPass", fe::BUILT_IN_GRAPH_PASS, 0x04);
+STUB_REG_PASS("MatmulReduceScatterV2TransposeA5FusionPass", fe::BUILT_IN_GRAPH_PASS, 0x04);
+STUB_REG_PASS("QuantGroupedMatMulAlltoAllvTransposeFusionPass", fe::BUILT_IN_GRAPH_PASS, 0x04);
+
+// GMM 的同名实现从 GE 9.1 起才编译 kCompatibleInherited 注册。
+#if CANN_VERSION_NUM >= 90000000 && GE_COMPILER_VERSION_NUM >= 90100000
+STUB_REG_PASS("GroupedMatmulTransFusionPass", fe::BUILT_IN_GRAPH_PASS, 0x00);
+STUB_REG_PASS("GroupedMatmulFinalizeRoutingTransposeFusionPass", fe::BUILT_IN_GRAPH_PASS, 0x04);
+STUB_REG_PASS("GroupedMatmulSwigluQuantTransposeFusionPass", fe::BUILT_IN_GRAPH_PASS, 0x04);
+STUB_REG_PASS("QuantGroupedMatmulInplaceAddTransposeFusionPass", fe::BUILT_IN_GRAPH_PASS, 0x01);
+#endif
 
 #endif // GE_COMPILER_VERSION_NUM >= GE_COMPILER_VERSION_900
 #endif // OP_GRAPH_TRANSFORMER_ASCEND950
