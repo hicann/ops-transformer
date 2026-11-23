@@ -284,7 +284,7 @@ aclnnStatus aclnnFlashAttentionVarLenScore(
         <td>-</td>
         <td>FLOAT</td>
         <td>ND</td>
-        <td>[N,T,8]</td>
+        <td>[T,N,8]（声明形状；缓冲区内数据按 [N,T,8] 排布）</td>
         <td>√</td>
       </tr>
       <tr>
@@ -294,7 +294,7 @@ aclnnStatus aclnnFlashAttentionVarLenScore(
         <td>-</td>
         <td>FLOAT</td>
         <td>ND</td>
-        <td>[N,T,8]</td>
+        <td>[T,N,8]（声明形状；缓冲区内数据按 [N,T,8] 排布）</td>
         <td>√</td>
       </tr>
       <tr>
@@ -432,6 +432,7 @@ aclnnStatus aclnnFlashAttentionVarLenScore(
     - T：取值范围为1\~1M。
     - N：取值范围为1\~256。
     - D：取值范围为1\~768。
+- softmaxMaxOut、softmaxSumOut的声明shape必须为[T,N,8]（T为所有batch的query长度之和，N为headNum）。缓冲区内的数据按[N,T,8]（head主序）排布，N>1时需按该顺序读回；若按[N,T,8]声明，接口将返回161001。
 - realShiftOptional：如果Sq大于1024且每个batch的Sq与Skv等长且是sparseMode为0、2、3的下三角掩码场景，可开启alibi位置编码压缩，此时只需要输入原始PSE最后1024行进行内存优化，即alibi_compress = ori_pse[:, :, -1024:, :]，具体如下：
   - 参数每个batch不相同时，shape为BNHSkv(H=1024)。
   - 每个batch相同时，shape为1NHSkv(H=1024)。

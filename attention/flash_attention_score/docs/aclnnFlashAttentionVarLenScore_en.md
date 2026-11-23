@@ -286,7 +286,7 @@ aclnnStatus aclnnFlashAttentionVarLenScore(
         <td>-</td>
         <td>FLOAT</td>
         <td>ND</td>
-        <td>[N,T,8]</td>
+        <td>[T,N,8] (declaration shape; buffer data is laid out as [N,T,8])</td>
         <td>√</td>
       </tr>
       <tr>
@@ -296,7 +296,7 @@ aclnnStatus aclnnFlashAttentionVarLenScore(
         <td>-</td>
         <td>FLOAT</td>
         <td>ND</td>
-        <td>[N,T,8]</td>
+        <td>[T,N,8] (declaration shape; buffer data is laid out as [N,T,8])</td>
         <td>√</td>
       </tr>
       <tr>
@@ -434,6 +434,7 @@ aclnnStatus aclnnFlashAttentionVarLenScore(
     - T: The value range is 1 to 1M.
     - N: ranges from 1 to 256.
     - D: ranges from 1 to 768.
+- The declared shape of softmaxMaxOut and softmaxSumOut must be [T,N,8] (T is the total query length across all batches and N is headNum). The buffer data is laid out as [N,T,8] (head-major); when N > 1, read it back in that order. Declaring [N,T,8] causes the API to return 161001.
 - realShiftOptional: If Sq is greater than 1024, the Sq of each batch is equal in length to Skv, and the mask is a lower triangular mask with sparseMode configured as 0, 2, or 3, alibi position encoding compression can be enabled. In this case, only the last 1024 rows of the original pse need to be input for memory optimization, that is, alibi_compress = ori_pse[:, :, -1024:, :]. The details are as follows:
   - When the parameter differs for each batch, the shape is BNHSkv (H = 1024).
   - When the parameter is the same for each batch, the shape is 1NHSkv (H = 1024).
