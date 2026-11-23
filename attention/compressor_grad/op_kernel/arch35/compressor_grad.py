@@ -1147,6 +1147,8 @@ def _zero_outputs(
         zo_core_idx if zo_core_idx < rows_remain else rows_remain
     )
     r_e = r_s + rows_per_core + (1 if zo_core_idx < rows_remain else 0)
+    # Limit each GM store to the valid width of one d_x row.
+    pl.set_validshape(zo_zero_cast, [1, zo_hidden_size])
     for r in pl.range(r_s, r_e):
         pl.store(d_x_out_gm, zo_zero_cast, [r, 0])
 

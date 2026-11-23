@@ -619,7 +619,7 @@ template <typename COMP, bool IS_FULL_LOAD>
 __aicore__ inline bool CompressorKernel<COMP, IS_FULL_LOAD>::IsNeedExcuteC1(RunInfo info)
 {
     // B超出范围则cube不执行
-    return info.bStart < constInfo.batchSize;
+    return info.bStart < constInfo.batchSize && constInfo.curGroupIdx < constInfo.mGroupNum * constInfo.kBaseNum;
 }
 
 template <typename COMP, bool IS_FULL_LOAD>

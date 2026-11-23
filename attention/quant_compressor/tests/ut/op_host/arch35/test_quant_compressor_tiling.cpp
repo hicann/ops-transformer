@@ -64,6 +64,13 @@ TEST_F(QuantCompressorTiling, quant_compressor_tiling_bsh_c4li)
         },
         &compileInfo, "Ascend950");
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, std::numeric_limits<uint64_t>::max());
+
+    // Cover Arch92 dispatch through the registered tiling entry.
+    tilingContextPara.socVersion_ = "Ascend960DT";
+    TilingInfo arch92TilingInfo;
+    ASSERT_TRUE(ExecuteTiling(tilingContextPara, arch92TilingInfo));
+    EXPECT_GT(arch92TilingInfo.tilingDataSize, 0U);
+    EXPECT_GT(arch92TilingInfo.blockNum, 0U);
 }
 
 // C128A: D=512, coff=1, cmp_ratio=128; BSH layout; cache_mode=2 (RING_BUFFER).

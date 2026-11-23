@@ -43,12 +43,11 @@ CMP_EXTERN_C ge::graphStatus TilingQuantCompressor(gert::TilingContext* context)
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("QuantCompressor", "platformInfo", "is nullptr"),
                 return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
-    if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_3510) {
+    auto npuArch = ascendcPlatform.GetCurNpuArch();
+    if (npuArch == NpuArch::DAV_3510) {
         return TilingQuantCompressorArch35(context);
-    } else if (ascendcPlatform.GetCurNpuArch() == NpuArch::DAV_9201) {
-        return TilingQuantCompressorArch92(context);
     } else {
-        return ge::GRAPH_SUCCESS;
+        return TilingQuantCompressorArch92(context);
     }
 }
 

@@ -359,6 +359,7 @@ inline constexpr uint32_t BRCB_NUM = 8;
 inline constexpr uint32_t MAX_R = 256;
 
 inline constexpr uint32_t NZ_FRACTAL_DIM = 16;
+inline constexpr uint32_t MMAD_BARRIER_TILE_THRESHOLD = 10;
 inline constexpr uint32_t WEIGHT_MATRIX_NUM = 2;
 inline constexpr uint32_t STATE_INTERLEAVE_FACTOR = 2;
 inline constexpr float SOFTMAX_MIN_VALUE = -2e38f;

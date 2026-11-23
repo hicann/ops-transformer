@@ -321,6 +321,9 @@ __aicore__ inline void QuantCompressorBlockCube<COMP, IS_FULL_LOAD>::MatrixMmad(
     mmadParams.cmatrixInitVal = isInitL0C;
     mmadParams.cmatrixSource = false;
     Mmad(cL0Tensor, aL0Tensor, bL0Tensor, mmadParams);
+    if ((mmadParams.m / NZ_FRACTAL_DIM) * (mmadParams.n / NZ_FRACTAL_DIM) < MMAD_BARRIER_TILE_THRESHOLD) {
+        PipeBarrier<PIPE_M>();
+    }
 }
 
 template <typename COMP, bool IS_FULL_LOAD>
