@@ -22,9 +22,9 @@
 #include "arch22/lightning_indexer_v2_kernel_arch22.h"
 #endif
 
-// Legacy core-version gate: 310. NPU architecture 9201 identifies Ascend960.
-// Keep the 950-only fast implementation out of the 960 compilation branch.
-#if (__CCE_AICORE__ == 310) && (!defined(__NPU_ARCH__) || (__NPU_ARCH__ != 9201))
+// Legacy core-version gate: 310. NPU architectures 9201/9202 identify Ascend960.
+// Keep the 950-only fast implementation out of the 960 (9201/9202) compilation branch.
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
 #include "arch35/lightning_indexer_v2_fast_kernel_arch35.h"
 #define INVOKE_LI_V2_FAST(...) \
     do { \
@@ -40,7 +40,7 @@
             return; \
         } \
     } while (0)
-#elif !((defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201)) || (__CCE_AICORE__ == 310))
+#elif defined(__NPU_ARCH__) && !(__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
 #include "arch22/lightning_indexer_v2_kernel_fast_arch22.h"
 #define INVOKE_LI_V2_FAST(...) \
     do { \
