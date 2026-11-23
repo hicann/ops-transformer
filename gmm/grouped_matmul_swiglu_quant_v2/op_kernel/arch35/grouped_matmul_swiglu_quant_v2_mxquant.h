@@ -33,6 +33,9 @@ __aicore__ inline void GmmSwigluAswt(GM_ADDR x, GM_ADDR weight, GM_ADDR weightSc
     GET_TILING_DATA_MEMBER(GMMSwigluQuantV2TilingDataParams, gmmSwigluQuantParams, gmmSwigluQuantParams_, tiling);
     GET_TILING_DATA_MEMBER(GMMSwigluQuantV2TilingDataParams, mmTilingData, mmTilingData_,
                            tiling); // 定义L1和L0的TileShape
+    if (mmTilingData_.M == 0 || mmTilingData_.N == 0) {
+        return;
+    }
     using L1TileShape = AscendC::Shape<_0, _0, _0>;
     using L0TileShape = AscendC::Shape<_0, _0, _0>;
     // 定义矩阵的类型和布局

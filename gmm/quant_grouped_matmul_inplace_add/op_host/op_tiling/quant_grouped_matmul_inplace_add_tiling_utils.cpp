@@ -119,6 +119,34 @@ bool CheckShapeNotNegative(const gert::Shape& xShape, const gert::Shape& wShape,
     return true;
 }
 
+void NormalizeEmptyReductionForInplaceAdd(const gert::TilingContext* context, const gert::Shape& wShape,
+                                          uint64_t groupNum, gert::Shape& xShape, gert::Shape& x1ScaleShape)
+{
+    if (xShape.GetDimNum() != DIM_NUM_2D || wShape.GetDimNum() != DIM_NUM_2D || wShape.GetDim(0) != 0 ||
+        xShape.GetDim(1) != 0 || xShape.GetDim(0) <= 0) {
+        return;
+    }
+    const auto* yStorageShape = context->GetOutputShape(Y_INDEX);
+    if (yStorageShape == nullptr) {
+        return;
+    }
+    const auto& yShape = yStorageShape->GetOriginShape();
+    const int64_t m = xShape.GetDim(0);
+    constexpr size_t Y_REF_RANK = 3;
+    if (yShape.GetDimNum() != Y_REF_RANK || yShape.GetDim(0) != static_cast<int64_t>(groupNum) ||
+        yShape.GetDim(1) != m || yShape.GetDim(2) != wShape.GetDim(1)) {
+        return;
+    }
+    xShape.SetDim(0, 0);
+    xShape.SetDim(1, m);
+    // For K=0, MX has one scale row per group. An unfused [M, E, 2] becomes [E, M, 2].
+    if (x1ScaleShape.GetDimNum() == MXFP_PER_TOKEN_SCALE_DIM_NUM && x1ScaleShape.GetDim(0) == m &&
+        x1ScaleShape.GetDim(1) == static_cast<int64_t>(groupNum)) {
+        x1ScaleShape.SetDim(0, static_cast<int64_t>(groupNum));
+        x1ScaleShape.SetDim(1, m);
+    }
+}
+
 bool CheckXAndWeightKDim(const gert::Shape& xShape, const gert::Shape& wShape, const GQmmInputInfo& inputParams)
 {
     const size_t xDimNum = xShape.GetDimNum();

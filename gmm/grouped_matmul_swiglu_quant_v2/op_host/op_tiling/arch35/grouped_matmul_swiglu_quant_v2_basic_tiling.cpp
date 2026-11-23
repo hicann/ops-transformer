@@ -542,6 +542,13 @@ bool GroupedMatmulSwigluQuantV2Tiling950::SetQuantModeForGMMSwigluQuant(const ge
 bool GroupedMatmulSwigluQuantV2Tiling950::CheckDims(const gert::Shape& xShape, const gert::Shape& wShape) const
 {
     const auto* compileInfo = context_->GetCompileInfo<GMMSwigluV2CompileInfo>();
+    const bool isV2Mx950 = compileInfo != nullptr && compileInfo->npuArch_ == static_cast<int32_t>(NpuArch::DAV_3510) &&
+                           !IsSplitSwigluMode() && inputParams_.bQuantMode == optiling::QuantMode::MX_PERGROUP_MODE;
+    OP_CHECK_IF(isV2Mx950 && inputParams_.kSize == 0 && inputParams_.mSize != 0 && inputParams_.nSize != 0,
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(inputParams_.opType, "x, weight",
+                                                       ShapesToString({ShapeToString(xShape), ShapeToString(wShape)}),
+                                                       "K must be positive when M and N are both nonzero"),
+                return false);
     // The 9201/9202 MX path requires N to be 128-aligned for both ND and NZ weights.
     if (compileInfo != nullptr && (compileInfo->npuArch_ == static_cast<int32_t>(NpuArch::DAV_9201) ||
                                    compileInfo->npuArch_ == static_cast<int32_t>(NpuArch::DAV_9202))) {
@@ -564,7 +571,8 @@ bool GroupedMatmulSwigluQuantV2Tiling950::CheckDims(const gert::Shape& xShape, c
                 return false);
     // MXFP4场景下，当输出类型为FP4时，N需要满足为大于等于4的偶数
     if (IsFp4Input() && IsFp4(inputParams_.outDataDtype)) {
-        OP_CHECK_IF(inputParams_.nSize < MXFP4_N_MIN_VALUE || inputParams_.nSize % EVEN_FACTOR != 0,
+        OP_CHECK_IF((inputParams_.nSize < MXFP4_N_MIN_VALUE && !(isV2Mx950 && inputParams_.nSize == 0)) ||
+                        inputParams_.nSize % EVEN_FACTOR != 0,
                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
                         inputParams_.opType, "weight", ShapeToString(wShape),
                         "when inputs and output are FLOAT4, n value must be even and greater or equal to 4"),
@@ -848,13 +856,20 @@ ge::graphStatus GroupedMatmulSwigluQuantV2Tiling950::DoLibApiTiling()
         FillA8W4MatmulTiling();
         return ge::GRAPH_SUCCESS;
     }
+    const auto* compileInfo = context_->GetCompileInfo<GMMSwigluV2CompileInfo>();
+    if (compileInfo != nullptr && compileInfo->npuArch_ == static_cast<int32_t>(NpuArch::DAV_3510) &&
+        !IsSplitSwigluMode() && inputParams_.bQuantMode == optiling::QuantMode::MX_PERGROUP_MODE &&
+        (inputParams_.mSize == 0 || inputParams_.nSize == 0)) {
+        // Both MX outputs are empty. Serialize their logical dimensions without tiling a zero-sized block.
+        FillLegacyMatmulTiling();
+        return ge::GRAPH_SUCCESS;
+    }
     CalBasicBlock();
     if (useTensorApi_) {
         GroupedMatmulSwigluQuantTensorApiTiling::PrepareBasicBlockForL1(basicTiling_);
     } else {
         const auto cappedBaseM = std::min(basicTiling_.baseM, CGMCT_MAX_BASE_M);
         basicTiling_.baseM = GroupedMatmul::CeilAlign(cappedBaseM, GmmConstant::CUBE_BLOCK);
-        const auto* compileInfo = context_->GetCompileInfo<GMMSwigluV2CompileInfo>();
         if (compileInfo != nullptr && (compileInfo->npuArch_ == static_cast<int32_t>(NpuArch::DAV_9201) ||
                                        compileInfo->npuArch_ == static_cast<int32_t>(NpuArch::DAV_9202))) {
             basicTiling_.baseN = GroupedMatmul::CeilAlign(

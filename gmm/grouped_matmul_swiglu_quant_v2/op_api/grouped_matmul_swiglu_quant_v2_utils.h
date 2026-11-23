@@ -503,6 +503,15 @@ protected:
         bool transposeXScale = hif4Weight && gmmDsqParams_.quantMode == QUNAT_MODE_HIF4 ?
                                    IsTransposeForHif4Shape(gmmDsqParams_.xScale) :
                                    IsTransposeForMxShape(gmmDsqParams_.xScale);
+        // Empty views have no storage traversal; their strides cannot reliably identify a transpose.
+        const bool allowEmptyMx = !gmmDsqParams_.isMxA8W4 && !gmmDsqParams_.isMxA8Hif4 && !hif4Weight;
+        if (allowEmptyMx && (*gmmDsqParams_.weight)[0]->IsEmpty()) {
+            transposeWeightScale = transposeWeight;
+        }
+        if (allowEmptyMx && gmmDsqParams_.x->IsEmpty()) {
+            transposeX = false;
+            transposeXScale = false;
+        }
         if (gmmDsqParams_.isMxA8W4 || gmmDsqParams_.isMxA8Hif4 || gmmDsqParams_.quantMode == QUNAT_MODE_HIF4) {
             if (hif4Weight && IsMultiTensorWeight()) {
                 OP_LOGE_FOR_INVALID_VALUE(apiName_.c_str(), "weight", "multiple tensors", "single tensor");
@@ -534,7 +543,7 @@ protected:
 
         if (transposeWeightScale && transposeWeight) {
             gmmDsqParams_.transposeWeight = true;
-            if (!IsMxWeightNzMultiTensorSupported()) {
+            if (!IsMxWeightNzMultiTensorSupported() && !(allowEmptyMx && (*gmmDsqParams_.weight)[0]->IsEmpty())) {
                 aclOpExecutor* executorPtr = l0Executor_;
                 CHECK_RET(executorPtr != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
                 std::vector<aclTensor*> scaleTensorList;
@@ -1082,6 +1091,9 @@ protected:
             return false;
         }
 
+        if (nValue == 0 && op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+            return true;
+        }
         // mxfp4、NZ场景下，N需满足128对齐
         if (IsMxfp4WeightNzFormat((*gmmDsqParams_.weight)[0])) {
             if (nValue % MXFP4_NZ_N_ALIGN != 0 || nValue == 0) {
@@ -1123,6 +1135,9 @@ protected:
                              (gmmDsqParams_.transposeWeight ? ((*gmmDsqParams_.weight)[0])->GetViewShape().GetDim(1) :
                                                               ((*gmmDsqParams_.weight)[0])->GetViewShape().GetDim(2));
 
+        if (nValue == 0 && op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
+            return true;
+        }
         // mxfp8、NZ场景下，N需满足64对齐
         if (IsMxfp8WeightNzFormat((*gmmDsqParams_.weight)[0])) {
             int64_t nAlign = (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_9201 ||
@@ -1193,31 +1208,7 @@ protected:
 
     bool CheckEmptyTensor() override
     {
-        auto xMDim = gmmDsqParams_.x->GetViewShape().GetDim(0);
-        if (gmmDsqParams_.x->GetViewShape().GetDim(1) <= 0) {
-            std::string gotStr = BuildLogValue("K", gmmDsqParams_.x->GetViewShape().GetDim(1));
-            std::ostringstream constraint;
-            constraint << "K must be positive when " << GetGroupedMatmulSwigluQuantV2ScenarioName(gmmDsqParams_);
-            std::string constraintStr = constraint.str();
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(apiName_.c_str(), "x", ViewShapeToString(gmmDsqParams_.x),
-                                                   "when the value of M is not 0 [M=" + std::to_string(xMDim) +
-                                                       "], axis K of x must be a positive number");
-            return false;
-        }
-        auto weightDimNum = ((*gmmDsqParams_.weight)[0])->GetViewShape().GetDimNum();
-        auto weightKIndex = weightDimNum - LAST_SECOND_DIM_INDEX;
-        auto weightNDim = ((*gmmDsqParams_.weight)[0])->GetViewShape().GetDim(weightDimNum - 1);
-        if (((*gmmDsqParams_.weight)[0])->GetViewShape().GetDim(weightKIndex) <= 0) {
-            std::string gotStr = BuildLogValue("K", ((*gmmDsqParams_.weight)[0])->GetViewShape().GetDim(weightKIndex));
-            std::ostringstream constraint;
-            constraint << "K must be positive when " << GetGroupedMatmulSwigluQuantV2ScenarioName(gmmDsqParams_);
-            std::string constraintStr = constraint.str();
-            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(apiName_.c_str(), "weight",
-                                                   ViewShapeToString((*gmmDsqParams_.weight)[0]),
-                                                   "when the value of N is not 0 [N=" + std::to_string(weightNDim) +
-                                                       "], axis K of weight must be a positive number");
-            return false;
-        }
+        // Empty tensors remain subject to the logical shape checks below.
         return true;
     }
 
@@ -1323,6 +1314,13 @@ protected:
         }
         // 从x的第1维获取k
         int64_t kInX = gmmDsqParams_.x->GetViewShape().GetDim(1);
+        const bool allowZeroK =
+            op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510 && gmmDsqParams_.output->IsEmpty();
+        if (kInX < 0 || (kInX == 0 && !allowZeroK)) {
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(apiName_.c_str(), "x", ViewShapeToString(gmmDsqParams_.x),
+                                                   "K must be positive unless M or N is zero on Ascend 950");
+            return false;
+        }
         int64_t kInWeight = 0;
         if (IsMxWeightNzMultiTensorSupported()) {
             kInWeight = ((*gmmDsqParams_.weight)[0])->GetViewShape().GetDim(0);

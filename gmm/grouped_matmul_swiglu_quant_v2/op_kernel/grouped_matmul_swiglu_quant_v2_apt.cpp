@@ -58,7 +58,7 @@ using GMMSQWeightQuantAswTilingData = GMMSQArch35Tiling::GMMSQWeightQuantAswTili
 #include "arch35/grouped_matmul_swiglu_quant_v2_tensor_api_tiling_data.h"
 #include "arch35/grouped_matmul_swiglu_quant_v2_pertoken_quant.h"
 #include "arch35/grouped_matmul_swiglu_quant_v2_tiling_key.h"
-#elif ORIG_DTYPE_X_SCALE == DT_HIFLOAT4_SCALE
+#elif defined(DT_HIFLOAT4_SCALE) && ORIG_DTYPE_X_SCALE == DT_HIFLOAT4_SCALE
 #include "arch35/grouped_matmul_swiglu_quant_v2_hif4quant.h"
 #include "arch35/grouped_matmul_swiglu_quant_v2_tiling_key.h"
 #endif
@@ -152,7 +152,8 @@ __global__ __aicore__ void grouped_matmul_swiglu_quant_v2(GM_ADDR x, GM_ADDR xSc
         AscendC::SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(oriOverflowMode);
     }
 #else
-#if ORIG_DTYPE_X_SCALE == DT_HIFLOAT4_SCALE
+// Older SDKs do not define DT_HIFLOAT4_SCALE. An undefined macro evaluates to zero, like DT_FLOAT.
+#if defined(DT_HIFLOAT4_SCALE) && ORIG_DTYPE_X_SCALE == DT_HIFLOAT4_SCALE
     AscendC::InitSocState();
     REGISTER_TILING_DEFAULT(GMMSwigluQuantBasicApiTilingDataParams);
 #else
@@ -259,7 +260,7 @@ __global__ __aicore__ void grouped_matmul_swiglu_quant_v2(GM_ADDR x, GM_ADDR xSc
                 tiling, &tPipe);
         }
     }
-#elif ORIG_DTYPE_X_SCALE == DT_HIFLOAT4_SCALE
+#elif defined(DT_HIFLOAT4_SCALE) && ORIG_DTYPE_X_SCALE == DT_HIFLOAT4_SCALE
     if (QUANT_B_TRANS == GMM_SWIGLU_QUANT_TRANS && QUANT_A_TRANS == GMM_SWIGLU_QUANT_NO_TRANS &&
         KERNEL_TYPE == GMM_SWIGLU_HIF4_QUANT_KERNEL_TYPE) {
         GmmSwigluHiF4<Cgmct::Gemm::layout::RowMajor, Cgmct::Gemm::layout::ColumnMajor>(

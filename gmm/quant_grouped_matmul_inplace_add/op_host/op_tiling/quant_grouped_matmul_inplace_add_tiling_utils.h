@@ -52,6 +52,10 @@ bool CheckFormatForInplaceAdd(const optiling::GQmmInputInfo& inputParams);
 bool CheckShapeNotNegative(const gert::Shape& xShape, const gert::Shape& wShape,
                            const optiling::GQmmInputInfo& inputParams);
 
+// A graph can keep the logical [M, 0] view instead of fusing TN when the reduction is empty.
+void NormalizeEmptyReductionForInplaceAdd(const gert::TilingContext* context, const gert::Shape& wShape,
+                                          uint64_t groupNum, gert::Shape& xShape, gert::Shape& x1ScaleShape);
+
 // 两路 K 轴相等：SetMKN 只从 x 取 kSize，K 不等不会在其他校验中暴露。
 bool CheckXAndWeightKDim(const gert::Shape& xShape, const gert::Shape& wShape,
                          const optiling::GQmmInputInfo& inputParams);

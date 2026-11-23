@@ -577,8 +577,11 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantV2(
       - 支持dequantDtype参数：MX量化场景支持取值0，Pertoken场景支持取值为0、1、27。
       - 支持quantMode参数：MX量化场景支持取值2，Pertoken场景支持取值为0。
       - 仅支持dequantMode和quantMode相同取值。
-      - x和xScale支持M为0的空Tensor。
-      - weight和weightScale支持N为0的空Tensor。
+      - MXFP8/MXFP4场景：M或N为0时，output和outputScale均为空Tensor，K可以同时为0。
+      - ND Pertoken场景：output的shape为[M, N/2]，outputScale的shape为[M]，即每个token对应一个量化系数。
+        - M为0时（N、K也可以为0），output和outputScale均为空Tensor。
+        - M大于0且N为0时（K也可以为0），output为空Tensor，outputScale仍为非空的[M]。接口跳过计算，不写入outputScale，不能依赖其值。
+      - 仅K为0且M、N均非0时，返回参数错误。空Tensor仍需满足输入和量化参数的秩、类型、格式及shape约束。
       - weight和weightScale目前仅支持tensorlist长度为1。
 
     <!-- end id11 -->

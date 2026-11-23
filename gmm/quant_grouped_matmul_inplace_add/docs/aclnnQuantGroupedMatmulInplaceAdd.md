@@ -274,6 +274,8 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(
 ## 约束说明
 
   - 确定性说明：aclnnQuantGroupedMatmulInplaceAdd默认确定性实现。
+  - x1、x2仅支持ND，不支持FRACTAL_NZ，空Tensor也不例外。
+  - 对合法输入，M或N为0时调用成功，yRef为原shape的空Tensor；仅K为0时调用成功，yRef保持原值，shape仍为[E, M, N]。M、N、K同时有多个为0时按同样规则处理。空维度不免除输入的类型、格式和逻辑shape校验。
   - x1和x2的每一维大小在32字节对齐后都应小于int32的最大值2147483647，且内轴大小需小于2097152。
     - 动态量化（T-T/T-C量化）场景支持的输入类型为：
       - 不为空的参数支持的数据类型组合要满足下表：

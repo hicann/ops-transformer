@@ -260,8 +260,9 @@ static graphStatus GroupedMatmulSwigluQuantV2ExecuteFunc(OpExecuteContext* host_
         OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "PrepareAclTensor groupList failed"), return GRAPH_FAILED);
 
     std::vector<const aclTensor*> aclTensorVectorWeight;
-    OP_CHECK_IF(PrepareAclTensorVector(host_api_ctx, aclTensorVectorWeight, INDEX_INPUT_WEIGHT, *transWeightGe,
-                                       false) != GRAPH_SUCCESS,
+    // Keep FRACTAL_NZ when the GE weight descriptor is packed; its logical axes still drive empty-output checks.
+    OP_CHECK_IF(PrepareAclTensorVector(host_api_ctx, aclTensorVectorWeight, INDEX_INPUT_WEIGHT, *transWeightGe, true) !=
+                    GRAPH_SUCCESS,
                 OP_LOGE("GroupedMatmulSwigluQuantV2 aclnnfallback", "Prepare weight list failed"), return GRAPH_FAILED);
     auto aclTensorListWeight = aclCreateTensorList(aclTensorVectorWeight.data(), aclTensorVectorWeight.size());
     OP_CHECK_IF(aclTensorListWeight == nullptr,

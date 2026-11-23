@@ -105,6 +105,15 @@ TEST(QuantGroupedMatmulInplaceAddStorage, ValidEmptyFastPathIsPreserved)
     }
 }
 
+TEST(QuantGroupedMatmulInplaceAddStorage, EmptyOutputDoesNotPermitNzInput)
+{
+    StorageTestInputs inputs;
+    inputs.x1 = TensorDesc({0, 2}, ACL_HIFLOAT8, ACL_FORMAT_ND).ToAclType();
+    inputs.x2->SetStorageFormat(op::Format::FORMAT_FRACTAL_NZ);
+    inputs.y = TensorDesc({1, 0, 4}, ACL_FLOAT, ACL_FORMAT_ND).ToAclType();
+    ExpectWorkspaceError(inputs.Tensors(), ACLNN_ERR_PARAM_INVALID);
+}
+
 TEST(QuantGroupedMatmulInplaceAddStorage, RequiredNullptrReturnCodesArePreserved)
 {
     for (size_t index = 0; index < 6; ++index) {

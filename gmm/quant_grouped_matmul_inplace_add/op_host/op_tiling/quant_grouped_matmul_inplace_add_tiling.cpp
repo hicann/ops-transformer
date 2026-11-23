@@ -84,7 +84,7 @@ bool QuantGroupedInplaceAddTiling::AnalyzeInputs()
         xStorageShape == nullptr,
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "x1", "nullptr", "xStorageShape cannot be nullptr"),
         return false);
-    const gert::Shape& xShape = xStorageShape->GetOriginShape();
+    gert::Shape xShape = xStorageShape->GetOriginShape();
 
     auto wStorageShape = context_->GetInputShape(WEIGHT_INDEX);
     OP_CHECK_IF(
@@ -109,8 +109,9 @@ bool QuantGroupedInplaceAddTiling::AnalyzeInputs()
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "scale1", "nullptr",
                                                       "x1ScaleStorageShape cannot be nullptr"),
                 return false);
-    const gert::Shape& x1ScaleShape = x1ScaleStorageShape->GetOriginShape();
+    gert::Shape x1ScaleShape = x1ScaleStorageShape->GetOriginShape();
     OP_CHECK_IF(!SetGroupNum(GROUPLIST_INDEX), OP_LOGE(inputParams_.opName, "SetGroupNum failed."), return false);
+    NormalizeEmptyReductionForInplaceAdd(context_, wShape, inputParams_.groupNum, xShape, x1ScaleShape);
     OP_CHECK_IF(!CheckShapeNotNegative(xShape, wShape, inputParams_),
                 OP_LOGE_WITHOUT_REPORT(inputParams_.opName, "CheckShapeNotNegative returned false."), return false);
     OP_CHECK_IF(!CheckXAndWeightKDim(xShape, wShape, inputParams_),
@@ -171,6 +172,13 @@ int64_t QuantGroupedInplaceAddTiling::LogQuantParams() const
 
 ge::graphStatus QuantGroupedInplaceAddTiling::DoLibApiTiling()
 {
+    if (inputParams_.mSize == 0 || inputParams_.nSize == 0) {
+        // The graph kernel recognizes these dimensions before constructing a scheduler.
+        tilingData_.mmTilingData.M = inputParams_.mSize;
+        tilingData_.mmTilingData.N = inputParams_.nSize;
+        tilingData_.mmTilingData.Ka = inputParams_.kSize;
+        return ge::GRAPH_SUCCESS;
+    }
     CalBasicBlock();
     if (supportMmadF16S8_ && inputParams_.aQuantMode == optiling::QuantMode::PERTENSOR_MODE) {
         basicTiling_.baseM = std::min(basicTiling_.baseM, static_cast<uint64_t>(GmmConstant::BASIC_BLOCK_SIZE_128));

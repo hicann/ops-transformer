@@ -567,8 +567,9 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV2(
       - 支持dequantDtype参数：A8W8 Pertoken量化场景支持取值0、1、27，MX量化场景支持取值0。
       - 支持quantMode参数：A8W8 Pertoken量化场景支持取值0，MX量化场景支持取值2。
       - 仅支持dequantMode和quantMode相同取值。
-      - x和xScale支持M为0的空Tensor。
-      - weight和weightScale支持N为0的空Tensor。
+      - MXFP8/MXFP4场景：M或N为0时，output和outputScale均为空Tensor，K可以同时为0。
+      - A8W8 Pertoken场景：M为0时，output和outputScale均为空Tensor，shape分别为[0, N/2]和[0]。
+      - 受支持的空Tensor仍需满足输入和量化参数的秩、类型、格式及shape约束；NZ权重仍需提供合规的逻辑shape和物理存储shape。
       - MXFP4和MXFP8场景下，weight和weightScale既支持单Tensor场景（tensorlist长度必须为1）也支持多Tensor场景（tensorlist长度大于等于1）。多Tensor场景下，tensorlist长度需等于E，E可以为1，weight、weightScale的shape需要按照E的维度展平，例如{(E, K, N)}需要变成{E个(K, N)}。
       - MXA8W4场景下weight和weightScale支持多Tensor场景（tensorlist长度大于等于1）。
       - MXFP4场景支持weight NZ格式，x和weight为FLOAT4_E2M1或FLOAT4_E1M2（支持交叉），output支持FLOAT8_E4M3FN、FLOAT4_E1M2或FLOAT4_E2M1。

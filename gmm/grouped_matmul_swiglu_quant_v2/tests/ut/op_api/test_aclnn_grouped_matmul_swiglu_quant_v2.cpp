@@ -61,6 +61,7 @@ void SetupPlatformForCase(const string& socVersion)
     static const map<string, op::SocVersion> socMap = {
         {"Ascend910B", op::SocVersion::ASCEND910B},
         {"Ascend950", op::SocVersion::ASCEND950},
+        {"Ascend960DT", op::SocVersion::ASCEND960DT},
     };
     auto it = socMap.find(socVersion);
     op::SetPlatformSocVersion(it == socMap.end() ? op::SocVersion::ASCEND910B : it->second);
@@ -367,6 +368,11 @@ struct SwigluOpApiCase {
         if (ParseBool(checkRet)) {
             EXPECT_EQ(ret, static_cast<aclnnStatus>(expectRet));
         }
+        if (expectRet == ACLNN_SUCCESS && (caseName.rfind("ascend950_mxfp8_nd_empty_", 0) == 0 ||
+                                           caseName.rfind("ascend950_mxfp8_nz_empty_", 0) == 0 ||
+                                           caseName == "ascend960dt_mxfp8_empty_m_stride_ambiguous")) {
+            EXPECT_EQ(workspaceSize, 0U);
+        }
     }
 };
 
@@ -441,7 +447,7 @@ vector<SwigluOpApiCase> LoadCases(const string& csvFilePath)
             c.out2Shape = Trim(cols[i++]);
             c.out2Dtype = Trim(cols[i++]);
             c.out2Format = Trim(cols[i++]);
-            if (c.socVersion == "Ascend950" || c.socVersion == "Ascend910B") {
+            if (c.socVersion == "Ascend950" || c.socVersion == "Ascend960DT" || c.socVersion == "Ascend910B") {
                 cases.emplace_back(c);
             }
         } catch (const std::exception& error) {

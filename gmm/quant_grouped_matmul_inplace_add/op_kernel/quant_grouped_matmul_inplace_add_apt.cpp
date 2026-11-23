@@ -60,6 +60,27 @@ __global__ __aicore__ void quant_grouped_matmul_inplace_add(GM_ADDR x1, GM_ADDR 
     GM_ADDR user1 = GetUserWorkspace(workspace);
 
 #ifndef __CCE_KT_TEST__
+#if defined(QGMM_INPLACE_ADD_USE_BLAZE_MX) || defined(V310_QGMM_QUANT_MX_HIF4) || defined(V310_QGMM_QUANT_MX)
+    GET_TILING_DATA_MEMBER(QuantGroupedMatmulInplaceAdd::QGmmInplaceAddTilingDataParams, mmTilingData, emptyCheck,
+                           tiling);
+    if (emptyCheck.M == 0 || emptyCheck.N == 0 || emptyCheck.Ka == 0) {
+        return;
+    }
+#else
+    if constexpr (KERNEL_TYPE == QGMM_INPLACE_ADD_DEQUANT_FIXP) {
+        GET_TILING_DATA_MEMBER(QuantGroupedMatmulInplaceAdd::QGmmInplaceAddBasicApiTilingData, mmTilingData, emptyCheck,
+                               tiling);
+        if (emptyCheck.m == 0 || emptyCheck.n == 0 || emptyCheck.k == 0) {
+            return;
+        }
+    } else {
+        GET_TILING_DATA_MEMBER(QuantGroupedMatmulInplaceAdd::QGmmInplaceAddTilingDataParams, mmTilingData, emptyCheck,
+                               tiling);
+        if (emptyCheck.M == 0 || emptyCheck.N == 0 || emptyCheck.Ka == 0) {
+            return;
+        }
+    }
+#endif
 #if defined(QGMM_INPLACE_ADD_USE_BLAZE_MX)
     if constexpr (QUANT_B_TRANS == QGMM_INPLACE_ADD_NO_TRANS && QUANT_A_TRANS == QGMM_INPLACE_ADD_TRANS &&
                   (KERNEL_TYPE == QGMM_INPLACE_ADD_DEQUANT_FIXP || KERNEL_TYPE == QGMM_INPLACE_ADD_MX_UB_ADD)) {

@@ -97,6 +97,10 @@ struct QGmmInplaceAddOpApiCase {
         if (checkRet) {
             EXPECT_EQ(ret, ops::ut::ParseAclnnStatus(expectRet)) << "case=" << caseName;
         }
+        if (ret == ACLNN_SUCCESS &&
+            (caseName.rfind("mxfp8_nd_empty_", 0) == 0 || caseName.rfind("graph_empty_m_", 0) == 0)) {
+            EXPECT_EQ(workspaceSize, 0U) << "case=" << caseName;
+        }
     }
 
     string socVersion;

@@ -69,7 +69,8 @@ bool QGMMInplaceAddBasicApiTiling::AnalyzeAttrs()
 
 bool QGMMInplaceAddBasicApiTiling::AnalyzeDtype()
 {
-    return AnalyzeDtypeForInplaceAdd(context_, inputParams_) && CheckDtypeForInplaceAdd(inputParams_);
+    return AnalyzeDtypeForInplaceAdd(context_, inputParams_) && CheckDtypeForInplaceAdd(inputParams_) &&
+           CheckFormatForInplaceAdd(inputParams_);
 }
 
 bool QGMMInplaceAddBasicApiTiling::AnalyzeInputs()
@@ -79,7 +80,7 @@ bool QGMMInplaceAddBasicApiTiling::AnalyzeInputs()
         xStorageShape == nullptr,
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "x1", "nullptr", "xStorageShape cannot be nullptr"),
         return false);
-    const gert::Shape& xShape = xStorageShape->GetOriginShape();
+    gert::Shape xShape = xStorageShape->GetOriginShape();
 
     auto wStorageShape = context_->GetInputShape(WEIGHT_INDEX);
     OP_CHECK_IF(
@@ -105,9 +106,10 @@ bool QGMMInplaceAddBasicApiTiling::AnalyzeInputs()
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opType, "scale1", "nullptr",
                                                       "x1ScaleStorageShape cannot be nullptr"),
                 return false);
-    const gert::Shape& x1ScaleShape = x1ScaleStorageShape->GetOriginShape();
+    gert::Shape x1ScaleShape = x1ScaleStorageShape->GetOriginShape();
 
     OP_CHECK_IF(!SetGroupNum(GROUPLIST_INDEX), OP_LOGE(inputParams_.opName, "SetGroupNum failed."), return false);
+    NormalizeEmptyReductionForInplaceAdd(context_, wShape, inputParams_.groupNum, xShape, x1ScaleShape);
     OP_CHECK_IF(!CheckShapeNotNegative(xShape, wShape, inputParams_),
                 OP_LOGE(inputParams_.opName, "CheckShapeNotNegative failed."), return false);
     OP_CHECK_IF(!CheckXAndWeightKDim(xShape, wShape, inputParams_),
@@ -161,12 +163,15 @@ int64_t QGMMInplaceAddBasicApiTiling::LogQuantParams() const
 
 ge::graphStatus QGMMInplaceAddBasicApiTiling::DoLibApiTiling()
 {
-    GroupedQmmTiling::CalBasicBlock();
-    OP_CHECK_IF(GroupedQmmBasicApiTiling::CalL1Tiling() != ge::GRAPH_SUCCESS,
-                OP_LOGE(context_->GetNodeName(), "CalL1Tiling failed"), return ge::GRAPH_FAILED);
     tilingData_.mmTilingData.m = inputParams_.mSize;
     tilingData_.mmTilingData.n = inputParams_.nSize;
     tilingData_.mmTilingData.k = inputParams_.kSize;
+    if (inputParams_.mSize == 0 || inputParams_.nSize == 0) {
+        return ge::GRAPH_SUCCESS;
+    }
+    GroupedQmmTiling::CalBasicBlock();
+    OP_CHECK_IF(GroupedQmmBasicApiTiling::CalL1Tiling() != ge::GRAPH_SUCCESS,
+                OP_LOGE(context_->GetNodeName(), "CalL1Tiling failed"), return ge::GRAPH_FAILED);
     tilingData_.mmTilingData.baseM = basicTiling_.baseM;
     tilingData_.mmTilingData.baseN = basicTiling_.baseN;
     tilingData_.mmTilingData.baseK = basicTiling_.baseK;

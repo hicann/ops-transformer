@@ -71,18 +71,9 @@ static bool ApplyTranspose(size_t index, bool enableTranspose, ge::DataType data
         // dimM the second-to-last dim， dimN the last dim
         auto dimM = viewShape.size() - 2;
         auto dimN = viewShape.size() - 1;
-        // The fused graph provides X1 in the source (K, M) layout.  K == 1
-        // is a valid case and must not suppress the axis exchange; otherwise
-        // the aclnn fallback receives X1 as (K, M) while X2 is interpreted as
-        // (K, N), causing a K-dimension mismatch.
-        if (viewShape[dimN] != 0) {
-            auto swap = strides[dimN];
-            strides[dimN] = strides[dimM];
-            strides[dimM] = swap;
-            swap = viewShape[dimN];
-            viewShape[dimN] = viewShape[dimM];
-            viewShape[dimM] = swap;
-        }
+        // The fused graph supplies (K, M). ACLNN needs (M, K), even for an empty view.
+        std::swap(strides[dimN], strides[dimM]);
+        std::swap(viewShape[dimN], viewShape[dimM]);
     }
     return true;
 }
@@ -92,8 +83,11 @@ static inline aclTensor* GeTensor2AclTensor(const gert::Tensor* geTensor, bool e
     if (geTensor == nullptr) {
         return nullptr;
     }
+    OP_CHECK_IF((index == INDEX_INPUT_X1 || index == INDEX_INPUT_X2) &&
+                    ge::GetPrimaryFormat(geTensor->GetStorageFormat()) == ge::FORMAT_FRACTAL_NZ,
+                OP_LOGE("aclnnfallback", "X1 and X2 do not support FRACTAL_NZ."), return nullptr);
     auto storageShape = geTensor->GetStorageShape();
-    if (storageShape.GetDimNum() <= 1) {
+    if (storageShape.GetDimNum() <= 1 && !enableTranspose) {
         return ConvertType(geTensor);
     }
     std::vector<int64_t> storageShapeVec;

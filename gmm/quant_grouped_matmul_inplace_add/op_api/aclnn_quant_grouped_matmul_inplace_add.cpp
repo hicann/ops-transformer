@@ -221,6 +221,13 @@ static aclnnStatus CheckShape(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams
     auto yMDim = params.yRef->GetViewShape().GetDim(1);
     auto yNDim = params.yRef->GetViewShape().GetDim(2);
 
+    // Some graph paths pass the physical TN descriptor [K, 0] directly.
+    // Only interpret it as [0, K] when X2 confirms K and Y confirms M=0.
+    if (yMDim == 0 && aKDim == 0 && bKDim > 0 && mDim == bKDim) {
+        aKDim = mDim;
+        mDim = 0;
+    }
+
     QGMM_INPLACE_ADD_CHECK_REPORT(
         mDim >= 0, return ACLNN_ERR_PARAM_INVALID,
         OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "x1", ViewShapeToString(params.x1),
@@ -395,6 +402,11 @@ static aclnnStatus CheckDtype(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams
     return ACLNN_SUCCESS;
 }
 
+static bool HasEmptyOutputAxes(const aclTensor* y)
+{
+    return y->GetViewShape().GetDim(1) == 0 || y->GetViewShape().GetDim(2) == 0;
+}
+
 static aclnnStatus CheckParams(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams params)
 {
     if (!(params.groupListType == 0 || params.groupListType == 1)) {
@@ -409,6 +421,9 @@ static aclnnStatus CheckParams(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParam
     CHECK_RET(CheckFormat(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckShape(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckDtype(params) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    if (HasEmptyOutputAxes(params.yRef)) {
+        return ACLNN_SUCCESS;
+    }
     gmm::GroupedMatmulParamsBase<aclTensor> gmmParams;
     gmmParams.x = params.x1;
     gmmParams.weight = params.x2;
@@ -513,21 +528,17 @@ static aclnnStatus aclnnQuantGroupedMatmulInplaceAddGetWorkspaceSizeCommon(
 {
     // 固定写法，创建OpExecutor
     OP_CHECK_COMM_INPUT(workspaceSize, executor);
-    auto ret = CheckX1X2NotNull(params);
+    const auto ret = CheckParams(params);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
     auto executorPtr = uniqueExecutor.get();
-    auto x1MDim = params.x1->GetViewShape().GetDim(0);
-    auto x2NDim = params.x2->GetViewShape().GetDim(1);
-    if (x1MDim == 0 || x2NDim == 0) {
+    if (HasEmptyOutputAxes(params.yRef) || params.x1->GetViewShape().GetDim(1) == 0) {
+        // Empty output or reduction: preserve yRef and do not infer a transpose from empty strides.
         *workspaceSize = 0UL;
         uniqueExecutor.ReleaseTo(executor);
         return ACLNN_SUCCESS;
     }
-    // 固定写法，参数检查
-    ret = CheckParams(params);
-    CHECK_RET(ret == ACLNN_SUCCESS, ret);
     bool transposeX = gmm::IsTransposeLastTwoDims(params.x1);      // check is transpose x
     bool transposeWeight = gmm::IsTransposeLastTwoDims(params.x2); // check is transpose weight
     // when the last two dims of weight are (1, 1), consider tranB as false
