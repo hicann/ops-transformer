@@ -20,6 +20,10 @@
 #include "fia_arch35_template_tiling_key_enum.h"
 #include "flash_attention_score_antiquant_kernel.h"
 
+#ifndef GLOBAL_OVERFLOW_MODE_CTRL
+#define GLOBAL_OVERFLOW_MODE_CTRL 60
+#endif
+
 #define INVOKE_FA_OP_IMPL_ASCEND950_ANTIQUANT_BASEAPI(templateClass, ...) \
     do { \
         if (query == nullptr) { \
@@ -63,6 +67,9 @@ inline __aicore__ void fia_antiquant_regbase(
     __gm__ uint8_t* user = GetUserWorkspace(workspace);
 
     constexpr bool isPa = KvLayoutType != 0;
+
+    int64_t globalOriOverflowMode = AscendC::GetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>();
+    AscendC::SetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>(0);
 
 #if (ORIG_DTYPE_QUERY == DT_FLOAT16 && ORIG_DTYPE_KEY == DT_INT8 && ORIG_DTYPE_ATTENTION_OUT == DT_FLOAT16)
     KERNEL_TASK_TYPE_DEFAULT(FIA_ARCH35_TASK_TYPE);
@@ -240,6 +247,8 @@ inline __aicore__ void fia_antiquant_regbase(
         static_cast<PseTypeEnum>(pseMode), static_cast<AntiquantTypeEnum>(quantMode), hasAttenMask, false, false, true,
         isPa, isFd, enableKVPrefix);
 #endif
+
+    AscendC::SetCtrlSpr<GLOBAL_OVERFLOW_MODE_CTRL, GLOBAL_OVERFLOW_MODE_CTRL>(globalOriOverflowMode);
 }
 
 #endif // FIA_ARCH35_ANTIQUANT_H_
