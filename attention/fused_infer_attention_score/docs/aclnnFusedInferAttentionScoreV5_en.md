@@ -632,6 +632,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         <td>        <ul>
             <li>The data type must satisfy the data type deduction rule with the data type of query. </li>
             <li>If the user does not specifically specify it, it is recommended to pass in 1.0. </li>
+            <li>It is recommended to choose a value in (0, 1] based on the model and formula, for example, 1/sqrt(d). Large values, zero, or negative values may cause numerical overflow or accuracy issues for some inputs; validate the value for the actual scenario. </li>
         </ul>
         </td>
         <td>DOUBLE</td>

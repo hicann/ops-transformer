@@ -661,6 +661,7 @@ aclnnStatus aclnnFusedInferAttentionScoreV5(
         <ul>
             <li>数据类型与query的数据类型需满足数据类型推导规则。 </li>
             <li>用户不特意指定时建议传入1.0。 </li>
+            <li>建议根据模型和计算公式选择 (0, 1] 范围内的值，例如 1/sqrt(d)。较大值、零或负值在某些输入下可能引入数值溢出或精度异常，请结合实际场景验证。 </li>
         </ul>
         </td>
         <td>DOUBLE</td>
