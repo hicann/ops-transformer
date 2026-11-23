@@ -16,6 +16,7 @@
 #ifndef MOE_FINALIZE_ROUTING_V2_BASE_H_
 #define MOE_FINALIZE_ROUTING_V2_BASE_H_
 #include "kernel_operator.h"
+#include "moe_finalize_routing_v2_tiling_struct.h"
 #include "op_kernel/platform_util.h"
 #include "op_kernel/math_util.h"
 
@@ -644,6 +645,314 @@ __simd_vf__ void VFComputeDequantizeWithBias(__ubuf__ bfloat16_t* yAddr, __ubuf_
         LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
     }
 }
+#endif
+
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+#define MOE_FINALIZE_ROUTING_HAS_MXFP4
+constexpr uint32_t MX4_SCALE_GROUP_SIZE = 32;
+constexpr uint32_t MX4_QUEUE_DEPTH = 1;
+constexpr uint8_t E8M0_NAN_CODE = 255;
+constexpr uint32_t E8M0_MIN_SCALE_FP32_BITS = 0x00400000U;
+constexpr uint32_t FP32_QUIET_NAN_BITS = 0x7fc00000U;
+constexpr uint32_t FP32_EXPONENT_SHIFT = 23;
+constexpr uint8_t E2M1_BITS = 4;
+constexpr uint8_t E2M1_CODE_MASK = 0xF;
+constexpr uint8_t E2M1_MAGNITUDE_MASK = 0x7;
+constexpr uint8_t E2M1_SIGN_MASK = 0x8;
+constexpr uint8_t E2M1_MANTISSA_BITS = 1;
+constexpr uint8_t E2M1_MANTISSA_MASK = 0x1;
+constexpr int32_t E2M1_EXPONENT_BIAS = 1;
+constexpr float E2M1_MANTISSA_UNIT = 0.5f;
+
+// Decode E8M0 as bits: zero is 2^-127, 255 is a quiet NaN.
+__aicore__ inline float Mx4Scale(uint8_t exponent)
+{
+    union {
+        uint32_t bits;
+        float value;
+    } scale;
+    if (exponent == 0) {
+        scale.bits = E8M0_MIN_SCALE_FP32_BITS;
+    } else if (exponent == E8M0_NAN_CODE) {
+        scale.bits = FP32_QUIET_NAN_BITS;
+    } else {
+        scale.bits = static_cast<uint32_t>(exponent) << FP32_EXPONENT_SHIFT;
+    }
+    return scale.value;
+}
+
+// Common MXFP4 data access, E2M1/E8M0 decoding and FP32 arithmetic.
+// Loading strategies and processing loops belong to the four existing kernel templates.
+template <int MODE>
+class MoeFinalizeRoutingV2Mx4Base {
+protected:
+    using TYPE = bfloat16_t;
+    __aicore__ inline void InitMx4Inputs(GM_ADDR expandedX, GM_ADDR indices, GM_ADDR x1, GM_ADDR x2, GM_ADDR bias,
+                                         GM_ADDR scales, GM_ADDR routingWeights, GM_ADDR experts, GM_ADDR output,
+                                         const MoeFinalizeRoutingV2RegbaseTilingData* data, TPipe* pipe)
+    {
+        d_ = data;
+        pipe_ = pipe;
+        hasX1_ = x1 != nullptr;
+        hasX2_ = x2 != nullptr;
+        hasExpertIdx_ = experts != nullptr;
+        hasBias_ = bias != nullptr && hasExpertIdx_;
+        x_.SetGlobalBuffer((__gm__ uint8_t*)expandedX);
+        scales_.SetGlobalBuffer((__gm__ uint8_t*)scales);
+        hasRoutingWeights_ = routingWeights != nullptr;
+        routingWeights_.SetGlobalBuffer((__gm__ float*)routingWeights);
+        indices_.SetGlobalBuffer((__gm__ int32_t*)indices);
+        experts_.SetGlobalBuffer((__gm__ int32_t*)experts);
+        x1_.SetGlobalBuffer((__gm__ TYPE*)x1);
+        x2_.SetGlobalBuffer((__gm__ TYPE*)x2);
+        bias_.SetGlobalBuffer((__gm__ TYPE*)bias);
+        output_.SetGlobalBuffer((__gm__ TYPE*)output);
+        packedStride_ = Align(d_->hFactor / NUM_FP4_IN_BYTE);
+        scaleStride_ = Align(Ops::Base::CeilDiv(d_->hFactor, static_cast<int64_t>(MX4_SCALE_GROUP_SIZE)));
+        auxStride_ = Align(d_->hFactor * sizeof(TYPE)) / sizeof(TYPE);
+        pipe_->InitBuffer(auxQue_, MX4_QUEUE_DEPTH, auxStride_ * sizeof(TYPE));
+        pipe_->InitBuffer(outQue_, MX4_QUEUE_DEPTH, auxStride_ * sizeof(TYPE));
+        pipe_->InitBuffer(accBuf_, Align(d_->hFactor * sizeof(float)));
+        pipe_->InitBuffer(valueBuf_, Align(d_->hFactor * sizeof(float)));
+    }
+    __aicore__ inline int64_t Align(int64_t bytes)
+    {
+        return Ops::Base::CeilAlign(bytes, static_cast<int64_t>(UBBLOCKSIZE));
+    }
+    __aicore__ inline int64_t Min(int64_t a, int64_t b)
+    {
+        return a < b ? a : b;
+    }
+    __aicore__ inline void CopyBytes(LocalTensor<uint8_t> dst, GlobalTensor<uint8_t> src, uint32_t bytes)
+    {
+        DataCopyPad(dst, src, DataCopyExtParams{1, bytes, 0, 0, 0}, DataCopyPadExtParams<uint8_t>{false, 0, 0, 0});
+    }
+    __aicore__ inline void Convert(LocalTensor<float> dst, LocalTensor<TYPE> src, uint32_t length)
+    {
+        __ubuf__ TYPE* srcPtr = (__ubuf__ TYPE*)src.GetPhyAddr();
+        __ubuf__ float* dstPtr = (__ubuf__ float*)dst.GetPhyAddr();
+        __VEC_SCOPE__
+        {
+            RegTensor<float> value;
+            MaskReg mask;
+            UnalignRegForLoad state;
+            LoadUnAlignPre<TYPE>(state, srcPtr);
+            uint32_t remaining = length;
+            const uint16_t loops = static_cast<uint16_t>((length + VL_FP32 - 1) / VL_FP32);
+            for (uint16_t i = 0; i < loops; ++i) {
+                mask = UpdateMask<float>(remaining);
+                LoadInputDataUnalign<TYPE>(value, srcPtr, state, mask, VL_FP32);
+                StoreAlign(dstPtr + i * VL_FP32, value, mask);
+            }
+        }
+    }
+    __aicore__ inline LocalTensor<TYPE> LoadAux(GlobalTensor<TYPE> source, int64_t offset, uint32_t length)
+    {
+        auto local = auxQue_.AllocTensor<TYPE>();
+        CopyIn(source[offset], local, 1, length);
+        auxQue_.EnQue(local);
+        return auxQue_.DeQue<TYPE>();
+    }
+    __aicore__ inline void ConvertAux(LocalTensor<float> values, GlobalTensor<TYPE> source, int64_t offset,
+                                      uint32_t length)
+    {
+        auto local = LoadAux(source, offset, length);
+        Convert(values, local, length);
+        PipeBarrier<PIPE_V>();
+        auxQue_.FreeTensor(local);
+    }
+    __aicore__ inline void AddAux(GlobalTensor<TYPE> source, int64_t offset, uint32_t length, LocalTensor<float> acc,
+                                  LocalTensor<float> values)
+    {
+        ConvertAux(values, source, offset, length);
+        Add(acc, acc, values, length);
+        PipeBarrier<PIPE_V>();
+    }
+    __aicore__ inline bool ResolveRoute(int64_t row, int64_t k, int64_t& r, int64_t& expert)
+    {
+        const int64_t index = MODE == DROPLESS_COLUMN || MODE == DROP_PAD_COLUMN ? row + k * d_->row : row * d_->k + k;
+        r = indices_.GetValue(index);
+        if (r < 0 || r >= d_->activeNum) {
+            return false;
+        }
+        expert = hasExpertIdx_ ? experts_.GetValue(row * d_->k + k) : 0;
+        return !hasBias_ || (expert >= 0 && expert < d_->mx4BiasRows);
+    }
+    __aicore__ inline float RoutingWeight(int64_t row, int64_t k)
+    {
+        return hasRoutingWeights_ ? routingWeights_.GetValue(row * d_->k + k) : 1.0f;
+    }
+    __aicore__ inline void AddRoute(LocalTensor<float> acc, LocalTensor<float> values, uint32_t length, float weight)
+    {
+        if (hasRoutingWeights_) {
+            Muls(values, values, weight, length);
+            PipeBarrier<PIPE_V>();
+        }
+        Add(acc, acc, values, length);
+        PipeBarrier<PIPE_V>();
+    }
+    __aicore__ inline uint32_t LoadMx4Batch(int64_t row, int64_t h, uint32_t length, int64_t k0, int64_t end)
+    {
+        packedLocal_ = packedQue_.AllocTensor<uint8_t>();
+        scaleLocal_ = scaleQue_.AllocTensor<uint8_t>();
+        if (hasBias_) {
+            biasLocal_ = biasQue_.AllocTensor<TYPE>();
+        }
+        uint32_t regular = 0;
+        for (int64_t k = k0; k < end; ++k) {
+            int64_t r, expert;
+            if (!ResolveRoute(row, k, r, expert)) {
+                continue;
+            }
+            CopyBytes(packedLocal_[regular * packedStride_], x_[r * (d_->h / NUM_FP4_IN_BYTE) + h / NUM_FP4_IN_BYTE],
+                      length / NUM_FP4_IN_BYTE);
+            CopyBytes(scaleLocal_[regular * scaleStride_], scales_[r * d_->mx4ScaleRowBytes + h / MX4_SCALE_GROUP_SIZE],
+                      Ops::Base::CeilDiv(length, MX4_SCALE_GROUP_SIZE));
+            if (hasBias_) {
+                CopyIn(bias_[expert * d_->h + h], biasLocal_[regular * auxStride_], 1, length);
+            }
+            ++regular;
+        }
+        packedQue_.EnQue(packedLocal_);
+        scaleQue_.EnQue(scaleLocal_);
+        packedLocal_ = packedQue_.DeQue<uint8_t>();
+        scaleLocal_ = scaleQue_.DeQue<uint8_t>();
+        if (hasBias_) {
+            biasQue_.EnQue(biasLocal_);
+            biasLocal_ = biasQue_.DeQue<TYPE>();
+        }
+        return regular;
+    }
+    __aicore__ inline void ComputeMx4BatchTile(int64_t row, int64_t h, uint32_t length)
+    {
+        BeginMx4Tile(row, h, length);
+        auto acc = accBuf_.Get<float>();
+        auto values = valueBuf_.Get<float>();
+        for (int64_t k0 = 0; k0 < d_->k; k0 += d_->kFactor) {
+            const int64_t end = Min(k0 + d_->kFactor, d_->k);
+            uint32_t regular = LoadMx4Batch(row, h, length, k0, end);
+            if (hasRoutingWeights_) {
+                // Recover the original K index of each buffered route to look up its weight.
+                regular = 0;
+                for (int64_t k = k0; k < end; ++k) {
+                    int64_t r, expert;
+                    if (ResolveRoute(row, k, r, expert)) {
+                        AccumulateBuffered(acc, values, regular++, length, RoutingWeight(row, k));
+                    }
+                }
+            } else {
+                for (uint32_t slot = 0; slot < regular; ++slot) {
+                    AccumulateBuffered(acc, values, slot, length, 1.0f);
+                }
+            }
+            packedQue_.FreeTensor(packedLocal_);
+            scaleQue_.FreeTensor(scaleLocal_);
+            if (hasBias_) {
+                biasQue_.FreeTensor(biasLocal_);
+            }
+        }
+        StoreMx4Tile(row, h, length);
+    }
+    __aicore__ inline void AccumulateBuffered(LocalTensor<float> acc, LocalTensor<float> values, uint32_t slot,
+                                              uint32_t length, float weight)
+    {
+        Accumulate(acc, values, packedLocal_[slot * packedStride_], scaleLocal_[slot * scaleStride_],
+                   hasBias_ ? biasLocal_[slot * auxStride_] : LocalTensor<TYPE>(), length, weight);
+    }
+    __aicore__ inline void Decode(LocalTensor<float> values, LocalTensor<uint8_t> packed, uint32_t length)
+    {
+        // Portable E2M1 decoding. Preserve the packed row convention on all supported architectures.
+        const event_t vs = static_cast<event_t>(pipe_->FetchEventID(HardEvent::V_S));
+        SetFlag<HardEvent::V_S>(vs);
+        WaitFlag<HardEvent::V_S>(vs);
+        for (uint32_t j = 0; j < length; ++j) {
+            const uint8_t code =
+                (packed.GetValue(j / NUM_FP4_IN_BYTE) >> (E2M1_BITS * (j % NUM_FP4_IN_BYTE))) & E2M1_CODE_MASK;
+            const uint8_t magnitude = code & E2M1_MAGNITUDE_MASK;
+            const uint8_t exponent = magnitude >> E2M1_MANTISSA_BITS;
+            const float mantissa = (magnitude & E2M1_MANTISSA_MASK) * E2M1_MANTISSA_UNIT;
+            const float v = exponent == 0 ? mantissa : (1.0f + mantissa) * (1U << (exponent - E2M1_EXPONENT_BIAS));
+            values.SetValue(j, (code & E2M1_SIGN_MASK) ? -v : v);
+        }
+        const event_t sv = static_cast<event_t>(pipe_->FetchEventID(HardEvent::S_V));
+        SetFlag<HardEvent::S_V>(sv);
+        WaitFlag<HardEvent::S_V>(sv);
+    }
+    __aicore__ inline void Accumulate(LocalTensor<float> acc, LocalTensor<float> values, LocalTensor<uint8_t> packed,
+                                      LocalTensor<uint8_t> scale, LocalTensor<TYPE> bias, uint32_t length, float weight)
+    {
+        Decode(values, packed, length);
+        for (uint32_t group = 0; group < length; group += MX4_SCALE_GROUP_SIZE) {
+            const uint32_t valid = static_cast<uint32_t>(Min(length - group, MX4_SCALE_GROUP_SIZE));
+            Muls(values[group], values[group], Mx4Scale(scale.GetValue(group / MX4_SCALE_GROUP_SIZE)), valid);
+        }
+        PipeBarrier<PIPE_V>();
+        if (hasBias_) {
+            // Keep the accumulator intact: add bias to decoded values in a dedicated VF.
+            ApplyAux(values, bias, length);
+        }
+        AddRoute(acc, values, length, weight);
+    }
+    __aicore__ inline void ApplyAux(LocalTensor<float> values, LocalTensor<TYPE> bias, uint32_t length)
+    {
+        __ubuf__ TYPE* src = (__ubuf__ TYPE*)bias.GetPhyAddr();
+        __ubuf__ float* dst = (__ubuf__ float*)values.GetPhyAddr();
+        __VEC_SCOPE__
+        {
+            RegTensor<float> b, x;
+            MaskReg mask;
+            UnalignRegForLoad state;
+            LoadUnAlignPre<TYPE>(state, src);
+            uint32_t remaining = length;
+            const uint16_t loops = static_cast<uint16_t>((length + VL_FP32 - 1) / VL_FP32);
+            for (uint16_t i = 0; i < loops; ++i) {
+                mask = UpdateMask<float>(remaining);
+                LoadInputDataUnalign<TYPE>(b, src, state, mask, VL_FP32);
+                LoadAlign(x, dst + i * VL_FP32);
+                Add(x, x, b, mask);
+                StoreAlign(dst + i * VL_FP32, x, mask);
+            }
+        }
+        PipeBarrier<PIPE_V>();
+    }
+    __aicore__ inline void BeginMx4Tile(int64_t row, int64_t h, uint32_t length)
+    {
+        auto acc = accBuf_.Get<float>();
+        auto values = valueBuf_.Get<float>();
+        Duplicate(acc, 0.0f, length);
+        PipeBarrier<PIPE_V>();
+        if (hasX1_) {
+            AddAux(x1_, row * d_->h + h, length, acc, values);
+        }
+        if (hasX2_) {
+            AddAux(x2_, row * d_->h + h, length, acc, values);
+        }
+    }
+    __aicore__ inline void StoreMx4Tile(int64_t row, int64_t h, uint32_t length)
+    {
+        auto acc = accBuf_.Get<float>();
+        auto result = outQue_.AllocTensor<TYPE>();
+        Cast(result, acc, RoundMode::CAST_RINT, length);
+        outQue_.EnQue(result);
+        result = outQue_.DeQue<TYPE>();
+        CopyOut(result, output_[row * d_->h + h], 1, length);
+        outQue_.FreeTensor(result);
+    }
+
+    const MoeFinalizeRoutingV2RegbaseTilingData* d_;
+    TPipe* pipe_;
+    bool hasX1_, hasX2_, hasExpertIdx_, hasBias_, hasRoutingWeights_;
+    int64_t packedStride_, scaleStride_, auxStride_;
+    GlobalTensor<uint8_t> x_, scales_;
+    GlobalTensor<float> routingWeights_;
+    GlobalTensor<int32_t> indices_, experts_;
+    GlobalTensor<TYPE> x1_, x2_, bias_, output_;
+    TQue<QuePosition::VECIN, MX4_QUEUE_DEPTH> packedQue_, scaleQue_, biasQue_, auxQue_;
+    TQue<QuePosition::VECOUT, MX4_QUEUE_DEPTH> outQue_;
+    TBuf<TPosition::VECCALC> accBuf_, valueBuf_;
+    LocalTensor<uint8_t> packedLocal_, scaleLocal_;
+    LocalTensor<TYPE> biasLocal_;
+};
 #endif
 
 } // namespace MoeFinalizeRoutingV2Regbase

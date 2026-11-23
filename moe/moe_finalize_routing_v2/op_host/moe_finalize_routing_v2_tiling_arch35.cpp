@@ -14,6 +14,7 @@
  */
 #include "op_host/tiling_util.h"
 #include "moe_finalize_routing_v2_tiling.h"
+#include <limits>
 #include "../op_kernel/arch35/moe_finalize_routing_v2_tiling_struct.h"
 #include "common/include/op_host/op_const_def_transformer.h"
 
@@ -30,6 +31,7 @@ static constexpr int64_t X_IDX = 7;
 static constexpr int64_t CONST_EXPERT_ALPHA1_IDX = 8;
 static constexpr int64_t CONST_EXPERT_ALPHA2_IDX = 9;
 static constexpr int64_t CONST_EXPERT_V_IDX = 10;
+static constexpr size_t EXPANDED_X_SCALE_IDX = 11;
 static constexpr int64_t BIAS_DIM_NUM = 2;
 static constexpr int64_t SCALES_DIM_NUM = 2;
 static constexpr int64_t DROPLESS_EXPANDED_X_DIM_NUM = 2;
@@ -57,6 +59,18 @@ static constexpr size_t WORKSPACE_RESERVED = 0;
 static constexpr size_t SIZEOF_B16 = 2;
 static constexpr uint64_t NUM_FP4_IN_BYTE = 2;
 static constexpr uint64_t HIF4_BLOCK_SIZE = 64;
+
+static constexpr uint64_t MX4_K_BATCH_BASE_TILING_KEY = 130000;
+static constexpr uint64_t MX4_SPLIT_H_BASE_TILING_KEY = 140000;
+static constexpr uint64_t MX4_FULL_LOAD_K_H_BASE_TILING_KEY = 150000;
+static constexpr uint64_t MX4_FULL_LOAD_ROW_K_H_BASE_TILING_KEY = 160000;
+static constexpr uint64_t DROP_PAD_MODE_KEY_BASE = 10;
+static constexpr int64_t MX4_GROUP_SIZE = 32;
+static constexpr int64_t MX4_BLOCK_SIZE = 64;
+static constexpr int64_t MX4_SCALE_PAIR_SIZE = 2;
+static constexpr int64_t MX4_FP32_BUFFER_NUM = 2; // accumulator and decoded values
+static constexpr int64_t MX4_BF16_BUFFER_NUM = 2; // auxiliary input and output
+static constexpr int64_t MX4_UB_BYTES_PER_COLUMN = 16;
 
 static constexpr uint64_t HIF4_FULL_LOAD_K_H_BASE_TILING_KEY = 50000;
 static constexpr uint64_t HIF4_FULL_LOAD_H_BASE_TILING_KEY = 60000;
@@ -145,6 +159,16 @@ protected:
     bool kHFullLoad_{false};
     bool hFullLoad_{false};
     bool isHif4Dequant_{false};
+    bool isMx4Dequant_{false};
+    uint64_t mx4Key_{0};
+    int64_t mx4Rows_{0};
+    int64_t mx4BiasRows_{0};
+    ge::graphStatus CheckMx4Support();
+    int64_t Mx4AlignedSize(int64_t size);
+    int64_t Mx4CommonUbSize(int64_t hFactor);
+    int64_t RowHSizeForMx4(int64_t hFactor);
+    ge::graphStatus CalcMx4Factors(int64_t& hFactor, int64_t& kFactor);
+    ge::graphStatus TileMx4();
     bool isHif4KHFullLoad_{false};
     bool isHif4HFullLoad_{false};
     bool isHif4RowKHFullLoad_{false};
@@ -216,6 +240,15 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::GetK(const gert::StorageShape* scal
     const int64_t* attrKPtr = attrsPtr->GetAttrPointer<int64_t>(ATTR_K_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrKPtr);
     k = *attrKPtr;
+    if (isMx4Dequant_) {
+        OP_CHECK_NULL_WITH_CONTEXT(context_, scalesShape);
+        hasScales_ = true;
+        OP_CHECK_IF(k <= 0,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "k", std::to_string(k).c_str(),
+                                                          "k must be greater than 0."),
+                    return ge::GRAPH_FAILED);
+        return ge::GRAPH_SUCCESS;
+    }
     // 适配hif4
     if (isHif4Dequant_) {
         OP_CHECK_NULL_WITH_CONTEXT(context_, scalesShape);
@@ -333,6 +366,14 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckBiasShape(const gert::StorageS
                 OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "bias",
                                              std::to_string(biasShape->GetStorageShape().GetDimNum()).c_str(), "2D"),
                 return ge::GRAPH_FAILED);
+    if (isMx4Dequant_) {
+        mx4BiasRows_ = biasShape->GetStorageShape().GetDim(0);
+        OP_CHECK_IF(mx4BiasRows_ <= 0,
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "bias", "invalid",
+                                                           "MXFP4 bias row count must be positive."),
+                    return ge::GRAPH_FAILED);
+        return ge::GRAPH_SUCCESS;
+    }
     e = biasShape->GetStorageShape().GetDim(0);
     if (dropPadMode == DROP_PAD_ROW || dropPadMode == DROP_PAD_COL) {
         OP_CHECK_IF(dim0OfExpandedX != e,
@@ -417,7 +458,6 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckShapeAndDtypeIsValid()
 ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckConstExpertPartShapeAndDtypeIsValid(int64_t idx)
 {
     // const_expert_alpha等的shape信息要与const_expert_range_num一致
-    constExpertRangeNum = constantExpertEnd - constantExpertStart;
     auto desc = context_->GetOptionalInputDesc(idx);
     if (desc) {
         OP_CHECK_IF(desc->GetDataType() != dtype,
@@ -444,6 +484,16 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckScalesDtypeIsValid()
 {
     auto scalesDesc = context_->GetOptionalInputDesc(SCALES_IDX);
     scaleDtypeSize = dtypeSize;
+    if (isMx4Dequant_) {
+        const auto dequantScalesDesc = context_->GetOptionalInputDesc(EXPANDED_X_SCALE_IDX);
+        OP_CHECK_NULL_WITH_CONTEXT(context_, dequantScalesDesc);
+        OP_CHECK_IF(
+            dequantScalesDesc->GetDataType() != ge::DT_FLOAT8_E8M0,
+            OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "expanded_x_scale",
+                                      Ops::Base::ToString(dequantScalesDesc->GetDataType()).c_str(), "FLOAT8_E8M0"),
+            return ge::GRAPH_FAILED);
+        return CheckOptionalInputDtype(SCALES_IDX, "scales", ge::DT_FLOAT);
+    }
     if (isHif4Dequant_) {
         OP_CHECK_NULL_WITH_CONTEXT(context_, scalesDesc);
         auto scaleDtype = scalesDesc->GetDataType();
@@ -453,20 +503,20 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckScalesDtypeIsValid()
                     return ge::GRAPH_FAILED);
         scaleDtypeSize = sizeof(float);
         scaleDtypeKey = 0;
-    } else {
-        if (scalesDesc) {
-            auto scaleDtype = scalesDesc->GetDataType();
-            OP_CHECK_IF(scaleDtype != ge::DataType::DT_FLOAT && scaleDtype != ge::DataType::DT_FLOAT16 &&
-                            scaleDtype != ge::DataType::DT_BF16,
-                        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "scales",
-                                                  Ops::Base::ToString(scaleDtype).c_str(), "FLOAT, FLOAT16 or BF16"),
-                        return ge::GRAPH_FAILED);
-            scaleDtypeSize = (scaleDtype == ge::DataType::DT_FLOAT) ? sizeof(float) : sizeof(short);
-            if (scaleDtype == ge::DataType::DT_FLOAT16) {
-                scaleDtypeKey = FLOAT16_TILING_KEY;
-            } else if (scaleDtype == ge::DataType::DT_BF16) {
-                scaleDtypeKey = BFLOAT16_TILING_KEY;
-            }
+        return ge::GRAPH_SUCCESS;
+    }
+    if (scalesDesc) {
+        auto scaleDtype = scalesDesc->GetDataType();
+        OP_CHECK_IF(scaleDtype != ge::DataType::DT_FLOAT && scaleDtype != ge::DataType::DT_FLOAT16 &&
+                        scaleDtype != ge::DataType::DT_BF16,
+                    OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "scales",
+                                              Ops::Base::ToString(scaleDtype).c_str(), "FLOAT, FLOAT16 or BF16"),
+                    return ge::GRAPH_FAILED);
+        scaleDtypeSize = (scaleDtype == ge::DataType::DT_FLOAT) ? sizeof(float) : sizeof(short);
+        if (scaleDtype == ge::DataType::DT_FLOAT16) {
+            scaleDtypeKey = FLOAT16_TILING_KEY;
+        } else if (scaleDtype == ge::DataType::DT_BF16) {
+            scaleDtypeKey = BFLOAT16_TILING_KEY;
         }
     }
     return ge::GRAPH_SUCCESS;
@@ -499,6 +549,11 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckPartShapeAndDtypeIsValid()
         return ge::GRAPH_FAILED;
     }
 
+    const bool invalidRange = __builtin_sub_overflow(constantExpertEnd, constantExpertStart, &constExpertRangeNum);
+    OP_CHECK_IF(invalidRange,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "constant_expert_range",
+                                                         "Invalid constant expert range."),
+                return ge::GRAPH_FAILED);
     if (CheckConstExpertPartShapeAndDtypeIsValid(CONST_EXPERT_ALPHA1_IDX) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
@@ -515,20 +570,25 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::FinalCheckShapeAndDtypeIsValid()
 {
     gert::Shape bsk = {row, k};
     gert::Shape bsh = {row, h};
-    gert::Shape hif4ScaleShape = {row, k, h / 64};
 
-    // 适配hif4
-    if (isHif4Dequant_) {
+    if (isMx4Dequant_) {
+        gert::Shape mx4ScaleShape = {mx4Rows_, h / MX4_BLOCK_SIZE + (h % MX4_BLOCK_SIZE != 0), MX4_SCALE_PAIR_SIZE};
+        if (CheckOptionalInputShape(EXPANDED_X_SCALE_IDX, "expanded_x_scale", mx4ScaleShape,
+                                    "shape of expanded_x_scale must be (R, ceil(H/64), 2) for MXFP4 inputs.") !=
+            ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
+    } else if (isHif4Dequant_) {
+        const gert::Shape hif4ScaleShape = {row, k, h / static_cast<int64_t>(HIF4_BLOCK_SIZE)};
         if (CheckOptionalInputShape(SCALES_IDX, "scales", hif4ScaleShape,
                                     "shape of scales must be (bs,k,h/64) under hif4 dequantize mode.") !=
             ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
-    } else {
-        if (CheckOptionalInputShape(SCALES_IDX, "scales", bsk, "shape of scales must be (bs,k).") !=
-            ge::GRAPH_SUCCESS) {
-            return ge::GRAPH_FAILED;
-        }
+    }
+    if (!isHif4Dequant_ &&
+        CheckOptionalInputShape(SCALES_IDX, "scales", bsk, "shape of scales must be (bs,k).") != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
     if (CheckOptionalInputDtype(EXPERTIDX_IDX, "expert_idx", ge::DataType::DT_INT32) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -584,11 +644,11 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckRange(int64_t start, int64_t e
         return ge::GRAPH_SUCCESS;
     }
 
-    if (!(0 <= start && start < end && end <= e)) {
+    if (!(0 <= start && start < end && (e == 0 || end <= e))) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
             context_->GetNodeName(), (std::string(rangeName) + " range").c_str(),
             ("[" + std::to_string(start) + ", " + std::to_string(end) + "), E=" + std::to_string(e)).c_str(),
-            "Range must satisfy 0 <= start < end <= E.");
+            "Range must satisfy 0 <= start < end and end <= E when E is known.");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -614,6 +674,24 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckRangeOverlap(int64_t start1, i
 
 ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckExpertRangeValidity()
 {
+    if (isMx4Dequant_) {
+        const auto* attrs = context_->GetAttrs();
+        for (const auto index :
+             {ATTR_ZERO_EXPERT_RANGE_IDX, ATTR_COPY_EXPERT_RANGE_IDX, ATTR_CONSTANT_EXPERT_RANGE_IDX}) {
+            const auto* range = attrs->GetAttrPointer<gert::ContinuousVector>(index);
+            if (range == nullptr || range->GetSize() == 0) {
+                continue;
+            }
+            const auto* values = static_cast<const int64_t*>(range->GetData());
+            // The operator definition uses [-1, -1] for an omitted range.
+            OP_CHECK_IF(range->GetSize() != CONST_EXPERT_ATTR_LIST_SIZE || values[0] != -1 || values[1] != -1,
+                        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "special expert ranges",
+                                                                 "MXFP4 requires empty special expert ranges."),
+                        return ge::GRAPH_FAILED);
+        }
+        return ge::GRAPH_SUCCESS;
+    }
+
     // 检查是否合法区间
     if (CheckRange(zeroExpertStart, zeroExpertEnd, "zero expert") != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -666,8 +744,11 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::GetRequiredInputInfo()
     auto expandedXDesc = context_->GetInputDesc(EXPANDED_X_IDX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, expandedXDesc);
     dtype = expandedXDesc->GetDataType();
-    // 适配hif4
-    if (dtype == Ops::Transformer::DT_HIFLOAT4) {
+    isMx4Dequant_ = dtype == ge::DT_FLOAT4_E2M1;
+    if (isMx4Dequant_) {
+        dtype = ge::DT_BF16;
+        dtypeSize = SIZEOF_B16;
+    } else if (dtype == Ops::Transformer::DT_HIFLOAT4) {
         isHif4Dequant_ = true;
         dtypeSize = 0;                 // hif4不使用这个变量
         dtype = ge::DataType::DT_BF16; // 用于x1/x2/bias的校验
@@ -685,7 +766,25 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::GetRequiredInputInfo()
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "H", "GRAPH_FAILED", "failed to get H."),
                 return ge::GRAPH_FAILED);
 
-    auto scalesShape = context_->GetOptionalInputShape(SCALES_IDX);
+    if (isMx4Dequant_) {
+        OP_CHECK_IF(h % NUM_FP4_IN_BYTE != 0,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "h", std::to_string(h).c_str(),
+                                                          "h must be even for MXFP4 inputs."),
+                    return ge::GRAPH_FAILED);
+        mx4Rows_ = dim0OfExpandedX;
+        if (dropPadMode == DROP_PAD_ROW || dropPadMode == DROP_PAD_COL) {
+            OP_CHECK_IF(__builtin_mul_overflow(e, c, &mx4Rows_),
+                        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "expanded_x", "invalid",
+                                                               "MXFP4 expanded row count overflows."),
+                        return ge::GRAPH_FAILED);
+        }
+        OP_CHECK_IF(mx4Rows_ <= 0,
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "expanded_x", "invalid",
+                                                           "MXFP4 expanded row count must be positive."),
+                    return ge::GRAPH_FAILED);
+    }
+
+    auto scalesShape = context_->GetOptionalInputShape(isMx4Dequant_ ? EXPANDED_X_SCALE_IDX : SCALES_IDX);
     OP_CHECK_IF(GetK(scalesShape) != ge::GRAPH_SUCCESS,
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "K", "GRAPH_FAILED", "failed to get K."),
                 return ge::GRAPH_FAILED);
@@ -722,6 +821,136 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::GetOptionalInputFlags()
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus MoeFinalizeRoutingV2Regbase::CheckMx4Support()
+{
+    const auto platform = context_->GetPlatformInfo();
+    OP_CHECK_NULL_WITH_CONTEXT(context_, platform);
+    OP_CHECK_IF(!Ops::Transformer::OpTiling::IsRegbaseSocVersion(context_),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "platform",
+                                                         "MXFP4 requires a supported Regbase platform."),
+                return ge::GRAPH_FAILED);
+    for (size_t i = 0; i <= EXPANDED_X_SCALE_IDX; ++i) {
+        const auto desc = i <= EXPANDED_ROW_IDX_IDX ? context_->GetInputDesc(i) : context_->GetOptionalInputDesc(i);
+        OP_CHECK_IF(desc != nullptr && i >= X_IDX && i <= CONST_EXPERT_V_IDX,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "x, alpha1, alpha2, v",
+                                                             "MXFP4 requires empty special expert inputs."),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            desc && desc->GetFormat().GetStorageFormat() != ge::FORMAT_ND,
+            OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(context_->GetNodeName(), std::to_string(i).c_str(),
+                                                   Ops::Base::ToString(desc->GetFormat().GetStorageFormat()).c_str(),
+                                                   "MXFP4 inputs must use ND format."),
+            return ge::GRAPH_FAILED);
+    }
+    OP_CHECK_IF(hasBias_ && context_->GetOptionalInputDesc(EXPERTIDX_IDX) == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context_->GetNodeName(), "expert_idx",
+                                                         "expert_idx is required when bias is provided."),
+                return ge::GRAPH_FAILED);
+    int64_t bytes;
+    OP_CHECK_IF(__builtin_mul_overflow(row, h, &bytes) || __builtin_mul_overflow(bytes, SIZEOF_B16, &bytes) ||
+                    __builtin_mul_overflow(row, k, &bytes) || __builtin_mul_overflow(bytes, sizeof(int32_t), &bytes),
+                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(context_->GetNodeName(), "out and expanded_row_idx", "invalid",
+                                                       "MXFP4 output or index byte size overflows."),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+int64_t MoeFinalizeRoutingV2Regbase::Mx4AlignedSize(int64_t size)
+{
+    return Ops::Base::CeilAlign(size, static_cast<int64_t>(blockSize_));
+}
+
+int64_t MoeFinalizeRoutingV2Regbase::Mx4CommonUbSize(int64_t hFactor)
+{
+    return MX4_FP32_BUFFER_NUM * Mx4AlignedSize(sizeof(float) * hFactor) +
+           MX4_BF16_BUFFER_NUM * Mx4AlignedSize(SIZEOF_B16 * hFactor);
+}
+
+int64_t MoeFinalizeRoutingV2Regbase::RowHSizeForMx4(int64_t hFactor)
+{
+    return Mx4CommonUbSize(hFactor) + Mx4AlignedSize(hFactor / NUM_FP4_IN_BYTE) +
+           Mx4AlignedSize(Ops::Base::CeilDiv(hFactor, MX4_GROUP_SIZE)) +
+           (hasBias_ ? Mx4AlignedSize(SIZEOF_B16 * hFactor) : 0);
+}
+
+ge::graphStatus MoeFinalizeRoutingV2Regbase::CalcMx4Factors(int64_t& hFactor, int64_t& kFactor)
+{
+    // DMA lengths and per-queue sizes are uint32. Reserve space for alignment and avoid narrowing overflow.
+    const int64_t limit = std::min<int64_t>(ubSize_, std::numeric_limits<uint32_t>::max() / DOUBLE_BUFFER);
+    hFactor = std::min<int64_t>(h, limit / MX4_UB_BYTES_PER_COLUMN / MX4_BLOCK_SIZE * MX4_BLOCK_SIZE);
+    if (hFactor <= 0) {
+        return ge::GRAPH_FAILED;
+    }
+    if (RowHSizeForMx4(hFactor) > limit) {
+        constexpr auto blockSize = MX4_BLOCK_SIZE;
+        hFactor = (hFactor - 1) / blockSize * blockSize;
+        while (hFactor > 0 && RowHSizeForMx4(hFactor) > limit) {
+            hFactor -= blockSize;
+        }
+    }
+    if (hFactor <= 0) {
+        return ge::GRAPH_FAILED;
+    }
+    kFactor = 1;
+    mx4Key_ = MX4_SPLIT_H_BASE_TILING_KEY;
+    const int64_t scaleStride = MX4_SCALE_PAIR_SIZE * (h / MX4_BLOCK_SIZE + (h % MX4_BLOCK_SIZE != 0));
+    int64_t packedTotal = 0;
+    int64_t scaleTotal = 0;
+    int64_t biasTotal = 0;
+    if (__builtin_mul_overflow(mx4Rows_, h / NUM_FP4_IN_BYTE, &packedTotal) ||
+        __builtin_mul_overflow(mx4Rows_, scaleStride, &scaleTotal) ||
+        __builtin_mul_overflow(mx4BiasRows_, h, &biasTotal) ||
+        __builtin_mul_overflow(biasTotal, SIZEOF_B16, &biasTotal)) {
+        return ge::GRAPH_FAILED;
+    }
+    // Full-row residency is considered only when all row-local buffers fit.
+    if (h <= hFactor && RowHSizeForMx4(h) <= limit) {
+        hFactor = h;
+        const int64_t commonBytes = Mx4CommonUbSize(h);
+        if (packedTotal <= limit && scaleTotal <= limit && biasTotal <= limit &&
+            Mx4AlignedSize(packedTotal) + Mx4AlignedSize(scaleTotal) + Mx4AlignedSize(biasTotal) + commonBytes <=
+                limit) {
+            mx4Key_ = MX4_FULL_LOAD_ROW_K_H_BASE_TILING_KEY;
+        } else {
+            const int64_t perRoute = Mx4AlignedSize(h / NUM_FP4_IN_BYTE) +
+                                     Mx4AlignedSize(Ops::Base::CeilDiv(h, MX4_GROUP_SIZE)) +
+                                     (hasBias_ ? Mx4AlignedSize(SIZEOF_B16 * h) : 0);
+            kFactor = std::min<int64_t>(k, (limit - commonBytes) / perRoute);
+            mx4Key_ = kFactor == k ? MX4_FULL_LOAD_K_H_BASE_TILING_KEY : MX4_K_BATCH_BASE_TILING_KEY;
+        }
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus MoeFinalizeRoutingV2Regbase::TileMx4()
+{
+    int64_t hFactor = 0;
+    int64_t kFactor = 1;
+    if (CalcMx4Factors(hFactor, kFactor) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    tilingData = context_->GetTilingData<MoeFinalizeRoutingV2RegbaseTilingData>();
+    OP_CHECK_NULL_WITH_CONTEXT(context_, tilingData);
+    *tilingData = MoeFinalizeRoutingV2RegbaseTilingData{};
+    usedCoreNum_ = std::min<int64_t>(row, coreNum_);
+    const int64_t rowOfFormerBlock = Ops::Base::CeilDiv(row, static_cast<int64_t>(usedCoreNum_));
+    usedCoreNum_ = Ops::Base::CeilDiv(row, rowOfFormerBlock);
+    tilingData->row = row;
+    tilingData->h = h;
+    tilingData->k = k;
+    tilingData->activeNum = mx4Rows_;
+    tilingData->rowOfFormerBlock = rowOfFormerBlock;
+    tilingData->rowOfTailBlock = row - (usedCoreNum_ - 1) * rowOfFormerBlock;
+    tilingData->rowFactor = 1;
+    tilingData->hFactor = hFactor;
+    tilingData->hLoop = Ops::Base::CeilDiv(h, hFactor);
+    tilingData->tailHFactor = h - (tilingData->hLoop - 1) * hFactor;
+    tilingData->kFactor = kFactor;
+    tilingData->mx4ScaleRowBytes = MX4_SCALE_PAIR_SIZE * (h / MX4_BLOCK_SIZE + (h % MX4_BLOCK_SIZE != 0));
+    tilingData->mx4BiasRows = mx4BiasRows_;
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus MoeFinalizeRoutingV2Regbase::DoGetShapeAttrsInfo()
 {
     if (GetDropPadModeAndExpertRangeAttrs() != ge::GRAPH_SUCCESS) {
@@ -731,6 +960,9 @@ ge::graphStatus MoeFinalizeRoutingV2Regbase::DoGetShapeAttrsInfo()
         return ge::GRAPH_FAILED;
     }
     if (GetOptionalInputFlags() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (isMx4Dequant_ && CheckMx4Support() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     if (CheckShapeAndDtypeIsValid() != ge::GRAPH_SUCCESS) {
@@ -1069,6 +1301,10 @@ void MoeFinalizeRoutingV2Regbase::PrintTilingData()
 
 ge::graphStatus MoeFinalizeRoutingV2Regbase::CalcOpTiling()
 {
+    if (isMx4Dequant_) {
+        return TileMx4();
+    }
+
     int64_t rowPerCore = Ops::Base::CeilDiv(row, static_cast<int64_t>(coreNum_));
     usedCoreNum_ = std::min(Ops::Base::CeilDiv(row, rowPerCore), static_cast<int64_t>(coreNum_));
     int64_t rowOfTailBlock = row - (usedCoreNum_ - 1) * rowPerCore;
@@ -1256,6 +1492,9 @@ bool MoeFinalizeRoutingV2Regbase::IsCapable()
     if (!Ops::Transformer::OpTiling::IsRegbaseSocVersion(context_)) {
         return false;
     }
+    if (isMx4Dequant_) {
+        return true;
+    }
     // 适配hif4
     if (isHif4Dequant_) {
         isHif4RowKHFullLoad_ = IsHif4RowKHFullLoad();
@@ -1291,6 +1530,11 @@ bool MoeFinalizeRoutingV2Regbase::IsCapable()
 
 ge::graphStatus MoeFinalizeRoutingV2Regbase::CalcTilingKey()
 {
+    if (isMx4Dequant_) {
+        tilingKey_ = mx4Key_ + dropPadMode * DROP_PAD_MODE_KEY_BASE;
+        return ge::GRAPH_SUCCESS;
+    }
+
     // 适配hif4
     if (isHif4Dequant_) {
         // isHif4KHFullLoad_必须为True

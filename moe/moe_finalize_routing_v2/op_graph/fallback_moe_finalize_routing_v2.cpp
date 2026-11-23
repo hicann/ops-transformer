@@ -32,61 +32,21 @@ static const size_t X_INDEX = 7;
 static const size_t ALPHA1_INDEX = 8;
 static const size_t ALPHA2_INDEX = 9;
 static const size_t V_INDEX = 10;
+static const size_t EXPANDED_X_SCALE_INDEX = 11;
 
-static std::vector<int64_t> GetExpertRange(const gert::ContinuousVector* ptr)
+static std::vector<int64_t> GetExpertRange(const gert::ContinuousVector* ptr, bool isMx4)
 {
     std::vector<int64_t> range = {-1, -1};
     if (ptr != nullptr) {
         const int64_t* data = reinterpret_cast<const int64_t*>(ptr->GetData());
         range.assign(data, data + ptr->GetSize());
     }
+    // The operator definition uses [-1, -1] for an omitted range.
+    if (isMx4 && range.size() == 2 && range[0] == -1 && range[1] == -1) {
+        return {};
+    }
     return range;
 }
-
-using CreateIntArrayFunc = aclIntArray* (*)(const int64_t*, uint64_t);
-using DestroyIntArrayFunc = int (*)(const aclIntArray*);
-
-static aclIntArray* CreateExpertRange(const std::vector<int64_t>& range)
-{
-    if (range.empty()) {
-        return nullptr;
-    }
-    static const auto aclCreateIntArray = reinterpret_cast<CreateIntArrayFunc>(GetOpApiFuncAddr("aclCreateIntArray"));
-    OP_CHECK_IF(
-        aclCreateIntArray == nullptr,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnfallback", "aclCreateIntArray", "aclCreateIntArray is null"),
-        return nullptr);
-    return aclCreateIntArray(range.data(), range.size());
-}
-
-class ExpertRangeGuard {
-public:
-    explicit ExpertRangeGuard(const std::vector<int64_t>& range)
-        : range_(CreateExpertRange(range))
-    {}
-
-    ~ExpertRangeGuard()
-    {
-        if (range_ == nullptr) {
-            return;
-        }
-        static const auto aclDestroyIntArray =
-            reinterpret_cast<DestroyIntArrayFunc>(GetOpApiFuncAddr("aclDestroyIntArray"));
-        OP_CHECK_IF(aclDestroyIntArray == nullptr,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnfallback", "aclDestroyIntArray",
-                                                             "aclDestroyIntArray is null"),
-                    return);
-        aclDestroyIntArray(range_);
-    }
-
-    aclIntArray* Get() const
-    {
-        return range_;
-    }
-
-private:
-    aclIntArray* range_;
-};
 
 static graphStatus MoeFinalizeRoutingV2HostExecuteFunc(OpExecuteContext* host_api_ctx)
 {
@@ -135,27 +95,31 @@ static graphStatus MoeFinalizeRoutingV2HostExecuteFunc(OpExecuteContext* host_ap
     const gert::ContinuousVector* constant_expert_range_ptr = attrs->GetAttrPointer<gert::ContinuousVector>(3);
     const int64_t* k = attrs->GetAttrPointer<int64_t>(4);
 
-    std::vector<int64_t> zeroExpertRangeVec = GetExpertRange(zero_expert_range_ptr);
-    std::vector<int64_t> copyExpertRangeVec = GetExpertRange(copy_expert_range_ptr);
-    std::vector<int64_t> constantExpertRangeVec = GetExpertRange(constant_expert_range_ptr);
-    ExpertRangeGuard zeroExpertRangeAcl(zeroExpertRangeVec);
-    ExpertRangeGuard copyExpertRangeAcl(copyExpertRangeVec);
-    ExpertRangeGuard constantExpertRangeAcl(constantExpertRangeVec);
-    aclIntArray* zeroExpertRange = zeroExpertRangeAcl.Get();
-    aclIntArray* copyExpertRange = copyExpertRangeAcl.Get();
-    aclIntArray* constantExpertRange = constantExpertRangeAcl.Get();
+    const bool isMx4 = expanded_permuted_rows->GetDataType() == ge::DT_FLOAT4_E2M1;
+    const auto zeroExpertRange = GetExpertRange(zero_expert_range_ptr, isMx4);
+    const auto copyExpertRange = GetExpertRange(copy_expert_range_ptr, isMx4);
+    const auto constantExpertRange = GetExpertRange(constant_expert_range_ptr, isMx4);
 
     auto output = host_api_ctx->GetOutputTensor(0);
     OP_CHECK_IF(output == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnfallback", "output", "output is null"),
                 return GRAPH_FAILED);
 
-    // execute opapi
-    auto api_ret = EXEC_OPAPI_CMD(aclnnMoeFinalizeRoutingV4, expanded_permuted_rows, expanded_src_to_dst_row, skip1,
-                                  skip2_optional, bias, scales, expert_for_source_row, x, alpha1, alpha2, v, *mode,
-                                  zeroExpertRange, copyExpertRange, constantExpertRange, *k, output);
-    OP_CHECK_IF(api_ret != GRAPH_SUCCESS,
-                OP_LOGE_WITHOUT_REPORT(host_api_ctx->GetNodeName(), "api_ret faild:%u", api_ret), return GRAPH_FAILED);
+    // EXEC_OPAPI_CMD converts and releases the expert range arrays.
+    const auto expandedXScale = isMx4 ? host_api_ctx->GetOptionalInputTensor(EXPANDED_X_SCALE_INDEX) : nullptr;
+    const auto api_ret =
+        isMx4 ?
+            EXEC_OPAPI_CMD(aclnnMoeFinalizeRoutingV5, expanded_permuted_rows, expanded_src_to_dst_row, skip1,
+                           skip2_optional, bias, scales, expert_for_source_row, x, alpha1, alpha2, v, expandedXScale,
+                           *mode, zeroExpertRange, copyExpertRange, constantExpertRange, *k, output) :
+            EXEC_OPAPI_CMD(aclnnMoeFinalizeRoutingV4, expanded_permuted_rows, expanded_src_to_dst_row, skip1,
+                           skip2_optional, bias, scales, expert_for_source_row, x, alpha1, alpha2, v, *mode,
+                           zeroExpertRange, copyExpertRange, constantExpertRange, *k, output);
+    OP_CHECK_IF(
+        api_ret != GRAPH_SUCCESS,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(host_api_ctx->GetNodeName(), "aclnn status",
+                                              std::to_string(api_ret).c_str(), "MoeFinalizeRoutingV2 fallback failed."),
+        return GRAPH_FAILED);
 
     return GRAPH_SUCCESS;
 }

@@ -47,6 +47,8 @@ struct MoeFinalizeRoutingV2RegbaseTilingData {
     int64_t constantExpertStart = 0;
     int64_t constantExpertEnd = 0;
     int64_t constExpertRangeNum = 0;
+    int64_t mx4ScaleRowBytes = 0; // tightly packed GM scale row stride
+    int64_t mx4BiasRows = 0;
 };
 
 #endif

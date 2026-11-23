@@ -113,6 +113,16 @@
           "shape": [
             -2
           ]
+        },
+          {
+          "name": "expanded_x_scale",
+          "index": 11,
+          "dtype": "float8_e8m0",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [
+            -2
+          ]
         }
       ],
       "outputs": [
@@ -276,6 +286,16 @@
           "shape": [
             -2
           ]
+        },
+          {
+          "name": "expanded_x_scale",
+          "index": 11,
+          "dtype": "float8_e8m0",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [
+            -2
+          ]
         }
       ],
       "outputs": [
@@ -434,6 +454,16 @@
           "name": "v",
           "index": 10,
           "dtype": "bfloat16",
+          "format": "ND",
+          "paramType": "optional",
+          "shape": [
+            -2
+          ]
+        },
+          {
+          "name": "expanded_x_scale",
+          "index": 11,
+          "dtype": "float8_e8m0",
           "format": "ND",
           "paramType": "optional",
           "shape": [

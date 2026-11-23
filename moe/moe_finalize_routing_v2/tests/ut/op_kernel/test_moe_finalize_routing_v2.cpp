@@ -23,8 +23,9 @@
 extern "C" __global__ __aicore__ void moe_finalize_routing_v2(GM_ADDR expandedPermutedRows, GM_ADDR expandedSrcToDstRow,
                                                               GM_ADDR skip1, GM_ADDR skip2, GM_ADDR bias,
                                                               GM_ADDR scales, GM_ADDR expertForSourceRow, GM_ADDR x,
-                                                              GM_ADDR alpha1, GM_ADDR alpha2, GM_ADDR v, GM_ADDR out,
-                                                              GM_ADDR workspace, GM_ADDR tiling);
+                                                              GM_ADDR alpha1, GM_ADDR alpha2, GM_ADDR v,
+                                                              GM_ADDR expandedXScale, GM_ADDR out, GM_ADDR workspace,
+                                                              GM_ADDR tiling);
 
 class moe_finalize_routing_test_v2 : public testing::Test {
 protected:
@@ -94,8 +95,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float32_db1)
 
     ICPU_SET_TILING_KEY(20004);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -166,8 +167,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float16_db1)
 
     ICPU_SET_TILING_KEY(20005);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -238,8 +239,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_bfloat16_db1)
 
     ICPU_SET_TILING_KEY(20003);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -310,8 +311,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float32_cuth_k2)
 
     ICPU_SET_TILING_KEY(20006);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -382,8 +383,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float16_cuth_k2)
 
     ICPU_SET_TILING_KEY(20007);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -454,8 +455,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_bfloat16_cuth_k2)
 
     ICPU_SET_TILING_KEY(20008);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -526,8 +527,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float32_cuth_k4)
 
     ICPU_SET_TILING_KEY(20009);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -598,8 +599,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float16_cuth_k4)
 
     ICPU_SET_TILING_KEY(20010);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -670,8 +671,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_bfloat16_cuth_k4)
 
     ICPU_SET_TILING_KEY(20011);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -742,8 +743,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float32_cuth)
 
     ICPU_SET_TILING_KEY(20012);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -814,8 +815,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float16_cuth)
 
     ICPU_SET_TILING_KEY(20013);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -886,8 +887,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_bfloat16_cuth)
 
     ICPU_SET_TILING_KEY(20014);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -958,8 +959,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float32_cutk)
 
     ICPU_SET_TILING_KEY(20000);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -1030,8 +1031,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float16_cutk)
 
     ICPU_SET_TILING_KEY(20001);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -1102,8 +1103,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_bfloat16_cutk)
 
     ICPU_SET_TILING_KEY(20002);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -1174,8 +1175,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float32_all_bias)
 
     ICPU_SET_TILING_KEY(20015);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -1246,8 +1247,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float16_all_bias)
 
     ICPU_SET_TILING_KEY(20016);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -1318,8 +1319,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_bfloat16_all_bias)
 
     ICPU_SET_TILING_KEY(20017);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -1390,8 +1391,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float32_networkCase)
 
     ICPU_SET_TILING_KEY(20018);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -1462,8 +1463,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float32_db1_without_bias)
 
     ICPU_SET_TILING_KEY(20023);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -1534,8 +1535,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float16_db1_without_bias)
 
     ICPU_SET_TILING_KEY(20024);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -1606,8 +1607,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_bfloat16_db1_without_bias)
 
     ICPU_SET_TILING_KEY(20022);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -1678,8 +1679,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float32_cuth_k2_without_bias)
 
     ICPU_SET_TILING_KEY(20025);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -1750,8 +1751,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float16_cuth_k2_without_bias)
 
     ICPU_SET_TILING_KEY(20026);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -1822,8 +1823,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_bfloat16_cuth_k2_without_bias)
 
     ICPU_SET_TILING_KEY(20027);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -1894,8 +1895,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float32_cuth_k4_without_bias)
 
     ICPU_SET_TILING_KEY(20028);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -1966,8 +1967,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float16_cuth_k4_without_bias)
 
     ICPU_SET_TILING_KEY(20029);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -2038,8 +2039,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_bfloat16_cuth_k4_without_bias)
 
     ICPU_SET_TILING_KEY(20030);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -2110,8 +2111,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float32_cuth_without_bias)
 
     ICPU_SET_TILING_KEY(20031);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -2182,8 +2183,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float16_cuth_without_bias)
 
     ICPU_SET_TILING_KEY(20032);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -2254,8 +2255,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_bfloat16_cuth_without_bias)
 
     ICPU_SET_TILING_KEY(20033);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -2326,8 +2327,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float32_cutk_without_bias)
 
     ICPU_SET_TILING_KEY(20019);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -2398,8 +2399,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float16_cutk_without_bias)
 
     ICPU_SET_TILING_KEY(20020);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -2470,8 +2471,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_bfloat16_cutk_without_bias)
 
     ICPU_SET_TILING_KEY(20021);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -2542,8 +2543,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float32_all_bias_without_bias)
 
     ICPU_SET_TILING_KEY(20034);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -2614,8 +2615,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_float16_all_bias_without_bias)
 
     ICPU_SET_TILING_KEY(20035);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -2686,8 +2687,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_bfloat16_all_bias_without_bias)
 
     ICPU_SET_TILING_KEY(20036);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -2758,8 +2759,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_0037_bf16_fp32_cutk)
 
     ICPU_SET_TILING_KEY(20002);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -2830,8 +2831,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_0038_bf16_fp32_db1)
 
     ICPU_SET_TILING_KEY(20003);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -2902,8 +2903,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_0039_bf16_fp32_cuth_k2)
 
     ICPU_SET_TILING_KEY(20008);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -2974,8 +2975,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_0040_bf16_fp32_cuth_k4)
 
     ICPU_SET_TILING_KEY(20011);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -3046,8 +3047,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_0041_bf16_fp32_cuth)
 
     ICPU_SET_TILING_KEY(20014);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -3118,8 +3119,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_0042_bf16_fp32_all_bias)
 
     ICPU_SET_TILING_KEY(20017);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -3190,8 +3191,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_0043_bf16_fp32_cutk_without_bias)
 
     ICPU_SET_TILING_KEY(20021);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -3262,8 +3263,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_0044_bf16_fp32_db1_without_bias)
 
     ICPU_SET_TILING_KEY(20022);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -3334,8 +3335,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_0045_bf16_fp32_cuth_k2_without_bi
 
     ICPU_SET_TILING_KEY(20027);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -3406,8 +3407,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_0046_bf16_fp32_cuth_k4_without_bi
 
     ICPU_SET_TILING_KEY(20030);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -3478,8 +3479,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_0047_bf16_fp32_cuth_without_bias)
 
     ICPU_SET_TILING_KEY(20033);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);
@@ -3550,8 +3551,8 @@ TEST_F(moe_finalize_routing_test_v2, test_case_0048_bf16_fp32_all_bias_without_b
 
     ICPU_SET_TILING_KEY(20036);
     ICPU_RUN_KF(moe_finalize_routing_v2, blockDim, in_expanded_permuted_rows, in_expanded_src_to_dst_row, in_skip1,
-                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, out,
-                workSpace, tiling);
+                in_skip2, in_bias, in_scales, in_expert_for_source_row, nullptr, nullptr, nullptr, nullptr, nullptr,
+                out, workSpace, tiling);
 
     WriteFile(curPath + "/finalize_routing_v2_data/output.bin", out, outByteSize);
     AscendC::GmFree((void*)in_expanded_permuted_rows);

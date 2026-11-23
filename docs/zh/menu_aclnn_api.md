@@ -180,6 +180,7 @@
 - [aclnnMoeFinalizeRoutingV2Grad](../../moe/moe_finalize_routing_v2_grad/docs/aclnnMoeFinalizeRoutingV2Grad.md)
 - [aclnnMoeFinalizeRoutingV3](../../moe/moe_finalize_routing_v2/docs/aclnnMoeFinalizeRoutingV3.md)
 - [aclnnMoeFinalizeRoutingV4](../../moe/moe_finalize_routing_v2/docs/aclnnMoeFinalizeRoutingV4.md)
+- [aclnnMoeFinalizeRoutingV5](../../moe/moe_finalize_routing_v2/docs/aclnnMoeFinalizeRoutingV5.md)
 - [aclnnMoeFusedTopk](../../moe/moe_fused_topk/docs/aclnnMoeFusedTopk.md)
 - [aclnnMoeGatingTopK](../../moe/moe_gating_top_k/docs/aclnnMoeGatingTopK.md)
 - [aclnnMoeGatingTopKBackward](../../moe/moe_gating_top_k_backward/docs/aclnnMoeGatingTopKBackward.md)

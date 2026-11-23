@@ -394,6 +394,40 @@ private:
 
     LocalTensor<float> yLocal;
 };
+
+#ifdef MOE_FINALIZE_ROUTING_HAS_MXFP4
+// MXFP4 specialization: BF16 output and FP32 accumulation.
+template <int32_t dropPadMode>
+class MoeFinalizeRoutingV2HFullLoad<fp4x2_e2m1_t, float8_e8m0_t, dropPadMode>
+    : public MoeFinalizeRoutingV2Mx4Base<dropPadMode> {
+    using TYPE = bfloat16_t;
+
+public:
+    __aicore__ inline void Init(GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR x1, GM_ADDR x2, GM_ADDR bias,
+                                GM_ADDR scales, GM_ADDR routingWeights, GM_ADDR expertIdx, GM_ADDR y,
+                                GM_ADDR /*workspace*/, const MoeFinalizeRoutingV2RegbaseTilingData* data, TPipe* pipe)
+    {
+        this->InitMx4Inputs(expandedX, expandedRowIdx, x1, x2, bias, scales, routingWeights, expertIdx, y, data, pipe);
+        const int64_t rows = this->d_->kFactor;
+        this->pipe_->InitBuffer(this->packedQue_, MX4_QUEUE_DEPTH, rows * this->packedStride_);
+        this->pipe_->InitBuffer(this->scaleQue_, MX4_QUEUE_DEPTH, rows * this->scaleStride_);
+        if (this->hasBias_) {
+            this->pipe_->InitBuffer(this->biasQue_, MX4_QUEUE_DEPTH, rows * this->auxStride_ * sizeof(TYPE));
+        }
+    }
+
+    __aicore__ inline void Process()
+    {
+        const int64_t start = GetBlockIdx() * this->d_->rowOfFormerBlock;
+        const int64_t count =
+            GetBlockIdx() == GetBlockNum() - 1 ? this->d_->rowOfTailBlock : this->d_->rowOfFormerBlock;
+        for (int64_t row = start; row < start + count; ++row) {
+            this->ComputeMx4BatchTile(row, 0, static_cast<uint32_t>(this->d_->h));
+        }
+    }
+};
+#endif
+
 } // namespace MoeFinalizeRoutingV2Regbase
 
 #endif

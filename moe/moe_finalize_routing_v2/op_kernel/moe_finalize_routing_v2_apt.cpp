@@ -90,6 +90,23 @@
 #define TILING_KEY_HIF4_ROW_K_H_FULL_LOAD_DROPLESS_ROW 80020
 #define TILING_KEY_HIF4_ROW_K_H_FULL_LOAD_DROP_PAD_ROW 80030
 
+#define TILING_KEY_MX4_K_BATCH_DROPLESS_COLUMN 130000
+#define TILING_KEY_MX4_K_BATCH_DROP_PAD_COLUMN 130010
+#define TILING_KEY_MX4_K_BATCH_DROPLESS_ROW 130020
+#define TILING_KEY_MX4_K_BATCH_DROP_PAD_ROW 130030
+#define TILING_KEY_MX4_H_PARTIAL_LOAD_DROPLESS_COLUMN 140000
+#define TILING_KEY_MX4_H_PARTIAL_LOAD_DROP_PAD_COLUMN 140010
+#define TILING_KEY_MX4_H_PARTIAL_LOAD_DROPLESS_ROW 140020
+#define TILING_KEY_MX4_H_PARTIAL_LOAD_DROP_PAD_ROW 140030
+#define TILING_KEY_MX4_K_H_FULL_LOAD_DROPLESS_COLUMN 150000
+#define TILING_KEY_MX4_K_H_FULL_LOAD_DROP_PAD_COLUMN 150010
+#define TILING_KEY_MX4_K_H_FULL_LOAD_DROPLESS_ROW 150020
+#define TILING_KEY_MX4_K_H_FULL_LOAD_DROP_PAD_ROW 150030
+#define TILING_KEY_MX4_ROW_K_H_FULL_LOAD_DROPLESS_COLUMN 160000
+#define TILING_KEY_MX4_ROW_K_H_FULL_LOAD_DROP_PAD_COLUMN 160010
+#define TILING_KEY_MX4_ROW_K_H_FULL_LOAD_DROPLESS_ROW 160020
+#define TILING_KEY_MX4_ROW_K_H_FULL_LOAD_DROP_PAD_ROW 160030
+
 using namespace MoeFinalizeRoutingV2Regbase;
 
 #define MOE_FINALIZE_ROUTING_V2_H_FULLLOAD_IMPL(INPUT_TYPE, SCALE_DTYPE, DROP_PAD_MODE) \
@@ -158,17 +175,115 @@ using namespace MoeFinalizeRoutingV2Regbase;
 extern "C" __global__ __aicore__ void moe_finalize_routing_v2(GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR x1,
                                                               GM_ADDR x2, GM_ADDR bias, GM_ADDR scales,
                                                               GM_ADDR expertIdx, GM_ADDR x, GM_ADDR alpha1,
-                                                              GM_ADDR alpha2, GM_ADDR v, GM_ADDR y, GM_ADDR workspace,
-                                                              GM_ADDR tiling)
+                                                              GM_ADDR alpha2, GM_ADDR v, GM_ADDR expandedXScale,
+                                                              GM_ADDR y, GM_ADDR workspace, GM_ADDR tiling)
 {
-    GM_ADDR userWS = GetUserWorkspace(workspace);
-    if (userWS == nullptr) {
-        return;
+    GM_ADDR userWS = nullptr;
+    // MXFP4 uses only UB buffers; zero workspace is valid for this path.
+    if constexpr (!IsSameType<DTYPE_EXPANDED_X, fp4x2_e2m1_t>::value) {
+        userWS = GetUserWorkspace(workspace);
+        if (userWS == nullptr) {
+            return;
+        }
     }
 
     REGISTER_TILING_DEFAULT(MoeFinalizeRoutingV2RegbaseTilingData);
     GET_TILING_DATA(tilingData, tiling);
     TPipe tPipe;
+#ifdef MOE_FINALIZE_ROUTING_HAS_MXFP4
+    if constexpr (IsSameType<DTYPE_EXPANDED_X, fp4x2_e2m1_t>::value) {
+        if (TILING_KEY_IS(TILING_KEY_MX4_K_BATCH_DROPLESS_COLUMN)) {
+            MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2HFullLoad<fp4x2_e2m1_t, float8_e8m0_t, DROPLESS_COLUMN> op;
+            op.Init(expandedX, expandedRowIdx, x1, x2, bias, expandedXScale, scales, expertIdx, y, userWS, &tilingData,
+                    &tPipe);
+            op.Process();
+        } else if (TILING_KEY_IS(TILING_KEY_MX4_K_BATCH_DROP_PAD_COLUMN)) {
+            MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2HFullLoad<fp4x2_e2m1_t, float8_e8m0_t, DROP_PAD_COLUMN> op;
+            op.Init(expandedX, expandedRowIdx, x1, x2, bias, expandedXScale, scales, expertIdx, y, userWS, &tilingData,
+                    &tPipe);
+            op.Process();
+        } else if (TILING_KEY_IS(TILING_KEY_MX4_K_BATCH_DROPLESS_ROW)) {
+            MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2HFullLoad<fp4x2_e2m1_t, float8_e8m0_t, DROPLESS_ROW> op;
+            op.Init(expandedX, expandedRowIdx, x1, x2, bias, expandedXScale, scales, expertIdx, y, userWS, &tilingData,
+                    &tPipe);
+            op.Process();
+        } else if (TILING_KEY_IS(TILING_KEY_MX4_K_BATCH_DROP_PAD_ROW)) {
+            MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2HFullLoad<fp4x2_e2m1_t, float8_e8m0_t, DROP_PAD_ROW> op;
+            op.Init(expandedX, expandedRowIdx, x1, x2, bias, expandedXScale, scales, expertIdx, y, userWS, &tilingData,
+                    &tPipe);
+            op.Process();
+        } else if (TILING_KEY_IS(TILING_KEY_MX4_H_PARTIAL_LOAD_DROPLESS_COLUMN)) {
+            MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2HPartialLoad<fp4x2_e2m1_t, float8_e8m0_t, DROPLESS_COLUMN>
+                op;
+            op.Init(expandedX, expandedRowIdx, x1, x2, bias, expandedXScale, scales, expertIdx, y, userWS, &tilingData,
+                    &tPipe);
+            op.Process();
+        } else if (TILING_KEY_IS(TILING_KEY_MX4_H_PARTIAL_LOAD_DROP_PAD_COLUMN)) {
+            MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2HPartialLoad<fp4x2_e2m1_t, float8_e8m0_t, DROP_PAD_COLUMN>
+                op;
+            op.Init(expandedX, expandedRowIdx, x1, x2, bias, expandedXScale, scales, expertIdx, y, userWS, &tilingData,
+                    &tPipe);
+            op.Process();
+        } else if (TILING_KEY_IS(TILING_KEY_MX4_H_PARTIAL_LOAD_DROPLESS_ROW)) {
+            MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2HPartialLoad<fp4x2_e2m1_t, float8_e8m0_t, DROPLESS_ROW> op;
+            op.Init(expandedX, expandedRowIdx, x1, x2, bias, expandedXScale, scales, expertIdx, y, userWS, &tilingData,
+                    &tPipe);
+            op.Process();
+        } else if (TILING_KEY_IS(TILING_KEY_MX4_H_PARTIAL_LOAD_DROP_PAD_ROW)) {
+            MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2HPartialLoad<fp4x2_e2m1_t, float8_e8m0_t, DROP_PAD_ROW> op;
+            op.Init(expandedX, expandedRowIdx, x1, x2, bias, expandedXScale, scales, expertIdx, y, userWS, &tilingData,
+                    &tPipe);
+            op.Process();
+        } else if (TILING_KEY_IS(TILING_KEY_MX4_K_H_FULL_LOAD_DROPLESS_COLUMN)) {
+            MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2KHFullLoad<fp4x2_e2m1_t, float8_e8m0_t, DROPLESS_COLUMN>
+                op;
+            op.Init(expandedX, expandedRowIdx, x1, x2, bias, expandedXScale, scales, expertIdx, y, userWS, &tilingData,
+                    &tPipe);
+            op.Process();
+        } else if (TILING_KEY_IS(TILING_KEY_MX4_K_H_FULL_LOAD_DROP_PAD_COLUMN)) {
+            MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2KHFullLoad<fp4x2_e2m1_t, float8_e8m0_t, DROP_PAD_COLUMN>
+                op;
+            op.Init(expandedX, expandedRowIdx, x1, x2, bias, expandedXScale, scales, expertIdx, y, userWS, &tilingData,
+                    &tPipe);
+            op.Process();
+        } else if (TILING_KEY_IS(TILING_KEY_MX4_K_H_FULL_LOAD_DROPLESS_ROW)) {
+            MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2KHFullLoad<fp4x2_e2m1_t, float8_e8m0_t, DROPLESS_ROW> op;
+            op.Init(expandedX, expandedRowIdx, x1, x2, bias, expandedXScale, scales, expertIdx, y, userWS, &tilingData,
+                    &tPipe);
+            op.Process();
+        } else if (TILING_KEY_IS(TILING_KEY_MX4_K_H_FULL_LOAD_DROP_PAD_ROW)) {
+            MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2KHFullLoad<fp4x2_e2m1_t, float8_e8m0_t, DROP_PAD_ROW> op;
+            op.Init(expandedX, expandedRowIdx, x1, x2, bias, expandedXScale, scales, expertIdx, y, userWS, &tilingData,
+                    &tPipe);
+            op.Process();
+        } else if (TILING_KEY_IS(TILING_KEY_MX4_ROW_K_H_FULL_LOAD_DROPLESS_COLUMN)) {
+            MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2RowKHFullLoad<fp4x2_e2m1_t, float8_e8m0_t, DROPLESS_COLUMN>
+                op;
+            op.Init(expandedX, expandedRowIdx, x1, x2, bias, expandedXScale, scales, expertIdx, y, userWS, &tilingData,
+                    &tPipe);
+            op.Process();
+        } else if (TILING_KEY_IS(TILING_KEY_MX4_ROW_K_H_FULL_LOAD_DROP_PAD_COLUMN)) {
+            MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2RowKHFullLoad<fp4x2_e2m1_t, float8_e8m0_t, DROP_PAD_COLUMN>
+                op;
+            op.Init(expandedX, expandedRowIdx, x1, x2, bias, expandedXScale, scales, expertIdx, y, userWS, &tilingData,
+                    &tPipe);
+            op.Process();
+        } else if (TILING_KEY_IS(TILING_KEY_MX4_ROW_K_H_FULL_LOAD_DROPLESS_ROW)) {
+            MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2RowKHFullLoad<fp4x2_e2m1_t, float8_e8m0_t, DROPLESS_ROW>
+                op;
+            op.Init(expandedX, expandedRowIdx, x1, x2, bias, expandedXScale, scales, expertIdx, y, userWS, &tilingData,
+                    &tPipe);
+            op.Process();
+        } else if (TILING_KEY_IS(TILING_KEY_MX4_ROW_K_H_FULL_LOAD_DROP_PAD_ROW)) {
+            MoeFinalizeRoutingV2Regbase::MoeFinalizeRoutingV2RowKHFullLoad<fp4x2_e2m1_t, float8_e8m0_t, DROP_PAD_ROW>
+                op;
+            op.Init(expandedX, expandedRowIdx, x1, x2, bias, expandedXScale, scales, expertIdx, y, userWS, &tilingData,
+                    &tPipe);
+            op.Process();
+        }
+        return;
+    }
+#endif
     // 适配hif4：部分函数模板无法实例化fp4类型，因此需要区分编译
     if constexpr (IsSameType<DTYPE_EXPANDED_X, float>::value || IsSameType<DTYPE_EXPANDED_X, half>::value ||
                   IsSameType<DTYPE_EXPANDED_X, bfloat16_t>::value) {
@@ -271,7 +386,7 @@ extern "C" __global__ __aicore__ void moe_finalize_routing_v2(GM_ADDR expandedX,
         }
     }
 #if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
-    else {
+    else if constexpr (IsSameType<DTYPE_EXPANDED_X, fp4x2_e1m2_t>::value) {
         if (TILING_KEY_IS(TILING_KEY_HIF4_K_H_FULL_LOAD_DROPLESS_COLUMN)) {
             MOE_FINALIZE_ROUTING_V2_HIF4_KH_FULLLOAD_IMPL(DROPLESS_COLUMN);
         } else if (TILING_KEY_IS(TILING_KEY_HIF4_K_H_FULL_LOAD_DROP_PAD_COLUMN)) {

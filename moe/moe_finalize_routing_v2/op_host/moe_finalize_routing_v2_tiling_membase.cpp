@@ -15,6 +15,7 @@
 #include "log/log.h"
 #include <string>
 #include "moe_finalize_routing_v2_tiling.h"
+#include "op_host/op_const_def_transformer.h"
 #include "op_host/util/op_const_def.h"
 #include "op_host/tiling_util.h"
 using namespace std;
@@ -181,6 +182,12 @@ ge::graphStatus MoeFinalizeRoutingV2Membase::SetParamInfo()
 
 ge::graphStatus MoeFinalizeRoutingV2Membase::DoGetShapeAttrsInfo()
 {
+    // Regbase validates the scale layouts for both 4-bit input types.
+    const auto input = context_->GetInputDesc(INDEX_IN_EXPAND_PERMUTED_ROWS_V2);
+    if (input &&
+        (input->GetDataType() == ge::DT_FLOAT4_E2M1 || input->GetDataType() == Ops::Transformer::DT_HIFLOAT4)) {
+        return ge::GRAPH_PARAM_INVALID;
+    }
     offset_ = 0;
     auto expandedXShapePtr = context_->GetInputShape(INDEX_IN_EXPAND_PERMUTED_ROWS_V2);
     OP_CHECK_IF(expandedXShapePtr == nullptr, OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "expanded_x"),

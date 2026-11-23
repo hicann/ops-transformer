@@ -113,6 +113,16 @@
             "shape": [
               -2
             ]
+          },
+          {
+            "name": "expanded_x_scale",
+            "index": 11,
+            "dtype": "float8_e8m0",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ]
           }
         ],
         "outputs": [
@@ -271,6 +281,16 @@
             "name": "v",
             "index": 10,
             "dtype": "float16",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ]
+          },
+          {
+            "name": "expanded_x_scale",
+            "index": 11,
+            "dtype": "float8_e8m0",
             "format": "ND",
             "paramType": "optional",
             "shape": [
@@ -439,6 +459,16 @@
             "shape": [
               -2
             ]
+          },
+          {
+            "name": "expanded_x_scale",
+            "index": 11,
+            "dtype": "float8_e8m0",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ]
           }
         ],
         "outputs": [
@@ -597,6 +627,189 @@
             "name": "v",
             "index": 10,
             "dtype": "bfloat16",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ]
+          },
+          {
+            "name": "expanded_x_scale",
+            "index": 11,
+            "dtype": "float32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ]
+          }
+        ],
+        "outputs": [
+          {
+            "name": "y",
+            "index": 0,
+            "dtype": "bfloat16",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ]
+          }
+        ],
+        "attrs": [
+          {
+            "name": "drop_pad_mode",
+            "dtype": "int",
+            "value": 0
+          },
+          {
+            "name": "zero_expert_range",
+            "dtype": "listInt",
+            "value": [
+              -1,
+              -1
+            ]
+          },
+          {
+            "name": "copy_expert_range",
+            "dtype": "listInt",
+            "value": [
+              -1,
+              -1
+            ]
+          },
+          {
+            "name": "constant_expert_range",
+            "dtype": "listInt",
+            "value": [
+              -1,
+              -1
+            ]
+          },
+          {
+            "name": "k",
+            "dtype": "int",
+            "value": 1
+          }
+        ]
+      },
+      {
+        "bin_filename": "MoeFinalizeRoutingV2_mx4_bfloat16",
+        "inputs": [
+          {
+            "name": "expanded_x",
+            "index": 0,
+            "dtype": "float4_e2m1",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ]
+          },
+          {
+            "name": "expanded_row_idx",
+            "index": 1,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ]
+          },
+          {
+            "name": "x1",
+            "index": 2,
+            "dtype": "bfloat16",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ]
+          },
+          {
+            "name": "x2",
+            "index": 3,
+            "dtype": "bfloat16",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ]
+          },
+          {
+            "name": "bias",
+            "index": 4,
+            "dtype": "bfloat16",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ]
+          },
+          {
+            "name": "scales",
+            "index": 5,
+            "dtype": "float32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ]
+          },
+          {
+            "name": "expert_idx",
+            "index": 6,
+            "dtype": "int32",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ]
+          },
+          {
+            "name": "x",
+            "index": 7,
+            "dtype": "bfloat16",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ]
+          },
+          {
+            "name": "alpha1",
+            "index": 8,
+            "dtype": "bfloat16",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ]
+          },
+          {
+            "name": "alpha2",
+            "index": 9,
+            "dtype": "bfloat16",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ]
+          },
+          {
+            "name": "v",
+            "index": 10,
+            "dtype": "bfloat16",
+            "format": "ND",
+            "paramType": "optional",
+            "shape": [
+              -2
+            ]
+          },
+          {
+            "name": "expanded_x_scale",
+            "index": 11,
+            "dtype": "float8_e8m0",
             "format": "ND",
             "paramType": "optional",
             "shape": [

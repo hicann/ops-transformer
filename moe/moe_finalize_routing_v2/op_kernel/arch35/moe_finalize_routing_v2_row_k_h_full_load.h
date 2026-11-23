@@ -394,6 +394,80 @@ private:
     int64_t expandedRowIdxOffset{0};
     int64_t expertIdxOffset{0};
 };
+
+#ifdef MOE_FINALIZE_ROUTING_HAS_MXFP4
+// MXFP4 specialization: BF16 output and FP32 accumulation.
+template <int32_t dropPadMode>
+class MoeFinalizeRoutingV2RowKHFullLoad<fp4x2_e2m1_t, float8_e8m0_t, dropPadMode>
+    : public MoeFinalizeRoutingV2Mx4Base<dropPadMode> {
+    using TYPE = bfloat16_t;
+
+public:
+    __aicore__ inline void Init(GM_ADDR expandedX, GM_ADDR expandedRowIdx, GM_ADDR x1, GM_ADDR x2, GM_ADDR bias,
+                                GM_ADDR scales, GM_ADDR routingWeights, GM_ADDR expertIdx, GM_ADDR y,
+                                GM_ADDR /*workspace*/, const MoeFinalizeRoutingV2RegbaseTilingData* data, TPipe* pipe)
+    {
+        this->InitMx4Inputs(expandedX, expandedRowIdx, x1, x2, bias, scales, routingWeights, expertIdx, y, data, pipe);
+        this->pipe_->InitBuffer(this->packedQue_, MX4_QUEUE_DEPTH,
+                                this->Align(this->d_->activeNum * this->d_->h / NUM_FP4_IN_BYTE));
+        this->pipe_->InitBuffer(this->scaleQue_, MX4_QUEUE_DEPTH,
+                                this->Align(this->d_->activeNum * this->d_->mx4ScaleRowBytes));
+        if (this->hasBias_) {
+            this->pipe_->InitBuffer(this->biasQue_, MX4_QUEUE_DEPTH,
+                                    this->Align(this->d_->mx4BiasRows * this->d_->h * sizeof(TYPE)));
+        }
+    }
+
+    __aicore__ inline void Process()
+    {
+        this->packedLocal_ = this->packedQue_.template AllocTensor<uint8_t>();
+        this->scaleLocal_ = this->scaleQue_.template AllocTensor<uint8_t>();
+        this->CopyBytes(this->packedLocal_, this->x_, this->d_->activeNum * this->d_->h / NUM_FP4_IN_BYTE);
+        this->CopyBytes(this->scaleLocal_, this->scales_, this->d_->activeNum * this->d_->mx4ScaleRowBytes);
+        this->packedQue_.EnQue(this->packedLocal_);
+        this->scaleQue_.EnQue(this->scaleLocal_);
+        this->packedLocal_ = this->packedQue_.template DeQue<uint8_t>();
+        this->scaleLocal_ = this->scaleQue_.template DeQue<uint8_t>();
+        if (this->hasBias_) {
+            this->biasLocal_ = this->biasQue_.template AllocTensor<TYPE>();
+            CopyIn(this->bias_, this->biasLocal_, 1, this->d_->mx4BiasRows * this->d_->h);
+            this->biasQue_.EnQue(this->biasLocal_);
+            this->biasLocal_ = this->biasQue_.template DeQue<TYPE>();
+        }
+        const int64_t start = GetBlockIdx() * this->d_->rowOfFormerBlock;
+        const int64_t count =
+            GetBlockIdx() == GetBlockNum() - 1 ? this->d_->rowOfTailBlock : this->d_->rowOfFormerBlock;
+        for (int64_t row = start; row < start + count; ++row) {
+            ComputeMx4Tile(row, 0, static_cast<uint32_t>(this->d_->h));
+        }
+        this->packedQue_.FreeTensor(this->packedLocal_);
+        this->scaleQue_.FreeTensor(this->scaleLocal_);
+        if (this->hasBias_) {
+            this->biasQue_.FreeTensor(this->biasLocal_);
+        }
+    }
+
+private:
+    __aicore__ inline void ComputeMx4Tile(int64_t row, int64_t h, uint32_t length)
+    {
+        this->BeginMx4Tile(row, h, length);
+        auto acc = this->accBuf_.template Get<float>();
+        auto values = this->valueBuf_.template Get<float>();
+        for (int64_t k0 = 0; k0 < this->d_->k; k0 += this->d_->kFactor) {
+            int64_t r, expert;
+            if (this->ResolveRoute(row, k0, r, expert)) {
+                this->Accumulate(acc, values,
+                                 this->packedLocal_[r * this->d_->h / NUM_FP4_IN_BYTE + h / NUM_FP4_IN_BYTE],
+                                 this->scaleLocal_[r * this->d_->mx4ScaleRowBytes + h / MX4_SCALE_GROUP_SIZE],
+                                 this->hasBias_ ? this->biasLocal_[expert * this->d_->h + h] : LocalTensor<TYPE>(),
+                                 length, this->RoutingWeight(row, k0));
+            }
+        }
+        this->StoreMx4Tile(row, h, length);
+    }
+};
+#endif
+
 } // namespace MoeFinalizeRoutingV2Regbase
 
 #endif

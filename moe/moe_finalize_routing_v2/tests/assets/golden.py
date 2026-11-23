@@ -16,6 +16,8 @@ import torch
 __spec__ = {
     "moe_finalize_routing_v2": "MoeFinalizeRoutingV2TestSpec",
     "aclnnMoeFinalizeRoutingV2": "AclnnMoeFinalizeRoutingV2TestSpec",
+    "aclnnMoeFinalizeRoutingV5": "AclnnMoeFinalizeRoutingV5TestSpec",
+    "torch.ops.cann_ops_transformer.moe_finalize_routing": "TorchMoeFinalizeRoutingTestSpec",
 }
 
 
@@ -53,6 +55,26 @@ _TOLERANCE = {
 }
 
 
+_E2M1_CODE_MASK = 0xF
+_E2M1_MAGNITUDE_MASK = 0x7
+_E2M1_SIGN_MASK = 0x8
+_E2M1_MANTISSA_BITS = 1
+_E2M1_MANTISSA_MASK = 0x1
+_E2M1_EXPONENT_BIAS = 1
+_E2M1_MANTISSA_UNIT = 0.5
+_E8M0_EXPONENT_BIAS = 127
+_E8M0_NAN_CODE = 0xFF
+_MXFP4_SCALE_GROUP_SIZE = 32
+_FIRST_ROW_ROUTING_MODE = 2
+_ROUTING_MODE_COUNT = 4
+_EXPERT_RANGE_SIZE = 2
+_DISABLED_EXPERT_RANGE = (-1, -1)
+_MXFP4_TEST_SEED = 20261112
+_MXFP4_TEST_SCALE_EXPONENT_RADIUS = 4
+_MXFP4_TEST_MIN_SCALE_STRIDE = 97
+_MXFP4_TEST_NEXT_SCALE_STRIDE = 101
+
+
 class _MoeFinalizeRoutingV2TorchImpl:
     """Independent Torch reference used by the remote GPU cross-check."""
 
@@ -69,6 +91,7 @@ class _MoeFinalizeRoutingV2TorchImpl:
         alpha1=None,
         alpha2=None,
         v=None,
+        expanded_x_scale=None,
         *,
         drop_pad_mode=0,
         zero_expert_range=None,
@@ -80,6 +103,26 @@ class _MoeFinalizeRoutingV2TorchImpl:
         zero_expert_range = zero_expert_range or []
         copy_expert_range = copy_expert_range or []
         constant_expert_range = constant_expert_range or []
+        if str(expanded_x.dtype) == "float4_e2m1":
+            return self._mxfp4(
+                expanded_x,
+                expanded_row_idx,
+                x1,
+                x2,
+                bias,
+                scales,
+                expanded_x_scale,
+                expert_idx,
+                drop_pad_mode,
+                k,
+                x,
+                alpha1,
+                alpha2,
+                v,
+                zero_expert_range,
+                copy_expert_range,
+                constant_expert_range,
+            )
         output_dtype = expanded_x.dtype
         compute_dtype = (
             torch.float64 if output_dtype == torch.float32 else torch.float32
@@ -149,6 +192,111 @@ class _MoeFinalizeRoutingV2TorchImpl:
 
         return [out.to(output_dtype)]
 
+    @staticmethod
+    def _mxfp4(
+        expanded_x,
+        expanded_row_idx,
+        x1,
+        x2,
+        bias,
+        scales,
+        expanded_x_scale,
+        expert_idx,
+        drop_pad_mode,
+        k,
+        x,
+        alpha1,
+        alpha2,
+        v,
+        zero_range,
+        copy_range,
+        constant_range,
+    ):
+        # The remote transport keeps custom FP4/E8M0 arrays as NumPy byte
+        # storage. Decode and compute with independent Torch ops on the GPU.
+        device = expanded_row_idx.device
+        width = expanded_x.shape[-1]
+        rows = expanded_x.size // width
+        num_rows = expanded_row_idx.numel() // int(k)
+        codes = (
+            torch.from_numpy(numpy.ascontiguousarray(expanded_x).view(numpy.uint8))
+            .to(device=device)
+            .reshape(rows, width)
+            .long()
+            & _E2M1_CODE_MASK
+        )
+        # Decode sign/exponent/mantissa, independently of the CPU golden LUT.
+        magnitude = codes & _E2M1_MAGNITUDE_MASK
+        exponent = magnitude >> _E2M1_MANTISSA_BITS
+        mantissa = (magnitude & _E2M1_MANTISSA_MASK).float()
+        values = torch.where(
+            exponent == 0,
+            mantissa * _E2M1_MANTISSA_UNIT,
+            torch.ldexp(
+                1.0 + mantissa * _E2M1_MANTISSA_UNIT,
+                exponent.int() - _E2M1_EXPONENT_BIAS,
+            ),
+        )
+        values = torch.where((codes & _E2M1_SIGN_MASK) != 0, -values, values)
+        scale_codes = (
+            torch.from_numpy(
+                numpy.ascontiguousarray(expanded_x_scale).view(numpy.uint8)
+            )
+            .to(device=device)
+            .reshape(rows, -1)
+        )
+        factors = torch.ldexp(
+            torch.ones_like(scale_codes, dtype=torch.float32),
+            scale_codes.int() - _E8M0_EXPONENT_BIAS,
+        )
+        factors = torch.where(scale_codes == _E8M0_NAN_CODE, float("nan"), factors)
+        columns = torch.arange(width, device=device) // _MXFP4_SCALE_GROUP_SIZE
+        decoded = values * factors[:, columns]
+        routes = (
+            expanded_row_idx.reshape(int(k), num_rows).T
+            if drop_pad_mode < _FIRST_ROW_ROUTING_MODE
+            else expanded_row_idx.reshape(num_rows, int(k))
+        )
+        out = torch.zeros((num_rows, width), dtype=torch.float32, device=device)
+        for residual in (x1, x2):
+            if residual is not None:
+                out = out + residual.float()
+        for branch in range(int(k)):
+            physical = routes[:, branch].long()
+            valid = (physical >= 0) & (physical < rows)
+            value = decoded[physical.clamp(0, rows - 1)]
+            if expert_idx is not None:
+                expert = expert_idx[:, branch].long()
+                for bounds, kind in (
+                    (zero_range, "zero"),
+                    (copy_range, "copy"),
+                    (constant_range, "constant"),
+                ):
+                    if len(bounds) != _EXPERT_RANGE_SIZE or bounds[0] < 0:
+                        continue
+                    selected = (expert >= bounds[0]) & (expert < bounds[1])
+                    if kind == "zero":
+                        valid = valid & ~selected
+                    elif x is not None and kind == "copy":
+                        value = torch.where(selected[:, None], x.float(), value)
+                    elif x is not None and all(
+                        t is not None for t in (alpha1, alpha2, v)
+                    ):
+                        ids = (expert - bounds[0]).clamp(0, alpha1.shape[0] - 1)
+                        constant = (
+                            alpha1[ids].float() * x.float()
+                            + alpha2[ids].float() * v[ids].float()
+                        )
+                        value = torch.where(selected[:, None], constant, value)
+            if bias is not None:
+                expert = expert_idx[:, branch].long()
+                valid = valid & (expert >= 0) & (expert < bias.shape[0])
+                value = value + bias[expert.clamp(0, bias.shape[0] - 1)].float()
+            if scales is not None:
+                value = value * scales[:, branch, None].float()
+            out = out + torch.where(valid[:, None], value, 0.0)
+        return [out.to(torch.bfloat16)]
+
 
 class _AclnnMoeFinalizeRoutingV2TorchImpl(_MoeFinalizeRoutingV2TorchImpl):
     def __call__(
@@ -196,6 +344,7 @@ class MoeFinalizeRoutingV2TestSpec:
         alpha1=None,
         alpha2=None,
         v=None,
+        expanded_x_scale=None,
         *,
         drop_pad_mode=0,
         zero_expert_range=None,
@@ -204,6 +353,78 @@ class MoeFinalizeRoutingV2TestSpec:
         k=1,
         **kwargs,
     ):
+        if str(expanded_x.dtype) == "float4_e2m1":
+            import ml_dtypes
+
+            h = expanded_x.shape[-1]
+            rows = expanded_x.size // h
+            n = expanded_row_idx.size // k
+            codes = expanded_x.view(numpy.uint8).reshape(rows, h) & _E2M1_CODE_MASK
+            lut = numpy.array(
+                [0, 0.5, 1, 1.5, 2, 3, 4, 6, -0.0, -0.5, -1, -1.5, -2, -3, -4, -6],
+                numpy.float32,
+            )
+            # Each physical row has one E8M0 scale per 32 features.
+            scale_bytes = expanded_x_scale.view(numpy.uint8).reshape(rows, -1)
+            factors = numpy.exp2(
+                scale_bytes.astype(numpy.float32) - numpy.float32(_E8M0_EXPONENT_BIAS)
+            )
+            factors[scale_bytes == _E8M0_NAN_CODE] = numpy.nan
+            decoded = (
+                lut[codes] * factors[:, numpy.arange(h) // _MXFP4_SCALE_GROUP_SIZE]
+            )
+            routes = (
+                expanded_row_idx.reshape(k, n).T
+                if drop_pad_mode < _FIRST_ROW_ROUTING_MODE
+                else expanded_row_idx.reshape(n, k)
+            )
+            out = numpy.zeros((n, h), numpy.float32)
+            for aux in (x1, x2):
+                if aux is not None:
+                    out += aux.astype(numpy.float32)
+            for row in range(n):
+                for branch in range(k):
+                    physical = routes[row, branch]
+                    if not 0 <= physical < rows:
+                        continue
+                    value = decoded[physical]
+                    if expert_idx is not None:
+                        expert = expert_idx[row, branch]
+                        if (
+                            zero_expert_range
+                            and zero_expert_range[0] <= expert < zero_expert_range[1]
+                        ):
+                            continue
+                        if (
+                            x is not None
+                            and copy_expert_range
+                            and copy_expert_range[0] <= expert < copy_expert_range[1]
+                        ):
+                            value = x[row].astype(numpy.float32)
+                        elif (
+                            x is not None
+                            and constant_expert_range
+                            and constant_expert_range[0]
+                            <= expert
+                            < constant_expert_range[1]
+                            and all(t is not None for t in (alpha1, alpha2, v))
+                        ):
+                            idx = expert - constant_expert_range[0]
+                            value = alpha1[idx].astype(numpy.float32) * x[row].astype(
+                                numpy.float32
+                            ) + alpha2[idx].astype(numpy.float32) * v[idx].astype(
+                                numpy.float32
+                            )
+                    if bias is not None:
+                        expert = expert_idx[row, branch]
+                        if not 0 <= expert < len(bias):
+                            continue
+                        value = value + bias[expert].astype(numpy.float32)
+                    if scales is not None:
+                        value = value * numpy.float32(scales[row, branch])
+                    out[row] += value
+            return [out.astype(ml_dtypes.bfloat16)]
+
         if zero_expert_range is None:
             zero_expert_range = []
         if copy_expert_range is None:
@@ -301,8 +522,98 @@ class MoeFinalizeRoutingV2TestSpec:
         alpha1=None,
         alpha2=None,
         v=None,
+        expanded_x_scale=None,
         **kwargs,
     ):
+        if str(expanded_x.dtype) == "float4_e2m1":
+            # Reproduce the shared 16 scenarios without external data files.
+            profiles = ("resident", "kh_full", "k_batch", "h_partial")
+            name = kwargs.get("testcase_name", "")
+            mode = kwargs.get("drop_pad_mode", 0)
+            profile = next(
+                (
+                    i
+                    for i, label in enumerate(profiles)
+                    if name.startswith("mx4_" + label + "_")
+                ),
+                0,
+            )
+            rng = numpy.random.default_rng(
+                _MXFP4_TEST_SEED + profile * _ROUTING_MODE_COUNT + mode
+            )
+            h = expanded_x.shape[-1]
+            rows = expanded_x.size // h
+            k = kwargs.get("k", 1)
+            n = expanded_row_idx.size // k
+            expanded_x.view(numpy.uint8)[...] = (
+                (
+                    numpy.arange(expanded_x.size, dtype=numpy.uint32)
+                    % (_E2M1_CODE_MASK + 1)
+                )
+                .astype(numpy.uint8)
+                .reshape(expanded_x.shape)
+            )
+            scale_bytes = rng.integers(
+                _E8M0_EXPONENT_BIAS - _MXFP4_TEST_SCALE_EXPONENT_RADIUS,
+                _E8M0_EXPONENT_BIAS + _MXFP4_TEST_SCALE_EXPONENT_RADIUS,
+                expanded_x_scale.shape,
+                dtype=numpy.uint8,
+            )
+            scale_bytes.flat[::_MXFP4_TEST_MIN_SCALE_STRIDE] = 0
+            scale_bytes.flat[1::_MXFP4_TEST_NEXT_SCALE_STRIDE] = 1
+            expanded_x_scale.view(numpy.uint8)[...] = scale_bytes
+            routes = rng.integers(0, rows, (n, k), dtype=numpy.int32)
+            if n > 0:
+                routes[0, -1] = -1
+                routes[-1] = -1
+                # Keep a valid route even when the first and last tokens coincide.
+                routes[0, 0] = rows - 1
+            if n > 2:
+                routes[1, 0] = rows
+                if k > 1:
+                    routes[1, 1] = 0
+            expanded_row_idx[...] = (
+                routes.T if mode < _FIRST_ROW_ROUTING_MODE else routes
+            ).reshape(-1)
+            for tensor in (x1, x2, bias, x, alpha1, alpha2, v):
+                if tensor is not None:
+                    tensor[...] = rng.normal(size=tensor.shape).astype(tensor.dtype)
+            if expert_idx is not None and bias is not None:
+                expert_idx[...] = rng.integers(
+                    0, bias.shape[0], expert_idx.shape, dtype=numpy.int32
+                )
+                if n > 0 and k > 1:
+                    expert_idx[0, 1] = -1
+                    if k > 2:
+                        expert_idx[0, 2] = bias.shape[0]
+            if expert_idx is not None and (x is not None or bias is None):
+                ranges = [
+                    kwargs.get(name) or _DISABLED_EXPERT_RANGE
+                    for name in (
+                        "zero_expert_range",
+                        "copy_expert_range",
+                        "constant_expert_range",
+                    )
+                ]
+                experts = max([bounds[1] for bounds in ranges] + [1])
+                expert_idx[...] = (
+                    numpy.arange(n * k, dtype=numpy.int32).reshape(n, k) % experts
+                )
+            return (
+                expanded_x,
+                expanded_row_idx,
+                x1,
+                x2,
+                bias,
+                scales,
+                expert_idx,
+                x,
+                alpha1,
+                alpha2,
+                v,
+                expanded_x_scale,
+            )
+
         drop_pad_mode = kwargs.get("drop_pad_mode", 0)
         expand_n = expanded_row_idx.shape[0]
         expanded_row_idx = numpy.random.choice(
@@ -331,6 +642,60 @@ class MoeFinalizeRoutingV2TestSpec:
             alpha1,
             alpha2,
             v,
+        )
+
+
+class TorchMoeFinalizeRoutingTestSpec:
+    """CPU reference for the Torch schema; preserve the CSV input ranges."""
+
+    third_party = {"torch": _MoeFinalizeRoutingV2TorchImpl}
+    tolerance = _TOLERANCE
+
+    @staticmethod
+    def golden(
+        expanded_x,
+        expanded_row_idx,
+        x1=None,
+        x2=None,
+        bias=None,
+        scales=None,
+        expert_idx=None,
+        x=None,
+        alpha1=None,
+        alpha2=None,
+        v=None,
+        drop_pad_mode=0,
+        zero_expert_range=None,
+        copy_expert_range=None,
+        constant_expert_range=None,
+        k=1,
+        expanded_x_scale=None,
+        **kwargs,
+    ):
+        return MoeFinalizeRoutingV2TestSpec.golden(
+            *[
+                _to_numpy(t)
+                for t in (
+                    expanded_x,
+                    expanded_row_idx,
+                    x1,
+                    x2,
+                    bias,
+                    scales,
+                    expert_idx,
+                    x,
+                    alpha1,
+                    alpha2,
+                    v,
+                    expanded_x_scale,
+                )
+            ],
+            drop_pad_mode=drop_pad_mode,
+            k=k,
+            zero_expert_range=zero_expert_range,
+            copy_expert_range=copy_expert_range,
+            constant_expert_range=constant_expert_range,
+            **kwargs,
         )
 
 
@@ -398,3 +763,95 @@ class AclnnMoeFinalizeRoutingV2TestSpec:
             _restore_type(value, template)
             for value, template in zip(results, templates)
         )
+
+
+class AclnnMoeFinalizeRoutingV5TestSpec:
+    """Bind the V5 header parameters to the shared operator reference."""
+
+    @staticmethod
+    def customize_inputs(
+        expanded_x,
+        expanded_row_idx,
+        x1,
+        x2,
+        bias,
+        scales,
+        expert_idx,
+        x,
+        alpha1,
+        alpha2,
+        v,
+        expanded_x_scale,
+        drop_pad_mode,
+        zero_expert_range,
+        copy_expert_range,
+        constant_expert_range,
+        k,
+        out,
+        **kwargs,
+    ):
+        return MoeFinalizeRoutingV2TestSpec.customize_inputs(
+            expanded_x,
+            expanded_row_idx,
+            x1,
+            x2,
+            bias,
+            scales,
+            expert_idx,
+            x,
+            alpha1,
+            alpha2,
+            v,
+            expanded_x_scale,
+            drop_pad_mode=drop_pad_mode,
+            k=k,
+            zero_expert_range=zero_expert_range,
+            copy_expert_range=copy_expert_range,
+            constant_expert_range=constant_expert_range,
+            **kwargs,
+        )
+
+    @staticmethod
+    def golden(
+        expanded_x,
+        expanded_row_idx,
+        x1,
+        x2,
+        bias,
+        scales,
+        expert_idx,
+        x,
+        alpha1,
+        alpha2,
+        v,
+        expanded_x_scale,
+        drop_pad_mode,
+        zero_expert_range,
+        copy_expert_range,
+        constant_expert_range,
+        k,
+        out,
+        **kwargs,
+    ):
+        return MoeFinalizeRoutingV2TestSpec.golden(
+            expanded_x,
+            expanded_row_idx,
+            x1,
+            x2,
+            bias,
+            scales,
+            expert_idx,
+            x,
+            alpha1,
+            alpha2,
+            v,
+            expanded_x_scale,
+            drop_pad_mode=drop_pad_mode,
+            k=k,
+            zero_expert_range=zero_expert_range,
+            copy_expert_range=copy_expert_range,
+            constant_expert_range=constant_expert_range,
+            **kwargs,
+        )
+
+    tolerance = MoeFinalizeRoutingV2TestSpec.tolerance

@@ -892,3 +892,76 @@ TEST_F(MoeFinalizeRoutingV2Proto, dtype_infer_err5)
         EXPECT_EQ(data_type_func(context), ge::GRAPH_FAILED);
     }
 }
+
+TEST_F(MoeFinalizeRoutingV2Proto, dtype_infer_mxfp4)
+{
+    auto registry = gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry();
+    ASSERT_NE(registry, nullptr);
+    const auto impl = registry->GetOpImpl("MoeFinalizeRoutingV2");
+    ASSERT_NE(impl, nullptr);
+    const auto infer = impl->infer_datatype;
+    ASSERT_NE(infer, nullptr);
+    const std::vector<ge::DataType> validTypes = {
+        ge::DT_FLOAT4_E2M1, ge::DT_INT32,     ge::DT_BF16,      ge::DT_BF16,      ge::DT_BF16,      ge::DT_FLOAT,
+        ge::DT_INT32,       ge::DT_UNDEFINED, ge::DT_UNDEFINED, ge::DT_UNDEFINED, ge::DT_UNDEFINED, ge::DT_FLOAT8_E8M0};
+    constexpr size_t validCase = 0;
+    const size_t missingScaleCase = validTypes.size();
+    // Exercise the valid combination, invalid auxiliary types and a missing scale.
+    for (size_t invalidInput = validCase; invalidInput <= missingScaleCase; ++invalidInput) {
+        auto types = validTypes;
+        if (invalidInput == missingScaleCase) {
+            types.back() = ge::DT_UNDEFINED;
+        } else if (invalidInput != validCase) {
+            types[invalidInput] = types[invalidInput] == ge::DT_UNDEFINED ? ge::DT_BF16 : ge::DT_FLOAT16;
+        }
+        std::vector<void*> inputs;
+        inputs.reserve(types.size());
+        for (auto& type : types) {
+            inputs.push_back(&type);
+        }
+        ge::DataType output = ge::DT_UNDEFINED;
+        auto holder = gert::InferDataTypeContextFaker()
+                          .NodeIoNum(types.size(), 1)
+                          .IrInstanceNum(std::vector<uint32_t>(types.size(), 1))
+                          .InputDataTypes(inputs)
+                          .OutputDataTypes({&output})
+                          .Build();
+        auto context = holder.GetContext<gert::InferDataTypeContext>();
+        ASSERT_NE(context, nullptr);
+        EXPECT_EQ(infer(context), invalidInput == validCase ? ge::GRAPH_SUCCESS : ge::GRAPH_FAILED)
+            << "invalid input index: " << invalidInput;
+        if (invalidInput == validCase) {
+            EXPECT_EQ(context->GetOutputDataType(0), ge::DT_BF16);
+        }
+    }
+}
+
+TEST_F(MoeFinalizeRoutingV2Proto, dtype_infer_ignores_expanded_x_scale_for_float)
+{
+    auto registry = gert::DefaultOpImplSpaceRegistryV2::GetInstance().GetSpaceRegistry();
+    ASSERT_NE(registry, nullptr);
+    const auto impl = registry->GetOpImpl("MoeFinalizeRoutingV2");
+    ASSERT_NE(impl, nullptr);
+    ASSERT_NE(impl->infer_datatype, nullptr);
+
+    for (auto scale : {ge::DT_FLOAT8_E8M0, ge::DT_INT32}) {
+        std::vector<ge::DataType> types(12, ge::DT_UNDEFINED);
+        types[0] = ge::DT_BF16;
+        types[1] = ge::DT_INT32;
+        types.back() = scale;
+        std::vector<void*> inputs;
+        for (auto& type : types) {
+            inputs.push_back(&type);
+        }
+        ge::DataType output = ge::DT_UNDEFINED;
+        auto holder = gert::InferDataTypeContextFaker()
+                          .NodeIoNum(types.size(), 1)
+                          .IrInstanceNum(std::vector<uint32_t>(types.size(), 1))
+                          .InputDataTypes(inputs)
+                          .OutputDataTypes({&output})
+                          .Build();
+        auto context = holder.GetContext<gert::InferDataTypeContext>();
+        ASSERT_EQ(impl->infer_datatype(context), ge::GRAPH_SUCCESS);
+        EXPECT_EQ(context->GetOutputDataType(0), ge::DT_BF16);
+    }
+}

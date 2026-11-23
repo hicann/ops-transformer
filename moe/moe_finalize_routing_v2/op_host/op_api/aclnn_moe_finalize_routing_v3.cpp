@@ -133,8 +133,8 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV3GetWorkspaceSize(
     // 调用l0接口进行计算，传入out参数
     auto out_ = l0op::MoeFinalizeRoutingV2(
         expandedXContiguous, expandedRowIdxContiguous, x1Contiguous, x2Contiguous, biasContiguous, scalesContiguous,
-        expertIdxContiguous, xContiguous, alpha1Contiguous, alpha2Contiguous, vContiguous, dropPadMode, zeroExpertRange,
-        copyExpertRange, constantExpertRange, 1, out, uniqueExecutor.get());
+        expertIdxContiguous, xContiguous, alpha1Contiguous, alpha2Contiguous, vContiguous, nullptr, dropPadMode,
+        zeroExpertRange, copyExpertRange, constantExpertRange, 1, out, uniqueExecutor.get());
     CHECK_RET(out_ != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     // copyout结果，如果出参out是非连续Tensor，需要把计算完的连续Tensor转非连续

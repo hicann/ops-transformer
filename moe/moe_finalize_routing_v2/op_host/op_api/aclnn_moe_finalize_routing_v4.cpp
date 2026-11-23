@@ -132,8 +132,8 @@ ACLNN_API aclnnStatus aclnnMoeFinalizeRoutingV4GetWorkspaceSize(
 
     auto out_ = l0op::MoeFinalizeRoutingV2(
         expandedXContiguous, expandedRowIdxContiguous, x1Contiguous, x2Contiguous, biasContiguous, scalesContiguous,
-        expertIdxContiguous, xContiguous, alpha1Contiguous, alpha2Contiguous, vContiguous, dropPadMode, zeroExpertRange,
-        copyExpertRange, constantExpertRange, k, out, uniqueExecutor.get());
+        expertIdxContiguous, xContiguous, alpha1Contiguous, alpha2Contiguous, vContiguous, nullptr, dropPadMode,
+        zeroExpertRange, copyExpertRange, constantExpertRange, k, out, uniqueExecutor.get());
     CHECK_RET(out_ != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
     auto viewCopyOutResult = l0op::ViewCopy(out_, out, uniqueExecutor.get());

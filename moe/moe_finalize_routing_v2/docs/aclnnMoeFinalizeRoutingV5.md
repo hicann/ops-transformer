@@ -1,0 +1,587 @@
+# aclnnMoeFinalizeRoutingV5
+
+## 产品支持情况
+
+<!-- npu="950" id1 -->
+- <term>Ascend 950PR&950DT系列产品</term>：支持
+<!-- end id1 -->
+<!-- npu="A3" id2 -->
+- <term>Atlas A3系列产品</term>：支持
+<!-- end id2 -->
+<!-- npu="910b" id3 -->
+- <term>Atlas A2系列产品</term>：支持
+<!-- end id3 -->
+<!-- npu="310b" id4 -->
+- <term>Atlas 200I/500 A2推理产品</term>：不支持
+<!-- end id4 -->
+<!-- npu="310p" id5 -->
+- <term>Atlas推理系列产品</term>：支持
+<!-- end id5 -->
+<!-- npu="910" id6 -->
+- <term>Atlas训练系列产品</term>：不支持
+<!-- end id6 -->
+
+## 功能说明
+
+- **接口功能**：MoE计算中，最后处理合并MoE FFN的输出结果。相比[aclnnMoeFinalizeRoutingV4](aclnnMoeFinalizeRoutingV4.md)，本接口新增expandedXScaleOptional，用于传入expandedX的反量化系数。
+- **计算公式**：
+
+输入为 FLOAT16、BFLOAT16、FLOAT32 时：
+
+$$
+\begin{aligned} &\mathrm{expertId} = \mathrm{expertIdx}[i,k] \\ &\text{if } \mathrm{expertId} \in \mathrm{zero\_expert\_range}:\\&\quad \text{skip}; \\&\text{elif } \mathrm{expertId} \in \mathrm{copy\_expert\_range}: \\ &\quad x = x[i] \\ &\quad \mathrm{out}(i, j) = x1_{i, j} + x2_{i, j} + \sum_{k=1}^{K}\mathrm{scales}_{i,k} \cdot \left(x + \mathrm{bias}_{\mathrm{expertId},j}\right) \\ &\text{elif } \mathrm{expertId} \in \mathrm{constant\_expert\_range}: \\&\quad x = \alpha_1 \cdot x[i] + \alpha_2 \cdot v \\ &\quad \mathrm{out}(i, j) = x1_{i, j} + x2_{i, j} + \sum_{k=1}^{K}\mathrm{scales}_{i,k} \cdot \left(x + \mathrm{bias}_\mathrm{expertId},j\right) \\ &\text{else}: \\ &\quad \mathrm{out}(i, j) = x1_{i, j} + x2_{i, j} + \sum_{k=0}^{K}\mathrm{scales}_{i,k} \cdot\big(\mathrm{expandedX}_{\mathrm{expandedRowIdx}_{i\cdot K+k},j} + \mathrm{bias}_{\mathrm{expertid}_{i\cdot K+k},j}\big) \end{aligned}
+$$
+
+输入为 FLOAT4_E2M1 时，使用 expandedXScaleOptional 对 expandedX 反量化。传入 scalesOptional 时，每路在反量化并叠加可选 bias 后乘以对应的路由权重。路由贡献及共享专家输出使用 FP32 累加，最后转换为 BF16。
+
+## 函数原型
+
+每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnMoeFinalizeRoutingV5GetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnMoeFinalizeRoutingV5”接口执行计算。
+
+```c++
+aclnnStatus aclnnMoeFinalizeRoutingV5GetWorkspaceSize(
+    const aclTensor *expandedX,
+    const aclTensor *expandedRowIdx,
+    const aclTensor *x1Optional,
+    const aclTensor *x2Optional,
+    const aclTensor *biasOptional,
+    const aclTensor *scalesOptional,
+    const aclTensor *expertIdxOptional,
+    const aclTensor *xOptional,
+    const aclTensor *alpha1Optional,
+    const aclTensor *alpha2Optional,
+    const aclTensor *vOptional,
+    const aclTensor *expandedXScaleOptional,
+    int64_t           dropPadMode,
+    const aclIntArray *zeroExpertRange,
+    const aclIntArray *copyExpertRange,
+    const aclIntArray *constantExpertRange,
+    int64_t           k,
+    const aclTensor *out,
+    uint64_t        *workspaceSize,
+    aclOpExecutor  **executor)
+```
+
+```c++
+aclnnStatus aclnnMoeFinalizeRoutingV5(
+    void          *workspace,
+    uint64_t       workspaceSize,
+    aclOpExecutor *executor,
+    aclrtStream    stream)
+```
+
+## aclnnMoeFinalizeRoutingV5GetWorkspaceSize
+
+- **参数说明：**
+
+  <table style="undefined;table-layout: fixed; width: 1522px"><colgroup>
+  <col style="width: 170px">
+  <col style="width: 120px">
+  <col style="width: 315px">
+  <col style="width: 231px">
+  <col style="width: 210px">
+  <col style="width: 121px">
+  <col style="width: 210px">
+  <col style="width: 145px">
+  </colgroup>
+  <thead>
+  <tr>
+    <th>参数名</th>
+    <th>输入/输出</th>
+    <th>描述</th>
+    <th>使用说明</th>
+    <th>数据类型</th>
+    <th>数据格式</th>
+    <th>维度(shape)</th>
+    <th>非连续Tensor</th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td>expandedX(aclTensor*)</td>
+    <td>输入</td>
+    <td>公式中的expandedX ，MoE的FFN输出。</td>
+    <td>-</td>
+    <td>FLOAT16、BFLOAT16、FLOAT32、FLOAT4_E2M1</td>
+    <td>ND</td>
+    <td>drop less场景：(NUM_ROWS * K, H)，<br>drop pad场景：(E, C, H)。<br>输入为 FLOAT4_E2M1 时，dropPadMode 为 0/2 时为 (R, H)，为 1/3 时为 (E, C, H)，R=E*C。</td>
+    <td>√；FLOAT4_E2M1 输入必须连续</td>
+  </tr>
+  <tr>
+    <td>expandedRowIdx(aclTensor*)</td>
+    <td>输入</td>
+    <td>公式中的expandedRowIdx。</td>
+    <td>-</td>
+    <td>INT32</td>
+    <td>ND</td>
+    <td>(NUM_ROWS * K)</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>x1Optional(aclTensor*)</td>
+    <td>输入</td>
+    <td>公式中的x1，表示第一个共享专家。</td>
+    <td>-</td>
+    <td>与expandedX一致。 输入为 FLOAT4_E2M1 时为 BFLOAT16。</td>
+    <td>ND</td>
+    <td>与out一致。</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>x2Optional(aclTensor*)</td>
+    <td>输入</td>
+    <td>公式中的x2，表示第二个共享专家。</td>
+    <td>-</td>
+    <td>与expandedX一致。 输入为 FLOAT4_E2M1 时为 BFLOAT16。</td>
+    <td>ND</td>
+    <td>与out一致。</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>biasOptional(aclTensor*)</td>
+    <td>输入</td>
+    <td>公式中的bias，表示偏置量。</td>
+    <td>-</td>
+    <td>与expandedX一致。 输入为 FLOAT4_E2M1 时为 BFLOAT16。</td>
+    <td>ND</td>
+    <td>(E, H)</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>scalesOptional(aclTensor*)</td>
+    <td>输入</td>
+    <td>公式中的路由权重。</td>
+    <td>可选参数。</td>
+    <td>FLOAT16、BFLOAT16、FLOAT32。当 expandedX 输入为 FLOAT4_E2M1 时，路由权重仅支持 FLOAT32。</td>
+    <td>ND</td>
+    <td>(NUM_ROWS, K)</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>expertIdxOptional(aclTensor*)</td>
+    <td>输入</td>
+    <td>公式中的expertIdx。</td>
+    <td>Tensor中的值取值范围是[0, E-1]。</td>
+    <td>INT32</td>
+    <td>ND</td>
+    <td>(NUM_ROWS, K)</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>xOptional(aclTensor*)</td>
+    <td>输入</td>
+    <td>拷贝专家和常量专家使用的原始 token 输入。</td>
+    <td>MXFP4（FLOAT4_E2M1）输入时必须传入 <code>nullptr</code>。</td>
+    <td>非量化输入时与 expandedX 一致。</td>
+    <td>ND</td>
+    <td>(NUM_ROWS, H)</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>alpha1Optional(aclTensor*)</td>
+    <td>输入</td>
+    <td>常量专家对原始 token 输入的缩放系数。</td>
+    <td>MXFP4（FLOAT4_E2M1）输入时必须传入 <code>nullptr</code>。</td>
+    <td>非量化输入时与 expandedX 一致。</td>
+    <td>ND</td>
+    <td>(constantExpertEnd - constantExpertStart, H)</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>alpha2Optional(aclTensor*)</td>
+    <td>输入</td>
+    <td>常量专家对偏移向量的缩放系数。</td>
+    <td>MXFP4（FLOAT4_E2M1）输入时必须传入 <code>nullptr</code>。</td>
+    <td>非量化输入时与 expandedX 一致。</td>
+    <td>ND</td>
+    <td>(constantExpertEnd - constantExpertStart, H)</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>vOptional(aclTensor*)</td>
+    <td>输入</td>
+    <td>常量专家的偏移向量。</td>
+    <td>MXFP4（FLOAT4_E2M1）输入时必须传入 <code>nullptr</code>。</td>
+    <td>非量化输入时与 expandedX 一致。</td>
+    <td>ND</td>
+    <td>(constantExpertEnd - constantExpertStart, H)</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>expandedXScaleOptional(aclTensor*)</td>
+    <td>输入</td>
+    <td>expandedX的块反量化系数。输入为FLOAT4_E2M1时必传，其他支持的输入类型会忽略此参数。</td>
+    <td>-</td>
+    <td>FLOAT8_E8M0</td>
+    <td>ND</td>
+    <td>FLOAT4_E2M1：(R, ceil(H/64), 2)。</td>
+    <td>×</td>
+  </tr>
+  <tr>
+    <td>dropPadMode(int64_t)</td>
+    <td>输入</td>
+    <td>可选参数，默认值为0。表示是否支持丢弃模式，expandedRowIdx的排列方式。</td>
+    <td>取值范围为[0, 3]。</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+  </tr>
+  <tr>
+    <td>zeroExpertRange(aclIntArray*)</td>
+    <td>输入</td>
+    <td>可选参数。表示zero expert的范围，数组内的值为[zeroExpertStart, zeroExpertEnd]，左闭右开，要求值大于0，并且zeroExpertEnd大于zeroExpertStart，zeroExpertEnd不大于expertIdxOptional的最大值。</td>
+    <td>MXFP4（FLOAT4_E2M1）输入时必须传入 <code>nullptr</code> 或空数组。非量化输入时取值范围与 expertIdxOptional 一致。</td>
+    <td>-</td>
+    <td>2</td>
+    <td>-</td>
+    <td>-</td>
+  </tr>
+  <tr>
+    <td>copyExpertRange(aclIntArray*)</td>
+    <td>输入</td>
+    <td>可选参数。表示copy expert的范围。数组内的值为[copyExpertStart, copyExpertEnd]，左闭右开，要求值大于0，并且copyExpertEnd大于copyExpertStart，copyExpertEnd不大于expertIdxOptional的最大值。</td>
+    <td>MXFP4（FLOAT4_E2M1）输入时必须传入 <code>nullptr</code> 或空数组。非量化输入时取值范围与 expertIdxOptional 一致。</td>
+    <td>-</td>
+    <td>2</td>
+    <td>-</td>
+    <td>-</td>
+  </tr>
+    <tr>
+    <td>constantExpertRange(aclIntArray*)</td>
+    <td>输入</td>
+    <td>可选参数。表示constant expert的范围。数组内的值为[constantExpertStart, constantExpertEnd]，左闭右开，要求值大于0，并且constantExpertEnd大于constantExpertStart，constantExpertEnd不大于expertIdxOptional的最大值。</td>
+    <td>MXFP4（FLOAT4_E2M1）输入时必须传入 <code>nullptr</code> 或空数组。非量化输入时取值范围与 expertIdxOptional 一致。</td>
+    <td>-</td>
+    <td>2</td>
+    <td>-</td>
+    <td>-</td>
+  </tr>
+  <tr>
+    <td>k(int64_t)</td>
+    <td>输入</td>
+    <td>可选参数，默认值为1。表示每个token选出的top-K专家个数。</td>
+    <td>expandedX为非量化类型且scalesOptional不为空时，若k>1则校验k必须与scalesOptional的shape第二维一致；scalesOptional为空时，直接使用k推导输出shape。 输入为 FLOAT4_E2M1 时，k 必须大于 0，NUM_ROWS 由索引长度除以 k 得到，不从反量化系数形状推导 K。</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+  </tr>
+  <tr>
+    <td>out(aclTensor*)</td>
+    <td>输出</td>
+    <td>公式中的输出。</td>
+    <td>-</td>
+    <td>与expandedX一致。 输入为 FLOAT4_E2M1 时为 BFLOAT16。</td>
+    <td>ND</td>
+    <td>(NUM_ROWS, H)</td>
+    <td>×</td>
+  </tr>
+  <tr>
+    <td>workspaceSize(uint64_t)</td>
+    <td>输出</td>
+    <td>返回需要在Device侧申请的workspace大小。</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+  </tr>
+  <tr>
+    <td>executor(aclOpExecutor**)</td>
+    <td>输出</td>
+    <td>返回op执行器，包含了算子计算流程。</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+  </tr>
+  </tbody></table>
+
+  <!-- npu="A3,910b" id7 -->
+  - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
+    - expandedX要求是一个2D/3D的Tensor，支持的数据类型为FLOAT16、BFLOAT16、FLOAT32，支持drop less和drop pad场景。
+    - scalesOptional：混合精度模式下，支持expandedX为BFLOAT16 时scalesOptional为FLOAT32；非混合精度模式下，数据类型要求与expandedX一致。
+    - xOptional、alpha1Optional、alpha2Optional、vOptional、zeroExpertRange、copyExpertRange、constantExpertRange仅支持传入nullptr。
+  <!-- end id7 -->
+  <!-- npu="950" id8 -->
+  - <term>Ascend 950PR&950DT系列产品</term>：
+    - expandedX要求是一个2D/3D的Tensor，支持的数据类型为FLOAT16、BFLOAT16、FLOAT32、FLOAT4_E2M1，支持drop less和drop pad场景。
+    - scalesOptional数据类型可以与expandedX不一致。
+  <!-- end id8 -->
+  <!-- npu="310p" id9 -->
+  - <term>Atlas推理系列产品</term>：
+    - expandedX要求是一个2D的Tensor，数据类型支持FLOAT16、FLOAT32，shape要求尾轴H为32对齐。
+    - x1Optional、x2Optional、biasOptional、expertIdxOptional仅支持传入nullptr
+    - xOptional、alpha1Optional、alpha2Optional、vOptional、zeroExpertRange、copyExpertRange、constantExpertRange仅支持传入nullptr
+    - 仅支持dropPadMode传入2。
+    - scalesOptional数据类型支持FLOAT16、FLOAT32，且需要与expandedX一致。
+  <!-- end id9 -->
+
+- **返回值：**
+
+  aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+
+  第一段接口完成入参校验，出现以下场景时报错：
+
+  <table style="undefined;table-layout: fixed; width: 1155px"><colgroup>
+  <col style="width: 253px">
+  <col style="width: 140px">
+  <col style="width: 762px">
+  </colgroup>
+  <thead>
+    <tr>
+    <th>返回值</th>
+    <th>错误码</th>
+    <th>描述</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+    <td>ACLNN_ERR_PARAM_NULLPTR</td>
+    <td>161001</td>
+    <td>传入的必选输入、必选输出或者必选属性，是空指针。</td>
+    </tr>
+    <tr>
+    <td>ACLNN_ERR_PARAM_INVALID</td>
+    <td>161002</td>
+    <td>输入和输出的数据类型、数据格式或维度不在支持的范围之内。</td>
+    </tr>
+    <tr>
+    <td rowspan="2">ACLNN_ERR_INNER_TILING_ERROR</td>
+    <td rowspan="2">561002</td>
+    <td>多个输入tensor之间的shape信息不匹配。</td>
+    </tr>
+    <tr>
+    <td>输入属性和输入tensor之间的shape信息不匹配。</td>
+    </tr>
+  </tbody></table>
+
+## aclnnMoeFinalizeRoutingV5
+
+- **参数说明：**
+
+  <table style="undefined;table-layout: fixed; width: 1179px"> <colgroup>
+  <col style="width: 169px">
+  <col style="width: 130px">
+  <col style="width: 880px">
+  </colgroup>
+  <thead>
+  <tr>
+    <th>参数名</th>
+    <th>输入/输出</th>
+    <th>描述</th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td>workspace</td>
+    <td>输入</td>
+    <td>在Device侧申请的workspace内存地址。</td>
+  </tr>
+  <tr>
+    <td>workspaceSize</td>
+    <td>输入</td>
+    <td>在Device侧申请的workspace大小，由第一段接口<code>aclnnMoeFinalizeRoutingV5GetWorkspaceSize</code>获取。</td>
+  </tr>
+  <tr>
+    <td>executor</td>
+    <td>输入</td>
+    <td>op执行器，包含了算子计算流程。</td>
+  </tr>
+  <tr>
+    <td>stream</td>
+    <td>输入</td>
+    <td>指定执行任务的Stream。</td>
+  </tr>
+  </tbody>
+  </table>
+
+- **返回值**
+
+  aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
+
+## 约束说明
+
+1. 确定性计算：
+    - aclnnMoeFinalizeRoutingV5默认确定性实现。
+
+2. NUM\_ROWS：表示行数；
+    - K：表示从总的专家E中选出K个专家；
+    - H：表示hidden size，即每个token序列长度，为列数；
+    - E：表示expert num，即专家数，E需要大于等于K；
+    - C：表示expert capacity，即专家处理token数量的能力阈值。
+
+3. expandedRowIdx：输入不为 FLOAT4_E2M1 时，当dropPadMode参数值为0、2时，Tensor中的值取值范围是[0,NUM_ROWS * K-1]；当dropPadMode参数值为1、3时，Tensor中的值取值范围是[-1, E \* C - 1]。
+
+4. 在x1Optional参数未输入的情况下，x2Optional参数也不能输入。
+
+5. expandedX 为非量化类型时，scalesOptional不存在时，K由属性k决定，默认值为1。scalesOptional存在时，若显式传入k（k > 1），则校验k必须与scalesOptional的shape第二维一致。
+
+6. biasOptional存在时，expertIdxOptional必须同时存在。
+
+7. dropPadMode的取值与含义对应如下：
+    - 0：drop less场景，expandedRowIdx按**列**排列（与[aclnnMoeInitRouting](../../moe_init_routing/docs/aclnnMoeInitRouting.md)输出格式对应）。
+    - 1：drop pad场景，expandedRowIdx按**列**排列（与[aclnnMoeInitRouting](../../moe_init_routing/docs/aclnnMoeInitRouting.md)输出格式对应）。
+    - 2：drop less场景，expandedRowIdx按**行**排列（与[aclnnMoeInitRoutingV2](../../moe_init_routing_v2/docs/aclnnMoeInitRoutingV2.md)输出格式对应）。
+    - 3：drop pad场景，expandedRowIdx按**行**排列（与[aclnnMoeInitRoutingV2](../../moe_init_routing_v2/docs/aclnnMoeInitRoutingV2.md)输出格式对应）。
+
+    <!-- npu="950" id10 -->
+8. <term>Ascend 950PR&950DT系列产品</term>：非量化输入支持零计算专家、拷贝专家、常量专家特性，xOptional、alpha1Optional、alpha2Optional、vOptional、zeroExpertRange、copyExpertRange、constantExpertRange支持传入非空值，zeroExpertRange、copyExpertRange、constantExpertRange专家范围不能重叠。
+    <!-- end id10 -->
+
+9. 输入为 `FLOAT4_E2M1` 时：
+    - 当前不支持零计算专家、拷贝专家和常量专家。xOptional、alpha1Optional、alpha2Optional、vOptional 必须传入 nullptr，zeroExpertRange、copyExpertRange、constantExpertRange 必须传入 nullptr 或空数组。
+    - H 为逻辑元素数，必须为正偶数；每字节低 4 bit 对应偶数列，高 4 bit 对应奇数列。R 为实际物理行数，裁剪后可小于 NUM_ROWS*K。expandedX 和 expandedXScaleOptional 必须为连续 ND Tensor。
+    - expandedXScaleOptional 为 `(R,ceil(H/64),2)`，行尾无对应数据的预留 scale 不参与计算；每个 scale 对应同一物理行中的 32 个元素。
+    - k 必须大于 0，索引长度必须能被 k 整除，NUM_ROWS 由索引长度除以 k 得到。dropPadMode 为 0/1 时按 `expandedRowIdx[i+t*NUM_ROWS]` 取索引，为 2/3 时按 `expandedRowIdx[i*K+t]` 取索引；超出 `[0,R)` 的路由整路跳过，包括 bias。
+    - x1Optional/x2Optional 为 `(NUM_ROWS,H)`，biasOptional 为 `(E_bias,H)`，均使用 BFLOAT16。biasOptional 依赖 INT32 的 expertIdxOptional `(NUM_ROWS,K)`，有效专家索引在 `[0,E_bias)`。out 为连续 ND Tensor，shape 为 `(NUM_ROWS,H)`，固定输出 BFLOAT16。
+
+
+## 调用示例
+
+以下示例使用 FLOAT4_E2M1 输入和 FLOAT8_E8M0 反量化系数。具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
+
+```cpp
+#include "acl/acl.h"
+#include "aclnnop/aclnn_moe_finalize_routing_v5.h"
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <vector>
+
+#define CHECK_RET(cond, return_expr) \
+  do {                               \
+    if (!(cond)) {                   \
+      return_expr;                   \
+    }                                \
+  } while (0)
+
+#define LOG_PRINT(message, ...)     \
+  do {                              \
+    printf(message, ##__VA_ARGS__); \
+  } while (0)
+
+int64_t GetShapeSize(const std::vector<int64_t>& shape) {
+    int64_t shape_size = 1;
+    for (auto i : shape) {
+        shape_size *= i;
+    }
+    return shape_size;
+}
+int Init(int32_t deviceId, aclrtStream* stream) {
+    // 固定写法，资源初始化
+    auto  ret = aclInit(nullptr);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
+    ret = aclrtSetDevice(deviceId);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSetDevice failed. ERROR: %d\n", ret); return ret);
+    ret = aclrtCreateStream(stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtCreateStream failed. ERROR: %d\n", ret); return ret);
+    return 0;
+}
+
+template <typename T>
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor) {
+    auto size = hostData.size() * sizeof(T);
+    // 调用aclrtMalloc申请device侧内存
+    auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
+    // 调用aclrtMemcpy将host侧数据拷贝到device侧内存上
+    ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); return ret);
+    // 计算连续tensor的strides
+    std::vector<int64_t> strides(shape.size(), 1);
+    for (int64_t i = static_cast<int64_t>(shape.size()) - 2; i >= 0; i--) {
+        strides[i] = shape[i + 1] * strides[i + 1];
+    }
+    // 调用aclCreateTensor接口创建aclTensor
+    *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
+                              shape.data(), shape.size(), *deviceAddr);
+    return *tensor == nullptr ? ACL_ERROR_INVALID_PARAM : ACL_SUCCESS;
+}
+
+int main() {
+  // 1.（固定写法）device/stream初始化，参考acl API手册
+  // 根据自己的实际device填写deviceId
+  int32_t deviceId = 0;
+  aclrtStream stream;
+  auto ret = Init(deviceId, &stream);
+  // check根据自己的需要处理
+  CHECK_RET(ret == 0, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
+
+  // 2. 构造两条路由的 FP4 输入，描述符记录逻辑形状，每个字节存两个 E2M1 元素。
+  std::vector<int64_t> expandedXShape = {2, 4};
+  std::vector<uint8_t> expandedXHostData = {0x22, 0x22, 0x44, 0x44};  // 两行分别填入 1 和 2
+  std::vector<int64_t> expandedXScaleShape = {2, 1, 2};  // (R, ceil(H/64), 2)
+  std::vector<uint8_t> expandedXScaleHostData = {127, 127, 128, 127};  // 两行实际使用的 scale 分别为 1 和 2
+  std::vector<int64_t> expandedRowIdxShape = {2};
+  std::vector<int32_t> expandedRowIdxHostData = {0, 1};
+  std::vector<int64_t> outShape = {1, 4};
+  std::vector<uint16_t> outHostData(GetShapeSize(outShape));  // BF16 的原始位模式
+  void *expandedXAddr = nullptr, *expandedXScaleAddr = nullptr, *expandedRowIdxAddr = nullptr, *outDeviceAddr = nullptr;
+  aclTensor *expandedX = nullptr, *expandedXScale = nullptr, *expandedRowIdx = nullptr, *out = nullptr;
+
+  ret = CreateAclTensor(expandedXHostData, expandedXShape, &expandedXAddr, ACL_FLOAT4_E2M1, &expandedX);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = CreateAclTensor(expandedXScaleHostData, expandedXScaleShape, &expandedXScaleAddr,
+                        ACL_FLOAT8_E8M0, &expandedXScale);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = CreateAclTensor(expandedRowIdxHostData, expandedRowIdxShape, &expandedRowIdxAddr,
+                        ACL_INT32, &expandedRowIdx);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = CreateAclTensor(outHostData, outShape, &outDeviceAddr, ACL_BF16, &out);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+
+  // 3. 调用算子接口。特殊专家输入和三个区间均传 nullptr。
+  int64_t dropPadMode = 2;
+  int64_t k = 2;
+  uint64_t workspaceSize = 0;
+  aclOpExecutor* executor = nullptr;
+  ret = aclnnMoeFinalizeRoutingV5GetWorkspaceSize(expandedX, expandedRowIdx, nullptr, nullptr, nullptr, nullptr,
+                                                 nullptr, nullptr, nullptr, nullptr, nullptr, expandedXScale,
+                                                 dropPadMode, nullptr, nullptr, nullptr, k, out, &workspaceSize,
+                                                 &executor);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMoeFinalizeRoutingV5GetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+  // 根据第一段接口计算出的workspaceSize申请device内存
+  void* workspaceAddr = nullptr;
+  if (workspaceSize > 0) {
+      ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+      CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+  }
+  // 调用aclnnMoeFinalizeRoutingV5第二段接口
+  ret = aclnnMoeFinalizeRoutingV5(workspaceAddr, workspaceSize, executor, stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMoeFinalizeRoutingV5 failed. ERROR: %d\n", ret); return ret);
+
+  // 4.（固定写法）同步等待任务执行结束
+  ret = aclrtSynchronizeStream(stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+
+  // 5. 读取 BF16 输出。每个元素的预期值为 1 * 1 + 2 * 2 = 5。
+  const size_t outBytes = outHostData.size() * sizeof(outHostData[0]);
+  ret = aclrtMemcpy(outHostData.data(), outBytes, outDeviceAddr, outBytes, ACL_MEMCPY_DEVICE_TO_HOST);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
+  for (size_t i = 0; i < outHostData.size(); ++i) {
+      uint32_t bits = static_cast<uint32_t>(outHostData[i]) << 16;
+      float value;
+      std::memcpy(&value, &bits, sizeof(value));
+      LOG_PRINT("result[%zu] is: %f\n", i, value);
+  }
+
+  // 6. 释放资源。
+  aclDestroyTensor(expandedX);
+  aclDestroyTensor(expandedXScale);
+  aclDestroyTensor(expandedRowIdx);
+  aclDestroyTensor(out);
+  aclrtFree(expandedXAddr);
+  aclrtFree(expandedXScaleAddr);
+  aclrtFree(expandedRowIdxAddr);
+  aclrtFree(outDeviceAddr);
+  if (workspaceSize > 0) {
+    aclrtFree(workspaceAddr);
+  }
+  aclrtDestroyStream(stream);
+  aclrtResetDevice(deviceId);
+  aclFinalize();
+  return 0;
+}
+```

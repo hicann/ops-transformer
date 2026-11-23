@@ -28,19 +28,21 @@ const aclTensor* MoeFinalizeRoutingV2(const aclTensor* expanded_x, const aclTens
                                       const aclTensor* x1, const aclTensor* x2, const aclTensor* bias,
                                       const aclTensor* scales, const aclTensor* expert_idx, const aclTensor* x,
                                       const aclTensor* alpha1, const aclTensor* alpha2, const aclTensor* v,
-                                      int64_t drop_pad_mode, const aclIntArray* zeroExpertRange,
-                                      const aclIntArray* copyExpertRange, const aclIntArray* constantExpertRange,
-                                      int64_t k, const aclTensor* out, aclOpExecutor* executor)
+                                      const aclTensor* expandedXScale, int64_t drop_pad_mode,
+                                      const aclIntArray* zeroExpertRange, const aclIntArray* copyExpertRange,
+                                      const aclIntArray* constantExpertRange, int64_t k, const aclTensor* out,
+                                      aclOpExecutor* executor)
 {
     L0_DFX(MoeFinalizeRoutingV2, expanded_x, expanded_row_idx, x1, x2, bias, scales, expert_idx, x, alpha1, alpha2, v,
-           drop_pad_mode, zeroExpertRange, copyExpertRange, constantExpertRange, k, out);
+           expandedXScale, drop_pad_mode, zeroExpertRange, copyExpertRange, constantExpertRange, k, out);
 
     auto y = executor->AllocTensor(out->GetViewShape(), out->GetDataType(), Format::FORMAT_ND);
     // 如果输出是空，直接不走算子逻辑
     if (!y->IsEmpty()) {
         auto ret = ADD_TO_LAUNCHER_LIST_AICORE(
             MoeFinalizeRoutingV2,
-            OP_INPUT(expanded_x, expanded_row_idx, x1, x2, bias, scales, expert_idx, x, alpha1, alpha2, v),
+            OP_INPUT(expanded_x, expanded_row_idx, x1, x2, bias, scales, expert_idx, x, alpha1, alpha2, v,
+                     expandedXScale),
             OP_OUTPUT(y), OP_ATTR(drop_pad_mode, zeroExpertRange, copyExpertRange, constantExpertRange, k));
         OP_CHECK_ADD_TO_LAUNCHER_LIST_AICORE(ret != ACLNN_SUCCESS, return nullptr,
                                              "MoeFinalizeRoutingV2AiCore ADD_TO_LAUNCHER_LIST_AICORE failed.");
