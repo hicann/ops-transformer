@@ -125,38 +125,38 @@ aclnnStatus aclnnMsaIndexScore(
     <tr>
       <td>query</td>
       <td>Input</td>
-      <td>$Q_{idx}$ in the formula.</td>
+      <td>Q_idx in the formula.</td>
       <td>Supported layout: TND.</td>
       <td>BFLOAT16, FLOAT16; Ascend 950 also supports FLOAT8_E5M2, FLOAT8_E4M3FN and FLOAT4_E2M1</td>
       <td>ND</td>
-      <td>3 ($[T1, N1, D]$)</td>
+      <td>3 ([T1, N1, D])</td>
     </tr>
     <tr>
       <td>key</td>
       <td>Input</td>
-      <td>$K_{idx}$ in the formula.</td>
-      <td>TND $[T2, N2, D]$, BSND $[B, S2, N2, D]$, BNSD $[B, N2, S2, D]$, BBND, and BNBD. Query stays TND. BSND / BNSD do not pass <code>blockTableOptional</code>. A PageAttention key may be non-contiguous on dim0 (physical page). Non-leading axes with size greater than 1 must be contiguous; otherwise tiling rejects the input. TND / BSND / BNSD must be contiguous.</td>
+      <td>K_idx in the formula.</td>
+      <td>TND [T2, N2, D], BSND [B, S2, N2, D], BNSD [B, N2, S2, D], BBND, and BNBD. Query stays TND. BSND / BNSD do not pass blockTableOptional. A PageAttention key may be non-contiguous on dim0 (physical page). Non-leading axes with size greater than 1 must be contiguous; otherwise tiling rejects the input. TND / BSND / BNSD must be contiguous.</td>
       <td>Same dtype as query</td>
       <td>ND</td>
-      <td>3 ($[T2, N2, D]$) or 4 ($[B, S2, N2, D]$, $[B, N2, S2, D]$, $[block\_num, N2, block\_size, D]$, $[block\_num, block\_size, N2, D]$)</td>
+      <td>3 ([T2, N2, D]) or 4 ([B, S2, N2, D], [B, N2, S2, D], [block_num, N2, block_size, D], [block_num, block_size, N2, D])</td>
     </tr>
     <tr>
       <td>startLoc</td>
       <td>Input</td>
       <td>Logical block index of the current query (not a token prefix).</td>
-      <td>Generates $local\_mask$ together with <code>initBlocks</code> and <code>localBlocks</code>.</td>
+      <td>Generates local_mask together with initBlocks and localBlocks.</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>1 ($[B]$)</td>
+      <td>1 ([B])</td>
     </tr>
-<tr>
+    <tr>
       <td>blockTableOptional</td>
       <td>Input</td>
       <td>Block mapping table for PageAttention storage.</td>
-      <td>In the PageAttention scenario, blockTableOptional must be 2D. The second dimension must be at least $maxBlockNumPerSeq$.</td>
+      <td>In the PageAttention scenario, blockTableOptional must be 2D. The second dimension must be at least maxBlockNumPerSeq.</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>2 ($[B, S2/block\_size]$)</td>
+      <td>2 ([B, S2/block_size])</td>
     </tr>
     <tr>
       <td>queryScaleOptional</td>
@@ -176,14 +176,14 @@ aclnnStatus aclnnMsaIndexScore(
       <td>ND</td>
       <td>For MXFP4, same outer dimensions as key; last dimension D/32</td>
     </tr>
-        <tr>
+    <tr>
       <td>attenMaskOptional</td>
       <td>Input</td>
       <td>Mask that controls causal visibility.</td>
       <td>Used only when sparseMode=3, as the base mask for causal visibility. A value of 1 means the position is excluded from the computation. A value of 0 means it is included.</td>
       <td>INT8</td>
       <td>ND</td>
-      <td>2 ($[2048, 2048]$)</td>
+      <td>2 ([2048, 2048])</td>
     </tr>
     <tr>
       <td>actualSeqQlenOptional</td>
@@ -192,22 +192,22 @@ aclnnStatus aclnnMsaIndexScore(
       <td>Required for TND. Monotonically non-decreasing prefix sum.</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>1 ($[B+1]$)</td>
+      <td>1 ([B+1])</td>
     </tr>
     <tr>
       <td>actualSeqKlenOptional</td>
       <td>Input</td>
       <td>Number of valid key tokens in each batch.</td>
-      <td>TND / BSND / BNSD use a monotonically non-decreasing prefix sum $[B+1]$. For BSND / BNSD, each per-request length difference must not exceed $S2$. PageAttention uses the visible $S2$ of each request ($[B]$).</td>
+      <td>TND / BSND / BNSD use a monotonically non-decreasing prefix sum [B+1]. For BSND / BNSD, each per-request length difference must not exceed S2. PageAttention uses the visible S2 of each request ([B]).</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>1 ($[B]$ or $[B+1]$)</td>
+      <td>1 ([B] or [B+1])</td>
     </tr>
-        <tr>
+    <tr>
       <td>layoutKeyOptional</td>
       <td>Input</td>
       <td>Data layout of key.</td>
-      <td>One of <code>"TND"</code>, <code>"BSND"</code>, <code>"BNSD"</code>, <code>"BBND"</code>, or <code>"BNBD"</code>. Defaults to <code>"BBND"</code> when omitted or empty. Must match the actual shape of <code>key</code>. Query stays TND on this API; key may still be BSND / BNSD.</td>
+      <td>One of "TND", "BSND", "BNSD", "BBND", or "BNBD". Defaults to "BBND" when omitted or empty. Must match the actual shape of key. Query stays TND on this API; key may still be BSND / BNSD.</td>
       <td>CHAR*</td>
       <td>-</td>
       <td>-</td>
@@ -224,8 +224,8 @@ aclnnStatus aclnnMsaIndexScore(
     <tr>
       <td>initBlocks</td>
       <td>Input</td>
-      <td>Number of leading blocks forced by $local\_mask$.</td>
-      <td>Writes the high score $1\mathrm{e}30$ to logical blocks $[0, initBlocks)$. Optional. Default $0$. Must be $\ge 0$ and $\le maxBlockNumPerSeq$.</td>
+      <td>Number of leading blocks forced by local_mask.</td>
+      <td>Writes the high score 1e30 to logical blocks [0, initBlocks). Optional. Default 0. Must be ≥ 0 and ≤ maxBlockNumPerSeq.</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -233,8 +233,8 @@ aclnnStatus aclnnMsaIndexScore(
     <tr>
       <td>localBlocks</td>
       <td>Input</td>
-      <td>Local window length forced by $local\_mask$.</td>
-      <td>The window is $[max(0, startLoc+1-localBlocks), startLoc]$. It writes the high score $1\mathrm{e}29$ and overrides init at the same positions. Optional. Default $1$.</td>
+      <td>Local window length forced by local_mask.</td>
+      <td>The window is [max(0, startLoc+1-localBlocks), startLoc]. It writes the high score 1e29 and overrides init at the same positions. Optional. Default 1.</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -251,11 +251,11 @@ aclnnStatus aclnnMsaIndexScore(
     <tr>
       <td>score</td>
       <td>Output</td>
-      <td>$score$ in the formula.</td>
+      <td>score in the formula.</td>
       <td>Per-block importance score. The last dimension is the aligned logical block count.</td>
       <td>FLOAT</td>
       <td>ND</td>
-      <td>3 ($[N1, T1, RoundUp(maxBlockNumPerSeq, 16)]$)</td>
+      <td>3 ([N1, T1, RoundUp(maxBlockNumPerSeq, 16)])</td>
     </tr>
     <tr>
       <td>workspaceSize</td>

@@ -108,41 +108,41 @@ aclnnStatus aclnnMsaIndexScoreV2(
     <tr>
       <td>query</td>
       <td>输入</td>
-      <td>公式中的$Q_{idx}$。</td>
-      <td>支持TND、BSND、BNSD。由<code>layoutQueryOptional</code>指定，不传时为TND。</td>
+      <td>公式中的Q_idx。</td>
+      <td>支持TND、BSND、BNSD。由layoutQueryOptional指定，不传时为TND。</td>
       <td>BFLOAT16、FLOAT16；Ascend950另支持FLOAT8_E4M3FN、FLOAT8_E5M2、FLOAT4_E2M1</td>
       <td>ND</td>
-      <td>3（$[T1, N1, D]$）或4（$[B, S1, N1, D]$、$[B, N1, S1, D]$）</td>
+      <td>3（[T1, N1, D]）或4（[B, S1, N1, D]、[B, N1, S1, D]）</td>
       <td>×</td>
     </tr>
     <tr>
       <td>key</td>
       <td>输入</td>
-      <td>公式中的$K_{idx}$。</td>
+      <td>公式中的K_idx。</td>
       <td>支持TND、BSND、BNSD、BBND、BNBD。非分页通常与query同布局，block128另允许TND query配BSND/BNSD key。分页可配任意合法query布局，允许dim0（物理page）非连续，其余轴连续。pool为16/128，物理页16/128且pool不大于页长；block16跨head归约，block128分别输出各head。</td>
       <td>与query同型</td>
       <td>ND</td>
-      <td>3（$[T2, N2, D]$）或4（$[B, S2, N2, D]$、$[B, N2, S2, D]$、$[block\_num, N2, block\_size, D]$、$[block\_num, block\_size, N2, D]$）</td>
+      <td>3（[T2, N2, D]）或4（[B, S2, N2, D]、[B, N2, S2, D]、[block_num, N2, block_size, D]、[block_num, block_size, N2, D]）</td>
       <td>仅支持首轴非连续</td>
     </tr>
     <tr>
       <td>startLoc</td>
       <td>输入</td>
       <td>当前query所在逻辑block索引（非token前缀）。</td>
-      <td>与<code>initBlocks</code> / <code>localBlocks</code>一起生成$local\_mask$。</td>
+      <td>与initBlocks / localBlocks一起生成local_mask。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>1（$[B]$）</td>
+      <td>1（[B]）</td>
       <td>-</td>
     </tr>
     <tr>
       <td>blockTableOptional</td>
       <td>输入</td>
       <td>表示当前传入的使用PageAttention存储的block映射表。</td>
-      <td>仅BBND / BNBD传入，需为2维；第二维长度不能小于$maxBlockNumPerSeq$。TND / BSND / BNSD传<code>nullptr</code>。</td>
+      <td>仅BBND / BNBD传入，需为2维；第二维长度不能小于maxBlockNumPerSeq。TND / BSND / BNSD传nullptr。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>2（$[B, S2/block\_size]$）</td>
+      <td>2（[B, S2/block_size]）</td>
       <td>-</td>
     </tr>
     <tr>
@@ -165,41 +165,41 @@ aclnnStatus aclnnMsaIndexScoreV2(
       <td>MXFP4与key同rank，末维D/32；其他预留反量化形状沿用原定义。</td>
       <td>-</td>
     </tr>
-        <tr>
+    <tr>
       <td>attenMaskOptional</td>
       <td>输入</td>
       <td>控制因果可见的mask掩码。</td>
       <td>仅在sparseMode=3时使用，作为base mask控制causal可见；取值为1代表该位不参与计算，为0代表该位参与计算。</td>
       <td>INT8</td>
       <td>ND</td>
-      <td>2（$[2048, 2048]$）</td>
+      <td>2（[2048, 2048]）</td>
       <td>-</td>
     </tr>
     <tr>
       <td>actualSeqQlenOptional</td>
       <td>输入</td>
       <td>每个Batch中，Query的有效token数。</td>
-      <td>三种query布局都必须传入，单调不减（前缀和）。BSND / BNSD时每个请求的长度不能超过shape里的$S1$。</td>
+      <td>三种query布局都必须传入，单调不减（前缀和）。BSND / BNSD时每个请求的长度不能超过shape里的S1。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>1（$[B+1]$）</td>
+      <td>1（[B+1]）</td>
       <td>-</td>
     </tr>
     <tr>
       <td>actualSeqKlenOptional</td>
       <td>输入</td>
       <td>每个Batch中，Key的有效token数。</td>
-      <td>key为TND / BSND / BNSD时必须传入，单调不减（前缀和，$[B+1]$）；PageAttention场景下为各请求可见$S2$（$[B]$）。</td>
+      <td>key为TND / BSND / BNSD时必须传入，单调不减（前缀和，[B+1]）；PageAttention场景下为各请求可见S2（[B]）。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>1（$[B]$或$[B+1]$）</td>
+      <td>1（[B]或[B+1]）</td>
       <td>-</td>
     </tr>
-        <tr>
+    <tr>
       <td>layoutKeyOptional</td>
       <td>输入</td>
       <td>key的数据排布。</td>
-      <td>取值<code>"TND"</code> / <code>"BSND"</code> / <code>"BNSD"</code> / <code>"BBND"</code> / <code>"BNBD"</code>。不传或空串时默认<code>"BBND"</code>。必须与<code>key</code>实际shape一致，不可仅凭维度推断。非分页通常与<code>layoutQueryOptional</code>相同，block128的BSND/BNSD key另允许TND query。</td>
+      <td>取值"TND" / "BSND" / "BNSD" / "BBND" / "BNBD"。不传或空串时默认"BBND"。必须与key实际shape一致，不可仅凭维度推断。非分页通常与layoutQueryOptional相同，block128的BSND/BNSD key另允许TND query。</td>
       <td>CHAR*</td>
       <td>-</td>
       <td>-</td>
@@ -218,8 +218,8 @@ aclnnStatus aclnnMsaIndexScoreV2(
     <tr>
       <td>initBlocks</td>
       <td>输入</td>
-      <td>$local\_mask$强制选中的头部block数。</td>
-      <td>对逻辑block $[0, initBlocks)$写入高分$1\mathrm{e}30$。可选，默认$0$；须$\ge 0$且$\le maxBlockNumPerSeq$。</td>
+      <td>local_mask强制选中的头部block数。</td>
+      <td>对逻辑block [0, initBlocks)写入高分1e30。可选，默认0；须≥ 0且≤ maxBlockNumPerSeq。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -228,8 +228,8 @@ aclnnStatus aclnnMsaIndexScoreV2(
     <tr>
       <td>localBlocks</td>
       <td>输入</td>
-      <td>$local\_mask$强制选中的局部窗口长度。</td>
-      <td>窗口为$[max(0, startLoc+1-localBlocks), startLoc]$，写入高分$1\mathrm{e}29$（覆盖同位置init）。可选，默认$1$（对齐MiniMax HF）；与Triton raw score对齐时置$0$。</td>
+      <td>local_mask强制选中的局部窗口长度。</td>
+      <td>窗口为[max(0, startLoc+1-localBlocks), startLoc]，写入高分1e29（覆盖同位置init）。可选，默认1（对齐MiniMax HF）；与Triton raw score对齐时置0。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -239,7 +239,7 @@ aclnnStatus aclnnMsaIndexScoreV2(
       <td>layoutQueryOptional</td>
       <td>输入</td>
       <td>query的数据排布。</td>
-      <td>取值<code>"TND"</code> / <code>"BSND"</code> / <code>"BNSD"</code>。不传或空串时默认<code>"TND"</code>。key为TND / BSND / BNSD时必须与<code>layoutKeyOptional</code>相同；key为BBND / BNBD时三种都可以。</td>
+      <td>取值"TND" / "BSND" / "BNSD"。不传或空串时默认"TND"。key为TND / BSND / BNSD时必须与layoutKeyOptional相同；key为BBND / BNBD时三种都可以。</td>
       <td>CHAR*</td>
       <td>-</td>
       <td>-</td>
@@ -249,7 +249,7 @@ aclnnStatus aclnnMsaIndexScoreV2(
       <td>poolBlockSize</td>
       <td>输入</td>
       <td>打分池化块长。</td>
-      <td>每个score归约的token数。只允许16 / 128，非正数按128处理。与BBND / BNBD的存储页长<code>page_size</code>不是同一个量；分页时不能超过页长，且页长必须是它的正整数倍。128为默认值，走原单次块内maxpool。16走两级maxpool。</td>
+      <td>每个score归约的token数。只允许16 / 128，非正数按128处理。与BBND / BNBD的存储页长page_size不是同一个量；分页时不能超过页长，且页长必须是它的正整数倍。128为默认值，走原单次块内maxpool。16走两级maxpool。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -268,11 +268,11 @@ aclnnStatus aclnnMsaIndexScoreV2(
     <tr>
       <td>score</td>
       <td>输出</td>
-      <td>公式中的$score$。</td>
-      <td>逐block的重要性分数；末维为对齐后的逻辑block数。逻辑块长为16时，每个block再取head间max，head维为1。块长128时每个head只做一次块内max，head维为$N1$。</td>
+      <td>公式中的score。</td>
+      <td>逐block的重要性分数；末维为对齐后的逻辑block数。逻辑块长为16时，每个block再取head间max，head维为1。块长128时每个head只做一次块内max，head维为N1。</td>
       <td>FLOAT</td>
       <td>ND</td>
-      <td>3（块长16为$[1, T1, RoundUp(maxBlockNumPerSeq, 16)]$，块长128为$[N1, T1, RoundUp(maxBlockNumPerSeq, 16)]$）</td>
+      <td>3（块长16为[1, T1, RoundUp(maxBlockNumPerSeq, 16)]，块长128为[N1, T1, RoundUp(maxBlockNumPerSeq, 16)]）</td>
       <td>-</td>
     </tr>
     <tr>

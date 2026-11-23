@@ -85,30 +85,30 @@ cann_ops_transformer.msa_index_score_v2(
   <tr>
     <td>query</td>
     <td>必选</td>
-    <td>$Q_{idx}$。由<code>layout_query</code>指定：TND/BSND/BNSD，默认TND。</td>
+    <td>Q_idx。由layout_query指定：TND/BSND/BNSD，默认TND。</td>
     <td>fp16/bf16；Ascend 950另支持float8_e5m2、float8_e4m3fn及float4_e2m1fn_x2</td>
-    <td><code>[T1,N1,D]</code> / <code>[B,S1,N1,D]</code> / <code>[B,N1,S1,D]</code></td>
+    <td>[T1,N1,D] / [B,S1,N1,D] / [B,N1,S1,D]</td>
   </tr>
   <tr>
     <td>key</td>
     <td>必选</td>
-    <td>$K_{idx}$。非分页TND/BSND/ BNSD必须与query同布局；分页BBND/BNBD可配任意query。PA允许dim0非连续。TND缺省逻辑块长128，每head一次块内max。</td>
+    <td>K_idx。非分页TND/BSND/ BNSD必须与query同布局；分页BBND/BNBD可配任意query。PA允许dim0非连续。TND缺省逻辑块长128，每head一次块内max。</td>
     <td>与query同型</td>
-    <td><code>[T2,N2,D]</code> / <code>[B,S2,N2,D]</code> / <code>[B,N2,S2,D]</code> / <code>[NP,P,N2,D]</code> / <code>[NP,N2,P,D]</code></td>
+    <td>[T2,N2,D] / [B,S2,N2,D] / [B,N2,S2,D] / [NP,P,N2,D] / [NP,N2,P,D]</td>
   </tr>
   <tr>
     <td>start_loc</td>
     <td>必选</td>
     <td>query所在逻辑block</td>
     <td>int32</td>
-    <td><code>[B]</code></td>
+    <td>[B]</td>
   </tr>
   <tr>
     <td>block_table</td>
     <td>PA必选</td>
     <td>逻辑→物理page；TND/BSND/BNSD不传</td>
     <td>int32</td>
-    <td><code>[B,MB]</code></td>
+    <td>[B,MB]</td>
   </tr>
   <tr>
     <td>query_scale</td>
@@ -117,31 +117,31 @@ cann_ops_transformer.msa_index_score_v2(
     <td>float8_e8m0fnu</td>
     <td>-</td>
   </tr>
-    <tr>
+  <tr>
     <td>atten_mask</td>
     <td>mode=3必选</td>
     <td>压缩下三角模板</td>
     <td>int8</td>
-    <td><code>[2048,2048]</code></td>
+    <td>[2048,2048]</td>
   </tr>
   <tr>
     <td>actual_seq_qlen</td>
     <td>必选</td>
-    <td>query前缀和。BSND/BNSD时每个请求长度不超过$S1$</td>
+    <td>query前缀和。BSND/BNSD时每个请求长度不超过S1</td>
     <td>int32</td>
-    <td><code>[B+1]</code></td>
+    <td>[B+1]</td>
   </tr>
   <tr>
     <td>actual_seq_klen</td>
     <td>必选</td>
     <td>PA为各请求S2；TND/BSND/BNSD为key前缀和</td>
     <td>int32</td>
-    <td><code>[B]</code> / <code>[B+1]</code></td>
+    <td>[B] / [B+1]</td>
   </tr>
   <tr>
     <td>layout_key</td>
     <td>可选</td>
-    <td>key布局：<code>TND</code>/<code>BSND</code>/<code>BNSD</code>/<code>BBND</code>/<code>BNBD</code>，默认<code>BBND</code>。非分页必须与<code>layout_query</code>相同</td>
+    <td>key布局：TND/BSND/BNSD/BBND/BNBD，默认BBND。非分页必须与layout_query相同</td>
     <td>str</td>
     <td>-</td>
   </tr>
@@ -155,28 +155,28 @@ cann_ops_transformer.msa_index_score_v2(
   <tr>
     <td>init_blocks</td>
     <td>可选</td>
-    <td><code>local_mask</code>头部强制块数，默认0</td>
+    <td>local_mask头部强制块数，默认0</td>
     <td>int</td>
     <td>-</td>
   </tr>
   <tr>
     <td>local_blocks</td>
     <td>可选</td>
-    <td><code>local_mask</code>局部窗口，默认1</td>
+    <td>local_mask局部窗口，默认1</td>
     <td>int</td>
     <td>-</td>
   </tr>
   <tr>
     <td>layout_query</td>
     <td>可选</td>
-    <td>query布局：<code>TND</code>/<code>BSND</code>/<code>BNSD</code>，默认<code>TND</code>。分页key可配任意query；非分页key必须相同</td>
+    <td>query布局：TND/BSND/BNSD，默认TND。分页key可配任意query；非分页key必须相同</td>
     <td>str</td>
     <td>-</td>
   </tr>
   <tr>
     <td>pool_block_size</td>
     <td>可选</td>
-    <td>打分池化块长：每个score归约的token数。<code>16</code>/<code>128</code>，默认128。与BBND/BNBD的存储页长不是同一个量；分页时不能超过页长。128走原单次块内maxpool；16走两级maxpool，且<code>N1</code>整除128。BSND/BNSD固定16</td>
+    <td>打分池化块长：每个score归约的token数。16/128，默认128。与BBND/BNBD的存储页长不是同一个量；分页时不能超过页长。128走原单次块内maxpool；16走两级maxpool，且N1整除128。BSND/BNSD固定16</td>
     <td>int</td>
     <td>-</td>
   </tr>

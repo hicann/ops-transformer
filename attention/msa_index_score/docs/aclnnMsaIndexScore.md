@@ -125,38 +125,38 @@ aclnnStatus aclnnMsaIndexScore(
     <tr>
       <td>query</td>
       <td>输入</td>
-      <td>公式中的$Q_{idx}$。</td>
+      <td>公式中的Q_idx。</td>
       <td>支持的shape为：TND。</td>
       <td>BFLOAT16、FLOAT16；950还支持FP8和MXFP4（FLOAT4_E2M1）</td>
       <td>ND</td>
-      <td>3（$[T1, N1, D]$）</td>
+      <td>3（[T1, N1, D]）</td>
     </tr>
     <tr>
       <td>key</td>
       <td>输入</td>
-      <td>公式中的$K_{idx}$。</td>
-      <td>支持TND $[T2, N2, D]$、BSND $[B, S2, N2, D]$、BNSD $[B, N2, S2, D]$、BBND、BNBD。query仍为TND。BSND / BNSD不传<code>blockTableOptional</code>。PA key允许dim0（物理page）非连续；size&gt;1的非首轴须连续，否则tiling拒绝。TND / BSND / BNSD不允许非连续。</td>
+      <td>公式中的K_idx。</td>
+      <td>支持TND [T2, N2, D]、BSND [B, S2, N2, D]、BNSD [B, N2, S2, D]、BBND、BNBD。query仍为TND。BSND / BNSD不传blockTableOptional。PA key允许dim0（物理page）非连续；size&gt;1的非首轴须连续，否则tiling拒绝。TND / BSND / BNSD不允许非连续。</td>
       <td>与query同型</td>
       <td>ND</td>
-      <td>3（$[T2, N2, D]$）或4（$[B, S2, N2, D]$、$[B, N2, S2, D]$、$[block\_num, N2, block\_size, D]$、$[block\_num, block\_size, N2, D]$）</td>
+      <td>3（[T2, N2, D]）或4（[B, S2, N2, D]、[B, N2, S2, D]、[block_num, N2, block_size, D]、[block_num, block_size, N2, D]）</td>
     </tr>
     <tr>
       <td>startLoc</td>
       <td>输入</td>
       <td>当前query所在逻辑block索引（非token前缀）。</td>
-      <td>与<code>initBlocks</code> / <code>localBlocks</code>一起生成$local\_mask$。</td>
+      <td>与initBlocks / localBlocks一起生成local_mask。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>1（$[B]$）</td>
+      <td>1（[B]）</td>
     </tr>
-<tr>
+    <tr>
       <td>blockTableOptional</td>
       <td>输入</td>
       <td>表示当前传入的使用PageAttention存储的block映射表。</td>
-      <td>PageAttention场景下，blockTableOptional需为2维；第二维长度不能小于$maxBlockNumPerSeq$。</td>
+      <td>PageAttention场景下，blockTableOptional需为2维；第二维长度不能小于maxBlockNumPerSeq。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>2（$[B, S2/block\_size]$）</td>
+      <td>2（[B, S2/block_size]）</td>
     </tr>
     <tr>
       <td>queryScaleOptional</td>
@@ -176,14 +176,14 @@ aclnnStatus aclnnMsaIndexScore(
       <td>ND</td>
       <td>MXFP4形状前缀与key相同，末维为逻辑D/32。</td>
     </tr>
-        <tr>
+    <tr>
       <td>attenMaskOptional</td>
       <td>输入</td>
       <td>控制因果可见的mask。</td>
       <td>仅在sparseMode=3时使用，作为base mask控制causal可见；取值为1代表该位不参与计算，为0代表该位参与计算。</td>
       <td>INT8</td>
       <td>ND</td>
-      <td>2（$[2048, 2048]$）</td>
+      <td>2（[2048, 2048]）</td>
     </tr>
     <tr>
       <td>actualSeqQlenOptional</td>
@@ -192,22 +192,22 @@ aclnnStatus aclnnMsaIndexScore(
       <td>当传入TND时，该入参必须传入，单调不减（前缀和）。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>1（$[B+1]$）</td>
+      <td>1（[B+1]）</td>
     </tr>
     <tr>
       <td>actualSeqKlenOptional</td>
       <td>输入</td>
       <td>每个Batch中，Key的有效token数。</td>
-      <td>TND / BSND / BNSD为单调不减的前缀和$[B+1]$；其中BSND / BNSD每个请求的长度差不超过$S2$。PageAttention为各请求可见$S2$（$[B]$）。</td>
+      <td>TND / BSND / BNSD为单调不减的前缀和[B+1]；其中BSND / BNSD每个请求的长度差不超过S2。PageAttention为各请求可见S2（[B]）。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>1（$[B]$或$[B+1]$）</td>
+      <td>1（[B]或[B+1]）</td>
     </tr>
-        <tr>
+    <tr>
       <td>layoutKeyOptional</td>
       <td>输入</td>
       <td>key的数据排布。</td>
-      <td>取值<code>"TND"</code> / <code>"BSND"</code> / <code>"BNSD"</code> / <code>"BBND"</code> / <code>"BNBD"</code>。不传或空串时默认<code>"BBND"</code>。必须与<code>key</code>实际shape一致。</td>
+      <td>取值"TND" / "BSND" / "BNSD" / "BBND" / "BNBD"。不传或空串时默认"BBND"。必须与key实际shape一致。</td>
       <td>CHAR*</td>
       <td>-</td>
       <td>-</td>
@@ -224,8 +224,8 @@ aclnnStatus aclnnMsaIndexScore(
     <tr>
       <td>initBlocks</td>
       <td>输入</td>
-      <td>$local\_mask$强制选中的头部block数。</td>
-      <td>对逻辑block $[0, initBlocks)$写入高分$1\mathrm{e}30$。可选，默认$0$；须$\ge 0$且$\le maxBlockNumPerSeq$。</td>
+      <td>local_mask强制选中的头部block数。</td>
+      <td>对逻辑block [0, initBlocks)写入高分1e30。可选，默认0；须≥ 0且≤ maxBlockNumPerSeq。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -233,8 +233,8 @@ aclnnStatus aclnnMsaIndexScore(
     <tr>
       <td>localBlocks</td>
       <td>输入</td>
-      <td>$local\_mask$强制选中的局部窗口长度。</td>
-      <td>窗口为$[max(0, startLoc+1-localBlocks), startLoc]$，写入高分$1\mathrm{e}29$（覆盖同位置init）。可选，默认$1$。</td>
+      <td>local_mask强制选中的局部窗口长度。</td>
+      <td>窗口为[max(0, startLoc+1-localBlocks), startLoc]，写入高分1e29（覆盖同位置init）。可选，默认1。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -251,11 +251,11 @@ aclnnStatus aclnnMsaIndexScore(
     <tr>
       <td>score</td>
       <td>输出</td>
-      <td>公式中的$score$。</td>
+      <td>公式中的score。</td>
       <td>逐block的重要性分数；末维为对齐后的逻辑block数。</td>
       <td>FLOAT</td>
       <td>ND</td>
-      <td>3（$[N1, T1, RoundUp(maxBlockNumPerSeq, 16)]$）</td>
+      <td>3（[N1, T1, RoundUp(maxBlockNumPerSeq, 16)]）</td>
     </tr>
     <tr>
       <td>workspaceSize</td>

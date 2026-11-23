@@ -95,30 +95,30 @@ cann_ops_transformer.msa_index_score(
   <tr>
     <td>query</td>
     <td>Required</td>
-    <td>$Q_{idx}$ TND</td>
+    <td>Q_idx TND</td>
     <td>fp16/bf16; Ascend 950 also supports float8_e5m2, float8_e4m3fn and float4_e2m1fn_x2</td>
-    <td><code>[T1,N1,D]</code></td>
+    <td>[T1,N1,D]</td>
   </tr>
   <tr>
     <td>key</td>
     <td>Required</td>
-    <td>$K_{idx}$. TND, BSND, BNSD, BBND, or BNBD. Query stays TND. BSND / BNSD do not pass <code>block_table</code>. PA may be non-contiguous on dim0.</td>
+    <td>K_idx. TND, BSND, BNSD, BBND, or BNBD. Query stays TND. BSND / BNSD do not pass block_table. PA may be non-contiguous on dim0.</td>
     <td>Same dtype as query</td>
-    <td><code>[T2,N2,D]</code> / <code>[B,S2,N2,D]</code> / <code>[B,N2,S2,D]</code> / <code>[NP,P,N2,D]</code> / <code>[NP,N2,P,D]</code></td>
+    <td>[T2,N2,D] / [B,S2,N2,D] / [B,N2,S2,D] / [NP,P,N2,D] / [NP,N2,P,D]</td>
   </tr>
   <tr>
     <td>start_loc</td>
     <td>Required</td>
     <td>Logical block where the query is located.</td>
     <td>int32</td>
-    <td><code>[B]</code></td>
+    <td>[B]</td>
   </tr>
   <tr>
     <td>block_table</td>
     <td>Required for PA</td>
     <td>Logical to physical page. Not passed for TND / BSND / BNSD.</td>
     <td>int32</td>
-    <td><code>[B,MB]</code></td>
+    <td>[B,MB]</td>
   </tr>
   <tr>
     <td>query_scale</td>
@@ -127,31 +127,31 @@ cann_ops_transformer.msa_index_score(
     <td>float8_e8m0fnu</td>
     <td>-</td>
   </tr>
-    <tr>
+  <tr>
     <td>atten_mask</td>
     <td>Required for mode=3</td>
     <td>Compressed lower triangular template.</td>
     <td>int8</td>
-    <td><code>[2048,2048]</code></td>
+    <td>[2048,2048]</td>
   </tr>
   <tr>
     <td>actual_seq_qlen</td>
     <td>Required for TND query</td>
     <td>Query prefix sum.</td>
     <td>int32</td>
-    <td><code>[B+1]</code></td>
+    <td>[B+1]</td>
   </tr>
   <tr>
     <td>actual_seq_klen</td>
     <td>Required</td>
-    <td>Visible length <code>[B]</code> for PA. Prefix sum <code>[B+1]</code> for TND / BSND / BNSD.</td>
+    <td>Visible length [B] for PA. Prefix sum [B+1] for TND / BSND / BNSD.</td>
     <td>int32</td>
-    <td><code>[B]</code> / <code>[B+1]</code></td>
+    <td>[B] / [B+1]</td>
   </tr>
   <tr>
     <td>layout_key</td>
     <td>optional</td>
-    <td>Key layout: <code>TND</code> / <code>BSND</code> / <code>BNSD</code> / <code>BBND</code> / <code>BNBD</code>, default <code>BBND</code>.</td>
+    <td>Key layout: TND / BSND / BNSD / BBND / BNBD, default BBND.</td>
     <td>str</td>
     <td>-</td>
   </tr>
@@ -165,14 +165,14 @@ cann_ops_transformer.msa_index_score(
   <tr>
     <td>init_blocks</td>
     <td>optional</td>
-    <td>Number of forced head blocks of <code>local_mask</code>. Defaults to 0</td>
+    <td>Number of forced head blocks of local_mask. Defaults to 0</td>
     <td>int</td>
     <td>-</td>
   </tr>
   <tr>
     <td>local_blocks</td>
     <td>optional</td>
-    <td>Local window of <code>local_mask</code>. Defaults to 1</td>
+    <td>Local window of local_mask. Defaults to 1</td>
     <td>int</td>
     <td>-</td>
   </tr>

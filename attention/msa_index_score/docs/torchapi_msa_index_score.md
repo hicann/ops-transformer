@@ -78,22 +78,123 @@ cann_ops_transformer.msa_index_score(
 
 ## 参数说明
 
-| 参数名 | 参数类型 | 描述 | dtype | shape |
-| --- | --- | --- | --- | --- |
-| query | 必选 | $Q_{idx}$，TND | fp16 / bf16 | `[T1,N1,D]` |
-| key | 必选 | $K_{idx}$。PA允许dim0非连续 | 与query同型。 | `[NP,P,N2,D]` / `[NP,N2,P,D]` / `[T2,N2,D]` / `[B,S2,N2,D]` / `[B,N2,S2,D]` |
-| start_loc | 必选 | query所在逻辑block | int32 | `[B]` |
-| block_table | PA必选 | 逻辑block到物理page。TND / BSND / BNSD不传 | int32 | `[B,MB]` |
-| query_scale | 可选 | MXFP4的Q逐组系数，其他类型为None | float8_e8m0fnu | Q形状前缀相同，末维D/32 |
-| key_scale | 可选 | MXFP4的K逐组系数，原生浮点不传 | float32 / float8_e8m0fnu | MXFP4与K形状前缀相同，末维D/32 |
-| atten_mask | mode=3必选 | 因果模板 | int8 | `[2048,2048]` |
-| actual_seq_qlen | 必选 | query前缀和 | int32 | `[B+1]` |
-| actual_seq_klen | 必选 | PA为各请求可见长度；TND / BSND / BNSD为前缀和 | int32 | `[B]` / `[B+1]` |
-| layout_key | 可选 | `TND` / `BSND` / `BNSD` / `BBND` / `BNBD`，默认`BBND` | str | - |
-| sparse_mode | 可选 | 0或3，默认3 | int | - |
-| init_blocks | 可选 | `local_mask`头部强制块数，默认0 | int | - |
-| local_blocks | 可选 | `local_mask`局部窗口，默认1 | int | - |
-| compress_factor | 可选 | key压缩倍数，默认1。当前只支持1 | int | - |
+<table style="undefined;table-layout: fixed; width: 1180px"><colgroup>
+<col style="width: 160px">
+<col style="width: 120px">
+<col style="width: 360px">
+<col style="width: 280px">
+<col style="width: 260px">
+</colgroup>
+<thead>
+  <tr>
+    <th>参数名</th>
+    <th>参数类型</th>
+    <th>描述</th>
+    <th>dtype</th>
+    <th>shape</th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td>query</td>
+    <td>必选</td>
+    <td>Q_idx，TND</td>
+    <td>fp16 / bf16</td>
+    <td>[T1,N1,D]</td>
+  </tr>
+  <tr>
+    <td>key</td>
+    <td>必选</td>
+    <td>K_idx。PA允许dim0非连续</td>
+    <td>与query同型。</td>
+    <td>[NP,P,N2,D] / [NP,N2,P,D] / [T2,N2,D] / [B,S2,N2,D] / [B,N2,S2,D]</td>
+  </tr>
+  <tr>
+    <td>start_loc</td>
+    <td>必选</td>
+    <td>query所在逻辑block</td>
+    <td>int32</td>
+    <td>[B]</td>
+  </tr>
+  <tr>
+    <td>block_table</td>
+    <td>PA必选</td>
+    <td>逻辑block到物理page。TND / BSND / BNSD不传</td>
+    <td>int32</td>
+    <td>[B,MB]</td>
+  </tr>
+  <tr>
+    <td>query_scale</td>
+    <td>可选</td>
+    <td>MXFP4的Q逐组系数，其他类型为None</td>
+    <td>float8_e8m0fnu</td>
+    <td>Q形状前缀相同，末维D/32</td>
+  </tr>
+  <tr>
+    <td>key_scale</td>
+    <td>可选</td>
+    <td>MXFP4的K逐组系数，原生浮点不传</td>
+    <td>float32 / float8_e8m0fnu</td>
+    <td>MXFP4与K形状前缀相同，末维D/32</td>
+  </tr>
+  <tr>
+    <td>atten_mask</td>
+    <td>mode=3必选</td>
+    <td>因果模板</td>
+    <td>int8</td>
+    <td>[2048,2048]</td>
+  </tr>
+  <tr>
+    <td>actual_seq_qlen</td>
+    <td>必选</td>
+    <td>query前缀和</td>
+    <td>int32</td>
+    <td>[B+1]</td>
+  </tr>
+  <tr>
+    <td>actual_seq_klen</td>
+    <td>必选</td>
+    <td>PA为各请求可见长度；TND / BSND / BNSD为前缀和</td>
+    <td>int32</td>
+    <td>[B] / [B+1]</td>
+  </tr>
+  <tr>
+    <td>layout_key</td>
+    <td>可选</td>
+    <td>TND / BSND / BNSD / BBND / BNBD，默认BBND</td>
+    <td>str</td>
+    <td>-</td>
+  </tr>
+  <tr>
+    <td>sparse_mode</td>
+    <td>可选</td>
+    <td>0或3，默认3</td>
+    <td>int</td>
+    <td>-</td>
+  </tr>
+  <tr>
+    <td>init_blocks</td>
+    <td>可选</td>
+    <td>local_mask头部强制块数，默认0</td>
+    <td>int</td>
+    <td>-</td>
+  </tr>
+  <tr>
+    <td>local_blocks</td>
+    <td>可选</td>
+    <td>local_mask局部窗口，默认1</td>
+    <td>int</td>
+    <td>-</td>
+  </tr>
+  <tr>
+    <td>compress_factor</td>
+    <td>可选</td>
+    <td>key压缩倍数，默认1。当前只支持1</td>
+    <td>int</td>
+    <td>-</td>
+  </tr>
+</tbody>
+</table>
 
 <!-- npu="A3,910b" id8 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
