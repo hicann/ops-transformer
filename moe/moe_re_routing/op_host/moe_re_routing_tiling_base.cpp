@@ -14,10 +14,19 @@
  */
 #include <iostream>
 #include "log/log.h"
+#include "err/ops_err.h"
 #include "moe_re_routing_tiling_base.h"
 #include "common/include/op_host/op_const_def_transformer.h"
 
 namespace optiling {
+// 合法输入下 Tiling 失败时，按正式错误码 EZ1008（Arglist: opName, reason）首报，并输出 PLOG 上下文
+static void ReportTilingFailure(const char* opName, const char* reason)
+{
+    OP_LOGE_WITHOUT_REPORT(opName, "%s\n", reason);
+    const std::vector<const char*> msgKey = {"opName", "reason"};
+    const std::vector<const char*> msgValue = {opName, reason};
+    REPORT_PREDEFINED_ERR_MSG("EZ1008", msgKey, msgValue);
+}
 
 constexpr int64_t IN_TOKEN_INDEX = 0;
 constexpr int64_t IN_EXPERT_TOKEN_NUM_PER_RANK_INDEX = 1;
@@ -90,8 +99,7 @@ ge::graphStatus MoeReRoutingTilingBase::GetPlatformInfo()
     if (platformInfo == nullptr) {
         auto compileInfoPtr = reinterpret_cast<const MoeReRoutingCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr,
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "compileInfo", "nullptr",
-                                                          "Compile info should not be null."),
+                    ReportTilingFailure(context_->GetNodeName(), "CompileInfo is null, framework contract failure."),
                     return ge::GRAPH_FAILED);
         coreNum_ = compileInfoPtr->coreNum;
         ubSize_ = compileInfoPtr->ubSize;
@@ -104,14 +112,15 @@ ge::graphStatus MoeReRoutingTilingBase::GetPlatformInfo()
         ubSize_ = ubSize;
         npuArch_ = ascendcPlatform.GetCurNpuArch();
     }
-    OP_CHECK_IF(
-        (coreNum_ <= 0),
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "coreNum", std::to_string(coreNum_).c_str(),
-                                              "Failed to get valid core num."),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF((coreNum_ <= 0),
+                ReportTilingFailure(context_->GetNodeName(), ("PlatformAscendC::GetCoreNumAiv returned " +
+                                                              std::to_string(coreNum_) + ", platform query failure.")
+                                                                 .c_str()),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(ubSize_ <= 0,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "ubSize",
-                                                      std::to_string(ubSize_).c_str(), "Failed to get valid ub size."),
+                ReportTilingFailure(context_->GetNodeName(), ("PlatformAscendC::GetCoreMemSize(UB) returned " +
+                                                              std::to_string(ubSize_) + ", platform query failure.")
+                                                                 .c_str()),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -210,8 +219,9 @@ ge::graphStatus MoeReRoutingTilingBase::CheckOutputDtypeAndIdxType() const
         OP_CHECK_NULL_WITH_CONTEXT(context_, outputTopkWeightDesc);
         auto outputTopkWeightType = outputTopkWeightDesc->GetDataType();
         OP_CHECK_IF(outputTopkWeightType != ge::DT_FLOAT,
-                    OP_LOGE(context_->GetNodeName(), "permute_topk_weight should be DT_FLOAT, actual %s.",
-                            ge::TypeUtils::DataTypeToSerialString(outputTopkWeightType).c_str()),
+                    OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "permute_topk_weight",
+                                              ge::TypeUtils::DataTypeToSerialString(outputTopkWeightType).c_str(),
+                                              ge::TypeUtils::DataTypeToSerialString(ge::DT_FLOAT).c_str()),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -323,12 +333,21 @@ ge::graphStatus MoeReRoutingTilingBase::CheckOutputShape() const
     if (hasTopkWeight_) {
         const gert::StorageShape* outTopkWeightShapePtr = context_->GetOutputShape(OUT_PERMUTE_TOPK_WEIGHT_INDEX);
         OP_CHECK_IF(outTopkWeightShapePtr == nullptr,
-                    OP_LOGE(context_->GetNodeName(), "outTopkWeightShapePtr is nullptr."), return ge::GRAPH_FAILED);
+                    ReportTilingFailure(context_->GetNodeName(),
+                                        "Output shape of permute_topk_weight is null, framework contract failure."),
+                    return ge::GRAPH_FAILED);
         const gert::StorageShape* inTopkWeightShapePtr = context_->GetOptionalInputShape(IN_EXPERT_TOPK_WEIGHT_INDEX);
         OP_CHECK_IF(inTopkWeightShapePtr == nullptr,
-                    OP_LOGE(context_->GetNodeName(), "inTopkWeightShapePtr is nullptr."), return ge::GRAPH_FAILED);
+                    ReportTilingFailure(context_->GetNodeName(),
+                                        "Input shape of expert_topk_weight is null, framework contract failure."),
+                    return ge::GRAPH_FAILED);
         OP_CHECK_IF(outTopkWeightShapePtr->GetStorageShape() != inTopkWeightShapePtr->GetStorageShape(),
-                    OP_LOGE(context_->GetNodeName(), "expert_topk_weight shape must same with permute_topk_weight."),
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        context_->GetNodeName(), "expert_topk_weight and permute_topk_weight",
+                        (Ops::Base::ToString(inTopkWeightShapePtr->GetStorageShape()) + " and " +
+                         Ops::Base::ToString(outTopkWeightShapePtr->GetStorageShape()))
+                            .c_str(),
+                        "The output permute_topk_weight shape should be the same as input expert_topk_weight shape."),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
@@ -336,10 +355,9 @@ ge::graphStatus MoeReRoutingTilingBase::CheckOutputShape() const
 
 ge::graphStatus MoeReRoutingTilingBase::CheckParam()
 {
-    OP_CHECK_IF(CheckDtypeAndAttr() != ge::GRAPH_SUCCESS,
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "dtype and attr", "check failed",
-                                                      "Please check input and output dtypes, scales and attrs."),
-                return ge::GRAPH_FAILED);
+    if (CheckDtypeAndAttr() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     OP_CHECK_IF(
         tokenSum_ < 0,
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "tokenSum", std::to_string(tokenSum_).c_str(),
@@ -360,11 +378,9 @@ ge::graphStatus MoeReRoutingTilingBase::CheckParam()
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expertNum", std::to_string(expertNum_).c_str(),
                                               "expertNum should be greater than 0."),
         return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        CheckOutputShape() != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "output shape", "check failed",
-                                              "Please check output shapes against input shapes and derived sizes."),
-        return ge::GRAPH_FAILED);
+    if (CheckOutputShape() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     if (tokenDtype_ == Ops::Transformer::DT_HIFLOAT4) {
         // tokenSize_ 已在 GetShapeAttrsInfo 中折半为打包字节宽度，H 的偶数与 64 分组约束
         // 需按逻辑宽度 tokenSizeH_ 校验

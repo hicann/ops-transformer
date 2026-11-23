@@ -44,8 +44,9 @@ protected:
         if (topkWeightPtr != nullptr) {
             topkWeightDtype_ = topkWeightPtr->GetDataType();
             OP_CHECK_IF(topkWeightDtype_ != ge::DT_FLOAT,
-                        OP_LOGE(context_->GetNodeName(), "expert_topk_weight only supports DT_FLOAT, actual %s.",
-                                ge::TypeUtils::DataTypeToSerialString(topkWeightDtype_).c_str()),
+                        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "expert_topk_weight",
+                                                  ge::TypeUtils::DataTypeToSerialString(topkWeightDtype_).c_str(),
+                                                  ge::TypeUtils::DataTypeToSerialString(ge::DT_FLOAT).c_str()),
                         return ge::GRAPH_FAILED);
             hasTopkWeight_ = true;
             auto topkWeightShapePtr = context_->GetOptionalInputShape(V2_IN_EXPERT_TOPK_WEIGHT_INDEX);
@@ -56,20 +57,26 @@ protected:
                                                      std::to_string(topkWeightShape.GetDimNum()).c_str(), "2"),
                         return ge::GRAPH_FAILED);
             OP_CHECK_IF(topkWeightShape.GetDim(0) != tokenSum_,
-                        OP_LOGE(context_->GetNodeName(), "expert_topk_weight dim0: %ld should equal tokenSum: %ld.",
-                                topkWeightShape.GetDim(0), tokenSum_),
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            context_->GetNodeName(), "expert_topk_weight", Ops::Base::ToString(topkWeightShape).c_str(),
+                            ("Dim 0 of expert_topk_weight should be equal to tokenSum, tokenSum is " +
+                             std::to_string(tokenSum_))
+                                .c_str()),
                         return ge::GRAPH_FAILED);
             OP_CHECK_IF(topkWeightShape.GetDim(1) != TOPK_WEIGHT_DIM1_VALUE,
-                        OP_LOGE(context_->GetNodeName(), "expert_topk_weight dim1 must be 1, actual %ld.",
-                                topkWeightShape.GetDim(1)),
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expert_topk_weight",
+                                                              Ops::Base::ToString(topkWeightShape).c_str(),
+                                                              "Dim 1 of expert_topk_weight should be 1."),
                         return ge::GRAPH_FAILED);
         } else {
             auto permuteTopkWeightOutShape = context_->GetOutputShape(V2_OUTPUT_PERMUTE_TOPK_WEIGHT_INDEX);
             if (permuteTopkWeightOutShape != nullptr) {
                 auto& shape = permuteTopkWeightOutShape->GetStorageShape();
                 OP_CHECK_IF(shape.GetDimNum() > 0 && shape.GetDim(0) > 0,
-                            OP_LOGE(context_->GetNodeName(), "permute_topk_weight output must not be provided"
-                                                             " when expert_topk_weight is not input."),
+                            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                                context_->GetNodeName(), "permute_topk_weight", Ops::Base::ToString(shape).c_str(),
+                                "permute_topk_weight output must not be provided when expert_topk_weight is not "
+                                "input."),
                             return ge::GRAPH_FAILED);
             }
         }
@@ -97,8 +104,9 @@ protected:
         if (topkWeightPtr != nullptr) {
             topkWeightDtype_ = topkWeightPtr->GetDataType();
             OP_CHECK_IF(topkWeightDtype_ != ge::DT_FLOAT,
-                        OP_LOGE(context_->GetNodeName(), "expert_topk_weight only supports DT_FLOAT, actual %s.",
-                                ge::TypeUtils::DataTypeToSerialString(topkWeightDtype_).c_str()),
+                        OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "expert_topk_weight",
+                                                  ge::TypeUtils::DataTypeToSerialString(topkWeightDtype_).c_str(),
+                                                  ge::TypeUtils::DataTypeToSerialString(ge::DT_FLOAT).c_str()),
                         return ge::GRAPH_FAILED);
             hasTopkWeight_ = true;
             auto topkWeightShapePtr = context_->GetOptionalInputShape(V2_IN_EXPERT_TOPK_WEIGHT_INDEX);
@@ -109,20 +117,26 @@ protected:
                                                      std::to_string(topkWeightShape.GetDimNum()).c_str(), "2"),
                         return ge::GRAPH_FAILED);
             OP_CHECK_IF(topkWeightShape.GetDim(0) != tokenSum_,
-                        OP_LOGE(context_->GetNodeName(), "expert_topk_weight dim0: %ld should equal tokenSum: %ld.",
-                                topkWeightShape.GetDim(0), tokenSum_),
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            context_->GetNodeName(), "expert_topk_weight", Ops::Base::ToString(topkWeightShape).c_str(),
+                            ("Dim 0 of expert_topk_weight should be equal to tokenSum, tokenSum is " +
+                             std::to_string(tokenSum_))
+                                .c_str()),
                         return ge::GRAPH_FAILED);
             OP_CHECK_IF(topkWeightShape.GetDim(1) != TOPK_WEIGHT_DIM1_VALUE,
-                        OP_LOGE(context_->GetNodeName(), "expert_topk_weight dim1 must be 1, actual %ld.",
-                                topkWeightShape.GetDim(1)),
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "expert_topk_weight",
+                                                              Ops::Base::ToString(topkWeightShape).c_str(),
+                                                              "Dim 1 of expert_topk_weight should be 1."),
                         return ge::GRAPH_FAILED);
         } else {
             auto permuteTopkWeightOutShape = context_->GetOutputShape(V2_OUTPUT_PERMUTE_TOPK_WEIGHT_INDEX);
             if (permuteTopkWeightOutShape != nullptr) {
                 auto& shape = permuteTopkWeightOutShape->GetStorageShape();
                 OP_CHECK_IF(shape.GetDimNum() > 0 && shape.GetDim(0) > 0,
-                            OP_LOGE(context_->GetNodeName(), "permute_topk_weight output must not be provided"
-                                                             " when expert_topk_weight is not input."),
+                            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                                context_->GetNodeName(), "permute_topk_weight", Ops::Base::ToString(shape).c_str(),
+                                "permute_topk_weight output must not be provided when expert_topk_weight is not "
+                                "input."),
                             return ge::GRAPH_FAILED);
             }
         }

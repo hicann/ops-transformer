@@ -13,8 +13,18 @@
  * \brief Implements the common AttentionWorkerCombine tiling lifecycle, workspace and platform preparation.
  */
 #include "attention_worker_combine_tiling_base.h"
+#include "err/ops_err.h"
 
 namespace optiling {
+// 合法输入下 Tiling 失败时，按正式错误码 EZ1008（Arglist: opName, reason）首报，并输出 PLOG 上下文。
+// static 内部链接：避免与其他算子文件的同名 inline 函数 ODR 去重导致覆盖率归因不确定。
+static void ReportTilingFailure(const char* opName, const char* reason)
+{
+    OP_LOGE_WITHOUT_REPORT(opName, "%s\n", reason);
+    const std::vector<const char*> msgKey = {"opName", "reason"};
+    const std::vector<const char*> msgValue = {opName, reason};
+    REPORT_PREDEFINED_ERR_MSG("EZ1008", msgKey, msgValue);
+}
 
 constexpr int64_t DEFAULT_WORKSPACE_SIZE = 32;
 constexpr uint32_t BATCH_MODE = 1;
@@ -86,13 +96,21 @@ ge::graphStatus TilingPrepare4AttentionWorkerCombine(gert::TilingParseContext* c
     OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo);
     compileInfo->coreNum = ascendcPlatform.GetCoreNumAiv();
-    OP_CHECK_IF(compileInfo->coreNum <= 0, OP_LOGE(context->GetNodeName(), "coreNum must be greater than 0."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        compileInfo->coreNum <= 0,
+        ReportTilingFailure(context->GetNodeName(), ("PlatformAscendC::GetCoreNumAiv returned " +
+                                                     std::to_string(compileInfo->coreNum) + ", platform query failure.")
+                                                        .c_str()),
+        return ge::GRAPH_FAILED);
     uint64_t ubSize = 0;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSize);
     compileInfo->ubSize = ubSize;
-    OP_CHECK_IF(compileInfo->ubSize <= 0, OP_LOGE(context->GetNodeName(), "ubSize must be greater than 0."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        compileInfo->ubSize <= 0,
+        ReportTilingFailure(context->GetNodeName(), ("PlatformAscendC::GetCoreMemSize(UB) returned " +
+                                                     std::to_string(compileInfo->ubSize) + ", platform query failure.")
+                                                        .c_str()),
+        return ge::GRAPH_FAILED);
     OP_LOGD(context->GetNodeName(), "coreNum: %ld, ubSize: %ld", compileInfo->coreNum, compileInfo->ubSize);
     OP_LOGD(context->GetNodeName(), "TilingPrepare4AttentionWorkerCombine success.");
     return ge::GRAPH_SUCCESS;

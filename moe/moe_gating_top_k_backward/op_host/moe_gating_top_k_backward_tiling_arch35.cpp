@@ -15,8 +15,18 @@
 
 #include "moe_gating_top_k_backward_tiling_arch35.h"
 #include "op_host/tiling_util.h"
+#include "err/ops_err.h"
 
 namespace optiling {
+// 合法输入下 Tiling 失败时，按正式错误码 EZ1008（Arglist: opName, reason）首报，并输出 PLOG 上下文。
+// static 内部链接：避免与其他算子文件的同名 inline 函数 ODR 去重导致覆盖率归因不确定。
+static void ReportTilingFailure(const char* opName, const char* reason)
+{
+    OP_LOGE_WITHOUT_REPORT(opName, "%s\n", reason);
+    const std::vector<const char*> msgKey = {"opName", "reason"};
+    const std::vector<const char*> msgValue = {opName, reason};
+    REPORT_PREDEFINED_ERR_MSG("EZ1008", msgKey, msgValue);
+}
 
 const static int64_t NORM_TYPE_SOFTMAX = 0;
 const static int64_t NORM_TYPE_SIGMOID = 1;
@@ -82,8 +92,14 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::GetPlatformInfo()
     uint64_t ubSizePlatForm;
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubSizePlatForm);
     aicoreParams_.ubSize = ubSizePlatForm;
-    OP_CHECK_IF(aicoreParams_.numBlocks == 0, OP_LOGE(context_, "coreNum is 0"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(aicoreParams_.ubSize == 0, OP_LOGE(context_, "ubSize is 0"), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(aicoreParams_.numBlocks == 0,
+                ReportTilingFailure(context_->GetNodeName(),
+                                    "PlatformAscendC::GetCoreNumAiv returned 0, platform query failure."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(aicoreParams_.ubSize == 0,
+                ReportTilingFailure(context_->GetNodeName(),
+                                    "PlatformAscendC::GetCoreMemSize(UB) returned 0, platform query failure."),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -158,7 +174,10 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::PostTiling()
     errno_t ret = memcpy_s(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity(),
                            reinterpret_cast<void*>(&td), tilingDataSize);
     if (ret != EOK) {
-        OP_LOGE(context_->GetNodeName(), "memcpy_s failed, ret=%d", ret);
+        ReportTilingFailure(context_->GetNodeName(),
+                            ("memcpy_s failed with errno " + std::to_string(ret) +
+                             " when saving tiling data to raw buffer, framework contract failure.")
+                                .c_str());
         return ge::GRAPH_FAILED;
     }
     context_->GetRawTilingData()->SetDataSize(tilingDataSize);
@@ -380,8 +399,8 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::CheckOutShape()
     OP_CHECK_NULL_WITH_CONTEXT(context_, gradXDesc);
     auto gradXDtype = gradXDesc->GetDataType();
     if (gradXDtype != gradYDtype_) {
-        std::string incorrectDtypes = std::string(ge::TypeUtils::DataTypeToSerialString(gradYDtype_)) + " and " +
-                                      ge::TypeUtils::DataTypeToSerialString(gradXDtype);
+        std::string incorrectDtypes = std::string(ge::TypeUtils::DataTypeToSerialString(gradXDtype)) + " and " +
+                                      ge::TypeUtils::DataTypeToSerialString(gradYDtype_);
         OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context_->GetNodeName(), "grad_x and grad_y", incorrectDtypes.c_str(),
                                                "The dtypes of grad_x and grad_y must be the same");
         return ge::GRAPH_FAILED;
@@ -446,10 +465,9 @@ ge::graphStatus MoeGatingTopKBackwardTilingArch35::SplitRows()
     }
 
     if (baseRows_ <= 0) {
-        OP_LOGE(context_->GetNodeName(),
-                "UB space is not enough to fit a single token row, "
-                "baseRows must be greater than 0, but got %ld. Please reduce N or K.",
-                baseRows_);
+        ReportTilingFailure(context_->GetNodeName(), ("UB space is not enough to fit a single token row, baseRows is " +
+                                                      std::to_string(baseRows_) + ", please reduce N or K.")
+                                                         .c_str());
         return ge::GRAPH_FAILED;
     }
 

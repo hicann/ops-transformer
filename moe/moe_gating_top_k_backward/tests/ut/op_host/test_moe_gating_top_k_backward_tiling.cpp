@@ -881,3 +881,99 @@ TEST_F(MoeGatingTopKBackwardTiling, moe_gating_top_k_backward_tiling_a5_fail_exp
         &compileInfo, "Ascend950");
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 10000, "", {});
 }
+
+// Boundary case A5: grad_x dtype mismatch with grad_y
+TEST_F(MoeGatingTopKBackwardTiling, moe_gating_top_k_backward_tiling_a5_fail_grad_x_dtype_01)
+{
+    optiling::MoeGatingTopKBackwardCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopKBackward",
+        {
+            {{{16, 256}, {16, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{16, 8}, {16, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{16, 8}, {16, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{16, 256}, {16, 256}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"norm_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"routed_scaling_factor", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-20f)},
+        },
+        &compileInfo, "Ascend950");
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 10000, "", {});
+}
+
+// Boundary case A5: UB space insufficient (baseRows <= 0)
+TEST_F(MoeGatingTopKBackwardTiling, moe_gating_top_k_backward_tiling_a5_fail_ub_space_01)
+{
+    optiling::MoeGatingTopKBackwardCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopKBackward",
+        {
+            {{{16, 2048}, {16, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{16, 2048}, {16, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{16, 2048}, {16, 2048}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{16, 2048}, {16, 2048}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"norm_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"routed_scaling_factor", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-20f)},
+        },
+        &compileInfo, "Ascend950", 32, 8192, 4096);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 10000, "", {});
+}
+
+// Boundary case A5: grad_x shape mismatch with x_norm
+TEST_F(MoeGatingTopKBackwardTiling, moe_gating_top_k_backward_tiling_a5_fail_grad_x_shape_01)
+{
+    optiling::MoeGatingTopKBackwardCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopKBackward",
+        {
+            {{{16, 256}, {16, 256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{16, 8}, {16, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{16, 8}, {16, 8}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{16, 8}, {16, 8}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"norm_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"routed_scaling_factor", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-20f)},
+        },
+        &compileInfo, "Ascend950");
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 10000, "", {});
+}
+
+// Boundary case A5: raw tiling data capacity insufficient, memcpy_s failed
+TEST_F(MoeGatingTopKBackwardTiling, moe_gating_top_k_backward_tiling_a5_fail_memcpy_01)
+{
+    optiling::MoeGatingTopKBackwardCompileInfo compileInfo = {};
+    gert::TilingContextPara tilingContextPara(
+        "MoeGatingTopKBackward",
+        {
+            {{{2048, 192}, {2048, 192}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{2048, 10}, {2048, 10}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{2048, 10}, {2048, 10}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {{{2048, 192}, {2048, 192}}, ge::DT_BF16, ge::FORMAT_ND},
+        },
+        {
+            {"renorm", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"norm_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"routed_scaling_factor", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)},
+            {"eps", Ops::Transformer::AnyValue::CreateFrom<float>(1e-20f)},
+        },
+        &compileInfo, "Ascend950", 64, 262144, 8);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 10000, "", {});
+}

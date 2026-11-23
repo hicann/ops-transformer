@@ -18,9 +18,18 @@
 #include "tiling/tiling_api.h"
 #include "util/math_util.h"
 #include "log/log.h"
+#include "err/ops_err.h"
 #include "common/include/op_host/op_const_def_transformer.h"
 
 namespace optiling {
+// 合法输入下 Tiling 失败时，按正式错误码 EZ1008（Arglist: opName, reason）首报，并输出 PLOG 上下文
+static void ReportTilingFailure(const char* opName, const char* reason)
+{
+    OP_LOGE_WITHOUT_REPORT(opName, "%s\n", reason);
+    const std::vector<const char*> msgKey = {"opName", "reason"};
+    const std::vector<const char*> msgValue = {opName, reason};
+    REPORT_PREDEFINED_ERR_MSG("EZ1008", msgKey, msgValue);
+}
 
 constexpr int64_t TOKENS_INDEX = 0;
 constexpr int64_t EXPERT_TOKEN_NUM_PER_RANK_INDEX = 1;
@@ -71,11 +80,16 @@ static const std::map<std::pair<ge::DataType, ge::DataType>, int64_t> TILING_KEY
 static std::tuple<int64_t, int64_t> GetShapeTuple(const gert::TilingContext* context, const int64_t index = 0)
 {
     const gert::StorageShape* shapePtr = context->GetInputShape(index);
-    OP_CHECK_IF(shapePtr == nullptr, OP_LOGE(context->GetNodeName(), "Shape is nullptr."),
+    OP_CHECK_IF(shapePtr == nullptr,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(),
+                                                      ("input " + std::to_string(index) + " shape").c_str(), "nullptr",
+                                                      "Input shape should not be null."),
                 return std::make_tuple(0, 0));
     // check shape length is DIM_SIZE
     OP_CHECK_IF(shapePtr->GetStorageShape().GetDimNum() != DIM_SIZE,
-                OP_LOGE(context->GetNodeName(), "Shape must be (A, H)."), return std::make_tuple(0, 0));
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context->GetNodeName(), ("input " + std::to_string(index)).c_str(),
+                                             std::to_string(shapePtr->GetStorageShape().GetDimNum()).c_str(), "2"),
+                return std::make_tuple(0, 0));
     return std::make_tuple(shapePtr->GetStorageShape().GetDim(SHAPE_IDX_A),
                            shapePtr->GetStorageShape().GetDim(SHAPE_IDX_H));
 }
@@ -85,7 +99,8 @@ ge::graphStatus MoeReRoutingTiling::GetPlatformInfo()
     auto platformInfo = context_->GetPlatformInfo();
     if (platformInfo == nullptr) {
         auto compileInfoPtr = reinterpret_cast<const MoeReRoutingCompileInfo*>(context_->GetCompileInfo());
-        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_->GetNodeName(), "CompileInfo is nullptr."),
+        OP_CHECK_IF(compileInfoPtr == nullptr,
+                    ReportTilingFailure(context_->GetNodeName(), "CompileInfo is null, framework contract failure."),
                     return ge::GRAPH_FAILED);
         coreNum_ = compileInfoPtr->coreNum;
         ubSize_ = compileInfoPtr->ubSize;
@@ -103,7 +118,9 @@ ge::graphStatus MoeReRoutingTiling::GetPlatformInfo()
 
 ge::graphStatus MoeReRoutingTiling::GetShapeAttrsInfo()
 {
-    OP_CHECK_IF(context_ == nullptr, OP_LOGE(context_->GetNodeName(), "context_ can not be nullptr."),
+    OP_CHECK_IF(context_ == nullptr,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "context", "nullptr",
+                                                      "Context should not be null."),
                 return ge::GRAPH_FAILED);
     auto tokenShapeTuple = GetShapeTuple(context_, TOKENS_INDEX);
     auto expertShapeTuple = GetShapeTuple(context_, EXPERT_TOKEN_NUM_PER_RANK_INDEX);
@@ -124,9 +141,12 @@ ge::graphStatus MoeReRoutingTiling::GetShapeAttrsInfo()
         commonParams_.scaleDtype = ge::DT_FLOAT;
     }
 
-    OP_CHECK_IF(tokenSize > TOKENS_LENGTH_UPPER_BOUND,
-                OP_LOGE(context_->GetNodeName(), "tokenSize[%ld] should <= 16384,", tokenSize),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        tokenSize > TOKENS_LENGTH_UPPER_BOUND,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context_->GetNodeName(), "tokenSize", std::to_string(tokenSize).c_str(),
+            ("tokenSize should be less than or equal to " + std::to_string(TOKENS_LENGTH_UPPER_BOUND) + ".").c_str()),
+        return ge::GRAPH_FAILED);
     tilingData_.set_tokensNum(tokenNum);
     tilingData_.set_tokensSize(tokenSize);
     tilingData_.set_rankNum(rankNums);
@@ -138,12 +158,14 @@ ge::graphStatus MoeReRoutingTiling::GetShapeAttrsInfo()
     auto expertTokenNumType = attrs->GetInt(EXPERT_TOKEN_NUM_TYPE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, expertTokenNumType);
     OP_CHECK_IF(*expertTokenNumType != EXPERT_TOKEN_NUM_TYPE,
-                OP_LOGE(context_->GetNodeName(), "expertTokenNumType[%ld] should == 1.", *expertTokenNumType),
+                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "expertTokenNumType",
+                                          std::to_string(*expertTokenNumType).c_str(), "1"),
                 return ge::GRAPH_FAILED);
 
     auto idxType = attrs->GetInt(IDX_TYPE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, idxType);
-    OP_CHECK_IF(*idxType != IDX_TYPE, OP_LOGE(context_->GetNodeName(), "idxType[%ld] should == 0.", *idxType),
+    OP_CHECK_IF(*idxType != IDX_TYPE,
+                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "idxType", std::to_string(*idxType).c_str(), "0"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -155,7 +177,9 @@ bool MoeReRoutingTiling::IsCapable()
 
 ge::graphStatus MoeReRoutingTiling::DoOpTiling()
 {
-    OP_CHECK_IF(context_ == nullptr, OP_LOGE(context_->GetNodeName(), "context_ can not be nullptr."),
+    OP_CHECK_IF(context_ == nullptr,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "context", "nullptr",
+                                                      "Context should not be null."),
                 return ge::GRAPH_FAILED);
     int64_t tokenNum = tilingData_.get_tokensNum();
     int64_t tokenSize = tilingData_.get_tokensSize();
@@ -179,8 +203,14 @@ ge::graphStatus MoeReRoutingTiling::DoOpTiling()
 
     std::pair<ge::DataType, ge::DataType> keyToFind = {commonParams_.tokenDtype, commonParams_.expertDtype};
     auto valueToFind = TILING_KEY_MAP.find(keyToFind);
-    OP_CHECK_IF(valueToFind == TILING_KEY_MAP.end(), OP_LOGE(context_->GetNodeName(), "Failed to find tilingkey."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        valueToFind == TILING_KEY_MAP.end(),
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+            context_->GetNodeName(), "tokens and expert_token_num_per_rank",
+            (Ops::Base::ToString(commonParams_.tokenDtype) + " and " + Ops::Base::ToString(commonParams_.expertDtype))
+                .c_str(),
+            "The combination of tokens dtype and expert_token_num_per_rank dtype is not supported."),
+        return ge::GRAPH_FAILED);
     tilingKey_ = valueToFind->second;
 
     int64_t blockDimFactor = CeilDiv(rankNums, coreNum_);

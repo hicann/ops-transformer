@@ -13,8 +13,18 @@
  * \brief
  */
 #include "attention_worker_combine_tiling_base.h"
+#include "err/ops_err.h"
 
 namespace optiling {
+// 合法输入下 Tiling 失败时，按正式错误码 EZ1008（Arglist: opName, reason）首报，并输出 PLOG 上下文。
+// static 内部链接：避免与其他算子文件的同名 inline 函数 ODR 去重导致覆盖率归因不确定。
+static void ReportTilingFailure(const char* opName, const char* reason)
+{
+    OP_LOGE_WITHOUT_REPORT(opName, "%s\n", reason);
+    const std::vector<const char*> msgKey = {"opName", "reason"};
+    const std::vector<const char*> msgValue = {opName, reason};
+    REPORT_PREDEFINED_ERR_MSG("EZ1008", msgKey, msgValue);
+}
 
 class AttentionWorkerCombineTiling : public AttentionWorkerCombineTilingBase {
 public:
@@ -68,7 +78,8 @@ ge::graphStatus AttentionWorkerCombineTiling::DoGetPlatformInfo()
     auto platformInfo = context_->GetPlatformInfo();
     if (platformInfo == nullptr) {
         auto compileInfoPtr = reinterpret_cast<const AttentionWorkerCombineCompileInfo*>(context_->GetCompileInfo());
-        OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_->GetNodeName(), "CompileInfo is nullptr."),
+        OP_CHECK_IF(compileInfoPtr == nullptr,
+                    ReportTilingFailure(context_->GetNodeName(), "CompileInfo is null, framework contract failure."),
                     return ge::GRAPH_FAILED);
         coreNum_ = compileInfoPtr->coreNum;
         ubSize_ = compileInfoPtr->ubSize;
@@ -84,11 +95,15 @@ ge::graphStatus AttentionWorkerCombineTiling::DoGetPlatformInfo()
 
 ge::graphStatus AttentionWorkerCombineTiling::DoGetShapeAttrsInfo()
 {
-    OP_CHECK_IF(context_ == nullptr, OP_LOGE(context_->GetNodeName(), "context_ can not be nullptr."),
+    OP_CHECK_IF(context_ == nullptr,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "context", "nullptr",
+                                                      "Context should not be null."),
                 return ge::GRAPH_FAILED);
 
     const gert::StorageShape* shapePtr = context_->GetInputShape(EXPERT_SCALES_INDEX);
-    OP_CHECK_IF(shapePtr == nullptr, OP_LOGE(context_->GetNodeName(), "expert_scales shape is nullptr."),
+    OP_CHECK_IF(shapePtr == nullptr,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expert_scales shape", "nullptr",
+                                                      "Input shape should not be null."),
                 return ge::GRAPH_FAILED);
     const auto& shape = shapePtr->GetStorageShape();
     OP_CHECK_IF(shape.GetDimNum() != DIM_SIZE,
@@ -103,7 +118,9 @@ ge::graphStatus AttentionWorkerCombineTiling::DoGetShapeAttrsInfo()
                                                       "BS must be positive and K must be in [1,64]."),
                 return ge::GRAPH_FAILED);
     const auto* scaleDesc = context_->GetInputDesc(EXPERT_SCALES_INDEX);
-    OP_CHECK_IF(scaleDesc == nullptr, OP_LOGE(context_->GetNodeName(), "expert_scales desc is nullptr."),
+    OP_CHECK_IF(scaleDesc == nullptr,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "expert_scales desc", "nullptr",
+                                                      "Input desc should not be null."),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(scaleDesc->GetDataType() != ge::DT_FLOAT,
                 OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "expert_scales",
@@ -127,7 +144,9 @@ ge::graphStatus AttentionWorkerCombineTiling::DoGetShapeAttrsInfo()
     OP_CHECK_NULL_WITH_CONTEXT(context_, tokenDtype);
     tokenDtype_ = *tokenDtype;
     OP_CHECK_IF(tokenDtype_ < 0 || tokenDtype_ > 1,
-                OP_LOGE(context_->GetNodeName(), "MXFP tokens are only supported on Ascend950."),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "token_dtype",
+                                                      std::to_string(tokenDtype_).c_str(),
+                                                      "MXFP tokens are only supported on Ascend950."),
                 return ge::GRAPH_FAILED);
     auto needSchedule = attrs->GetInt(NEED_SCHEDULE_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context_, needSchedule);

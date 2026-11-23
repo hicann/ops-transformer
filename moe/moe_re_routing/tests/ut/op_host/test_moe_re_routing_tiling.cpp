@@ -731,3 +731,29 @@ TEST_F(MoeReRoutingTiling, moe_re_routing_regbase_zero_tokens)
         &compileInfo, "Ascend950");
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, std::numeric_limits<uint64_t>::max(), "", {0});
 }
+
+// 平台资源查询失败场景：ubSize=0（PlatformAscendC 查询结果非用户可控），
+// tiling 应按 EZ1008 框架契约失败上报并返回 GRAPH_FAILED
+TEST_F(MoeReRoutingTiling, moe_re_routing_tiling_fail_ubsize_zero_000)
+{
+    optiling::MoeReRoutingCompileInfo compileInfo = {48, 65536};
+    gert::TilingContextPara tilingContextPara(
+        "MoeReRouting",
+        {
+            {{{256, 7168}, {256, 7168}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{16, 16}, {16, 16}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{256, 7168}, {256, 7168}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{256}, {256}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{16}, {16}}, ge::DT_INT32, ge::FORMAT_ND},
+        },
+        {
+            {"expert_token_num_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        },
+        &compileInfo, "Ascend910B", 64, 0);
+    ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, 0, "", {});
+}
