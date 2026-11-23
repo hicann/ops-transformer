@@ -352,7 +352,7 @@ static aclnnStatus CheckDtype(QGmmInPlaceAdd::QuantGroupedMatmulInplaceAddParams
                 "in quant case, the dtypes of x1 and x2 must be within the range both FLOAT8_E4M3FN/FLOAT8_E5M2 "
                 "or both HIFLOAT8") +
                 (isDav92 ? ", or both FLOAT4_E2M1, both HIFLOAT4, or FLOAT8_E4M3FN with FLOAT4_E2M1/HIFLOAT4" :
-                           (curNpuArch == NpuArch::DAV_3510 ? ", or both FLOAT4_E2M1" : ""))));
+                           (curNpuArch == NpuArch::DAV_3510 ? " or both FLOAT4_E2M1" : ""))));
     QGMM_INPLACE_ADD_CHECK_REPORT(
         params.yRef->GetDataType() == DataType::DT_FLOAT, return ACLNN_ERR_PARAM_INVALID,
         OP_LOGE_FOR_INVALID_DTYPE(QGMM_INPLACE_ADD_ACLNN_OP_NAME, "yRef",
