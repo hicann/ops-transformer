@@ -288,7 +288,6 @@ private:
 namespace MhcPreSinkhornRegbase {
 struct CoreRowTiling;
 struct RowAndDTiling;
-struct PremixUbConfig;
 struct PremixUbTiling;
 } // namespace MhcPreSinkhornRegbase
 
@@ -322,20 +321,15 @@ private:
 
     using CoreRowTiling = MhcPreSinkhornRegbase::CoreRowTiling;
     using RowAndDTiling = MhcPreSinkhornRegbase::RowAndDTiling;
-    using PremixUbConfig = MhcPreSinkhornRegbase::PremixUbConfig;
     using PremixUbTiling = MhcPreSinkhornRegbase::PremixUbTiling;
 
     int64_t CalcPrePostCoreNum(bool withGradOut, bool isKSplit);
     ge::graphStatus InitUbTiling(bool isKSplit, PremixUbTiling& ubTiling);
-    PremixUbConfig MakePremixUbConfig(bool isKSplit, int64_t mL1Size, int64_t kL1Size, int64_t initialKUbSize);
     ge::graphStatus SelectPremixUbTiling(bool isKSplit, PremixUbTiling& ubTiling);
     ge::graphStatus CalcRowTiling(bool withGradOut, bool isKSplit, const CoreRowTiling& coreRowTiling,
                                   const PremixUbTiling& ubTiling, RowAndDTiling& rowAndDTiling);
     void SaveCommonTiling(bool withGradOut, bool isKSplit, const CoreRowTiling& coreRowTiling,
                           const RowAndDTiling& rowAndDTiling, const PremixUbTiling& ubTiling);
-    void CalcPremixMSplitTiling(int32_t deterministicLevel);
-    bool CalcPremixML1UbTiling(uint64_t mL1Size, PremixUbTiling& ubTiling);
-    uint64_t SelectPremixML1Size();
     void SelectTilingKey(bool isKSplit);
     ge::graphStatus CalcRegbaseCommonTiling(GradOutMode gradOutMode, SplitMode splitMode);
 

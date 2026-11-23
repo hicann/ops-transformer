@@ -127,7 +127,7 @@ std::unique_ptr<gert::TilingContextPara> BuildRegbaseTilingContext(const Regbase
         context->inputInstanceNum_ = {1, 1, 1, 1, 1};
         context->outputInstanceNum_ = {1, 1, 1, 1, 1, 1, 1, 1};
     }
-    context->deterministicLevel_ = deterministicLevel;
+    context->deterministicInfo_ = deterministicLevel;
     return context;
 }
 
@@ -374,10 +374,9 @@ TEST_F(MhcPreSinkhornTiling, DAV_3510_regbase_core_tiling_boundary_branches)
 TEST_F(MhcPreSinkhornTiling, ascend950_premix_cast_segments_and_ub_fallback)
 {
     for (bool needBackward : {false, true}) {
-        // Ratio 1 needs a larger UB to retain the entire AIV row range. Small UB
-        // must keep the accumulator path instead of allocating four oversized slices.
+        // The four cast slices require more UB when CV ratio 1 gives each AIV the full M tile.
         for (uint64_t cvRatio : {1U, 2U}) {
-            for (uint64_t ubSize : {131072U, 524288U}) {
+            for (uint64_t ubSize : {131072U, 655360U}) {
                 SCOPED_TRACE(::testing::Message() << needBackward << ":" << cvRatio << ":" << ubSize);
                 RegbaseTilingBaseline baseline = {"premix_m_split", 16385, 4096, needBackward, ubSize, 0, 0, {}};
                 optiling::MhcPreSinkhornCompileInfo compileInfo = {baseline.coreNum, 0, ubSize, SYS_WORKSPACE_SIZE,
@@ -389,7 +388,7 @@ TEST_F(MhcPreSinkhornTiling, ascend950_premix_cast_segments_and_ub_fallback)
                 DeserializeRegbaseTilingData(info, actual);
                 EXPECT_EQ(actual.get_cubeBlockDimK(), 1);
                 EXPECT_EQ(actual.get_hasPremix(), 1);
-                EXPECT_EQ(actual.get_premixCastSegments(), ubSize == 524288U ? 1 : 0);
+                EXPECT_EQ(actual.get_premixCastSegments(), ubSize == 655360U ? 1 : 0);
                 if (actual.get_premixCastSegments() != 0) {
                     EXPECT_EQ(actual.get_mUbSize(), (actual.get_mL1Size() + cvRatio - 1) / cvRatio);
                     EXPECT_EQ(baseline.d % actual.get_kUbSize(), 0);
@@ -474,68 +473,54 @@ TEST_F(MhcPreSinkhornTiling, ascend950_premix_stage_selection_respects_paralleli
     }
 }
 
-TEST_F(MhcPreSinkhornTiling, ascend950_premix_m_split_avoids_round_quantization_cliff)
+TEST_F(MhcPreSinkhornTiling, ascend950_m_partition_matches_with_and_without_premix)
 {
-    // Cover both the measured 28/56 platform and the usual 32/64 platform.
-    // Derive tile transitions from the AIC count instead of fixing the 28-core boundary.
-    for (int64_t cores : {28, 32}) {
-        const std::vector<int64_t> rowCases = {cores * 208, cores * 208 + 1,
-                                               cores * 224, cores * 224 + 1,
-                                               cores * 240, cores * 240 + 1,
-                                               cores * 256, cores * 256 + 1,
-                                               5830,        6068,
-                                               6144,        7168,
-                                               7200};
-        for (bool needBackward : {false, true}) {
-            for (int64_t d : {1024, 1792}) {
-                for (int64_t rows : rowCases) {
-                    SCOPED_TRACE(::testing::Message() << cores << ":" << needBackward << ":" << d << ":" << rows);
-                    RegbaseTilingBaseline baseline = {"premix_round_cliff", rows, d, needBackward, 253952, 0, 0, {}};
-                    baseline.coreNum = cores;
-                    optiling::MhcPreSinkhornRegbaseTilingData actual;
-                    ASSERT_TRUE(ExecutePremixTiling(baseline, 2, actual));
-                    ASSERT_EQ(actual.get_cubeBlockDimK(), 1);
-                    ASSERT_EQ(actual.get_cubeBlockDimM(), cores);
-                    const int64_t mL1 = actual.get_mL1Size();
-                    const int64_t mTiles = (rows + mL1 - 1) / mL1;
-                    EXPECT_EQ((mTiles + cores - 1) / cores, rows <= cores * 256 ? 1 : 2);
-                    if (rows > cores * 208 && rows <= cores * 256) {
-                        EXPECT_GE(mL1, 224);
-                        EXPECT_EQ(actual.get_premixCastSegments(), 0);
-                    }
-                }
-            }
-        }
-    }
-}
-
-TEST_F(MhcPreSinkhornTiling, ascend950_premix_multi_round_preserves_wide_k_cast_path)
-{
-    struct PremixCase {
-        int64_t cores;
+    struct SplitCase {
+        uint64_t cores;
+        uint64_t cvRatio;
         int64_t rows;
-        int64_t mL1;
-        int64_t kL1;
-        int64_t kUb;
+        int64_t d;
+        int32_t deterministicLevel;
     };
-    const std::array<PremixCase, 4> cases = {
-        {{28, 4096, 160, 128, 64}, {28, 8192, 160, 128, 64}, {28, 65536, 112, 256, 128}, {32, 65536, 208, 128, 64}}};
+    // Cover M+K split, M-only split, multiple M rounds, and batch consistency (level 3).
+    const std::array<SplitCase, 6> cases = {{{28, 2, 3072, 1792, 0},
+                                             {32, 1, 4096, 4096, 0},
+                                             {28, 2, 4096, 4096, 0},
+                                             {32, 2, 8193, 2048, 0},
+                                             {28, 2, 65536, 7168, 0},
+                                             {32, 2, 65, 4096, 3}}};
     for (const auto& test : cases) {
         for (bool needBackward : {false, true}) {
-            for (int64_t d : {2048, 2560, 4096, 5120, 7168}) {
-                SCOPED_TRACE(::testing::Message() << test.cores << ":" << test.rows << ":" << needBackward << ":" << d);
-                RegbaseTilingBaseline baseline = {"premix_steady_state", test.rows, d, needBackward, 253952, 0, 0, {}};
-                baseline.coreNum = test.cores;
-                optiling::MhcPreSinkhornRegbaseTilingData actual;
-                ASSERT_TRUE(ExecutePremixTiling(baseline, 2, actual));
-                EXPECT_EQ(actual.get_cubeBlockDimK(), 1);
-                EXPECT_EQ(actual.get_cubeBlockDimM(), test.cores);
-                EXPECT_EQ(actual.get_mL1Size(), test.mL1);
-                EXPECT_EQ(actual.get_kL1Size(), test.kL1);
-                EXPECT_EQ(actual.get_kUbSize(), test.kUb);
-                EXPECT_EQ(actual.get_mUbSize(), test.mL1 / 2);
-                EXPECT_EQ(actual.get_premixCastSegments(), 1);
-            }
+            SCOPED_TRACE(::testing::Message()
+                         << test.cores << ":" << test.cvRatio << ":" << test.rows << ":" << needBackward);
+            RegbaseTilingBaseline baseline = {
+                "m_partition_parity", test.rows, test.d, needBackward, 253952, 0, 0, {}, test.cores};
+            const uint64_t vectorCores = test.cores * test.cvRatio;
+            optiling::MhcPreSinkhornCompileInfo compileInfo = {vectorCores, test.cores, baseline.ubSize,
+                                                               SYS_WORKSPACE_SIZE, test.cvRatio};
+            auto withoutPremix = BuildRegbaseTilingContext(baseline, &compileInfo, false, test.deterministicLevel);
+            auto withPremix = BuildRegbaseTilingContext(baseline, &compileInfo, true, test.deterministicLevel);
+            withoutPremix->socInfoString_ = MakeRegbaseSocInfo(test.cores, vectorCores, baseline.ubSize);
+            withPremix->socInfoString_ = withoutPremix->socInfoString_;
+
+            TilingInfo baselineInfo;
+            TilingInfo premixInfo;
+            ASSERT_TRUE(ExecuteTiling(*withoutPremix, baselineInfo));
+            ASSERT_TRUE(ExecuteTiling(*withPremix, premixInfo));
+            EXPECT_EQ(premixInfo.tilingKey, baselineInfo.tilingKey);
+            EXPECT_EQ(premixInfo.blockNum, baselineInfo.blockNum);
+            EXPECT_EQ(premixInfo.workspaceSizes, baselineInfo.workspaceSizes);
+
+            optiling::MhcPreSinkhornRegbaseTilingData expected;
+            optiling::MhcPreSinkhornRegbaseTilingData actual;
+            DeserializeRegbaseTilingData(baselineInfo, expected);
+            DeserializeRegbaseTilingData(premixInfo, actual);
+            EXPECT_EQ(actual.get_hasPremix(), 1);
+            EXPECT_EQ(actual.get_cubeBlockDimM(), expected.get_cubeBlockDimM());
+            EXPECT_EQ(actual.get_cubeBlockDimK(), expected.get_cubeBlockDimK());
+            EXPECT_EQ(actual.get_mL1Size(), expected.get_mL1Size());
+            EXPECT_EQ(actual.get_kL1Size(), expected.get_kL1Size());
+            EXPECT_EQ(actual.get_multCoreSplitKSize(), expected.get_multCoreSplitKSize());
         }
     }
 }
