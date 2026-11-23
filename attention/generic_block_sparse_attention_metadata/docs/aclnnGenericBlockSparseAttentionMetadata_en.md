@@ -466,7 +466,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 ## Constraints
 
 - A4C4 (quantType=4) on <term>Ascend 950PR&950DT products</term>: D=192/256, blockShape=[1,Y] with Y in {4,8,16,32,64,128}, GQA group size 1–16, maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. Match the Attention inputs and attributes. [A4C4 API constraints](#a4c4metadataquanttype4).
-- INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7): D is 1..256 and the GQA group size is 1..128. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, sequsedQ must be nullptr. Metadata and attention must use matching inputs and attributes.
+- INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7): D is 1..256 and the GQA group size is 1..16. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, sequsedQ must be nullptr. Metadata and attention must use matching inputs and attributes.
 
 ### Baseline Description
 

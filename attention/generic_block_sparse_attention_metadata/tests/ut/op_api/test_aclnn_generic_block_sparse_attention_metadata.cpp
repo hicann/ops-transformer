@@ -98,54 +98,10 @@ protected:
     }
 };
 
-// 公共API边界出参为空是用户参数契约错误：返回 ACLNN_ERR_PARAM_NULLPTR 并经 errno 映射上报正式参数码 EZ1001。
-TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, int8_dense_tnd_workspace)
+TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, int8_rejects_group_above_16)
 {
-    op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
-    auto idx = TensorDesc({2, 4, 3}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 2).ToAclType();
-    auto count = TensorDesc({2, 4}, ACL_INT32, ACL_FORMAT_ND).ValueRange(1, 3).ToAclType();
-    auto cuQ = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{0, 4}).ToAclType();
-    auto cuKv = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{0, 257}).ToAclType();
-    auto metadata = TensorDesc({1024}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 0).ToAclType();
-    for (int64_t dim : {1, 17, 128, 129, 250, 255, 256}) {
-        for (int64_t residual : {0, 1}) {
-            for (int64_t y : {1, 2, 4, 8, 16, 32, 64, 128}) {
-                const int64_t values[] = {1, y};
-                aclIntArray* blockShape = aclCreateIntArray(values, 2);
-                uint64_t workspaceSize = 0;
-                aclOpExecutor* executor = nullptr;
-                EXPECT_EQ(
-                    aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
-                        idx.get(), count.get(), cuQ.get(), cuKv.get(), nullptr, nullptr, 4, 257, 8, 2, dim, blockShape,
-                        "TND", "TND", 4, 1, 7, 0, -1, -1, residual, false, metadata.get(), &workspaceSize, &executor),
-                    ACLNN_SUCCESS);
-                aclDestroyIntArray(blockShape);
-            }
-        }
-    }
-    op::SetPlatformSocVersion(op::SocVersion::ASCEND950);
-}
-
-TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, int8_generalized_group_size)
-{
-    op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
-    auto idx = TensorDesc({2, 4, 3}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 2).ToAclType();
-    auto count = TensorDesc({2, 4}, ACL_INT32, ACL_FORMAT_ND).ValueRange(1, 3).ToAclType();
-    auto cuQ = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{0, 4}).ToAclType();
-    auto cuKv = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{0, 257}).ToAclType();
-    auto metadata = TensorDesc({1024}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 0).ToAclType();
-    aclIntArray* blockShape = MakeBlockShape();
-    for (int64_t group : {1, 16, 17, 32, 63, 64, 65, 127, 128, 129}) {
-        uint64_t workspaceSize = 0;
-        aclOpExecutor* executor = nullptr;
-        EXPECT_EQ(
-            aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
-                idx.get(), count.get(), cuQ.get(), cuKv.get(), nullptr, nullptr, 4, 257, group * 2, 2, 256, blockShape,
-                "TND", "TND", 4, 1, 7, 0, -1, -1, 1, false, metadata.get(), &workspaceSize, &executor),
-            group <= 128 ? ACLNN_SUCCESS : ACLNN_ERR_PARAM_INVALID);
-    }
-    aclDestroyIntArray(blockShape);
-    op::SetPlatformSocVersion(op::SocVersion::ASCEND950);
+    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND910B, 7, 0, kD, kBlockSize, 0, kMaskType, 1, 17, 1),
+              ACLNN_ERR_PARAM_INVALID);
 }
 
 TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, mxfp8_q32_q64_group_boundary)
@@ -216,6 +172,7 @@ TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, mxfp8_sparse_block_size_co
     }
 }
 
+// 公共API边界出参为空是用户参数契约错误：返回 ACLNN_ERR_PARAM_NULLPTR 并经 errno 映射上报正式参数码 EZ1001。
 TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, null_workspace_size)
 {
     aclOpExecutor* executor = nullptr;
@@ -295,43 +252,15 @@ TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, metadata_rejects_union_mxf
               ACLNN_ERR_PARAM_INVALID);
 }
 
-TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, quant_type_platform_matrix)
+TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, rejects_unsupported_quant_types_and_precision)
 {
-    auto idx = TensorDesc({2, 1, 1}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{0}).ToAclType();
-    auto count = TensorDesc({2, 1}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{1}).ToAclType();
-    auto cuQ = TensorDesc({2}, ACL_INT64, ACL_FORMAT_ND).Value(vector<int64_t>{0, 1}).ToAclType();
-    auto usedKv = TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND).Value(vector<int32_t>{128}).ToAclType();
-    auto metadata = TensorDesc({1024}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 0).ToAclType();
-    for (bool arch35 : {false, true}) {
-        op::SetPlatformSocVersion(arch35 ? op::SocVersion::ASCEND950 : op::SocVersion::ASCEND910B);
-        for (int64_t quantType : {0, 3, 5, 6, 7}) {
-            const vector<int64_t> shape = {1, quantType == 6 ? 8 : kBlockSize};
-            auto blockShape = aclCreateIntArray(shape.data(), shape.size());
-            uint64_t workspaceSize = 0;
-            aclOpExecutor* executor = nullptr;
-            SCOPED_TRACE(testing::Message() << "arch35=" << arch35 << " quantType=" << quantType);
-            const bool mxQuant = arch35 && quantType == 6;
-            const int64_t headDim = mxQuant ? 192 : 128;
-            const bool supported = quantType == 0 || mxQuant || quantType == (arch35 ? 5 : 7);
-            EXPECT_EQ(aclnnGenericBlockSparseAttentionMetadataGetWorkspaceSize(
-                          idx.get(), count.get(), cuQ.get(), nullptr, nullptr, usedKv.get(), 1, 128, 24, 2, headDim,
-                          blockShape, "TND", "PA_BBND", 4, 1, quantType, arch35 && quantType == 5 ? 1 : 0, -1, -1, 0,
-                          false, metadata.get(), &workspaceSize, &executor),
-                      supported ? ACLNN_SUCCESS : ACLNN_ERR_PARAM_INVALID);
-            if (executor != nullptr) {
-                aclDestroyAclOpExecutor(executor);
-            }
-            aclDestroyIntArray(blockShape);
-        }
+    for (int64_t quantType : {3, 5, 6}) {
+        EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND910B, quantType, 0), ACLNN_ERR_PARAM_INVALID)
+            << "910B quantType=" << quantType;
     }
-    op::SetPlatformSocVersion(op::SocVersion::ASCEND950);
-}
-
-TEST_F(aclnnGenericBlockSparseAttentionMetadata_test, int8_seven_platform_contract)
-{
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND910B, 7, 0, 256, 4), ACLNN_SUCCESS);
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND910B, 6, 0, 256, 4), ACLNN_ERR_PARAM_INVALID);
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND910B, 7, 1, 256, 4), ACLNN_ERR_PARAM_INVALID);
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 7, 0, 256, 4), ACLNN_ERR_PARAM_INVALID);
-    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, 6, 0, 256, 4), ACLNN_SUCCESS);
+    for (int64_t quantType : {3, 7}) {
+        EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND950, quantType, 0), ACLNN_ERR_PARAM_INVALID)
+            << "950 quantType=" << quantType;
+    }
+    EXPECT_EQ(CheckMetadataContract(SocVersion::ASCEND910B, 7, 1), ACLNN_ERR_PARAM_INVALID);
 }

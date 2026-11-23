@@ -624,11 +624,11 @@ aclnnStatus CheckGbsaMetadataParams(const aclTensor* sparseBlockIdx, const aclTe
         }
     }
     if (!isArch35 && quantType == GBSA_QUANT_TYPE_INT8 &&
-        (headDim < 1 || headDim > 256 || numQHeads / numKvHeads > 128 || blockShapeX != 1 || blockShapeY < 1 ||
+        (headDim < 1 || headDim > 256 || numQHeads / numKvHeads > 16 || blockShapeX != 1 || blockShapeY < 1 ||
          blockShapeY > 128 || (blockShapeY & (blockShapeY - 1)) != 0 || (maskType != 0 && maskType != 1) ||
          (GbsaIsLayout(qInputLayout, "TND") && seqUsedQOptional != nullptr))) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                "INT8 metadata requires D in [1,256], GQA group<=128, X=1, power-of-two Y in [1,128], "
+                "INT8 metadata requires D in [1,256], GQA group<=16, X=1, power-of-two Y in [1,128], "
                 "causal/no mask; sequsedQ is supported for BSND/BNSD.");
         return ACLNN_ERR_PARAM_INVALID;
     }
