@@ -9,6 +9,7 @@
  */
 
 #include "log/log.h"
+#include <algorithm>
 #include <string>
 #include <initializer_list>
 #include "op_host/util/op_const_def.h"
@@ -26,15 +27,12 @@
 #include "aclnn_kernels/slice.h"
 #include "opdev/tensor_view_utils.h"
 #include "opdev/op_log.h"
-#include "moe/moe_init_routing_v2/op_host/op_api/moe_init_routing_v2.h"
 #include "moe/moe_init_routing_v3/op_host/op_api/moe_init_routing_v3.h"
 
 using namespace op;
 
 namespace MoeTokenPermuteV2Check {
 
-static const std::initializer_list<op::DataType> MOE_DTYPE_SUPPORT_LIST_X = {DataType::DT_FLOAT16, DataType::DT_BF16,
-                                                                             DataType::DT_FLOAT};
 static const std::initializer_list<op::DataType> MOE_DTYPE_SUPPORT_LIST_X_V3 = {DataType::DT_FLOAT16, DataType::DT_BF16,
                                                                                 DataType::DT_FLOAT, DataType::DT_INT8};
 static const std::initializer_list<op::DataType> MOE_QUANT_DTYPE_SUPPORT_LIST_X = {DataType::DT_FLOAT16,
@@ -64,25 +62,8 @@ static inline bool CheckNotNull(const aclTensor* tokens, const aclTensor* indice
     return true;
 }
 
-static inline bool CheckDtypeValidRegbase(const aclTensor* tokens, const aclTensor* indices,
-                                          const aclTensor* permuteTokensOut, const aclTensor* sortedIndicesOut)
-{
-    if (tokens != nullptr && tokens->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(tokens, MOE_DTYPE_SUPPORT_LIST_X, return false);
-    }
-    if (indices != nullptr && indices->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(indices, MOE_DTYPE_SUPPORT_LIST_EXPERT_IDX_REGBASE, return false);
-    }
-    if (permuteTokensOut != nullptr && permuteTokensOut->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(permuteTokensOut, MOE_DTYPE_SUPPORT_LIST_X, return false);
-        OP_CHECK_DTYPE_NOT_SAME(tokens, permuteTokensOut, return false);
-    }
-    if (sortedIndicesOut != nullptr && sortedIndicesOut->GetViewShape().GetShapeSize() != 0) {
-        OP_CHECK_DTYPE_NOT_SUPPORT(sortedIndicesOut, MOE_DTYPE_SUPPORT_LIST_ROW_IDX, return false);
-    }
-    return true;
-}
-static inline bool CheckShapeValid(const aclTensor* tokens, const aclTensor* indices)
+// 输入shape校验：tokens维度等于2，indices为1D或2D
+static inline bool CheckInputShapeValid(const aclTensor* tokens, const aclTensor* indices)
 {
     auto tokensDimNum = tokens->GetViewShape().GetDimNum();
     OP_CHECK(
@@ -100,6 +81,64 @@ static inline bool CheckShapeValid(const aclTensor* tokens, const aclTensor* ind
                                                           std::to_string(static_cast<int64_t>(indicesDimNum)) + "."),
              return false);
     return true;
+}
+
+// 输出shape校验：按文档「输出Shape」公式，permuteTokensOut为2D且首维为M、隐藏维为H，
+// sortedIndicesOut为1D且shape为flatten_size（indices元素个数）
+static inline bool CheckOutputShapeValid(const aclTensor* tokens, const aclTensor* indices, int64_t numOutTokens,
+                                         const aclTensor* permuteTokensOut, const aclTensor* sortedIndicesOut)
+{
+    int64_t flattenSize = static_cast<int64_t>(indices->GetViewShape().GetShapeSize());
+    int64_t outTokenNum = (numOutTokens > 0) ? std::min(numOutTokens, flattenSize) :
+                                               std::max(numOutTokens + flattenSize, static_cast<int64_t>(0));
+    int64_t expectedCols = tokens->GetViewShape().GetDim(1);
+    // FLOAT4_E2M1两两打包仅影响存储字节数，输出shape的逻辑隐藏维仍为H。
+
+    auto permuteTokensOutDimNum = permuteTokensOut->GetViewShape().GetDimNum();
+    OP_CHECK(permuteTokensOutDimNum == TOKENS_REQUIRED_DIM,
+             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                 "MoeTokenPermute", "permute_tokens", std::to_string(static_cast<int64_t>(permuteTokensOutDimNum)),
+                 "The dimension of permuteTokensOut should be 2, but got " +
+                     std::to_string(static_cast<int64_t>(permuteTokensOutDimNum)) + "."),
+             return false);
+
+    OP_CHECK(permuteTokensOut->GetViewShape().GetDim(0) == outTokenNum,
+             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                 "MoeTokenPermute", "permute_tokens",
+                 "The dim 0 of permuteTokensOut should be [" + std::to_string(outTokenNum) + "], but got [" +
+                     std::to_string(permuteTokensOut->GetViewShape().GetDim(0)) + "]."),
+             return false);
+
+    OP_CHECK(permuteTokensOut->GetViewShape().GetDim(1) == expectedCols,
+             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                 "MoeTokenPermute", "permute_tokens",
+                 "The dim 1 of permuteTokensOut should be [" + std::to_string(expectedCols) + "], but got [" +
+                     std::to_string(permuteTokensOut->GetViewShape().GetDim(1)) + "]."),
+             return false);
+
+    auto sortedIndicesOutDimNum = sortedIndicesOut->GetViewShape().GetDimNum();
+    OP_CHECK(sortedIndicesOutDimNum == INDICES_MIN_DIM,
+             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                 "MoeTokenPermute", "sorted_indices", std::to_string(static_cast<int64_t>(sortedIndicesOutDimNum)),
+                 "The dimension of sortedIndicesOut should be 1, but got " +
+                     std::to_string(static_cast<int64_t>(sortedIndicesOutDimNum)) + "."),
+             return false);
+
+    OP_CHECK(sortedIndicesOut->GetViewShape().GetDim(0) == flattenSize,
+             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                 "MoeTokenPermute", "sorted_indices",
+                 "The dim 0 of sortedIndicesOut should be [" + std::to_string(flattenSize) + "], but got [" +
+                     std::to_string(sortedIndicesOut->GetViewShape().GetDim(0)) + "]."),
+             return false);
+    return true;
+}
+
+// shape前置校验，不满足时接口直接返回参数错误
+static inline bool CheckShapeValid(const aclTensor* tokens, const aclTensor* indices, int64_t numOutTokens,
+                                   const aclTensor* permuteTokensOut, const aclTensor* sortedIndicesOut)
+{
+    return CheckInputShapeValid(tokens, indices) &&
+           CheckOutputShapeValid(tokens, indices, numOutTokens, permuteTokensOut, sortedIndicesOut);
 }
 
 static inline bool CheckDtypeValidV2Regbase(const aclTensor* tokens, const aclTensor* indices, int64_t quantMode,
@@ -146,45 +185,8 @@ static aclnnStatus CheckParamsV2Regbase(const aclTensor* tokens, const aclTensor
         ACLNN_ERR_PARAM_INVALID);
     return ACLNN_SUCCESS;
 }
-static aclnnStatus CheckParamsV2Fallback(const aclTensor* tokens, const aclTensor* indices,
-                                         const aclTensor* permuteTokensOut, const aclTensor* sortedIndicesOut,
-                                         const aclTensor* expandedScaleOut)
-{
-    CHECK_RET(CheckNotNull(tokens, indices, permuteTokensOut, sortedIndicesOut, expandedScaleOut),
-              ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(CheckDtypeValidRegbase(tokens, indices, permuteTokensOut, sortedIndicesOut), ACLNN_ERR_PARAM_INVALID);
-    OP_CHECK_DTYPE_NOT_MATCH(expandedScaleOut, DataType::DT_FLOAT, return ACLNN_ERR_PARAM_INVALID);
-    return ACLNN_SUCCESS;
-}
 
 } // namespace MoeTokenPermuteV2Check
-
-static aclnnStatus BuildMoeInitRoutingV2Executor(const aclTensor* tokens, const aclTensor* indices,
-                                                 int64_t numOutTokens, const aclTensor* permuteTokensOut,
-                                                 const aclTensor* sortedIndicesOut, uint64_t* workspaceSize,
-                                                 aclOpExecutor** executor)
-{
-    auto uniqueExecutor = CREATE_EXECUTOR();
-    CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
-
-    auto tokensContiguous = l0op::Contiguous(tokens, uniqueExecutor.get());
-    CHECK_RET(tokensContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    auto indicesContiguous = l0op::Contiguous(indices, uniqueExecutor.get());
-    CHECK_RET(indicesContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-
-    auto result = l0op::MoeInitRoutingV2(tokensContiguous, indicesContiguous, numOutTokens, 0, 0, 0, 0, false,
-                                         permuteTokensOut, sortedIndicesOut, nullptr, nullptr, uniqueExecutor.get());
-    auto expandedXOut = std::get<0>(result);
-    auto expandedRowIdxOut = std::get<1>(result);
-    CHECK_RET(expandedXOut != nullptr && expandedRowIdxOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(l0op::ViewCopy(expandedXOut, permuteTokensOut, uniqueExecutor.get()) != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(l0op::ViewCopy(expandedRowIdxOut, sortedIndicesOut, uniqueExecutor.get()) != nullptr,
-              ACLNN_ERR_INNER_NULLPTR);
-
-    *workspaceSize = uniqueExecutor->GetWorkspaceSize();
-    uniqueExecutor.ReleaseTo(executor);
-    return ACLNN_SUCCESS;
-}
 
 static aclnnStatus SliceAndViewCopy(const aclTensor* src, const aclTensor* dst, aclOpExecutor* executor)
 {
@@ -305,7 +307,9 @@ aclnnStatus aclnnMoeTokenPermuteV2GetWorkspaceSize(const aclTensor* tokens, cons
     CHECK_RET(
         MoeTokenPermuteV2Check::CheckNotNull(tokens, indices, permuteTokensOut, sortedIndicesOut, expandedScaleOut),
         ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(MoeTokenPermuteV2Check::CheckShapeValid(tokens, indices), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(
+        MoeTokenPermuteV2Check::CheckShapeValid(tokens, indices, numOutTokens, permuteTokensOut, sortedIndicesOut),
+        ACLNN_ERR_PARAM_INVALID);
 
     if (!Ops::Transformer::AclnnUtil::IsRegbase()) {
         return aclnnInnerMoeTokenPermuteGetWorkspaceSize(tokens, indices, numOutTokens, paddedMode, permuteTokensOut,
@@ -317,13 +321,6 @@ aclnnStatus aclnnMoeTokenPermuteV2GetWorkspaceSize(const aclTensor* tokens, cons
         return ACLNN_ERR_PARAM_INVALID;
     }
 
-    if (GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) {
-        CHECK_RET(MoeTokenPermuteV2Check::CheckParamsV2Fallback(tokens, indices, permuteTokensOut, sortedIndicesOut,
-                                                                expandedScaleOut) == ACLNN_SUCCESS,
-                  ACLNN_ERR_PARAM_INVALID);
-        return BuildMoeInitRoutingV2Executor(tokens, indices, numOutTokens, permuteTokensOut, sortedIndicesOut,
-                                             workspaceSize, executor);
-    }
     CHECK_RET(MoeTokenPermuteV2Check::CheckParamsV2Regbase(tokens, indices, quantMode, permuteTokensOut,
                                                            sortedIndicesOut, expandedScaleOut) == ACLNN_SUCCESS,
               ACLNN_ERR_PARAM_INVALID);

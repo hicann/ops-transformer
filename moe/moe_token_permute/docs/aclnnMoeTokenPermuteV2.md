@@ -64,7 +64,7 @@ aclnnStatus aclnnMoeTokenPermuteV2(
 | numOutTokens | 输入 | 有效输出token数。 | `0`表示不删除token；大于0时保留排序后的前`numOutTokens`个token；小于0时按负切片索引处理。 | - | - | - |
 | paddedMode | 输入 | 是否为填充模式。 | 当前不支持`true`，建议固定为`false`。 | - | - | - |
 | quantMode | 输入 | 量化模式。 | `-1`为非量化；`2`为MXFP8 E5M2；`3`为MXFP8 E4M3FN；`9`为MXFP4 E2M1。非Ascend 950平台静默忽略量化参数。 | - | - | - |
-| permuteTokensOut | 输出 | 根据indices扩展并排序后的tokens。 | 非量化时数据类型同`tokens`；`quantMode=2/3/9`时分别为FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1。 | FLOAT16、BFLOAT16、FLOAT32、INT8、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1 | ND | ≥2 |
+| permuteTokensOut | 输出 | 根据indices扩展并排序后的tokens。 | 非量化时数据类型同`tokens`；`quantMode=2/3/9`时分别为FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1。 | FLOAT16、BFLOAT16、FLOAT32、INT8、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1 | ND | 2 |
 | sortedIndicesOut | 输出 | `permuteTokensOut`和`tokens`的映射关系。 | 1D Tensor，shape为`[indices.numel()]`。 | INT32 | ND | 1 |
 | expandedScaleOut | 输出 | 量化后的per-token分块scale。 | 量化场景必须提供有效输出；非量化场景可传shape为`[0]`、dtype为FLOAT32的空Tensor。 | FLOAT8_E8M0、FLOAT32 | ND | 1、2或3 |
 | workspaceSize | 输出 | 返回需要在Device侧申请的workspace大小。 | - | - | - | - |
@@ -92,9 +92,11 @@ H = tokens.shape[1]
 | `-1` | `[M, H]` | `[flatten_size]` | `[0]` |
 | `2` | `[M, H]` | `[flatten_size]` | `[M, AlignUp(CeilDiv(H, 32), 2)]` |
 | `3` | `[M, H]` | `[flatten_size]` | `[M, AlignUp(CeilDiv(H, 32), 2)]` |
-| `9` | `[M, H / 2]` | `[flatten_size]` | `[M, CeilDiv(H, 64), 2]` |
+| `9` | `[M, H]` | `[flatten_size]` | `[M, CeilDiv(H, 64), 2]` |
 
 其中：
+
+`FLOAT4_E2M1` 的两个逻辑元素打包存储于一个字节，输出 shape 的隐藏维仍为 `H`。
 
 ```text
 CeilDiv(a, b) = (a + b - 1) // b
@@ -110,7 +112,7 @@ aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/co
 | 返回值 | 错误码 | 描述 |
 | --- | --- | --- |
 | ACLNN_ERR_PARAM_NULLPTR | 161001 | 输入或输出Tensor为空指针。 |
-| ACLNN_ERR_PARAM_INVALID | 161002 | 输入、输出数据类型或`quantMode`不在支持范围内。 |
+| ACLNN_ERR_PARAM_INVALID | 161002 | 输入、输出的数据类型或shape不在支持范围内，或`quantMode`不在支持范围内。 |
 | ACLNN_ERR_INNER_TILING_ERROR | 561002 | shape不满足算子约束，或`paddedMode=true`。 |
 
 ## aclnnMoeTokenPermuteV2

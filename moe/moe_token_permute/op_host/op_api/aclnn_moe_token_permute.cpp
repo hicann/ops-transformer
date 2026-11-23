@@ -9,6 +9,7 @@
  */
 
 #include "log/log.h"
+#include <algorithm>
 #include <string>
 #include "aclnn_moe_token_permute.h"
 #include "op_host/util/op_const_def.h"
@@ -93,6 +94,121 @@ static aclnnStatus CheckParamsRegbase(const aclTensor* tokens, const aclTensor* 
     CHECK_RET(CheckDtypeValidRegbase(tokens, indices, permuteTokensOut, sortedIndicesOut), ACLNN_ERR_PARAM_INVALID);
     return ACLNN_SUCCESS;
 }
+
+static constexpr size_t DIM_ONE = 1;
+static constexpr size_t DIM_TWO = 2;
+
+// 计算indices的元素个数，即num_tokens * topK，与MoeInitRoutingV2 tiling中的totalLength推导保持一致
+static int64_t CalcIndicesTotalLength(const aclTensor* indices)
+{
+    const op::Shape& indicesShape = indices->GetViewShape();
+    int64_t topK = (indicesShape.GetDimNum() == DIM_TWO) ? indicesShape.GetDim(1) : 1;
+    return indicesShape.GetDim(0) * topK;
+}
+
+// 计算permuteTokensOut的首维大小，推导逻辑与MoeInitRoutingV2 tiling(regbase分支)中activateNum保持一致
+static int64_t CalcPermutedTokenNum(const aclTensor* indices, int64_t numOutTokens)
+{
+    int64_t totalLength = CalcIndicesTotalLength(indices);
+    int64_t permutedTokenNum = (numOutTokens <= 0) ? numOutTokens + totalLength : numOutTokens;
+    permutedTokenNum = std::min(permutedTokenNum, totalLength);
+    return std::max(permutedTokenNum, static_cast<int64_t>(0));
+}
+
+// 计算除首维外其余维度的乘积
+static int64_t CalcTrailingDimsProduct(const aclTensor* tensor)
+{
+    const op::Shape& shape = tensor->GetViewShape();
+    int64_t product = 1;
+    for (size_t i = 1; i < shape.GetDimNum(); i++) {
+        product *= shape.GetDim(i);
+    }
+    return product;
+}
+
+// 输入shape校验：tokens维度大于等于2，indices为1D或2D，且tokens与indices首维一致
+static bool CheckInputShapeValid(const aclTensor* tokens, const aclTensor* indices)
+{
+    size_t tokensDimNum = tokens->GetViewShape().GetDimNum();
+    OP_CHECK(tokensDimNum >= DIM_TWO,
+             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                 "MoeTokenPermute", "tokens", std::to_string(tokensDimNum),
+                 "The dim number of tokens should be greater than or equal to 2, but got [" +
+                     std::to_string(tokensDimNum) + "]."),
+             return false);
+
+    size_t indicesDimNum = indices->GetViewShape().GetDimNum();
+    OP_CHECK(indicesDimNum == DIM_ONE || indicesDimNum == DIM_TWO,
+             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                 "MoeTokenPermute", "indices", std::to_string(indicesDimNum),
+                 "The dim number of indices should be 1 or 2, but got [" + std::to_string(indicesDimNum) + "]."),
+             return false);
+
+    OP_CHECK(
+        tokens->GetViewShape().GetDim(0) == indices->GetViewShape().GetDim(0),
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+            "MoeTokenPermute", "tokens, indices",
+            "The dim 0 of tokens [" + std::to_string(tokens->GetViewShape().GetDim(0)) +
+                "] should be same with indices' dim 0 [" + std::to_string(indices->GetViewShape().GetDim(0)) + "]."),
+        return false);
+    return true;
+}
+
+// 输出shape校验：permuteTokensOut维度大于等于2，除首维外维度乘积与tokens一致，
+// 首维与numOutTokens推导结果一致；sortedIndicesOut为1D且shape为(num_tokens * topK)
+static bool CheckOutputShapeValid(const aclTensor* tokens, const aclTensor* indices, int64_t numOutTokens,
+                                  const aclTensor* permuteTokensOut, const aclTensor* sortedIndicesOut)
+{
+    size_t permuteTokensOutDimNum = permuteTokensOut->GetViewShape().GetDimNum();
+    OP_CHECK(permuteTokensOutDimNum >= DIM_TWO,
+             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                 "MoeTokenPermute", "permute_tokens", std::to_string(permuteTokensOutDimNum),
+                 "The dim number of permuteTokensOut should be greater than or equal to 2, but got [" +
+                     std::to_string(permuteTokensOutDimNum) + "]."),
+             return false);
+
+    int64_t permuteTokensOutCols = CalcTrailingDimsProduct(permuteTokensOut);
+    OP_CHECK(permuteTokensOutCols == CalcTrailingDimsProduct(tokens),
+             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                 "MoeTokenPermute", "permute_tokens",
+                 "The product of permuteTokensOut's trailing dims [" + std::to_string(permuteTokensOutCols) +
+                     "] should be equal to the product of tokens' trailing dims [" +
+                     std::to_string(CalcTrailingDimsProduct(tokens)) + "]."),
+             return false);
+
+    int64_t permutedTokenNum = CalcPermutedTokenNum(indices, numOutTokens);
+    OP_CHECK(permuteTokensOut->GetViewShape().GetDim(0) == permutedTokenNum,
+             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                 "MoeTokenPermute", "permute_tokens",
+                 "The dim 0 of permuteTokensOut should be [" + std::to_string(permutedTokenNum) + "], but got [" +
+                     std::to_string(permuteTokensOut->GetViewShape().GetDim(0)) + "]."),
+             return false);
+
+    size_t sortedIndicesOutDimNum = sortedIndicesOut->GetViewShape().GetDimNum();
+    OP_CHECK(sortedIndicesOutDimNum == DIM_ONE,
+             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON("MoeTokenPermute", "sorted_indices",
+                                                      std::to_string(sortedIndicesOutDimNum),
+                                                      "The dim number of sortedIndicesOut should be 1, but got [" +
+                                                          std::to_string(sortedIndicesOutDimNum) + "]."),
+             return false);
+
+    int64_t indicesTotalLength = CalcIndicesTotalLength(indices);
+    OP_CHECK(sortedIndicesOut->GetViewShape().GetDim(0) == indicesTotalLength,
+             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                 "MoeTokenPermute", "sorted_indices",
+                 "The dim 0 of sortedIndicesOut should be [" + std::to_string(indicesTotalLength) + "], but got [" +
+                     std::to_string(sortedIndicesOut->GetViewShape().GetDim(0)) + "]."),
+             return false);
+    return true;
+}
+
+// 非INT8路径的shape前置校验，不满足时接口直接返回参数错误
+static bool CheckShapeValid(const aclTensor* tokens, const aclTensor* indices, int64_t numOutTokens,
+                            const aclTensor* permuteTokensOut, const aclTensor* sortedIndicesOut)
+{
+    return CheckInputShapeValid(tokens, indices) &&
+           CheckOutputShapeValid(tokens, indices, numOutTokens, permuteTokensOut, sortedIndicesOut);
+}
 } // namespace MoeTokenPermuteCheck
 
 static aclnnStatus BuildMoeInitRoutingV3Executor(const aclTensor* tokens, const aclTensor* indices,
@@ -176,6 +292,65 @@ static aclnnStatus BuildMoeInitRoutingV3Executor(const aclTensor* tokens, const 
     return ACLNN_SUCCESS;
 }
 
+// MoeInitRoutingV2仅支持2D输入输出：tokens维度大于2时，先将首维以外的维度乘积展平为cols，
+// 以2D [num_tokens, cols]调用MoeInitRoutingV2，计算完成后将2D结果恢复为用户报的输出shape再copyout，
+// 与文档声明的tokens/permuteTokensOut维度大于等于2、以及非regbase平台的语义保持一致
+static aclnnStatus BuildMoeInitRoutingV2Executor(const aclTensor* tokens, const aclTensor* indices,
+                                                 int64_t numOutTokens, const aclTensor* permuteTokensOut,
+                                                 const aclTensor* sortedIndicesOut, uint64_t* workspaceSize,
+                                                 aclOpExecutor** executor)
+{
+    // 创建OpExecutor
+    auto uniqueExecutor = CREATE_EXECUTOR();
+    CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
+
+    // 固定写法，将输入转换成连续的tensor
+    auto tokensContiguous = l0op::Contiguous(tokens, uniqueExecutor.get());
+    CHECK_RET(tokensContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    auto indicesContiguous = l0op::Contiguous(indices, uniqueExecutor.get());
+    CHECK_RET(indicesContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
+
+    // tokens维度大于2时展平为2D，首维num_tokens不变，其余维度乘积作为cols
+    const aclTensor* tokens2D = tokensContiguous;
+    if (tokensContiguous->GetViewShape().GetDimNum() > MoeTokenPermuteCheck::DIM_TWO) {
+        op::Shape tokens2DShape;
+        tokens2DShape.AppendDim(tokensContiguous->GetViewShape().GetDim(0));
+        tokens2DShape.AppendDim(MoeTokenPermuteCheck::CalcTrailingDimsProduct(tokensContiguous));
+        tokens2D = uniqueExecutor->CreateView(tokensContiguous, tokens2DShape, 0);
+        CHECK_RET(tokens2D != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    }
+
+    // 构造2D输出描述符，MoeInitRoutingV2内部按该描述符的shape/dtype分配实际输出
+    op::Shape permuteTokens2DShape;
+    permuteTokens2DShape.AppendDim(MoeTokenPermuteCheck::CalcPermutedTokenNum(indicesContiguous, numOutTokens));
+    permuteTokens2DShape.AppendDim(MoeTokenPermuteCheck::CalcTrailingDimsProduct(tokensContiguous));
+    auto permuteTokens2D =
+        uniqueExecutor->AllocTensor(permuteTokens2DShape, permuteTokensOut->GetDataType(), Format::FORMAT_ND);
+    CHECK_RET(permuteTokens2D != nullptr, ACLNN_ERR_INNER_NULLPTR);
+
+    // 调用l0接口进行计算
+    auto result = l0op::MoeInitRoutingV2(tokens2D, indicesContiguous, numOutTokens, 0, 0, 0, 0, false, permuteTokens2D,
+                                         sortedIndicesOut, nullptr, nullptr, uniqueExecutor.get());
+
+    auto expandedXOut = std::get<0>(result);
+    auto expandedRowIdxOut = std::get<1>(result);
+    CHECK_RET(expandedXOut != nullptr && expandedRowIdxOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
+
+    // 将2D计算结果恢复为用户输出的shape，copyout结果，如果出参是非连续Tensor，
+    // 需要把计算完的连续Tensor转非连续
+    auto expandedXOutRestored = uniqueExecutor->CreateView(expandedXOut, permuteTokensOut->GetViewShape(), 0);
+    CHECK_RET(expandedXOutRestored != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(l0op::ViewCopy(expandedXOutRestored, permuteTokensOut, uniqueExecutor.get()) != nullptr,
+              ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(l0op::ViewCopy(expandedRowIdxOut, sortedIndicesOut, uniqueExecutor.get()) != nullptr,
+              ACLNN_ERR_INNER_NULLPTR);
+
+    // 获取计算过程中需要使用的workspace大小
+    *workspaceSize = uniqueExecutor->GetWorkspaceSize();
+    uniqueExecutor.ReleaseTo(executor);
+    return ACLNN_SUCCESS;
+}
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -192,8 +367,8 @@ aclnnStatus aclnnMoeTokenPermuteGetWorkspaceSize(const aclTensor* tokens, const 
     CHECK_RET(MoeTokenPermuteCheck::CheckNotNull(tokens, indices, permuteTokensOut, sortedIndicesOut),
               ACLNN_ERR_PARAM_NULLPTR);
 
-    bool useMoeInitRoutingV2 = Ops::Transformer::AclnnUtil::IsRegbase();
-    if (!useMoeInitRoutingV2) {
+    bool useMoeInitRouting = Ops::Transformer::AclnnUtil::IsRegbase();
+    if (!useMoeInitRouting) {
         return aclnnInnerMoeTokenPermuteGetWorkspaceSize(tokens, indices, numOutTokens, paddedMode, permuteTokensOut,
                                                          sortedIndicesOut, workspaceSize, executor);
     }
@@ -203,9 +378,8 @@ aclnnStatus aclnnMoeTokenPermuteGetWorkspaceSize(const aclTensor* tokens, const 
         return ACLNN_ERR_PARAM_INVALID;
     }
 
-    bool isRegbaseCalled =
-        GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510 && tokens->GetDataType() == DataType::DT_INT8;
-    if (isRegbaseCalled) {
+    bool useMoeInitRoutingV3 = tokens->GetDataType() == DataType::DT_INT8;
+    if (useMoeInitRoutingV3) {
         CHECK_RET(MoeTokenPermuteCheck::CheckDtypeValidInt8Regbase(tokens, indices, permuteTokensOut, sortedIndicesOut),
                   ACLNN_ERR_PARAM_INVALID);
         return BuildMoeInitRoutingV3Executor(tokens, indices, permuteTokensOut, sortedIndicesOut, workspaceSize,
@@ -213,42 +387,17 @@ aclnnStatus aclnnMoeTokenPermuteGetWorkspaceSize(const aclTensor* tokens, const 
     }
     aclnnStatus ret = MoeTokenPermuteCheck::CheckParamsRegbase(tokens, indices, permuteTokensOut, sortedIndicesOut);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    CHECK_RET(MoeTokenPermuteCheck::CheckShapeValid(tokens, indices, numOutTokens, permuteTokensOut, sortedIndicesOut),
+              ACLNN_ERR_PARAM_INVALID);
 
-    // 创建OpExecutor
-    auto uniqueExecutor = CREATE_EXECUTOR();
-    CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
-
-    // 固定写法，将输入转换成连续的tensor
-    auto tokensContiguous = l0op::Contiguous(tokens, uniqueExecutor.get());
-    CHECK_RET(tokensContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    auto indicesContiguous = l0op::Contiguous(indices, uniqueExecutor.get());
-    CHECK_RET(indicesContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
-
-    // 调用l0接口进行计算
-    auto result = l0op::MoeInitRoutingV2(tokensContiguous, indicesContiguous, numOutTokens, 0, 0, 0, 0, false,
-                                         permuteTokensOut, sortedIndicesOut, nullptr, nullptr, uniqueExecutor.get());
-
-    auto expandedXOut_ = std::get<0>(result);
-    auto expandedRowIdxOut_ = std::get<1>(result);
-    bool hasNullptr = (expandedXOut_ == nullptr) || (expandedRowIdxOut_ == nullptr);
-    CHECK_RET(hasNullptr != true, ACLNN_ERR_INNER_NULLPTR);
-
-    // copyout结果，如果出参是非连续Tensor，需要把计算完的连续Tensor转非连续
-    auto viewCopyExpandedXOutResult = l0op::ViewCopy(expandedXOut_, permuteTokensOut, uniqueExecutor.get());
-    CHECK_RET(viewCopyExpandedXOutResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    auto viewCopyExpandedRowIdxOutResult = l0op::ViewCopy(expandedRowIdxOut_, sortedIndicesOut, uniqueExecutor.get());
-    CHECK_RET(viewCopyExpandedRowIdxOutResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
-
-    // 获取计算过程中需要使用的workspace大小
-    *workspaceSize = uniqueExecutor->GetWorkspaceSize();
-    uniqueExecutor.ReleaseTo(executor);
-    return ACLNN_SUCCESS;
+    return BuildMoeInitRoutingV2Executor(tokens, indices, numOutTokens, permuteTokensOut, sortedIndicesOut,
+                                         workspaceSize, executor);
 }
 
 aclnnStatus aclnnMoeTokenPermute(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
-    static bool useMoeInitRoutingV2 = Ops::Transformer::AclnnUtil::IsRegbase();
-    if (!useMoeInitRoutingV2) {
+    static bool useMoeInitRouting = Ops::Transformer::AclnnUtil::IsRegbase();
+    if (!useMoeInitRouting) {
         return aclnnInnerMoeTokenPermute(workspace, workspaceSize, executor, stream);
     }
     L2_DFX_PHASE_2(aclnnMoeTokenPermute);
