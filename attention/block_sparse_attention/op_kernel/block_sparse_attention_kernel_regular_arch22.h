@@ -493,13 +493,19 @@ public:
 
             uint64_t curSelectIdx = static_cast<uint64_t>(curBatch) * qHeads * maxQBlockNum +
                                     static_cast<uint64_t>(qHeadIdx) * maxQBlockNum + qXIdx;
-            uint32_t curSelectNum = static_cast<uint32_t>(gSelectNumIdx.GetValue(curSelectIdx));
+            uint32_t kvYBlockNum = (kvSeqlen + qBlockY - 1) / qBlockY;
+            uint32_t curSelectNum = Min(static_cast<uint32_t>(gSelectNumIdx.GetValue(curSelectIdx)), kvYBlockNum);
             if (curSelectNum == 0) {
                 continue;
             }
-            uint32_t lastSelectIdx =
-                static_cast<int32_t>(gSelectIdx.GetValue(curSelectIdx * maxKvBlockNum + curSelectNum - 1));
-            uint32_t kvYBlockNum = (kvSeqlen + qBlockY - 1) / qBlockY; // CeilDiv
+            uint64_t idxOffset = curSelectIdx * maxKvBlockNum;
+            uint32_t lastSelectIdx = gSelectIdx.GetValue(idxOffset + curSelectNum - 1);
+            while (lastSelectIdx >= kvYBlockNum && --curSelectNum > 0) {
+                lastSelectIdx = gSelectIdx.GetValue(idxOffset + curSelectNum - 1);
+            }
+            if (curSelectNum == 0) {
+                continue;
+            }
             uint32_t curKvSeqLen = (lastSelectIdx == kvYBlockNum - 1 && kvSeqlen % qBlockY != 0) ?
                                        qBlockY * (curSelectNum - 1) + kvSeqlen % qBlockY :
                                        qBlockY * curSelectNum;

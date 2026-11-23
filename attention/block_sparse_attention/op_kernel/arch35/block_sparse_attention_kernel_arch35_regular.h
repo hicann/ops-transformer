@@ -257,13 +257,20 @@ public:
             // calc the gathered kvS from sparse mask
             uint64_t gmOffsetSparseCount = static_cast<uint64_t>(curBatch) * qHeads_ * xBlockNumAligned_ +
                                            static_cast<uint64_t>(qHeadIdx) * xBlockNumAligned_ + xBlockIdx;
-            uint32_t yBlockNumRsvd = gSparseCount.GetValue(gmOffsetSparseCount);
-
-            uint64_t gmOffsetSparseIdx = gmOffsetSparseCount * yBlockNumAligned_;
-            uint64_t lastIdxOffset = gmOffsetSparseIdx + yBlockNumRsvd - 1;
-            uint32_t lastSparseIdx = gSparseIdx.GetValue(lastIdxOffset);
-
             uint32_t yBlockNumAval = static_cast<uint32_t>(CeilDiv(kvSeqlen, static_cast<int64_t>(blockShapeY_)));
+            uint32_t yBlockNumRsvd =
+                Min(static_cast<uint32_t>(gSparseCount.GetValue(gmOffsetSparseCount)), yBlockNumAval);
+            uint64_t gmOffsetSparseIdx = gmOffsetSparseCount * yBlockNumAligned_;
+            if (yBlockNumRsvd == 0) {
+                continue;
+            }
+            uint32_t lastSparseIdx = gSparseIdx.GetValue(gmOffsetSparseIdx + yBlockNumRsvd - 1);
+            while (lastSparseIdx >= yBlockNumAval && --yBlockNumRsvd > 0) {
+                lastSparseIdx = gSparseIdx.GetValue(gmOffsetSparseIdx + yBlockNumRsvd - 1);
+            }
+            if (yBlockNumRsvd == 0) {
+                continue;
+            }
             uint32_t lastYBlockSize =
                 (lastSparseIdx == yBlockNumAval - 1) ? kvSeqlen - lastSparseIdx * blockShapeY_ : blockShapeY_;
             int64_t gatheredKvSeqlen = (yBlockNumRsvd - 1) * blockShapeY_ + lastYBlockSize;
