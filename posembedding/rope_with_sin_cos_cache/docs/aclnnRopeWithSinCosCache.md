@@ -404,6 +404,14 @@ aclnnStatus aclnnRopeWithSinCosCache(
         <td> 161002 </td>
         <td>输入和输出的数据类型、数据格式或shape，以及输入属性不满足约束。</td>
         </tr>
+        <tr>
+        <td> ACLNN_ERR_INNER_NULLPTR </td>
+        <td> 561103 </td>
+        <td>
+        headSize或rotaryDim不满足对齐要求。<br>
+        headSize小于rotaryDim。<br>
+        </td>
+        </tr>
     </tbody></table>
 
 ## aclnnRopeWithSinCosCache
@@ -468,7 +476,6 @@ aclnnStatus aclnnRopeWithSinCosCache(
 #include <vector>
 #include "acl/acl.h"
 #include "aclnnop/level2/aclnn_rope_with_sin_cos_cache.h"
-#include <iostream>
 
 #define CHECK_RET(cond, return_expr)                                           \
   do {                                                                         \

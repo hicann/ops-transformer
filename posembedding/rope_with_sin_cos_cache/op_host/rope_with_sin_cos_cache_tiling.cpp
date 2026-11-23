@@ -411,7 +411,10 @@ static ge::graphStatus TilingRopeWithSinCosCache(gert::TilingContext* context)
                 return ge::GRAPH_FAILED);
 
     TilingKeyChose(context, params);
-    TilingCompute(context, params);
+    auto ret = TilingCompute(context, params);
+    if (ret != ge::GRAPH_SUCCESS) {
+        return ret;
+    }
     SetTiling(params, tiling);
     PrintTilingData(context, tiling);
     tiling.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());

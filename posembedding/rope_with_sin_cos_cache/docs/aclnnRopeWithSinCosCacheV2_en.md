@@ -30,102 +30,91 @@
   - When cacheMode=1, cos and sin are concatenated in interleaved mode.
 - Formula:
 
-    1, **mrope mode**: The input shape of positions is [m, numTokens], where m is the number of elements in mropeSection, and 3 or 4 are supported:
+    The computation consists of two stages: obtaining the rotation coefficients and performing the rotation. The mrope and rope modes differ only in how cos and sin are obtained; the rotation computation is the same.
+
+    1. **Stage 1: Obtain the rotation coefficients cos and sin in mrope or rope mode**
+
+    (1) **mrope mode**: m is the number of elements in mropeSection and can be 3 or 4:
 
     $$
-    cosSin[i] = cosSinCache[positions[i]]
+    cosSin = cosSinCache[positions]
+    $$
+
+    $$
+    cosSrc, sinSrc = cosSin.chunk(2, dim=-1)
+    $$
+
+    The shapes of cosSrc and sinSrc are both [m, numTokens, rotaryDim / 2]. The mrope mode is further divided into segmented and interleaved modes, controlled by cacheMode:
+
+    - **cacheMode=0 (segmented)**: Split the last dimension according to mropeSection. For segment i, select the coefficients corresponding to row i of positions, then concatenate along the last dimension. The following formulas apply to both 3-segment and 4-segment mropeSection:
+
+      $$
+      cosParts = cosSrc.split(mropeSection, dim=-1)
+      $$
+
+      $$
+      sinParts = sinSrc.split(mropeSection, dim=-1)
+      $$
+
+      $$
+      cos = torch.cat([part[i]\ for\ i, part\ in\ enumerate(cosParts)], dim=-1)
+      $$
+
+      $$
+      sin = torch.cat([part[i]\ for\ i, part\ in\ enumerate(sinParts)], dim=-1)
+      $$
+
+    - **cacheMode=1 (interleaved)**: Start with all coefficients corresponding to row 0 of positions, then replace the specified positions with coefficients corresponding to rows 1 and 2, respectively. The remaining positions are unchanged. Only 3-segment mropeSection is supported:
+
+      $$
+      cos = cosSrc[0].clone()
+      $$
+
+      $$
+      sin = sinSrc[0].clone()
+      $$
+
+      $$
+      cos[..., 1:mropeSection[1] * 3:3] = cosSrc[1, ..., 1:mropeSection[1] * 3:3]
+      $$
+
+      $$
+      cos[..., 2:mropeSection[2] * 3:3] = cosSrc[2, ..., 2:mropeSection[2] * 3:3]
+      $$
+
+      $$
+      sin[..., 1:mropeSection[1] * 3:3] = sinSrc[1, ..., 1:mropeSection[1] * 3:3]
+      $$
+
+      $$
+      sin[..., 2:mropeSection[2] * 3:3] = sinSrc[2, ..., 2:mropeSection[2] * 3:3]
+      $$
+
+    (2) **rope mode**:
+
+    $$
+    cosSin = cosSinCache[positions]
     $$
 
     $$
     cos, sin = cosSin.chunk(2, dim=-1)
     $$
 
-    (1) When cacheMode is 0:
-    - The number of elements in mropeSection is 3:
+    In both modes, the resulting cos and sin have shape [numTokens, rotaryDim / 2].
 
-      $$
-      cos0 = cos[0, :, :mropeSection[0]]
-      $$
+    2. **Stage 2: Perform the rotation computation**
 
-      $$
-      cos1 = cos[1, :, mropeSection[0]:(mropeSection[0] + mropeSection[1])]
-      $$
-
-      $$
-      cos2 = cos[2, :, (mropeSection[0] + mropeSection[1]):(mropeSection[0] + mropeSection[1] + mropeSection[2])]
-      $$
-
-      $$
-      cos = torch.cat((cos0, cos1, cos2), dim=-1)
-      $$
-
-      $$
-      sin0 = sin[0, :, :mropeSection[0]]
-      $$
-
-      $$
-      sin1 = sin[1, :, mropeSection[0]:(mropeSection[0] + mropeSection[1])]
-      $$
-
-      $$
-      sin2 = sin[2, :, (mropeSection[0] + mropeSection[1]):(mropeSection[0] + mropeSection[1] + mropeSection[2])]
-      $$
-
-      $$
-      sin= torch.cat((sin0, sin1, sin2), dim=-1)
-      $$
-
-      $$
-      queryRot = query[..., :rotaryDim]
-      $$
-
-      $$
-      queryPass = query[..., rotaryDim:]
-      $$
-
-    - The number of elements in mropeSection is 4:
-
-      $$
-      cos = torch.cat([m[i]\ for\ i, m\ in\ enumerate(cos.split(mropeSection, dim=-1))], dim=-1)
-      $$
-
-      $$
-      sin = torch.cat([m[i]\ for\ i, m\ in\ enumerate(sin.split(mropeSection, dim=-1))], dim=-1)
-      $$
-
-      $$
-      queryRot = query[..., :rotaryDim]
-      $$
-
-      $$
-      queryPass = query[..., rotaryDim:]
-      $$
-
-    (2) cacheMode is 1:
+    The following uses query as an example; key is computed in the same way. There are rotate\_half and rotate\_interleaved modes:
 
     $$
-    cosTmp = cos
+    cos = cos.unsqueeze(1)
     $$
 
     $$
-    cos [..., 1:mropeSection[1] * 3:3] = cosTmp[1, ..., 1:mropeSection[1] * 3:3]
+    sin = sin.unsqueeze(1)
     $$
 
-    $$
-    cos[..., 2:mropeSection[1] * 3:3] = cosTmp[2, ..., 2:mropeSection[1] * 3:3]
-    $$
-
-    $$
-    sinTmp = sin
-    $$
-
-    $$
-    sin[..., 1:mropeSection[1] * 3:3] = sinTmp [1, ..., 1:mropeSection[1] * 3:3]
-    $$
-
-    $$
-    sin[..., 2:mropeSection[1] * 3:3] = sinTmp [2, ..., 2:mropeSection[1] * 3:3]
-    $$
+    Split each head into the first rotaryDim elements that participate in rotation and the remaining elements that stay unchanged:
 
     $$
     queryRot = query[..., :rotaryDim]
@@ -135,29 +124,25 @@
     queryPass = query[..., rotaryDim:]
     $$
 
-    (1)rotate\_half(GPT-NeoX style) computation mode:
+    (1) **rotate\_half (GPT-NeoX style, isNeoxStyle=true)**:
 
     $$
     x1, x2 = torch.chunk(queryRot, 2, dim=-1)
     $$
 
     $$
-    o1[i] = x1[i] * cos[i] - x2[i] * sin[i]
+    o1 = x1 * cos - x2 * sin
     $$
 
     $$
-    o2[i] = x2[i] * cos[i] + x1[i] * sin[i]
+    o2 = x2 * cos + x1 * sin
     $$
 
     $$
     queryRot = torch.cat((o1, o2), dim=-1)
     $$
 
-    $$
-    query = torch.cat((queryRot, queryPass), dim=-1)
-    $$
-
-    (2)rotate\_interleaved(GPT-J style) computation mode:
+    (2) **rotate\_interleaved (GPT-J style, isNeoxStyle=false)**:
 
     $$
     x1 = queryRot[..., ::2]
@@ -168,85 +153,21 @@
     $$
 
     $$
-    o1[i] = x1[i] * cos[i] - x2[i] * sin[i]
+    o1 = x1 * cos - x2 * sin
     $$
 
     $$
-    o2[i] = x2[i] * cos[i] + x1[i] * sin[i]
-    $$
-
-    $$
-    queryRot = torch.stack((o1, o2), dim=-1)
-    $$
-
-    $$
-    query = torch.cat((queryRot, queryPass), dim=-1)
-    $$
-
-    2.**rope mode**: The input shape of positions is [numTokens]:
-
-    $$
-    cosSin[i] = cosSinCache[positions[i]]
-    $$
-
-    $$
-    cos, sin = cosSin.chunk(2, dim=-1)
-    $$
-
-    $$
-    queryRot = query[..., :rotaryDim]
-    $$
-
-    $$
-    queryPass = query[..., rotaryDim:]
-    $$
-
-    (1)rotate\_half(GPT-NeoX style) computation mode:
-
-    $$
-    x1, x2 = torch.chunk(queryRot, 2, dim=-1)
-    $$
-
-    $$
-    o1[i] = x1[i] * cos[i] - x2[i] * sin[i]
-    $$
-
-    $$
-    o2[i] = x2[i] * cos[i] + x1[i] * sin[i]
-    $$
-
-    $$
-    queryRot = torch.cat((o1, o2), dim=-1)
-    $$
-
-    $$
-    query = torch.cat((queryRot, queryPass), dim=-1)
-    $$
-
-    (2)rotate\_interleaved(GPT-J style) computation mode:
-
-    $$
-    x1 = queryRot[..., ::2]
-    $$
-
-    $$
-    x2 = queryRot[..., 1::2]
-    $$
-
-    $$
-    o1[i] = x1[i] * cos[i] - x2[i] * sin[i]
-    $$
-
-    $$
-    o2[i] = x2[i] * cos[i] + x1[i] * sin[i]
+    o2 = x2 * cos + x1 * sin
     $$
 
     $$
     queryRot = torch.stack((o1, o2), dim=-1)
     $$
 
+    Both rotation styles concatenate the rotation result with the unrotated portion to obtain queryOut:
+
     $$
-    query = torch.cat((queryRot, queryPass), dim=-1)
+    queryOut = torch.cat((queryRot, queryPass), dim=-1)
     $$
 
 ## Function Prototype
@@ -452,23 +373,16 @@ aclnnStatus aclnnRopeWithSinCosCacheV2(
         <tr>
         <td> ACLNN_ERR_PARAM_INVALID </td>
         <td> 161002 </td>
-        <td>The data types and data formats of the input and output are not within the supported range.</td>
+        <td>The data types, data formats, or shapes of the inputs and outputs, or the input attributes, do not meet the constraints.</td>
         </tr>
         <tr>
-        <td rowspan="2"> ACLNN_ERR_INNER_TILING_ERROR </td>
-        <td rowspan="2"> 561002 </td>
-        <td>The shape information of multiple input tensors does not match.</td>
-        </tr>
-        <tr>
-        <td>The shape information between the input attributes and input tensors does not match.</td>
-        </tr>
-        <tr>
-        <td rowspan="2"> ACLNN_ERR_INNER_TILING_ERROR </td>
-        <td rowspan="2">361001</td>
-        <td>query or key is not 64-byte aligned.</td>
-        </tr>
-        <tr>
-        <td>rotaryDim is greater than headSize.</td>
+        <td> ACLNN_ERR_INNER_NULLPTR </td>
+        <td> 561103 </td>
+        <td>
+        headSize and rotaryDim do not meet the alignment requirements.<br>
+        headSize is less than rotaryDim.<br>
+        When mropeSection contains 4 elements, cacheMode is not 0.<br>
+        </td>
         </tr>
     </tbody></table>
 
@@ -534,7 +448,6 @@ The following sample code is for reference only. For details about compilation a
 #include <vector>
 #include "acl/acl.h"
 #include "aclnnop/level2/aclnn_rope_with_sin_cos_cache_v2.h"
-#include <iostream>
 
 #define CHECK_RET(cond, return_expr)                                           \
   do {                                                                         \

@@ -28,102 +28,91 @@
   - cacheMode=1时，为交错式拼接cos和sin。
 * 计算公式：
 
-    1、**mrope模式**：positions的shape输入是[m, numTokens], m为mropeSection的元素数，支持3或4：
+    计算分为获取旋转系数和执行旋转两步。mrope模式与rope模式仅在获取cos、sin的方式上不同，旋转计算相同。
+
+    1、**阶段一：获取旋转系数cos和sin，分为mrope和rope模式**
+
+    （1）**mrope模式**：m为mropeSection的元素数，支持3或4：
 
     $$
-    cosSin[i] = cosSinCache[positions[i]]
+    cosSin = cosSinCache[positions]
+    $$
+
+    $$
+    cosSrc, sinSrc = cosSin.chunk(2, dim=-1)
+    $$
+
+    此时cosSrc和sinSrc的shape均为[m, numTokens, rotaryDim / 2]，mrope模式还分为分段式和交错式，由cacheMode控制：
+
+    - **cacheMode为0（分段式）**：将最后一维按mropeSection分段，第i段选取positions第i行对应的系数，再沿最后一维拼接。以下公式同时适用于mropeSection3段和4段：
+
+      $$
+      cosParts = cosSrc.split(mropeSection, dim=-1)
+      $$
+
+      $$
+      sinParts = sinSrc.split(mropeSection, dim=-1)
+      $$
+
+      $$
+      cos = torch.cat([part[i]\ for\ i, part\ in\ enumerate(cosParts)], dim=-1)
+      $$
+
+      $$
+      sin = torch.cat([part[i]\ for\ i, part\ in\ enumerate(sinParts)], dim=-1)
+      $$
+
+    - **cacheMode为1（交错式）**：先使用positions第0行对应的全部系数，再分别用第1行和第2行对应的系数替换指定位置，其余位置保持不变。仅支持mropeSection3段：
+
+      $$
+      cos = cosSrc[0].clone()
+      $$
+
+      $$
+      sin = sinSrc[0].clone()
+      $$
+
+      $$
+      cos[..., 1:mropeSection[1] * 3:3] = cosSrc[1, ..., 1:mropeSection[1] * 3:3]
+      $$
+
+      $$
+      cos[..., 2:mropeSection[2] * 3:3] = cosSrc[2, ..., 2:mropeSection[2] * 3:3]
+      $$
+
+      $$
+      sin[..., 1:mropeSection[1] * 3:3] = sinSrc[1, ..., 1:mropeSection[1] * 3:3]
+      $$
+
+      $$
+      sin[..., 2:mropeSection[2] * 3:3] = sinSrc[2, ..., 2:mropeSection[2] * 3:3]
+      $$
+
+    （2）**rope模式**：
+
+    $$
+    cosSin = cosSinCache[positions]
     $$
 
     $$
     cos, sin = cosSin.chunk(2, dim=-1)
     $$
 
-    （1）cacheMode为0：
-    - mropeSection的元素数为3：
+    两种模式最终得到的cos和sin的shape均为[numTokens, rotaryDim / 2]。
 
-      $$
-      cos0 = cos[0, :, :mropeSection[0]]
-      $$
+    2、**阶段二：执行旋转计算**
 
-      $$
-      cos1 = cos[1, :, mropeSection[0]:(mropeSection[0] + mropeSection[1])]
-      $$
-
-      $$
-      cos2 = cos[2, :, (mropeSection[0] + mropeSection[1]):(mropeSection[0] + mropeSection[1] + mropeSection[2])]
-      $$
-
-      $$
-      cos = torch.cat((cos0, cos1, cos2), dim=-1)
-      $$
-
-      $$
-      sin0 = sin[0, :, :mropeSection[0]]
-      $$
-
-      $$
-      sin1 = sin[1, :, mropeSection[0]:(mropeSection[0] + mropeSection[1])]
-      $$
-
-      $$
-      sin2 = sin[2, :, (mropeSection[0] + mropeSection[1]):(mropeSection[0] + mropeSection[1] + mropeSection[2])]
-      $$
-
-      $$
-      sin= torch.cat((sin0, sin1, sin2), dim=-1)
-      $$
-
-      $$
-      queryRot = query[..., :rotaryDim]
-      $$
-
-      $$
-      queryPass = query[..., rotaryDim:]
-      $$
-
-    - mropeSection的元素数为4：
-
-      $$
-      cos = torch.cat([m[i]\ for\ i, m\ in\ enumerate(cos.split(mropeSection, dim=-1))], dim=-1)
-      $$
-
-      $$
-      sin = torch.cat([m[i]\ for\ i, m\ in\ enumerate(sin.split(mropeSection, dim=-1))], dim=-1)
-      $$
-
-      $$
-      queryRot = query[..., :rotaryDim]
-      $$
-
-      $$
-      queryPass = query[..., rotaryDim:]
-      $$
-
-    （2）cacheMode为1：
+    以下以query为例，key的计算方式相同。分为rotate\_half和rotate\_interleaved模式：
 
     $$
-    cosTmp = cos
+    cos = cos.unsqueeze(1)
     $$
 
     $$
-    cos [..., 1:mropeSection[1] * 3:3] = cosTmp[1, ..., 1:mropeSection[1] * 3:3]
+    sin = sin.unsqueeze(1)
     $$
 
-    $$
-    cos[..., 2:mropeSection[1] * 3:3] = cosTmp[2, ..., 2:mropeSection[1] * 3:3]
-    $$
-
-    $$
-    sinTmp = sin
-    $$
-
-    $$
-    sin[..., 1:mropeSection[1] * 3:3] = sinTmp [1, ..., 1:mropeSection[1] * 3:3]
-    $$
-
-    $$
-    sin[..., 2:mropeSection[1] * 3:3] = sinTmp [2, ..., 2:mropeSection[1] * 3:3]
-    $$
+    将每个头分为参与旋转的前rotaryDim个元素和保持不变的其余元素：
 
     $$
     queryRot = query[..., :rotaryDim]
@@ -133,29 +122,25 @@
     queryPass = query[..., rotaryDim:]
     $$
 
-    （3）rotate\_half（GPT-NeoX style）计算模式：（并将后续的"（2）rotate\_interleaved"改为"（4）"，或将旋转计算模式另起层级，与cacheMode编号区分）
+    （1）**rotate\_half（GPT-NeoX style，isNeoxStyle为true）**：
 
     $$
     x1, x2 = torch.chunk(queryRot, 2, dim=-1)
     $$
 
     $$
-    o1[i] = x1[i] * cos[i] - x2[i] * sin[i]
+    o1 = x1 * cos - x2 * sin
     $$
 
     $$
-    o2[i] = x2[i] * cos[i] + x1[i] * sin[i]
+    o2 = x2 * cos + x1 * sin
     $$
 
     $$
     queryRot = torch.cat((o1, o2), dim=-1)
     $$
 
-    $$
-    query = torch.cat((queryRot, queryPass), dim=-1)
-    $$
-
-    （2）rotate\_interleaved（GPT-J style）计算模式：
+    （2）**rotate\_interleaved（GPT-J style，isNeoxStyle为false）**：
 
     $$
     x1 = queryRot[..., ::2]
@@ -166,85 +151,21 @@
     $$
 
     $$
-    o1[i] = x1[i] * cos[i] - x2[i] * sin[i]
+    o1 = x1 * cos - x2 * sin
     $$
 
     $$
-    o2[i] = x2[i] * cos[i] + x1[i] * sin[i]
-    $$
-
-    $$
-    queryRot = torch.stack((o1, o2), dim=-1)
-    $$
-
-    $$
-    query = torch.cat((queryRot, queryPass), dim=-1)
-    $$
-
-    2、**rope模式**：positions的shape输入是[numTokens]：
-
-    $$
-    cosSin[i] = cosSinCache[positions[i]]
-    $$
-
-    $$
-    cos, sin = cosSin.chunk(2, dim=-1)
-    $$
-
-    $$
-    queryRot = query[..., :rotaryDim]
-    $$
-
-    $$
-    queryPass = query[..., rotaryDim:]
-    $$
-
-    （3）rotate\_half（GPT-NeoX style）计算模式：（并将后续的"（2）rotate\_interleaved"改为"（4）"，或将旋转计算模式另起层级，与cacheMode编号区分）
-
-    $$
-    x1, x2 = torch.chunk(queryRot, 2, dim=-1)
-    $$
-
-    $$
-    o1[i] = x1[i] * cos[i] - x2[i] * sin[i]
-    $$
-
-    $$
-    o2[i] = x2[i] * cos[i] + x1[i] * sin[i]
-    $$
-
-    $$
-    queryRot = torch.cat((o1, o2), dim=-1)
-    $$
-
-    $$
-    query = torch.cat((queryRot, queryPass), dim=-1)
-    $$
-
-    （2）rotate\_interleaved（GPT-J style）计算模式：
-
-    $$
-    x1 = queryRot[..., ::2]
-    $$
-
-    $$
-    x2 = queryRot[..., 1::2]
-    $$
-
-    $$
-    o1[i] = x1[i] * cos[i] - x2[i] * sin[i]
-    $$
-
-    $$
-    o2[i] = x2[i] * cos[i] + x1[i] * sin[i]
+    o2 = x2 * cos + x1 * sin
     $$
 
     $$
     queryRot = torch.stack((o1, o2), dim=-1)
     $$
 
+    两种旋转方式均将旋转结果与未旋转部分拼接，得到queryOut：
+
     $$
-    query = torch.cat((queryRot, queryPass), dim=-1)
+    queryOut = torch.cat((queryRot, queryPass), dim=-1)
     $$
 
 ## 函数原型
@@ -452,6 +373,15 @@ aclnnStatus aclnnRopeWithSinCosCacheV2(
         <td> 161002 </td>
         <td>输入和输出的数据类型、数据格式或shape，以及输入属性不满足约束。</td>
         </tr>
+        <tr>
+        <td> ACLNN_ERR_INNER_NULLPTR </td>
+        <td> 561103 </td>
+        <td>
+        headSize，rotaryDim不满足对齐要求。<br>
+        headSize小于rotaryDim。<br>
+        mropeSection包含4个元素时cacheMode不为0。<br>
+        </td>
+        </tr>
     </tbody></table>
 
 ## aclnnRopeWithSinCosCacheV2
@@ -517,7 +447,6 @@ aclnnStatus aclnnRopeWithSinCosCacheV2(
 #include <vector>
 #include "acl/acl.h"
 #include "aclnnop/level2/aclnn_rope_with_sin_cos_cache_v2.h"
-#include <iostream>
 
 #define CHECK_RET(cond, return_expr)                                           \
   do {                                                                         \

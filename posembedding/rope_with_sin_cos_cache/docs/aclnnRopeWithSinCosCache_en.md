@@ -404,23 +404,15 @@ aclnnStatus aclnnRopeWithSinCosCache(
         <tr>
         <td> ACLNN_ERR_PARAM_INVALID </td>
         <td> 161002 </td>
-        <td>The data types and data formats of the inputs and outputs are not supported.</td>
+        <td>The data types, data formats, or shapes of the inputs and outputs, or the input attributes, do not meet the constraints.</td>
         </tr>
         <tr>
-        <td rowspan="2"> ACLNN_ERR_INNER_TILING_ERROR </td>
-        <td rowspan="2"> 561002 </td>
-        <td>The shape information of multiple input tensors does not match.</td>
-        </tr>
-        <tr>
-        <td>The shape information between input attributes and input tensors does not match.</td>
-        </tr>
-        <tr>
-        <td rowspan="2"> ACLNN_ERR_INNER_TILING_ERROR </td>
-        <td rowspan="2"> 361001 </td>
-        <td>query or key is not 64B-aligned.</td>
-        </tr>
-        <tr>
-        <td>rotaryDim>headSize.</td>
+        <td> ACLNN_ERR_INNER_NULLPTR </td>
+        <td> 561103 </td>
+        <td>
+        headSize or rotaryDim does not meet the alignment requirements.<br>
+        headSize is less than rotaryDim.<br>
+        </td>
         </tr>
     </tbody></table>
 
@@ -485,7 +477,6 @@ The following sample code is for reference only. For details about compilation a
 #include <vector>
 #include "acl/acl.h"
 #include "aclnnop/level2/aclnn_rope_with_sin_cos_cache.h"
-#include <iostream>
 
 #define CHECK_RET(cond, return_expr)                                           \
   do {                                                                         \
