@@ -35,7 +35,9 @@ ge::graphStatus FlashMlaInfoParser::GetEmptyTensorFlag()
         }
         for (size_t i = 0; i < shape->GetStorageShape().GetDimNum(); i++) {
             if (shape->GetStorageShape().GetDim(i) == 0) {
-                OP_LOGE(opName_, "Tensor %s has empty dimension at axis %zu, size is 0.", name.c_str(), i);
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                    opName_, name.c_str(), "0",
+                    ("axis " + std::to_string(i) + " of " + name + " must be greater than 0").c_str());
                 return true;
             }
         }
@@ -92,8 +94,9 @@ ge::graphStatus FlashMlaInfoParser::CheckRequiredParaExistence() const
 ge::graphStatus FlashMlaInfoParser::GetCuSeqLenQSize(int64_t& size)
 {
     if (opParamInfo_.cuSeqlensQ.tensor == nullptr) {
-        OP_LOGE(opName_, "when %s's layout is %s, %s must be provided.", QUERY_NAME.c_str(),
-                LayoutToSerialString(layoutQ_).c_str(), CU_SEQLENS_Q_NAME.c_str());
+        std::string reason =
+            "must be provided when layout_q of " + QUERY_NAME + " is " + LayoutToSerialString(layoutQ_);
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, CU_SEQLENS_Q_NAME.c_str(), reason.c_str());
         return ge::GRAPH_FAILED;
     }
     int64_t shapeSize = opParamInfo_.cuSeqlensQ.tensor->GetShapeSize();
@@ -277,7 +280,9 @@ ge::graphStatus FlashMlaInfoParser::GetQkNopeHeadDim()
     int64_t headDimV = (opParamInfo_.headDimV == nullptr) ? arch35MLA::MLA_D_DIM_512 : *opParamInfo_.headDimV;
     int64_t lastDim = queryShape_->GetShapeD();
     if (lastDim <= headDimV || (lastDim - headDimV) != arch35MLA::MLA_ROPE_D_DIM_64) {
-        OP_LOGE(opName_, "q last dim(%ld) must be head_dim_v(%ld) + rope(64).", lastDim, headDimV);
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            opName_, QUERY_NAME.c_str(), std::to_string(lastDim).c_str(),
+            ("last dim of q must be head_dim_v(" + std::to_string(headDimV) + ") + rope(64)").c_str());
         return ge::GRAPH_FAILED;
     }
     qkNopeHeadDim_ = headDimV;
@@ -382,7 +387,9 @@ ge::graphStatus FlashMlaInfoParser::GetValueHeadDim()
     int64_t headDimV = (opParamInfo_.headDimV == nullptr) ? arch35MLA::MLA_D_DIM_512 : *opParamInfo_.headDimV;
     int64_t lastDim = valueShape_->GetShapeD();
     if (lastDim <= headDimV || (lastDim - headDimV) != arch35MLA::MLA_ROPE_D_DIM_64) {
-        OP_LOGE(opName_, "k_cache last dim(%ld) must be head_dim_v(%ld) + rope(64).", lastDim, headDimV);
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            opName_, K_CACHE_NAME.c_str(), std::to_string(lastDim).c_str(),
+            ("last dim of k_cache must be head_dim_v(" + std::to_string(headDimV) + ") + rope(64)").c_str());
         return ge::GRAPH_FAILED;
     }
     vHeadDim_ = headDimV;
@@ -426,7 +433,8 @@ ge::graphStatus FlashMlaInfoParser::GetN1Size()
     if (queryShape_ != nullptr && queryShape_->HasShapeN()) {
         n1Size_ = static_cast<uint32_t>(queryShape_->GetShapeN());
     } else {
-        OP_LOGE(opName_, "Failed to get N1 size from query shape.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, QUERY_NAME.c_str(),
+                                                 "cannot get axis N from q shape, check layout_q");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -437,7 +445,8 @@ ge::graphStatus FlashMlaInfoParser::GetN2Size()
     if (keyShape_ != nullptr && keyShape_->HasShapeN()) {
         n2Size_ = static_cast<uint32_t>(keyShape_->GetShapeN());
     } else {
-        OP_LOGE(opName_, "Failed to get N2 size from key shape.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, K_CACHE_NAME.c_str(),
+                                                 "cannot get axis N from k_cache shape, check layout_kv");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -456,7 +465,8 @@ void FlashMlaInfoParser::SetFaShape()
 ge::graphStatus FlashMlaInfoParser::GetGSize()
 {
     if (n2Size_ == 0U) {
-        OP_LOGE(opName_, "Kv Heads(%ld) should not be zero.", n2Size_);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, K_CACHE_NAME.c_str(), std::to_string(n2Size_).c_str(),
+                                              "N of k_cache (kv heads) must be greater than 0");
         return ge::GRAPH_FAILED;
     }
     if (n1Size_ % n2Size_ != 0U) {
@@ -628,7 +638,8 @@ ge::graphStatus FlashMlaInfoParser::ParseFeatureInfo()
         return ge::GRAPH_FAILED;
     }
     if (maskMode_ == static_cast<int64_t>(MaskMode::NO_MASK) && opParamInfo_.attnMask.tensor != nullptr) {
-        OP_LOGE(opName_, "When mask_mode=0 (no mask), attn_mask must not be provided.");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "mask_mode", std::to_string(maskMode_).c_str(),
+                                              "attn_mask must not be provided when mask_mode is 0 (no mask)");
         return ge::GRAPH_FAILED;
     }
 

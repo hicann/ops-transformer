@@ -190,18 +190,23 @@ ge::graphStatus FiaTilingShape::CheckHasAxis(const FiaAxis& axis, const std::str
         if (HasShapeD()) {
             return ge::GRAPH_SUCCESS;
         } else if (!HasShapeH()) {
-            OP_LOGE(opName_, "[%s] %s's layout is %s, do not have D and H.", funcName.c_str(), name_.c_str(),
-                    LayoutToSerialString(layout_).c_str());
+            std::string reason = "[" + funcName + "] layout of " + name_ + " has neither axis D nor axis H";
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, name_.c_str(), LayoutToSerialString(layout_).c_str(),
+                                                  reason.c_str());
             return ge::GRAPH_FAILED;
         } else if (!hasSetN_) {
-            OP_LOGE(opName_, "[%s] %s's N is not specified, cannot calculate D by H.", funcName.c_str(), name_.c_str());
+            std::string reason = "[" + funcName + "] N of " + name_ + " is not specified, cannot calculate D by H";
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, name_.c_str(), reason.c_str());
             return ge::GRAPH_FAILED;
         } else if (N_ == 0) {
-            OP_LOGE(opName_, "[%s] %s's N is 0.", funcName.c_str(), name_.c_str());
+            std::string reason = "[" + funcName + "] N of " + name_ + " must be greater than 0";
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, name_.c_str(), std::to_string(N_).c_str(), reason.c_str());
             return ge::GRAPH_FAILED;
         } else if (GetShapeH() % N_ != 0) {
-            OP_LOGE(opName_, "[%s] %s's H(%ld) should be an integer multiple of N(%ld).", funcName.c_str(),
-                    name_.c_str(), GetShapeH(), N_);
+            std::string reason =
+                "[" + funcName + "] H of " + name_ + " should be an integer multiple of N(" + std::to_string(N_) + ")";
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(opName_, name_.c_str(), std::to_string(GetShapeH()).c_str(),
+                                                     reason.c_str());
             return ge::GRAPH_FAILED;
         }
     } else if (HasAxis(axis)) {

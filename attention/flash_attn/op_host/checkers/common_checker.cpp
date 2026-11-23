@@ -272,23 +272,27 @@ static const std::map<FaLayout, LayoutConstraintConfig> LAYOUT_CONSTRAINT_TABLE 
 ge::graphStatus CommonChecker::CheckMultiParaLayout(const FaTilingInfo& faInfo)
 {
     auto it = LAYOUT_CONSTRAINT_TABLE.find(faInfo.qLayout);
-    OP_CHECK_IF(it == LAYOUT_CONSTRAINT_TABLE.end(),
-                OP_LOGE(faInfo.opName, "layout_q %s is not supported", LayoutToSerialString(faInfo.qLayout).c_str()),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        it == LAYOUT_CONSTRAINT_TABLE.end(),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(faInfo.opName, "layout_q", LayoutToSerialString(faInfo.qLayout).c_str(),
+                                              "layout_q must be BNSD, BSND or TND"),
+        return ge::GRAPH_FAILED);
 
     const auto& config = it->second;
     const std::string qLayoutStr = LayoutToSerialString(faInfo.qLayout);
 
     OP_CHECK_IF(std::find(config.supportedKvLayouts.begin(), config.supportedKvLayouts.end(), faInfo.kvLayout) ==
                     config.supportedKvLayouts.end(),
-                OP_LOGE(faInfo.opName, "When layout_q is %s, layout_kv must match constraint, but got %s",
-                        qLayoutStr.c_str(), LayoutToSerialString(faInfo.kvLayout).c_str()),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    faInfo.opName, "layout_kv", LayoutToSerialString(faInfo.kvLayout).c_str(),
+                    ("layout_kv must match the constraint of layout_q " + qLayoutStr).c_str()),
                 return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(std::find(config.supportedOutLayouts.begin(), config.supportedOutLayouts.end(), faInfo.outLayout) ==
                     config.supportedOutLayouts.end(),
-                OP_LOGE(faInfo.opName, "When layout_q is %s, layout_out must match constraint, but got %s",
-                        qLayoutStr.c_str(), LayoutToSerialString(faInfo.outLayout).c_str()),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    faInfo.opName, "layout_out", LayoutToSerialString(faInfo.outLayout).c_str(),
+                    ("layout_out must match the constraint of layout_q " + qLayoutStr).c_str()),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

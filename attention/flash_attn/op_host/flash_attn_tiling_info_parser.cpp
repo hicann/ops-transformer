@@ -38,7 +38,9 @@ ge::graphStatus FaInfoParser::GetEmptyTensorFlag()
         }
         for (size_t i = 0; i < shape->GetStorageShape().GetDimNum(); i++) {
             if (shape->GetStorageShape().GetDim(i) == 0) {
-                OP_LOGE(opName_, "Tensor %s has empty dimension at axis %zu, size is 0.", name.c_str(), i);
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                    opName_, name.c_str(), "0",
+                    ("axis " + std::to_string(i) + " of " + name + " must be greater than 0").c_str());
                 return true;
             }
         }
@@ -99,8 +101,9 @@ ge::graphStatus FaInfoParser::CheckRequiredParaExistence() const
 ge::graphStatus FaInfoParser::GetCuSeqLenQSize(int64_t& size)
 {
     if (opParamInfo_.cuSeqlensQ.tensor == nullptr) {
-        OP_LOGE(opName_, "when %s's layout is %s, %s must be provided.", QUERY_NAME.c_str(),
-                LayoutToSerialString(layoutQ_).c_str(), CU_SEQLENS_Q_NAME.c_str());
+        std::string reason =
+            "must be provided when layout_q of " + QUERY_NAME + " is " + LayoutToSerialString(layoutQ_);
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, CU_SEQLENS_Q_NAME.c_str(), reason.c_str());
         return ge::GRAPH_FAILED;
     }
     int64_t shapeSize = opParamInfo_.cuSeqlensQ.tensor->GetShapeSize();
@@ -503,7 +506,8 @@ ge::graphStatus FaInfoParser::GetN1Size()
     if (queryShape_ != nullptr && queryShape_->HasShapeN()) {
         n1Size_ = static_cast<uint32_t>(queryShape_->GetShapeN());
     } else {
-        OP_LOGE(opName_, "Failed to get N1 size from query shape.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, QUERY_NAME.c_str(),
+                                                 "cannot get axis N from q shape, check layout_q");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -515,7 +519,8 @@ ge::graphStatus FaInfoParser::GetN2Size()
     if (keyShape_ != nullptr && keyShape_->HasShapeN()) {
         n2Size_ = static_cast<uint32_t>(keyShape_->GetShapeN());
     } else {
-        OP_LOGE(opName_, "Failed to get N2 size from key shape.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName_, KEY_NAME.c_str(),
+                                                 "cannot get axis N from k shape, check layout_kv");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -535,7 +540,8 @@ ge::graphStatus FaInfoParser::GetGSize()
 {
     // 获取G基准值
     if (n2Size_ == 0U) {
-        OP_LOGE(opName_, "Kv Heads(%ld) should not be zero.", n2Size_);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, KEY_NAME.c_str(), std::to_string(n2Size_).c_str(),
+                                              "N of k (kv heads) must be greater than 0");
         return ge::GRAPH_FAILED;
     }
     if (n1Size_ % n2Size_ != 0U) {

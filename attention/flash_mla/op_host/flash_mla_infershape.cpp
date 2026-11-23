@@ -45,16 +45,31 @@ ge::graphStatus InferShapeFlashMla(gert::InferShapeContext* context)
     const char* layoutQ = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_Q);
     const char* layoutKv = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_KV);
     const char* layoutOut = attrs->GetAttrPointer<char>(ATTR_IDX_LAYOUT_OUT);
-    OP_CHECK_NULL_WITH_CONTEXT(context, layoutQ);
-    OP_CHECK_NULL_WITH_CONTEXT(context, layoutKv);
-    OP_CHECK_NULL_WITH_CONTEXT(context, layoutOut);
+    OP_CHECK_IF(layoutQ == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "layout_q",
+                                                         "required shape, descriptor or attribute is missing"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(layoutKv == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "layout_kv",
+                                                         "required shape, descriptor or attribute is missing"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(layoutOut == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "layout_out",
+                                                         "required shape, descriptor or attribute is missing"),
+                return ge::GRAPH_FAILED);
 
     auto headDimVPtr = attrs->GetAttrPointer<int64_t>(ATTR_IDX_HEAD_DIM_V);
-    OP_CHECK_NULL_WITH_CONTEXT(context, headDimVPtr);
+    OP_CHECK_IF(headDimVPtr == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "head_dim_v",
+                                                         "required shape, descriptor or attribute is missing"),
+                return ge::GRAPH_FAILED);
     int64_t headDimV = *headDimVPtr;
 
     auto returnSoftmaxLsePtr = attrs->GetAttrPointer<int64_t>(ATTR_IDX_RETURN_SOFTMAX_LSE);
-    OP_CHECK_NULL_WITH_CONTEXT(context, returnSoftmaxLsePtr);
+    OP_CHECK_IF(returnSoftmaxLsePtr == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "return_softmax_lse",
+                                                         "required shape, descriptor or attribute is missing"),
+                return ge::GRAPH_FAILED);
     int64_t returnSoftmaxLse = *returnSoftmaxLsePtr;
 
     if (headDimV <= 0) {
