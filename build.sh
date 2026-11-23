@@ -927,28 +927,81 @@ build_static_lib() {
         option="--verbose"
     fi
 
-    cd "${BUILD_PATH}" && cmake ${CUSTOM_OPTION} .. -DENABLE_STATIC=ON -DASCEND_COMPUTE_UNIT=${unit}
-    local all_targets=$(cmake --build . --target help)
+    cd "${BUILD_PATH}" && cmake ${CUSTOM_OPTION} .. -DENABLE_STATIC=ON -DASCEND_COMPUTE_UNIT=${unit} -DENABLE_BUILD_PKG=ON
+    # no_ops.flag 由 configure 写/删，需在其后判断，避免 --static --jit 读到旧状态。
+    if [ -f "${BUILD_PATH}/no_ops.flag" ]; then
+        echo "[STATIC][${unit}] no operators to build (no_ops.flag), skip static lib"
+        echo "Build static lib success!"
+        return 0
+    fi
+
+    local all_targets
+    if ! all_targets=$(cmake --build . --target help); then
+        echo "[ERROR][${unit}] failed to query cmake targets"
+        exit 1
+    fi
+
+    # 目标缺失或构建失败必须退出，避免产出注册为空的静态库后仍打印成功。
+    build_static_target() {
+        local target="$1"
+        local required="$2"
+        # 用 here-string 避免 echo|grep -q 在 pipefail 下因 SIGPIPE 误判目标不存在。
+        if ! grep -wq "${target}" <<< "${all_targets}"; then
+            if [ "${required}" == "required" ]; then
+                echo "[ERROR][${unit}] cmake target ${target} not found (all_targets_len=${#all_targets})"
+                exit 1
+            fi
+            echo "[STATIC][${unit}] skip optional target ${target}"
+            return 0
+        fi
+        if ! cmake --build . --target "${target}" ${JOB_NUM} ${option}; then
+            echo "[ERROR][${unit}] build target ${target} failed"
+            exit 1
+        fi
+    }
+
     rm -fr ${BUILD_PATH}/bin_tmp
     mkdir -p ${BUILD_PATH}/bin_tmp
-    if echo "${all_targets}" | grep -wq "ophost_transformer_static"; then
-        cmake --build . --target ophost_transformer_static ${JOB_NUM} ${option}
-    fi
-    if echo "${all_targets}" | grep -wq "opapi_transformer_static"; then
-        cmake --build . --target opapi_transformer_static ${JOB_NUM} ${option}
-    fi
+    build_static_target ophost_transformer_static required
+    build_static_target opapi_transformer_static optional
     local jit_command=""
     if [[ "$ENABLE_BUILT_JIT" == "TRUE" ]]; then
         jit_command="-j"
+    fi
+
+    if [ ! -s "${BUILD_PATH}/ophost_transformer.txt" ]; then
+        echo "[ERROR][${unit}] ${BUILD_PATH}/ophost_transformer.txt was not generated; Tiling/InferShape register resources would be empty"
+        exit 1
     fi
 
     rm -fr ${BUILD_PATH}/autogen/${unit}
     python3 "${BASE_PATH}/scripts/util/build_opp_kernel_static.py" GenStaticOpResourceIni -s ${unit} -b ${BUILD_PATH} ${jit_command}
     python3 "${BASE_PATH}/scripts/util/build_opp_kernel_static.py" StaticCompile -s ${unit} -b ${BUILD_PATH} -n=0 -a=${ARCH_INFO} ${jit_command}
 
-    cd "${BUILD_PATH}" && cmake ${CUSTOM_OPTION} .. -DENABLE_STATIC=ON -DASCEND_COMPUTE_UNIT=${unit}
-    if echo "${all_targets}" | grep -wq "cann_transformer_static"; then
-        cmake --build . --target cann_transformer_static ${JOB_NUM} ${option}
+    cd "${BUILD_PATH}" && cmake ${CUSTOM_OPTION} .. -DENABLE_STATIC=ON -DASCEND_COMPUTE_UNIT=${unit} -DENABLE_BUILD_PKG=ON
+    build_static_target cann_transformer_static required
+
+    # 产物名与 static.cmake 的 OPSTATIC_NAME 一致。
+    local static_lib_name="libcann_transformer_static.a"
+    local static_lib="${BUILD_PATH}/bin_tmp/${unit}/${static_lib_name}"
+    if [ ! -s "${static_lib}" ]; then
+        echo "[ERROR][${unit}] ${static_lib} was not produced"
+        exit 1
+    fi
+
+    # make clean 会删除 bin_tmp 原件，需先落盘；组件名与 static.cmake 一致。
+    local static_out_lib="${BUILD_PATH}/static_library_files/lib64/${static_lib_name}"
+    local static_component="${static_lib_name#lib}"
+    static_component="${static_component%.a}"
+    # 清理旧产物，避免 install 失败时下游误用。
+    rm -f "${static_out_lib}"
+    if ! cmake --install . --component "${static_component}"; then
+        echo "[ERROR][${unit}] install static lib failed (component=${static_component})"
+        exit 1
+    fi
+    if [ ! -s "${static_out_lib}" ]; then
+        echo "[ERROR][${unit}] ${static_out_lib} was not produced by install"
+        exit 1
     fi
     echo "Build static lib success!"
 }
@@ -966,6 +1019,11 @@ package_static() {
         CUSTOM_OPTION="${CUSTOM_OPTION} -DENABLE_OPS_KERNEL=ON"
     fi
     cmake_config -DASCEND_COMPUTE_UNIT=${unit}
+    # 零算子时 build_package 已短路，这里同步跳过。
+    if [ -f "${BUILD_PATH}/no_ops.flag" ]; then
+        echo "[STATIC][${unit}] no operators to build (no_ops.flag), skip static package"
+        return 0
+    fi
     build_package
     # Check weather BUILD_OUT_DIR directory exists
     if [ ! -d "$BUILD_OUT_DIR" ]; then
@@ -2496,6 +2554,11 @@ elif [[ "$ENABLE_CREATE_LIB" == "TRUE" ]]; then
     build_lib
 elif [[ "$ENABLE_STATIC" == "TRUE" ]]; then
     IFS=';' read -ra SOC_ARRAY <<< "$ASCEND_SOC_UNITS"  # 分割字符串为数组
+    # 多 soc 会互相覆盖产物，需按 soc 分别构建。
+    if [[ ${#SOC_ARRAY[@]} -gt 1 ]]; then
+        echo "[ERROR] --static supports a single --soc value; build each SoC separately"
+        exit 1
+    fi
     for soc in "${SOC_ARRAY[@]}"; do
         soc=$(echo "${soc}" | xargs)  # 去除前后空格
         if [[ -n "${soc}" ]]; then  # 检查非空

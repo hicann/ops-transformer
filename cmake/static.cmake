@@ -97,6 +97,7 @@ if (TARGET ${OPHOST_NAME}_static OR TARGET ${OPAPI_NAME}_static)
         if (ENABLE_BUILD_PKG)
             install(FILES ${CMAKE_BINARY_DIR}/bin_tmp/${compute_unit}/lib${OPSTATIC_NAME}.a
                     DESTINATION ${CMAKE_BINARY_DIR}/static_library_files/lib64
+                    COMPONENT ${OPSTATIC_NAME}
                     OPTIONAL)
         endif ()
     endforeach()

@@ -70,9 +70,17 @@ def generate_symbol(args):
             f"generate_symbol input library error, file <{library_file}> not exists."
         )
     process = subprocess.Popen(("readelf", "-Ws", library_file), stdout=subprocess.PIPE)
-    output = process.communicate(timeout=180)[0].decode("utf-8")
+    raw_output = process.communicate(timeout=180)[0]
+    if process.returncode != 0:
+        raise RuntimeError(
+            f"generate_symbol failed: 'readelf -Ws {library_file}' exited with {process.returncode}."
+        )
+    if not raw_output.strip():
+        raise RuntimeError(
+            f"generate_symbol failed: 'readelf -Ws {library_file}' produced no output."
+        )
     with open(symbol_file, "w") as fd:
-        fd.write(output)
+        fd.write(raw_output.decode("utf-8"))
 
 
 def parser_generate_symbol(subparsers):
@@ -667,7 +675,11 @@ const OP_BINARY_RES& {op_type}KernelResource() {{
         # ophost txt 适配
         ophost_symbol = self._build_dir / "ophost_transformer.txt"
         if not os.path.exists(ophost_symbol):
-            return
+            raise FileNotFoundError(
+                f"symbol file <{ophost_symbol}> not found. "
+                "GenStaticOpResourceIni requires ophost_transformer_static to be built first; "
+                "otherwise Tiling/InferShape register resources are generated as empty sections."
+            )
         # infershape
         for op_type, symbol in self._extract_op_symbol_pair(
             ophost_symbol,
