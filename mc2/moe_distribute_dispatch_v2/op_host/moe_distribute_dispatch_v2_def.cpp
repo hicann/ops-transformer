@@ -17,6 +17,15 @@
 #include "../../common/op_host/mc2_moe_input_registration.h"
 #include "common/include/op_host/op_const_def_transformer.h"
 
+// 旧版 CANN(如 9.2.0)的 op_build 生成器不支持 DT_HIFLOAT4/Ascend960,
+// 通过 devkit 版本宏守卫整段 960 配置: CANN >= 9.3 才注册(参照 moe_re_routing 同型守卫)
+#if __has_include("version/asc_devkit_version.h")
+#include "version/asc_devkit_version.h"
+#if ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR >= 3)
+#define ENABLE_DISPATCHV2_DT_HIFLOAT4
+#endif
+#endif
+
 namespace ops {
 class MoeDistributeDispatchV2 : public OpDef {
 public:
@@ -145,9 +154,10 @@ public:
             .ExtendCfgInfo("jitCompile.flag", "static_true")
             .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
             .ExtendCfgInfo("opFile.value", "moe_distribute_dispatch_v2_a6");
-
+#ifdef ENABLE_DISPATCHV2_DT_HIFLOAT4
         this->AICore().AddConfig("ascend960dt", aicore_config_a6);
         this->AICore().AddConfig("ascend960pr", aicore_config_a6);
+#endif
     }
 
 private:
