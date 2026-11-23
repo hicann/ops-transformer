@@ -65,9 +65,8 @@ TensorDesc Tensor(const std::vector<int64_t>& dims, ge::DataType dtype)
 }
 
 gert::InfershapeContextPara MakeCase(bool gate = true, bool gamma = true, int64_t b = 1, int64_t s = SEQUENCE,
-                                     int64_t d = FEATURES, int64_t r = PROJECTION)
+                                     int64_t d = FEATURES, int64_t r = PROJECTION, int64_t c = CHANNELS)
 {
-    constexpr int64_t c = CHANNELS;
     const int64_t h = d == -1 ? -1 : d / c;
     std::vector<TensorDesc> allInputs{
         Tensor({b, s, h}, ge::DT_BF16), Tensor({b, s, d}, ge::DT_BF16),  Tensor({r, d}, ge::DT_BF16),
@@ -191,7 +190,7 @@ TEST_F(TextGatedResidualGradInferShape, Channels_FAILED)
 
 TEST_F(TextGatedResidualGradInferShape, UnknownRankInvalidChannels_FAILED)
 {
-    for (int64_t c : {0, -1}) {
+    for (int64_t c : {0, -1, 21}) {
         auto p = MakeCase();
         p.inputTensorDesc_[INPUT_X] = Tensor({UNKNOWN_RANK}, ge::DT_BF16);
         p.attrs_[0].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(c);
@@ -251,10 +250,24 @@ TEST_F(TextGatedResidualGradInferShape, GammaShape_FAILED)
 
 TEST_F(TextGatedResidualGradInferShape, InvalidProjectionDimension_FAILED)
 {
-    for (int64_t r : std::initializer_list<int64_t>{0, INVALID_PROJECTION}) {
+    for (int64_t r : std::initializer_list<int64_t>{0, INVALID_PROJECTION, 656}) {
         auto p = MakeCase(true, true, 1, SEQUENCE, FEATURES, r);
         ExecuteTestCase(p, ge::GRAPH_FAILED);
     }
+}
+
+TEST_F(TextGatedResidualGradInferShape, ChannelAndProjectionLimits)
+{
+    auto atLimit = MakeCase(true, true, 1, SEQUENCE, 20 * HIDDEN, 640, 20);
+    ExecuteTestCase(
+        atLimit, ge::GRAPH_SUCCESS,
+        {{1, SEQUENCE, 20 * HIDDEN}, {640, 20 * HIDDEN}, {20 * HIDDEN, 640}, {20, 20 * HIDDEN}, {20 * HIDDEN}});
+    auto aboveLimit = MakeCase(true, true, 1, SEQUENCE, 21 * HIDDEN, 640, 21);
+    ExecuteTestCase(aboveLimit, ge::GRAPH_FAILED);
+    auto unalignedH = MakeCase(true, true, 1, SEQUENCE, CHANNELS * (HIDDEN + 1));
+    ExecuteTestCase(unalignedH, ge::GRAPH_FAILED);
+    auto unalignedR = MakeCase(true, true, 1, SEQUENCE, FEATURES, PROJECTION + 1);
+    ExecuteTestCase(unalignedR, ge::GRAPH_FAILED);
 }
 
 TEST_F(TextGatedResidualGradInferShape, OutputDtypes)

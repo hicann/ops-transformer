@@ -1,5 +1,11 @@
 # TextGatedResidualGrad regression tests
 
+Run the chunk-gradient regressions against the installed ACLNN example. Select the board with `--arch a2` or `--arch a5`.
+
+```bash
+python3 test_chunk_gradients.py --arch a2 --runner ./test_aclnn_text_gated_residual_grad --device 0
+```
+
 Run the workspace arithmetic boundary test (no device allocation):
 
 ```bash
@@ -67,9 +73,9 @@ c++ -std=c++17 test_optional_outputs.cpp \
 /tmp/tgrg-optional 0
 ```
 
-These 20 query-only checks cover all valid optional combinations, both directions
-of the wGate/dwGate and gamma/dgamma pairs, and null workspaceSize/executor
-pointers for FP16 and BF16. No kernel is launched.
+The 40 workspace queries cover FP16 and BF16 optional combinations, mismatched
+input/output pairs and weight-gradient dtypes, null result pointers, and the
+channel and projection limits and H/R alignment with otherwise consistent shapes.
 
 The `rms_cancellation_cases.json` fixture preserves the failing ATK seed 2026110550
 (BF16, N=1944, C=2, H=1280, R=160, gamma present, gate absent). With saturated

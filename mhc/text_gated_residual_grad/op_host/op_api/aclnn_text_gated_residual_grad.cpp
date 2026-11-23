@@ -11,13 +11,13 @@
 #include "aclnn_text_gated_residual_grad.h"
 #include "text_gated_residual_grad.h"
 
+#include <initializer_list>
 #include <limits>
 
 #include "aclnn_kernels/contiguous.h"
 #include "external/aclnn_kernels/aclnn_platform.h"
 #include "aclnn/aclnn_base.h"
 #include "acl/acl.h"
-#include "aclnn_kernels/common/op_error_check.h"
 #include "opdev/common_types.h"
 #include "opdev/data_type_utils.h"
 #include "opdev/format_utils.h"
@@ -28,6 +28,7 @@
 #include "opdev/shape_utils.h"
 #include "opdev/tensor_view_utils.h"
 #include "opdev/make_op_executor.h"
+#include "../../op_kernel/text_gated_residual_grad_constants.h"
 
 using namespace op;
 
@@ -94,30 +95,39 @@ static aclnnStatus TextGatedResidualGradCheckNotNull(const TextGatedResidualGrad
 
 static aclnnStatus TextGatedResidualGradCheckDtype(const TextGatedResidualGradParams& p)
 {
-    const std::initializer_list<op::DataType> supportDtype = {op::DataType::DT_FLOAT16, op::DataType::DT_BF16};
-    OP_CHECK_DTYPE_NOT_SUPPORT(p.x, supportDtype, return ACLNN_ERR_PARAM_INVALID);
-    OP_CHECK_DTYPE_NOT_SUPPORT(p.gradMixed, supportDtype, return ACLNN_ERR_PARAM_INVALID);
-    OP_CHECK_DTYPE_NOT_SUPPORT(p.wDown, supportDtype, return ACLNN_ERR_PARAM_INVALID);
-    OP_CHECK_DTYPE_NOT_SUPPORT(p.wUp, supportDtype, return ACLNN_ERR_PARAM_INVALID);
-    OP_CHECK_DTYPE_NOT_SUPPORT(p.downPreAct, supportDtype, return ACLNN_ERR_PARAM_INVALID);
-    OP_CHECK_DTYPE_NOT_SAME(p.x, p.gradMixed, return ACLNN_ERR_PARAM_INVALID);
-    OP_CHECK_DTYPE_NOT_SAME(p.x, p.wDown, return ACLNN_ERR_PARAM_INVALID);
-    OP_CHECK_DTYPE_NOT_SAME(p.x, p.wUp, return ACLNN_ERR_PARAM_INVALID);
-    OP_CHECK_DTYPE_NOT_SAME(p.x, p.downPreAct, return ACLNN_ERR_PARAM_INVALID);
-    OP_CHECK_DTYPE_NOT_SAME(p.x, p.up, return ACLNN_ERR_PARAM_INVALID);
-    OP_CHECK_DTYPE_NOT_SAME(p.x, p.dx, return ACLNN_ERR_PARAM_INVALID);
-    OP_CHECK_DTYPE_NOT_MATCH(p.invRms, op::DataType::DT_FLOAT, return ACLNN_ERR_PARAM_INVALID);
-    OP_CHECK_DTYPE_NOT_SAME(p.wDown, p.dwDown, return ACLNN_ERR_PARAM_INVALID);
-    OP_CHECK_DTYPE_NOT_SAME(p.wUp, p.dwUp, return ACLNN_ERR_PARAM_INVALID);
-    if (p.wGate != nullptr) {
-        OP_CHECK_DTYPE_NOT_SAME(p.x, p.gradInject, return ACLNN_ERR_PARAM_INVALID);
-        OP_CHECK_DTYPE_NOT_SAME(p.x, p.wGate, return ACLNN_ERR_PARAM_INVALID);
-        OP_CHECK_DTYPE_NOT_SAME(p.x, p.inject, return ACLNN_ERR_PARAM_INVALID);
-        OP_CHECK_DTYPE_NOT_SAME(p.wGate, p.dwGate, return ACLNN_ERR_PARAM_INVALID);
-    }
-    if (p.gamma != nullptr) {
-        OP_CHECK_DTYPE_NOT_MATCH(p.gamma, op::DataType::DT_FLOAT, return ACLNN_ERR_PARAM_INVALID);
-        OP_CHECK_DTYPE_NOT_MATCH(p.dgamma, op::DataType::DT_FLOAT, return ACLNN_ERR_PARAM_INVALID);
+    const auto xDtype = p.x->GetDataType();
+    CHECK_COND(xDtype == op::DataType::DT_FLOAT16 || xDtype == op::DataType::DT_BF16, ACLNN_ERR_PARAM_INVALID,
+               "x dtype is %s. Expected BF16 or FP16.", op::ToString(xDtype).GetString());
+
+    struct DtypeExpectation {
+        const aclTensor* tensor;
+        const char* name;
+        op::DataType expected;
+    };
+    const DtypeExpectation expectations[] = {
+        {p.gradMixed, "gradMixed", xDtype},
+        {p.wDown, "wDown", xDtype},
+        {p.wUp, "wUp", xDtype},
+        {p.downPreAct, "downPreAct", xDtype},
+        {p.up, "up", xDtype},
+        {p.dx, "dx", xDtype},
+        {p.invRms, "invRms", op::DataType::DT_FLOAT},
+        {p.dwDown, "dwDown", xDtype},
+        {p.dwUp, "dwUp", xDtype},
+        {p.gradInject, "gradInject", xDtype},
+        {p.wGate, "wGate", xDtype},
+        {p.inject, "inject", xDtype},
+        {p.dwGate, "dwGate", xDtype},
+        {p.gamma, "gamma", op::DataType::DT_FLOAT},
+        {p.dgamma, "dgamma", op::DataType::DT_FLOAT},
+    };
+    for (const auto& [tensor, name, expected] : expectations) {
+        if (tensor == nullptr) {
+            continue;
+        }
+        const auto dtype = tensor->GetDataType();
+        CHECK_COND(dtype == expected, ACLNN_ERR_PARAM_INVALID, "%s dtype is %s. Expected %s.", name,
+                   op::ToString(dtype).GetString(), op::ToString(expected).GetString());
     }
     return ACLNN_SUCCESS;
 }
@@ -149,13 +159,17 @@ static aclnnStatus TextGatedResidualGradCheckShape(const TextGatedResidualGradPa
     CHECK_COND(s == 0 || b <= std::numeric_limits<int64_t>::max() / s, ACLNN_ERR_PARAM_INVALID,
                "B*S overflows int64, got B=%ld, S=%ld", b, s);
     CHECK_COND(d > 0, ACLNN_ERR_PARAM_INVALID, "x last dim must be positive, but got %ld", d);
-    CHECK_COND(p.channels > 0 && d % p.channels == 0, ACLNN_ERR_PARAM_INVALID,
-               "channels %ld invalid for x last dim %ld", p.channels, d);
+    CHECK_COND(p.channels > 0 && p.channels <= TextGatedResidualGrad::HC_GRAD_MAX_CHANNELS && d % p.channels == 0,
+               ACLNN_ERR_PARAM_INVALID, "channels %ld invalid for x last dim %ld", p.channels, d);
     int64_t h = d / p.channels;
     CHECK_COND(p.wDown->GetViewShape().GetDimNum() == MATRIX_RANK, ACLNN_ERR_PARAM_INVALID,
                "wDown dim num should be 2, but got %zu", p.wDown->GetViewShape().GetDimNum());
     int64_t r = p.wDown->GetViewShape().GetDim(MATRIX_ROW_DIM);
-    CHECK_COND(h > 0 && r > 0, ACLNN_ERR_PARAM_INVALID, "invalid channels/H or R.");
+    CHECK_COND(h % TextGatedResidualGrad::HC_GRAD_VECTOR_ALIGN == 0 && r > 0 &&
+                   r <= TextGatedResidualGrad::HC_GRAD_MAX_PROJECTION &&
+                   r % TextGatedResidualGrad::HC_GRAD_GATE_ALIGN == 0,
+               ACLNN_ERR_PARAM_INVALID, "H=%ld and R=%ld must be aligned to 16 and R must be in [1, %ld].", h, r,
+               static_cast<int64_t>(TextGatedResidualGrad::HC_GRAD_MAX_PROJECTION));
 
     CHECK_RET(TextGatedResidualGradCheckTensorShape(p.gradMixed, {b, s, h}, "gradMixed") == ACLNN_SUCCESS,
               ACLNN_ERR_PARAM_INVALID);
@@ -194,11 +208,15 @@ static aclnnStatus TextGatedResidualGradCheckShape(const TextGatedResidualGradPa
 
 static aclnnStatus TextGatedResidualGradCheckParams(const TextGatedResidualGradParams& p)
 {
-    CHECK_COND(TextGatedResidualGradCheckNotNull(p) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_NULLPTR,
-               "required param is nullptr.");
-    CHECK_COND(TextGatedResidualGradCheckDtype(p) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "invalid dtype.");
-    CHECK_COND(TextGatedResidualGradCheckShape(p) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID, "invalid shape.");
-    return ACLNN_SUCCESS;
+    const auto nullStatus = TextGatedResidualGradCheckNotNull(p);
+    if (nullStatus != ACLNN_SUCCESS) {
+        return nullStatus;
+    }
+    const auto dtypeStatus = TextGatedResidualGradCheckDtype(p);
+    if (dtypeStatus != ACLNN_SUCCESS) {
+        return dtypeStatus;
+    }
+    return TextGatedResidualGradCheckShape(p);
 }
 
 static const aclTensor* TextGatedResidualGradContiguousOrNull(const aclTensor* t, aclOpExecutor* executor)
@@ -217,6 +235,7 @@ static aclnnStatus TextGatedResidualGradMakeContiguousInputs(const TextGatedResi
     contiguous.gradMixed = l0op::Contiguous(p.gradMixed, executor);
     CHECK_RET(contiguous.gradMixed != nullptr, ACLNN_ERR_INNER_NULLPTR);
     contiguous.gradInject = TextGatedResidualGradContiguousOrNull(p.gradInject, executor);
+    CHECK_RET(p.gradInject == nullptr || contiguous.gradInject != nullptr, ACLNN_ERR_INNER_NULLPTR);
     contiguous.x = l0op::Contiguous(p.x, executor);
     CHECK_RET(contiguous.x != nullptr, ACLNN_ERR_INNER_NULLPTR);
     contiguous.wDown = l0op::Contiguous(p.wDown, executor);
@@ -224,10 +243,9 @@ static aclnnStatus TextGatedResidualGradMakeContiguousInputs(const TextGatedResi
     contiguous.wUp = l0op::Contiguous(p.wUp, executor);
     CHECK_RET(contiguous.wUp != nullptr, ACLNN_ERR_INNER_NULLPTR);
     contiguous.wGate = TextGatedResidualGradContiguousOrNull(p.wGate, executor);
-    contiguous.gamma = TextGatedResidualGradContiguousOrNull(p.gamma, executor);
     CHECK_RET(p.wGate == nullptr || contiguous.wGate != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    contiguous.gamma = TextGatedResidualGradContiguousOrNull(p.gamma, executor);
     CHECK_RET(p.gamma == nullptr || contiguous.gamma != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(p.gradInject == nullptr || contiguous.gradInject != nullptr, ACLNN_ERR_INNER_NULLPTR);
     contiguous.invRms = l0op::Contiguous(p.invRms, executor);
     CHECK_RET(contiguous.invRms != nullptr, ACLNN_ERR_INNER_NULLPTR);
     contiguous.inject = TextGatedResidualGradContiguousOrNull(p.inject, executor);
@@ -281,7 +299,6 @@ aclnnStatus aclnnTextGatedResidualGradGetWorkspaceSize(
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     auto uniqueExecutor = CREATE_EXECUTOR();
-    CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     auto contiguous = params;
     ret = TextGatedResidualGradMakeContiguousInputs(params, contiguous, uniqueExecutor.get());
@@ -322,7 +339,7 @@ aclnnStatus aclnnTextGatedResidualGrad(void* workspace, uint64_t workspaceSize, 
     L2_DFX_PHASE_2(aclnnTextGatedResidualGrad);
     auto ret = CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
     if (ret != ACLNN_SUCCESS) {
-        OP_LOGE(ACLNN_ERR_INNER, "This is an error in TextGatedResidualGrad launch aicore");
+        OP_LOGE_WITHOUT_REPORT(ret, "TextGatedResidualGrad CommonOpExecutorRun failed, rc=%d.", ret);
         return ACLNN_ERR_INNER;
     }
     return ACLNN_SUCCESS;

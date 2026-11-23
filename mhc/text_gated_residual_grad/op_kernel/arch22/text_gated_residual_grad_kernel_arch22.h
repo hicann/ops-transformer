@@ -20,7 +20,7 @@
 
 namespace TextGatedResidualGrad {
 
-// Atlas A2/A3: CATLASS AtlasA2 BlockMmad; G56 and C1b read Vector results directly as ColumnMajor,
+// Atlas A2/A3: ops-nn MatmulBaseKernel; G56 and C1b read Vector results directly as ColumnMajor,
 // as on A5. Init/Process/RunCube use the shared pipeline.
 template <typename D_T, int HAS_GAMMA>
 using KernelTextGatedResidualGradArch22 =

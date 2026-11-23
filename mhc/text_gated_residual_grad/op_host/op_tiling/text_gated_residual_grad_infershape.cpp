@@ -10,9 +10,12 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <string>
+#include <utility>
 
 #include "log/log.h"
 #include "register/op_impl_registry.h"
+#include "../../op_kernel/text_gated_residual_grad_constants.h"
 
 using namespace ge;
 
@@ -94,7 +97,8 @@ void CopyShape(const gert::Shape* src, gert::Shape* dst)
 graphStatus CheckRank(const gert::Shape* shape, size_t rank, const char* name, gert::InferShapeContext* context)
 {
     if (shape->GetDimNum() != rank) {
-        OP_LOGE(context->GetNodeName(), "%s rank should be %zu, but got %zu.", name, rank, shape->GetDimNum());
+        OP_LOGE_FOR_INVALID_SHAPEDIM(Ops::Base::GetOpInfo(context), name, std::to_string(shape->GetDimNum()),
+                                     std::to_string(rank));
         return GRAPH_FAILED;
     }
     return GRAPH_SUCCESS;
@@ -105,7 +109,8 @@ graphStatus CheckDim(const gert::Shape* shape, size_t idx, int64_t expect, const
 {
     const int64_t actual = shape->GetDim(idx);
     if (!DimEqualOrUnknown(actual, expect)) {
-        OP_LOGE(context->GetNodeName(), "%s dim[%zu] should be %ld, but got %ld.", name, idx, expect, actual);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(Ops::Base::GetOpInfo(context), name, Ops::Base::ToString(*shape),
+                                              "dim[" + std::to_string(idx) + "] must be " + std::to_string(expect));
         return GRAPH_FAILED;
     }
     return GRAPH_SUCCESS;
@@ -173,22 +178,39 @@ private:
         gammaShape = context->GetOptionalInputShape(IDX_GAMMA);
         injectShape = context->GetOptionalInputShape(IDX_INJECT);
 
-        OP_CHECK_NULL_WITH_CONTEXT(context, gradMixedShape);
-        OP_CHECK_NULL_WITH_CONTEXT(context, xShape);
-        OP_CHECK_NULL_WITH_CONTEXT(context, wDownShape);
-        OP_CHECK_NULL_WITH_CONTEXT(context, wUpShape);
-        OP_CHECK_NULL_WITH_CONTEXT(context, invRmsShape);
-        OP_CHECK_NULL_WITH_CONTEXT(context, downPreShape);
-        OP_CHECK_NULL_WITH_CONTEXT(context, upShape);
+        const std::pair<const gert::Shape*, const char*> requiredInputs[] = {
+            {gradMixedShape, "grad_mixed"},
+            {xShape, "x"},
+            {wDownShape, "w_down"},
+            {wUpShape, "w_up"},
+            {invRmsShape, "inv_rms"},
+            {downPreShape, "down_pre_act"},
+            {upShape, "up"},
+        };
+        for (const auto& [shape, name] : requiredInputs) {
+            if (shape == nullptr) {
+                OP_LOGE_WITH_INVALID_INPUT(Ops::Base::GetOpInfo(context), name);
+                return GRAPH_FAILED;
+            }
+        }
 
         dxShape = GetOutputShapeByIrIndex(context, OUT_DX);
         dwDownShape = GetOutputShapeByIrIndex(context, OUT_DW_DOWN);
         dwUpShape = GetOutputShapeByIrIndex(context, OUT_DW_UP);
         dwGateShape = GetOutputShapeByIrIndex(context, OUT_DW_GATE);
         dgammaShape = GetOutputShapeByIrIndex(context, OUT_DGAMMA);
-        OP_CHECK_NULL_WITH_CONTEXT(context, dxShape);
-        OP_CHECK_NULL_WITH_CONTEXT(context, dwDownShape);
-        OP_CHECK_NULL_WITH_CONTEXT(context, dwUpShape);
+        const std::pair<gert::Shape*, const char*> requiredOutputs[] = {
+            {dxShape, "dx"},
+            {dwDownShape, "dw_down"},
+            {dwUpShape, "dw_up"},
+        };
+        for (const auto& [shape, name] : requiredOutputs) {
+            if (shape == nullptr) {
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Ops::Base::GetOpInfo(context), name,
+                                                         "required output shape is missing");
+                return GRAPH_FAILED;
+            }
+        }
 
         return GRAPH_SUCCESS;
     }
@@ -196,30 +218,36 @@ private:
     graphStatus CheckAttributes()
     {
         const auto* attrs = context->GetAttrs();
-        OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
-        const int64_t* channelsPtr = attrs->GetAttrPointer<int64_t>(CHANNELS_ATTR_INDEX);
+        const int64_t* channelsPtr = attrs == nullptr ? nullptr : attrs->GetAttrPointer<int64_t>(CHANNELS_ATTR_INDEX);
         if (channelsPtr == nullptr) {
-            OP_LOGE(context->GetNodeName(), "channels attr is null.");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Ops::Base::GetOpInfo(context), "channels",
+                                                     "the required integer attribute is missing");
             return GRAPH_FAILED;
         }
         c = *channelsPtr;
-        if (c <= 0) {
-            OP_LOGE(context->GetNodeName(), "channels should be positive, but got %ld.", c);
+        if (c <= 0 || c > TextGatedResidualGrad::HC_GRAD_MAX_CHANNELS) {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                Ops::Base::GetOpInfo(context), "channels", std::to_string(c),
+                "must be in [1, " + std::to_string(TextGatedResidualGrad::HC_GRAD_MAX_CHANNELS) + "]");
             return GRAPH_FAILED;
         }
         hasGate = !IsEmptyShape(wGateShape);
         if (hasGate && dwGateShape == nullptr) {
-            OP_LOGE(context->GetNodeName(), "dw_gate output is required when w_gate is present.");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Ops::Base::GetOpInfo(context), "dw_gate",
+                                                     "the output is required when w_gate is provided");
             return GRAPH_FAILED;
         }
         if (hasGate && (gradInjectShape == nullptr || injectShape == nullptr)) {
-            OP_LOGE(context->GetNodeName(), "grad_inject and inject are required when w_gate is present.");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Ops::Base::GetOpInfo(context),
+                                                     gradInjectShape == nullptr ? "grad_inject" : "inject",
+                                                     "the input is required when w_gate is provided");
             return GRAPH_FAILED;
         }
 
         hasGamma = !IsEmptyShape(gammaShape);
         if (hasGamma && dgammaShape == nullptr) {
-            OP_LOGE(context->GetNodeName(), "dgamma output is required when gamma is present.");
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(Ops::Base::GetOpInfo(context), "dgamma",
+                                                     "the output is required when gamma is provided");
             return GRAPH_FAILED;
         }
 
@@ -255,19 +283,33 @@ private:
         }
         d = xShape->GetDim(FEATURE_DIM);
         if (d != UNKNOWN_DIM && (d <= 0 || d % c != 0)) {
-            OP_LOGE(context->GetNodeName(), "x last dim %ld is not divisible by channels %ld.", d, c);
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                Ops::Base::GetOpInfo(context), "x", Ops::Base::ToString(*xShape),
+                "the last dimension must be positive and divisible by channels=" + std::to_string(c));
             return GRAPH_FAILED;
         }
         h = (d == UNKNOWN_DIM) ? UNKNOWN_DIM : d / c;
+        if (h != UNKNOWN_DIM && h % TextGatedResidualGrad::HC_GRAD_VECTOR_ALIGN != 0) {
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(Ops::Base::GetOpInfo(context), "x", Ops::Base::ToString(*xShape),
+                                                  "the last dimension divided by channels=" + std::to_string(c) +
+                                                      " gives H=" + std::to_string(h) +
+                                                      ", which must be a multiple of 16");
+            return GRAPH_FAILED;
+        }
         r = wDownShape->GetDim(FIRST_DIM);
-        if (r != UNKNOWN_DIM && r <= 0) {
-            OP_LOGE(context->GetNodeName(), "R must be positive or unknown, but got %ld.", r);
+        if (r != UNKNOWN_DIM && (r <= 0 || r > TextGatedResidualGrad::HC_GRAD_MAX_PROJECTION ||
+                                 r % TextGatedResidualGrad::HC_GRAD_GATE_ALIGN != 0)) {
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                Ops::Base::GetOpInfo(context), "w_down", Ops::Base::ToString(*wDownShape),
+                "the first dimension R must be a multiple of 16 in [1, " +
+                    std::to_string(TextGatedResidualGrad::HC_GRAD_MAX_PROJECTION) + "]");
             return GRAPH_FAILED;
         }
         b = xShape->GetDim(FIRST_DIM);
         s = xShape->GetDim(SECOND_DIM);
         if ((b < 0 && b != UNKNOWN_DIM) || (s < 0 && s != UNKNOWN_DIM)) {
-            OP_LOGE(context->GetNodeName(), "B/S must be non-negative or unknown, but got B=%ld, S=%ld.", b, s);
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(Ops::Base::GetOpInfo(context), "x", Ops::Base::ToString(*xShape),
+                                                  "the batch and sequence dimensions must be non-negative or unknown");
             return GRAPH_FAILED;
         }
         return GRAPH_SUCCESS;
@@ -355,13 +397,18 @@ ge::graphStatus InferShapeForTextGatedResidualGrad(gert::InferShapeContext* cont
     return TextGatedResidualGradShapeInference(context).Infer();
 }
 
-graphStatus SetOutputDtype(gert::InferDataTypeContext* context, size_t irIndex, ge::DataType dtype)
+graphStatus SetOutputDtype(gert::InferDataTypeContext* context, size_t irIndex, ge::DataType dtype, const char* name)
 {
     const auto* instance = context->GetIrOutputInstanceInfo(irIndex);
     if (instance == nullptr || instance->GetInstanceNum() == 0) {
         return ge::GRAPH_SUCCESS;
     }
-    return context->SetOutputDataType(instance->GetInstanceStart(), dtype);
+    const auto status = context->SetOutputDataType(instance->GetInstanceStart(), dtype);
+    if (status != ge::GRAPH_SUCCESS) {
+        OP_LOGE_WITHOUT_REPORT(context, "SetOutputDataType failed for %s, dtype=%s, status=%u.", name,
+                               Ops::Base::ToString(dtype).c_str(), static_cast<unsigned>(status));
+    }
+    return status;
 }
 
 ge::graphStatus InferDataTypeForTextGatedResidualGrad(gert::InferDataTypeContext* context)
@@ -371,40 +418,50 @@ ge::graphStatus InferDataTypeForTextGatedResidualGrad(gert::InferDataTypeContext
     }
     const ge::DataType xDtype = context->GetRequiredInputDataType(IDX_X);
     if (xDtype != ge::DT_BF16 && xDtype != ge::DT_FLOAT16) {
-        OP_LOGE(context->GetNodeName(), "x dtype only supports bf16/fp16, but got %d.", static_cast<int32_t>(xDtype));
+        OP_LOGE_FOR_INVALID_DTYPE(Ops::Base::GetOpInfo(context), "x", Ops::Base::ToString(xDtype), "BF16 or FP16");
         return GRAPH_FAILED;
     }
-    const size_t requiredSameDtypeInputs[] = {IDX_GRAD_MIXED, IDX_W_DOWN, IDX_W_UP, IDX_DOWN_PRE, IDX_UP};
-    for (size_t idx : requiredSameDtypeInputs) {
-        if (context->GetRequiredInputDataType(idx) != xDtype) {
-            OP_LOGE(context->GetNodeName(), "input %zu dtype should match x.", idx);
+    constexpr std::pair<size_t, const char*> requiredSameDtypeInputs[] = {
+        {IDX_GRAD_MIXED, "grad_mixed"}, {IDX_W_DOWN, "w_down"}, {IDX_W_UP, "w_up"},
+        {IDX_DOWN_PRE, "down_pre_act"}, {IDX_UP, "up"},
+    };
+    for (const auto& [idx, name] : requiredSameDtypeInputs) {
+        const ge::DataType dtype = context->GetRequiredInputDataType(idx);
+        if (dtype != xDtype) {
+            OP_LOGE_FOR_INVALID_DTYPE(Ops::Base::GetOpInfo(context), name, Ops::Base::ToString(dtype),
+                                      Ops::Base::ToString(xDtype));
             return GRAPH_FAILED;
         }
     }
-    const size_t optionalSameDtypeInputs[] = {IDX_GRAD_INJECT, IDX_W_GATE, IDX_INJECT};
-    for (size_t idx : optionalSameDtypeInputs) {
+    constexpr std::pair<size_t, const char*> optionalSameDtypeInputs[] = {
+        {IDX_GRAD_INJECT, "grad_inject"},
+        {IDX_W_GATE, "w_gate"},
+        {IDX_INJECT, "inject"},
+    };
+    for (const auto& [idx, name] : optionalSameDtypeInputs) {
         const ge::DataType dtype = context->GetOptionalInputDataType(idx);
         if (dtype != ge::DT_UNDEFINED && dtype != xDtype) {
-            OP_LOGE(context->GetNodeName(), "input %zu dtype should match x.", idx);
+            OP_LOGE_FOR_INVALID_DTYPE(Ops::Base::GetOpInfo(context), name, Ops::Base::ToString(dtype),
+                                      Ops::Base::ToString(xDtype));
             return GRAPH_FAILED;
         }
     }
     const ge::DataType gammaDtype = context->GetOptionalInputDataType(IDX_GAMMA);
     if (gammaDtype != ge::DT_UNDEFINED && gammaDtype != ge::DT_FLOAT) {
-        OP_LOGE(context->GetNodeName(), "gamma dtype only supports float32.");
+        OP_LOGE_FOR_INVALID_DTYPE(Ops::Base::GetOpInfo(context), "gamma", Ops::Base::ToString(gammaDtype), "FP32");
         return GRAPH_FAILED;
     }
-    if (context->GetRequiredInputDataType(IDX_INV_RMS) != ge::DT_FLOAT) {
-        OP_LOGE(context->GetNodeName(), "inv_rms dtype only supports float32.");
+    const ge::DataType invRmsDtype = context->GetRequiredInputDataType(IDX_INV_RMS);
+    if (invRmsDtype != ge::DT_FLOAT) {
+        OP_LOGE_FOR_INVALID_DTYPE(Ops::Base::GetOpInfo(context), "inv_rms", Ops::Base::ToString(invRmsDtype), "FP32");
         return GRAPH_FAILED;
     }
 
-    if (SetOutputDtype(context, OUT_DX, xDtype) != ge::GRAPH_SUCCESS ||
-        SetOutputDtype(context, OUT_DW_DOWN, xDtype) != ge::GRAPH_SUCCESS ||
-        SetOutputDtype(context, OUT_DW_UP, xDtype) != ge::GRAPH_SUCCESS ||
-        SetOutputDtype(context, OUT_DW_GATE, xDtype) != ge::GRAPH_SUCCESS ||
-        SetOutputDtype(context, OUT_DGAMMA, ge::DT_FLOAT) != ge::GRAPH_SUCCESS) {
-        OP_LOGE(context->GetNodeName(), "failed to set output dtype.");
+    if (SetOutputDtype(context, OUT_DX, xDtype, "dx") != ge::GRAPH_SUCCESS ||
+        SetOutputDtype(context, OUT_DW_DOWN, xDtype, "dw_down") != ge::GRAPH_SUCCESS ||
+        SetOutputDtype(context, OUT_DW_UP, xDtype, "dw_up") != ge::GRAPH_SUCCESS ||
+        SetOutputDtype(context, OUT_DW_GATE, xDtype, "dw_gate") != ge::GRAPH_SUCCESS ||
+        SetOutputDtype(context, OUT_DGAMMA, ge::DT_FLOAT, "dgamma") != ge::GRAPH_SUCCESS) {
         return GRAPH_FAILED;
     }
     return GRAPH_SUCCESS;

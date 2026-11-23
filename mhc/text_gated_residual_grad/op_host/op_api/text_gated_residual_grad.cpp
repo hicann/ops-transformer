@@ -14,7 +14,6 @@
 #include "opdev/make_op_executor.h"
 #include "opdev/op_def.h"
 #include "opdev/op_dfx.h"
-#include "aclnn_kernels/common/op_error_check.h"
 
 using namespace op;
 
@@ -38,9 +37,8 @@ const std::tuple<aclTensor*, aclTensor*, aclTensor*, aclTensor*, aclTensor*> Tex
         OP_INPUT(gradMixed, x, wDown, wUp, invRms, downPreAct, up, gradInject, wGate, gamma, inject),
         OP_OUTPUT(dx, dwDown, dwUp, dwGate, dgamma), OP_ATTR(channels));
     if (retAicore != ACLNN_SUCCESS) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "TextGatedResidualGrad launch kernel failed.");
-        return std::tuple<aclTensor*, aclTensor*, aclTensor*, aclTensor*, aclTensor*>(nullptr, nullptr, nullptr,
-                                                                                      nullptr, nullptr);
+        OP_LOGE_WITHOUT_REPORT(retAicore, "TextGatedResidualGrad launcher registration failed, rc=%d.", retAicore);
+        return {};
     }
     return std::tuple<aclTensor*, aclTensor*, aclTensor*, aclTensor*, aclTensor*>(dx, dwDown, dwUp, dwGate, dgamma);
 }
@@ -61,27 +59,37 @@ const std::tuple<aclTensor*, aclTensor*, aclTensor*, aclTensor*, aclTensor*> Tex
     };
 
     auto gammaInput = gamma != nullptr ? gamma : allocateEmptyTensor(op::DataType::DT_FLOAT, op::Format::FORMAT_ND);
+    // AllocTensor reports allocation failures. Stop before allocating or launching any other tensors.
+    CHECK_RET(gammaInput != nullptr, {});
     auto gradInjectInput =
         gradInject != nullptr ? gradInject : allocateEmptyTensor(x->GetDataType(), x->GetViewFormat());
+    CHECK_RET(gradInjectInput != nullptr, {});
     auto wGateInput = wGate != nullptr ? wGate : allocateEmptyTensor(x->GetDataType(), x->GetViewFormat());
+    CHECK_RET(wGateInput != nullptr, {});
     auto injectInput = inject != nullptr ? inject : allocateEmptyTensor(x->GetDataType(), x->GetViewFormat());
+    CHECK_RET(injectInput != nullptr, {});
 
     // Allocate outputs.
     auto dx = executor->AllocTensor(x->GetViewShape(), x->GetDataType(), x->GetViewFormat());
+    CHECK_RET(dx != nullptr, {});
     auto dwDown = executor->AllocTensor(wDown->GetViewShape(), wDown->GetDataType(), wDown->GetViewFormat());
+    CHECK_RET(dwDown != nullptr, {});
     auto dwUp = executor->AllocTensor(wUp->GetViewShape(), wUp->GetDataType(), wUp->GetViewFormat());
+    CHECK_RET(dwUp != nullptr, {});
     aclTensor* dwGate = nullptr;
     if (wGate != nullptr) {
         dwGate = executor->AllocTensor(wGate->GetViewShape(), wGate->GetDataType(), wGate->GetViewFormat());
     } else {
         dwGate = allocateEmptyTensor(x->GetDataType(), op::Format::FORMAT_ND);
     }
+    CHECK_RET(dwGate != nullptr, {});
     aclTensor* dgamma = nullptr;
     if (gamma != nullptr) {
         dgamma = executor->AllocTensor(gamma->GetViewShape(), op::DataType::DT_FLOAT, gamma->GetViewFormat());
     } else {
         dgamma = allocateEmptyTensor(op::DataType::DT_FLOAT, op::Format::FORMAT_ND);
     }
+    CHECK_RET(dgamma != nullptr, {});
 
     return TextGatedResidualGradAICore(gradMixed, x, wDown, wUp, invRms, downPreAct, up, gradInjectInput, wGateInput,
                                        gammaInput, injectInput, channels, dx, dwDown, dwUp, dwGate, dgamma, executor);

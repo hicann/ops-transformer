@@ -33,14 +33,25 @@ namespace TextGatedResidualGrad {
 
 // Shared host/kernel geometry and workspace alignment.
 constexpr uint32_t HC_GRAD_TASK_ROWS = 1024U;
+constexpr uint32_t HC_GRAD_NN_C1A_TILE_M = 192U;
+constexpr uint32_t HC_GRAD_NN_C1A_TILE_N = 320U;
 constexpr uint32_t HC_GRAD_GATE_ALIGN = 16U;
 constexpr uint32_t HC_GRAD_MAX_AIV = 64U;
+constexpr int64_t HC_GRAD_MAX_CHANNELS = 20;
+constexpr int64_t HC_GRAD_MAX_PROJECTION = 640;
 constexpr uint32_t HC_GRAD_RING_SLOTS = 3U;
+// Full-batch work is retained only for one fixed-size chunk, never for the whole BS.
+constexpr uint32_t HC_GRAD_CHUNK_ROWS = 5120U;
+constexpr uint32_t HC_GRAD_G56_BLOCKED_XN_N = 192U;
 constexpr uint64_t HC_GRAD_WS_ALIGN = 512U;
 constexpr uint32_t HC_GRAD_NO_TASK = 0xFFFFFFFFU;
 // All supported architectures read dup directly as ColumnMajor by default.
 constexpr bool HC_GRAD_USE_DUP_T = false;
 constexpr uint32_t HC_GRAD_CUBE_TILE_M_A2 = 128U;
+constexpr uint32_t HC_GRAD_CUBE_TILE_N_A2 = 256U;
+constexpr uint32_t HC_GRAD_CUBE_L1_TILE_K_A2 = 256U;
+constexpr uint32_t HC_GRAD_C1B_TILE_M_A2 = 256U;
+constexpr uint32_t HC_GRAD_C1B_TILE_N_A2 = 128U;
 constexpr uint32_t HC_GRAD_CUBE_TILE_M_A5 = 256U;
 constexpr uint32_t HC_GRAD_C1A_TILE_N = 128U;
 constexpr uint32_t HC_GRAD_CUBE_TILE_K = 64U;
@@ -90,6 +101,8 @@ constexpr uint32_t HC_GRAD_V1_POOL_BYTES =
     HC_GRAD_V1_FLOAT_SLOTS * sizeof(float) + HC_GRAD_PIPE_MAX_STAGES * HC_GRAD_V1_INPUT_SLOTS * sizeof(uint16_t);
 constexpr uint32_t HC_GRAD_V6_POOL_BYTES =
     HC_GRAD_V6_FLOAT_SLOTS * sizeof(float) + HC_GRAD_PIPE_MAX_STAGES * sizeof(uint16_t);
+// Recomputed direct needs per-stage BF16 grad_mixed/up inputs in addition to x.
+constexpr uint32_t HC_GRAD_V6_DIRECT_RECOMP_EXTRA_BYTES = 8U;
 constexpr uint32_t HC_GRAD_V6_ROW_BYTES = HC_GRAD_V6_ROW_SLOTS * sizeof(float);
 constexpr uint32_t HC_GRAD_SCALAR_SLOTS = 2U; // Sum and centered residual, each aligned to one data block.
 constexpr uint32_t HC_GRAD_DGAMMA_SLOTS = 2U; // Kahan sum and compensation, per AIV.

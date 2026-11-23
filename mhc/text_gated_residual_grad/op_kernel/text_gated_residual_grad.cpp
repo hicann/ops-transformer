@@ -30,13 +30,25 @@
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == HC_GRAD_CCE_A5
 #include "arch35/text_gated_residual_grad_kernel_arch35.h"
 #else
-// The v220 MIX wrapper calls matmul::clearWorkspace; include its declaration only. CATLASS handles computation.
+// The v220 MIX wrapper calls matmul::clearWorkspace; include the same MatMul API used by the NN backend.
 #include "lib/matmul_intf.h"
 #include "arch22/text_gated_residual_grad_kernel_arch22.h"
 #endif
 
 using namespace AscendC;
 using namespace TextGatedResidualGrad;
+
+#if !defined(__CCE_AICORE__) || __CCE_AICORE__ != HC_GRAD_CCE_A5
+// The v220 MIX wrapper installs the FFTS address before entering this kernel.
+// Restore its idle value only after all operator work and TPipe cleanup finish.
+struct HcGradSyncAddressGuard {
+    __aicore__ inline ~HcGradSyncAddressGuard()
+    {
+        PipeBarrier<PIPE_ALL>();
+        SetSyncBaseAddr(0);
+    }
+};
+#endif
 
 template <typename D_T, int HAS_GAMMA>
 __global__ __aicore__ void text_gated_residual_grad(GM_ADDR grad_mixed, GM_ADDR x, GM_ADDR w_down, GM_ADDR w_up,
@@ -48,6 +60,9 @@ __global__ __aicore__ void text_gated_residual_grad(GM_ADDR grad_mixed, GM_ADDR 
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     REGISTER_TILING_DEFAULT(TextGatedResidualGradTilingDataArch35);
     GET_TILING_DATA(tilingData, tiling);
+#if !defined(__CCE_AICORE__) || __CCE_AICORE__ != HC_GRAD_CCE_A5
+    HcGradSyncAddressGuard syncAddressGuard;
+#endif
     if (workspace == nullptr) {
         return;
     }
@@ -56,8 +71,7 @@ __global__ __aicore__ void text_gated_residual_grad(GM_ADDR grad_mixed, GM_ADDR 
         return;
     }
 #if defined(__CCE_AICORE__) && __CCE_AICORE__ == HC_GRAD_CCE_A5
-    // CATLASS Arch::Resource owns the Cube TPipe. Construct the outer TPipe only for AIV
-    // to avoid event-resource conflicts with older CATLASS versions.
+    // NN Blaze uses raw Cube resources; the outer TPipe belongs only to the fusion Vector buffers.
     if ASCEND_IS_AIV {
         TPipe tPipe;
         KernelTextGatedResidualGradArch35<D_T, HAS_GAMMA> op;
@@ -72,8 +86,7 @@ __global__ __aicore__ void text_gated_residual_grad(GM_ADDR grad_mixed, GM_ADDR 
         op.Process();
     }
 #else
-    // On A2/A3, CATLASS Arch::Resource owns the Cube TPipe. A second outer TPipe would compete
-    // for the default TPipe and can hang GEMM after L1/L0 initialization.
+    // On A2/A3, each NN GEMM invocation owns and releases its Cube TPipe.
     // Only AIV Vector execution needs the outer TPipe; construct it according to the core type.
     if ASCEND_IS_AIV {
         TPipe tPipe;

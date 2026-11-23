@@ -32,13 +32,15 @@
 #include <vector>
 #include "acl/acl.h"
 #include "aclnnop/aclnn_text_gated_residual_grad.h"
+#include "../op_kernel/text_gated_residual_grad_constants.h"
 
 #define CHECK_RET(cond) ((cond) ? true : (false))
 #define LOG_PRINT(message, ...) printf(message, ##__VA_ARGS__)
 
 namespace {
 constexpr size_t HALF_BYTES = sizeof(uint16_t);
-constexpr int64_t METADATA_CHANNEL_LIMIT = 4096; // Tiling additionally checks the actual AIV count.
+constexpr int64_t DATA_BATCH_SIZE = 1;
+constexpr char TENSOR_FILE_EXTENSION[] = ".bin";
 constexpr int DATA_DIR_ARG = 1;
 constexpr int DEVICE_ARG = 2;
 enum TensorIndex : size_t {
@@ -73,7 +75,7 @@ struct Metadata {
 };
 
 struct TensorSpec {
-    std::string file;
+    const char* name;
     std::vector<int64_t> shape;
     aclDataType dtype;
     size_t elemBytes;
@@ -250,7 +252,9 @@ bool ValidateMetadata(Metadata& m)
 {
     const auto maxDim = std::numeric_limits<uint32_t>::max();
     if ((m.dtype != "bf16" && m.dtype != "fp16") || m.n < 0 || m.n > maxDim || m.c <= 0 ||
-        m.c > METADATA_CHANNEL_LIMIT || m.h <= 0 || m.h > maxDim / m.c || m.r <= 0 || m.r > maxDim) {
+        m.c > TextGatedResidualGrad::HC_GRAD_MAX_CHANNELS || m.h <= 0 || m.h > maxDim / m.c ||
+        m.h % TextGatedResidualGrad::HC_GRAD_VECTOR_ALIGN != 0 || m.r <= 0 ||
+        m.r > TextGatedResidualGrad::HC_GRAD_MAX_PROJECTION || m.r % TextGatedResidualGrad::HC_GRAD_GATE_ALIGN != 0) {
         LOG_PRINT("invalid dtype or dimensions in meta.txt\n");
         return false;
     }
@@ -286,22 +290,27 @@ bool ReadMetadata(const std::string& dir, Metadata& m)
 std::array<TensorSpec, TENSOR_COUNT> MakeTensorSpecs(const Metadata& m)
 {
     const auto type = m.dtype == "fp16" ? ACL_FLOAT16 : ACL_BF16;
-    return {{{"grad_mixed.bin", {1, m.n, m.h}, type, HALF_BYTES},
-             {"grad_inject.bin", {1, m.n, m.c}, type, HALF_BYTES, m.hasGate != 0},
-             {"x.bin", {1, m.n, m.d}, type, HALF_BYTES},
-             {"w_down.bin", {m.r, m.d}, type, HALF_BYTES},
-             {"w_up.bin", {m.d, m.r}, type, HALF_BYTES},
-             {"w_gate.bin", {m.c, m.d}, type, HALF_BYTES, m.hasGate != 0},
-             {"gamma.bin", {m.d}, ACL_FLOAT, sizeof(float), m.hasGamma != 0},
-             {"inv_rms.bin", {1, m.n, m.c}, ACL_FLOAT, sizeof(float)},
-             {"inject.bin", {1, m.n, m.c}, type, HALF_BYTES, m.hasGate != 0},
-             {"down_pre_act.bin", {1, m.n, m.r}, type, HALF_BYTES},
-             {"up.bin", {1, m.n, m.d}, type, HALF_BYTES},
-             {"dx.bin", {1, m.n, m.d}, type, HALF_BYTES},
-             {"dw_down.bin", {m.r, m.d}, type, HALF_BYTES},
-             {"dw_up.bin", {m.d, m.r}, type, HALF_BYTES},
-             {"dw_gate.bin", {m.c, m.d}, type, HALF_BYTES, m.hasGate != 0},
-             {"dgamma.bin", {m.d}, ACL_FLOAT, sizeof(float), m.hasGamma != 0}}};
+    return {{{"grad_mixed", {DATA_BATCH_SIZE, m.n, m.h}, type, HALF_BYTES},
+             {"grad_inject", {DATA_BATCH_SIZE, m.n, m.c}, type, HALF_BYTES, m.hasGate != 0},
+             {"x", {DATA_BATCH_SIZE, m.n, m.d}, type, HALF_BYTES},
+             {"w_down", {m.r, m.d}, type, HALF_BYTES},
+             {"w_up", {m.d, m.r}, type, HALF_BYTES},
+             {"w_gate", {m.c, m.d}, type, HALF_BYTES, m.hasGate != 0},
+             {"gamma", {m.d}, ACL_FLOAT, sizeof(float), m.hasGamma != 0},
+             {"inv_rms", {DATA_BATCH_SIZE, m.n, m.c}, ACL_FLOAT, sizeof(float)},
+             {"inject", {DATA_BATCH_SIZE, m.n, m.c}, type, HALF_BYTES, m.hasGate != 0},
+             {"down_pre_act", {DATA_BATCH_SIZE, m.n, m.r}, type, HALF_BYTES},
+             {"up", {DATA_BATCH_SIZE, m.n, m.d}, type, HALF_BYTES},
+             {"dx", {DATA_BATCH_SIZE, m.n, m.d}, type, HALF_BYTES},
+             {"dw_down", {m.r, m.d}, type, HALF_BYTES},
+             {"dw_up", {m.d, m.r}, type, HALF_BYTES},
+             {"dw_gate", {m.c, m.d}, type, HALF_BYTES, m.hasGate != 0},
+             {"dgamma", {m.d}, ACL_FLOAT, sizeof(float), m.hasGamma != 0}}};
+}
+
+std::string TensorFilePath(const std::string& dir, const TensorSpec& spec)
+{
+    return dir + "/" + spec.name + TENSOR_FILE_EXTENSION;
 }
 
 int CreateTensors(const std::string& dir, const std::array<TensorSpec, TENSOR_COUNT>& specs, Resources& resources)
@@ -314,8 +323,8 @@ int CreateTensors(const std::string& dir, const std::array<TensorSpec, TENSOR_CO
         }
         auto* tensor = &resources.tensors[i];
         auto* address = &resources.addresses[i];
-        const auto status = i < DX ? CreateTensorFromBin(dir + "/" + spec.file, spec.shape, spec.dtype, spec.elemBytes,
-                                                         tensor, address, hostBuf) :
+        const auto status = i < DX ? CreateTensorFromBin(TensorFilePath(dir, spec), spec.shape, spec.dtype,
+                                                         spec.elemBytes, tensor, address, hostBuf) :
                                      CreateOutTensor(spec.shape, spec.dtype, spec.elemBytes, tensor, address);
         if (status != 0) {
             return -1;
@@ -352,7 +361,8 @@ int DumpOutputs(const std::string& dir, const std::array<TensorSpec, TENSOR_COUN
 {
     for (size_t i = DX; i < specs.size(); ++i) {
         const auto& spec = specs[i];
-        if (spec.enabled && DumpOut(dir + "/" + spec.file, resources.addresses[i], spec.shape, spec.elemBytes) != 0) {
+        if (spec.enabled &&
+            DumpOut(TensorFilePath(dir, spec), resources.addresses[i], spec.shape, spec.elemBytes) != 0) {
             return -1;
         }
     }

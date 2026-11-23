@@ -14,6 +14,7 @@
 #include "op_host/tiling_templates_registry.h"
 #include "log/log.h"
 #include "kernel_tiling/kernel_tiling.h"
+#include "../../op_kernel/text_gated_residual_grad_constants.h"
 
 using Ops::Transformer::OpTiling::TilingRegistryNew;
 using Ops::Transformer::OpTiling::TilingRegistryArch;
@@ -23,14 +24,17 @@ namespace optiling {
 static ge::graphStatus Tiling4TextGatedResidualGrad(gert::TilingContext* context)
 {
     auto platformInfo = context->GetPlatformInfo();
-    OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);
+    OP_CHECK_IF(platformInfo == nullptr, OP_LOGE_WITHOUT_REPORT(context, "Tiling platform info is missing."),
+                return ge::GRAPH_FAILED);
     platform_ascendc::PlatformAscendC ascendcPlatform(platformInfo);
-    NpuArch npuArch = ascendcPlatform.GetCurNpuArch();
-    if (npuArch == NpuArch::DAV_3510 || npuArch == NpuArch::DAV_2201) {
+    const auto npuArch = static_cast<int32_t>(ascendcPlatform.GetCurNpuArch());
+    if (npuArch == HC_GRAD_ARCH_A5 || npuArch == HC_GRAD_ARCH_A2) {
         return TilingRegistryArch::GetInstance().DoTilingImpl(context);
     }
-    OP_LOGE(context,
-            "TextGatedResidualGrad: only DAV_3510 (ascend950) and DAV_2201 (ascend910b/910_93) are supported.");
+    OP_LOGE_WITHOUT_REPORT(context,
+                           "Unsupported NPU architecture %d. Expected DAV_3510 (ascend950) or "
+                           "DAV_2201 (ascend910b/910_93).",
+                           npuArch);
     return ge::GRAPH_FAILED;
 }
 

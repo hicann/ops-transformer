@@ -26,6 +26,9 @@ METHOD_NAMES = (
     "DgammaAccumAdd",
     "FloatBuf",
     "Pointer",
+    "ZeroDgammaAccumulators",
+    "TransferDgammaPartial",
+    "ResumeDgammaAfterNn",
     "ReduceDgamma",
 )
 
@@ -39,7 +42,10 @@ def method(source, name):
     while depth:
         depth += (source[end] == "{") - (source[end] == "}")
         end += 1
-    return source[start:end].replace("__aicore__ ", "")
+    declaration = (
+        "    template <bool LOAD>\n" if name == "TransferDgammaPartial" else ""
+    )
+    return declaration + source[start:end].replace("__aicore__ ", "")
 
 
 prefix = r"""
@@ -61,11 +67,12 @@ void Duplicate(LocalTensor<float>d,float b,unsigned n){for(unsigned i=0;i<n;i++)
 struct Kernel {
  Buffer ub_;
  bool kahanDgamma_=true;
+ static constexpr bool HAS_GAMMA=true;
  unsigned h_=16,bufCount_=16,c_=1,aivNum_=2,aivId_=0,dgammaBytes_=64,ubBufBase_=128;
  struct {uint64_t dgammaPartial=0;} layout_;
  GM_ADDR workspace_=nullptr,gmDgamma_=nullptr;
  template<class T> void CopyIn(GM_ADDR src,uint64_t off,LocalTensor<T> dst,unsigned n){std::memcpy(dst.p,reinterpret_cast<T*>(src)+off,n*sizeof(T));}
- template<class T> void CopyOut(GM_ADDR dst,uint64_t off,LocalTensor<T> src,unsigned n){std::memcpy(reinterpret_cast<T*>(dst)+off,src.p,n*sizeof(T));}
+ template<class T,bool ATOMIC_ADD=false> void CopyOut(GM_ADDR dst,uint64_t off,LocalTensor<T> src,unsigned n){if constexpr(ATOMIC_ADD){for(unsigned i=0;i<n;i++)reinterpret_cast<T*>(dst)[off+i]+=src[i];}else{std::memcpy(reinterpret_cast<T*>(dst)+off,src.p,n*sizeof(T));}}
 """
 suffix = r"""
 };
@@ -80,6 +87,21 @@ int main(){
  Kernel reducer;reducer.workspace_=reinterpret_cast<GM_ADDR>(partial);reducer.gmDgamma_=reinterpret_cast<GM_ADDR>(output);reducer.ReduceDgamma();
  std::cout<<output[0]<<'\n';
  for(float v:output)if(v!=1.0f)return 1;
+ // Model V1/NN taking the whole UB between three successive 5120-row chunks.
+ std::memset(partial,0,sizeof(partial));
+ Kernel producer;
+ producer.workspace_=reinterpret_cast<GM_ADDR>(partial);
+ const float contributions[] = {16777216.f, 1.f, -16777216.f};
+ for(unsigned chunk=0;chunk<3;++chunk){
+  for(float& word:producer.ub_.data)word=-19.f;
+  producer.ResumeDgammaAfterNn(chunk!=0);
+  auto value=producer.FloatBuf(0,16),tmp=producer.FloatBuf(1,16),tmp2=producer.FloatBuf(2,16);
+  Duplicate(value,contributions[chunk],16);
+  producer.DgammaAccumAdd(value,16,0,tmp,tmp2);
+  producer.TransferDgammaPartial<false>();
+ }
+ reducer.ReduceDgamma();
+ for(float v:output)if(v!=1.f)return 2;
 }
 """
 if __name__ == "__main__":

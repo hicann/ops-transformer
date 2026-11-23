@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * Copyright (c) 2025-2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
  * CANN Open Software License Agreement Version 2.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -8,126 +8,85 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
-/*!
- * \file text_gated_residual_grad_gemm_arch22.h
- * \brief Atlas A2/A3 CATLASS GEMM backend for TextGatedResidualGrad.
- */
+// A2/A3 Cube backend: ops-nn ordinary MatMulV3 kernel with fusion strides.
 #ifndef TEXT_GATED_RESIDUAL_GRAD_GEMM_ARCH22_H
 #define TEXT_GATED_RESIDUAL_GRAD_GEMM_ARCH22_H
-
-#include "../text_gated_residual_grad_constants.h"
-
-#if !defined(CATLASS_ARCH) || CATLASS_ARCH != HC_GRAD_ARCH_A2
-#error "text_gated_residual_grad_gemm_arch22.h requires CATLASS_ARCH=2201"
-#endif
-
-#ifndef K_MAX_SHAPE_DIM
-#define K_MAX_SHAPE_DIM 0
-#endif
-
 #include <type_traits>
-
-#include "kernel_operator.h"
-#include "catlass/catlass.hpp"
-#include "catlass/arch/local_tensor_buffer.hpp"
-
-#if HC_GRAD_NPU_ARCH == HC_GRAD_ARCH_A2
-// Limit AIC VECCALC UB allocation only for this operator's A2/A3 kernel.
-// CATLASS's full-UB default blocks L0C-to-GM Fixpipe; use a local specialization instead of patching shared code.
-namespace Catlass::Arch {
-template <>
-struct LocalTensorBuffer<AtlasA2, AscendC::TPosition::VECCALC> : LocalTensorBufferBase {
-public:
-    static constexpr AscendC::TPosition Position = AscendC::TPosition::VECCALC;
-
-    CATLASS_DEVICE LocalTensorBuffer()
-    {
-        AscendC::TBuf<AscendC::TPosition::VECCALC> tbufVECCALC;
-        uint32_t ubBytes = AtlasA2::UB_SIZE;
-        if ASCEND_IS_AIC {
-            ubBytes = TextGatedResidualGrad::HC_GRAD_A2_CUBE_UB_BYTES;
-        }
-        GetTPipePtr()->InitBuffer(tbufVECCALC, ubBytes);
-        tensor = tbufVECCALC.Get<uint8_t>();
-    }
-};
-} // namespace Catlass::Arch
-#endif
-
-#include "catlass/gemm/block/block_mmad.hpp"
-#include "catlass/gemm/block/block_swizzle.hpp"
-#include "catlass/gemm/dispatch_policy.hpp"
-#include "catlass/gemm/gemm_type.hpp"
-#include "catlass/gemm_coord.hpp"
-#include "catlass/layout/layout.hpp"
+#include "../arch35/text_gated_residual_grad_tiling_data_arch35.h"
+#include "text_gated_residual_grad_pipeline_arch22.h"
+#include "nn_base/tgrg_mat_mul_nd2nz.h"
+#include "nn_base/tgrg_batch_mat_mul_v3_common_kernel.h"
+#if defined(__CCE_ENABLE_ASAN__)
 #include "../arch35/text_gated_residual_grad_pipeline_arch35.h"
-
+#endif
 namespace TextGatedResidualGrad {
-
-// A2/A3 (arch22) uses the same algorithm as arch35, with these platform differences:
-//   1) Cube uses AtlasA2 BlockMmad (Gemm::Block::BlockMmad + MmadAtlasA2Pingpong),
-//      as other A2 operators do; A5 MmadPingpongMutex supports Ascend950 only.
-//   2) C1/DX use 128x128x64 tiles for A2's 128 KiB L0C, consuming 64 KiB per tile.
-//      BlockMmad uses one L0C stage and double buffering for L1/L0A/L0B.
-//   3) MmadAtlasA2Pingpong<false> disables unit flags and uses explicit M_FIX/FIX_M synchronization.
-//   4) Block strides use the tiling AIC count; GetBlockNum() is not the AIC count in a mixed kernel.
-// As on A5, C1b and G56 read Vector results directly as ColumnMajor without materializing transposes.
 template <typename D_T>
 class HcGradGemmArch22 {
-    static constexpr uint32_t C1TileM = HC_GRAD_CUBE_TILE_M_A2;
-    static constexpr uint32_t C1TileN = HC_GRAD_C1A_TILE_N;
-    static constexpr uint32_t C1TileK = HC_GRAD_CUBE_TILE_K;
-
 public:
-    __aicore__ inline void Init(uint32_t aicNum)
+    __aicore__ inline void Init(uint32_t, const TextGatedResidualGradTilingDataArch35* data, GM_ADDR workspace)
     {
-        aicNum_ = aicNum;
+        data_ = data;
+        scratch_ = workspace + data_->nnScratchOffset;
     }
 
-    // C1a: dact = dup @ wUp. As on A5, distribute all (m,n,slice) blocks across AICs in one loop,
-    // treating split-K slices as virtual cores. Each slice writes its own FP32 partial,
-    // which Vector REDUCE_DACT merges; slices do not run as separate serial GEMMs.
+    __aicore__ inline uint32_t ConversionPlan(uint32_t rows) const
+    {
+        const uint32_t fullRows = data_->scheduleMode == HC_GRAD_FULL_BATCH_SCHEDULE ?
+                                      static_cast<uint32_t>(data_->fullBatchRows) :
+                                      (data_->n < data_->taskRows ? data_->n : data_->taskRows);
+        return (rows == fullRows || rows == data_->n) ? 0U : 1U;
+    }
+
+    __aicore__ inline bool NeedsNnConversion(uint32_t stage, uint32_t plan) const
+    {
+        return (data_->nnMixMask[plan] & (1U << stage)) != 0U;
+    }
+
+    __aicore__ inline void ConvertNnInputs(uint32_t stage, uint32_t task, GM_ADDR a, GM_ADDR b,
+                                           AscendC::TBuf<AscendC::TPosition::VECCALC>& ub)
+    {
+        const auto& nn = data_->nnBase[task][stage];
+        if (nn.matmulRunInfo.nd2nzA != 0) {
+            MatrixAtoNZV2<D_T>(scratch_, a, nn.matmulTiling, nn.matmulRunInfo.transA, ub, nn.baseAN, nn.baseAD);
+        }
+        if (nn.matmulRunInfo.nd2nzB != 0) {
+            AscendC::PipeBarrier<PIPE_ALL>();
+            MatrixBtoNZV2<D_T>(ConvertedB(nn), b, nn.matmulTiling, false, ub, nn.baseBN, nn.baseBD);
+        }
+    }
+    __aicore__ inline void RunC1aSlabs(GM_ADDR dup, GM_ADDR partial, uint32_t tilesPerSlab, uint16_t readyFlag)
+    {
+        const auto& nn = data_->nnBase[0][0];
+        using InputA = matmul::MatmulType<AscendC::TPosition::GM, CubeFormat::ND, D_T>;
+        using InputB = matmul::MatmulType<AscendC::TPosition::GM, CubeFormat::NZ, D_T>;
+        using Output = matmul::MatmulType<AscendC::TPosition::GM, CubeFormat::ND, float>;
+        using Bias = matmul::MatmulType<AscendC::TPosition::GM, CubeFormat::ND, D_T>;
+        AscendC::TPipe pipe;
+        MatmulBaseKernel<InputA, InputB, Output, Bias> kernel;
+        kernel.Init(dup, scratch_, partial, nullptr, nullptr, nullptr, &nn, &pipe);
+        kernel.Process(0U, 0U, tilesPerSlab, readyFlag);
+        kernel.End();
+        AscendC::PipeBarrier<PIPE_ALL>();
+        AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
+        pipe.Destroy();
+    }
+
     __aicore__ inline void RunC1aSplitK(GM_ADDR dup, GM_ADDR wUp, GM_ADDR partial, uint32_t rows, uint32_t r,
                                         uint32_t d, uint32_t splitkFactor)
     {
-        using BlockScheduler =
-            Catlass::Gemm::Block::SplitkGemmIdentityBlockSwizzle<HC_GRAD_SWIZZLE_OFFSET, HC_GRAD_SWIZZLE_M_FIRST>;
-        Catlass::GemmCoord problemShape{rows, r, d};
-        BlockScheduler scheduler(problemShape, Catlass::GemmCoord(C1TileM, C1TileN, C1TileK), splitkFactor);
-        const uint32_t coreLoops = scheduler.GetCoreLoops();
-
-        Catlass::Arch::Resource<ArchTag> resource;
-        C1BlockMmad blockMmad(resource);
-
-        AscendC::GlobalTensor<D_T> gmA;
-        gmA.SetGlobalBuffer(reinterpret_cast<__gm__ D_T*>(dup));
-        AscendC::GlobalTensor<D_T> gmB;
-        gmB.SetGlobalBuffer(reinterpret_cast<__gm__ D_T*>(wUp));
-        AscendC::GlobalTensor<float> gmW;
-        gmW.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(partial));
-
-        RowMajor layoutA{rows, d, d};
-        RowMajor layoutB{d, r, r};
-        RowMajor layoutC{rows, r, r};
-        const size_t lenC = static_cast<size_t>(rows) * r;
-        for (uint32_t loopIdx = AscendC::GetBlockIdx(); loopIdx < coreLoops; loopIdx += aicNum_) {
-            const Catlass::GemmCoord blockCoord = scheduler.GetBlockCoord(loopIdx);
-            const uint32_t slice = scheduler.GetSplitkSliceIdx(loopIdx);
-            const Catlass::GemmCoord actual = scheduler.GetActualBlockShape(blockCoord, slice);
-            const MatrixCoord offsetA{blockCoord.m() * C1TileM, blockCoord.k() * C1TileK};
-            const MatrixCoord offsetB{blockCoord.k() * C1TileK, blockCoord.n() * C1TileN};
-            const MatrixCoord offsetC{blockCoord.m() * C1TileM, blockCoord.n() * C1TileN};
-            blockMmad(gmA[layoutA.GetOffset(offsetA)], layoutA, gmB[layoutB.GetOffset(offsetB)], layoutB,
-                      gmW[lenC * slice + layoutC.GetOffset(offsetC)], layoutC, actual);
+        // Host A2/A3 always uses splitkFactor=1, full-K FP32 accumulation.
+#if defined(__CCE_ENABLE_ASAN__)
+        if (rows % 16U == 0U && TryTrackedFullBatch<HC_GRAD_NN_STAGE_C1A, false, false>(rows, dup, wUp, partial)) {
+            return;
         }
-        AscendC::PipeBarrier<PIPE_ALL>();
-        AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
+#endif
+        RunNn<false>(0, rows, rows, r, d, dup, d, wUp, r, partial, r);
     }
-
     // C1b: dwUpPartial = dup^T @ act, reading dup as ColumnMajor [D,rows], as on A5.
-    __aicore__ inline void RunC1b(GM_ADDR dup, GM_ADDR act, GM_ADDR dwUpPartial, uint32_t rows, uint32_t r, uint32_t d)
+    __aicore__ inline void RunC1b(GM_ADDR dup, GM_ADDR act, GM_ADDR dwUpPartial, uint32_t rows, uint32_t r, uint32_t d,
+                                  bool accumulate = false)
     {
-        RunC1GemmColumnMajor(d, r, rows, dup, d, act, r, dwUpPartial, r);
+        RunNn<true>(1, rows, d, r, rows, dup, d, act, r, dwUpPartial, r, accumulate);
     }
 
     // For multiple tasks, use one M=R+gateRows GEMM to avoid rereading xn in a separate small gate GEMM.
@@ -135,40 +94,53 @@ public:
                                         uint32_t d, uint32_t gateRows, bool hasGate)
     {
         const uint32_t m = hasGate ? (r + gateRows) : r;
-        RunC1Gemm(m, d, rows, packedT, rows, xn, d, dwOut, d);
+        RunNn<false>(HC_GRAD_NN_STAGE_G56, rows, m, d, rows, packedT, rows, xn, d, dwOut, d);
     }
 
     __aicore__ inline void RunG56MergedPacked(GM_ADDR packed, GM_ADDR xn, GM_ADDR dwOut, uint32_t rows, uint32_t r,
-                                              uint32_t d, uint32_t packedStride, uint32_t gateRows, bool hasGate)
+                                              uint32_t d, uint32_t packedStride, uint32_t gateRows, bool hasGate,
+                                              bool accumulate = false)
     {
+#if defined(__CCE_ENABLE_ASAN__)
+        if (TryTrackedFullBatch<HC_GRAD_NN_STAGE_G56, true, true>(rows, packed, xn, dwOut)) {
+            return;
+        }
+#endif
         const uint32_t m = hasGate ? (r + gateRows) : r;
-        RunC1GemmColumnMajor(m, d, rows, packed, packedStride, xn, d, dwOut, d);
+        RunNn<true>(HC_GRAD_NN_STAGE_G56, rows, m, d, rows, packed, packedStride, xn, d, dwOut, d, accumulate);
     }
 
     __aicore__ inline void RunG56DirectPacked(GM_ADDR packed, GM_ADDR xn, GM_ADDR dwDown, GM_ADDR dwGate, uint32_t rows,
                                               uint32_t r, uint32_t d, uint32_t packedStride, uint32_t gateRows,
                                               bool hasGate)
     {
-        RunC1GemmColumnMajor(r, d, rows, packed, packedStride, xn, d, dwDown, d);
+        RunNn<true>(HC_GRAD_NN_STAGE_G56, rows, r, d, rows, packed, packedStride, xn, d, dwDown, d);
         if (hasGate) {
-            RunC1GemmColumnMajor(gateRows, d, rows, packed + r * sizeof(D_T), packedStride, xn, d, dwGate, d);
+            RunNn<true>(HC_GRAD_NN_STAGE_GATE, rows, gateRows, d, rows, packed + r * sizeof(D_T), packedStride, xn, d,
+                        dwGate, d);
         }
     }
 
     // Single-task fast paths: accumulate straight into the FP32 outputs.
     __aicore__ inline void RunC1bDirect(GM_ADDR dup, GM_ADDR act, GM_ADDR dwUp, uint32_t rows, uint32_t r, uint32_t d)
     {
-        RunC1GemmColumnMajor(d, r, rows, dup, d, act, r, dwUp, r);
+#if defined(__CCE_ENABLE_ASAN__)
+        if (TryTrackedFullBatch<HC_GRAD_NN_STAGE_C1B, true, false>(rows, dup, act, dwUp)) {
+            return;
+        }
+#endif
+        RunNn<true>(1, rows, d, r, rows, dup, d, act, r, dwUp, r);
     }
 
     __aicore__ inline void RunG56Direct(GM_ADDR packedT, GM_ADDR xn, GM_ADDR dwDown, GM_ADDR dwGate, uint32_t rows,
                                         uint32_t r, uint32_t d, uint32_t gateRows, bool hasGate)
     {
-        RunC1Gemm(r, d, rows, packedT, rows, xn, d, dwDown, d);
+        RunNn<false>(HC_GRAD_NN_STAGE_G56, rows, r, d, rows, packedT, rows, xn, d, dwDown, d);
         if (hasGate) {
             // As on A5, write gateRows aligned to 16 into dwGatePartial, which has room for all padded rows.
             // Vector REDUCE_WD copies only the first c*d elements into the dwGate FP32 accumulator.
-            RunC1Gemm(gateRows, d, rows, packedT + r * rows * sizeof(D_T), rows, xn, d, dwGate, d);
+            RunNn<false>(HC_GRAD_NN_STAGE_GATE, rows, gateRows, d, rows, packedT + r * rows * sizeof(D_T), rows, xn, d,
+                         dwGate, d);
         }
     }
 
@@ -176,105 +148,220 @@ public:
     __aicore__ inline void RunDx(GM_ADDR packed, GM_ADDR wDown, GM_ADDR wGate, GM_ADDR wConcat, GM_ADDR dxOut,
                                  uint32_t rows, uint32_t d, uint32_t r, uint32_t c, uint32_t packedStride, bool hasGate)
     {
+        if (data_->lowpDx != 0) {
+            if (hasGate) {
+                RunNn<false, D_T>(HC_GRAD_NN_STAGE_DX, rows, rows, d, r + c, packed, packedStride, wConcat, d, dxOut,
+                                  d);
+            } else {
+                RunNn<false, D_T>(HC_GRAD_NN_STAGE_DX, rows, rows, d, r, packed, packedStride, wDown, d, dxOut, d);
+            }
+            return;
+        }
         if (hasGate) {
-            RunDxGemm(rows, d, r + c, packed, packedStride, wConcat, d, dxOut, d);
+            RunNn<false>(HC_GRAD_NN_STAGE_DX, rows, rows, d, r + c, packed, packedStride, wConcat, d, dxOut, d);
         } else {
-            RunDxGemm(rows, d, r, packed, packedStride, wDown, d, dxOut, d);
+            RunNn<false>(HC_GRAD_NN_STAGE_DX, rows, rows, d, r, packed, packedStride, wDown, d, dxOut, d);
         }
     }
 
 private:
-    using ArchTag = Catlass::Arch::AtlasA2;
-    using DispatchPolicy = Catlass::Gemm::MmadAtlasA2Pingpong<false>;
-    using RowMajor = Catlass::layout::RowMajor;
-    using ColumnMajor = Catlass::layout::ColumnMajor;
-    using MatrixCoord = Catlass::MatrixCoord;
-
-    static_assert(C1TileM * C1TileN * sizeof(float) <= Catlass::Arch::AtlasA2::L0C_SIZE,
-                  "A2/A3 L0C tile exceeds 128KB");
-
-    using AType = Catlass::Gemm::GemmType<D_T, RowMajor>;
-    using BType = Catlass::Gemm::GemmType<D_T, RowMajor>;
-    using CType = Catlass::Gemm::GemmType<float, RowMajor>;
-
-    using C1BlockMmad =
-        Catlass::Gemm::Block::BlockMmad<DispatchPolicy, Catlass::GemmShape<C1TileM, C1TileN, C1TileK>,
-                                        Catlass::GemmShape<C1TileM, C1TileN, C1TileK>, AType, BType, CType>;
-
-    using ATypeColumnMajor = Catlass::Gemm::GemmType<D_T, Catlass::layout::ColumnMajor>;
-    using C1BlockMmadColumnMajor =
-        Catlass::Gemm::Block::BlockMmad<DispatchPolicy, Catlass::GemmShape<C1TileM, C1TileN, C1TileK>,
-                                        Catlass::GemmShape<C1TileM, C1TileN, C1TileK>, ATypeColumnMajor, BType, CType>;
-
-    template <class BlockMmad, uint32_t Direction, class LayoutAT = RowMajor>
-    __aicore__ inline void RunBlockLoop(uint32_t m, uint32_t n, uint32_t k, GM_ADDR ptrA, int64_t lda, GM_ADDR ptrB,
-                                        int64_t ldb, GM_ADDR ptrC, int64_t ldc)
+    __aicore__ inline GM_ADDR ConvertedB(const MatmulTilingData& nn) const
     {
-        using BlockScheduler = Catlass::Gemm::Block::GemmIdentityBlockSwizzle<HC_GRAD_SWIZZLE_OFFSET, Direction>;
-        constexpr uint32_t tileM = BlockMmad::L1TileShape::M;
-        constexpr uint32_t tileN = BlockMmad::L1TileShape::N;
-        constexpr uint32_t tileK = BlockMmad::L1TileShape::K;
-        Catlass::GemmCoord problemShape{m, n, k};
-        BlockScheduler scheduler(problemShape, MatrixCoord(tileM, tileN));
-        const uint32_t coreLoops = scheduler.GetCoreLoops();
-
-        Catlass::Arch::Resource<ArchTag> resource;
-        BlockMmad blockMmad(resource);
-
-        AscendC::GlobalTensor<D_T> gmA;
-        gmA.SetGlobalBuffer(reinterpret_cast<__gm__ D_T*>(ptrA));
-        AscendC::GlobalTensor<D_T> gmB;
-        gmB.SetGlobalBuffer(reinterpret_cast<__gm__ D_T*>(ptrB));
-        AscendC::GlobalTensor<float> gmC;
-        gmC.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(ptrC));
-
-        LayoutAT layoutA{m, k, lda};
-        RowMajor layoutB{k, n, ldb};
-        RowMajor layoutC{m, n, ldc};
-        for (uint32_t loopIdx = AscendC::GetBlockIdx(); loopIdx < coreLoops; loopIdx += aicNum_) {
-            const Catlass::GemmCoord blockCoord = scheduler.GetBlockCoord(loopIdx);
-            const Catlass::GemmCoord actual = scheduler.GetActualBlockShape(blockCoord);
-            const MatrixCoord offsetA{blockCoord.m() * tileM, blockCoord.k() * tileK};
-            const MatrixCoord offsetB{blockCoord.k() * tileK, blockCoord.n() * tileN};
-            const MatrixCoord offsetC{blockCoord.m() * tileM, blockCoord.n() * tileN};
-            blockMmad(gmA[layoutA.GetOffset(offsetA)], layoutA, gmB[layoutB.GetOffset(offsetB)], layoutB,
-                      gmC[layoutC.GetOffset(offsetC)], layoutC, actual);
+        if (nn.matmulRunInfo.nd2nzA == 0) {
+            return scratch_;
         }
+        // BF16 and FP16 both use a 16-element C0. Match NN's A-then-B workspace layout.
+        const uint64_t m = nn.matmulTiling.M;
+        const uint64_t k = nn.matmulTiling.Ka;
+        return scratch_ + ((m + 15U) / 16U * 16U) * ((k + 15U) / 16U * 16U) * sizeof(D_T);
+    }
+
+    template <bool TransA, CubeFormat FormatA, CubeFormat FormatB, typename OUT_T = float>
+#if defined(__CCE_ENABLE_ASAN__)
+    __aicore__ __attribute__((always_inline)) inline void RunNativeBody(GM_ADDR a, GM_ADDR b, GM_ADDR c,
+                                                                        const MatmulTilingData& nn,
+                                                                        bool accumulate = false)
+#else
+    __aicore__ __attribute__((noinline)) void RunNative(GM_ADDR a, GM_ADDR b, GM_ADDR c, const MatmulTilingData& nn,
+                                                        bool accumulate = false)
+#endif
+    {
+        using InputA = matmul::MatmulType<AscendC::TPosition::GM, FormatA, D_T, TransA>;
+        using InputB = matmul::MatmulType<AscendC::TPosition::GM, FormatB, D_T>;
+        using Output = matmul::MatmulType<AscendC::TPosition::GM, CubeFormat::ND, OUT_T>;
+        using Bias = matmul::MatmulType<AscendC::TPosition::GM, CubeFormat::ND, D_T>;
+        AscendC::TPipe pipe;
+        MatmulBaseKernel<InputA, InputB, Output, Bias> kernel;
+        kernel.Init(a, b, c, nullptr, nullptr, nullptr, &nn, &pipe);
+        kernel.Process(0U, accumulate);
+        kernel.End();
         AscendC::PipeBarrier<PIPE_ALL>();
         AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
+        pipe.Destroy();
     }
 
-    __aicore__ inline void RunC1Gemm(uint32_t m, uint32_t n, uint32_t k, GM_ADDR ptrA, int64_t lda, GM_ADDR ptrB,
-                                     int64_t ldb, GM_ADDR ptrC, int64_t ldc)
+#if defined(__CCE_ENABLE_ASAN__)
+    template <bool TransA, CubeFormat FormatA, CubeFormat FormatB, typename OUT_T = float>
+    __aicore__ __attribute__((noinline)) void RunNative(GM_ADDR a, GM_ADDR b, GM_ADDR c, const MatmulTilingData& nn,
+                                                        bool accumulate = false)
     {
-        if (m >= n) {
-            RunBlockLoop<C1BlockMmad, HC_GRAD_SWIZZLE_M_FIRST>(m, n, k, ptrA, lda, ptrB, ldb, ptrC, ldc);
-        } else {
-            RunBlockLoop<C1BlockMmad, HC_GRAD_SWIZZLE_N_FIRST>(m, n, k, ptrA, lda, ptrB, ldb, ptrC, ldc);
+        RunNativeBody<TransA, FormatA, FormatB, OUT_T>(a, b, c, nn, accumulate);
+    }
+
+    // Let CCEC track the Fixpipe writes consumed by the full-batch Vector stages.
+    // Preserve the native tiling and A/B substitutions used by RunNn.
+    template <uint32_t Stage, bool TransA, bool ConvertA>
+    __aicore__ __attribute__((always_inline)) inline bool TryTrackedFullBatch(uint32_t rows, GM_ADDR a, GM_ADDR b,
+                                                                              GM_ADDR c)
+    {
+        constexpr uint32_t mask = 1U << Stage;
+        if (data_->scheduleMode != HC_GRAD_FULL_BATCH_SCHEDULE || rows != data_->n ||
+            (data_->nnBaseMask[0] & data_->nnMixMask[0] & mask) == 0U) {
+            return false;
         }
-    }
-
-    __aicore__ inline void RunC1GemmColumnMajor(uint32_t m, uint32_t n, uint32_t k, GM_ADDR ptrA, int64_t lda,
-                                                GM_ADDR ptrB, int64_t ldb, GM_ADDR ptrC, int64_t ldc)
-    {
-        if (m >= n) {
-            RunBlockLoop<C1BlockMmadColumnMajor, HC_GRAD_SWIZZLE_M_FIRST, ColumnMajor>(m, n, k, ptrA, lda, ptrB, ldb,
-                                                                                       ptrC, ldc);
-        } else {
-            RunBlockLoop<C1BlockMmadColumnMajor, HC_GRAD_SWIZZLE_N_FIRST, ColumnMajor>(m, n, k, ptrA, lda, ptrB, ldb,
-                                                                                       ptrC, ldc);
+        const auto& nn = data_->nnBase[0][Stage];
+        if ((nn.matmulRunInfo.nd2nzA != 0U) != ConvertA || (nn.matmulRunInfo.nd2nzB != 0U) == ConvertA) {
+            return false;
         }
+        if constexpr (ConvertA) {
+            RunNativeBody<TransA, CubeFormat::NZ, CubeFormat::ND>(scratch_, b, c, nn);
+        } else {
+            RunNativeBody<TransA, CubeFormat::ND, CubeFormat::NZ>(a, scratch_, c, nn);
+        }
+        return true;
     }
+#endif
 
-    __aicore__ inline void RunDxGemm(uint32_t m, uint32_t n, uint32_t k, GM_ADDR ptrA, int64_t lda, GM_ADDR ptrB,
-                                     int64_t ldb, GM_ADDR ptrC, int64_t ldc)
+    __aicore__ __attribute__((noinline)) void RunNativeWeightBatch(GM_ADDR a, GM_ADDR b, GM_ADDR c,
+                                                                   const BatchMatmulTilingData& nn, bool accumulate)
     {
-        RunC1Gemm(m, n, k, ptrA, lda, ptrB, ldb, ptrC, ldc);
+        using InputA = matmul::MatmulType<AscendC::TPosition::GM, CubeFormat::ND, D_T, true>;
+        using InputB = matmul::MatmulType<AscendC::TPosition::GM, CubeFormat::ND, D_T>;
+        using Output = matmul::MatmulType<AscendC::TPosition::GM, CubeFormat::ND, float>;
+        using Bias = matmul::MatmulType<AscendC::TPosition::GM, CubeFormat::ND, D_T>;
+        AscendC::TPipe pipe;
+        BatchMatMulCommonKernel<InputA, InputB, Output, Bias> kernel;
+        kernel.Init(a, b, c, nullptr, nullptr, nullptr, &nn, &pipe);
+        kernel.Process(accumulate);
+        kernel.End();
+        AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
+        pipe.Destroy();
     }
 
-    uint32_t aicNum_{1};
+    template <bool TRANS_A, typename OUT_T = float>
+    __aicore__ __attribute__((noinline)) void RunNn(uint32_t stage, uint32_t rows, uint32_t m, uint32_t n, uint32_t k,
+                                                    GM_ADDR a, uint32_t lda, GM_ADDR b, uint32_t ldb, GM_ADDR c,
+                                                    uint32_t ldc, bool accumulate = false)
+    {
+        // ND-to-NZ only writes valid M rows, while LoadData reads complete 16-row tiles.
+        // Initialize the Cube scratch for an unaligned C1a M tail before the NN kernel
+        // owns L1. This also covers both ping-pong operand regions without altering K.
+        if (stage == 0 && (m % 16) != 0) {
+            constexpr uint32_t l1Bytes = 512 * 1024; // A2/A3 Cube L1 capacity.
+            AscendC::TPipe paddingPipe;
+            AscendC::TBuf<AscendC::TPosition::A1> paddingBuf;
+            paddingPipe.InitBuffer(paddingBuf, l1Bytes);
+            auto padding = paddingBuf.Get<uint16_t>();
+            AscendC::InitConstValueParams<uint16_t> params{1, l1Bytes / 32, 0, 0};
+            AscendC::InitConstValue(padding, params);
+            AscendC::PipeBarrier<PIPE_ALL>();
+            paddingPipe.Destroy();
+        }
+        const uint32_t fullRows = data_->scheduleMode == HC_GRAD_FULL_BATCH_SCHEDULE ?
+                                      static_cast<uint32_t>(data_->fullBatchRows) :
+                                      (data_->n < data_->taskRows ? data_->n : data_->taskRows);
+        const uint32_t task = (rows == fullRows || rows == data_->n) ? 0 : 1;
+        const auto& nn = data_->nnBase[task][stage];
+        if ((data_->nnBaseMask[task] & (1U << stage)) != 0) {
+            if ((data_->nnMixMask[task] & (1U << stage)) != 0) {
+                const bool convertA = nn.matmulRunInfo.nd2nzA != 0;
+                const bool convertB = nn.matmulRunInfo.nd2nzB != 0;
+                if (convertA && convertB) {
+                    RunNative<TRANS_A, CubeFormat::NZ, CubeFormat::NZ, OUT_T>(scratch_, ConvertedB(nn), c, nn,
+                                                                              accumulate);
+                } else if (convertA) {
+                    RunNative<TRANS_A, CubeFormat::NZ, CubeFormat::ND, OUT_T>(scratch_, b, c, nn, accumulate);
+                } else {
+                    RunNative<TRANS_A, CubeFormat::ND, CubeFormat::NZ, OUT_T>(a, scratch_, c, nn, accumulate);
+                }
+                return;
+            }
+            if (lda == (TRANS_A ? m : k) && ldb == n && ldc == n) {
+                if constexpr (TRANS_A) {
+                    if (task == 0 && (data_->nnWeightBatchMask & (1U << stage)) != 0) {
+                        RunNativeWeightBatch(a, b, c, data_->nnWeightBatch[stage - 1], accumulate);
+                        return;
+                    }
+                }
+                RunNative<TRANS_A, CubeFormat::ND, CubeFormat::ND, OUT_T>(a, b, c, nn, accumulate);
+                return;
+            }
+            AscendC::TPipe pipe;
+            HcGradNnKernel<D_T, TRANS_A, OUT_T> kernel;
+            kernel.Init(a, b, c, nullptr, nullptr, nullptr, &nn, &pipe);
+            kernel.SetStrides(m, k, lda, ldb, ldc);
+            kernel.Process(0U, accumulate);
+            kernel.End();
+            AscendC::PipeBarrier<PIPE_ALL>();
+            AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
+            pipe.Destroy();
+            return;
+        }
+        MatmulTilingData tiling{};
+        // Materialize the NN parameter representation, including alignment padding.
+        // Some optimized aggregate-copy instructions are not tracked by initcheck.
+        volatile unsigned char* parameterBytes = reinterpret_cast<volatile unsigned char*>(&tiling);
+        const auto* sourceBytes = reinterpret_cast<const unsigned char*>(&nn);
+        for (uint32_t i = 0; i < sizeof(tiling); ++i) {
+            parameterBytes[i] = sourceBytes[i];
+        }
+        if constexpr (!std::is_same_v<OUT_T, float>) {
+            AscendC::TPipe pipe;
+            HcGradNnKernel<D_T, TRANS_A, OUT_T> kernel;
+            kernel.Init(a, b, c, nullptr, nullptr, nullptr, &tiling, &pipe);
+            kernel.SetStrides(m, k, lda, ldb, ldc);
+            kernel.Process();
+            kernel.End();
+            AscendC::PipeBarrier<PIPE_ALL>();
+            AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
+            pipe.Destroy();
+            return;
+        }
+        if constexpr (TRANS_A) {
+            if (!accumulate && TryHcOperandPipeline<D_T>(a, b, c, m, n, k, lda, ldb, ldc, tiling)) {
+                return;
+            }
+        } else if (stage == 0 && k >= 1024 && k % 256 == 0 && m % 16 == 0 && n % 16 == 0 && lda % 16 == 0 &&
+                   ldb % 16 == 0 && ldc % 16 == 0 && tiling.matmulTiling.singleCoreK == k &&
+                   tiling.matmulTiling.baseK == 64 && tiling.matmulTiling.singleCoreM == tiling.matmulTiling.baseM &&
+                   tiling.matmulTiling.singleCoreN == tiling.matmulTiling.baseN && tiling.matmulTiling.baseM >= 64 &&
+                   tiling.matmulTiling.baseM <= 128 && tiling.matmulTiling.baseM % 16 == 0 &&
+                   tiling.matmulTiling.baseN <= 256 && tiling.matmulTiling.baseN % 16 == 0) {
+            RunHcOperandPipeline<D_T, 128, 256, false>(a, b, c, m, n, k, lda, ldb, ldc, tiling);
+            return;
+        }
+        if constexpr (!TRANS_A) {
+            const auto& tile = tiling.matmulTiling;
+            if (stage == 3 && (k == 320 || k == 324) && m % 16 == 0 && n % 16 == 0 && lda % 16 == 0 && ldb % 16 == 0 &&
+                ldc % 16 == 0 && tile.singleCoreK == k && tile.baseK == 64 && tile.baseM == 128 && tile.baseN == 256 &&
+                tile.singleCoreM == tile.baseM && tile.singleCoreN == tile.baseN) {
+                // Split the NN tile locally along N to keep two independent L0C tiles.
+                RunHcOperandPipeline<D_T, 128, 256, false, true>(a, b, c, m, n, k, lda, ldb, ldc, tiling);
+                return;
+            }
+        }
+        AscendC::TPipe pipe;
+        HcGradNnKernel<D_T, TRANS_A, OUT_T> kernel;
+        kernel.Init(a, b, c, nullptr, nullptr, nullptr, &tiling, &pipe);
+        kernel.SetStrides(m, k, lda, ldb, ldc);
+        kernel.Process(0U, accumulate);
+        kernel.End();
+        AscendC::PipeBarrier<PIPE_ALL>();
+        AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
+        pipe.Destroy();
+    }
+    const TextGatedResidualGradTilingDataArch35* data_{nullptr};
+    GM_ADDR scratch_{nullptr};
 };
-
 } // namespace TextGatedResidualGrad
-
-#endif // TEXT_GATED_RESIDUAL_GRAD_GEMM_ARCH22_H
+#endif

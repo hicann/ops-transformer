@@ -49,6 +49,12 @@ inline uint32_t GetBlockIdx()
 }
 
 namespace AscendC {
+enum class MemDsbT {
+    DDR
+};
+template <MemDsbT>
+inline void DataSyncBarrier()
+{}
 template <unsigned Mode, int Pipe>
 void CrossCoreSetFlag(uint16_t flag)
 {

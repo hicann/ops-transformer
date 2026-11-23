@@ -1,5 +1,11 @@
 # TextGatedResidualGrad 回归测试
 
+在已安装算子包的设备上运行分块梯度回归。A2 使用 `--arch a2`，A5 使用 `--arch a5`。
+
+```bash
+python3 test_chunk_gradients.py --arch a2 --runner ./test_aclnn_text_gated_residual_grad --device 0
+```
+
 运行工作区大小计算的边界测试（不分配设备内存）：
 
 ```bash
@@ -54,7 +60,7 @@ c++ -std=c++17 test_optional_outputs.cpp \
 /tmp/tgrg-optional 0
 ```
 
-这 20 项仅查询检查覆盖 FP16 和 BF16 下所有有效的可选参数组合、wGate/dwGate 和 gamma/dgamma 配对的两个方向，以及 workspaceSize/executor 为空指针的情况，不启动内核。
+40 项工作区查询覆盖 FP16 和 BF16 的可选参数组合、输入与输出配对、权重梯度类型、空结果指针，以及其余张量形状一致时的 C/R 上限和 H/R 对齐要求。
 
 `rms_cancellation_cases.json` 保留了精度失败的 ATK 随机种子 2026110550（BF16，N=1944，C=2，H=1280，R=160，提供 gamma，不提供 gate）。在 sigmoid 饱和输入下，旧 RMS 计算在 dx 上产生 6 个小值域误差点，独立标杆为 2 个，未通过保持不变的计数比阈值 2。文件还包含种子 2026111050（BF16，N=4308，C=4，H=2560，R=320，提供 gamma 和 gate），用于暴露 RMS 投影归一化后仍存在的归约误差：算子有 16 个小值域误差点，标杆为 1 个。
 

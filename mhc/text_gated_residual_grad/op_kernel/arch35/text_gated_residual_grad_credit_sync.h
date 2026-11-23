@@ -71,6 +71,83 @@ class HcGradCreditSync {
 #endif
 
 public:
+#if HC_GRAD_NPU_ARCH == HC_GRAD_ARCH_A5
+    // The chunk schedule and task credit ring are mutually exclusive.
+    static constexpr uint16_t CHUNK_V1_READY = EDGE_V1_C1;
+    static constexpr uint16_t CHUNK_V3_READY = EDGE_V3_DX;
+    static constexpr uint16_t CHUNK_C1A_READY = EDGE_C1_RD;
+    // The UB path delivers C1a tiles locally and uses this edge for G56 storage ownership.
+    static constexpr uint16_t CHUNK_G56_READ_DONE = EDGE_C1_RD;
+    static constexpr uint16_t CHUNK_DX_READY = EDGE_DX_V6;
+    static constexpr uint16_t CHUNK_DW_READY = EDGE_G56_WD;
+
+    HC_GRAD_HOST_DEVICE void PublishChunkInput(uint16_t flag)
+    {
+        // A Cube tile can consume entries from multiple Vector producers.
+        constexpr uint16_t AIV_AGGREGATE_FLAG = 6U;
+        AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
+        AscendC::CrossCoreSetFlag<SAME_KIND_MODE, PIPE_MTE3>(AIV_AGGREGATE_FLAG);
+        AscendC::CrossCoreWaitFlag<SAME_KIND_MODE, PIPE_MTE3>(AIV_AGGREGATE_FLAG);
+        Send(flag);
+    }
+
+    template <uint16_t READY>
+    HC_GRAD_HOST_DEVICE void PublishChunkOutput()
+    {
+        static_assert(READY == CHUNK_C1A_READY || READY == CHUNK_DX_READY || READY == CHUNK_DW_READY);
+        // Use distinct aggregate counters because C1b and G56 can follow DX
+        // before every Vector core has begun consuming the DX publication.
+        constexpr uint16_t AIC_AGGREGATE_FLAG = READY == CHUNK_C1A_READY ? 3U : (READY == CHUNK_DX_READY ? 4U : 7U);
+        AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
+        AscendC::CrossCoreSetFlag<SAME_KIND_MODE, PIPE_FIX>(AIC_AGGREGATE_FLAG);
+        AscendC::CrossCoreWaitFlag<SAME_KIND_MODE, PIPE_FIX>(AIC_AGGREGATE_FLAG);
+        Send(READY);
+    }
+
+    HC_GRAD_HOST_DEVICE void WaitChunkStage(uint16_t flag)
+    {
+        WaitEdge(flag);
+    }
+
+    HC_GRAD_HOST_DEVICE void JoinAivWritesForReads()
+    {
+        constexpr uint16_t AIV_AGGREGATE_FLAG = 8U;
+        AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
+        AscendC::CrossCoreSetFlag<SAME_KIND_MODE, PIPE_MTE3>(AIV_AGGREGATE_FLAG);
+        // Peer producers write on MTE3 and consumers read on MTE2.
+        AscendC::CrossCoreWaitFlag<SAME_KIND_MODE, PIPE_MTE2>(AIV_AGGREGATE_FLAG);
+    }
+#endif
+#if HC_GRAD_NPU_ARCH == HC_GRAD_ARCH_A2
+    // The retained-chunk scheduler owns these edges separately from the task ring.
+    static constexpr uint16_t A2_C1A_INPUT_READY = EDGE_V1_C1;
+    static constexpr uint16_t A2_C1A_OUTPUT_READY = EDGE_C1_RD;
+    static constexpr uint16_t A2_DX_INPUT_READY = EDGE_V3_DX;
+    static constexpr uint16_t A2_DX_OUTPUT_READY = EDGE_DX_V6;
+    static constexpr uint16_t A2_C1B_INPUT_READY = EDGE_RD_C1;
+    static constexpr uint16_t A2_C1B_READ_DONE = EDGE_C1_WU;
+    static constexpr uint16_t A2_G56_INPUT_READY = EDGE_V3_G56;
+    static constexpr uint16_t A2_G56_READ_DONE = EDGE_G56_WD;
+
+    HC_GRAD_HOST_DEVICE void PublishA2ChunkEdge(uint16_t edge)
+    {
+        AscendC::DataSyncBarrier<AscendC::MemDsbT::DDR>();
+        SameKindBarrier();
+        Send(edge);
+    }
+
+    HC_GRAD_HOST_DEVICE void WaitA2ChunkEdge(uint16_t edge)
+    {
+        WaitEdge(edge);
+    }
+
+    static constexpr uint16_t C1A_SLAB_READY = EDGE_V1_C1;
+    HC_GRAD_HOST_DEVICE void MarkC1aSlabReady()
+    {
+        Send(C1A_SLAB_READY);
+    }
+#endif
+
     HC_GRAD_HOST_DEVICE void Init(GM_ADDR, uint64_t, uint32_t taskCount, uint32_t workspaceSlots, uint32_t, uint32_t)
     {
         workspaceSlots_ = workspaceSlots;
@@ -96,6 +173,7 @@ public:
         }
     }
 
+    template <bool DEFER_WEIGHT_GRADS = false>
     HC_GRAD_HOST_DEVICE void WaitCubeDeps(HcGradCubeOp op, uint32_t task)
     {
         switch (op) {
@@ -103,7 +181,9 @@ public:
                 WaitEdge(EDGE_V1_C1);
                 if (task >= workspaceSlots_) {
                     WaitEdge(EDGE_RD_C1); // Credit for the dactPartial slot.
-                    WaitEdge(EDGE_WD_C1); // Credit for the dwPartial slot.
+                    if constexpr (!DEFER_WEIGHT_GRADS) {
+                        WaitEdge(EDGE_WD_C1); // Credit for the dwPartial slot.
+                    }
                 }
                 break;
             case HcGradCubeOp::DX:
@@ -122,23 +202,28 @@ public:
         }
     }
 
+    template <bool DEFER_WEIGHT_GRADS = false>
     HC_GRAD_HOST_DEVICE void WaitVectorDeps(HcGradVectorOp op, uint32_t task)
     {
         switch (op) {
             case HcGradVectorOp::V1:
-                if (task >= workspaceSlots_) {
-                    // The AIV peer barrier covers V6 -> V1; G56 requires a cross-core-type credit.
-                    WaitEdge(EDGE_G56_V1);
+                if constexpr (!DEFER_WEIGHT_GRADS) {
+                    if (task >= workspaceSlots_) {
+                        // The AIV peer barrier covers V6 -> V1; G56 requires a cross-core-type credit.
+                        WaitEdge(EDGE_G56_V1);
+                    }
                 }
                 break;
             case HcGradVectorOp::REDUCE_DACT:
                 WaitEdge(EDGE_C1_RD);
                 break;
             case HcGradVectorOp::V3:
-                // REDUCE_DACT and V3 both run on AIV; wait across core types for the previous packed consumer.
-                if (task >= workspaceSlots_) {
-                    WaitEdge(EDGE_DX_V3);
-                    WaitEdge(EDGE_G56_V3);
+                if constexpr (!DEFER_WEIGHT_GRADS) {
+                    // Wait for the previous packed consumers before a ring slot can be overwritten.
+                    if (task >= workspaceSlots_) {
+                        WaitEdge(EDGE_DX_V3);
+                        WaitEdge(EDGE_G56_V3);
+                    }
                 }
                 break;
             case HcGradVectorOp::V6:
@@ -165,16 +250,21 @@ public:
         }
     }
 
+    template <bool DEFER_WEIGHT_GRADS = false>
     HC_GRAD_HOST_DEVICE void MarkCube(HcGradCubeOp op, uint32_t task)
     {
         switch (op) {
             case HcGradCubeOp::C1:
                 Send(EDGE_C1_RD);
-                Send(EDGE_C1_WU);
+                if constexpr (!DEFER_WEIGHT_GRADS) {
+                    Send(EDGE_C1_WU);
+                }
                 break;
             case HcGradCubeOp::DX:
                 Send(EDGE_DX_V6);
-                SendSlotCredit(EDGE_DX_V3, task);
+                if constexpr (!DEFER_WEIGHT_GRADS) {
+                    SendSlotCredit(EDGE_DX_V3, task);
+                }
                 break;
             case HcGradCubeOp::G56:
                 Send(EDGE_G56_WD);
@@ -186,6 +276,7 @@ public:
         }
     }
 
+    template <bool DEFER_WEIGHT_GRADS = false>
     HC_GRAD_HOST_DEVICE void MarkVector(HcGradVectorOp op, uint32_t task)
     {
         switch (op) {
@@ -197,7 +288,9 @@ public:
                 break;
             case HcGradVectorOp::V3:
                 Send(EDGE_V3_DX);
-                Send(EDGE_V3_G56);
+                if constexpr (!DEFER_WEIGHT_GRADS) {
+                    Send(EDGE_V3_G56);
+                }
                 break;
             case HcGradVectorOp::V6:
                 SendSlotCredit(EDGE_V6_DX, task);
@@ -228,7 +321,9 @@ private:
             if constexpr (HC_GRAD_EDGE_MODE == A2_EDGE_MODE) {
                 AscendC::CrossCoreWaitFlag<A2_EDGE_MODE>(flag);
             } else {
-                AscendC::CrossCoreWaitFlag<HC_GRAD_EDGE_MODE, PIPE_MTE1>(flag);
+                // NN prefetches GM inputs on MTE2. Waiting only on MTE1 permits
+                // two L1 stages to read a producer's not-yet-ready GM buffer.
+                AscendC::CrossCoreWaitFlag<HC_GRAD_EDGE_MODE, PIPE_MTE2>(flag);
             }
         } else {
             if constexpr (HC_GRAD_EDGE_MODE == A2_EDGE_MODE) {

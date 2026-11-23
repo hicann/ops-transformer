@@ -33,31 +33,32 @@ void CheckDrained()
     }
 }
 
+template <bool DEFER_WEIGHT_GRADS = false>
 void CheckSchedule(uint32_t tasks, bool gamma)
 {
     HcGradCreditSync credit;
     const auto slots = std::min(tasks, HC_GRAD_RING_SLOTS);
     credit.Init(nullptr, 0, tasks, slots, TEST_AIC_COUNT, TEST_AIV_PER_AIC);
-    HcGradScheduler<false, false> scheduler(tasks, slots, gamma);
+    HcGradScheduler<false, false, DEFER_WEIGHT_GRADS> scheduler(tasks, slots, gamma);
     unsigned beats = 0;
     while (!scheduler.Done()) {
         assert(beats++ < scheduler.MaxBeats());
         auto beat = scheduler.Next();
         testCore = TEST_AIC;
-        credit.WaitCubeDeps(beat.cubeOp, beat.cubeTask);
-        credit.WaitCubeDeps(beat.cubeOp2, beat.cubeTask2);
+        credit.WaitCubeDeps<DEFER_WEIGHT_GRADS>(beat.cubeOp, beat.cubeTask);
+        credit.WaitCubeDeps<DEFER_WEIGHT_GRADS>(beat.cubeOp2, beat.cubeTask2);
         for (testCore = TEST_AIV0; testCore <= TEST_AIV1; ++testCore) {
             for (unsigned i = 0; i < HC_GRAD_VECTOR_OPS_PER_BEAT; ++i) {
-                credit.WaitVectorDeps(beat.vectorOp[i], beat.vectorTask[i]);
+                credit.WaitVectorDeps<DEFER_WEIGHT_GRADS>(beat.vectorOp[i], beat.vectorTask[i]);
             }
         }
         // Mark only after both sides' waits: a beat cannot consume its own output.
         testCore = TEST_AIC;
-        credit.MarkCube(beat.cubeOp, beat.cubeTask);
-        credit.MarkCube(beat.cubeOp2, beat.cubeTask2);
+        credit.MarkCube<DEFER_WEIGHT_GRADS>(beat.cubeOp, beat.cubeTask);
+        credit.MarkCube<DEFER_WEIGHT_GRADS>(beat.cubeOp2, beat.cubeTask2);
         for (testCore = TEST_AIV0; testCore <= TEST_AIV1; ++testCore) {
             for (unsigned i = 0; i < HC_GRAD_VECTOR_OPS_PER_BEAT; ++i) {
-                credit.MarkVector(beat.vectorOp[i], beat.vectorTask[i]);
+                credit.MarkVector<DEFER_WEIGHT_GRADS>(beat.vectorOp[i], beat.vectorTask[i]);
             }
         }
     }
@@ -88,9 +89,13 @@ int main()
     for (unsigned tasks = 0; tasks <= EXHAUSTIVE_TASK_LIMIT; ++tasks) {
         CheckSchedule(tasks, false);
         CheckSchedule(tasks, true);
+        CheckSchedule<true>(tasks, false);
+        CheckSchedule<true>(tasks, true);
     }
     CheckSchedule(STRESS_TASK_COUNT, false);
     CheckSchedule(STRESS_TASK_COUNT, true);
+    CheckSchedule<true>(STRESS_TASK_COUNT, false);
+    CheckSchedule<true>(STRESS_TASK_COUNT, true);
     CheckPairedReductionTail();
-    std::cout << "PASS: 260 schedules, both AIV subblocks, reserved IDs and paired reduction tail\n";
+    std::cout << "PASS: 520 schedules, both AIV subblocks, reserved IDs and paired reduction tail\n";
 }
