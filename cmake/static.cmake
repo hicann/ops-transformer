@@ -83,6 +83,8 @@ if (TARGET ${OPHOST_NAME}_static OR TARGET ${OPAPI_NAME}_static)
                     $<$<TARGET_EXISTS:${OPHOST_NAME}_opapi_obj>:$<TARGET_OBJECTS:${OPHOST_NAME}_opapi_obj>>
                     $<$<TARGET_EXISTS:opbuild_gen_aclnn_all>:$<TARGET_OBJECTS:opbuild_gen_aclnn_all>>)
         target_sources(resource_${compute_unit}_static PRIVATE ${RESOURCE_CPP})
+        target_compile_definitions(resource_${compute_unit}_static PRIVATE
+                _GLIBCXX_USE_CXX11_ABI=0)
         target_include_directories(resource_${compute_unit}_static PRIVATE
                 ${OPAPI_INCLUDE})
         set_target_properties(resource_${compute_unit}_static PROPERTIES
