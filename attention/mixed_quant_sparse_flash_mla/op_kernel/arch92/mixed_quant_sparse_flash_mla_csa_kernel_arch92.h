@@ -836,16 +836,13 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
     if (runInfo0.isValid) {
         if ASCEND_IS_AIV {
             this->vecBlock.ProcessVec0(this->l1RightBuffers.Get(), v0ResGmBuffers.Get(), runInfo0, this->constInfo);
-        } else {
-            this->cubeBlock.IterateBmm1(this->bmm1Buffers.Get(), this->l1RightBuffers.Get(), v0ResGmBuffers.Get(),
-                                        runInfo0, this->constInfo);
         }
     }
     if (loop >= 1) {
         if (runInfo1.isValid) {
             if ASCEND_IS_AIC {
-                this->cubeBlock.IterateBmm2(this->bmm2Buffers.Get(), this->bmm2Buffers1.Get(), this->l1PBuffers,
-                                            this->l1RightBuffers.GetReused(), runInfo1, this->constInfo);
+                this->cubeBlock.IterateBmm1(this->bmm1Buffers.Get(), this->l1RightBuffers.Get(), v0ResGmBuffers.Get(),
+                                            runInfo1, this->constInfo);
             } else {
                 this->vecBlock.ProcessVec1(this->l1PBuffers.Get(), this->bmm1Buffers.Get(), runInfo1, this->constInfo);
             }
@@ -856,6 +853,9 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>:
             if ASCEND_IS_AIV {
                 this->vecBlock.ProcessVec2(this->bmm2Buffers.Get(), this->bmm2Buffers1.Get(), runInfo2,
                                            this->constInfo);
+            } else {
+                this->cubeBlock.IterateBmm2(this->bmm2Buffers.Get(), this->bmm2Buffers1.Get(), this->l1PBuffers,
+                                            this->l1RightBuffers.GetReused(), runInfo2, this->constInfo);
             }
             runInfo2.isValid = false;
         }

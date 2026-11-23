@@ -178,7 +178,7 @@ __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::InitLocalBuffer(
     l0bBufferManager.Init(tPipe, L0AB_SHARED_SIZE_64K);
     l0cBufferManager.Init(tPipe, L0C_SHARED_SIZE_256K);
 
-    mmL0ABuffers.Init(l0aBufferManager, BUFFER_SIZE_16K); // db类型，填入数值是总大小的一半
+    mmL0ABuffers.Init(l0aBufferManager, BUFFER_SIZE_32K); // db类型，填入数值是总大小的一半
     mmL0BBuffers.Init(l0bBufferManager, BUFFER_SIZE_32K);
     mmL0CBuffers.Init(l0cBufferManager, BUFFER_SIZE_128K);
 }
@@ -279,15 +279,15 @@ __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
     Buffer<BufferType::L0C> mm1ResL0C = mmL0CBuffers.Get();
     mm1ResL0C.Wait<HardEvent::FIX_M>(); // 占用
     MMParam param = {
-        static_cast<uint32_t>(runInfo.mRealSize),  // singleM
-        static_cast<uint32_t>(runInfo.s2RealSize), // singleN
+        static_cast<uint32_t>(runInfo.s2RealSize), // singleM
+        static_cast<uint32_t>(runInfo.mRealSize),  // singleN
         static_cast<uint32_t>(constInfo.dSize),    // singleK
         0,                                         // isLeftTranspose
         1                                          // isRightTranspose
     };
-    MatmulK<Q_T, Q_T, T, s1BaseSize, s2BaseSize, dBaseMatmulSize, ABLayout::MK, ABLayout::KN>( // m,n不切，k切128
-        inputLeftBuf.GetTensor<Q_T>(), inputRightBuf.GetTensor<Q_T>(), // mm1B直接用tensor的数据
-        mmL0ABuffers, mmL0BBuffers, mm1ResL0C.GetTensor<T>(), param);
+    MatmulK<Q_T, Q_T, T, s2BaseSize, s1BaseSize, dBaseMatmulSize, ABLayout::MK, ABLayout::KN>(
+        inputRightBuf.GetTensor<Q_T>(), inputLeftBuf.GetTensor<Q_T>(), mmL0ABuffers, mmL0BBuffers,
+        mm1ResL0C.GetTensor<T>(), param);
     if (unlikely(runInfo.s2LoopCount == runInfo.s2LoopLimit)) {
         inputLeftBuf.Set<HardEvent::MTE1_MTE2>(); // 释放L1A
     }
@@ -295,15 +295,10 @@ __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm1CSA(
     mm1ResL0C.Wait<HardEvent::M_FIX>(); // 等待L0C
     outputBuf.WaitCrossCore();
     FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams; // L0C→UB
-    fixpipeParams.nSize = Align8Func(
-        runInfo.s2RealSize); // L0C上的bmm1结果矩阵N方向的size大小; 同mmadParams.n; 为什么要8个元素对齐(32B对齐) // 128
-    fixpipeParams.mSize = Align2Func(runInfo.mRealSize); // 有效数据不足16行，只需要输出部分行即可;
-                                                         // L0C上的bmm1结果矩阵M方向的size大小(必须为偶数) // 128
-    fixpipeParams.srcStride = Align16Func(
-        fixpipeParams.mSize); // L0C上bmm1结果相邻连续数据片段间隔(前面一个数据块的头与后面数据块的头的间隔),
-                              // 单位为16*sizeof(T) // 源Nz矩阵中相邻大Z排布的起始地址偏移
-    fixpipeParams.dstStride = s2BaseSize; // mmResUb上两行之间的间隔，单位：element。 // 128:根据比对dump文件得到,
-                                          // ND方案(S1*S2)时脏数据用mask剔除
+    fixpipeParams.nSize = Align8Func(runInfo.mRealSize);
+    fixpipeParams.mSize = Align2Func(runInfo.s2RealSize);
+    fixpipeParams.srcStride = Align16Func(fixpipeParams.mSize);
+    fixpipeParams.dstStride = s1BaseSize;
     fixpipeParams.params.ndNum = 1;
     fixpipeParams.params.srcNdStride = 0;
     fixpipeParams.params.dstNdStride = 0;
@@ -328,7 +323,7 @@ __aicore__ inline void MqsmlaCsaBlockCube<TEMPLATE_ARGS>::IterateBmm2CSA(
         static_cast<uint32_t>(runInfo.mRealSize),  // singleM 64
         static_cast<uint32_t>(constInfo.dSizeV),   // singleN 512
         static_cast<uint32_t>(runInfo.s2RealSize), // singleK 128
-        0,                                         // isLeftTranspose
+        1,                                         // isLeftTranspose
         0                                          // isRightTranspose
     };
     MatmulN<Q_T, Q_T, T, s1BaseSize, s2BaseSize, dBaseMatmulSize, ABLayout::MK, ABLayout::KN>(

@@ -26,7 +26,7 @@
 #include "lib/matrix/matmul/tiling.h"
 #include "c_api/vector_datamove/vector_datamove.h"
 
-#include "../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz_sfa.h"
+#include "../../common/op_kernel/arch92/vf/vf_mul_sel_softmaxflashv2_cast_nz_dn_sfa.h"
 #include "../../common/op_kernel/arch92/vf/vf_flashupdate_new_sfa.h"
 #include "../../../sparse_flash_mla/op_kernel/arch35/common/get_kv_phy_addr_vf.h"
 
@@ -79,6 +79,11 @@ public:
     static constexpr uint32_t NUM_128 = 128;
     static constexpr uint32_t NUM_256 = 256;
     static constexpr uint32_t NUM_384 = 384;
+    static constexpr uint32_t vec1S2CopyLenDn = s2BaseSize >> 1;
+    static constexpr uint32_t vec1HalfS1BaseSize = s1BaseSize >> 1;
+    static constexpr uint32_t vec1S2CopyCountDn = (s1BaseSize >> 4) / CV_RATIO;
+    static constexpr uint32_t vec1S2strideDn = s2BaseSize * 8;
+    static constexpr uint32_t vec1ResOffsetDn = s2BaseSize * 32 + 64;
     static constexpr float R0 = 1.0f;
     static constexpr uint64_t SYNC_SINKS_BUF_FLAG = 6;
 
@@ -296,7 +301,6 @@ private:
     GlobalTensor<uint32_t> cmpKvPhyAddrGm;
 
     TBuf<> dequantScaleMode2Buf_;
-    TBuf<> commonTBuf; // common的复用空间
     TBuf<> sinksBuf;
     TQue<QuePosition::VECOUT, 1> stage1OutQue; // 2份表示可能存在pingpong
     TBuf<> stage2OutBuf;
@@ -1197,8 +1201,10 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::ProcessVec1(outputl1
     LocalTensor<float> maxUb = this->softmaxMaxBuf[runInfo.multiCoreIdxMod2].template Get<float>();
     LocalTensor<float> expUb = this->softmaxExpBuf[runInfo.taskIdMod2].template Get<T>();
     auto stage1CastTensor = this->stage1OutQue.template AllocTensor<Q_T>();
-    LocalTensor<T> apiTmpBuffer = this->commonTBuf.template Get<T>();
     LocalTensor<T> mmRes = bmm1ResBuf.template GetTensor<T>();
+    const uint32_t originN = runInfo.s2RealSize;
+    const uint32_t s2Align = runInfo.s2AlignedSize;
+    const T scale = static_cast<T>(constInfo.softmaxScale);
     bool isFirstSoftmaxBase = runInfo.s2LoopCount == 0;
     if constexpr (IS_BATCH_CONSISTENCY) {
         isFirstSoftmaxBase = runInfo.isFirstBase;
@@ -1225,35 +1231,34 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::ProcessVec1(outputl1
             Duplicate(sumUb, static_cast<T>(0), runInfo.halfMRealSize);
         }
     }
-    if (likely(runInfo.s2RealSize == 128)) { // s2RealSize等于128分档, VF内常量化减少if判断
-        ProcessVec1Vf<T, Q_T, true, s1BaseSize, s2BaseSize, FaVectorApi::OriginNRange::EQ_128_SFA>(
-            stage1CastTensor, mmRes, sumUb, maxUb, maxUb, apiTmpBuffer, vselrIndexesBuf, runInfo.halfMRealSize,
-            runInfo.s2RealSize, static_cast<T>(constInfo.softmaxScale), negativeFloatScalar);
-    } else if (runInfo.s2RealSize <= 64) { // s2RealSize小于等于64分档, VF内常量化减少if判断
-        ProcessVec1Vf<T, Q_T, true, s1BaseSize, s2BaseSize, FaVectorApi::OriginNRange::GT_0_AND_LTE_64_SFA>(
-            stage1CastTensor, mmRes, sumUb, maxUb, maxUb, apiTmpBuffer, vselrIndexesBuf, runInfo.halfMRealSize,
-            runInfo.s2RealSize, static_cast<T>(constInfo.softmaxScale), negativeFloatScalar);
-    } else if (runInfo.s2RealSize < 128) { // s2RealSize小于128分档, VF内常量化减少if判断
-        ProcessVec1Vf<T, Q_T, true, s1BaseSize, s2BaseSize, FaVectorApi::OriginNRange::GT_64_AND_LTE_128_SFA>(
-            stage1CastTensor, mmRes, sumUb, maxUb, maxUb, apiTmpBuffer, vselrIndexesBuf, runInfo.halfMRealSize,
-            runInfo.s2RealSize, static_cast<T>(constInfo.softmaxScale), negativeFloatScalar);
+    if (!isFirstSoftmaxBase || isSinks) {
+        MqsmlaVec1Dn64<Q_T, s2BaseSize, true>(stage1CastTensor, sumUb, maxUb, mmRes, expUb, s1BaseSize, s2BaseSize,
+                                              originN, scale, negativeFloatScalar);
+    } else {
+        MqsmlaVec1Dn64<Q_T, s2BaseSize, false>(stage1CastTensor, sumUb, maxUb, mmRes, expUb, s1BaseSize, s2BaseSize,
+                                               originN, scale, negativeFloatScalar);
     }
     bmm1ResBuf.SetCrossCore();
     this->stage1OutQue.template EnQue(stage1CastTensor);
     this->stage1OutQue.template DeQue<Q_T>();
     LocalTensor<Q_T> mm2AL1Tensor = outputBuf.GetTensor<Q_T>();
-    if (likely(runInfo.halfMRealSize != 0)) {
-        DataCopy(mm2AL1Tensor[constInfo.subBlockIdx * (BLOCK_BYTE / sizeof(Q_T)) *
-                              (runInfo.mRealSize - runInfo.halfMRealSize)],
-                 stage1CastTensor,
-                 {s2BaseSize / 16, (uint16_t)(runInfo.halfMRealSize), (uint16_t)(vec1Srcstride - runInfo.halfMRealSize),
-                  (uint16_t)(Align16Func(runInfo.mRealSize) - runInfo.halfMRealSize)});
+    if (runInfo.s2RealSize > vec1S2CopyLenDn) {
+        asc_copy_ub2l1((__cbuf__ void*)mm2AL1Tensor[constInfo.subBlockIdx * vec1HalfS1BaseSize * s2Align].GetPhyAddr(),
+                       (__ubuf__ void*)stage1CastTensor.GetPhyAddr(), static_cast<uint16_t>(vec1S2CopyCountDn),
+                       static_cast<uint16_t>(vec1S2CopyLenDn), 1, static_cast<uint16_t>(s2Align - vec1S2CopyLenDn));
+        asc_copy_ub2l1(
+            (__cbuf__ void*)(mm2AL1Tensor[constInfo.subBlockIdx * vec1HalfS1BaseSize * s2Align + vec1S2strideDn]
+                                 .GetPhyAddr()),
+            (__ubuf__ void*)stage1CastTensor[vec1ResOffsetDn].GetPhyAddr(), static_cast<uint16_t>(vec1S2CopyCountDn),
+            static_cast<uint16_t>(s2Align - vec1S2CopyLenDn), static_cast<uint16_t>(s2BaseSize - s2Align + 1),
+            static_cast<uint16_t>(vec1S2CopyLenDn));
+    } else {
+        asc_copy_ub2l1((__cbuf__ void*)mm2AL1Tensor[constInfo.subBlockIdx * vec1HalfS1BaseSize * s2Align].GetPhyAddr(),
+                       (__ubuf__ void*)stage1CastTensor.GetPhyAddr(), static_cast<uint16_t>(vec1S2CopyCountDn),
+                       static_cast<uint16_t>(s2Align), static_cast<uint16_t>(vec1S2CopyLenDn - s2Align + 1), 0);
     }
     this->stage1OutQue.template FreeTensor(stage1CastTensor);
     outputBuf.SetCrossCore();
-    if (!isFirstSoftmaxBase || isSinks) {
-        SFAUpdateExpSumAndExpMax<T>(sumUb, maxUb, expUb, sumUb, maxUb, apiTmpBuffer, runInfo.halfMRealSize);
-    }
     if constexpr (!HIGH_PERF) {
         const bool copyOutLse = (!IS_BATCH_CONSISTENCY || runInfo.reduceBlockId == 0) && !runInfo.isCrossCoreSplit &&
                                 this->isSoftmaxLseGmValid_ && runInfo.halfMRealSize > 0 &&
@@ -2541,8 +2546,7 @@ __aicore__ inline void MqsmlaCsaBlockVector<TEMPLATE_ARGS>::InitLocalBuffer(TPip
         SetFlag<HardEvent::V_MTE2>(vToMte2V0Id3[NUM_2]);
     }
 
-    tPipe->InitBuffer(commonTBuf, 512); // commonTBuf内存申请512B
-    tPipe->InitBuffer(sinksBuf, 512);   // sinksBuf内存申请512B
+    tPipe->InitBuffer(sinksBuf, 512);
 
     tPipe->InitBuffer(stage0OutBuf[0], dVTemplateType * (v0BaseSize + 1) * sizeof(Q_T));
     tPipe->InitBuffer(stage0OutBuf[1], dVTemplateType * (v0BaseSize + 1) * sizeof(Q_T));
