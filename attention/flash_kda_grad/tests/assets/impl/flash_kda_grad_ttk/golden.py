@@ -44,7 +44,7 @@ from __future__ import annotations
 import math
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from threading import local
 from typing import Optional, Tuple
 
@@ -401,6 +401,25 @@ def _gate_beta(
     emulate_npu_forward: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Return (per-step log decay, effective beta) for one chunk/head."""
+    step_gate = _activate_gate(
+        raw_g, A_log, dt_bias, high_dtype, gate_mode, lower_bound,
+        use_gate_in_kernel, emulate_npu_forward,
+    )
+
+    if use_beta_sigmoid_in_kernel:
+        factor = 2.0 if allow_neg_eigval else 1.0
+        beta = beta.to(high_dtype)
+        if emulate_npu_forward:
+            beta_effective = (1.0 / (1.0 + (-beta).exp())) * factor
+        else:
+            beta_effective = torch.sigmoid(beta) * factor
+    else:
+        beta_effective = beta.to(high_dtype)
+    return step_gate, beta_effective
+
+
+def _activate_gate(raw_g, A_log, dt_bias, high_dtype, gate_mode, lower_bound,
+                   use_gate_in_kernel, emulate_npu_forward):
     if use_gate_in_kernel:
         alpha = A_log.exp().to(high_dtype)
         biased = raw_g + (0.0 if dt_bias is None else dt_bias.to(high_dtype))
@@ -419,16 +438,18 @@ def _gate_beta(
         # supplies the per-step log decay directly, positive values included.
         step_gate = raw_g
 
-    if use_beta_sigmoid_in_kernel:
-        factor = 2.0 if allow_neg_eigval else 1.0
-        beta = beta.to(high_dtype)
-        if emulate_npu_forward:
-            beta_effective = (1.0 / (1.0 + (-beta).exp())) * factor
-        else:
-            beta_effective = torch.sigmoid(beta) * factor
-    else:
-        beta_effective = beta.to(high_dtype)
-    return step_gate, beta_effective
+    return step_gate
+
+
+def _gate_prefix(step_gate, ordered):
+    if not ordered:
+        return step_gate.cumsum(0)
+    prefix = torch.zeros_like(step_gate[0])
+    rows = []
+    for row in step_gate:
+        prefix = prefix + row
+        rows.append(prefix)
+    return torch.stack(rows)
 
 
 @dataclass(frozen=True)
@@ -590,6 +611,7 @@ def _chunk_step(
     persistent_forward=False,
     emit_output=True,
     advance_state=True,
+    retain_only=False,
 ):
     """Chunkwise KDA step; every ABI-stored tensor is rounded to ``low_dtype``.
 
@@ -610,16 +632,7 @@ def _chunk_step(
         use_beta_sigmoid_in_kernel=use_beta_sigmoid_in_kernel,
         emulate_npu_forward=emulate_npu_forward,
     )
-    if emulate_npu_forward:
-        # Vector updates the prefix one token at a time in FP32.
-        prefix = torch.zeros_like(step_gate[0])
-        rows = []
-        for row in step_gate:
-            prefix = prefix + row
-            rows.append(prefix)
-        gate = torch.stack(rows)
-    else:
-        gate = step_gate.cumsum(0)
+    gate = _gate_prefix(step_gate, emulate_npu_forward)
     length = Q.shape[0]
 
     if emulate_npu_forward and use_gate_in_kernel and gate_mode != "softplus":
@@ -653,6 +666,8 @@ def _chunk_step(
         inverse = torch.linalg.solve_triangular(
             identity + lower, identity, upper=False, unitriangular=True
         ).to(low_dtype)
+    if retain_only:
+        return m, inverse, b_eff
     p = inverse.to(high_dtype)
 
     gate_exp = gate.exp()
@@ -874,6 +889,7 @@ def build_cache(
     emulate_bf16: bool = True,
     storage_dtype: Optional[torch.dtype] = None,
     _peer_only: bool = False,
+    _retain_only: bool = False,
     emulate_npu_forward: bool = False,
     forward_template: Optional[str] = None,
 ) -> Cache:
@@ -949,17 +965,19 @@ def build_cache(
     shape_tokens = (token_count, value_heads)
     Aqk = torch.zeros(chunk_count, value_heads, chunk_size, chunk_size, dtype=low_dtype, device=q.device)
     Akk = torch.zeros(Aqk.shape, dtype=low_dtype, device=q.device)
-    w = torch.zeros(*shape_tokens, key_dim, dtype=low_dtype, device=q.device)
-    u = torch.zeros(*shape_tokens, value_dim, dtype=low_dtype, device=q.device)
-    qg = torch.zeros(w.shape, dtype=low_dtype, device=w.device)
-    kg = torch.zeros(w.shape, dtype=low_dtype, device=w.device)
-    v_new = torch.zeros(u.shape, dtype=low_dtype, device=u.device)
-    g_cumsum = torch.zeros(*shape_tokens, key_dim, dtype=high_dtype, device=q.device)
-    chunk_states = torch.zeros(
-        chunk_count, value_heads, value_dim, key_dim, dtype=low_dtype, device=q.device
-    )
-    output = torch.zeros(token_count, value_heads, value_dim, dtype=low_dtype, device=v.device)
-    final_state = torch.empty_like(initial_state)
+    w = u = qg = kg = v_new = g_cumsum = chunk_states = output = final_state = None
+    if not _retain_only:
+        w = torch.zeros(*shape_tokens, key_dim, dtype=low_dtype, device=q.device)
+        u = torch.zeros(*shape_tokens, value_dim, dtype=low_dtype, device=q.device)
+        qg = torch.zeros(w.shape, dtype=low_dtype, device=w.device)
+        kg = torch.zeros(w.shape, dtype=low_dtype, device=w.device)
+        v_new = torch.zeros(u.shape, dtype=low_dtype, device=u.device)
+        g_cumsum = torch.zeros(*shape_tokens, key_dim, dtype=high_dtype, device=q.device)
+        chunk_states = torch.zeros(
+            chunk_count, value_heads, value_dim, key_dim, dtype=low_dtype, device=q.device
+        )
+        output = torch.zeros(token_count, value_heads, value_dim, dtype=low_dtype, device=v.device)
+        final_state = torch.empty_like(initial_state)
     beta_effective = torch.zeros(*shape_tokens, dtype=high_dtype, device=q.device)
     beta_sigmoid = torch.zeros(*shape_tokens, dtype=high_dtype, device=q.device)
 
@@ -976,7 +994,7 @@ def build_cache(
     for seq_index, head, qk_head, chunks, chunk_base in _head_chunks(
         token_count, batch, value_heads, key_heads, chunk_size, bounds
     ):
-        state = initial_state[seq_index, head].to(high_dtype).T.contiguous()
+        state = None if _retain_only else initial_state[seq_index, head].to(high_dtype).T.contiguous()
         for local_chunk, (start, end) in enumerate(chunks):
             length = end - start
             chunk = chunk_base + local_chunk
@@ -984,7 +1002,8 @@ def build_cache(
             # Public saved states are BF16; peer must consume the same rounded
             # cache as backward. Keep the live recurrence state in high_dtype.
             # Exact-math reference mode retains high_dtype via low_dtype above.
-            chunk_states[chunk, head] = state.T
+            if not _retain_only:
+                chunk_states[chunk, head] = state.T
             step = _chunk_step(
                 q_eff[start:end, qk_head],
                 k_eff[start:end, qk_head],
@@ -998,8 +1017,16 @@ def build_cache(
                 persistent_forward=persistent_forward,
                 emit_output=not _peer_only,
                 advance_state=not _peer_only or local_chunk + 1 < len(chunks),
+                retain_only=_retain_only,
                 **common,
             )
+            if _retain_only:
+                m, inverse, activated_beta = step
+                Aqk[chunk, head, :length, :length] = m
+                Akk[chunk, head, :length, :length] = inverse
+                beta_effective[start:end, head] = activated_beta
+                beta_sigmoid[start:end, head] = activated_beta
+                continue
             state = step.state
             Aqk[chunk, head, :length, :length] = step.m
             Akk[chunk, head, :length, :length] = step.inverse
@@ -1017,10 +1044,11 @@ def build_cache(
             )
             if not _peer_only:
                 output[start:end, head] = step.out
-        final_state[seq_index, head] = state.T
+        if not _retain_only:
+            final_state[seq_index, head] = state.T
 
     return Cache(
-        out=restore_layout(output, v, layout),
+        out=None if output is None else restore_layout(output, v, layout),
         final_state=final_state,
         q_norm=ctx["q_norm"],
         k_norm=ctx["k_norm"],
@@ -1038,6 +1066,76 @@ def build_cache(
         chunk_states=chunk_states,
         beta_effective=beta_effective,
     )
+
+
+def _recompute_peer_cache(cache, q, k, v, g, initial_state, A_log, dt_bias, *,
+                          layout, cu_seqlens, seqused, gate_mode, lower_bound,
+                          use_gate_in_kernel, use_qk_l2norm_in_kernel,
+                          staged, round_u_pre):
+    """Rebuild the seven tracks from the forward-retained BF16/FP32 inputs."""
+    initial_state = resolve_initial_state(q, v, initial_state, layout, cu_seqlens)
+    bounds = sequence_bounds(q, initial_state, layout, cu_seqlens, seqused)
+    qk = (cache.q_norm, cache.k_norm) if use_qk_l2norm_in_kernel else (
+        token_major(q, layout), token_major(k, layout)
+    )
+    q_tokens, k_tokens = qk
+    v_tokens = token_major(v, layout)
+    g_tokens = token_major(g, layout)
+    token_count, heads, value_dim = v_tokens.shape
+    key_heads, key_dim = q_tokens.shape[1:]
+    chunk_size = cache.Akk.shape[-1]
+    beta = cache.beta_effective
+    w = q.new_zeros((token_count, heads, key_dim), dtype=torch.bfloat16)
+    qg = torch.zeros_like(w)
+    kg = torch.zeros_like(w)
+    u = q.new_zeros((token_count, heads, value_dim), dtype=torch.float32)
+    v_new = torch.zeros_like(u, dtype=torch.bfloat16)
+    gamma = torch.zeros_like(w, dtype=torch.float32)
+    states = q.new_zeros(
+        (cache.Akk.shape[0], heads, value_dim, key_dim), dtype=torch.float32,
+    )
+    for seq, head, qk_head, chunks, chunk_base in _head_chunks(
+        token_count, initial_state.shape[0], heads, key_heads, chunk_size, bounds
+    ):
+        state = initial_state[seq, head].float().T.contiguous()
+        for local_chunk, (start, end) in enumerate(chunks):
+            chunk = chunk_base + local_chunk
+            length = end - start
+            Q = q_tokens[start:end, qk_head].float()
+            K = k_tokens[start:end, qk_head].float()
+            V = v_tokens[start:end, head].float()
+            G = _bf16_operand(g_tokens[start:end, head].float())
+            B = beta[start:end, head].float()[:, None]
+            gate = _gate_prefix(_activate_gate(
+                G, A_log[head] if A_log is not None else None,
+                dt_bias[head] if dt_bias is not None else None,
+                torch.float32, gate_mode, lower_bound, use_gate_in_kernel, True,
+            ), ordered=True)
+            decay = gate.exp()
+            q_decay = _bf16_operand(Q * decay)
+            k_restore = _bf16_operand(K * (gate[-1:] - gate).exp())
+            inverse = cache.Akk[chunk, head, :length, :length].float()
+            W = _bf16_operand(_cube_matmul(inverse, _bf16_operand((K * decay) * B), quantize=True))
+            U = _cube_matmul(inverse, _bf16_operand(V * B), quantize=True)
+            h_low = _bf16_operand(state)
+            if staged:
+                u_operand = _bf16_operand(U) if round_u_pre else U
+                corrected = u_operand - _cube_matmul(W, h_low, quantize=True)
+            else:
+                corrected = _cube_matmul(-W, h_low, quantize=True, initial=U)
+            corrected = _bf16_operand(corrected)
+            states[chunk, head] = state.T
+            w[start:end, head] = W
+            u[start:end, head] = U
+            qg[start:end, head] = q_decay
+            kg[start:end, head] = k_restore
+            v_new[start:end, head] = corrected
+            gamma[start:end, head] = gate
+            if local_chunk + 1 < len(chunks):
+                delta = _cube_matmul(k_restore.T, corrected, quantize=True)
+                state = torch.addcmul(delta, state, gate[-1:].exp().T)
+    return replace(cache, w=w, u=u, qg=qg, kg=kg, v_new=v_new, g_cumsum=gamma,
+                   chunk_states=states)
 
 
 # ---------------------------------------------------------------------------
@@ -1261,6 +1359,19 @@ def _persistent_peer_plan(bounds, key_heads, value_heads, cores=32):
     return balanced([x[0] for x in heap])
 
 
+def _peer_recompute_uses_staged(bounds, key_heads, value_heads, chunk_size,
+                                fused_gate, lower_bound, forward_template, cores):
+    # Same owner admission and masked-chunk/U_pre fallback as NPU recompute.
+    return (
+        forward_template == "staged"
+        or not fused_gate
+        or lower_bound is None
+        or key_heads != value_heads
+        or any(end == start or (end - start) % chunk_size for start, end in bounds)
+        or not _persistent_peer_plan(bounds, key_heads, value_heads, cores=cores)
+    )
+
+
 def _cube_causal_delta(q, k, gamma, beta, da, dl, scale):
     """Full-chunk Cube causal path, including coefficient/storage rounding."""
     forward = (gamma-gamma[:1]).exp()
@@ -1349,6 +1460,9 @@ def staged_backward(
     p_scale: str = "none",
     v_path_bf16: bool = False,
     emulate_npu_gate_backward: bool = False,
+    staged_recompute: bool = False,
+    recomputed_cache: bool = False,
+    backward_core_num: int = 32,
 ) -> Tuple[
     torch.Tensor,
     torch.Tensor,
@@ -1417,7 +1531,8 @@ def staged_backward(
     bounds = sequence_bounds(q, dht, layout, cu_seqlens, seqused)
     cube_causal = (quantize and use_gate_in_kernel and gate_mode != "softplus"
                    and key_heads == value_heads and abs(lower_bound)*63 <= 70
-                   and _persistent_peer_plan(bounds, key_heads, value_heads))
+                   and not staged_recompute
+                   and _persistent_peer_plan(bounds, key_heads, value_heads, cores=backward_core_num))
     chunk_size = cache.Aqk.shape[-1]
     chunk_base = 0
 
@@ -1518,7 +1633,9 @@ def staged_backward(
                     dkg = _cube_matmul(
                         v_operand, split_operand(dstate_out).T, quantize=False
                     )
-                dstate_decay = (dstate_out * chunk_state).sum(-1)
+                # Gate-last sees the BF16 boundary even when recompute stores FP32 states.
+                gate_state = state_operand if recomputed_cache else chunk_state
+                dstate_decay = (dstate_out * gate_state).sum(-1)
                 dchunk_state = (
                     float(scale) * _cube_matmul(
                         round_operand(qg).T, do_operand, quantize=quantize
@@ -1717,7 +1834,7 @@ def staged_backward(
                 if quantize and use_gate_in_kernel and gate_mode == "softplus" and len(chunks) == 1:
                     sensitivity_da, sensitivity_db = _short_softplus_sensitivity(
                         q_chunk, k_chunk, v_chunk, g_cumsum, beta_chunk,
-                        chunk_state.T, do_chunk, dht[seq_index, head].to(dtype), scale,
+                        gate_state.T, do_chunk, dht[seq_index, head].to(dtype), scale,
                     )
                     dA_log[head] += sensitivity_da - softplus_da
                     if use_beta_sigmoid_in_kernel:
@@ -2146,10 +2263,11 @@ def bf16_peer(
     gate_grad_bf16: bool = False,
     p_scale: str = "none",
     v_path_bf16: bool = False,
-    disable_recompute: bool = False,
+    disable_recompute: Optional[bool] = None,
     cache: Optional["Cache"] = None,
     cache_source: str = "ref",
     forward_template: Optional[str] = None,
+    backward_core_num: int = 32,
     **_ignored,
 ):
     """Third-party reference with the operator's BF16 quantization budget.
@@ -2179,8 +2297,9 @@ def bf16_peer(
     dt_bias, dht = normalize_backward_optionals(
         q, v, initial_state, dt_bias, dht, layout, cu_seqlens
     )
+    recompute = os.environ.get("KDA_GRAD_RECOMPUTE", "0") == "1" if disable_recompute is None else not disable_recompute
+    emulate_npu_forward = str(cache_source).lower() == "fwd"
     if cache is None:
-        emulate_npu_forward = str(cache_source).lower() == "fwd"
         # Forward consumes BF16 g even when the public tensor is FP32.
         # Keep the original gate for its backward chain rule below.
         forward_g = g.to(torch.bfloat16) if emulate_npu_forward else g
@@ -2196,9 +2315,26 @@ def bf16_peer(
             emulate_bf16=True,
             storage_dtype=torch.bfloat16,
             _peer_only=True,
+            _retain_only=recompute,
             emulate_npu_forward=emulate_npu_forward,
-            forward_template=forward_template if not disable_recompute else None,
+            forward_template=forward_template,
             **kwargs,
+        )
+    staged_recompute = False
+    if recompute:
+        bounds = sequence_bounds(q, dht, layout, cu_seqlens, seqused)
+        axis = 2 if layout == "BSND" else 1
+        staged_recompute = _peer_recompute_uses_staged(
+            bounds, q.shape[axis], v.shape[axis], cache.Akk.shape[-1],
+            use_gate_in_kernel, kwargs["lower_bound"], forward_template, backward_core_num,
+        )
+        cache = _recompute_peer_cache(
+            cache, q, k, v, g, initial_state, A_log, dt_bias,
+            layout=layout, cu_seqlens=cu_seqlens, seqused=seqused,
+            gate_mode=kwargs["gate_mode"], lower_bound=kwargs["lower_bound"],
+            use_gate_in_kernel=use_gate_in_kernel,
+            use_qk_l2norm_in_kernel=use_qk_l2norm_in_kernel,
+            staged=staged_recompute, round_u_pre=forward_template == "staged",
         )
     grads = staged_backward(
         q, k, v, g, beta, do, dht, cache,
@@ -2212,10 +2348,13 @@ def bf16_peer(
         v_path_bf16=bool(v_path_bf16),
         emulate_npu_gate_backward=(
             str(cache_source).lower() == "fwd"
-            and not disable_recompute
+            and recompute
             and g.device.type == "cpu"
             and q.dtype != torch.float64
         ),
+        staged_recompute=staged_recompute,
+        recomputed_cache=recompute,
+        backward_core_num=backward_core_num,
         **kwargs
     )
     return restore_bias_gradient(grads, raw_bias)

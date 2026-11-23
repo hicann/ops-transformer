@@ -107,7 +107,18 @@ def _token_major(t: torch.Tensor, layout: str) -> torch.Tensor:
 
 
 def _build_cache(
-    q, k, v, g, beta, initial_state, A_log, dt_bias, *, use_fwd: bool, **kwargs
+    q,
+    k,
+    v,
+    g,
+    beta,
+    initial_state,
+    A_log,
+    dt_bias,
+    *,
+    use_fwd: bool,
+    disable_recompute: bool = True,
+    **kwargs,
 ):
     """Forward cache for the backward operator.
 
@@ -139,6 +150,7 @@ def _build_cache(
             cu_seqlens=kwargs.get("cu_seqlens"),
             seqused=kwargs.get("seqused"),
             forward_template=kwargs.get("forward_template"),
+            disable_recompute=disable_recompute,
         )
 
     host = {
@@ -187,6 +199,11 @@ def _load_forward():
     """
     from attention.flash_kda.torch_extension.flash_kda import _dsl_module
 
+    if package := os.environ.get("KDA_FORWARD_NATIVE_PACKAGE"):
+        from cannbotdsl.aot import register_directory
+
+        register_directory(package)
+
     def flash_kda_fwd(q, *args, **kwargs):
         return _dsl_module("flash_kda", q).flash_kda_fwd(q, *args, **kwargs)
 
@@ -218,6 +235,7 @@ def _load_forward():
         cu_seqlens=None,
         seqused=None,
         forward_template=None,
+        disable_recompute=True,
     ):
         batch, heads, width = (
             (cu_seqlens.numel() - 1, q.shape[1], q.shape[-1])
@@ -268,7 +286,7 @@ def _load_forward():
             use_qk_l2norm_in_kernel=use_qk_l2norm_in_kernel,
             use_gate_in_kernel=use_gate_in_kernel,
             use_beta_sigmoid_in_kernel=use_beta_sigmoid_in_kernel,
-            disable_recompute=True,
+            disable_recompute=disable_recompute,
             allow_neg_eigval=allow_neg_eigval,
             output_final_state=True,
         )
@@ -432,13 +450,14 @@ def npu(
     use_beta_sigmoid_in_kernel: bool = True,
     disable_recompute: Optional[bool] = None,
     forward_template: str | None = None,
+    backward_core_num: int = 32,
 ):
     """FlashKDA backward; device dispatch on ``q.device.type``.
 
     ``disable_recompute=False`` asks the NPU kernel to rebuild seven forward
     caches; True consumes saved caches. None preserves the legacy
     KDA_GRAD_RECOMPUTE environment setting (unset means saved caches).
-    This switch does not change the CPU golden/peer arithmetic.
+    The BF16 peer mirrors the selected cache mode.
     """
     if q.dtype != k.dtype or q.shape != k.shape:
         raise ValueError("q and k must share shape and dtype")
@@ -467,7 +486,26 @@ def npu(
     cache_bias, dht = golden.normalize_backward_optionals(
         q, v, initial_state, dt_bias, dht, layout, cu_seqlens
     )
+    recompute = _RECOMPUTE if disable_recompute is None else not bool(disable_recompute)
     if q.device.type != "npu":
+        if recompute:
+            return golden.bf16_peer(
+                q,
+                k,
+                v,
+                g,
+                beta,
+                A_log,
+                dt_bias,
+                initial_state,
+                do,
+                dht,
+                disable_recompute=False,
+                cache_source=cache_source,
+                forward_template=forward_template,
+                backward_core_num=backward_core_num,
+                **common,
+            )
         # Host replay: identical signature and identical cache dtypes.
         cache = golden.build_cache(
             q,
@@ -499,6 +537,7 @@ def npu(
         cache_bias,
         use_fwd=use_fwd,
         forward_template=forward_template,
+        disable_recompute=not recompute,
         **common,
     )
     # With L2Norm enabled, backward consumes saved normalized Q/K and the
@@ -526,6 +565,10 @@ def npu(
         ),
         layout=layout,
     )
+    if use_fwd and recompute:
+        # Finish the standalone forward launch before the recompute kernel
+        # consumes its retained caches in the direct AOT test.
+        torch.npu.current_stream(q.device).synchronize()
     op_cache = _operator_cache(
         cache,
         batch=int(initial_state.shape[0]),
@@ -543,7 +586,6 @@ def npu(
     # Explicit per-case attributes take priority over the legacy environment.
     # In recompute mode retain Aqk/Akk, norm and beta caches, but pass None for
     # the seven tracks the kernel rebuilds from normalized Q/K and initial_state.
-    recompute = _RECOMPUTE if disable_recompute is None else not bool(disable_recompute)
     if recompute and use_fwd and forward_template == "staged":
         metadata._flash_kda_round_recomputed_u_pre = True
     if layout == "BNSD":
