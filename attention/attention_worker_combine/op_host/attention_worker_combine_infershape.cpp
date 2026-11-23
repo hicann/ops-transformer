@@ -73,7 +73,10 @@ graphStatus InferDtype4AttentionWorkerCombine(gert::InferDataTypeContext* contex
     auto tokenDtype = attrs->GetAttrPointer<int64_t>(IDX_ONE);
     OP_CHECK_NULL_WITH_CONTEXT(context, tokenDtype);
     OP_CHECK_IF(*tokenDtype < 0 || *tokenDtype > 4,
-                OP_LOGE(context->GetNodeName(), "token_dtype must be 0, 1, 2, 3 or 4."), return GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "token_dtype",
+                                                      std::to_string(*tokenDtype).c_str(),
+                                                      "The value of token_dtype must be in [0, 4]"),
+                return GRAPH_FAILED);
     if (*tokenDtype != TOKEN_DTYPE_FP16) {
         context->SetOutputDataType(OUTPUT_IDX_Y, ge::DT_BF16);
     } else {
