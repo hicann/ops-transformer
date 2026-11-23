@@ -10,6 +10,7 @@
 
 import torch
 import torch_npu
+import cann_ops_transformer
 
 # 参数设置
 total_tokens = 256

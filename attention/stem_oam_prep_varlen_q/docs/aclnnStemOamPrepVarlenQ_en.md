@@ -25,17 +25,17 @@
 
 ## Function
 
-- Description: Performs the Q-side preprocessing computation for Stem OAM block-sparse attention. Converts a varlen Q tensor from the paged storage format into flattened qFlat output grouped by stem block (128 tokens) for subsequent OAM score computation.
+- Description: Performs the Q-side preprocessing computation for Stem OAM block-sparse attention. Converts a varlen Q tensor stored in token-concatenated layout ([total_tokens, H_q, D]) into flattened qFlat output grouped by stem block (128 tokens) for subsequent OAM score computation.
 - Formula:
 
   Stage 1 Scale Fusion:
-  $$q\_scale[b, h, pos] = qscale[b, h, pos]$$
+  $$q\_scale[b,h,pos] = qScale[cu\_seqlens\_q[b]+pos,\ h]$$ (pos is the token index within the batch sequence)
 
-  Stage 2 De-page Varlen:
+  Stage 2 Varlen Positioning:
   $$Q\_dense[b] = Cast(q[cu\_seqlens\_q[b]:cu\_seqlens\_q[b]+q\_len[b], :, :], \text{FP32})$$
 
   Stage 3 Weighted Group Sum (natural order, NO flip):
-  $$Q\_group\_sum[b,h,qb,g,:] = \sum_{r=0}^{R-1} Q\_blocks[b,h,qb,r,g,:] \times q\_scale[b,h,position(qb,r,g)]$$
+  $$Q\_group\_sum[b,h,qb,g,:] = \sum_{r=0}^{R-1} Q\_blocks[b,h,qb,r,g,:] \times qScale[cu\_seqlens\_q[b]+position(qb,r,g),\ h]$$ (where position(qb,r,g) = qb*stemBlockSize + r*stemStride + g; positions beyond qSeqLens[b] are zero-filled by the kernel and contribute zero)
 
   Stage 4 Flatten:
   $$qflat[b, h, qb, g \times D : (g+1) \times D] = Q\_group\_sum[b, h, qb, g, :]$$
@@ -110,7 +110,7 @@ aclnnStatus aclnnStemOamPrepVarlenQ(
       <td>qSeqLens (aclIntArray*)</td>
       <td>Input</td>
       <td>Indicates the Q sequence length of each batch. Corresponds to q_seq_lens in the formula.</td>
-      <td><ul><li>The length is equal to batch, and the value range is (0, 1024].</li><li>Each value is ≥ 0.</li><li>If the length is 0, it is processed as an empty tensor and directly returned.</li></ul></td>
+      <td><ul><li>The length is equal to batch, and the batch value range is [0, 1024].</li><li>Each value is ≥ 0.</li><li>If the length is 0, it is processed as an empty tensor and directly returned.</li></ul></td>
       <td>INT64</td>
       <td>-</td>
       <td>1 ([batch])</td>
@@ -120,7 +120,7 @@ aclnnStatus aclnnStemOamPrepVarlenQ(
       <td>cuSeqLensQ (aclIntArray*)</td>
       <td>Input</td>
       <td>Indicates the cumulative sequence length offset of Q, used for varlen indexing. Corresponds to cu_seqlens_q in the formula.</td>
-      <td><ul><li>The length is batch+1.</li><li>cuSeqLensQ[0] must be 0.</li><li>cuSeqLensQ[batch] must be equal to total_tokens.</li><li>Monotonically increasing (equal values allowed).</li></ul></td>
+      <td><ul><li>The length is batch+1.</li><li>cuSeqLensQ[0] must be 0.</li><li>cuSeqLensQ[batch] must be equal to total_tokens.</li><li>The prefix-sum relation cuSeqLensQ[b+1] - cuSeqLensQ[b] equals qSeqLens[b] (equal adjacent values are allowed for zero-length sequences).</li></ul></td>
       <td>INT64</td>
       <td>-</td>
       <td>1 ([batch+1])</td>
@@ -230,15 +230,20 @@ aclnnStatus aclnnStemOamPrepVarlenQ(
       <td>The dimension of q is not 3 or the last dimension is not equal to 128; the dimension of qScale is not 2; the dimension of qFlat is not 4.</td>
     </tr>
     <tr>
-      <td>The length of qSeqLens is out of the range (0, 1024]; the length of cuSeqLensQ is not equal to batch+1, cuSeqLensQ[0] is not 0, the values are not monotonically increasing, or cuSeqLensQ[batch] is not equal to total_tokens.</td>
+      <td>The length of qSeqLens is greater than 1024; the length of cuSeqLensQ is not equal to batch+1, cuSeqLensQ[0] is not 0, cuSeqLensQ[b+1] - cuSeqLensQ[b] is not equal to qSeqLens[b], or cuSeqLensQ[batch] is not equal to total_tokens.</td>
     </tr>
     <tr>
       <td>stemBlockSize is not 128 or stemStride is not 16.</td>
     </tr>
     <tr>
-      <td>ACLNN_ERR_INNER</td>
-      <td>361001</td>
-      <td>Internal error, such as a Tiling computation failure or a Kernel search failure.</td>
+      <td>ACLNN_ERR_INNER_TILING_ERROR</td>
+      <td>561002</td>
+      <td>Internal error: the Tiling computation fails.</td>
+    </tr>
+    <tr>
+      <td>ACLNN_ERR_INNER_FIND_KERNEL_ERROR</td>
+      <td>561003</td>
+      <td>Internal error: the kernel binary fails to be found.</td>
     </tr>
   </tbody></table>
 

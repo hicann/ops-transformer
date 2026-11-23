@@ -13,9 +13,9 @@
 
 ## 功能说明
 
-- **算子功能**：推理场景，Stem OAM block-sparse attention中Q侧预处理计算。将变长Q tensor从paged存储格式转化为按stem block(stemBlockSize token)分组的flattened qFlat输出，供后续OAM score计算。主要计算过程如下：
+- **算子功能**：推理场景，Stem OAM block-sparse attention中Q侧预处理计算。将按token维拼接存储的变长Q tensor（shape为[total_tokens, H_q, D]）转化为按stem block(stemBlockSize token)分组的flattened qFlat输出，供后续OAM score计算。主要计算过程如下：
     - 首先对Q tensor进行Scale Fusion，将per-token scale factor应用到Q上
-    - 然后根据cuSeqLensQ进行De-page Varlen，从paged存储中提取变长Q tensor
+    - 然后根据cuSeqLensQ在拼接的token轴上定位各batch起点，切出各batch的Q序列
     - 对Q进行Weighted Group Sum（自然顺序，不翻转stride维度）
     - Flatten输出为qFlat：shape为[batch, H_q, max_Qb, kflat_dim]
     - Cast输出为BFLOAT16格式
@@ -23,15 +23,15 @@
 
     阶段1 Scale Fusion
 
-    $$q\_scale[b, h, pos] = qscale[b, h, pos]$$
+    $$q\_scale[b,h,pos] = qScale[cu\_seqlens\_q[b]+pos,\ h]$$（pos为batch内token下标）
 
-    阶段2 De-page Varlen
+    阶段2 Varlen定位
 
     $$Q\_dense[b] = Cast(q[cu\_seqlens\_q[b]:cu\_seqlens\_q[b]+q\_len[b], :, :], \text{FP32})$$
 
     阶段3 Weighted Group Sum(自然顺序，NO flip)
 
-    $$Q\_group\_sum[b,h,qb,g,:] = \sum_{r=0}^{R-1} Q\_blocks[b,h,qb,r,g,:] \times q\_scale[b,h,position(qb,r,g)]$$
+    $$Q\_group\_sum[b,h,qb,g,:] = \sum_{r=0}^{R-1} Q\_blocks[b,h,qb,r,g,:] \times qScale[cu\_seqlens\_q[b]+position(qb,r,g),\ h]$$（其中position(qb,r,g)=qb×stemBlockSize+r×stemStride+g；position≥qSeqLens[b]的位置由内核补零，贡献为零）
 
     阶段4 Flatten
 
@@ -70,22 +70,22 @@
   </tr>
   <tr>
     <td>qScale</td>
-    <td>可选输入</td>
-    <td>Device侧的aclTensor，Q的per-token scale factor，shape为[total_tokens, H_q]。</td>
+    <td>输入</td>
+    <td>Device侧的aclTensor，Q的per-token scale factor。q为FLOAT8_E4M3FN时必填，shape必须严格等于[total_tokens, H_q]。</td>
     <td>FLOAT</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>qSeqLens</td>
     <td>输入</td>
-    <td>Host侧的aclIntArray，每个batch的Q序列长度，长度为batch，每个值≥0，不支持空Array。batch最大值为1024。</td>
+    <td>Host侧的aclIntArray，每个batch的Q序列长度，长度为batch，每个值≥0，batch最大值为1024；长度为0时按空输入处理，直接返回。</td>
     <td>INT64</td>
     <td>-</td>
   </tr>
   <tr>
     <td>cuSeqLensQ</td>
     <td>输入</td>
-    <td>Host侧的aclIntArray，Q的累积序列长度偏移量，用于varlen索引。长度为batch+1。cuSeqLensQ[0]必须为0，cuSeqLensQ[batch]必须等于total_tokens，单调递增。</td>
+    <td>Host侧的aclIntArray，Q的累积序列长度偏移量，用于varlen索引。长度为batch+1。cuSeqLensQ[0]必须为0，cuSeqLensQ[batch]必须等于total_tokens，且满足前缀和关系cuSeqLensQ[b+1]-cuSeqLensQ[b]=qSeqLens[b]（零长序列允许相邻值相等）。</td>
     <td>INT64</td>
     <td>-</td>
   </tr>
@@ -125,8 +125,8 @@
     - kflat_dim：qFlat输出维度，kflat_dim=stemStride×D（默认16×128=2048）
 - **stride维度约束**：Q侧stride维度为自然顺序（g ∈ [0, S-1]），不翻转（与K侧处理不同）
 - **空值处理**：当qSeqLens中某batch值为0时，该batch对应的qFlat输出填充为零
-- **无条件Group Sum**：当qScale传入空指针时，Kernel内部Q Processing执行无权重Group Sum(Σ_r Q_blocks[:, r, :, :])，而非加权Group Sum(Σ_r Q_blocks×qScale)。
-- **FP8输入约束**：FP8输入时，qScale最后一维需要能覆盖max(qSeqLens)个位置（padding到stemBlockSize对齐）
+- **权重路径**：q为FLOAT8_E4M3FN时qScale必填，不存在无权重Group Sum路径。
+- **FP8输入约束**：FP8输入时，qScale的shape必须严格等于[total_tokens, H_q]；尾块中超出序列长度的位置由内核补零，无需调用方补齐。
 
 ## 调用说明
 

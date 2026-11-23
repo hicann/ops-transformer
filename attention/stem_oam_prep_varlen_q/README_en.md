@@ -15,9 +15,9 @@ English | [简体中文](./README.md)
 
 ## Function Description
 
-- **Operator function**: In the inference scenario, this operator performs the Q-side preprocessing computation in Stem OAM block-sparse attention. It converts the variable-length Q tensor from the paged storage format into the flattened qFlat output grouped by stem block (stemBlockSize tokens) for the subsequent OAM score computation. The main computation process is as follows:
+- **Operator function**: In the inference scenario, this operator performs the Q-side preprocessing computation in Stem OAM block-sparse attention. It converts the variable-length Q tensor stored in a token-concatenated layout (shape [total_tokens, H_q, D]) into the flattened qFlat output grouped by stem block (stemBlockSize tokens) for the subsequent OAM score computation. The main computation process is as follows:
     - First, perform Scale Fusion on the Q tensor by applying the per-token scale factor to Q
-    - Then perform De-page Varlen based on cuSeqLensQ to extract the variable-length Q tensor from the paged storage
+    - Then locate the start position of each batch on the concatenated token axis based on cuSeqLensQ, and slice out the Q sequence of each batch
     - Perform Weighted Group Sum on Q (natural order; the stride dimension is not flipped)
     - Flatten the output to qFlat: the shape is [batch, H_q, max_Qb, kflat_dim]
     - Cast the output to the BFLOAT16 format
@@ -25,15 +25,15 @@ English | [简体中文](./README.md)
 
     Stage 1 Scale Fusion
 
-    $$q\_scale[b, h, pos] = qscale[b, h, pos]$$
+    $$q\_scale[b,h,pos] = qScale[cu\_seqlens\_q[b]+pos,\ h]$$ (pos is the token index within the batch sequence)
 
-    Stage 2 De-page Varlen
+    Stage 2 Varlen Positioning
 
     $$Q\_dense[b] = Cast(q[cu\_seqlens\_q[b]:cu\_seqlens\_q[b]+q\_len[b], :, :], \text{FP32})$$
 
     Stage 3 Weighted Group Sum(natural order, NO flip)
 
-    $$Q\_group\_sum[b,h,qb,g,:] = \sum_{r=0}^{R-1} Q\_blocks[b,h,qb,r,g,:] \times q\_scale[b,h,position(qb,r,g)]$$
+    $$Q\_group\_sum[b,h,qb,g,:] = \sum_{r=0}^{R-1} Q\_blocks[b,h,qb,r,g,:] \times qScale[cu\_seqlens\_q[b]+position(qb,r,g),\ h]$$ (where position(qb,r,g) = qb×stemBlockSize + r×stemStride + g; positions beyond qSeqLens[b] are zero-filled by the kernel and contribute zero)
 
     Stage 4 Flatten
 
@@ -72,23 +72,23 @@ English | [简体中文](./README.md)
   </tr>
   <tr>
     <td>qScale</td>
-    <td>Optional Input</td>
-    <td>aclTensor on the device. Per-token scale factor of Q. The shape is [total_tokens, H_q].</td>
+    <td>Input</td>
+    <td>aclTensor on the device. Per-token scale factor of Q. It is mandatory when q is FLOAT8_E4M3FN, and the shape must be strictly equal to [total_tokens, H_q].</td>
     <td>FLOAT</td>
     <td>ND</td>
   </tr>
   <tr>
     <td>qSeqLens</td>
     <td>Input</td>
-    <td>aclTensor on the device. Q sequence length of each batch. The shape is [batch]. The length equals batch, each value must be ≥0, and empty arrays are not supported. The maximum value of batch is 1024.</td>
-    <td>INT32</td>
+    <td>aclIntArray on the host. Q sequence length of each batch. The length equals batch, and each value must be ≥0. The maximum value of batch is 1024. If the length is 0, the input is treated as empty and the API directly returns.</td>
+    <td>INT64</td>
     <td>-</td>
   </tr>
   <tr>
     <td>cuSeqLensQ</td>
     <td>Input</td>
-    <td>aclTensor on the device. Cumulative sequence length offsets of Q, used for varlen indexing. The shape is [batch+1]. cuSeqLensQ[0] must be 0, cuSeqLensQ[batch] must equal total_tokens, and the values must increase monotonically.</td>
-    <td>INT32</td>
+    <td>aclIntArray on the host. Cumulative sequence length offsets of Q, used for varlen indexing. The length is batch+1. cuSeqLensQ[0] must be 0, cuSeqLensQ[batch] must equal total_tokens, and the prefix-sum relation cuSeqLensQ[b+1]-cuSeqLensQ[b]=qSeqLens[b] must hold (equal adjacent values are allowed for zero-length sequences).</td>
+    <td>INT64</td>
     <td>-</td>
   </tr>
   <tr>
@@ -127,8 +127,8 @@ English | [简体中文](./README.md)
     - kflat_dim: output dimension of qFlat. kflat_dim=stemStride×D (default value: 16×128=2048)
 - **Stride dimension constraint**: The stride dimension on the Q side is in natural order (g ∈ [0, S-1]) and is not flipped (different from the K-side processing)
 - **Handling of zero values**: When the value of a batch in qSeqLens is 0, the corresponding qFlat output of the batch is filled with zeros
-- **Group sum without weights**: When a null pointer is passed for qScale, the kernel performs the group sum without weights (Σ_r Q_blocks[:, r, :, :]) during Q Processing, instead of the weighted group sum (Σ_r Q_blocks×qScale).
-- **FP8 input constraint**: For FP8 input, the last dimension of qScale must cover max(qSeqLens) positions (padded to be aligned with stemBlockSize)
+- **Weighted path**: qScale is mandatory when q is FLOAT8_E4M3FN, and no group sum path without weights exists.
+- **FP8 input constraint**: For FP8 input, the shape of qScale must be strictly equal to [total_tokens, H_q]. Positions beyond the sequence length in the tail block are zero-filled by the kernel, and no padding by the caller is required.
 
 ## Calling Instructions
 

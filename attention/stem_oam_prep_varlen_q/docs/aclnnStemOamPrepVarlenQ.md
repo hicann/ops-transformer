@@ -23,17 +23,17 @@
 
 ## 功能说明
 
-- 接口功能：完成Stem OAM block-sparse attention中Q侧预处理计算，将变长Q tensor从paged存储格式转化为按stem block(128 token)分组的flattened qFlat输出，供后续OAM score计算。
+- 接口功能：完成Stem OAM block-sparse attention中Q侧预处理计算，将按token维拼接存储的变长Q tensor（shape为[total_tokens, H_q, D]）转化为按stem block(128 token)分组的flattened qFlat输出，供后续OAM score计算。
 - 计算公式：
 
   阶段1 Scale Fusion:
-  $$q\_scale[b, h, pos] = qscale[b, h, pos]$$
+  $$q\_scale[b,h,pos] = qScale[cu\_seqlens\_q[b]+pos,\ h]$$（pos为batch内token下标）
 
-  阶段2 De-page Varlen:
+  阶段2 Varlen定位:
   $$Q\_dense[b] = Cast(q[cu\_seqlens\_q[b]:cu\_seqlens\_q[b]+q\_len[b], :, :], \text{FP32})$$
 
   阶段3 Weighted Group Sum (自然顺序，NO flip):
-  $$Q\_group\_sum[b,h,qb,g,:] = \sum_{r=0}^{R-1} Q\_blocks[b,h,qb,r,g,:] \times q\_scale[b,h,position(qb,r,g)]$$
+  $$Q\_group\_sum[b,h,qb,g,:] = \sum_{r=0}^{R-1} Q\_blocks[b,h,qb,r,g,:] \times qScale[cu\_seqlens\_q[b]+position(qb,r,g),\ h]$$（其中position(qb,r,g)=qb×stemBlockSize+r×stemStride+g；position≥qSeqLens[b]的位置由内核补零，贡献为零）
 
   阶段4 Flatten:
   $$qflat[b, h, qb, g \times D : (g+1) \times D] = Q\_group\_sum[b, h, qb, g, :]$$
@@ -108,7 +108,7 @@ aclnnStatus aclnnStemOamPrepVarlenQ(
       <td>qSeqLens（aclIntArray*）</td>
       <td>输入</td>
       <td>表示每个batch的Q序列长度。对应公式中q_seq_lens。</td>
-      <td><ul><li>长度等于batch，取值范围为(0, 1024]。</li><li>每个值≥0。</li><li>长度为0时按空Tensor处理，直接返回。</li></ul></td>
+      <td><ul><li>长度等于batch，batch取值范围为[0, 1024]。</li><li>每个值≥0。</li><li>长度为0时按空Tensor处理，直接返回。</li></ul></td>
       <td>INT64</td>
       <td>-</td>
       <td>1 ([batch])</td>
@@ -118,7 +118,7 @@ aclnnStatus aclnnStemOamPrepVarlenQ(
       <td>cuSeqLensQ（aclIntArray*）</td>
       <td>输入</td>
       <td>表示Q的累积序列长度偏移量，用于varlen索引。对应公式中cu_seqlens_q。</td>
-      <td><ul><li>长度等于batch+1。</li><li>cuSeqLensQ[0]必须为0。</li><li>cuSeqLensQ[batch]必须等于total_tokens。</li><li>单调递增（允许相等）。</li></ul></td>
+      <td><ul><li>长度等于batch+1。</li><li>cuSeqLensQ[0]必须为0。</li><li>cuSeqLensQ[batch]必须等于total_tokens。</li><li>满足前缀和关系cuSeqLensQ[b+1]-cuSeqLensQ[b]=qSeqLens[b]（零长序列允许相邻值相等）。</li></ul></td>
       <td>INT64</td>
       <td>-</td>
       <td>1 ([batch+1])</td>
@@ -228,15 +228,20 @@ aclnnStatus aclnnStemOamPrepVarlenQ(
       <td>q的维度不为3或最后一维不等于128；qScale维度不为2；qFlat维度不为4。</td>
     </tr>
     <tr>
-      <td>qSeqLens长度超出(0, 1024]范围；cuSeqLensQ长度不等于batch+1、cuSeqLensQ[0]不为0、非单调递增、或cuSeqLensQ[batch]不等于total_tokens。</td>
+      <td>qSeqLens长度大于1024；cuSeqLensQ长度不等于batch+1、cuSeqLensQ[0]不为0、cuSeqLensQ[b+1]-cuSeqLensQ[b]不等于qSeqLens[b]、或cuSeqLensQ[batch]不等于total_tokens。</td>
     </tr>
     <tr>
       <td>stemBlockSize不为128或stemStride不为16。</td>
     </tr>
     <tr>
-      <td>ACLNN_ERR_INNER</td>
-      <td>361001</td>
-      <td>内部错误，如Tiling计算失败或Kernel查找失败。</td>
+      <td>ACLNN_ERR_INNER_TILING_ERROR</td>
+      <td>561002</td>
+      <td>内部错误，Tiling计算失败。</td>
+    </tr>
+    <tr>
+      <td>ACLNN_ERR_INNER_FIND_KERNEL_ERROR</td>
+      <td>561003</td>
+      <td>内部错误，查找Kernel二进制失败。</td>
     </tr>
   </tbody></table>
 

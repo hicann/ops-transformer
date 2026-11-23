@@ -42,7 +42,7 @@ class StemOamPrepVarlenQOpBuilder(OpBuilder):
             qflat_dim = stem_stride * 128
             batch = len(q_seq_lens)
             h_q = q.size(1)
-            max_q_len = max(q_seq_lens)
+            max_q_len = max(q_seq_lens, default=0)
             max_q_padded = (
                 (max_q_len + stem_block_size - 1) // stem_block_size
             ) * stem_block_size

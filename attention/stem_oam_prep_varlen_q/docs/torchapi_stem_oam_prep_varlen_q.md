@@ -25,18 +25,18 @@
 
 - **接口功能**：
 
-  完成Stem OAM block-sparse attention中Q侧预处理计算。将变长Q tensor从paged存储格式转换为按stem block分组的flattened qFlat输出，供后续OAM score计算。
+  完成Stem OAM block-sparse attention中Q侧预处理计算。将按token维拼接存储的变长Q tensor（shape为[total_tokens, H_q, D]）转换为按stem block分组的flattened qFlat输出，供后续OAM score计算。
 
 - **计算公式**：
 
-  阶段1 Scale Fusion：
-  $$q\_scale[b, h, pos] = qscale[b, h, pos]$$
+  阶段1 Scale Fusion:
+  $$q\_scale[b,h,pos] = qScale[cu\_seqlens\_q[b]+pos,\ h]$$（pos为batch内token下标）
 
-  阶段2 De-page Varlen：
+  阶段2 Varlen定位:
   $$Q\_dense[b] = Cast(q[cu\_seqlens\_q[b]:cu\_seqlens\_q[b]+q\_len[b], :, :], \text{FP32})$$
 
-  阶段3 Weighted Group Sum (自然顺序，NO flip)：
-  $$Q\_group\_sum[b,h,qb,g,:] = \sum_{r=0}^{R-1} Q\_blocks[b,h,qb,r,g,:] \times q\_scale[b,h,position(qb,r,g)]$$
+  阶段3 Weighted Group Sum (自然顺序，NO flip):
+  $$Q\_group\_sum[b,h,qb,g,:] = \sum_{r=0}^{R-1} Q\_blocks[b,h,qb,r,g,:] \times qScale[cu\_seqlens\_q[b]+position(qb,r,g),\ h]$$（其中position(qb,r,g)=qb×stemBlockSize+r×stemStride+g；position≥qSeqLens[b]的位置由内核补零，贡献为零）
 
   阶段4 Flatten：
   $$qflat[b, h, qb, g \times D : (g+1) \times D] = Q\_group\_sum[b, h, qb, g, :]$$
@@ -85,7 +85,7 @@ cann_ops_transformer.stem_oam_prep_varlen_q(q, q_seq_lens, cu_seq_lens_q, *, q_s
         <td>q_seq_lens</td>
         <td>List[int]</td>
         <td>必选</td>
-        <td>表示每个batch的Q序列长度。对应公式中q_seq_lens。长度等于batch，取值范围为(0, 1024]。</td>
+        <td>表示每个batch的Q序列长度。对应公式中q_seq_lens。长度等于batch，batch取值范围为[0, 1024]，每个值≥0；长度为0时直接返回。</td>
         <td>int64</td>
         <td>(batch,)</td>
     </tr>
@@ -93,7 +93,7 @@ cann_ops_transformer.stem_oam_prep_varlen_q(q, q_seq_lens, cu_seq_lens_q, *, q_s
         <td>cu_seq_lens_q</td>
         <td>List[int]</td>
         <td>必选</td>
-        <td>表示Q的累积序列长度偏移量，用于varlen索引。对应公式中cu_seqlens_q。长度等于batch+1，cu_seq_lens_q[0]必须为0，cu_seq_lens_q[batch]必须等于total_tokens，单调递增（允许相等）。</td>
+        <td>表示Q的累积序列长度偏移量，用于varlen索引。对应公式中cu_seqlens_q。长度等于batch+1，cu_seq_lens_q[0]必须为0，cu_seq_lens_q[batch]必须等于total_tokens，且满足前缀和关系cu_seq_lens_q[b+1]-cu_seq_lens_q[b]=q_seq_lens[b]（零长序列允许相等）。</td>
         <td>int64</td>
         <td>(batch+1,)</td>
     </tr>
@@ -163,7 +163,7 @@ cann_ops_transformer.stem_oam_prep_varlen_q(q, q_seq_lens, cu_seq_lens_q, *, q_s
 - q的最后一维D必须等于128。
 - stem_block_size仅支持128，stem_stride仅支持16。派生值：R = stem_block_size / stem_stride = 8，kflat_dim = stem_stride × D = 2048。
 - q仅支持float8_e4m3fn数据类型，q_scale必填且数据类型为float32，q_flat输出固定为bfloat16。
-- q_seq_lens长度取值范围为(0, 1024]。
+- q_seq_lens长度（batch）取值范围为[0, 1024]，长度为0时直接返回。
 - 当q_seq_lens中某batch值为0时，该batch对应的q_flat输出填充为零。
 - Q侧stride维度为自然顺序（g ∈ [0, S-1]），不翻转（与K侧处理不同）。
 - 支持空Tensor输入：当q为空或q_seq_lens长度为0时，直接返回。
