@@ -423,41 +423,37 @@ __simd_vf__ void MaskUbCopyGS1VF(__ubuf__ T* maskUb, __ubuf__ T* maskSecUb, uint
             StoreAlign(dstTailBase + i * 512 + halfStride, vreg_tail2, preg_all);
         }
     } else {
-        // constexpr uint32_t repeatStride = s2BaseSize >> 5;
-        // // head
-        // RegTensor<T> vreg_head;
-        // __ubuf__ T * srcHead = maskSecUb + (midRowCount - headLoop) * s2BaseSize;
-        // __ubuf__ T * dstHead = maskUb;
-        // for (uint16_t i = 0; i < headLoop; ++i) {
-        //     LoadAlign<T, DataCopyMode::DATA_BLOCK_COPY>(
-        //         vreg_head, srcHead + i * s2BaseSize, 1, repeatStride, preg_all);
-        //     StoreAlign<T, DataCopyMode::DATA_BLOCK_COPY>(
-        //         dstHead + i * s2BaseSize, vreg_head, 1, repeatStride, preg_all);
-        // }
+        constexpr uint32_t repeatStride = s2BaseSize >> 5;
+        // head
+        RegTensor<T> vreg_head;
+        __ubuf__ T* srcHead = maskSecUb + (midRowCount - headLoop) * s2BaseSize;
+        __ubuf__ T* dstHead = maskUb;
+        for (uint16_t i = 0; i < headLoop; ++i) {
+            LoadAlign<T, DataCopyMode::DATA_BLOCK_COPY>(vreg_head, srcHead + i * s2BaseSize, 1, repeatStride, preg_all);
+            StoreAlign<T, DataCopyMode::DATA_BLOCK_COPY>(dstHead + i * s2BaseSize, vreg_head, 1, repeatStride,
+                                                         preg_all);
+        }
 
-        // // mid
-        // RegTensor<T> vreg_mid;
-        // for (uint16_t row = 0; row < midRowCount; ++row) {
-        //     __ubuf__ T * srcRow = maskSecUb + row * s2BaseSize;
-        //     LoadAlign<T, DataCopyMode::DATA_BLOCK_COPY>(
-        //         vreg_mid, srcRow, 1, repeatStride, preg_all);
-        //     for (uint16_t sg = 0; sg < midGLoop; ++sg) {
-        //         __ubuf__ T * dstRow = maskUb + (headLoop + sg * midRowCount + row) * s2BaseSize;
-        //         StoreAlign<T, DataCopyMode::DATA_BLOCK_COPY>(
-        //             dstRow, vreg_mid, 1, repeatStride, preg_all);
-        //     }
-        // }
+        // mid
+        RegTensor<T> vreg_mid;
+        for (uint16_t row = 0; row < midRowCount; ++row) {
+            __ubuf__ T* srcRow = maskSecUb + row * s2BaseSize;
+            LoadAlign<T, DataCopyMode::DATA_BLOCK_COPY>(vreg_mid, srcRow, 1, repeatStride, preg_all);
+            for (uint16_t sg = 0; sg < midGLoop; ++sg) {
+                __ubuf__ T* dstRow = maskUb + (headLoop + sg * midRowCount + row) * s2BaseSize;
+                StoreAlign<T, DataCopyMode::DATA_BLOCK_COPY>(dstRow, vreg_mid, 1, repeatStride, preg_all);
+            }
+        }
 
-        // // tail
-        // RegTensor<T> vreg_tail;
-        // __ubuf__ T * srcTail = maskSecUb;
-        // __ubuf__ T * dstTailBase = maskUb + (headLoop + midGLoop * midRowCount) * s2BaseSize;
-        // for (uint16_t i = 0; i < tailLoop; ++i) {
-        //     LoadAlign<T, DataCopyMode::DATA_BLOCK_COPY>(
-        //         vreg_tail, srcTail + i * s2BaseSize, 1, repeatStride, preg_all);
-        //     StoreAlign<T, DataCopyMode::DATA_BLOCK_COPY>(
-        //         dstTailBase + i * s2BaseSize, vreg_tail, 1, repeatStride, preg_all);
-        // }
+        // tail
+        RegTensor<T> vreg_tail;
+        __ubuf__ T* srcTail = maskSecUb;
+        __ubuf__ T* dstTailBase = maskUb + (headLoop + midGLoop * midRowCount) * s2BaseSize;
+        for (uint16_t i = 0; i < tailLoop; ++i) {
+            LoadAlign<T, DataCopyMode::DATA_BLOCK_COPY>(vreg_tail, srcTail + i * s2BaseSize, 1, repeatStride, preg_all);
+            StoreAlign<T, DataCopyMode::DATA_BLOCK_COPY>(dstTailBase + i * s2BaseSize, vreg_tail, 1, repeatStride,
+                                                         preg_all);
+        }
     }
 }
 
@@ -497,19 +493,6 @@ __aicore__ inline void AttentionmaskCopyInForGsLayout(LocalTensor<T>& attenMaskU
         __ubuf__ T* maskUb = (__ubuf__ T*)attenMaskUb.GetPhyAddr();
         __ubuf__ T* maskSecUb = (__ubuf__ T*)attenMaskSecUb.GetPhyAddr();
         MaskUbCopyGS1VF<T, s2BaseSize>(maskUb, maskSecUb, headS1Count, info.s1Size, midGCount, tailS1Size);
-        // // TODO，待优化，后续改成VF
-        // // head
-        // DataCopy(attenMaskUb, attenMaskUb[info.s1Size * attenMaskS2Stride], headS1Count * attenMaskS2Stride);
-        // // mid
-        // for (uint32_t i = 1; i < midGCount; i++) {
-        //     DataCopy(attenMaskUb[(headS1Count + i * info.s1Size) * attenMaskS2Stride], attenMaskSecUb,
-        //              info.s1Size * attenMaskS2Stride);
-        // }
-        // // tail
-        // if (tailS1Size > 0) {
-        //     DataCopy(attenMaskUb[(headS1Count + midGCount * info.s1Size) * attenMaskS2Stride], attenMaskSecUb,
-        //              tailS1Size * attenMaskS2Stride);
-        // }
     }
     PipeBarrier<PIPE_V>();
     Mutex::Unlock<PIPE_V>(mutexId);

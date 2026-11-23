@@ -175,6 +175,8 @@ uint32_t FABaseChecker::GetTypeSize(ge::DataType dtype)
         case ge::DT_FLOAT8_E4M3FN:
             return NUM_BIT_INT8;
         case ge::DT_FLOAT4_E2M1:
+        case ge::DT_FLOAT4_E1M2:
+        case Ops::Transformer::DT_HIFLOAT4:
             return NUM_BIT_FP4;
         default:
             return NUM_BIT_FLOAT16;

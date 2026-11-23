@@ -1339,18 +1339,6 @@ __aicore__ inline void FlashUpdateLast(const LocalTensor<T>& dstTensor, const Lo
     }
 }
 
-// template <typename T, typename OUTPUT_T, typename INPUT_T, typename MMOUTPUT_T, uint32_t dSize = 0>
-// __aicore__ inline void FlashUpdateDiv(const LocalTensor<T>& dstTensor, const LocalTensor<MMOUTPUT_T>& preTensor,
-//     const LocalTensor<T>& expSumTensor, const uint16_t m, const uint16_t d, float dequantScale2)
-// {
-//     static_assert(IsSameType<T, float>::value, "VF FlashUpdateDiv, T must be float");
-
-//     constexpr uint16_t floatRepSize = 64;
-//     if (d % floatRepSize == 0) {
-//         FlashUpdateDivNoTail_VF<T, OUTPUT_T, INPUT_T, MMOUTPUT_T, dSize>(dstTensor, preTensor, expSumTensor, m, d,
-//         dequantScale2);
-//     }
-// }
 template <typename T, typename OUTPUT_T, typename INPUT_T, typename MMOUTPUT_T, uint32_t dSize = 0,
           bool isPseudoQuant = false>
 __aicore__ inline void FlashUpdateDiv(const LocalTensor<T>& dstTensor, const LocalTensor<MMOUTPUT_T>& preTensor,
@@ -1368,36 +1356,6 @@ __aicore__ inline void FlashUpdateDiv(const LocalTensor<T>& dstTensor, const Loc
                                                                          dequantScale2);
     }
 }
-
-// template <typename T>
-// __aicore__ inline void ComputeLseOutput_VF(const LocalTensor<T>& dstTensor, const LocalTensor<T>& softmaxSumTensor,
-//     const LocalTensor<T>& softmaxMaxTensor, uint32_t dealCount)
-// {
-//     __ubuf__ T * srcSumUb = (__ubuf__ T *)softmaxSumTensor.GetPhyAddr();
-//     __ubuf__ T * srcMaxUb = (__ubuf__ T *)softmaxMaxTensor.GetPhyAddr();
-//     __ubuf__ T * dstUb = (__ubuf__ T *)dstTensor.GetPhyAddr();
-
-//     __VEC_SCOPE__
-//     {
-//         MicroAPI::RegTensor<T> vregSum;
-//         MicroAPI::RegTensor<T> vregMax;
-//         MicroAPI::RegTensor<T> vregRes;
-//         const uint32_t dealRows = 8;
-//         const uint32_t  floatRepSize = 64; // 64: 一个寄存器存64个float
-//         uint16_t updateLoops = ((dealCount) + (dealRows - 1)) / dealRows;
-//         MicroAPI::MaskReg pregAll = MicroAPI::CreateMask<T, MicroAPI::MaskPattern::ALL>();
-
-//         for (uint16_t i = 0; i < updateLoops; ++i) {
-//             MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_E2B_B32>(vregSum, srcSumUb + (i * dealRows));
-//             MicroAPI::DataCopy<T, MicroAPI::LoadDist::DIST_E2B_B32>(vregMax, srcMaxUb + (i * dealRows));
-
-//             MicroAPI::Log<T, MicroAPI::MaskMergeMode::ZEROING>(vregRes, vregSum, pregAll);
-//             MicroAPI::Add<T, MicroAPI::MaskMergeMode::ZEROING>(vregRes, vregRes, vregMax, pregAll);
-
-//             MicroAPI::DataCopy<T, MicroAPI::StoreDist::DIST_NORM_B32>(dstUb + (i * floatRepSize), vregRes, pregAll);
-//         }
-//     }
-// }
 
 template <typename T, typename INPUT_T, uint32_t dSize = 0>
 __aicore__ inline void ComputeFirstInQuantVecNoTail(const LocalTensor<T>& dstTensor, const LocalTensor<T>& preTensor,

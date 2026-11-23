@@ -53,13 +53,7 @@ __global__ __aicore__ void mixed_quant_flash_attn(
 
     __gm__ uint8_t* user = GetUserWorkspace(workspace);
 
-    // dc_preload(reinterpret_cast<__gm__ uint64_t*>(seqUsedQ), 0);
     dc_preload(reinterpret_cast<__gm__ uint64_t*>(seqUsedKv), 0);
-    // dc_preload(reinterpret_cast<__gm__ uint64_t*>(tiling), 0);
-    // if ASCEND_IS_AIC {
-    //     uint32_t aicIdx = GetBlockIdx();
-    // dc_preload(reinterpret_cast<__gm__ uint64_t*>(metadata), 4*(16+16*aicIdx));
-    // }
 
     fa_base_matmul::idCounterNum = 0;
 
@@ -92,7 +86,6 @@ __global__ __aicore__ void mixed_quant_flash_attn(
 #endif
 
     Kernel op;
-    // printf("ly debug 004\n");
     op.Init(query, key, value, kDescale, vDescale, blockTable, cuSeqLensQ, nullptr, // cuSeqLenskv placeholder
             seqUsedQ, seqUsedKv, sinks, attnMask, attnOut, softmaxLse, user, metadata, &tilingData->baseTiling);
     op.Process();

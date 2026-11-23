@@ -263,12 +263,6 @@ __simd_vf__ void ComputeScaleValue_8_VF_FD(__ubuf__ T* lseSink, __ubuf__ T* lseM
     uint16_t blockStride = 0x1;
     uint16_t repeatStride = dealRowCount;
 
-    // for (i = 0;i < static_cast<uint16_t>(learnableSinkFlag); ++i){
-    //     MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_NORM>(vregLseMax, (__ubuf__ float *&)lseSink);
-    // }
-    // for(i = 1;i > static_cast<uint16_t>(learnableSinkFlag); --i){
-    //     MicroAPI::Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vregLseMax, -FLT_MAX_NEW, pregTailN);
-    // }
     MicroAPI::Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vregLseMax, -FLT_MAX_NEW, pregTailN);
     MicroAPI::Duplicate<T, MicroAPI::MaskMergeMode::ZEROING, float>(vregLseSum, FLT_ZERO, pregTailN);
 

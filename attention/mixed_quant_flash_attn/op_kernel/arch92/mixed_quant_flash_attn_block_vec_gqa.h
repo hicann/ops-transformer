@@ -406,7 +406,6 @@ public:
         LocalTensor<T> expUb =
             this->softmaxExpBuf[(runInfo.loop % (PRELOAD_N + 1)) * SOFTMAX_BUF_BYTES].template ReinterpretCast<T>();
         // todo vec2res单buffer同步id适配
-        //  uint32_t stage1Id = MOD2(runInfo.loop);
         uint32_t stage1Id = 0;
         auto vec1ResUb = this->vec1ResBuf[stage1Id * VEC1_RES_BYTE].template ReinterpretCast<SOFTMAX_OUT_T>();
         if constexpr (HAS_MASK) {

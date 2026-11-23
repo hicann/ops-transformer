@@ -129,17 +129,6 @@ __simd_vf__ void ProcessVec1NoUpdateAlignImpl512VF(
         LoadAlign(vreg_input_x7, srcUb + floatRepSize * 6 + i * s2BaseSize);
         LoadAlign(vreg_input_x8, srcUb + floatRepSize * 7 + i * s2BaseSize);
 
-        // todo fixp
-        //  Muls(vreg_input_x1, vreg_input_x1, scale, preg_all);
-        //  Muls(vreg_input_x2, vreg_input_x2, scale, preg_all);
-        //  Muls(vreg_input_x3, vreg_input_x3, scale, preg_all);
-        //  Muls(vreg_input_x4, vreg_input_x4, scale, preg_all);
-
-        // Muls(vreg_input_x5, vreg_input_x5, scale, preg_all);
-        // Muls(vreg_input_x6, vreg_input_x6, scale, preg_all);
-        // Muls(vreg_input_x7, vreg_input_x7, scale, preg_all);
-        // Muls(vreg_input_x8, vreg_input_x8, scale, preg_all);
-
         if constexpr (hasAtten == 1) {
             // atten mask
             LoadAlign<uint32_t, MicroAPI::PostLiteral::POST_MODE_UPDATE, MicroAPI::MaskDist::DIST_DS>(

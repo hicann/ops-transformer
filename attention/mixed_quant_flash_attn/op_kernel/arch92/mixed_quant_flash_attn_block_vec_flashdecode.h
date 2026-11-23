@@ -15,11 +15,7 @@
 #ifndef FIA_BLOCK_VEC_FLASHDECODE_H
 #define FIA_BLOCK_VEC_FLASHDECODE_H
 
-// #include "kernel_operator.h"
 #include "kernel_operator_list_tensor_intf.h"
-// #include "kernel_tiling/kernel_tiling.h"
-// #include "lib/matmul_intf.h"
-// #include "lib/matrix/matmul/tiling.h"
 #include "../../../common/op_kernel/arch35/infer_flash_attention_comm_arch35.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flash_decode_arch35.h"
 #include "../utils/mixed_quant_flash_attn_utils.h"
@@ -468,79 +464,6 @@ protected:
         fa_base_vector::InvalidMaskRows<UBOUT_T, T, true>(0, dealRowCount, columnCount, lseMaxUb, negativeIntScalar,
                                                           attenOutUb);
     }
-
-    // __aicore__ inline void InitPostQuant(__gm__ uint8_t *postQuantScale, __gm__ uint8_t *postQuantOffset)
-    // {
-    //     isQuant2PerChn = constInfo.isPostQuantPerChnl;
-    //     isQuant2Bf16 = constInfo.isPostQuantBF16;
-    //     if constexpr (POST_QUANT) {
-    //         if (!isQuant2PerChn && !isQuant2Bf16) {
-    //             if (postQuantScale != nullptr) {
-    //                 GlobalTensor<T> postQuantScaleGm;
-    //                 postQuantScaleGm.SetGlobalBuffer((__gm__ float *)postQuantScale);
-    //                 postQuantScaleValue = postQuantScaleGm.GetValue(0);
-    //             }
-    //             if (postQuantOffset != nullptr) {
-    //                 isQuantOffset2Exit = true;
-    //                 GlobalTensor<T> postQuantOffsetGm;
-    //                 postQuantOffsetGm.SetGlobalBuffer((__gm__ float *)postQuantOffset);
-    //                 postQuantOffsetValue = postQuantOffsetGm.GetValue(0);
-    //             } else {
-    //                 postQuantOffsetValue = 0.0;
-    //             }
-    //         }
-
-    //         if (!isQuant2PerChn && isQuant2Bf16) {
-    //             if (postQuantScale != nullptr) {
-    //                 GlobalTensor<bfloat16_t> postQuantScaleBf16Gm;
-    //                 postQuantScaleBf16Gm.SetGlobalBuffer((__gm__ bfloat16_t *)postQuantScale);
-    //                 postQuantScaleValue = ToFloat(postQuantScaleBf16Gm.GetValue(0));
-    //             }
-    //             if (postQuantOffset != nullptr) {
-    //                 isQuantOffset2Exit = true;
-    //                 GlobalTensor<bfloat16_t> postQuantOffsetBf16Gm;
-    //                 postQuantOffsetBf16Gm.SetGlobalBuffer((__gm__ bfloat16_t *)postQuantOffset);
-    //                 postQuantOffsetValue = ToFloat(postQuantOffsetBf16Gm.GetValue(0));
-    //             } else {
-    //                 postQuantOffsetValue = 0.0;
-    //             }
-    //         }
-
-    //         if (isQuant2PerChn && !isQuant2Bf16) {
-    //             if (postQuantScale != nullptr) {
-    //                 GlobalTensor<T> postQuantScaleGm;
-    //                 postQuantScaleGm.SetGlobalBuffer((__gm__ float *)postQuantScale);
-    //                 quantScale2GmTensor.gmTensor = postQuantScaleGm;
-    //                 quantScale2GmTensor.offsetCalculator.Init(constInfo.n2Size, constInfo.gSize, constInfo.dSizeV);
-    //             }
-    //             if (postQuantOffset != nullptr) {
-    //                 isQuantOffset2Exit = true;
-    //                 GlobalTensor<T> postQuantOffsetGm;
-    //                 postQuantOffsetGm.SetGlobalBuffer((__gm__ float *)postQuantOffset);
-    //                 quantOffset2GmTensor.gmTensor = postQuantOffsetGm;
-    //                 quantOffset2GmTensor.offsetCalculator.Init(constInfo.n2Size, constInfo.gSize, constInfo.dSizeV);
-    //             }
-    //         }
-
-    //         if (isQuant2PerChn && isQuant2Bf16) {
-    //             if (postQuantScale != nullptr) {
-    //                 GlobalTensor<bfloat16_t> postQuantScaleBf16Gm;
-    //                 postQuantScaleBf16Gm.SetGlobalBuffer((__gm__ bfloat16_t *)postQuantScale);
-    //                 quantScale2Bf16GmTensor.gmTensor = postQuantScaleBf16Gm;
-    //                 quantScale2Bf16GmTensor.offsetCalculator.Init(constInfo.n2Size, constInfo.gSize,
-    //                 constInfo.dSizeV);
-    //             }
-    //             if (postQuantOffset != nullptr) {
-    //                 isQuantOffset2Exit = true;
-    //                 GlobalTensor<bfloat16_t> postQuantOffsetBf16Gm;
-    //                 postQuantOffsetBf16Gm.SetGlobalBuffer((__gm__ bfloat16_t *)postQuantOffset);
-    //                 quantOffset2Bf16GmTensor.gmTensor = postQuantOffsetBf16Gm;
-    //                 quantOffset2Bf16GmTensor.offsetCalculator.Init(constInfo.n2Size, constInfo.gSize,
-    //                 constInfo.dSizeV);
-    //             }
-    //         }
-    //     }
-    // }
 
 public:
     __aicore__ inline void FlashDecode(FDparamsX& fd)

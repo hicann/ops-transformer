@@ -300,22 +300,22 @@ ge::graphStatus FaTilingShapeCompare::CompareShape(FaTilingShapeCompareParam& pa
             return ge::GRAPH_FAILED;
         }
 
-        // if (!compareFunc(shape_.GetDim(i), shapeExpected.GetDim(i))) {
-        //     if (param.compareTypeMap.empty()) {
-        //         OP_LOGE(opName_, "[%s] %s layout is %s, shape %s should be equal to %s.", funcName.c_str(),
-        //                 name_.c_str(), LayoutToSerialString(layout_).c_str(), GetShapeStr(shape_).c_str(),
-        //                 GetShapeStr(shapeExpected).c_str());
-        //     } else {
-        //         OP_LOGE(opName_,
-        //                 "[%s] %s layout is %s, shape is %s, expected is %s, "
-        //                 "axis %s(%ld) should %s expected %ld.",
-        //                 funcName.c_str(), name_.c_str(), LayoutToSerialString(layout_).c_str(),
-        //                 GetShapeStr(shape_).c_str(), GetShapeStr(shapeExpected).c_str(),
-        //                 AxisToSerialString(axis).c_str(), shape_.GetDim(i),
-        //                 CompareTypeToSerialSymbolString(compareType).c_str(), shapeExpected.GetDim(i));
-        //     }
-        //     return ge::GRAPH_FAILED;
-        // }
+        if (!compareFunc(shape_.GetDim(i), shapeExpected.GetDim(i))) {
+            if (param.compareTypeMap.empty()) {
+                OP_LOGE(opName_, "[%s] %s layout is %s, shape %s should be equal to %s.", funcName.c_str(),
+                        name_.c_str(), LayoutToSerialString(layout_).c_str(), GetShapeStr(shape_).c_str(),
+                        GetShapeStr(shapeExpected).c_str());
+            } else {
+                OP_LOGE(opName_,
+                        "[%s] %s layout is %s, shape is %s, expected is %s, "
+                        "axis %s(%ld) should %s expected %ld.",
+                        funcName.c_str(), name_.c_str(), LayoutToSerialString(layout_).c_str(),
+                        GetShapeStr(shape_).c_str(), GetShapeStr(shapeExpected).c_str(),
+                        AxisToSerialString(axis).c_str(), shape_.GetDim(i),
+                        CompareTypeToSerialSymbolString(compareType).c_str(), shapeExpected.GetDim(i));
+            }
+            return ge::GRAPH_FAILED;
+        }
     }
 
     return ge::GRAPH_SUCCESS;

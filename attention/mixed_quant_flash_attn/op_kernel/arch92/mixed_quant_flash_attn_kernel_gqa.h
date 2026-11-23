@@ -142,7 +142,6 @@ public:
         InitConstInfo();
 
         keyPtr = key;
-        // valuePtr = value;
 
         if constexpr (LAYOUT_Q == LayOutTypeEnum::LAYOUT_TND) {
             cuSeqLensGmQ.SetGlobalBuffer((__gm__ int32_t*)cuSeqLensQ, constInfo.cuSeqLensQSize + 1);
@@ -180,10 +179,6 @@ public:
             // FD combines ordinary partial max/sum/output; do not inject again.
             if (this->tilingData->mixedQuantFlashAttnBaseParams.needInitOutput) {
                 vecFaBlock.ClearOutput();
-                // if (constInfo.aicIdx == 0) {
-                //     DumpTensor(this->vecFaBlock.attentionOutGm, __LINE__, 10 * 128);
-                //     DumpTensor(ubBmm2Buffers, __LINE__, 10 * 128);
-                // }
             }
 
             if (isFd) {
@@ -308,7 +303,6 @@ public:
         constInfo.dSize = baseParams.dSize;
         constInfo.dSizeV = baseParams.dSizeV;
         constInfo.cuSeqLensQSize = baseParams.cuSeqLensQSize;
-        // constInfo.cuSeqLensKVSize = this->tilingData->mixedQuantFlashAttnBaseParams.cuSeqLensKVSize;
         constInfo.seqUsedQSize = baseParams.seqUsedQSize;
         constInfo.seqUsedKvSize = baseParams.seqUsedKvSize;
         constInfo.scaleValue = static_cast<float>(baseParams.scaleValue);

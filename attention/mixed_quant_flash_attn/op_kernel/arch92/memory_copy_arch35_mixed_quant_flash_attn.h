@@ -341,7 +341,6 @@ __aicore__ inline void DataCopySoftmaxLseBNSDArch35(GlobalTensor<float> softmaxL
     dataCopyParams.dstStride = 0;
     DataCopyPad(softmaxLseGm[outOffset], lseSrc[ubOffset], dataCopyParams);
     outOffset += constInfo.s1Size - qActSeqLens + headActSeq;
-    // ubOffset += headActSeq * AttentionCommon::FP32_BLOCK_ELEMENT_NUM;
     ubOffset += headActSeq * AttentionCommon::FP32_BLOCK_ELEMENT_NUM;
     // dealCount中间块
     uint64_t pendingCount = dealCount - headActSeq;
