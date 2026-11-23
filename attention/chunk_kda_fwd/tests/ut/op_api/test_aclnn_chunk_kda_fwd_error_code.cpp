@@ -152,9 +152,45 @@ TEST_F(ChunkKdaFwdErrorCodeTest, invalid_chunk_size_reports_param_error)
     EXPECT_FALSE(HasErrorCode(errors, "EZ9999"));
 }
 
-TEST_F(ChunkKdaFwdErrorCodeTest, missing_gate_input_returns_param_invalid)
+TEST_F(ChunkKdaFwdErrorCodeTest, required_tensor_nullptr_returns_param_nullptr)
 {
-    EXPECT_EQ(RunWorkspaceCase("BSND", kChunkSize, false), ACLNN_ERR_PARAM_INVALID);
+    std::array<AclTensorPtr, 8> tensors = {MakeTensor({kBatch, kSeqLen, kHeadNum, kHeadDim}, ACL_BF16),
+                                           MakeTensor({kBatch, kSeqLen, kHeadNum, kHeadDim}, ACL_BF16),
+                                           MakeTensor({kBatch, kSeqLen, kHeadNum, kHeadDim}, ACL_BF16),
+                                           MakeTensor({kBatch, kSeqLen, kHeadNum, kHeadDim}, ACL_FLOAT),
+                                           MakeTensor({kBatch, kSeqLen, kHeadNum}, ACL_FLOAT),
+                                           MakeTensor({kBatch, kSeqLen, kHeadNum, kHeadDim}, ACL_BF16),
+                                           MakeTensor({kBatch, kHeadNum, kSeqLen, kChunkSize}, ACL_BF16),
+                                           MakeTensor({kBatch, kHeadNum, kSeqLen, kChunkSize}, ACL_BF16)};
+    const std::array<const char*, 8> names = {"q", "k", "v", "g", "beta", "attnOut", "aqkOut", "akkOut"};
+    for (size_t nullIndex = 0; nullIndex < tensors.size(); ++nullIndex) {
+        SCOPED_TRACE(names[nullIndex]);
+        std::array<const aclTensor*, 8> args;
+        for (size_t index = 0; index < tensors.size(); ++index) {
+            ASSERT_NE(tensors[index].get(), nullptr);
+            args[index] = index == nullIndex ? nullptr : tensors[index].get();
+        }
+        uint64_t workspaceSize = 0;
+        aclOpExecutor* executor = nullptr;
+        EXPECT_EQ(aclnnChunkKdaFwdGetWorkspaceSize(
+                      args[0], args[1], args[2], args[3], args[4], nullptr, nullptr, nullptr, nullptr, nullptr, "BSND",
+                      1.0 / 16.0, kChunkSize, false, -5.0, false, false, args[5], nullptr, nullptr, args[6], args[7],
+                      nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &workspaceSize, &executor),
+                  ACLNN_ERR_PARAM_NULLPTR);
+        const auto errors = DrainErrorItems();
+        EXPECT_TRUE(HasErrorCode(errors, "EZ0004"));
+        EXPECT_FALSE(HasErrorCode(errors, "EZ1001"));
+        EXPECT_FALSE(HasErrorCode(errors, "EZ9999"));
+    }
+}
+
+TEST_F(ChunkKdaFwdErrorCodeTest, missing_gate_input_returns_param_nullptr)
+{
+    EXPECT_EQ(RunWorkspaceCase("BSND", kChunkSize, false), ACLNN_ERR_PARAM_NULLPTR);
+    const auto errors = DrainErrorItems();
+    EXPECT_TRUE(HasErrorCode(errors, "EZ0004"));
+    EXPECT_FALSE(HasErrorCode(errors, "EZ1001"));
+    EXPECT_FALSE(HasErrorCode(errors, "EZ9999"));
 }
 
 TEST_F(ChunkKdaFwdErrorCodeTest, launcher_failure_returns_null_outputs_without_error_report)

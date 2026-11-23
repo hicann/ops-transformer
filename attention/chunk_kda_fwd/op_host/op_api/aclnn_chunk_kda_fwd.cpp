@@ -26,6 +26,7 @@
 #include "opdev/op_executor.h"
 #include "opdev/op_log.h"
 #include "opdev/tensor_view_utils.h"
+#include "log/log.h"
 
 using namespace op;
 
@@ -409,12 +410,13 @@ aclnnStatus CheckOutputShapes(const ChunkKdaFwdParams& params, const KdaShapeInf
 
 aclnnStatus CheckParams(const ChunkKdaFwdParams& params, KdaFwdLayout& layout, KdaShapeInfo& info)
 {
-    CHECK_COND(params.q != nullptr && params.k != nullptr && params.v != nullptr && params.g != nullptr &&
-                   params.beta != nullptr,
-               ACLNN_ERR_PARAM_NULLPTR, "q, k, v, g and beta must not be nullptr.");
-    CHECK_COND(params.attnOut != nullptr, ACLNN_ERR_PARAM_NULLPTR, "attnOut must not be nullptr.");
-    CHECK_COND(params.aqkOut != nullptr && params.akkOut != nullptr, ACLNN_ERR_PARAM_NULLPTR,
-               "aqkOut and akkOut must not be nullptr.");
+    OP_CHECK(params.q != nullptr && params.k != nullptr && params.v != nullptr && params.g != nullptr &&
+                 params.beta != nullptr,
+             OP_LOGE_WITH_INVALID_INPUT("aclnnChunkKdaFwd", "q/k/v/g/beta"), return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK(params.attnOut != nullptr, OP_LOGE_WITH_INVALID_INPUT("aclnnChunkKdaFwd", "attnOut"),
+             return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK(params.aqkOut != nullptr && params.akkOut != nullptr,
+             OP_LOGE_WITH_INVALID_INPUT("aclnnChunkKdaFwd", "aqkOut/akkOut"), return ACLNN_ERR_PARAM_NULLPTR);
     CHECK_COND(params.chunkSize == 64 || params.chunkSize == 128, ACLNN_ERR_PARAM_INVALID,
                "chunkSize must be 64 or 128.");
     CHECK_RET(ParseLayout(params.layout, layout) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
@@ -439,8 +441,8 @@ aclnnStatus CheckParams(const ChunkKdaFwdParams& params, KdaFwdLayout& layout, K
         CheckStateShape(params.initialStateOptional, "initialStateOptional", info, params.stateVFirst) == ACLNN_SUCCESS,
         ACLNN_ERR_PARAM_INVALID);
     if (params.useGateInKernel) {
-        CHECK_COND(params.aLogOptional != nullptr, ACLNN_ERR_PARAM_NULLPTR,
-                   "aLogOptional is required when useGateInKernel is true.");
+        OP_CHECK(params.aLogOptional != nullptr, OP_LOGE_WITH_INVALID_INPUT("aclnnChunkKdaFwd", "aLogOptional"),
+                 return ACLNN_ERR_PARAM_NULLPTR);
         CHECK_COND(HasShape(params.aLogOptional, {info.hvNum}), ACLNN_ERR_PARAM_INVALID,
                    "aLogOptional must have shape [HV].");
         if (params.dtBiasOptional != nullptr) {
@@ -535,7 +537,8 @@ aclnnStatus aclnnChunkKdaFwdGetWorkspaceSize(const aclTensor* q, const aclTensor
     auto executorPtr = uniqueExecutor.get();
     KdaFwdLayout parsedLayout = KdaFwdLayout::BSND;
     KdaShapeInfo info;
-    CHECK_RET(CheckParams(params, parsedLayout, info) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    const aclnnStatus ret = CheckParams(params, parsedLayout, info);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
     CHECK_RET(ContiguousInputs(params, executorPtr) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     const aclTensor* qHead = params.q;
