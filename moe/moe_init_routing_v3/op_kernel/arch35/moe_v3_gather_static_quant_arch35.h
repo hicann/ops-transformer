@@ -119,28 +119,25 @@ __aicore__ inline void MoeV3GatherStaticQuant<T>::Compute()
     LocalTensor<half> halfLocal = halfQueue_.AllocTensor<half>();
     uint32_t elements = Align(colsTileLength_, sizeof(T));
 
-    if constexpr (IsSameType<T, bfloat16_t>::value) {
+    // 静态量化统一按公式 round(x*scale+offset) 在 FP32 精度计算（与文档及 A2/A3 实现一致），
+    // 避免中间量提前降到 FP16 导致 [0.49,0.5) 边界值多进 1 LSB。
+    // 取整链路: FP32 乘加 -> Cast(f32,f32,RINT) 即 vtrc 在 FP32 域取整 -> f322f16(整数值精确) -> f162s8(饱和)。
+    if constexpr (IsSameType<T, float>::value) {
+        Muls(inLocal, inLocal, scale_, elements);
+        Adds(inLocal, inLocal, offset_, elements);
+        Cast(inLocal, inLocal, RoundMode::CAST_RINT, elements);
+        Cast(halfLocal, inLocal, RoundMode::CAST_RINT, elements);
+        Cast(outLocal, halfLocal, RoundMode::CAST_RINT, elements);
+    } else {
         Cast(floatLocal, inLocal, RoundMode::CAST_NONE, colsTileLength_);
         TQueSync<PIPE_MTE3, PIPE_V> sync;
         sync.SetFlag(0);
         sync.WaitFlag(0);
-        Cast(halfLocal, floatLocal, RoundMode::CAST_NONE, elements);
-        Muls(halfLocal, halfLocal, static_cast<half>(scale_), elements);
-        Adds(halfLocal, halfLocal, static_cast<half>(offset_), elements);
-        LocalTensor<int32_t> intLocal = floatLocal.ReinterpretCast<int32_t>();
-        Cast(intLocal, halfLocal, RoundMode::CAST_RINT, elements);
-        SetDeqScale((half)1.000000e+00f);
-        Cast(halfLocal, intLocal, RoundMode::CAST_RINT, elements);
+        Muls(floatLocal, floatLocal, scale_, elements);
+        Adds(floatLocal, floatLocal, offset_, elements);
+        Cast(floatLocal, floatLocal, RoundMode::CAST_RINT, elements);
+        Cast(halfLocal, floatLocal, RoundMode::CAST_RINT, elements);
         Cast(outLocal, halfLocal, RoundMode::CAST_RINT, elements);
-    } else if constexpr (IsSameType<T, float>::value) {
-        Cast(halfLocal, inLocal, RoundMode::CAST_NONE, elements);
-        Muls(halfLocal, halfLocal, static_cast<half>(scale_), elements);
-        Adds(halfLocal, halfLocal, static_cast<half>(offset_), elements);
-        Cast(outLocal, halfLocal, RoundMode::CAST_RINT, elements);
-    } else {
-        Muls(inLocal, inLocal, static_cast<T>(scale_), elements);
-        Adds(inLocal, inLocal, static_cast<T>(offset_), elements);
-        Cast(outLocal, inLocal, RoundMode::CAST_RINT, elements);
     }
 
     inputXCopyOutQueue_.EnQue(outLocal);

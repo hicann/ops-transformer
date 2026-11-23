@@ -62,6 +62,36 @@ TEST_F(MoeInitRoutingV3, moe_init_routing_v3_infer_shape_1)
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
+TEST_F(MoeInitRoutingV3, moe_init_routing_v3_infer_shape_empty_active_expert_range)
+{
+    gert::InfershapeContextPara infershapeContextPara(
+        "MoeInitRoutingV3",
+        {
+            {{{-2}, {-2}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{-2}, {-2}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{-2}, {-2}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {"active_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(200)},
+            {"expert_capacity", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(256)},
+            {"drop_pad_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+            {"expert_tokens_num_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"expert_tokens_num_flag", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+            {"quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(-1)},
+            {"active_expert_range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({})},
+            {"row_idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+        });
+    std::vector<std::vector<int64_t>> expectOutputShape = {{-1, -1}, {-1}, {256}, {-1}};
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
+}
+
 TEST_F(MoeInitRoutingV3, moe_init_routing_v3_infer_shape_2)
 {
     gert::InfershapeContextPara infershapeContextPara(
@@ -330,7 +360,7 @@ TEST_F(MoeInitRoutingV3, moe_init_routing_v3_infer_shape_10)
             {"active_expert_range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({1, 8})},
             {"row_idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
         });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{4 * 512, 1024}, {8 * 512 * 512}, {}, {}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{4 * 512, 1024}, {8 * 512 * 512}, {0}, {}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -510,7 +540,7 @@ TEST_F(MoeInitRoutingV3, moe_init_routing_v3_infer_shape_16)
             {"active_expert_range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({0, 256})},
             {"row_idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
         });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{256, 200, 192}, {15114054}, {}, {256 * 200}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{256, 200, 192}, {15114054}, {0}, {256 * 200}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -753,7 +783,7 @@ TEST_F(MoeInitRoutingV3, moe_init_routing_v3_infer_shape_24)
             {"active_expert_range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({87, 222})},
             {"row_idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
         });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{256, 2000, 192}, {15114054}, {}, {256 * 2000}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{256, 2000, 192}, {15114054}, {0}, {256 * 2000}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -784,7 +814,7 @@ TEST_F(MoeInitRoutingV3, moe_init_routing_v3_infer_shape_25)
             {"active_expert_range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({87, 222})},
             {"row_idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
         });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{15114054, 192}, {15114054}, {}, {15114054}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{15114054, 192}, {15114054}, {0}, {15114054}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -873,7 +903,7 @@ TEST_F(MoeInitRoutingV3, moe_init_routing_v3_infer_shape_28)
             {"active_expert_range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({0, 8})},
             {"row_idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
         });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{20, 14}, {20}, {}, {20}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{20, 14}, {20}, {0}, {20}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -902,7 +932,7 @@ TEST_F(MoeInitRoutingV3, moe_init_routing_v3_infer_shape_29)
             {"active_expert_range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({0, 8})},
             {"row_idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
         });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{20, 14}, {20}, {}, {20}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{20, 14}, {20}, {0}, {20}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -933,7 +963,7 @@ TEST_F(MoeInitRoutingV3, moe_init_routing_v3_infer_shape_30)
             {"active_expert_range", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({0, 256})},
             {"row_idx_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
         });
-    std::vector<std::vector<int64_t>> expectOutputShape = {{256, 2, 14}, {20}, {}, {}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{256, 2, 14}, {20}, {0}, {}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 
@@ -2685,12 +2715,12 @@ TEST_F(MoeInitRoutingV3, moe_init_routing_v3_inferdatatype_fp8_perblock_e4m3fn)
     RunSuccessTestcaseInferDataType(ge::DT_BF16, QUANT_MODE_FP8_PERBLOCK_E4M3FN);
 }
 
-TEST_F(MoeInitRoutingV3, moe_init_routing_v3_infershape_false_keeps_unused_count_shape)
+TEST_F(MoeInitRoutingV3, moe_init_routing_v3_infershape_false_fills_unknown_count_shape_as_zero)
 {
     for (int64_t type : {0, 1, 2}) {
         SCOPED_TRACE(type);
         RunExtendedSuccessInferShape({4, 16}, ge::DT_FLOAT16, {4, 2}, {}, {}, 8, 0, 256, 0, type, false,
-                                     QUANT_MODE_UNQUANT, {1, 8}, 0, {8, 16}, {8}, {}, {8});
+                                     QUANT_MODE_UNQUANT, {1, 8}, 0, {8, 16}, {8}, {0}, {8});
     }
 }
 

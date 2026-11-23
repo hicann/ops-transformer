@@ -379,7 +379,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
       <td>activeExpertRangeOptional（aclIntArray）</td>
       <td>输入</td>
       <td>表示活跃的expert范围</td>
-      <td>长度为2，数组内的值为[expertStart, expertEnd]，左闭右开，要求值大于等于0，并且expertEnd不大于expertNum；Drop/Pad场景下，expertStart等于0，expertEnd等于expertNum。</td>
+      <td>可选参数。不传入或传入nullptr（None）时，默认为[0, expertNum)。长度为2，数组内的值为[expertStart, expertEnd]，左闭右开，要求值大于等于0，并且expertEnd不大于expertNum；Drop/Pad场景下，expertStart等于0，expertEnd等于expertNum。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>

@@ -239,7 +239,10 @@ class _MoeInitRoutingOpBuilder(OpBuilder):
 
     @staticmethod
     def _validate_active_expert_range(active_expert_range, expert_num):
+        # None或不传：默认全范围；空列表[]：与None等价（算子侧空列表归一为[0, expert_num)）
         if active_expert_range is None:
+            return expert_num
+        if isinstance(active_expert_range, list) and len(active_expert_range) == 0:
             return expert_num
         torch._check(
             isinstance(active_expert_range, list) and len(active_expert_range) == 2,
@@ -544,7 +547,7 @@ class _MoeInitRoutingOpBuilder(OpBuilder):
             "moe_init_routing(Tensor x, Tensor expert_idx, "
             "*, Tensor? scale=None, Tensor? offset=None, Tensor? topk_weight=None, "
             "SymInt active_num=-1, int expert_capacity=-1, int expert_num=-1, "
-            "int drop_pad_mode=0, int expert_tokens_num_type=0, bool expert_tokens_num_flag=True, "
+            "int drop_pad_mode=0, int expert_tokens_num_type=0, bool expert_tokens_num_flag=False, "
             "int quant_mode=-1, int[]? active_expert_range=None, int row_idx_type=0, "
             "int? x_dtype=None, int scale_alg=0) "
             "-> (Tensor, Tensor, Tensor, Tensor, Tensor)"
@@ -563,7 +566,7 @@ class _MoeInitRoutingOpBuilder(OpBuilder):
             expert_num=-1,
             drop_pad_mode=0,
             expert_tokens_num_type=0,
-            expert_tokens_num_flag=True,
+            expert_tokens_num_flag=False,
             quant_mode=-1,
             active_expert_range=None,
             row_idx_type=0,
@@ -668,7 +671,7 @@ def _moe_init_routing(
     expert_num=-1,
     drop_pad_mode=0,
     expert_tokens_num_type=0,
-    expert_tokens_num_flag=True,
+    expert_tokens_num_flag=False,
     quant_mode=-1,
     active_expert_range=None,
     row_idx_type=0,
@@ -869,7 +872,7 @@ def moe_init_routing(
     expert_num: int = -1,
     drop_pad_mode: int = 0,
     expert_tokens_num_type: int = 0,
-    expert_tokens_num_flag: bool = True,
+    expert_tokens_num_flag: bool = False,
     quant_mode: int = -1,
     active_expert_range: Optional[List[int]] = None,
     row_idx_type: int = 0,
@@ -912,7 +915,7 @@ def moe_init_routing(
         drop_pad_mode (int): 0 for dropless, 1 for drop/pad mode. Default: 0.
         expert_tokens_num_type (int): Type of expert token count output.
             0=count, 1=cumsum, 2=key_value. Default: 0.
-        expert_tokens_num_flag (bool): Whether to produce expert_tokens_count output. Default: True.
+        expert_tokens_num_flag (bool): Whether to produce expert_tokens_count output. Default: False.
         quant_mode (int): Quantization mode. Default: -1.
             -1: no quantization; 0: static; 1: dynamic int8; 2: mxfp8_e5m2;
             3: mxfp8_e4m3fn; 4: fp8_group_e5m2; 5: fp8_group_e4m3fn;
@@ -924,8 +927,8 @@ def moe_init_routing(
             13: int4_dynamic; 14: fp8_group_amax_e5m2; 15: fp8_group_amax_e4m3fn;
             16: mxfp8_roundscale_amax_e5m2; 17: mxfp8_roundscale_amax_e4m3fn.
         active_expert_range (list[int], optional): Range of active experts [start, end].
-            start >= 0, end <= 10240, end > start. When None, defaults to
-            ``[0, expert_num]`` (all experts active). Default: None.
+            start >= 0, end <= 10240, end > start. When None or an empty list,
+            defaults to ``[0, expert_num]`` (all experts active). Default: None.
         row_idx_type (int): Row index type. 0=gather, 1=scatter. Default: 0.
         x_dtype (int, optional): Override for actual data type of x when x is stored as uint8
             but represents a different type. Use torch_npu.float4_e2m1fn_x2,

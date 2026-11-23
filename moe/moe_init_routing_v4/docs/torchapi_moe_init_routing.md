@@ -176,7 +176,7 @@ cann_ops_transformer.moe_init_routing(
 |  expert_tokens_num_type  |  int |  可选  |  表示直方图的不同模式。默认值为0，取值为0、1和2。0表示cumsum模式；1表示count模式；2表示key_value模式。  |  -  | - |
 |  expert_tokens_num_flag  |  bool |  可选  |  表示是否输出`expert_token_cumsum_or_count`。默认值为True。为False时，返回shape为[0]、数据类型为int64的空Tensor。  |  -  | - |
 |  quant_mode  |  int |  可选  |  表示量化模式。默认值为-1，支持取值见下方说明。  |  -  | - |
-|  active_expert_range  |  List[int] |  可选  |  表示活跃expert的范围。默认值为None，长度为2，数组内的值为[expert_start, expert_end]，左闭右开，要求值大于等于0，并且expert_end不大于`expert_num`。Drop/Pad场景下，expert_start等于0，expert_end等于`expert_num`。传入None时，视为活跃的expert范围在0到`expert_num`之间。  |  -  | - |
+|  active_expert_range  |  List[int] |  可选  |  表示活跃expert的范围。默认值为None，长度为2，数组内的值为[expert_start, expert_end]，左闭右开，要求值大于等于0，并且expert_end不大于`expert_num`。Drop/Pad场景下，expert_start等于0，expert_end等于`expert_num`。传入None或空列表[]时，视为活跃的expert范围在0到`expert_num`之间。  |  -  | - |
 |  row_idx_type  |  int |  可选  |  表示输出`expanded_row_idx`使用的索引类型。默认值为0，取值为0和1。0表示gather类型的索引；1表示scatter类型的索引。DropPad场景下仅支持0。  |  -  | - |
 |  x_dtype  |  int |  可选  |  用于指定`x`的非原生数据类型（PyTorch原生dtype无法表达、以`torch.uint8`等原生dtype存储的类型），取值为`torch_npu`的dtype枚举。默认值为None，支持的全部枚举值为：`torch_npu.hifloat8`、`torch_npu.float4_e2m1fn_x2`、`torch_npu.int4`。不同quant_mode下的取值约束见下方说明。  |  -  | - |
 |  scale_alg  |  int |  可选  |  表示量化时scale算法的选择。默认值为0，取值为0和1：0表示默认算法（结果与不传该参数时一致），1表示另一组scale阈值，仅在受支持的量化场景生效，其他场景必须为0。  |  -  | - |

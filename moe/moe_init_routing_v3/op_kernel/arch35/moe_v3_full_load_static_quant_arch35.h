@@ -130,9 +130,13 @@ __aicore__ inline void MoeV3FullLoadStaticQuant<T>::Compute(int64_t rowLength)
             } else {
                 Reg::LoadAlign(inReg, inUbAddr + i * FLOAT_REG_TENSOR_LENGTH);
             }
+            // 静态量化按公式 round(x*scale+offset) 在 FP32 精度计算（与文档及 A2/A3 实现一致）：
+            // FP32 乘加 -> vtrc(Truncate, RINT) 在 FP32 域取整 -> f322f16(整数值精确) -> f162s8(饱和)。
+            // 不再先将中间量降到 FP16，避免 [0.49,0.5) 边界值在 FP16 网格上被舍入到 .5 后多进 1 LSB。
+            Reg::Muls(inReg, inReg, scale_, maskRegInLoop);
+            Reg::Adds(inReg, inReg, offset_, maskRegInLoop);
+            Reg::Truncate<float, RoundMode::CAST_RINT>(inReg, inReg, maskRegInLoop);
             Reg::Cast<half, float, castTraitF32ToF16>(outRegF16, inReg, maskRegInLoop);
-            Reg::Muls(outRegF16, outRegF16, static_cast<half>(scale_), maskRegInLoop);
-            Reg::Adds(outRegF16, outRegF16, static_cast<half>(offset_), maskRegInLoop);
             Reg::Cast<int8_t, half, castTraitF16ToI8>(outRegI8, outRegF16, maskRegInLoop);
             Reg::StoreAlign<int8_t, Reg::StoreDist::DIST_PACK4_B32>(outUbAddr + i * FLOAT_REG_TENSOR_LENGTH, outRegI8,
                                                                     maskRegInLoop);

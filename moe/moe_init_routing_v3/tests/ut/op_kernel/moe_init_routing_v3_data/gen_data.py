@@ -177,10 +177,12 @@ def gen_golden(
 
     if quant_mode == 0:
         expanded_scale = None
-        expanded_x_fp16 = expanded_x.astype(np.float16)
-        scale_val = scale.astype(np.float16)
-        offset_val = offset.astype(np.float16)
-        scale_rst = expanded_x_fp16 * scale_val[0]
+        # 文档公式: quantResult = round(x*scale + offset)，scale/offset 为 FLOAT32，
+        # 计算全程保持 FLOAT32 精度（与 A2/A3 及 arch35 kernel 实现一致），不降 FP16。
+        expanded_x_fp32 = expanded_x.astype(np.float32)
+        scale_val = scale.astype(np.float32)
+        offset_val = offset.astype(np.float32)
+        scale_rst = expanded_x_fp32 * scale_val[0]
         add_offset = scale_rst + offset_val[0]
         round_data = np.rint(add_offset)
         round_data = np.clip(round_data, -128, 127)

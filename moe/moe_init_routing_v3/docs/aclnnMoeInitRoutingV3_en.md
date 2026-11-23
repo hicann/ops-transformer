@@ -381,7 +381,7 @@ aclnnStatus aclnnMoeInitRoutingV3(
       <td>activeExpertRangeOptional (aclIntArray)</td>
       <td>Input</td>
       <td>Indicates the range of active experts.</td>
-      <td>Length is 2. The values in the array are [expertStart, expertEnd], with a left-closed and right-open interval. Values must be greater than or equal to 0, and expertEnd must not be greater than expertNum; in the Drop/Pad scenario, expertStart equals 0, expertEnd equals expertNum.</td>
+      <td>Optional parameter. If not provided or nullptr (None) is passed in, the default range is [0, expertNum). Length is 2. The values in the array are [expertStart, expertEnd], with a left-closed and right-open interval. Values must be greater than or equal to 0, and expertEnd must not be greater than expertNum; in the Drop/Pad scenario, expertStart equals 0, expertEnd equals expertNum.</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>

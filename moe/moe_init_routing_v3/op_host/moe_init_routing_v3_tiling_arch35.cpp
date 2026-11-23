@@ -402,17 +402,22 @@ ge::graphStatus MoeInitRoutingV3TilingArch35::GetInputAttrsInfo()
     OP_LOGD(context_, "Get input attr quantMode = %ld.", quantMode_);
     MIRV3_CHECK_GE_RET(GetInputAttr<int64_t>(rowIdxType_, attrsPtr, ATTR_ROW_IDX_TYPE_INDEX));
     OP_LOGD(context_, "Get input attr rowIdxType = %ld.", rowIdxType_);
-    // expertStart, expertEnd
+    // expertStart, expertEnd: active_expert_range为可选属性，未传入(空列表)时默认[0, expertNum)
     const auto* aerPtr = attrsPtr->GetAttrPointer<gert::ContinuousVector>(ATTR_EXPERT_RANGE_INDEX);
-    OP_CHECK_NULL_WITH_CONTEXT(context_, aerPtr);
-    int64_t aerLen = aerPtr->GetSize();
-    OP_CHECK_IF(
-        aerLen != 2,
-        OP_LOGE_FOR_INVALID_SHAPESIZE(context_->GetNodeName(), "active_expert_range", std::to_string(aerLen), "2"),
-        return ge::GRAPH_FAILED);
-    const int64_t* aerList = reinterpret_cast<const int64_t*>(aerPtr->GetData());
-    expertStart_ = aerList[0];
-    expertEnd_ = aerList[1];
+    int64_t aerLen = (aerPtr == nullptr) ? 0 : aerPtr->GetSize();
+    if (aerLen == DIM_VALUE_TWO) {
+        const int64_t* aerList = reinterpret_cast<const int64_t*>(aerPtr->GetData());
+        expertStart_ = aerList[0];
+        expertEnd_ = aerList[1];
+    } else if (aerLen == 0) {
+        expertStart_ = 0;
+        expertEnd_ = expertNum_;
+        OP_LOGI(context_, "active_expert_range is not set, use default range [0, %ld).", expertNum_);
+    } else {
+        OP_LOGE_FOR_INVALID_LISTSIZE(context_->GetNodeName(), "active_expert_range", std::to_string(aerLen),
+                                     "0 or 2 (0 means no input)");
+        return ge::GRAPH_FAILED;
+    }
     OP_LOGD(context_, "Extracted input attrs expertStart = %ld, expertEnd = %ld.", expertStart_, expertEnd_);
 
     return ge::GRAPH_SUCCESS;

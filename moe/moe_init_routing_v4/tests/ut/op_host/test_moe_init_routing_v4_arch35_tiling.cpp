@@ -340,7 +340,7 @@ gert::TilingContextPara MakeV4TilingContextPara(
     bool hasActiveNum, int64_t activeNumVal, bool hasTopkWeight, optiling::MoeInitRoutingV3CompileInfo* compileInfo)
 {
     int64_t expertNum = EXPERT_NUM;
-    int64_t expertRange = aciveExpertRange[1] - aciveExpertRange[0];
+    int64_t expertRange = aciveExpertRange.size() < 2 ? EXPERT_NUM : aciveExpertRange[1] - aciveExpertRange[0];
     int64_t totalLength = n * k;
     ge::DataType expandedXDtype = GetExpandedXDtype(quantMode, xDataType, expandedXDtypeOverride);
     ExpandedScaleDesc expandedScale =
@@ -555,6 +555,32 @@ TEST_F(MoeInitRoutingV4Tiling, moe_init_routing_v4_tiling_fullload_unquant_with_
     RunV4Testcase(1, h, 27, 0, 0, EXPERT_TOKENS_TYPE_COUNT, true, QUANT_MODE_UNQUANT, ge::DT_FLOAT16, {180, 192},
                   ROW_IDX_TYPE_GATHER, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT, kExpandedXDtypeAuto, false, 0, true,
                   ge::GRAPH_SUCCESS);
+}
+
+// fullload + not quant, empty active_expert_range
+TEST_F(MoeInitRoutingV4Tiling, moe_init_routing_v4_tiling_fullload_unquant_empty_active_expert_range)
+{
+    int64_t h = 83;
+    RunV4Testcase(1, h, 27, 0, 0, EXPERT_TOKENS_TYPE_COUNT, true, QUANT_MODE_UNQUANT, ge::DT_FLOAT16, {},
+                  ROW_IDX_TYPE_GATHER, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT, kExpandedXDtypeAuto, false, 0, false,
+                  ge::GRAPH_SUCCESS);
+}
+
+// droppad + not quant, empty active_expert_range
+TEST_F(MoeInitRoutingV4Tiling, moe_init_routing_v4_tiling_droppad_unquant_empty_active_expert_range)
+{
+    RunV4Testcase(1000000, 16, 1, 1, 1, EXPERT_TOKENS_TYPE_COUNT, true, QUANT_MODE_UNQUANT, ge::DT_FLOAT, {},
+                  ROW_IDX_TYPE_GATHER, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT, kExpandedXDtypeAuto, false, 0, true,
+                  ge::GRAPH_SUCCESS);
+}
+
+// invalid active_expert_range size
+TEST_F(MoeInitRoutingV4Tiling, moe_init_routing_v4_tiling_reject_active_expert_range_size_one)
+{
+    int64_t h = 83;
+    RunV4Testcase(1, h, 27, 0, 0, EXPERT_TOKENS_TYPE_COUNT, true, QUANT_MODE_UNQUANT, ge::DT_FLOAT16, {180},
+                  ROW_IDX_TYPE_GATHER, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT, kExpandedXDtypeAuto, false, 0, false,
+                  ge::GRAPH_FAILED);
 }
 
 // fullload + dynamic quant, no topk_weight
@@ -1142,4 +1168,47 @@ TEST_F(MoeInitRoutingV4Tiling, moe_init_routing_v4_tiling_false_empty_topkweight
     auto attrs = BuildV4Attrs(0, EXPERT_NUM, 0, 1, false, -1, {0, EXPERT_NUM}, 0);
     gert::TilingContextPara para("MoeInitRoutingV4", inputs, outputs, attrs, &info, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(para, ge::GRAPH_FAILED);
+}
+
+// 空 active_expert_range（None 语义）应与显式 [0, expertNum) 产生完全一致的 tiling 结果
+TEST_F(MoeInitRoutingV4Tiling, moe_init_routing_v4_tiling_data_empty_active_range_matches_full_range)
+{
+    auto buildInfo = [](const std::vector<int64_t>& expertRange, optiling::MoeInitRoutingV3CompileInfo& compileInfo,
+                        TilingInfo& tilingInfo) {
+        constexpr int64_t N = 1;
+        constexpr int64_t H = 83;
+        constexpr int64_t K = 27;
+        const int64_t expertRangeLen = expertRange.empty() ? EXPERT_NUM : expertRange[1] - expertRange[0];
+        const int64_t totalLength = N * K;
+        ge::DataType expandedXDtype = GetExpandedXDtype(QUANT_MODE_UNQUANT, ge::DT_FLOAT, kExpandedXDtypeAuto);
+        ExpandedScaleDesc expandedScale =
+            GetExpandedScaleDesc(QUANT_MODE_UNQUANT, totalLength, H, N, false, ge::DT_FLOAT, expandedXDtype);
+        std::vector<int64_t> expertTokensShape =
+            GetExpertTokensShape(EXPERT_TOKENS_TYPE_COUNT, EXPERT_NUM, expertRangeLen);
+        auto inputDesc =
+            BuildV4Inputs(N, H, K, ge::DT_FLOAT, {}, ge::DT_FLOAT, {}, ge::DT_FLOAT, false, 0, true, totalLength);
+        auto outputDesc = BuildV4Outputs(totalLength, H, expandedXDtype, expertTokensShape, expandedScale, true, N, K,
+                                         0, EXPERT_NUM, 0);
+        auto attrs = BuildV4Attrs(0, EXPERT_NUM, 0, EXPERT_TOKENS_TYPE_COUNT, true, QUANT_MODE_UNQUANT, expertRange,
+                                  ROW_IDX_TYPE_GATHER);
+        gert::TilingContextPara para("MoeInitRoutingV4", inputDesc, outputDesc, attrs, &compileInfo, "Ascend950",
+                                     A5SocInfo, 4096);
+        return ExecuteTiling(para, tilingInfo);
+    };
+    optiling::MoeInitRoutingV3CompileInfo compileInfo = {40, 262144, Ops::Base::DAV_3510};
+    TilingInfo emptyInfo;
+    TilingInfo fullInfo;
+    ASSERT_TRUE(buildInfo({}, compileInfo, emptyInfo));
+    ASSERT_TRUE(buildInfo({0, EXPERT_NUM}, compileInfo, fullInfo));
+    EXPECT_EQ(emptyInfo.tilingKey, fullInfo.tilingKey);
+    ASSERT_EQ(emptyInfo.tilingDataSize, fullInfo.tilingDataSize);
+    std::vector<uint8_t> emptyData(emptyInfo.tilingData.get(), emptyInfo.tilingData.get() + emptyInfo.tilingDataSize);
+    std::vector<uint8_t> fullData(fullInfo.tilingData.get(), fullInfo.tilingData.get() + fullInfo.tilingDataSize);
+    EXPECT_EQ(emptyData, fullData);
+    EXPECT_EQ(emptyInfo.workspaceSizes, fullInfo.workspaceSizes);
+    EXPECT_EQ(emptyInfo.blockNum, fullInfo.blockNum);
+    const auto* tilingData = reinterpret_cast<const MoeInitRoutingV3Arch35TilingData*>(emptyInfo.tilingData.get());
+    EXPECT_EQ(tilingData->expertStart, 0);
+    EXPECT_EQ(tilingData->expertEnd, EXPERT_NUM);
+    EXPECT_EQ(tilingData->actualExpertNum, EXPERT_NUM);
 }

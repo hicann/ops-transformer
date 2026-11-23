@@ -564,7 +564,7 @@ TEST_F(MoeInitRoutingV4, moe_init_routing_v4_infer_shape_no_expert_tokens)
         },
         {1, 1, 1, 1, 0, 0}, // x, expert_idx, scale, offset present for static quant
         {1, 1, 1, 1, 1});
-    std::vector<std::vector<int64_t>> expectOutputShape = {{8 * 512 * 512, 1024}, {8 * 512 * 512}, {}, {}, {0}};
+    std::vector<std::vector<int64_t>> expectOutputShape = {{8 * 512 * 512, 1024}, {8 * 512 * 512}, {0}, {}, {0}};
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
 }
 

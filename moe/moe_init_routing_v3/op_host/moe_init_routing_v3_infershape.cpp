@@ -745,6 +745,12 @@ static void SetExpertTokenCumsumOrCountShape(gert::Shape* expertTokenCumsumOrCou
             expertTokenCumsumOrCountShape->SetDimNum(DIM_ONE);
             expertTokenCumsumOrCountShape->SetDim(0U, expertEnd - expertStart);
         }
+    } else if (expertTokenCumsumOrCountShape->GetDimNum() == 0) {
+        // flag=false 时统计结果不输出：调用方未声明输出 shape（图模式）时给出确定的空 shape (0,)，
+        // 与 SetExpandedTopkWeightShape 的可选输出约定一致，保证 GE 图 NetOutput 与框架 meta 对齐；
+        // 调用方已声明 shape（如 aclnn 显式传入）时保持不动。
+        expertTokenCumsumOrCountShape->SetDimNum(DIM_ONE);
+        expertTokenCumsumOrCountShape->SetDim(0U, 0);
     }
 }
 

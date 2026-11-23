@@ -186,6 +186,9 @@ def _moe_init_routing_v3_numpy(
     active_expert_range,
     row_idx_type,
 ):
+    # active_expert_range为空列表/None时表示未传入，与算子语义对齐，默认[0, expert_num)
+    if not active_expert_range:
+        active_expert_range = [0, int(expert_num)]
     expert_start = active_expert_range[0]
     expert_end = active_expert_range[1]
     num_rows = x.shape[0]
@@ -295,12 +298,14 @@ def _moe_init_routing_v3_numpy(
         expanded_scale = None
         valid_num = min(actual_expert_total_num, x_out_num)
         gathered_x = x[sorted_expert_indices[:valid_num] // k, :]
-        x_fp16 = gathered_x.astype(numpy.float16)
-        scale_val = scale.astype(numpy.float16)[0]
-        offset_val = numpy.float16(0)
+        # 文档公式: quantResult = round(x*scale + offset)，scale/offset 为 FLOAT32，
+        # 计算全程保持 FLOAT32 精度（与 A2/A3 及 arch35 kernel 实现一致），不降 FP16。
+        x_fp32 = gathered_x.astype(numpy.float32)
+        scale_val = scale.astype(numpy.float32)[0]
+        offset_val = numpy.float32(0)
         if offset is not None:
-            offset_val = offset.astype(numpy.float16)[0]
-        expanded_x = x_fp16 * scale_val
+            offset_val = offset.astype(numpy.float32)[0]
+        expanded_x = x_fp32 * scale_val
         expanded_x = expanded_x + offset_val
         expanded_x = numpy.rint(expanded_x)
         expanded_x = numpy.clip(expanded_x, -128, 127)
@@ -665,9 +670,11 @@ def MoeInitRoutingV3(*input_arrays, **kwargs):
     expert_num = kwargs.get("expert_num", 256)
     drop_pad_mode = kwargs.get("drop_pad_mode", 0)
     expert_tokens_num_type = kwargs.get("expert_tokens_num_type", 1)
-    expert_tokens_num_flag = kwargs.get("expert_tokens_num_flag", True)
+    expert_tokens_num_flag = kwargs.get("expert_tokens_num_flag", False)
     quant_mode = kwargs.get("quant_mode", -1)
     active_expert_range = kwargs.get("active_expert_range", [0, expert_num])
+    if not active_expert_range:
+        active_expert_range = [0, expert_num]
     row_idx_type = kwargs.get("row_idx_type", 1)
 
     expanded_x, expanded_row_idx, expert_tokens_count, expanded_scale = (
@@ -1184,7 +1191,7 @@ class E2eMoeInitRoutingV3Spec:
         expert_idx_np = _torch_to_numpy(expert_idx)
         scale_np = _torch_to_numpy(scale)
         offset_np = _torch_to_numpy(offset)
-        if active_expert_range is not None:
+        if active_expert_range is not None and len(active_expert_range) > 0:
             active_expert_range = _to_list(active_expert_range)
         else:
             active_expert_range = [0, int(expert_num)]
@@ -1489,6 +1496,7 @@ class AclnnMoeInitRoutingV3Spec:
         active_expert_range = (
             _to_list(activeExpertRangeOptional)
             if activeExpertRangeOptional is not None
+            and len(activeExpertRangeOptional) > 0
             else [0, int(expertNum)]
         )
 
