@@ -254,6 +254,37 @@ void RunChunked(int64_t dim, bool save)
     }
 }
 
+void CheckPureCancellation(const DeviceBuffers& buffers, const std::vector<uint16_t>& xBits,
+                           const uint16_t (&pattern)[HEADS][4], int64_t dim)
+{
+    const auto* outValues = reinterpret_cast<const uint16_t*>(buffers.out);
+    for (int64_t h = 0; h < HEADS; ++h) {
+        double sumSq = 0.0;
+        double dot = 0.0;
+        for (int64_t v = 0; v < 4; ++v) {
+            const double value = Bf16ToFloat(pattern[h][v]);
+            sumSq += value * value;
+            dot += value;
+        }
+        const double rstdX = 1.0 / std::sqrt(sumSq / static_cast<double>(dim) + EPS);
+        const double rstdK = 1.0 / std::sqrt(1.0 + EPS);
+        const double normalized = dot * rstdX * rstdK / std::sqrt(static_cast<double>(dim));
+        const double magnitude = std::max(std::fabs(normalized), static_cast<double>(CLAMP_VALUE));
+        const double gate = 1.0 / (1.0 + std::exp(-std::sqrt(magnitude)));
+
+        EXPECT_NEAR(buffers.dot[h], dot, 2e-5F) << "dot head=" << h;
+        EXPECT_NEAR(buffers.gate[h], gate, 2e-5F) << "gate head=" << h;
+        EXPECT_NEAR(buffers.rstdX[h], rstdX, 2e-5F) << "rstd_x head=" << h;
+        EXPECT_NEAR(buffers.rstdK[h], rstdK, 2e-5F) << "rstd_k head=" << h;
+        for (int64_t i = 0; i < dim; ++i) {
+            const double value = Bf16ToFloat(xBits[static_cast<size_t>(h * dim + i)]);
+            const double out = value + gate; // v row is all ones
+            const double tolerance = std::max(8e-3, std::fabs(out) / 128.0);
+            EXPECT_NEAR(Bf16ToFloat(outValues[h * dim + i]), out, tolerance) << "output head=" << h << " i=" << i;
+        }
+    }
+}
+
 // Opposite-sign cancellation across the four dot channels: merging the
 // compensated accumulators must keep the rounding residual of every high-part
 // addition, otherwise the small term between two large cancelling terms is
@@ -292,32 +323,7 @@ void RunPureCancellation()
     DeviceBuffers buffers(xElems, kvElems, wElems, rows, true);
     buffers.Run(tiling, xElems, kvElems, wElems, &xBits);
 
-    const auto* outValues = reinterpret_cast<const uint16_t*>(buffers.out);
-    for (int64_t h = 0; h < HEADS; ++h) {
-        double sumSq = 0.0;
-        double dot = 0.0;
-        for (int64_t v = 0; v < 4; ++v) {
-            const double value = Bf16ToFloat(pattern[h][v]);
-            sumSq += value * value;
-            dot += value;
-        }
-        const double rstdX = 1.0 / std::sqrt(sumSq / static_cast<double>(dim) + EPS);
-        const double rstdK = 1.0 / std::sqrt(1.0 + EPS);
-        const double normalized = dot * rstdX * rstdK / std::sqrt(static_cast<double>(dim));
-        const double magnitude = std::max(std::fabs(normalized), static_cast<double>(CLAMP_VALUE));
-        const double gate = 1.0 / (1.0 + std::exp(-std::sqrt(magnitude)));
-
-        EXPECT_NEAR(buffers.dot[h], dot, 2e-5F) << "dot head=" << h;
-        EXPECT_NEAR(buffers.gate[h], gate, 2e-5F) << "gate head=" << h;
-        EXPECT_NEAR(buffers.rstdX[h], rstdX, 2e-5F) << "rstd_x head=" << h;
-        EXPECT_NEAR(buffers.rstdK[h], rstdK, 2e-5F) << "rstd_k head=" << h;
-        for (int64_t i = 0; i < dim; ++i) {
-            const double value = Bf16ToFloat(xBits[static_cast<size_t>(h * dim + i)]);
-            const double out = value + gate; // v row is all ones
-            const double tolerance = std::max(8e-3, std::fabs(out) / 128.0);
-            EXPECT_NEAR(Bf16ToFloat(outValues[h * dim + i]), out, tolerance) << "output head=" << h << " i=" << i;
-        }
-    }
+    CheckPureCancellation(buffers, xBits, pattern, dim);
 }
 
 } // namespace

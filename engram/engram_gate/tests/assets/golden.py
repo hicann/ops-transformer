@@ -44,6 +44,7 @@ def compute(
     clamp_value=1e-6,
     save_for_backward=True,
     work_dtype=torch.float64,
+    high_precision_output=False,
 ):
     """CPU FP64 reference; work_dtype=float32 is the composed competitor."""
     hidden_states, kv, weight_fused = map(_tensor, (hidden_states, kv, weight_fused))
@@ -58,12 +59,17 @@ def compute(
     dot = raw_dot * rx * rk * dim**-0.5
     s = torch.copysign(torch.sqrt(torch.clamp_min(torch.abs(dot), clamp_value)), dot)
     gate = 1 / (1 + torch.exp(-s))
-    y = (x + gate.unsqueeze(-1) * v).to(hidden_states.dtype)
+    y = x + gate.unsqueeze(-1) * v
+    # Golden outputs retain the reference precision for TTK Promote/cross_check.
+    # Third-party outputs follow the operator's declared output dtypes.
+    if not high_precision_output:
+        y = y.to(hidden_states.dtype)
     if not save_for_backward:
         return [y] + [
             torch.empty(0, dtype=torch.float32, device=x.device) for _ in range(4)
         ]
-    return [y] + [a.float() for a in (raw_dot, gate, rx, rk)]
+    stats = [raw_dot, gate, rx, rk]
+    return [y] + (stats if high_precision_output else [a.float() for a in stats])
 
 
 class _Compose:
@@ -89,6 +95,12 @@ class _AclnnCompose:
         )
 
 
+class _TorchCompose(_Compose):
+    def __call__(self, hidden_states, kv, weight_fused, **kwargs):
+        outputs = super().__call__(hidden_states, kv, weight_fused, **kwargs)
+        return outputs if self.attrs[2] else [outputs[0], None, None, None, None]
+
+
 class EngramGateKernelSpec:
     third_party = {"torch": _Compose}
     tolerance = {
@@ -103,7 +115,12 @@ class EngramGateKernelSpec:
             for k in ("eps", "clamp_value", "save_for_backward")
             if k in kwargs
         }
-        return [_numpy(a) for a in compute(hidden_states, kv, weight_fused, **attrs)]
+        return [
+            _numpy(a)
+            for a in compute(
+                hidden_states, kv, weight_fused, high_precision_output=True, **attrs
+            )
+        ]
 
 
 class EngramGateAclnnSpec:
@@ -135,14 +152,15 @@ class EngramGateAclnnSpec:
             float(eps),
             float(clampValue),
             bool(saveForBackward),
+            high_precision_output=True,
         )
-        if kwargs.get("use_numpy", not isinstance(output, torch.Tensor)):
-            return tuple(_numpy(value) for value in result)
-        return tuple(result)
+        if kwargs.get("use_numpy", not isinstance(hiddenStates, torch.Tensor)):
+            return [_numpy(value) for value in result]
+        return result
 
 
 class EngramGateTorchSpec:
-    # TTK e2e currently does not dispatch third-party benchmarks.
+    third_party = {"torch": _TorchCompose}
     tolerance = EngramGateAclnnSpec.tolerance
 
     @staticmethod
@@ -156,13 +174,15 @@ class EngramGateTorchSpec:
         **kwargs,
     ):
         outputs = compute(
-            hidden_states, kv, weight_fused, eps, clamp_value, save_for_backward
+            hidden_states,
+            kv,
+            weight_fused,
+            eps,
+            clamp_value,
+            save_for_backward,
+            high_precision_output=True,
         )
-        return (
-            tuple(outputs)
-            if save_for_backward
-            else (outputs[0], None, None, None, None)
-        )
+        return outputs if save_for_backward else [outputs[0], None, None, None, None]
 
 
 def engram_gate_golden(
