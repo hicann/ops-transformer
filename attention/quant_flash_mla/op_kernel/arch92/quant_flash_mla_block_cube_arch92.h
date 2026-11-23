@@ -68,9 +68,12 @@ public:
     static constexpr bool USE_DN = useDn;
     static constexpr bool SPLITD = splitD;
 
+    // bmm1 分块: D维(576)按 192 切 3 块, L0B 的 N 方向按 128 切块
+    static constexpr uint32_t baseK = 192U;
+    static constexpr uint32_t baseN = 128U;
+
     static constexpr bool isFp8 = IsSameType<INPUT_T, fp8_e5m2_t>::value || IsSameType<INPUT_T, fp8_e4m3fn_t>::value ||
                                   IsSameType<INPUT_T, hifloat8_t>::value;
-    static constexpr bool isInt8 = IsSameType<INPUT_T, int8_t>::value;
     static constexpr TPosition bmm2OutPos =
         GetC2Position(dVTemplateType,
                       UbOutCondition<INPUT_T>(IsSameType<INPUT_T, float>::value, PseTypeEnum::PSE_NONE_TYPE, false,
@@ -85,7 +88,6 @@ public:
     using Q_T = INPUT_T;
     using KV_T = INPUT_T;
     using MM_T = T;
-    using MLA_FULLQUANT_MM2_T = std::conditional_t<isInt8, int32_t, T>;
 
     // Dense layouts use per-batch lengths; TND uses cumulative offsets.
     static constexpr ActualSeqLensMode Q_MODE = GetQActSeqMode<layout>();
@@ -352,41 +354,51 @@ public:
 
     // QK: three equal K=192 blocks, Q resident across the full S2 loop.
     // MTE1 fills the alternate B slot while Cube consumes the current slot.
-    __aicore__ inline void Mm1MatmulK(const LocalTensor<INPUT_T>& q, const LocalTensor<INPUT_T>& kv,
-                                      const LocalTensor<T>& c, uint32_t m, uint32_t n, bool first, bool last)
+    __aicore__ inline void Mm1MatmulK(const LocalTensor<INPUT_T>& qL1Tensor, const LocalTensor<INPUT_T>& kvL1Tensor,
+                                      const LocalTensor<T>& cL0Tensor, uint32_t mSize, uint32_t nSize, bool first,
+                                      bool last)
     {
-        static_assert(mBaseSize * 192U <= BUFFER_SIZE_BYTE_32K);
-        static_assert(128U * 192U <= BUFFER_SIZE_BYTE_32K);
+        static_assert(mBaseSize * baseK <= BUFFER_SIZE_BYTE_32K);
+        static_assert(baseN * baseK <= BUFFER_SIZE_BYTE_32K);
         auto qCache = l0ABuffers_.template ReinterpretCast<INPUT_T>();
         if (first) {
             Mutex::Lock<PIPE_MTE1>(L0A_BUFFER_ID0);
-            LoadOperand(qCache, q, m, 576U, false);
+            LoadOperand(qCache, qL1Tensor, mSize, dBaseSize, false);
             Mutex::Unlock<PIPE_MTE1>(L0A_BUFFER_ID0);
             Mutex::Lock<PIPE_M>(L0A_BUFFER_ID0);
         }
-        if (likely(m == 64U && n == 256U)) {
-            Mm1FullTile(qCache, kv, c);
+        if (likely(mSize == mBaseSize && nSize == s2BaseSize)) {
+            Mm1FullTile(qCache, kvL1Tensor, cL0Tensor);
         } else {
-            for (uint32_t ni = 0; ni < (n + 127U) / 128U; ++ni) {
-                const uint32_t tileN = n - ni * 128U > 128U ? 128U : n - ni * 128U;
+            // M 方向按 cube 基块 16 对齐
+            const uint32_t mAligned = (mSize + 15U) >> 4 << 4;
+            // N 方向按 L0B 的 C0=32 对齐(fp8/hif8 的分形基块)
+            const uint32_t nAligned = (nSize + 31U) >> 5 << 5;
+            const uint32_t kLoops = dBaseSize / baseK;
+            const uint32_t nLoops = (nSize + baseN - 1U) / baseN;
+            for (uint32_t n = 0; n < nLoops; ++n) {
+                const uint32_t tileN = n == (nLoops - 1U) ? nSize - n * baseN : baseN;
+                const uint32_t L0COffset = n * baseN * mAligned;
 #pragma unroll
-                for (uint32_t k = 0; k < 3U; ++k) {
-                    const uint32_t id = L0B_BUFFER_ID0 + l0ABSlot_;
-                    auto a = qCache[k * 192U * ((m + 15U) / 16U * 16U)];
-                    auto b = l0BBuffers_[l0ABSlot_ * BUFFER_SIZE_BYTE_32K].template ReinterpretCast<INPUT_T>();
-                    Mutex::Lock<PIPE_MTE1>(id);
-                    LoadOperand(b, kv[k * 192U * ((n + 31U) / 32U * 32U) + ni * 128U * 32U], tileN, 192U, false, n);
-                    Mutex::Unlock<PIPE_MTE1>(id);
-                    Mutex::Lock<PIPE_M>(id);
-                    MmadParams mp;
-                    mp.m = m == 1U ? 16U : m;
-                    mp.n = tileN;
-                    mp.k = 192U;
-                    mp.cmatrixInitVal = k == 0U;
-                    mp.cmatrixSource = false;
-                    mp.unitFlag = 0;
-                    Mmad(c[ni * 128U * ((m + 15U) / 16U * 16U)], a, b, mp);
-                    Mutex::Unlock<PIPE_M>(id);
+                for (uint32_t k = 0; k < kLoops; ++k) {
+                    const uint32_t l0bBufId = L0B_BUFFER_ID0 + l0ABSlot_;
+                    auto L0ATensor = qCache[k * baseK * mAligned];
+                    auto L0BTensor = l0BBuffers_[l0ABSlot_ * BUFFER_SIZE_BYTE_32K].template ReinterpretCast<INPUT_T>();
+                    Mutex::Lock<PIPE_MTE1>(l0bBufId);
+                    // kv 偏移: [D块][n块][C0=32] 排布
+                    LoadOperand(L0BTensor, kvL1Tensor[k * baseK * nAligned + n * baseN * 32U], tileN, baseK, false,
+                                nSize);
+                    Mutex::Unlock<PIPE_MTE1>(l0bBufId);
+                    Mutex::Lock<PIPE_M>(l0bBufId);
+                    MmadParams mmadParams;
+                    mmadParams.m = mSize == 1U ? 16U : mSize; // m=1 时按 cube 基块 16 补足
+                    mmadParams.n = tileN;
+                    mmadParams.k = baseK;
+                    mmadParams.cmatrixInitVal = k == 0U;
+                    mmadParams.cmatrixSource = false;
+                    mmadParams.unitFlag = 0;
+                    Mmad(cL0Tensor[L0COffset], L0ATensor, L0BTensor, mmadParams);
+                    Mutex::Unlock<PIPE_M>(l0bBufId);
                     l0ABSlot_ ^= 1U;
                 }
             }
@@ -398,31 +410,34 @@ public:
 
     // PV: four N=128 blocks at K=256 fill the 32 KiB B slots.
     // P is loaded once and protected across all four Mmad instructions.
-    __aicore__ inline void Mm2MatmulN(const LocalTensor<INPUT_T>& p, const LocalTensor<INPUT_T>& v,
-                                      const LocalTensor<MLA_FULLQUANT_MM2_T>& c, uint32_t k)
+    __aicore__ inline void Mm2MatmulN(const LocalTensor<INPUT_T>& pL1Tensor, const LocalTensor<INPUT_T>& vL1Tensor,
+                                      const LocalTensor<T>& cL0Tensor, uint32_t kSize)
     {
-        auto a = l0ABuffers_[mBaseSize * 576U].template ReinterpretCast<INPUT_T>();
+        auto L0ATensor = l0ABuffers_[mBaseSize * dBaseSize].template ReinterpretCast<INPUT_T>();
         Mutex::Lock<PIPE_MTE1>(L0A_BUFFER_ID1);
-        LoadOperand(a, p, mBaseSize, k, false);
+        LoadOperand(L0ATensor, pL1Tensor, mBaseSize, kSize, false);
         Mutex::Unlock<PIPE_MTE1>(L0A_BUFFER_ID1);
         Mutex::Lock<PIPE_M>(L0A_BUFFER_ID1);
+        // N(V的head dim)按 baseN 切块, K 方向按 C0=32 对齐
+        const uint32_t nLoops = dVBaseSize / baseN;
+        const uint32_t kAligned = (kSize + 31U) >> 5 << 5;
 #pragma unroll
-        for (uint32_t n = 0; n < 4U; ++n) {
-            const uint32_t id = L0B_BUFFER_ID0 + l0ABSlot_;
-            auto b = l0BBuffers_[l0ABSlot_ * BUFFER_SIZE_BYTE_32K].template ReinterpretCast<INPUT_T>();
-            Mutex::Lock<PIPE_MTE1>(id);
-            LoadOperand(b, v[n * 128U * ((k + 31U) / 32U * 32U)], (k + 31U) / 32U * 32U, 128U, true);
-            Mutex::Unlock<PIPE_MTE1>(id);
-            Mutex::Lock<PIPE_M>(id);
-            MmadParams mp;
-            mp.m = mBaseSize;
-            mp.n = 128U;
-            mp.k = k;
-            mp.cmatrixInitVal = true;
-            mp.cmatrixSource = false;
-            mp.unitFlag = 0;
-            Mmad(c[n * mBaseSize * 128U], a, b, mp);
-            Mutex::Unlock<PIPE_M>(id);
+        for (uint32_t n = 0; n < nLoops; ++n) {
+            const uint32_t l0bBufId = L0B_BUFFER_ID0 + l0ABSlot_;
+            auto L0BTensor = l0BBuffers_[l0ABSlot_ * BUFFER_SIZE_BYTE_32K].template ReinterpretCast<INPUT_T>();
+            Mutex::Lock<PIPE_MTE1>(l0bBufId);
+            LoadOperand(L0BTensor, vL1Tensor[n * baseN * kAligned], kAligned, baseN, true);
+            Mutex::Unlock<PIPE_MTE1>(l0bBufId);
+            Mutex::Lock<PIPE_M>(l0bBufId);
+            MmadParams mmadParams;
+            mmadParams.m = mBaseSize;
+            mmadParams.n = baseN;
+            mmadParams.k = kSize;
+            mmadParams.cmatrixInitVal = true;
+            mmadParams.cmatrixSource = false;
+            mmadParams.unitFlag = 0;
+            Mmad(cL0Tensor[n * mBaseSize * baseN], L0ATensor, L0BTensor, mmadParams);
+            Mutex::Unlock<PIPE_M>(l0bBufId);
             l0ABSlot_ ^= 1U;
         }
         Mutex::Unlock<PIPE_M>(L0A_BUFFER_ID1);
@@ -565,7 +580,7 @@ public:
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;
         fixpipeParams.nSize = (s2RealSize + 7) >> 3 << 3;
         fixpipeParams.mSize = (runInfo.actMSize + 1) >> 1 << 1;
-        fixpipeParams.srcStride = ((runInfo.actMSize + 15) / 16) * 16;
+        fixpipeParams.srcStride = (runInfo.actMSize + 15) >> 4 << 4;
         fixpipeParams.dstStride = s2BaseSize;
         fixpipeParams.dualDstCtl = 1;
         fixpipeParams.params.ndNum = 1;
@@ -605,8 +620,7 @@ public:
 
         // d. L0C + Matmul
         Mutex::Lock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
-        LocalTensor<MLA_FULLQUANT_MM2_T> l0CSubTensor =
-            l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<MLA_FULLQUANT_MM2_T>();
+        LocalTensor<T> l0CSubTensor = l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<T>();
         Mm2MatmulN(pL1Tensor, vL1Tensor, l0CSubTensor, runInfo.actSingleLoopS2Size);
 
         Mutex::Unlock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
@@ -616,9 +630,9 @@ public:
         Mutex::Unlock<PIPE_MTE1>(KV_L1_BUFFER_ID0 + kvReuseBufId);
 
         // f. Fixpipe: 写bmm2 result到UB对应slot (写前才等vec2释放该slot)
-        LocalTensor<MLA_FULLQUANT_MM2_T> mm2ResUbTensor =
+        LocalTensor<T> mm2ResUbTensor =
             ubMmResBuffers_[UB_MM1_RES_BUFCNT * UB_MM1_RES_BUF_BYTES + mm2ResUbBufId * UB_MM2_RES_BUF_BYTES]
-                .template ReinterpretCast<MLA_FULLQUANT_MM2_T>();
+                .template ReinterpretCast<T>();
         if constexpr (BMM2_TOUB) {
             CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(mm2SyncIdx);
             // CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_FIX>(mm2SyncIdx + AIV0_AIV1_OFFSET);
@@ -637,8 +651,7 @@ public:
     }
 
     template <typename DST_TENSOR_T>
-    __aicore__ inline void FixpipeMm2(const DST_TENSOR_T& dstTensor, const LocalTensor<MLA_FULLQUANT_MM2_T>& l0C,
-                                      RunInfoX& runInfo)
+    __aicore__ inline void FixpipeMm2(const DST_TENSOR_T& dstTensor, const LocalTensor<T>& l0C, RunInfoX& runInfo)
     {
         FixpipeParamsC310<CO2Layout::ROW_MAJOR> fixpipeParams;
         if constexpr (BMM2_TOUB) {
@@ -647,7 +660,7 @@ public:
             fixpipeParams.nSize = constInfo_.dSizeV;
         }
         fixpipeParams.mSize = mBaseSize;
-        fixpipeParams.srcStride = ((mBaseSize + 15) / 16) * 16;
+        fixpipeParams.srcStride = (mBaseSize + 15) >> 4 << 4;
         if constexpr (BMM2_TOUB) {
             fixpipeParams.dstStride = ((uint32_t)dVBaseSize + 15) >> 4 << 4;
         } else {
@@ -657,7 +670,7 @@ public:
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;
-        Fixpipe<MLA_FULLQUANT_MM2_T, MLA_FULLQUANT_MM2_T, BMM2_FIXPIPE_CONFIG>(dstTensor, l0C, fixpipeParams);
+        Fixpipe<T, T, BMM2_FIXPIPE_CONFIG>(dstTensor, l0C, fixpipeParams);
     }
 };
 
@@ -682,11 +695,9 @@ public:
 
     static constexpr bool isFp8 = IsSameType<INPUT_T, fp8_e5m2_t>::value || IsSameType<INPUT_T, fp8_e4m3fn_t>::value ||
                                   IsSameType<INPUT_T, hifloat8_t>::value;
-    static constexpr bool isInt8 = IsSameType<INPUT_T, int8_t>::value;
     using Q_T = INPUT_T;
     using KV_T = INPUT_T;
     using MM_T = T;
-    using MLA_FULLQUANT_MM2_T = std::conditional_t<isInt8, int32_t, T>;
     using ConstInfoX = QfmlaConstInfo;
     using QSeqParserType = ActualSeqLensParser<ActualSeqLensMode::ACCUM, int32_t, true>;
     using KvSeqParserType = ActualSeqLensParser<ActualSeqLensMode::BY_BATCH, int32_t>;

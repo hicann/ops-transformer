@@ -190,7 +190,7 @@ void QuantFlashMlaTilingFp8Arch92Impl::UpdateTilingKeyInfo()
     UpdateTilingKeyQuantMode();
     tilingKeyInfo_.hasAttenMask = qfmlaInfo_->attnMaskFlag;
     UpdateTilingKeyKvLayout();
-    // MLA 分核由metadata算子完成，FD调度由kernel运行时读取metadata，tiling key固定false
+    // MLA 分核由metadata算子完成；FD能力常开(编译期IsFd=true)，是否实际执行FD由kernel运行时读取metadata决定
     tilingKeyInfo_.isFd = true;
 }
 

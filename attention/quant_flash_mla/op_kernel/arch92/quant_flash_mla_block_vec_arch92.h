@@ -51,208 +51,215 @@ using namespace AttentionCommon;
 namespace BaseApi {
 using ArchInfo::CV_RATIO;
 
+// 跨 S2 分块的输出归约更新:
+//   first=false: dstUb = dstUb * exp + curUb (在线 softmax 重标定)
+//   last=true : dstUb = dstUb / sum * outScale (归一化还原并乘 descale)
 template <bool first, bool last>
-__simd_vf__ inline void QfmlaOutputUpdate(__ubuf__ float* dst, __ubuf__ float* cur, __ubuf__ float* exp,
-                                          __ubuf__ float* sum, uint16_t rows, float outScale)
+__simd_vf__ inline void QfmlaOutputUpdate(__ubuf__ float* dstUb, __ubuf__ float* curUb, __ubuf__ float* expUb,
+                                          __ubuf__ float* sumUb, uint16_t rows, float outScale)
 {
     using namespace AscendC;
     using namespace AscendC::Reg;
+    constexpr uint16_t floatRepSize = 64;                   // 单个向量寄存器容纳的 float 数
+    constexpr uint16_t dSize = 512;                         // 每行输出元素数(DV)
+    constexpr uint16_t regNumPerRow = dSize / floatRepSize; // 每行占 8 个寄存器
+    constexpr uint16_t regNumPerGroup = 4;                  // 每次循环处理 4 个寄存器
+
     MaskReg mask = CreateMask<float, MaskPattern::ALL>();
-    RegTensor<float> e0, s0, x00, x01, x02, x03, o00, o01, o02, o03;
-    for (uint16_t i = 0; i < rows; ++i) {
+    RegTensor<float> vreg_exp, vreg_sum;
+    RegTensor<float> vreg_cur0, vreg_cur1, vreg_cur2, vreg_cur3;
+    for (uint16_t row = 0; row < rows; ++row) {
         if constexpr (!first) {
-            LoadAlign<float, LoadDist::DIST_BRC_B32>(e0, exp + i);
+            LoadAlign<float, LoadDist::DIST_BRC_B32>(vreg_exp, expUb + row);
         }
         if constexpr (last) {
-            LoadAlign<float, LoadDist::DIST_BRC_B32>(s0, sum + i);
+            LoadAlign<float, LoadDist::DIST_BRC_B32>(vreg_sum, sumUb + row);
         }
-        for (uint16_t n = 0; n < 2U; ++n) {
-            LoadAlign(x00, cur + (i) * 512U + n * 256U + 0U);
+        for (uint16_t grp = 0; grp < regNumPerRow / regNumPerGroup; ++grp) {
+            const uint32_t baseOffset = (row * regNumPerRow + grp * regNumPerGroup) * floatRepSize;
+            LoadAlign(vreg_cur0, curUb + baseOffset);
+            LoadAlign(vreg_cur1, curUb + baseOffset + floatRepSize);
+            LoadAlign(vreg_cur2, curUb + baseOffset + 2U * floatRepSize);
+            LoadAlign(vreg_cur3, curUb + baseOffset + 3U * floatRepSize);
             if constexpr (!first) {
-                LoadAlign(o00, dst + (i) * 512U + n * 256U + 0U);
-            }
-            LoadAlign(x01, cur + (i) * 512U + n * 256U + 64U);
-            if constexpr (!first) {
-                LoadAlign(o01, dst + (i) * 512U + n * 256U + 64U);
-            }
-            LoadAlign(x02, cur + (i) * 512U + n * 256U + 128U);
-            if constexpr (!first) {
-                LoadAlign(o02, dst + (i) * 512U + n * 256U + 128U);
-            }
-            LoadAlign(x03, cur + (i) * 512U + n * 256U + 192U);
-            if constexpr (!first) {
-                LoadAlign(o03, dst + (i) * 512U + n * 256U + 192U);
-            }
-            if constexpr (!first) {
-                // 在线softmax归并: cur = O*e0 + cur, 用一条向量FMA代替原来的Mul+Add两条,
-                // 每行(n循环2次x4块)共省8条向量指令, 且只舍入一次
-                MulAddDst(x00, o00, e0, mask);
-                MulAddDst(x01, o01, e0, mask);
-                MulAddDst(x02, o02, e0, mask);
-                MulAddDst(x03, o03, e0, mask);
+                // 在线softmax归并: cur = pre*exp + cur, 用一条向量FMA代替Mul+Add,
+                // 每行(2组x4块)共省8条向量指令, 且只舍入一次
+                RegTensor<float> vreg_pre0, vreg_pre1, vreg_pre2, vreg_pre3;
+                LoadAlign(vreg_pre0, dstUb + baseOffset);
+                LoadAlign(vreg_pre1, dstUb + baseOffset + floatRepSize);
+                LoadAlign(vreg_pre2, dstUb + baseOffset + 2U * floatRepSize);
+                LoadAlign(vreg_pre3, dstUb + baseOffset + 3U * floatRepSize);
+                MulAddDst(vreg_cur0, vreg_pre0, vreg_exp, mask);
+                MulAddDst(vreg_cur1, vreg_pre1, vreg_exp, mask);
+                MulAddDst(vreg_cur2, vreg_pre2, vreg_exp, mask);
+                MulAddDst(vreg_cur3, vreg_pre3, vreg_exp, mask);
             }
             if constexpr (last) {
-                Div(x00, x00, s0, mask);
-                Muls(x00, x00, outScale, mask);
+                // 除以行和还原归一化, 再乘 descale 得到最终输出
+                Div(vreg_cur0, vreg_cur0, vreg_sum, mask);
+                Muls(vreg_cur0, vreg_cur0, outScale, mask);
+                Div(vreg_cur1, vreg_cur1, vreg_sum, mask);
+                Muls(vreg_cur1, vreg_cur1, outScale, mask);
+                Div(vreg_cur2, vreg_cur2, vreg_sum, mask);
+                Muls(vreg_cur2, vreg_cur2, outScale, mask);
+                Div(vreg_cur3, vreg_cur3, vreg_sum, mask);
+                Muls(vreg_cur3, vreg_cur3, outScale, mask);
             }
-            if constexpr (last) {
-                Div(x01, x01, s0, mask);
-                Muls(x01, x01, outScale, mask);
-            }
-            if constexpr (last) {
-                Div(x02, x02, s0, mask);
-                Muls(x02, x02, outScale, mask);
-            }
-            if constexpr (last) {
-                Div(x03, x03, s0, mask);
-                Muls(x03, x03, outScale, mask);
-            }
-            StoreAlign<float, StoreDist::DIST_NORM_B32>(dst + (i) * 512U + n * 256U + 0U, x00, mask);
-            StoreAlign<float, StoreDist::DIST_NORM_B32>(dst + (i) * 512U + n * 256U + 64U, x01, mask);
-            StoreAlign<float, StoreDist::DIST_NORM_B32>(dst + (i) * 512U + n * 256U + 128U, x02, mask);
-            StoreAlign<float, StoreDist::DIST_NORM_B32>(dst + (i) * 512U + n * 256U + 192U, x03, mask);
+            StoreAlign<float, StoreDist::DIST_NORM_B32>(dstUb + baseOffset, vreg_cur0, mask);
+            StoreAlign<float, StoreDist::DIST_NORM_B32>(dstUb + baseOffset + floatRepSize, vreg_cur1, mask);
+            StoreAlign<float, StoreDist::DIST_NORM_B32>(dstUb + baseOffset + 2U * floatRepSize, vreg_cur2, mask);
+            StoreAlign<float, StoreDist::DIST_NORM_B32>(dstUb + baseOffset + 3U * floatRepSize, vreg_cur3, mask);
         }
     }
 }
 
 template <typename INPUT_T, bool FIRST, bool MASK, bool FULL_COLS>
-__simd_vf__ inline void QfmlaSoftmax256(__ubuf__ INPUT_T* out, __ubuf__ float* src, __ubuf__ float* qscale,
-                                        __ubuf__ float* oldMax, __ubuf__ float* newMax, __ubuf__ float* newSum,
-                                        __ubuf__ uint8_t* maskData, __ubuf__ uint8_t* indices, uint16_t rows,
+__simd_vf__ inline void QfmlaSoftmax256(__ubuf__ INPUT_T* pOutUb, __ubuf__ float* scoreUb, __ubuf__ float* qScaleUb,
+                                        __ubuf__ float* oldMaxUb, __ubuf__ float* newMaxUb, __ubuf__ float* newSumUb,
+                                        __ubuf__ uint8_t* maskUb, __ubuf__ uint8_t* indicesUb, uint16_t rows,
                                         uint32_t cols, float scale, float kscale)
 {
     using namespace AscendC::Reg;
     constexpr bool IS_HIF8 = IsSameType<INPUT_T, hifloat8_t>::value;
     constexpr float P_SCALE = IS_HIF8 ? 1.0f : 448.0f;
-    MaskReg all = CreateMask<float, MaskPattern::ALL>();
-    MaskReg bytes = CreateMask<uint8_t, MaskPattern::ALL>();
-    uint32_t outCount = 128U;
-    MaskReg outMask = UpdateMask<INPUT_T>(outCount);
-    RegTensor<float> x0, x1, x2, x3, factor, maximum, tmp, minusInf;
-    RegTensor<float> e0, e1, e2, e3, sum;
-    RegTensor<INPUT_T> c0, c1, packed, ordered;
-    RegTensor<uint8_t> idx;
-    LoadAlign(idx, indices);
-    Duplicate(minusInf, -3.402823466e38f);
-    auto maxWrite = newMax;
-    UnalignReg maxStore;
-    for (uint16_t i = 0; i < rows; ++i) {
-        LoadAlign<float, LoadDist::DIST_BRC_B32>(factor, qscale + i);
-        Muls(factor, factor, scale, all);
-        Muls(factor, factor, kscale, all);
-        LoadAlign(x0, src + i * 256U + 0U);
-        Mul(x0, x0, factor, all);
+    MaskReg pregAll = CreateMask<float, MaskPattern::ALL>();
+    MaskReg pregByte = CreateMask<uint8_t, MaskPattern::ALL>();
+    // 单次 StoreAlign 搬出 128 个 P 元素(整行 256 列的一半)
+    uint32_t pOutElems = 128U;
+    MaskReg pOutMask = UpdateMask<INPUT_T>(pOutElems);
+    RegTensor<float> vreg_score0, vreg_score1, vreg_score2, vreg_score3;
+    RegTensor<float> vreg_scale, vreg_rowMax, vreg_tmp, vreg_min;
+    RegTensor<float> vreg_exp0, vreg_exp1, vreg_exp2, vreg_exp3, vreg_rowSum;
+    RegTensor<INPUT_T> vreg_p0, vreg_p1, vreg_pack, vreg_ordered;
+    RegTensor<uint8_t> vreg_index;
+    LoadAlign(vreg_index, indicesUb);
+    Duplicate(vreg_min, -3.402823466e38f); // -FLT_MAX: 无效列/被 mask 列的填充值
+    __ubuf__ float* rowMaxWriteUb = newMaxUb;
+    UnalignReg rowMaxUnalign;
+    // 行跨度 256: score 每行固定 256 列; 按 4 个 64 列分块处理, 偏移 0/64/128/192 即各分块起始列
+    for (uint16_t rowIdx = 0; rowIdx < rows; ++rowIdx) {
+        LoadAlign<float, LoadDist::DIST_BRC_B32>(vreg_scale, qScaleUb + rowIdx);
+        Muls(vreg_scale, vreg_scale, scale, pregAll);
+        Muls(vreg_scale, vreg_scale, kscale, pregAll);
+        LoadAlign(vreg_score0, scoreUb + rowIdx * 256U);
+        Mul(vreg_score0, vreg_score0, vreg_scale, pregAll);
         // FULL_COLS: 本tile的S2正好填满256列, 行内无padding, 无需-INF占位
         if constexpr (!FULL_COLS) {
-            uint32_t count0 = cols > 0U ? cols - 0U : 0U;
-            MaskReg valid0 = UpdateMask<float>(count0);
-            Select(x0, x0, minusInf, valid0);
+            // 本 64 列分块内剩余的有效列数(cols 为该行总有效列数, 0/64/128/192 为分块起始列)
+            uint32_t remainCols0 = cols;
+            MaskReg validMask0 = UpdateMask<float>(remainCols0);
+            Select(vreg_score0, vreg_score0, vreg_min, validMask0);
         }
         if constexpr (MASK) {
-            MaskReg masked0;
-            LoadAlign<uint32_t, MaskDist::DIST_DS>(masked0, (__ubuf__ uint32_t*)(maskData + i * 256U + 0U));
-            Select(x0, minusInf, x0, masked0);
+            MaskReg attenMask0;
+            LoadAlign<uint32_t, MaskDist::DIST_DS>(attenMask0, (__ubuf__ uint32_t*)(maskUb + rowIdx * 256U));
+            Select(vreg_score0, vreg_min, vreg_score0, attenMask0);
         }
-        StoreAlign<float, StoreDist::DIST_NORM_B32>(src + i * 256U + 0U, x0, all);
-        LoadAlign(x1, src + i * 256U + 64U);
-        Mul(x1, x1, factor, all);
+        StoreAlign<float, StoreDist::DIST_NORM_B32>(scoreUb + rowIdx * 256U, vreg_score0, pregAll);
+        LoadAlign(vreg_score1, scoreUb + rowIdx * 256U + 64U);
+        Mul(vreg_score1, vreg_score1, vreg_scale, pregAll);
         if constexpr (!FULL_COLS) {
-            uint32_t count1 = cols > 64U ? cols - 64U : 0U;
-            MaskReg valid1 = UpdateMask<float>(count1);
-            Select(x1, x1, minusInf, valid1);
+            uint32_t remainCols1 = cols > 64U ? cols - 64U : 0U;
+            MaskReg validMask1 = UpdateMask<float>(remainCols1);
+            Select(vreg_score1, vreg_score1, vreg_min, validMask1);
         }
         if constexpr (MASK) {
-            MaskReg masked1;
-            LoadAlign<uint32_t, MaskDist::DIST_DS>(masked1, (__ubuf__ uint32_t*)(maskData + i * 256U + 64U));
-            Select(x1, minusInf, x1, masked1);
+            MaskReg attenMask1;
+            LoadAlign<uint32_t, MaskDist::DIST_DS>(attenMask1, (__ubuf__ uint32_t*)(maskUb + rowIdx * 256U + 64U));
+            Select(vreg_score1, vreg_min, vreg_score1, attenMask1);
         }
-        StoreAlign<float, StoreDist::DIST_NORM_B32>(src + i * 256U + 64U, x1, all);
-        LoadAlign(x2, src + i * 256U + 128U);
-        Mul(x2, x2, factor, all);
+        StoreAlign<float, StoreDist::DIST_NORM_B32>(scoreUb + rowIdx * 256U + 64U, vreg_score1, pregAll);
+        LoadAlign(vreg_score2, scoreUb + rowIdx * 256U + 128U);
+        Mul(vreg_score2, vreg_score2, vreg_scale, pregAll);
         if constexpr (!FULL_COLS) {
-            uint32_t count2 = cols > 128U ? cols - 128U : 0U;
-            MaskReg valid2 = UpdateMask<float>(count2);
-            Select(x2, x2, minusInf, valid2);
+            uint32_t remainCols2 = cols > 128U ? cols - 128U : 0U;
+            MaskReg validMask2 = UpdateMask<float>(remainCols2);
+            Select(vreg_score2, vreg_score2, vreg_min, validMask2);
         }
         if constexpr (MASK) {
-            MaskReg masked2;
-            LoadAlign<uint32_t, MaskDist::DIST_DS>(masked2, (__ubuf__ uint32_t*)(maskData + i * 256U + 128U));
-            Select(x2, minusInf, x2, masked2);
+            MaskReg attenMask2;
+            LoadAlign<uint32_t, MaskDist::DIST_DS>(attenMask2, (__ubuf__ uint32_t*)(maskUb + rowIdx * 256U + 128U));
+            Select(vreg_score2, vreg_min, vreg_score2, attenMask2);
         }
-        StoreAlign<float, StoreDist::DIST_NORM_B32>(src + i * 256U + 128U, x2, all);
-        LoadAlign(x3, src + i * 256U + 192U);
-        Mul(x3, x3, factor, all);
+        StoreAlign<float, StoreDist::DIST_NORM_B32>(scoreUb + rowIdx * 256U + 128U, vreg_score2, pregAll);
+        LoadAlign(vreg_score3, scoreUb + rowIdx * 256U + 192U);
+        Mul(vreg_score3, vreg_score3, vreg_scale, pregAll);
         if constexpr (!FULL_COLS) {
-            uint32_t count3 = cols > 192U ? cols - 192U : 0U;
-            MaskReg valid3 = UpdateMask<float>(count3);
-            Select(x3, x3, minusInf, valid3);
+            uint32_t remainCols3 = cols > 192U ? cols - 192U : 0U;
+            MaskReg validMask3 = UpdateMask<float>(remainCols3);
+            Select(vreg_score3, vreg_score3, vreg_min, validMask3);
         }
         if constexpr (MASK) {
-            MaskReg masked3;
-            LoadAlign<uint32_t, MaskDist::DIST_DS>(masked3, (__ubuf__ uint32_t*)(maskData + i * 256U + 192U));
-            Select(x3, minusInf, x3, masked3);
+            MaskReg attenMask3;
+            LoadAlign<uint32_t, MaskDist::DIST_DS>(attenMask3, (__ubuf__ uint32_t*)(maskUb + rowIdx * 256U + 192U));
+            Select(vreg_score3, vreg_min, vreg_score3, attenMask3);
         }
-        StoreAlign<float, StoreDist::DIST_NORM_B32>(src + i * 256U + 192U, x3, all);
-        Max(maximum, x0, x1, all);
-        Max(tmp, x2, x3, all);
-        Max(maximum, maximum, tmp, all);
-        Reduce<Reg::ReduceType::MAX, float, float, MaskMergeMode::ZEROING>(maximum, maximum, all);
-        StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(maxWrite, maximum, maxStore, 1);
+        StoreAlign<float, StoreDist::DIST_NORM_B32>(scoreUb + rowIdx * 256U + 192U, vreg_score3, pregAll);
+        Max(vreg_rowMax, vreg_score0, vreg_score1, pregAll);
+        Max(vreg_tmp, vreg_score2, vreg_score3, pregAll);
+        Max(vreg_rowMax, vreg_rowMax, vreg_tmp, pregAll);
+        Reduce<Reg::ReduceType::MAX, float, float, MaskMergeMode::ZEROING>(vreg_rowMax, vreg_rowMax, pregAll);
+        StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(rowMaxWriteUb, vreg_rowMax, rowMaxUnalign, 1);
     }
-    StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(maxWrite, maxStore, 0);
+    StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(rowMaxWriteUb, rowMaxUnalign, 0);
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
     if constexpr (!FIRST) {
-        LoadAlign(maximum, newMax);
-        LoadAlign(tmp, oldMax);
-        Max(maximum, maximum, tmp, all);
-        StoreAlign<float, StoreDist::DIST_NORM_B32>(newMax, maximum, all);
+        LoadAlign(vreg_rowMax, newMaxUb);
+        LoadAlign(vreg_tmp, oldMaxUb);
+        Max(vreg_rowMax, vreg_rowMax, vreg_tmp, pregAll);
+        StoreAlign<float, StoreDist::DIST_NORM_B32>(newMaxUb, vreg_rowMax, pregAll);
     }
     LocalMemBar<MemType::VEC_STORE, MemType::VEC_LOAD>();
-    auto sumWrite = newSum;
-    UnalignReg sumStore;
-    for (uint16_t i = 0; i < rows; ++i) {
-        LoadAlign<float, LoadDist::DIST_BRC_B32>(maximum, newMax + i);
-        LoadAlign<float, LoadDist::DIST_DINTLV_B32>(x0, x1, src + i * 256U);
-        LoadAlign<float, LoadDist::DIST_DINTLV_B32>(x2, x3, src + i * 256U + 128U);
-        ExpSub(e0, x0, maximum, all);
-        ExpSub(e1, x1, maximum, all);
-        ExpSub(e2, x2, maximum, all);
-        ExpSub(e3, x3, maximum, all);
-        Add(sum, e0, e1, all);
-        Add(tmp, e2, e3, all);
-        Add(sum, sum, tmp, all);
-        Reduce<Reg::ReduceType::SUM, float, float, MaskMergeMode::ZEROING>(sum, sum, all);
-        StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(sumWrite, sum, sumStore, 1);
-        Muls(e0, e0, P_SCALE, all);
-        Muls(e1, e1, P_SCALE, all);
+    __ubuf__ float* rowSumWriteUb = newSumUb;
+    UnalignReg rowSumUnalign;
+    for (uint16_t rowIdx = 0; rowIdx < rows; ++rowIdx) {
+        LoadAlign<float, LoadDist::DIST_BRC_B32>(vreg_rowMax, newMaxUb + rowIdx);
+        // 每行 256 列: 0~127 列解交织到 2 个寄存器, 128~255 列再解交织到另外 2 个
+        LoadAlign<float, LoadDist::DIST_DINTLV_B32>(vreg_score0, vreg_score1, scoreUb + rowIdx * 256U);
+        LoadAlign<float, LoadDist::DIST_DINTLV_B32>(vreg_score2, vreg_score3, scoreUb + rowIdx * 256U + 128U);
+        ExpSub(vreg_exp0, vreg_score0, vreg_rowMax, pregAll);
+        ExpSub(vreg_exp1, vreg_score1, vreg_rowMax, pregAll);
+        ExpSub(vreg_exp2, vreg_score2, vreg_rowMax, pregAll);
+        ExpSub(vreg_exp3, vreg_score3, vreg_rowMax, pregAll);
+        Add(vreg_rowSum, vreg_exp0, vreg_exp1, pregAll);
+        Add(vreg_tmp, vreg_exp2, vreg_exp3, pregAll);
+        Add(vreg_rowSum, vreg_rowSum, vreg_tmp, pregAll);
+        Reduce<Reg::ReduceType::SUM, float, float, MaskMergeMode::ZEROING>(vreg_rowSum, vreg_rowSum, pregAll);
+        StoreUnAlign<float, PostLiteral::POST_MODE_UPDATE>(rowSumWriteUb, vreg_rowSum, rowSumUnalign, 1);
+        Muls(vreg_exp0, vreg_exp0, P_SCALE, pregAll);
+        Muls(vreg_exp1, vreg_exp1, P_SCALE, pregAll);
         if constexpr (IS_HIF8) {
-            Cast<INPUT_T, float, castTraitZero>(c0, e0, all);
-            Cast<INPUT_T, float, castTraitTwo>(c1, e1, all);
+            Cast<INPUT_T, float, castTraitZero>(vreg_p0, vreg_exp0, pregAll);
+            Cast<INPUT_T, float, castTraitTwo>(vreg_p1, vreg_exp1, pregAll);
         } else {
-            Cast<INPUT_T, float, castTraitRintZero>(c0, e0, all);
-            Cast<INPUT_T, float, castTraitRintTwo>(c1, e1, all);
+            Cast<INPUT_T, float, castTraitRintZero>(vreg_p0, vreg_exp0, pregAll);
+            Cast<INPUT_T, float, castTraitRintTwo>(vreg_p1, vreg_exp1, pregAll);
         }
-        Or((RegTensor<uint8_t>&)packed, (RegTensor<uint8_t>&)c0, (RegTensor<uint8_t>&)c1, bytes);
-        Gather(ordered, packed, idx);
-        auto out0 = out + i * 32U + 0U;
-        StoreAlign<INPUT_T, DataCopyMode::DATA_BLOCK_COPY, PostLiteral::POST_MODE_UPDATE>(out0, ordered, 65U, 1U,
-                                                                                          outMask);
-        Muls(e2, e2, P_SCALE, all);
-        Muls(e3, e3, P_SCALE, all);
+        Or((RegTensor<uint8_t>&)vreg_pack, (RegTensor<uint8_t>&)vreg_p0, (RegTensor<uint8_t>&)vreg_p1, pregByte);
+        Gather(vreg_ordered, vreg_pack, vreg_index);
+        // P 输出按 "32 列(32 字节)一块" 的 NZ 布局存放: 同一列块内每行占 32 字节, 故行偏移为 32U
+        __ubuf__ INPUT_T* pOutUb0 = pOutUb + rowIdx * 32U;
+        // blockStride=65: 列块跨度为 64 行 + 1 行 padding; repeatStride=1
+        StoreAlign<INPUT_T, DataCopyMode::DATA_BLOCK_COPY, PostLiteral::POST_MODE_UPDATE>(pOutUb0, vreg_ordered, 65U,
+                                                                                          1U, pOutMask);
+        Muls(vreg_exp2, vreg_exp2, P_SCALE, pregAll);
+        Muls(vreg_exp3, vreg_exp3, P_SCALE, pregAll);
         if constexpr (IS_HIF8) {
-            Cast<INPUT_T, float, castTraitZero>(c0, e2, all);
-            Cast<INPUT_T, float, castTraitTwo>(c1, e3, all);
+            Cast<INPUT_T, float, castTraitZero>(vreg_p0, vreg_exp2, pregAll);
+            Cast<INPUT_T, float, castTraitTwo>(vreg_p1, vreg_exp3, pregAll);
         } else {
-            Cast<INPUT_T, float, castTraitRintZero>(c0, e2, all);
-            Cast<INPUT_T, float, castTraitRintTwo>(c1, e3, all);
+            Cast<INPUT_T, float, castTraitRintZero>(vreg_p0, vreg_exp2, pregAll);
+            Cast<INPUT_T, float, castTraitRintTwo>(vreg_p1, vreg_exp3, pregAll);
         }
-        Or((RegTensor<uint8_t>&)packed, (RegTensor<uint8_t>&)c0, (RegTensor<uint8_t>&)c1, bytes);
-        Gather(ordered, packed, idx);
-        auto out1 = out + i * 32U + 8320U;
-        StoreAlign<INPUT_T, DataCopyMode::DATA_BLOCK_COPY, PostLiteral::POST_MODE_UPDATE>(out1, ordered, 65U, 1U,
-                                                                                          outMask);
+        Or((RegTensor<uint8_t>&)vreg_pack, (RegTensor<uint8_t>&)vreg_p0, (RegTensor<uint8_t>&)vreg_p1, pregByte);
+        Gather(vreg_ordered, vreg_pack, vreg_index);
+        // 后半 128 列(第 4 个列块)起点: 4 * 65(列块跨度) * 32(字节/行) = 8320
+        __ubuf__ INPUT_T* pOutUb1 = pOutUb + rowIdx * 32U + 8320U;
+        // blockStride=65(64 行 + 1 行 padding), repeatStride=1
+        StoreAlign<INPUT_T, DataCopyMode::DATA_BLOCK_COPY, PostLiteral::POST_MODE_UPDATE>(pOutUb1, vreg_ordered, 65U,
+                                                                                          1U, pOutMask);
     }
-    StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(sumWrite, sumStore, 0);
+    StoreUnAlignPost<float, PostLiteral::POST_MODE_UPDATE>(rowSumWriteUb, rowSumUnalign, 0);
 }
 
 template <
@@ -272,7 +279,6 @@ public:
     static constexpr uint32_t dTemplateAlign64 = Align64Func((uint16_t)dVTemplateType);
     static constexpr bool isFp8 = IsSameType<INPUT_T, fp8_e5m2_t>::value || IsSameType<INPUT_T, fp8_e4m3fn_t>::value ||
                                   IsSameType<INPUT_T, hifloat8_t>::value;
-    static constexpr bool isInt8 = IsSameType<INPUT_T, int8_t>::value;
     static constexpr uint32_t DB = 2;
     static constexpr uint32_t PRELOAD_N = 2; // C1 C1 C2
 
@@ -1247,7 +1253,7 @@ public:
                 outGmTensor.offsetCalculator.Init(constInfo_.bSize, constInfo_.realN2Size, constInfo_.realGSize,
                                                   constInfo_.s1Size, constInfo_.dSizeV, *qSeqParserPtr_);
             } else {
-                // TND输入(TND_BNSD组合): UB行序为S1G(m=s1*G+g), CopyAttenOutUbToGm<S1G>
+                // 非BY_BATCH输入: UB行序为S1G(m=s1*G+g), CopyAttenOutUbToGm<S1G>
                 // 不依赖parser分解, 5参Init即可; 且ACCUM parser与BNGSD的6参Init类型不匹配
                 outGmTensor.offsetCalculator.Init(constInfo_.bSize, constInfo_.realN2Size, constInfo_.realGSize,
                                                   constInfo_.s1Size, constInfo_.dSizeV);

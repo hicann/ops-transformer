@@ -44,18 +44,27 @@ bool NnopbaseSupportTensorV2() __attribute__((weak));
 
 namespace {
 
-void QuantFlashMlaProcessSoftmaxLse(bool returnSoftmaxLse, const aclTensor* softmaxLse, const aclTensor*& tempTensor,
-                                    const aclTensor*& placeHolder)
+aclnnStatus QuantFlashMlaProcessSoftmaxLse(bool returnSoftmaxLse, const aclTensor* softmaxLse,
+                                           const aclTensor*& tempTensor, const aclTensor*& placeHolder)
 {
     if (!returnSoftmaxLse) {
         std::vector<int64_t> shape = {0};
-        int64_t addr = 0xff;
         tempTensor = aclCreateTensor(shape.data(), shape.size(), aclDataType::ACL_FLOAT, shape.data(), 0, ACL_FORMAT_ND,
-                                     shape.data(), shape.size(), static_cast<void*>(&addr));
+                                     shape.data(), shape.size(), nullptr);
+        if (tempTensor == nullptr) {
+            OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "Create placeholder tensor for softmaxLse failed.");
+            return ACLNN_ERR_INNER_NULLPTR;
+        }
         placeHolder = tempTensor;
     } else {
+        if (softmaxLse == nullptr) {
+            OP_LOGE(ACLNN_ERR_PARAM_NULLPTR,
+                    "When returnSoftmaxLse is enabled, softmaxLse must be provided, but got nullptr.");
+            return ACLNN_ERR_PARAM_NULLPTR;
+        }
         placeHolder = softmaxLse;
     }
+    return ACLNN_SUCCESS;
 }
 
 } // namespace
@@ -103,11 +112,17 @@ aclnnStatus aclnnQuantFlashMlaGetWorkspaceSize(
     const aclTensor* placeHolder = nullptr;
     const aclTensor* tempTensor = nullptr;
 
-    QuantFlashMlaProcessSoftmaxLse(returnSoftmaxLse, softmaxLseOptional, tempTensor, placeHolder);
+    aclnnStatus ret = QuantFlashMlaProcessSoftmaxLse(returnSoftmaxLse, softmaxLseOptional, tempTensor, placeHolder);
+    if (ret != ACLNN_SUCCESS) {
+        return ret;
+    }
 
-    aclnnStatus ret = CheckTensorContiguous(kCache);
+    ret = CheckTensorContiguous(kCache);
     if (ret != ACLNN_SUCCESS && NnopbaseSupportTensorV2 == nullptr) {
         OP_LOGE(ACLNN_ERR_INNER, "When tensor is not contiguous, opbase package version check failed");
+        if (!returnSoftmaxLse) {
+            aclDestroyTensor(tempTensor);
+        }
         return ret;
     }
 

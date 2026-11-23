@@ -25,11 +25,9 @@ using namespace optiling;
 ASCENDC_TPL_ARGS_DECL(QuantFlashMla,
                       //    InOutLayoutType (8-bit)
                       //    0: InOutLayoutType_TND_TND（输入TND, 输出TND）
-                      //    1: InOutLayoutType_TND_BSND（输入TND, 输出BSND）
-                      //    2: InOutLayoutType_TND_BNSD（输入TND, 输出BNSD）
-                      //    3: InOutLayoutType_TND_NTD（输入TND, 输出NTD）
-                      //    4: InOutLayoutType_BSND_BSND（输入BSND, 输出BSND）
-                      //    5: InOutLayoutType_BNSD_BNSD（输入BNSD, 输出BNSD）
+                      //    1: InOutLayoutType_TND_NTD（输入TND, 输出NTD）
+                      //    2: InOutLayoutType_BSND_BSND（输入BSND, 输出BSND）
+                      //    3: InOutLayoutType_BNSD_BNSD（输入BNSD, 输出BNSD）
                       ASCENDC_TPL_UINT_DECL(InOutLayoutType, ASCENDC_TPL_8_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 255),
                       //    Config (10-bit)
                       //    0: Config_S1Aligned64_S2Aligned256_DAligned576_DVAligned512

@@ -95,6 +95,11 @@ bool QuantFlashMlaMetadataCpuKernel::Prepare(CpuKernelContext& ctx)
     if (!requiredAttrs) {
         return false;
     }
+    // 核数用于分核及 aivCoreNum_/aicCoreNum_ 除法, 必须为正数
+    if (aicCoreNum_ <= 0 || aivCoreNum_ <= 0) {
+        KERNEL_LOG_ERROR("aic_core_num/aiv_core_num should be positive, but got %d/%d", aicCoreNum_, aivCoreNum_);
+        return false;
+    }
     GetAttrValueOpt(ctx, "quant_mode", quantMode_);
     GetAttrValueOpt(ctx, "max_seqlen_q", maxSeqlenQ_);
     GetAttrValueOpt(ctx, "max_seqlen_kv", maxSeqlenKv_);
@@ -194,7 +199,7 @@ bool QuantFlashMlaMetadataCpuKernel::ParamsInit()
         batchSize_ = static_cast<int32_t>(cacheSeqlens.size());
         baseInfo.actualKvSeqSize.resize(batchSize_, baseInfo.kvSeqSize);
         for (int64_t i = 0; i < batchSize_; ++i) {
-            if (cacheSeqlens[i] < 0 || (maxSeqlenKv_ > 0 && cacheSeqlens[i] > maxSeqlenKv_)) {
+            if (cacheSeqlens[i] < 0 || (maxSeqlenKv_ >= 0 && cacheSeqlens[i] > maxSeqlenKv_)) {
                 KERNEL_LOG_ERROR("cache_seqlens[%ld]=%ld must be non-negative and not exceed max_seqlen_kv=%d", i,
                                  cacheSeqlens[i], maxSeqlenKv_);
                 return false;
@@ -254,7 +259,7 @@ bool QuantFlashMlaMetadataCpuKernel::ParamsInit()
         }
         baseInfo.actualQuerySeqSize.resize(batchSize_, baseInfo.querySeqSize);
         for (int64_t i = 0; i < batchSize_; ++i) {
-            if (sequsedQ[i] < 0 || sequsedQ[i] > 16 || (maxSeqlenQ_ > 0 && sequsedQ[i] > maxSeqlenQ_)) {
+            if (sequsedQ[i] < 0 || sequsedQ[i] > 16 || (maxSeqlenQ_ >= 0 && sequsedQ[i] > maxSeqlenQ_)) {
                 KERNEL_LOG_ERROR("seqused_q[%ld]=%ld must be in [0, 16] and not exceed max_seqlen_q=%d", i, sequsedQ[i],
                                  maxSeqlenQ_);
                 return false;

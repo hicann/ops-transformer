@@ -723,8 +723,8 @@ def _build_qfmla_section_info(seqused_q, cache_seqlens):
         seqused_q_t = torch.tensor(
             seqused_q, dtype=torch.int32, device="npu"
         ).contiguous()
-        max_sq = MAX_SEQLEN_Q if MAX_SEQLEN_Q > 0 else max(seqused_q)
-        max_skv = MAX_SEQLEN_KV if MAX_SEQLEN_KV > 0 else max(cache_seqlens)
+        max_sq = MAX_SEQLEN_Q if MAX_SEQLEN_Q >= 0 else max(seqused_q)
+        max_skv = MAX_SEQLEN_KV if MAX_SEQLEN_KV >= 0 else max(cache_seqlens)
         meta = quant_flash_mla_metadata(
             cache_seqlens=cache_seqlens_t,
             num_heads_q=N_q,
@@ -1480,8 +1480,8 @@ def call_npu_fa_op(
     )
 
     # cache_seqlens: PA场景下为每batch KV实际长度（BY_BATCH模式, 非累积）
-    max_sq = MAX_SEQLEN_Q if MAX_SEQLEN_Q > 0 else max(seqused_q)
-    max_skv = MAX_SEQLEN_KV if MAX_SEQLEN_KV > 0 else max(cache_seqlens)
+    max_sq = MAX_SEQLEN_Q if MAX_SEQLEN_Q >= 0 else max(seqused_q)
+    max_skv = MAX_SEQLEN_KV if MAX_SEQLEN_KV >= 0 else max(cache_seqlens)
     cache_seqlens_t = torch.tensor(
         cache_seqlens, dtype=torch.int32, device="npu"
     ).contiguous()
@@ -1653,8 +1653,8 @@ def fia_mla_torch_npu(
         dequant_scale_k.float().reshape(-1)[0].contiguous().view(1).view(-1).npu()
     )
 
-    max_sq = MAX_SEQLEN_Q if MAX_SEQLEN_Q > 0 else max(seqused_q)
-    max_skv = MAX_SEQLEN_KV if MAX_SEQLEN_KV > 0 else max(cache_seqlens)
+    max_sq = MAX_SEQLEN_Q if MAX_SEQLEN_Q >= 0 else max(seqused_q)
+    max_skv = MAX_SEQLEN_KV if MAX_SEQLEN_KV >= 0 else max(cache_seqlens)
     cache_seqlens_t = torch.tensor(
         cache_seqlens, dtype=torch.int32, device="npu"
     ).contiguous()

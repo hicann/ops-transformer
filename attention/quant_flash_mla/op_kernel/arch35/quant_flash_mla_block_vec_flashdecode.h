@@ -311,7 +311,7 @@ protected:
                 outGmTensor.offsetCalculator.Init(constInfo_.bSize, constInfo_.realN2Size, constInfo_.realGSize,
                                                   constInfo_.s1Size, constInfo_.dSizeV, *qActSeqLensParser_);
             } else {
-                // TND输入(TND_BNSD组合): UB行序为S1G(m=s1*G+g), CopyAttenOutUbToGm<S1G>
+                // 非BY_BATCH输入: UB行序为S1G(m=s1*G+g), CopyAttenOutUbToGm<S1G>
                 // 不依赖parser分解, 5参Init即可; 且ACCUM parser与BNGSD的6参Init类型不匹配
                 outGmTensor.offsetCalculator.Init(constInfo_.bSize, constInfo_.realN2Size, constInfo_.realGSize,
                                                   constInfo_.s1Size, constInfo_.dSizeV);

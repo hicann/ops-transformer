@@ -71,6 +71,11 @@ bool QuantFlashAttnMetadataCpuKernel::Prepare(CpuKernelContext& ctx)
     if (!requiredAttrs) {
         return false;
     }
+    // 核数用于分核及 aivCoreNum_/aicCoreNum_ 除法, 必须为正数
+    if (aicCoreNum_ <= 0 || aivCoreNum_ <= 0) {
+        KERNEL_LOG_ERROR("aic_core_num/aiv_core_num should be positive, but got %d/%d", aicCoreNum_, aivCoreNum_);
+        return false;
+    }
     GetAttrValueOpt(ctx, "quant_compute_mode", quantMode_);
     GetAttrValueOpt(ctx, "batch_size", batchSize_);
     GetAttrValueOpt(ctx, "max_seqlen_q", maxSeqlenQ_);
