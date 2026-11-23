@@ -422,19 +422,24 @@ TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_mxa8w4_sms_per_token
 // MxA8W4 NZ场景 - 单单单模式TilingKey中SMS标志位应为0
 TEST_F(GroupedWeightQuantBatchMatmulTilingTest, test_tiling_mxa8w4_sss_tiling_key_sms_flag_false)
 {
-    auto compileInfo = MakeArch35CompileInfo();
-    auto tilingContextPara = MakeMxA8W4SssContext(&compileInfo);
-    TilingInfo tilingInfo;
-    ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
-    EXPECT_EQ(tilingInfo.tilingKey, static_cast<int64_t>(MakeExpectedMxA8W4TilingKey(false)));
-    EXPECT_NE(tilingInfo.tilingKey, static_cast<int64_t>(MakeExpectedMxA8W4TilingKey(true)));
-    const auto* tilingData = GetGMMWeightQuantTilingData(tilingInfo);
-    ASSERT_NE(tilingData, nullptr);
-    EXPECT_EQ(tilingData->gmmWeightQuantParam.groupNum, 2);
-    EXPECT_EQ(tilingData->gmmWeightQuantParam.singleX, 1);
-    EXPECT_EQ(tilingData->gmmWeightQuantParam.singleWeight, 1);
-    EXPECT_EQ(tilingData->gmmWeightQuantParam.singleY, 1);
-    EXPECT_EQ(tilingData->gmmWeightQuantParam.groupSize, 32);
+    constexpr int64_t ORIGINAL_MX_KEY = 74530817L; // Frozen original MX template ABI.
+    // Exercise the registered entry twice without linking internal Host helper symbols.
+    for (int repeat = 0; repeat < 2; ++repeat) {
+        auto compileInfo = MakeArch35CompileInfo();
+        auto tilingContextPara = MakeMxA8W4SssContext(&compileInfo);
+        TilingInfo tilingInfo;
+        ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
+        EXPECT_EQ(tilingInfo.tilingKey, ORIGINAL_MX_KEY);
+        EXPECT_EQ(tilingInfo.tilingKey, static_cast<int64_t>(MakeExpectedMxA8W4TilingKey(false)));
+        EXPECT_NE(tilingInfo.tilingKey, static_cast<int64_t>(MakeExpectedMxA8W4TilingKey(true)));
+        const auto* tilingData = GetGMMWeightQuantTilingData(tilingInfo);
+        ASSERT_NE(tilingData, nullptr);
+        EXPECT_EQ(tilingData->gmmWeightQuantParam.groupNum, 2);
+        EXPECT_EQ(tilingData->gmmWeightQuantParam.singleX, 1);
+        EXPECT_EQ(tilingData->gmmWeightQuantParam.singleWeight, 1);
+        EXPECT_EQ(tilingData->gmmWeightQuantParam.singleY, 1);
+        EXPECT_EQ(tilingData->gmmWeightQuantParam.groupSize, 32);
+    }
 }
 
 // MxA8W4 NZ场景 - 单多单模式, x必须是单tensor

@@ -8,6 +8,15 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
+# Enable MX keys from the minimum supported SDK version onward.
+set(_gmm_mx_pipeline_enabled 0)
+if(COMMAND get_cann_package_version)
+    get_cann_package_version(_gmm_cann_version)
+    if(_gmm_cann_version VERSION_GREATER_EQUAL "9.2.0"
+       AND "${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend950")
+        set(_gmm_mx_pipeline_enabled 1)
+    endif()
+endif()
 if (BUILD_OPEN_PROJECT)
     target_sources(op_host_aclnnExc PRIVATE
         grouped_matmul_def.cpp
@@ -94,4 +103,15 @@ if(NOT BUILD_OPS_RTY_KERNEL)
             APPEND PROPERTY COMPILE_OPTIONS -include
             ${CMAKE_CURRENT_SOURCE_DIR}/../tests/ut/op_api/grouped_matmul_infer_shape_stub.h)
     endif()
+endif()
+
+# The tiling object target may have been created by a different operator directory.
+# Attach the definition in the target's source-property scope, not only this directory.
+set(_gmm_mx_tiling_source ${CMAKE_CURRENT_SOURCE_DIR}/op_tiling/arch35/grouped_weight_quant_batch_matmul_tiling.cpp)
+if(TARGET ${OPHOST_NAME}_tiling_obj)
+    set_property(SOURCE ${_gmm_mx_tiling_source} TARGET_DIRECTORY ${OPHOST_NAME}_tiling_obj
+        APPEND PROPERTY COMPILE_DEFINITIONS GROUPED_MATMUL_ENABLE_MX_PIPELINE=${_gmm_mx_pipeline_enabled})
+else()
+    set_property(SOURCE ${_gmm_mx_tiling_source}
+        APPEND PROPERTY COMPILE_DEFINITIONS GROUPED_MATMUL_ENABLE_MX_PIPELINE=${_gmm_mx_pipeline_enabled})
 endif()

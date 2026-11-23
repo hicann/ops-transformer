@@ -318,6 +318,25 @@ __global__ __aicore__ void grouped_matmul(GM_ADDR x, GM_ADDR weight, GM_ADDR bia
      ORIG_DTYPE_X != DT_FLOAT8_E4M3FN || !IS_BLAZE)
     TPipe tPipe;
 #endif
+#if defined(V310_GMM_ANTI_QUANT) && defined(ORIG_DTYPE_X) && ORIG_DTYPE_X == DT_FLOAT8_E4M3FN && IS_BLAZE
+    if constexpr (ALGORITHM_CATEGORY == WQGMM_MX_DYNAMIC_ALIGNED) {
+        KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
+        AscendCUtils::SetOverflow(1);
+#if defined(CONST_TILING)
+        GET_TILING_DATA_MEMBER(GMMWeightQuantTilingData, gmmWeightQuantParam, gp, tiling);
+#else
+        GET_TILING_DATA_MEMBER_ADDR(GMMWeightQuantTilingData, gmmWeightQuantParam, gpAddr, tiling);
+        auto gp = GROUPED_MATMUL::MakeFixedMxGroupParams(gpAddr);
+#endif
+        // FixedTiles consumes only baseM; the host-selected Aligned route fixes it.
+        TCubeTiling mm{};
+        mm.baseM = static_cast<uint32_t>(GROUPED_MATMUL::MxPipeline::ALIGNED_TILE_SIZE);
+        GROUPED_MATMUL::MxPipeline::Aligned::GmmWeightQuantTensorApiMxKernel<
+            DTYPE_X, DTYPE_WEIGHT, DTYPE_ANTIQUANT_SCALE, DTYPE_BIAS, DTYPE_Y, false, true>(
+            x, weight, antiquantScale, bias, groupList, perTokenScale, y, &gp, &mm);
+        return;
+    }
+#endif
     AscendCUtils::SetOverflow(1);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_AIC_ONLY);
     GM_ADDR user1 = GetUserWorkspace(workspace);
@@ -592,13 +611,20 @@ __global__ __aicore__ void grouped_matmul(GM_ADDR x, GM_ADDR weight, GM_ADDR bia
                       C_QUANT_TYPE == WQGMM_NONE && W_QUANT_TYPE == WQGMM_MX && WQ_B_TRANS == WQGMM_TRANS &&
                       WQ_A_TRANS == WQGMM_NO_TRANS && TEMPLATE_CUSTOM_SC == WQGMM_MTE2_INNER_SIZE_DYNAMIC_BUF_NUM_4 &&
                       ALGORITHM_SUB_CATEGORY == WQGMM_N_FIRST_TAIL_RESPLIT &&
-                      ALGORITHM_CATEGORY == WQGMM_VECTOR_ANTIQUANT) {
+                      (ALGORITHM_CATEGORY == WQGMM_VECTOR_ANTIQUANT ||
+                       ALGORITHM_CATEGORY == WQGMM_MX_DYNAMIC_BUFFERED)) {
 #if IS_BLAZE
             GET_TILING_DATA_MEMBER(GMMWeightQuantTilingData, gmmWeightQuantParam, gmmBaseParams_, tiling);
             GET_TILING_DATA_MEMBER(GMMWeightQuantTilingData, mmTilingData, mmTilingData_, tiling);
-            GROUPED_MATMUL::GmmWeightQuantTensorApiMxKernel<DTYPE_X, DTYPE_WEIGHT, DTYPE_ANTIQUANT_SCALE, DTYPE_BIAS,
-                                                            DTYPE_Y, IS_SINGLE_MULTI_SINGLE>(
-                x, weight, antiquantScale, bias, groupList, perTokenScale, y, &gmmBaseParams_, &mmTilingData_);
+            if constexpr (ALGORITHM_CATEGORY == WQGMM_MX_DYNAMIC_BUFFERED) {
+                GROUPED_MATMUL::GmmWeightQuantTensorApiMxBufferedKernel<DTYPE_X, DTYPE_WEIGHT, DTYPE_ANTIQUANT_SCALE,
+                                                                        DTYPE_BIAS, DTYPE_Y, IS_SINGLE_MULTI_SINGLE>(
+                    x, weight, antiquantScale, bias, groupList, perTokenScale, y, &gmmBaseParams_, &mmTilingData_);
+            } else {
+                GROUPED_MATMUL::GmmWeightQuantTensorApiMxKernel<DTYPE_X, DTYPE_WEIGHT, DTYPE_ANTIQUANT_SCALE,
+                                                                DTYPE_BIAS, DTYPE_Y, IS_SINGLE_MULTI_SINGLE>(
+                    x, weight, antiquantScale, bias, groupList, perTokenScale, y, &gmmBaseParams_, &mmTilingData_);
+            }
 #else
             INVOKE_GMM_WEIGHT_QUANT_MXA8W4_CONTROLLER_OP_IMPL(GMMWeightQuantResplitController, MXA8W4_NZNK,
                                                               VEC_ANTIQUANT_CONFIG_DYNAMIC);

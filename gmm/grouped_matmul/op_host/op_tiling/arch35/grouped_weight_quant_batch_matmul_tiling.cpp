@@ -17,6 +17,7 @@
 #include "platform/platform_infos_def.h"
 #include "op_host/tiling_templates_registry.h"
 #include "../../../op_kernel/arch35/weight_quant_basic_block/weight_quant_tiling_key.h"
+#include "mx_a8w4_pipeline_policy.h"
 
 namespace {
 static constexpr const char* OP_NAME = "GroupedMatmul";
@@ -97,6 +98,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CheckCoreNum(const gert::TilingContext
 bool GroupedWeightQuantBatchMatmulTiling::SetTiling(gert::TilingContext* context)
 {
     OP_CHECK_IF(!AnalyzeAttr(context), OP_LOGE(context->GetNodeName(), "Invalid attr param"), return false);
+    platformBandwidth_ = IsMxA8W4() ? GetPlatformBandwidth(context->GetPlatformInfo()) : PlatformBandwidth{};
     OP_CHECK_IF(!CalcResplitTiling(context), OP_LOGE(context->GetNodeName(), "Unable to calculate resplit-tiling"),
                 return false);
     auto ret = SetBaseTiling();
@@ -913,32 +915,36 @@ bool GroupedWeightQuantBatchMatmulTiling::EnableTailResplit() const
     return true;
 }
 
-double GroupedWeightQuantBatchMatmulTiling::GetCoreFreq(fe::PlatFormInfos* platformInfo) const
+GroupedWeightQuantBatchMatmulTiling::PlatformBandwidth GroupedWeightQuantBatchMatmulTiling::GetPlatformBandwidth(
+    fe::PlatFormInfos* platformInfo)
 {
-    std::string freqStr;
-    platformInfo->GetPlatformRes("AICoreSpec", "cube_freq", freqStr);
-    // The platform reports cube_freq in MHz.
-    return StrToDoubleWithDefault(freqStr, DEFAULT_AICORE_FREQ_MHZ);
-}
-
-double GroupedWeightQuantBatchMatmulTiling::GetHbmBW(fe::PlatFormInfos* platformInfo) const
-{
-    std::string coreCntStr;
-    std::string ddrRateStr;
-    platformInfo->GetPlatformRes("SoCInfo", "ai_core_cnt", coreCntStr);
-    platformInfo->GetPlatformRes("AICoreMemoryRates", "ddr_rate", ddrRateStr);
-    return GetCoreFreq(platformInfo) * StrToDoubleWithDefault(coreCntStr, DEFAULT_AICORE_COUNT) *
-           StrToDoubleWithDefault(ddrRateStr, DEFAULT_DDR_RATE) / MHZ_PER_GHZ / KB_SIZE;
-}
-
-double GroupedWeightQuantBatchMatmulTiling::GetL2BW(fe::PlatFormInfos* platformInfo) const
-{
-    std::string coreCntStr;
-    std::string l2RateStr;
-    platformInfo->GetPlatformRes("SoCInfo", "ai_core_cnt", coreCntStr);
-    platformInfo->GetPlatformRes("AICoreMemoryRates", "l2_rate", l2RateStr);
-    return GetCoreFreq(platformInfo) * StrToDoubleWithDefault(coreCntStr, DEFAULT_AICORE_COUNT) *
-           StrToDoubleWithDefault(l2RateStr, DEFAULT_L2_RATE) / MHZ_PER_GHZ / KB_SIZE;
+    constexpr double MIN_PIPELINE_HBM_BW = 2.0;
+    if (platformInfo == nullptr) {
+        return {};
+    }
+    std::string frequency;
+    std::string cores;
+    std::string rate;
+    std::string l2Rate;
+    platformInfo->GetPlatformRes("AICoreSpec", "cube_freq", frequency);
+    platformInfo->GetPlatformRes("SoCInfo", "ai_core_cnt", cores);
+    platformInfo->GetPlatformRes("AICoreMemoryRates", "ddr_rate", rate);
+    platformInfo->GetPlatformRes("AICoreMemoryRates", "l2_rate", l2Rate);
+    const double parsedFrequency = StrToDoubleWithDefault(frequency, 0.0);
+    const double parsedCores = StrToDoubleWithDefault(cores, 0.0);
+    const double parsedRate = StrToDoubleWithDefault(rate, 0.0);
+    const double coreFrequency = parsedFrequency > 0.0 ? parsedFrequency : DEFAULT_AICORE_FREQ_MHZ;
+    const double coreCount = parsedCores > 0.0 ? parsedCores : DEFAULT_AICORE_COUNT;
+    const auto bandwidth = [coreFrequency, coreCount](double memoryRate) {
+        return coreFrequency * coreCount * memoryRate / MHZ_PER_GHZ / KB_SIZE;
+    };
+    PlatformBandwidth result;
+    result.hbm = bandwidth(parsedRate > 0.0 ? parsedRate : DEFAULT_DDR_RATE);
+    result.l2 = bandwidth(StrToDoubleWithDefault(l2Rate, DEFAULT_L2_RATE));
+    // Legacy fitting retains defaults; optimized routing requires real platform capabilities.
+    result.supportsMxPipeline = parsedFrequency > 0.0 && parsedCores > 0.0 && parsedRate > 0.0 &&
+                                std::isfinite(result.hbm) && result.hbm >= MIN_PIPELINE_HBM_BW;
+    return result;
 }
 
 bool GroupedWeightQuantBatchMatmulTiling::CalcMxA8W4BandwidthResplit(const gert::TilingContext* context,
@@ -947,7 +953,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CalcMxA8W4BandwidthResplit(const gert:
 {
     if (!IsMxA8W4() || groupType_ != static_cast<int64_t>(GroupType::SPLIT_M) || groupNum_ == 0 ||
         nSize_ > coreNum_ * BASIC_BLOCK_BASE_N || (groupListType_ != 0 && groupListType_ != 1) ||
-        !EnableBandWidthSelect(context)) {
+        !EnableBandWidthSelect()) {
         return false;
     }
 
@@ -956,8 +962,8 @@ bool GroupedWeightQuantBatchMatmulTiling::CalcMxA8W4BandwidthResplit(const gert:
         OP_LOGI(context->GetNodeName(), "platformInfo is null");
         return false;
     }
-    const double hbmBW = GetHbmBW(platformInfo);
-    const double l2BW = GetL2BW(platformInfo);
+    const double hbmBW = platformBandwidth_.hbm;
+    const double l2BW = platformBandwidth_.l2;
     const uint64_t coreNum = static_cast<uint64_t>(coreNum_);
     const double computeTflops = MX_A8W4_COMPUTE_PER_AIC_TFLOPS * static_cast<double>(coreNum);
     const uint64_t expectedGroupM = GroupedMatmul::CeilDiv(mSize_, static_cast<uint64_t>(groupNum_));
@@ -1018,11 +1024,9 @@ bool GroupedWeightQuantBatchMatmulTiling::CalcMxA8W4BandwidthResplit(const gert:
     return false;
 }
 
-bool GroupedWeightQuantBatchMatmulTiling::EnableBandWidthSelect(const gert::TilingContext* context) const
+bool GroupedWeightQuantBatchMatmulTiling::EnableBandWidthSelect() const
 {
-    fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();
-    const double hbmBW = GetHbmBW(platformInfo);
-    return hbmBW > BANDWIDTH_THRESHOLD;
+    return platformBandwidth_.hbm > BANDWIDTH_THRESHOLD;
 }
 
 bool GroupedWeightQuantBatchMatmulTiling::CalcResplitTiling(const gert::TilingContext* context)
@@ -1064,7 +1068,7 @@ bool GroupedWeightQuantBatchMatmulTiling::CalcResplitTiling(const gert::TilingCo
         nSize_ <= coreNum_ * static_cast<uint64_t>(BASIC_BLOCK_BASE_N) &&
         (groupListType_ == 0 || groupListType_ == 1) &&
         nBlockCount >= GroupedMatmul::CeilDiv(static_cast<uint64_t>(coreNum_), static_cast<uint64_t>(groupNum_)) &&
-        groupDistributedLoadBalanced && EnableBandWidthSelect(context);
+        groupDistributedLoadBalanced && EnableBandWidthSelect();
     if (bandwidthModelSelected) {
         resplitParam_.mainBlockSize = BASIC_BLOCK_BASE_N;
         resplitParam_.mainBlockCount = 0UL;
@@ -1178,6 +1182,7 @@ void GroupedWeightQuantBatchMatmulTiling::SetMatMulTiling()
 void GroupedWeightQuantBatchMatmulTiling::SetTilingKey(gert::TilingContext* context)
 {
     constexpr uint8_t DECIMAL = 10U;
+    constexpr uint64_t S8S4_SPECIAL_GROUP_SIZE = 192UL;
     // 平台类型占2位(平台大类， 平台小类)，平台大类在高位，需要乘10
     tilingKeyConfig_.socVersionType = static_cast<uint8_t>(SocVersionType::SUPPORT_L1_TO_BT_BF16) * DECIMAL;
     tilingKeyConfig_.quantizationScenario = static_cast<uint8_t>(QuantizationScenario::DEFAULT);
@@ -1210,7 +1215,7 @@ void GroupedWeightQuantBatchMatmulTiling::SetTilingKey(gert::TilingContext* cont
     }
     if (xDType_ == ge::DT_INT8 && weightDtype_ == ge::DT_INT4) {
         tilingKeyConfig_.templateCustom = static_cast<uint8_t>(Mte2Configuration::MTE2_INNER_SIZE_512_BUF_NUM_DEFAULT);
-        if (groupSize_ == 192u) {
+        if (groupSize_ == S8S4_SPECIAL_GROUP_SIZE) {
             tilingKeyConfig_.templateCustom = static_cast<uint8_t>(Mte2Configuration::MTE2_INNER_SIZE_384_BUF_NUM_3);
         }
     } else if (xDType_ == ge::DT_FLOAT8_E4M3FN &&
@@ -1220,7 +1225,39 @@ void GroupedWeightQuantBatchMatmulTiling::SetTilingKey(gert::TilingContext* cont
         tilingKeyConfig_.isSingleMultiSingle = isSingleMultiSingle_;
     }
     tilingKeyConfig_.apiConstexpr = 0U;
-    context->SetTilingKey(tilingKeyConfig_.GenTilingKey());
+    context->SetTilingKey(SelectMxPipelineKey(context, tilingKeyConfig_.GenTilingKey()));
+}
+
+uint64_t GroupedWeightQuantBatchMatmulTiling::SelectMxPipelineKey(gert::TilingContext* context, uint64_t originalKey)
+{
+    constexpr uint8_t DECIMAL = 10U;
+    if (!GROUPED_MATMUL_ENABLE_MX_PIPELINE || coreNum_ != GROUPED_MATMUL::MxPipeline::ALIGNED_CORE_COUNT) {
+        return originalKey;
+    }
+    const uint64_t originalMxKey = TilingKeyConfigure::GetOriginalMxKey();
+    if (originalKey != originalMxKey) {
+        return originalKey;
+    }
+    const auto route = GROUPED_MATMUL::MxPipeline::Select(mSize_, groupNum_, kSize_, nSize_);
+    if (route == GROUPED_MATMUL::MxPipeline::Route::Original || !platformBandwidth_.supportsMxPipeline) {
+        return originalKey;
+    }
+    auto outputDesc = context->GetOutputDesc(0);
+    const GROUPED_MATMUL::MxPipeline::Eligibility eligible{
+        originalKey,
+        groupListType_,
+        groupType_,
+        coreNum_,
+        hasBias_,
+        xDType_ == ge::DT_FLOAT8_E4M3FN && weightDtype_ == ge::DT_FLOAT4_E2M1,
+        antiquantScaleDtype_ == ge::DT_FLOAT8_E8M0,
+        outputDesc != nullptr && outputDesc->GetDataType() == ge::DT_BF16};
+    if (!GROUPED_MATMUL::MxPipeline::IsEligible(eligible, originalMxKey)) {
+        return originalKey;
+    }
+    // GenTilingKey validates this independently registered template category.
+    tilingKeyConfig_.algorithm = DECIMAL * static_cast<uint8_t>(route) + (tilingKeyConfig_.algorithm % DECIMAL);
+    return tilingKeyConfig_.GenTilingKey();
 }
 
 bool GroupedWeightQuantBatchMatmulTiling::SetCustomParam(gert::TilingContext* context)
@@ -2118,6 +2155,21 @@ void GroupedWeightQuantBatchMatmulTiling::PrintTilingResult(const gert::TilingCo
             tilingData_.gmmWeightQuantParam.mainBlockSize, tilingData_.gmmWeightQuantParam.mainBlockCount,
             tilingData_.gmmWeightQuantParam.firstTailBlockSize, tilingData_.gmmWeightQuantParam.secondTailBlockSize,
             tilingData_.gmmWeightQuantParam.firstTailBlockCount, tilingData_.gmmWeightQuantParam.secondTailBlockCount);
+}
+
+uint64_t TilingKeyConfigure::GetOriginalMxKey()
+{
+    // The SDK encoder is not constexpr. Reuse it once instead of duplicating its bit packing.
+    static const uint64_t key = [] {
+        TilingKeyConfigure config;
+        config.weightFormat = static_cast<uint8_t>(WeightFormat::FRACTAL_NZ);
+        config.antiquantType = static_cast<uint8_t>(QuantType::MX);
+        config.transposeSituation = static_cast<uint8_t>(TransposeSituation::A_NOT_TRANS_B_TRANS);
+        config.templateCustom = static_cast<uint16_t>(Mte2Configuration::MTE2_INNER_SIZE_DYNAMIC_BUF_NUM_4);
+        config.algorithm = static_cast<uint8_t>(OptimizationAlgorithmSubCategory::N_FIRST_TAIL_RESPLIT);
+        return config.GenTilingKey();
+    }();
+    return key;
 }
 
 uint64_t TilingKeyConfigure::GenTilingKey() const

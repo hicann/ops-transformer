@@ -234,6 +234,7 @@ public:
     }
 
     uint64_t GenTilingKey() const;
+    static uint64_t GetOriginalMxKey();
 };
 
 class GroupedS8S4BasicApiTiling : public GroupedQmmTiling {
@@ -358,12 +359,17 @@ protected:
     bool CalcResplitTiling(const gert::TilingContext* context);
     bool CalcMxA8W4BandwidthResplit(const gert::TilingContext* context, uint64_t c0Size, uint64_t& selectedNBlockCount,
                                     uint64_t& selectedNBlockSize) const;
-    double GetHbmBW(fe::PlatFormInfos* platformInfo) const;
-    double GetL2BW(fe::PlatFormInfos* platformInfo) const;
-    double GetCoreFreq(fe::PlatFormInfos* platformInfo) const;
+    struct PlatformBandwidth {
+        double hbm = 0.0;
+        double l2 = 0.0;
+        bool supportsMxPipeline = false;
+    };
+    static PlatformBandwidth GetPlatformBandwidth(fe::PlatFormInfos* platformInfo);
+    PlatformBandwidth platformBandwidth_;
     bool SetBaseTiling();
     void SetMatMulTiling();
     void SetTilingKey(gert::TilingContext* context);
+    uint64_t SelectMxPipelineKey(gert::TilingContext* context, uint64_t originalKey);
     bool SetCustomParam(gert::TilingContext* context);
     bool IsA16W4ND() const;
     bool IsA16W4NDPergroup() const;
@@ -401,7 +407,7 @@ protected:
     void PrintTilingResult(const gert::TilingContext* context);
     bool EnableTailResplit() const;
     bool TraverseForBalanceBaseN();
-    bool EnableBandWidthSelect(const gert::TilingContext* context) const;
+    bool EnableBandWidthSelect() const;
 
 private:
     int32_t mList_[GroupedMatmul::MAX_TENSOR_CONT] = {0};
@@ -448,5 +454,11 @@ private:
     GroupedMatmulTilingData::GMMWeightQuantTilingData tilingData_;
 };
 } // namespace optiling
+
+// The build enables this only for the SDK range with the required Blaze path.
+// Direct/unknown SDK builds retain the original tiling keys.
+#ifndef GROUPED_MATMUL_ENABLE_MX_PIPELINE
+#define GROUPED_MATMUL_ENABLE_MX_PIPELINE 0
+#endif
 
 #endif // GROUPED_WEIGHT_QUANT_BATCH_MATMUL_TILING_H
