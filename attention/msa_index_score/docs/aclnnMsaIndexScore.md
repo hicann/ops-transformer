@@ -55,7 +55,7 @@
     2. 按`sparse_mode`叠加$atten\_mask$：`sparse_mode=0`不做因果截断，`sparse_mode=3`按rightDownCausal屏蔽不可见位置。
     3. 在每个长度为$block\_size$的sparse block上做Maxpool，得到逐block的重要性分数。
     4. 用`start_loc`、`init_blocks`、`local_blocks`生成$local\_mask$，对强制保留的block写入高分，得到输出`score`。
-    5. `returnChoice`为1或2时继续做TopK。入选按分数从高到低，分数相同则列号更小者优先。写出时前缀列号从小到大，尾块列号放在该行有效结果的最后。尾块是有效列数按1024对齐后的余数。不足k的索引为-1。目前仅Ascend 950PR&950DT系列产品，设置`pool_block_size=128`时支持输出TopK后的结果。
+    5. `returnChoice`为1或2时继续做TopK。入选按分数从高到低，分数相同则列号更小者优先。写出时前缀列号从小到大，尾块列号放在该行有效结果的最后。尾块是有效列数按1024对齐后的余数。不足k的索引为-1。`pool_block_size=128`时支持输出TopK：Ascend 950PR&950DT系列产品支持fp16、bf16、fp8与MXFP4；Atlas A2/A3系列产品只支持fp16和bf16。
 
 - **参数介绍**：
 
@@ -138,7 +138,7 @@ aclnnStatus aclnnMsaIndexScore(
       <td>支持TND [T2, N2, D]、BSND [B, S2, N2, D]、BNSD [B, N2, S2, D]、BBND、BNBD。query仍为TND。BSND / BNSD不传blockTableOptional。PA key允许dim0（物理page）非连续；size&gt;1的非首轴须连续，否则tiling拒绝。TND / BSND / BNSD不允许非连续。</td>
       <td>与query同型</td>
       <td>ND</td>
-      <td>3（[T2, N2, D]）或4（[B, S2, N2, D]、[B, N2, S2, D]、[block_num, N2, block_size, D]、[block_num, block_size, N2, D]）</td>
+      <td>3（[T2, N2, D]）或4（[B, S2, N2, D]、[B, N2, S2, D]、[block_num, block_size, N2, D]、[block_num, N2, block_size, D]）</td>
     </tr>
     <tr>
       <td>startLoc</td>
@@ -410,7 +410,7 @@ aclnnStatus aclnnMsaIndexScore(
 - `initBlocks`、`localBlocks`必须$\ge 0$且不超过逻辑block数（PA为`blockTableOptional`第二维；TND为score末维对齐宽度）。两者均为0时跳过$local\_mask$。
 - `q_len` / `kv_len`允许为0。空KV的score填$-inf$。
 - `returnChoice`默认0，与原先只输出score一致。为1时只写`sparseIndicesOptional`，为2时同时写`sparseValuesOptional`。`topk`默认16，范围是1到128，只在非0时生效。
-- 目前仅Ascend 950PR&950DT系列产品，设置`pool_block_size=128`时支持输出TopK后的结果。索引是逻辑block列号，从0开始。不足k为-1。尾块列号位于该行其它入选列号之后。
+- `pool_block_size=128`时支持输出TopK。Ascend 950PR&950DT系列产品支持fp16、bf16、fp8与MXFP4。Atlas A2/A3系列产品只支持fp16和bf16，score经GM workspace。索引是逻辑block列号，从0开始。不足k为-1。尾块列号位于该行其它入选列号之后。
 - 确定性计算：相同输入下输出确定。
 
 ## 调用示例

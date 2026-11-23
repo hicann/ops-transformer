@@ -221,7 +221,7 @@ MSA_FN uint64_t MsaSeqKeyBlockElem(uint32_t keyLayout, uint32_t batchIdx, uint32
 // 块长 16（BSND/BNSD，或 BBND/BNBD 页长 16）：独立 TilingKey。
 #define MSA_TILING_KEY_BF16_BLK16 7
 #define MSA_TILING_KEY_FP16_BLK16 8
-// 950：max 之后再做 topk。A2/A3 的 13/14 只预留，本阶段 tiling 不发出。
+// 950：max 之后再做 topk，含 fp8。A2/A3 的 13/14 只覆盖 fp16/bf16，score 经 GM，不用 L0C→UB。
 #define MSA_TILING_KEY_BF16_TOPK 9
 #define MSA_TILING_KEY_FP16_TOPK 10
 #define MSA_TILING_KEY_FP8_E5M2_TOPK 11
@@ -285,6 +285,10 @@ constexpr uint32_t MSA_TOPK_LEN_CAP = 2048;
 // 行元数据放在 160KB 处。q、kv、token 偏移各 4096 个 int32，依次排列。
 constexpr uint32_t MSA_TOPK_META_FLOAT_OFF = 40960;
 constexpr uint32_t MSA_TOPK_META_CAP = 4096;
+// A2/A3 UB 为 192KB。排序缓冲峰值约 14336 个 float（约 56KB）。
+// 长度表从 64KB 起，三份行元数据接在后面，末尾落在 128KB。950 仍用 128KB/160KB。
+constexpr uint32_t MSA_TOPK_LEN_FLOAT_OFF_A2 = 16384;
+constexpr uint32_t MSA_TOPK_META_FLOAT_OFF_A2 = 20480;
 // 256 列、k=128 的稠密路径，一次最多拼 8 行。
 constexpr uint32_t MSA_TOPK_DENSE_COLS = 256;
 constexpr uint32_t MSA_TOPK_DENSE_K = MSA_TOPK_MAX;

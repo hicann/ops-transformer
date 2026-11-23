@@ -13,7 +13,7 @@
 
 ## 功能说明
 
-- **算子功能**：计算MSA（MiniMax Sparse Attention）Index Branch的block score。对每个query token与每个KV sparse block，取该block内因果可见token的$Q_{idx}$与$K_{idx}$做matmul，再按block做Maxpool，得到逐block的重要性分数。`return_choice`为0时只输出score。为1或2时，在max之后做TopK：入选按分数从高到低，分数相同则列号更小者优先；写出时前缀列号从小到大，尾块列号接在后面。目前仅Ascend 950PR&950DT系列产品，设置`pool_block_size=128`时支持输出TopK后的结果。Prefill与Decode共用本接口。
+- **算子功能**：计算MSA（MiniMax Sparse Attention）Index Branch的block score。对每个query token与每个KV sparse block，取该block内因果可见token的$Q_{idx}$与$K_{idx}$做matmul，再按block做Maxpool，得到逐block的重要性分数。`return_choice`为0时只输出score。为1或2时，在max之后做TopK：入选按分数从高到低，分数相同则列号更小者优先；写出时前缀列号从小到大，尾块列号接在后面。`pool_block_size=128`时支持输出TopK后的结果：<term>Ascend 950PR&950DT系列产品</term>支持fp16、bf16、fp8与MXFP4；<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>只支持fp16和bf16。Prefill与Decode共用本接口。
 
 - **计算公式**：
 
@@ -70,7 +70,7 @@
 | local_blocks | 属性 | 当前query附近强制保留的窗口长度，默认1。与raw score对齐时置0。 | INT64 | - |
 | layout_query | 属性 | `TND` / `BSND` / `BNSD`。默认`TND`。（aclnnMsaIndexScore接口不支持设置，固定为`TND`；aclnnMsaIndexScoreV2接口支持设置） | STRING | - |
 | pool_block_size | 属性 | 每个score归约的token数，只允许16 / 128，默认128。（aclnnMsaIndexScore接口不支持设置，固定为128；aclnnMsaIndexScoreV2接口支持设置） | INT64 | - |
-| return_choice | 属性 | 0只输出score，默认0。1只输出`sparse_indices`。2同时输出`sparse_indices`和`sparse_values`。TopK仅Ascend 950、块长128。 | INT64 | - |
+| return_choice | 属性 | 0只输出score，默认0。1只输出`sparse_indices`。2同时输出`sparse_indices`和`sparse_values`。TopK要求块长128。<term>Ascend 950PR&950DT系列产品</term>支持fp16、bf16、fp8与MXFP4；<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>只支持fp16和bf16。 | INT64 | - |
 | topk | 属性 | TopK的k，默认16，仅`return_choice`非0时生效，范围1到128。 | INT64 | - |
 | compress_factor | 属性 | key的压缩倍数。1表示不压缩，默认1。4表示输入时已把4个token压成一行，当前仅预留。 | INT64 | - |
 | score | 输出 | 逐block重要性分数。仅`return_choice=0`。块长128的shape为$[N1, T1, RoundUp(maxBlockNumPerSeq, 16)]$；块长16做完head间max后head维为1，shape为$[1, T1, RoundUp(maxBlockNumPerSeq, 16)]$。 | FLOAT | ND |
@@ -81,17 +81,17 @@
 
 ## 约束说明
 
-- MXFP4（A4C4）仅支持Ascend 950：Q/K均为FLOAT4_E2M1，逻辑D为64或128，N2=1；两份E8M0 scale每32个元素一组，形状前缀与对应Q/K相同、末维D/32。先分别缩放Q/K再点积，不能改成点积后乘一个标量。
+- MXFP4（A4C4）仅支持<term>Ascend 950PR&950DT系列产品</term>：Q/K均为FLOAT4_E2M1，逻辑D为64或128，N2=1；两份E8M0 scale每32个元素一组，形状前缀与对应Q/K相同、末维D/32。先分别缩放Q/K再点积，不能改成点积后乘一个标量。
 
 - 非V2 aclnn接口（`aclnnMsaIndexScore`）：query固定TND，逻辑块长128。key可为`BBND` / `BNBD` / `TND` / `BSND` / `BNSD`，<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>与<term>Ascend 950PR&950DT系列产品</term>都支持。BSND / BNSD不传`block_table`，`actual_seq_klen`为$[B+1]$前缀和，每个请求的长度差不超过key的$S2$。
 - V2 aclnn接口（`aclnnMsaIndexScoreV2`）：query可为TND / BSND / BNSD。BSND/BNSD顺序K配同布局Q时`pool_block_size`为16，配TND Q时为128，仅支持<term>Ascend 950PR&950DT系列产品</term>，`actual_seq_klen`为$[B+1]$前缀和。
 - PageAttention必须传`block_table`，`actual_seq_klen`为$[B]$可见长度。TND / BSND / BNSD不得传`block_table`，`actual_seq_klen`为$[B+1]$前缀和。
 - 非量化时key与query同dtype，`key_scale`为空（MXFP4除外）。<term>Ascend 950PR&950DT系列产品</term>支持FLOAT8_E5M2与FLOAT8_E4M3FN。
-- 以下数据类型组合只在原型中预留，当前计算会拒绝：A2/A3上原组合的`score`/`sparse_values`为FLOAT16，以及query/key均为INT8；Ascend 950上bf16/fp16的FLOAT16输出，以及query为FLOAT8_E4M3FN、key为FLOAT4_E2M1（`key_scale`为FLOAT8_E4M3FN）。已实现路径的`score`与`sparse_values`仍为FLOAT。
+- 以下数据类型组合只在原型中预留，当前计算会拒绝：<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上原组合的`score`/`sparse_values`为FLOAT16，以及query/key均为INT8；<term>Ascend 950PR&950DT系列产品</term>上bf16/fp16的FLOAT16输出，以及query为FLOAT8_E4M3FN、key为FLOAT4_E2M1（`key_scale`为FLOAT8_E4M3FN）。已实现路径的`score`与`sparse_values`仍为FLOAT。
 - `sparse_mode`仅0或3。为3时`atten_mask`必须是$[2048, 2048]$。
 - `init_blocks`、`local_blocks`必须$\ge 0$，且不超过逻辑block数。两者都为0时不写$local\_mask$。
 - `q_len` / `kv_len`允许为0。空KV的score填`-inf`。
-- `return_choice`默认0，与原先只输出score的行为一致。非0时仅Ascend 950、`pool_block_size=128`做TopK。仅Ascend 950PR&950DT系列产品，设置`pool_block_size=128`时支持输出TopK。
+- `return_choice`默认0，与原先只输出score的行为一致。非0时要求`pool_block_size=128`。<term>Ascend 950PR&950DT系列产品</term>支持fp16、bf16、fp8与MXFP4的TopK。<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>只支持fp16和bf16的TopK，score经GM workspace，不走L0C到UB。
 - 确定性计算：相同输入与属性下，输出与参考实现一致。
 
 ## 调用说明

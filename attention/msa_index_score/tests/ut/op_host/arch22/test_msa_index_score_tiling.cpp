@@ -95,6 +95,11 @@ struct MsaTilingSpec {
     int64_t localBlocks{1};
     int64_t returnChoice{0};
     int64_t topk{16};
+    bool hasScore{true};
+    bool hasIndices{false};
+    bool hasValues{false};
+    std::vector<int64_t> indicesShape{};
+    std::vector<int64_t> valuesShape{};
 };
 
 gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocParam& soc, void* compileInfo)
@@ -117,7 +122,13 @@ gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocPa
     inputs.push_back(klenDesc);
 
     std::vector<gert::TilingContextPara::TensorDescription> outputs;
-    outputs.push_back(Present(spec.scoreShape, ge::DT_FLOAT));
+    if (spec.hasIndices || spec.hasValues || !spec.hasScore) {
+        outputs.push_back(spec.hasScore ? Present(spec.scoreShape, ge::DT_FLOAT) : Absent(ge::DT_FLOAT));
+        outputs.push_back(spec.hasIndices ? Present(spec.indicesShape, ge::DT_INT32) : Absent(ge::DT_INT32));
+        outputs.push_back(spec.hasValues ? Present(spec.valuesShape, ge::DT_FLOAT) : Absent(ge::DT_FLOAT));
+    } else {
+        outputs.push_back(Present(spec.scoreShape, ge::DT_FLOAT));
+    }
 
     std::vector<gert::TilingContextPara::OpAttr> attrs = {
         {"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>(spec.layout)},
@@ -425,11 +436,42 @@ TEST_F(MsaIndexScoreTilingFp8Arch22, a2_a3_fp8_rejected)
     RunTiling(spec, kSoc910B, ge::GRAPH_FAILED);
 }
 
-TEST_F(MsaIndexScoreTilingFp8Arch22, a2_a3_topk_rejected)
+TEST_F(MsaIndexScoreTilingFp8Arch22, a2_a3_fp16_topk_indices_and_values)
+{
+    MsaTilingSpec spec;
+    spec.returnChoice = 2;
+    spec.topk = 16;
+    spec.hasScore = false;
+    spec.hasIndices = true;
+    spec.hasValues = true;
+    spec.indicesShape = {8, 32, 16};
+    spec.valuesShape = {8, 32, 16};
+    RunTiling(spec, kSoc910B, ge::GRAPH_SUCCESS, 14);
+    RunTiling(spec, kSoc91093, ge::GRAPH_SUCCESS, 14);
+}
+
+TEST_F(MsaIndexScoreTilingFp8Arch22, a2_a3_bf16_topk_indices)
+{
+    MsaTilingSpec spec;
+    spec.queryDtype = ge::DT_BF16;
+    spec.keyDtype = ge::DT_BF16;
+    spec.returnChoice = 1;
+    spec.topk = 32;
+    spec.hasScore = false;
+    spec.hasIndices = true;
+    spec.indicesShape = {8, 32, 32};
+    RunTiling(spec, kSoc910B, ge::GRAPH_SUCCESS, 13);
+    RunTiling(spec, kSoc91093, ge::GRAPH_SUCCESS, 13);
+}
+
+TEST_F(MsaIndexScoreTilingFp8Arch22, a2_a3_topk_pool16_rejected)
 {
     MsaTilingSpec spec;
     spec.returnChoice = 1;
-    spec.topk = 16;
+    spec.poolBlockSize = 16;
+    spec.hasScore = false;
+    spec.hasIndices = true;
+    spec.indicesShape = {8, 32, 16};
     RunTiling(spec, kSoc910B, ge::GRAPH_FAILED);
     RunTiling(spec, kSoc91093, ge::GRAPH_FAILED);
 }

@@ -16,6 +16,9 @@
  * int8 量化：key 为 int8；AIV 将 page DataCopy+Cast 到四槽 fp 暂存后通知 AIC 做 Mmad；
  * gather(st+4) 叠在 cube(st+1..st+3) 上；两 AIV 对分 8 page（每页仍串行 MTE2→V→MTE3）。
  * 同 AIV 上 MTE2∥MTE3 / 多 page 并发 MTE2 会写坏多 page int8。S 侧仍为 fp32 反量化。
+ *
+ * ENABLE_TOPK：score 仍走 L0C→GM，写到 workspace；全部核 SyncAll 后，AIV 用与 950 相同的
+ * Sort32 TopK 写出 indices/values。A2/A3 没有 L0C→UB，也不做 fp8。
  */
 
 #ifndef MSA_INDEX_SCORE_KERNEL_ARCH22_H
@@ -37,10 +40,11 @@
 #include "msa_block_mmad_arch22.h"
 #include "../msa_index_score_task.h"
 #include "msa_seg_row_max_epilogue_arch22.h"
+#include "msa_index_score_topk_arch22.h"
 
 namespace MsaIndexScoreNs {
 
-template <class ElementQ_, bool IS_QUANT>
+template <class ElementQ_, bool IS_QUANT, bool ENABLE_TOPK = false>
 class MsaIndexScoreKernel {
 public:
     using ElementQ = ElementQ_;
@@ -82,8 +86,6 @@ public:
                                 GM_ADDR sparseValues, GM_ADDR workspace,
                                 const MsaIndexScoreTilingData* __restrict tiling)
     {
-        (void)sparseIndices;
-        (void)sparseValues;
         tiling_ = tiling;
         gQuery_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementQ*>(query));
         if constexpr (IS_QUANT_V) {
@@ -102,7 +104,18 @@ public:
         gActualSeqQlen_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(actualSeqQlen));
         gActualSeqKlen_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(actualSeqKlen));
         gStartLoc_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(startLoc));
-        gScore_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(score));
+        if constexpr (ENABLE_TOPK) {
+            // 用户没有 score。归约结果写到 S/K scratch 之后的 fp32 workspace，再做 TopK。
+            gScore_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(workspace) + tiling_->scoreWorkspaceElems);
+            gSparseIndices_.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(sparseIndices));
+            if (tiling_->returnChoice == MSA_RETURN_INDICES_VALUES) {
+                gSparseValues_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(sparseValues));
+            }
+        } else {
+            (void)sparseIndices;
+            (void)sparseValues;
+            gScore_.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(score));
+        }
         gWorkspace_.SetGlobalBuffer(reinterpret_cast<__gm__ ElementS*>(workspace));
 
         scheduler_.Init(tiling_->batch, tiling_->numQHeads, tiling_->maxBlocksPerBatch, tiling_->scoreBlockStride,
@@ -164,6 +177,10 @@ private:
             }
         }
         AscendC::PipeBarrier<PIPE_ALL>();
+        if constexpr (ENABLE_TOPK) {
+            // Cube 与 Vector 都要进 SyncAll，否则 AIV 读 score 时 AIC 可能还没写完。
+            AscendC::SyncAll<false>();
+        }
     }
 
     __aicore__ inline uint64_t KScratchSlot(uint64_t coreKScratch, uint32_t st) const
@@ -562,7 +579,7 @@ private:
     __aicore__ inline void ProcessVector()
     {
         Catlass::Arch::Resource<ArchTag> resource;
-        MsaSegRowMaxEpilogue<IS_QUANT_V> epilogue;
+        MsaSegRowMaxEpilogue<IS_QUANT_V, ENABLE_TOPK> epilogue;
         epilogue.Init(resource, tiling_->numQHeads, tiling_->strideOutHead, tiling_->strideOutToken,
                       tiling_->maxBlocksPerBatch, tiling_->tableWidth, tiling_->strideScalePage,
                       tiling_->strideScaleHead, IS_QUANT_V, tiling_->keyLayout, tiling_->totalK, gScore_, gScale_,
@@ -637,6 +654,13 @@ private:
             epilogue.EndTask();
         }
         AscendC::PipeBarrier<PIPE_ALL>();
+        if constexpr (ENABLE_TOPK) {
+            AscendC::SyncAll<false>();
+            MsaIndexScoreTopk topk;
+            auto ubTrunk = resource.ubBuf.template GetBufferByByte<float>(0);
+            topk.Run(tiling_, gScore_, gSparseIndices_, gSparseValues_, gActualSeqQlen_, gActualSeqKlen_,
+                     tiling_->returnChoice == MSA_RETURN_INDICES_VALUES, ubTrunk);
+        }
     }
 
     const MsaIndexScoreTilingData* __restrict tiling_ = nullptr;
@@ -652,8 +676,14 @@ private:
     AscendC::GlobalTensor<int32_t> gActualSeqKlen_;
     AscendC::GlobalTensor<int32_t> gStartLoc_;
     AscendC::GlobalTensor<float> gScore_;
+    AscendC::GlobalTensor<int32_t> gSparseIndices_;
+    AscendC::GlobalTensor<float> gSparseValues_;
     AscendC::GlobalTensor<ElementS> gWorkspace_;
 };
+
+static_assert(MSA_TOPK_LEN_FLOAT_OFF_A2 >= 14336U, "A2 topk length table overlaps the sort buffer");
+static_assert(MSA_TOPK_META_FLOAT_OFF_A2 + MSA_TOPK_META_CAP * 3U <= (192U * 1024U) / sizeof(float),
+              "A2 topk metadata exceeds 192KB UB");
 
 } // namespace MsaIndexScoreNs
 

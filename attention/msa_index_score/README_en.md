@@ -15,7 +15,7 @@ English | [简体中文](./README.md)
 
 ## Function Description
 
-- **Operator function**: Computes the block score of the Index Branch of MSA (MiniMax Sparse Attention). For each query token and each KV sparse block, performs matmul on $Q_{idx}$ and $K_{idx}$ of the causally visible tokens in the block, and then performs Maxpool by block, obtaining the per-block importance score. This operator does not include TopK. Prefill and Decode share this API.
+- **Operator function**: Computes the block score of the Index Branch of MSA (MiniMax Sparse Attention). For each query token and each KV sparse block, performs matmul on $Q_{idx}$ and $K_{idx}$ of the causally visible tokens in the block, and then performs Maxpool by block, obtaining the per-block importance score. With `return_choice` 1 or 2 and `pool_block_size=128`, it also writes TopK. <term>Ascend 950PR&950DT products</term> support fp16, bf16, fp8 and MXFP4. <term>Atlas A2 products</term> and <term>Atlas A3 products</term> support fp16 and bf16 only. Prefill and Decode share this API.
 
 - **Computation formula**:
 
@@ -30,7 +30,7 @@ English | [简体中文](./README.md)
     1. Performs matrix multiplication between the $Q_{idx}$ of each query token and the causally visible $K_{idx}$ in the KV sparse block, obtaining token-level correlations.
     2. Applies $atten\_mask$ according to `sparse_mode`: `sparse_mode=0` performs no causal truncation, and `sparse_mode=3` masks invisible positions according to rightDownCausal.
     3. Performs Maxpool on each sparse block of length $block\_size$, obtaining the per-block importance score.
-    4. Uses `start_loc`, `init_blocks`, and `local_blocks` to generate $local\_mask$, writes high scores to the mandatory retention blocks, and obtains the output `score`. This operator does not include TopK.
+    4. Uses `start_loc`, `init_blocks`, and `local_blocks` to generate $local\_mask$, writes high scores to the mandatory retention blocks, and obtains the output `score`. When `return_choice` is 1 or 2, TopK follows on the valid columns. <term>Atlas A2 products</term> and <term>Atlas A3 products</term> keep that score in GM workspace.
 
 ## Parameter Description
 
@@ -64,16 +64,17 @@ English | [简体中文](./README.md)
 
 ## Constraints
 
-- MXFP4 (A4C4) requires Ascend 950, matching FLOAT4_E2M1 Q/K, logical D=64 or 128, and N2=1. Independent E8M0 scales have the same outer dimensions as Q/K and last dimension D/32. Scale Q/K separately before the dot product.
+- MXFP4 (A4C4) requires <term>Ascend 950PR&950DT products</term>, matching FLOAT4_E2M1 Q/K, logical D=64 or 128, and N2=1. Independent E8M0 scales have the same outer dimensions as Q/K and last dimension D/32. Scale Q/K separately before the dot product.
 
 - Non-V2 aclnn API (`aclnnMsaIndexScore`): query is fixed to TND, and the logical block length is 128. The key can be `BBND` / `BNBD` / `TND` / `BSND` / `BNSD`, which are supported by <term>Atlas A2 products</term>, <term>Atlas A3 products</term>, and <term>Ascend 950PR&950DT products</term>. For BSND / BNSD, `block_table` is not passed, `actual_seq_klen` is the $[B+1]$ prefix sum, and the length difference of each request does not exceed the $S2$ of key.
 - V2 aclnn API (`aclnnMsaIndexScoreV2`): query can be TND / BSND / BNSD. BSND/BNSD sequential K uses block16 with a matching Q layout, or block128 with TND Q; these batch layouts require <term>Ascend 950PR&950DT products</term>. `actual_seq_klen` is the $[B+1]$ prefix sum for sequential K.
 - PageAttention must pass `block_table`, and `actual_seq_klen` is the visible length $[B]$. TND / BSND / BNSD must not pass `block_table`, and `actual_seq_klen` is the $[B+1]$ prefix sum.
 - In the non-quantized scenario, key has the same dtype as query, and `query_scale` / `key_scale` are empty except for MXFP4. <term>Ascend 950PR&950DT products</term> support FLOAT8_E5M2 and FLOAT8_E4M3FN.
-- The following dtype combinations are reserved in the prototype and are rejected by the current implementation: on A2/A3, FLOAT16 `score` / `sparse_values` for the existing combinations, and INT8 query with INT8 key; on Ascend 950, FLOAT16 outputs for bf16/fp16, and FLOAT8_E4M3FN query with FLOAT4_E2M1 key (`key_scale` is FLOAT8_E4M3FN). Implemented paths still use FLOAT `score` and `sparse_values`.
+- The following dtype combinations are reserved in the prototype and are rejected by the current implementation: on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, FLOAT16 `score` / `sparse_values` for the existing combinations, and INT8 query with INT8 key; on <term>Ascend 950PR&950DT products</term>, FLOAT16 outputs for bf16/fp16, and FLOAT8_E4M3FN query with FLOAT4_E2M1 key (`key_scale` is FLOAT8_E4M3FN). Implemented paths still use FLOAT `score` and `sparse_values`.
 - `sparse_mode` supports only 0 or 3. When it is 3, `atten_mask` must be $[2048, 2048]$.
 - `init_blocks` and `local_blocks` must be $\ge 0$ and must not exceed the number of logical blocks. When both are 0, $local\_mask$ is not written.
 - `q_len` / `kv_len` can be 0. The score with empty KV is filled with `-inf`.
+- `return_choice` defaults to 0 and keeps the original score-only behavior. A non-zero value requires `pool_block_size=128`. <term>Ascend 950PR&950DT products</term> support TopK for fp16, bf16, fp8, and MXFP4. <term>Atlas A2 products</term> and <term>Atlas A3 products</term> support TopK for fp16 and bf16 only. The score goes through GM workspace and is not moved from L0C to UB.
 - Deterministic computation: with the same inputs and attributes, the output is consistent with the reference implementation.
 
 ## Invocation Description

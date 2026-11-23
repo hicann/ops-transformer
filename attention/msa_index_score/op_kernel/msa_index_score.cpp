@@ -199,6 +199,17 @@ __global__ __aicore__ void msa_index_score(GM_ADDR query, GM_ADDR key, GM_ADDR s
         MSA_INVOKE_KERNEL_DIRECT_FLOAT(bfloat16_t);
     } else if constexpr (schMode == MSA_TILING_KEY_FP16_DIRECT_FLOAT) {
         MSA_INVOKE_KERNEL_DIRECT_FLOAT(half);
+#else
+    } else if constexpr (schMode == MSA_TILING_KEY_BF16_TOPK_A2) {
+        MsaIndexScoreKernel<bfloat16_t, false, true> op;
+        op.Init(query, key, blockTable, keyScale, actualSeqQlen, actualSeqKlen, startLoc, score, sparseIndices,
+                sparseValues, userWs, tilingData);
+        op.Process();
+    } else if constexpr (schMode == MSA_TILING_KEY_FP16_TOPK_A2) {
+        MsaIndexScoreKernel<half, false, true> op;
+        op.Init(query, key, blockTable, keyScale, actualSeqQlen, actualSeqKlen, startLoc, score, sparseIndices,
+                sparseValues, userWs, tilingData);
+        op.Process();
 #endif
     }
 }

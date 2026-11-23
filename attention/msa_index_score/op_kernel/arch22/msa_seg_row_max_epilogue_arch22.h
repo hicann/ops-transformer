@@ -31,7 +31,7 @@
 
 namespace MsaIndexScoreNs {
 
-template <bool IS_QUANT>
+template <bool IS_QUANT, bool ENABLE_TOPK = false>
 class MsaSegRowMaxEpilogue {
 public:
     using ArchTag = Catlass::Arch::AtlasA2;
@@ -127,6 +127,13 @@ public:
     /// 进入一个新任务（M-tile）：确定本 subcore 负责的行区间并复位 score 暂存窗口。
     __aicore__ inline void BeginTask(const MsaTask& task, uint32_t subIdx, uint32_t subBlockNum)
     {
+        if constexpr (ENABLE_TOPK) {
+            // start_loc 是请求首 token 所在块。q 跨过 128-token 边界时，后续 token 的块号要逐行加。
+            const int32_t prefixLen = task.kvLen - task.qLen;
+            const int32_t blockSize = static_cast<int32_t>(MSA_BLOCK_SIZE);
+            needTokenLocalMask_ =
+                task.qLen > 1 && prefixLen >= 0 && (prefixLen % blockSize + task.qLen - 1) >= blockSize;
+        }
         const uint32_t subM = MsaCeilDiv(task.mActual, subBlockNum);
         mOff_ = subIdx * subM;
         mSub_ = (mOff_ >= task.mActual) ? 0U : MsaMinU32(subM, task.mActual - mOff_);
@@ -401,7 +408,7 @@ private:
         }
 
         FillInvalidBlocks(task, blkBase);
-        ApplyLocalMaskUb(task, blkBase, rows);
+        ApplyLocalMaskUb(task, blkBase, rows, rowOff);
 
         if (stageOn_) {
             StageScore(blkBase, rowOff - mOff_, rows);
@@ -538,8 +545,17 @@ private:
 
     /// Maxpool 之后、Store 之前施加 local_mask。
     /// 用与 FillInvalidBlocks 相同的位掩码 Duplicate，保证 32B 对齐访问。
-    __aicore__ inline void ApplyLocalMaskUb(const MsaTask& task, uint32_t blkBase, uint32_t rows)
+    /// 非融合路径保持请求级 start_loc。融合 TopK 在请求跨块时逐 token 推进块号。
+    __aicore__ inline void ApplyLocalMaskUb(const MsaTask& task, uint32_t blkBase, uint32_t rows, uint32_t rowOff)
     {
+        if constexpr (ENABLE_TOPK) {
+            if (needTokenLocalMask_) {
+                ApplyTokenLocalMaskUb(task, blkBase, rows, rowOff);
+                return;
+            }
+        } else {
+            (void)rowOff;
+        }
         if (task.initBlocks == 0 && task.localBlocks == 0) {
             return;
         }
@@ -580,6 +596,138 @@ private:
             uint64_t bits = 0;
             for (uint32_t g = 0; g < MSA_FP32_PER_REPEAT / MSA_BLOCKS_PER_STILE; ++g) {
                 bits |= (localBits << (g * MSA_BLOCKS_PER_STILE));
+            }
+            uint64_t mask[MSA_VEC_MASK_WORDS] = {bits, 0};
+            AscendC::Duplicate<float>(ubRowMax_, MSA_LOCAL_SCORE_LOCAL, mask, repeats, 1,
+                                      MSA_FP32_PER_REPEAT / MSA_FP32_PER_BLOCK);
+            AscendC::PipeBarrier<PIPE_V>();
+        }
+    }
+
+    __aicore__ inline int32_t QueryBlockForRow(const MsaTask& task, uint32_t rowInReq) const
+    {
+        const int32_t blockSize = static_cast<int32_t>(MSA_BLOCK_SIZE);
+        const int32_t prefixLen = task.kvLen - task.qLen;
+        const int32_t tOff = static_cast<int32_t>(rowInReq / numQHeads_);
+        if (prefixLen < 0) {
+            return task.startLoc;
+        }
+        return task.startLoc + (prefixLen % blockSize + tOff) / blockSize;
+    }
+
+    __aicore__ inline uint32_t VisibleEndBlkForRow(const MsaTask& task, uint32_t rowInReq) const
+    {
+        const int32_t tOff = static_cast<int32_t>(rowInReq / numQHeads_);
+        const int32_t visibleKeyEnd = VisibleKeyEnd(task, tOff);
+        const int32_t blockSize = static_cast<int32_t>(MSA_BLOCK_SIZE);
+        return visibleKeyEnd > 0 ? static_cast<uint32_t>((visibleKeyEnd + blockSize - 1) / blockSize) : 0U;
+    }
+
+    /// start_loc 对应请求首个 query token。跨块时每一行用自己的块号和可见范围打高分。
+    __aicore__ inline void ApplyTokenLocalMaskUb(const MsaTask& task, uint32_t blkBase, uint32_t rows, uint32_t rowOff)
+    {
+        if (task.initBlocks == 0 && task.localBlocks == 0) {
+            return;
+        }
+        constexpr uint32_t nBlocks = MSA_BLOCKS_PER_STILE;
+        const uint32_t firstRowInReq = task.mStart + rowOff;
+        if (rows == 0U) {
+            return;
+        }
+        const int32_t firstQBlock = QueryBlockForRow(task, firstRowInReq);
+        const int32_t firstLocalStart = (firstQBlock + 1 > static_cast<int32_t>(task.localBlocks)) ?
+                                            (firstQBlock + 1 - static_cast<int32_t>(task.localBlocks)) :
+                                            0;
+        const bool hasInit = task.initBlocks > 0U && blkBase < task.initBlocks;
+        if (!hasInit && (task.localBlocks == 0U || static_cast<int32_t>(blkBase + nBlocks) <= firstLocalStart)) {
+            return;
+        }
+        const uint32_t lastRowInReq = firstRowInReq + (rows - 1U);
+        const int32_t lastQBlock = QueryBlockForRow(task, lastRowInReq);
+        if (!hasInit && static_cast<int32_t>(blkBase) > lastQBlock) {
+            return;
+        }
+        const uint32_t firstVisibleEndBlk = VisibleEndBlkForRow(task, firstRowInReq);
+        const uint32_t lastVisibleEndBlk = VisibleEndBlkForRow(task, lastRowInReq);
+        const bool uniform = firstQBlock == lastQBlock && firstVisibleEndBlk == lastVisibleEndBlk;
+        if (uniform) {
+            ApplyRequestColumns(task, firstQBlock, firstVisibleEndBlk, blkBase, rows);
+            return;
+        }
+        for (uint32_t r = 0; r < rows; ++r) {
+            const uint32_t rowInReq = firstRowInReq + r;
+            const int32_t qBlock = QueryBlockForRow(task, rowInReq);
+            const uint32_t visibleEndBlk = VisibleEndBlkForRow(task, rowInReq);
+            const int32_t localStart = (qBlock + 1 > static_cast<int32_t>(task.localBlocks)) ?
+                                           (qBlock + 1 - static_cast<int32_t>(task.localBlocks)) :
+                                           0;
+            uint64_t initBits = 0;
+            uint64_t localBits = 0;
+            for (uint32_t j = 0; j < nBlocks; ++j) {
+                const int32_t blk = static_cast<int32_t>(blkBase + j);
+                if (blk < 0 || blk >= static_cast<int32_t>(visibleEndBlk)) {
+                    continue;
+                }
+                if (static_cast<uint32_t>(blk) < task.initBlocks) {
+                    initBits |= (1ULL << j);
+                }
+                if (blk >= localStart && blk <= qBlock) {
+                    localBits |= (1ULL << j);
+                }
+            }
+            initBits &= ~localBits;
+            if (initBits != 0) {
+                uint64_t mask[MSA_VEC_MASK_WORDS] = {initBits, 0};
+                AscendC::Duplicate<float>(ubRowMax_[r * nBlocks], MSA_LOCAL_SCORE_INIT, mask, 1, 1,
+                                          MSA_FP32_PER_REPEAT / MSA_FP32_PER_BLOCK);
+                AscendC::PipeBarrier<PIPE_V>();
+            }
+            if (localBits != 0) {
+                uint64_t mask[MSA_VEC_MASK_WORDS] = {localBits, 0};
+                AscendC::Duplicate<float>(ubRowMax_[r * nBlocks], MSA_LOCAL_SCORE_LOCAL, mask, 1, 1,
+                                          MSA_FP32_PER_REPEAT / MSA_FP32_PER_BLOCK);
+                AscendC::PipeBarrier<PIPE_V>();
+            }
+        }
+    }
+
+    __aicore__ inline void ApplyRequestColumns(const MsaTask& task, int32_t qBlock, uint32_t visibleEndBlk,
+                                               uint32_t blkBase, uint32_t rows)
+    {
+        constexpr uint32_t nBlocks = MSA_BLOCKS_PER_STILE;
+        const int32_t localStart = (qBlock + 1 > static_cast<int32_t>(task.localBlocks)) ?
+                                       (qBlock + 1 - static_cast<int32_t>(task.localBlocks)) :
+                                       0;
+        uint64_t initBits = 0;
+        uint64_t localBits = 0;
+        for (uint32_t j = 0; j < nBlocks; ++j) {
+            const int32_t blk = static_cast<int32_t>(blkBase + j);
+            if (blk < 0 || blk >= static_cast<int32_t>(visibleEndBlk)) {
+                continue;
+            }
+            if (static_cast<uint32_t>(blk) < task.initBlocks) {
+                initBits |= (1ULL << j);
+            }
+            if (blk >= localStart && blk <= qBlock) {
+                localBits |= (1ULL << j);
+            }
+        }
+        initBits &= ~localBits;
+        const uint8_t repeats = static_cast<uint8_t>((rows * nBlocks + MSA_FP32_PER_REPEAT - 1) / MSA_FP32_PER_REPEAT);
+        if (initBits != 0) {
+            uint64_t bits = 0;
+            for (uint32_t g = 0; g < MSA_FP32_PER_REPEAT / nBlocks; ++g) {
+                bits |= (initBits << (g * nBlocks));
+            }
+            uint64_t mask[MSA_VEC_MASK_WORDS] = {bits, 0};
+            AscendC::Duplicate<float>(ubRowMax_, MSA_LOCAL_SCORE_INIT, mask, repeats, 1,
+                                      MSA_FP32_PER_REPEAT / MSA_FP32_PER_BLOCK);
+            AscendC::PipeBarrier<PIPE_V>();
+        }
+        if (localBits != 0) {
+            uint64_t bits = 0;
+            for (uint32_t g = 0; g < MSA_FP32_PER_REPEAT / nBlocks; ++g) {
+                bits |= (localBits << (g * nBlocks));
             }
             uint64_t mask[MSA_VEC_MASK_WORDS] = {bits, 0};
             AscendC::Duplicate<float>(ubRowMax_, MSA_LOCAL_SCORE_LOCAL, mask, repeats, 1,
@@ -807,6 +955,7 @@ private:
     uint32_t writeLo_ = 0;
     uint32_t writeHi_ = 0;
     bool stageOn_ = false;
+    bool needTokenLocalMask_ = false;
 
     uint32_t numQHeads_ = 1;
     uint32_t strideOutHead_ = 0;

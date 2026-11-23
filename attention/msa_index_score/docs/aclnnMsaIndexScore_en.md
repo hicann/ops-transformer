@@ -55,7 +55,7 @@
     2. Apply $atten\_mask$ according to `sparse_mode`: `sparse_mode=0` does not truncate causally, and `sparse_mode=3` masks invisible positions with rightDownCausal.
     3. Maxpool over each sparse block of length $block\_size$ to obtain the per-block importance score.
     4. Generate $local\_mask$ from `start_loc`, `init_blocks`, and `local_blocks`, write high scores to blocks that must be kept, and produce `score`.
-    5. When `returnChoice` is 1 or 2, continue with TopK. Higher scores are selected first; equal scores keep the smaller column index. Prefix column indices are written in ascending order, and indices from the tail segment follow them. The tail is the remainder of the valid column count modulo 1024. Slots past the valid count are -1. TopK is supported on Ascend 950PR&950DT products with `pool_block_size=128` only.
+    5. When `returnChoice` is 1 or 2, continue with TopK. Higher scores are selected first; equal scores keep the smaller column index. Prefix column indices are written in ascending order, and indices from the tail segment follow them. The tail is the remainder of the valid column count modulo 1024. Slots past the valid count are -1. TopK requires `pool_block_size=128`. Ascend 950PR&950DT supports fp16, bf16, fp8 and MXFP4. Atlas A2/A3 supports fp16 and bf16 only.
 
 - **Parameters**:
 
@@ -138,7 +138,7 @@ aclnnStatus aclnnMsaIndexScore(
       <td>TND [T2, N2, D], BSND [B, S2, N2, D], BNSD [B, N2, S2, D], BBND, and BNBD. Query stays TND. BSND / BNSD do not pass blockTableOptional. A PageAttention key may be non-contiguous on dim0 (physical page). Non-leading axes with size greater than 1 must be contiguous; otherwise tiling rejects the input. TND / BSND / BNSD must be contiguous.</td>
       <td>Same dtype as query</td>
       <td>ND</td>
-      <td>3 ([T2, N2, D]) or 4 ([B, S2, N2, D], [B, N2, S2, D], [block_num, N2, block_size, D], [block_num, block_size, N2, D])</td>
+      <td>3 ([T2, N2, D]) or 4 ([B, S2, N2, D], [B, N2, S2, D], [block_num, block_size, N2, D], [block_num, N2, block_size, D])</td>
     </tr>
     <tr>
       <td>startLoc</td>
@@ -408,7 +408,7 @@ aclnnStatus aclnnMsaIndexScore(
     - 3 is rightDownCausal. `attenMaskOptional` is required, with shape $[2048, 2048]$. A value of 1 means the position is excluded. A value of 0 means it is included.
 - `initBlocks` and `localBlocks` must be $\ge 0$ and must not exceed the number of logical blocks (the second dimension of `blockTableOptional` for PageAttention; the aligned last dimension of score for TND). When both are 0, $local\_mask$ is skipped.
 - `q_len` / `kv_len` may be 0. The score of an empty KV request is $-inf$.
-- `returnChoice` defaults to 0 and keeps the score-only behavior. 1 writes `sparseIndicesOptional` only. 2 also writes `sparseValuesOptional`. `topk` defaults to 16 and must be in [1, 128]. This is supported on Ascend 950PR&950DT products with `pool_block_size=128` only.
+- `returnChoice` defaults to 0 and keeps the score-only behavior. 1 writes `sparseIndicesOptional` only. 2 also writes `sparseValuesOptional`. `topk` defaults to 16 and must be in [1, 128]. TopK requires `pool_block_size=128`. Ascend 950PR&950DT supports fp16, bf16, fp8 and MXFP4. Atlas A2/A3 supports fp16 and bf16 only, with the score kept in GM workspace.
 - Deterministic computation: the same inputs produce the same output.
 
 ## Example

@@ -907,9 +907,6 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
     if (info.returnChoice == MSA_RETURN_SCORE) {
         info.topk = 0;
     } else {
-        OP_CHECK_IF(!info.isAscend950,
-                    OP_LOGE(context, "return_choice=%ld is only supported on Ascend 950.", returnChoice),
-                    return ge::GRAPH_FAILED);
         const int64_t* topkPtr = attrs->GetInt(MSA_ATTR_TOPK);
         const int64_t topkVal = (topkPtr == nullptr) ? static_cast<int64_t>(MSA_TOPK_DEFAULT) : *topkPtr;
         OP_CHECK_IF(topkVal < 1 || topkVal > static_cast<int64_t>(MSA_TOPK_MAX),
@@ -1786,6 +1783,13 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
     if (!logicalBlock16 && info.returnChoice != MSA_RETURN_SCORE) {
         if (info.isMxFp4) {
             tilingKey = MSA_TILING_KEY_MXFP4_TOPK;
+        } else if (!info.isAscend950) {
+            // A2/A3 没有 fp8，也没有 L0C→UB。只发 fp16/bf16 的独立 key，950 的 9/10 保持不变。
+            if (info.isQuant || (info.queryDtype != ge::DT_BF16 && info.queryDtype != ge::DT_FLOAT16)) {
+                OP_LOGE(context, "return_choice=%u on A2/A3 supports fp16 and bf16 only.", info.returnChoice);
+                return ge::GRAPH_FAILED;
+            }
+            tilingKey = (info.queryDtype == ge::DT_BF16) ? MSA_TILING_KEY_BF16_TOPK_A2 : MSA_TILING_KEY_FP16_TOPK_A2;
         } else if (info.queryDtype == ge::DT_BF16) {
             tilingKey = MSA_TILING_KEY_BF16_TOPK;
         } else if (info.queryDtype == ge::DT_FLOAT16) {

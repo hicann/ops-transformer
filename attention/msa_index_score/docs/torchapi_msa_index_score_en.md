@@ -25,7 +25,7 @@
 
 ## Function
 
-- **Description**: Wraps `aclnnMsaIndexScore`. Query stays TND. `return_choice=0` returns score. `return_choice=1` returns `sparse_indices`. `return_choice=2` returns indices and values. TopK is supported on Ascend 950PR&950DT products with `pool_block_size=128`. Prefix column indices come first, in ascending order; tail-segment indices follow.
+- **Description**: Wraps `aclnnMsaIndexScore`. Query stays TND. `return_choice=0` returns score. `return_choice=1` returns `sparse_indices`. `return_choice=2` returns indices and values. TopK requires `pool_block_size=128`. Ascend 950PR&950DT supports fp16, bf16, fp8 and MXFP4. Atlas A2/A3 supports fp16 and bf16 only. Prefix column indices come first, in ascending order; tail-segment indices follow.
 - **Formula**:
 
 $$

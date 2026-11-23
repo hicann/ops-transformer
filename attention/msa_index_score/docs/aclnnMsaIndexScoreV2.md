@@ -136,7 +136,7 @@ aclnnStatus aclnnMsaIndexScoreV2(
       <td>必选，禁止传入nullptr。布局由layoutKeyOptional指定。非分页须连续，分页仅允许物理页轴非连续。</td>
       <td>与 query 同型</td>
       <td>ND</td>
-      <td>3（[T2, N2, D]）或4（[B, S2, N2, D]、[B, N2, S2, D]、[block_num, N2, block_size, D]、[block_num, block_size, N2, D]）</td>
+      <td>3（[T2, N2, D]）或4（[B, S2, N2, D]、[B, N2, S2, D]、[block_num, block_size, N2, D]、[block_num, N2, block_size, D]）</td>
       <td>仅支持首轴非连续</td>
     </tr>
     <tr>

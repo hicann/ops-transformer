@@ -50,7 +50,7 @@ $$
   2. 按`sparse_mode`叠加$atten\_mask$：`sparse_mode=0`不做因果截断，`sparse_mode=3`按rightDownCausal屏蔽不可见位置。
   3. 在每个长度为$block\_size$的sparse block上做Maxpool，得到逐block的重要性分数。
   4. 用`start_loc`、`init_blocks`、`local_blocks`生成$local\_mask$，对强制保留的block写入高分，得到输出`score`。
-  5. `return_choice`为1或2时做TopK。前缀列号从小到大写出，尾块列号接在后面。尾块是有效列数按1024取余。不足k的索引为-1，值为`-inf`。仅Ascend 950PR&950DT系列产品，设置`pool_block_size=128`时支持输出TopK后的结果。
+  5. `return_choice`为1或2时做TopK。前缀列号从小到大写出，尾块列号接在后面。尾块是有效列数按1024取余。不足k的索引为-1，值为`-inf`。`pool_block_size=128`时支持输出TopK：Ascend 950PR&950DT系列产品支持fp16、bf16、fp8与MXFP4；Atlas A2/A3系列产品只支持fp16和bf16。
 
 ## 函数原型
 
@@ -220,7 +220,7 @@ cann_ops_transformer.msa_index_score(
 
 - query固定TND，逻辑块长128。BSND / BNSD的$S2$是定长槽，`actual_seq_klen[b+1] - actual_seq_klen[b]`不超过$S2$，且不传`block_table`。
 - `q_len` / `kv_len`允许为0。空KV的score为`-inf`。
-- `return_choice`默认0，返回score。为1时返回`sparse_indices`，为2时返回`(sparse_indices, sparse_values)`。`topk`默认16，范围1到128。仅Ascend 950PR&950DT系列产品，设置`pool_block_size=128`时支持输出TopK后的结果。
+- `return_choice`默认0，返回score。为1时返回`sparse_indices`，为2时返回`(sparse_indices, sparse_values)`。`topk`默认16，范围1到128。`pool_block_size=128`时支持输出TopK。Ascend 950PR&950DT系列产品支持fp16、bf16、fp8与MXFP4；Atlas A2/A3系列产品只支持fp16和bf16。
 
 ## 确定性计算
 
