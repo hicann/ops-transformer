@@ -225,16 +225,22 @@ function(op_add_subdirectory OP_LIST OP_DIR_LIST)
         message(STATUS "Build experimental module")
         file(GLOB OP_HOST_CMAKE_FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/experimental/ffn/**/op_host/CMakeLists.txt"
+        "${CMAKE_CURRENT_SOURCE_DIR}/experimental/ffn/**/op_dsl/CMakeLists.txt"
         "${CMAKE_CURRENT_SOURCE_DIR}/experimental/gmm/**/op_host/CMakeLists.txt"
+        "${CMAKE_CURRENT_SOURCE_DIR}/experimental/gmm/**/op_dsl/CMakeLists.txt"
         "${CMAKE_CURRENT_SOURCE_DIR}/experimental/mhc/**/op_host/CMakeLists.txt"
+        "${CMAKE_CURRENT_SOURCE_DIR}/experimental/mhc/**/op_dsl/CMakeLists.txt"
         "${CMAKE_CURRENT_SOURCE_DIR}/experimental/moe/**/op_host/CMakeLists.txt"
+        "${CMAKE_CURRENT_SOURCE_DIR}/experimental/moe/**/op_dsl/CMakeLists.txt"
         "${CMAKE_CURRENT_SOURCE_DIR}/experimental/posembedding/**/op_host/CMakeLists.txt"
+        "${CMAKE_CURRENT_SOURCE_DIR}/experimental/posembedding/**/op_dsl/CMakeLists.txt"
         )
         if(NOT (ASCEND_COMPUTE_UNIT STREQUAL "kirinx90" OR
                 ASCEND_COMPUTE_UNIT STREQUAL "kirin9030" OR
                 ASCEND_COMPUTE_UNIT STREQUAL "mc62"))
             file(GLOB MC2_OP_HOST_CMAKE_FILES
             "${CMAKE_CURRENT_SOURCE_DIR}/experimental/mc2/**/op_host/CMakeLists.txt"
+            "${CMAKE_CURRENT_SOURCE_DIR}/experimental/mc2/**/op_dsl/CMakeLists.txt"
             )
             List(APPEND OP_HOST_CMAKE_FILES ${MC2_OP_HOST_CMAKE_FILES})
         endif()
@@ -244,6 +250,7 @@ function(op_add_subdirectory OP_LIST OP_DIR_LIST)
         if(ADD_GMM)
             file(GLOB GMM_OP_HOST_CMAKE_FILES
             "${CMAKE_CURRENT_SOURCE_DIR}/gmm/**/op_host/CMakeLists.txt"
+            "${CMAKE_CURRENT_SOURCE_DIR}/gmm/**/op_dsl/CMakeLists.txt"
             "${CMAKE_CURRENT_SOURCE_DIR}/gmm/**/CMakeLists.txt"
             )
             list(APPEND OP_HOST_CMAKE_FILES ${GMM_OP_HOST_CMAKE_FILES})
@@ -251,6 +258,7 @@ function(op_add_subdirectory OP_LIST OP_DIR_LIST)
         if(BUILD_OPEN_PROJECT AND (NOT BUILD_OPS_RTY_KERNEL))
             file(GLOB POSEMBEDDING_CANNDEV_OPS_HOST_CMAKE_FILES
                 "${CMAKE_CURRENT_SOURCE_DIR}/posembedding/**/op_host/CMakeLists.txt"
+                "${CMAKE_CURRENT_SOURCE_DIR}/posembedding/**/op_dsl/CMakeLists.txt"
                 "${CMAKE_CURRENT_SOURCE_DIR}/posembedding/**/framework/CMakeLists.txt"
             )
             should_add_module("posembedding" ADD_CANNDEV_POSEMBEDDING)
@@ -259,6 +267,7 @@ function(op_add_subdirectory OP_LIST OP_DIR_LIST)
             endif()
             file(GLOB MOE_CANNDEV_OPS_HOST_CMAKE_FILES
                 "${CMAKE_CURRENT_SOURCE_DIR}/moe/**/op_host/CMakeLists.txt"
+                "${CMAKE_CURRENT_SOURCE_DIR}/moe/**/op_dsl/CMakeLists.txt"
                 "${CMAKE_CURRENT_SOURCE_DIR}/moe/**/framework/CMakeLists.txt"
             )
             should_add_module("moe" ADD_CANNDEV_MOE)
@@ -267,6 +276,7 @@ function(op_add_subdirectory OP_LIST OP_DIR_LIST)
             endif()
             file(GLOB FFN_CANNDEV_OPS_HOST_CMAKE_FILES
                 "${CMAKE_CURRENT_SOURCE_DIR}/ffn/**/op_host/CMakeLists.txt"
+                "${CMAKE_CURRENT_SOURCE_DIR}/ffn/**/op_dsl/CMakeLists.txt"
                 "${CMAKE_CURRENT_SOURCE_DIR}/ffn/**/framework/CMakeLists.txt"
             )
             should_add_module("ffn" ADD_CANNDEV_FFN)
@@ -279,9 +289,10 @@ function(op_add_subdirectory OP_LIST OP_DIR_LIST)
                 ASCEND_COMPUTE_UNIT STREQUAL "ascend5162"))
                 file(GLOB MC2_CANNDEV_OPS_HOST_CMAKE_FILES
                 "${CMAKE_CURRENT_SOURCE_DIR}/mc2/**/op_host/CMakeLists.txt"
-                "${CMAKE_CURRENT_SOURCE_DIR}/mc2/**/framework/CMakeLists.txt"
                 "${CMAKE_CURRENT_SOURCE_DIR}/mc2/**/op_dsl/CMakeLists.txt"
+                "${CMAKE_CURRENT_SOURCE_DIR}/mc2/**/framework/CMakeLists.txt"
                 "${CMAKE_CURRENT_SOURCE_DIR}/mc2/tools/**/op_host/CMakeLists.txt"
+                "${CMAKE_CURRENT_SOURCE_DIR}/mc2/tools/**/op_dsl/CMakeLists.txt"
                 "${CMAKE_CURRENT_SOURCE_DIR}/mc2/tools/**/framework/CMakeLists.txt"
                 )
                 should_add_module("mc2" ADD_CANNDEV_MC2)
@@ -290,6 +301,7 @@ function(op_add_subdirectory OP_LIST OP_DIR_LIST)
                 endif()
                 file(GLOB ENGRAM_CANNDEV_OPS_HOST_CMAKE_FILES
                 "${CMAKE_CURRENT_SOURCE_DIR}/engram/**/op_host/CMakeLists.txt"
+                "${CMAKE_CURRENT_SOURCE_DIR}/engram/**/op_dsl/CMakeLists.txt"
                 "${CMAKE_CURRENT_SOURCE_DIR}/engram/**/framework/CMakeLists.txt"
                 )
             should_add_module("engram" ADD_CANNDEV_ENGRAM)
@@ -303,16 +315,9 @@ function(op_add_subdirectory OP_LIST OP_DIR_LIST)
     endif()
 
     foreach(OP_CMAKE_FILE ${OP_HOST_CMAKE_FILES})
-        if ("${OP_CMAKE_FILE}" MATCHES "op_host")
-            get_filename_component(OP_HOST_DIR "${OP_CMAKE_FILE}" DIRECTORY)
-            get_filename_component(OP_DIR "${OP_HOST_DIR}" DIRECTORY)
-        elseif ("${OP_CMAKE_FILE}" MATCHES "/op_dsl/CMakeLists.txt$")
-            # DSL-only operators carry no op_host tree; op_dsl/ belongs to the
-            # operator directory one level up (e.g. mc2/moonep/op_dsl).
-            get_filename_component(OP_DSL_DIR "${OP_CMAKE_FILE}" DIRECTORY)
-            get_filename_component(OP_DIR "${OP_DSL_DIR}" DIRECTORY)
-        else()
-            get_filename_component(OP_DIR "${OP_CMAKE_FILE}" DIRECTORY)
+        get_filename_component(OP_DIR "${OP_CMAKE_FILE}" DIRECTORY)
+        if ("${OP_CMAKE_FILE}" MATCHES "/op_(host|dsl)/CMakeLists[.]txt$")
+            get_filename_component(OP_DIR "${OP_DIR}" DIRECTORY)
         endif()
         get_filename_component(OP_NAME "${OP_DIR}" NAME)
 
@@ -388,7 +393,9 @@ function(op_add_depend_directory)
  	            else()
  	                set(depend_info_update ${depend_info})
  	            endif()
- 	            if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${depend_info_update}/op_host/CMakeLists.txt AND NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/${depend_info_update}/CMakeLists.txt)
+                if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${depend_info_update}/op_host/CMakeLists.txt
+                    AND NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${depend_info_update}/op_dsl/CMakeLists.txt
+                    AND NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/${depend_info_update}/CMakeLists.txt)
                     continue()
                 endif ()
 

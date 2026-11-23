@@ -290,8 +290,9 @@ foreach (OP_DIR ${OP_DIR_LIST})
         if(EXISTS "${OP_DIR}/op_kernel_aicpu/CMakeLists.txt")
             add_subdirectory(${OP_DIR}/op_kernel_aicpu)
         endif()
-    elseif(EXISTS "${OP_DIR}/op_dsl/CMakeLists.txt")
-        # DSL-only operator (CANNBotDSL Native/ACLNN publication, no ASC host tree).
+    elseif(NOT EXISTS "${OP_DIR}/CMakeLists.txt"
+           AND EXISTS "${OP_DIR}/op_dsl/CMakeLists.txt")
+        # Load standalone CANNBotDSL operators without a root build entry.
         add_subdirectory(${OP_DIR}/op_dsl)
     else()
         add_subdirectory(${OP_DIR})
@@ -381,6 +382,9 @@ foreach (OP_DEPEND_DIR ${OP_DEPEND_DIR_LIST})
         list(APPEND ASCEND_OP_NAME ${SUB_DIR})
         if (EXISTS "${OP_DEPEND_DIR}/op_host")
             add_subdirectory(${OP_DEPEND_DIR}/op_host)
+        elseif(NOT EXISTS "${OP_DEPEND_DIR}/CMakeLists.txt"
+               AND EXISTS "${OP_DEPEND_DIR}/op_dsl/CMakeLists.txt")
+            add_subdirectory(${OP_DEPEND_DIR}/op_dsl)
         else()
             add_subdirectory(${OP_DEPEND_DIR})
         endif()

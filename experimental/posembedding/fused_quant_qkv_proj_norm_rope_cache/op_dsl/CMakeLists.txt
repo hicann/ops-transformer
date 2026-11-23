@@ -9,7 +9,7 @@
 # -----------------------------------------------------------------------------------------------------------
 include_guard(GLOBAL)
 
-# Keep the explicit operator root when this file is included from op_host.
+# Register the operator root from the standalone DSL build entry.
 add_op_to_compiled_list(OP_DIR "${CMAKE_CURRENT_LIST_DIR}/..")
 
 if(BUILD_OPEN_PROJECT)
