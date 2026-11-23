@@ -85,7 +85,8 @@ TEST(TextGatedResidualTiling, A1B4ExactDomainAndOptionalInputs)
                     TilingInfo info;
                     ASSERT_TRUE(
                         RunSmallModelRouting(m, 320, 4, 2560, false, 28, "Ascend950", dtype, gate, gamma, info));
-                    EXPECT_EQ(info.tilingKey, 4);
+                    const uint32_t expectedKey = m <= 16 ? 14u : (m <= 64 ? 4u : (m == 128 ? 6u : 7u));
+                    EXPECT_EQ(info.tilingKey, expectedKey);
                     EXPECT_EQ(info.blockNum, 28);
                     EXPECT_EQ(info.tilingDataSize, 128);
                 }
@@ -94,7 +95,7 @@ TEST(TextGatedResidualTiling, A1B4ExactDomainAndOptionalInputs)
     }
 }
 
-TEST(TextGatedResidualTiling, A1B4FallbackPreservesExistingKeys)
+TEST(TextGatedResidualTiling, A1B4RoutingAndFallback)
 {
     auto fallback = [](int64_t m, int64_t r, int64_t c, int64_t h, bool backward, uint64_t cores,
                        const std::string& soc, int64_t expectedKey = 3) {
@@ -102,19 +103,22 @@ TEST(TextGatedResidualTiling, A1B4FallbackPreservesExistingKeys)
         ASSERT_TRUE(RunSmallModelRouting(m, r, c, h, backward, cores, soc, ge::DT_BF16, true, true, info));
         EXPECT_EQ(info.tilingKey, expectedKey);
     };
-    for (int64_t m : {0, 2, 127, 129, 255, 257, 512})
-        fallback(m, 320, 4, 2560, false, 28, "Ascend950");
+    fallback(0, 320, 4, 2560, false, 28, "Ascend950");
+    fallback(2, 320, 4, 2560, false, 28, "Ascend950", 14);
+    fallback(127, 320, 4, 2560, false, 28, "Ascend950", 6);
+    for (int64_t m : {129, 255, 257, 512})
+        fallback(m, 320, 4, 2560, false, 28, "Ascend950", 7);
     for (int64_t r : {256, 384})
         fallback(16, r, 4, 2560, false, 28, "Ascend950");
     for (int64_t c : {2, 8})
         fallback(16, 320, c, 2560, false, 28, "Ascend950");
     for (int64_t h : {2048, 4096})
         fallback(16, 320, 4, h, false, 28, "Ascend950");
-    fallback(16, 320, 4, 2560, true, 28, "Ascend950");
+    fallback(16, 320, 4, 2560, true, 28, "Ascend950", 21);
     for (uint64_t cores : {20u, 24u, 32u})
-        fallback(16, 320, 4, 2560, false, cores, "Ascend950");
-    fallback(1024, 320, 4, 2560, false, 28, "Ascend950", 1);
-    fallback(10240, 320, 4, 2560, false, 28, "Ascend950", 0);
+        fallback(16, 320, 4, 2560, false, cores, "Ascend950", 14);
+    fallback(1024, 320, 4, 2560, false, 28, "Ascend950", 3);
+    fallback(10240, 320, 4, 2560, false, 28, "Ascend950", 8);
     TilingInfo unsupported;
     EXPECT_FALSE(RunSmallModelRouting(16, 320, 4, 2560, false, 28, "Ascend950", ge::DT_FLOAT, true, true, unsupported));
 }
@@ -128,7 +132,8 @@ TEST(TextGatedResidualTiling, A2FullBSplitKeysExactMetadataAndWorkspace)
                     TilingInfo info;
                     ASSERT_TRUE(
                         RunSmallModelRouting(m, 320, 4, 2560, false, 20, "Ascend910B", dtype, gate, gamma, info));
-                    EXPECT_EQ(info.tilingKey, m == 256 ? 7u : (m == 128 ? 6u : 5u));
+                    const uint32_t expectedKey = m <= 16 ? 14u : (m <= 64 ? 4u : (m == 128 ? 6u : 7u));
+                    EXPECT_EQ(info.tilingKey, expectedKey);
                     EXPECT_EQ(info.blockNum, 20);
                     ASSERT_EQ(info.tilingDataSize, sizeof(HcForwardMulSumTilingData));
                     HcForwardMulSumTilingData t{};
@@ -155,11 +160,11 @@ TEST(TextGatedResidualTiling, A2FullBSplitKeysExactMetadataAndWorkspace)
         ASSERT_TRUE(
             RunSmallModelRouting(128, 320, 4, 2560, false, physicalCores, "Ascend910B", ge::DT_BF16, true, true, info));
         EXPECT_EQ(info.tilingKey, 6);
-        EXPECT_EQ(info.blockNum, 20);
+        EXPECT_EQ(info.blockNum, physicalCores);
     }
 }
 
-TEST(TextGatedResidualTiling, A2FullBFallbackExactKeys)
+TEST(TextGatedResidualTiling, A2FullBRoutingAndFallback)
 {
     auto fallback = [](int64_t m, int64_t r, int64_t c, int64_t h, bool backward, uint64_t cores,
                        int64_t expectedKey = 3) {
@@ -168,14 +173,20 @@ TEST(TextGatedResidualTiling, A2FullBFallbackExactKeys)
         EXPECT_EQ(info.tilingKey, expectedKey);
     };
     fallback(0, 320, 4, 2560, false, 20, 0);
-    for (int64_t m : {2, 127, 129, 255, 257, 512})
-        fallback(m, 320, 4, 2560, false, 20);
+    fallback(2, 320, 4, 2560, false, 20, 14);
+    fallback(127, 320, 4, 2560, false, 20, 6);
+    for (int64_t m : {129, 255, 257, 384})
+        fallback(m, 320, 4, 2560, false, 20, 7);
+    for (int64_t m : {385, 512, 8192})
+        fallback(m, 320, 4, 2560, false, 20, 3);
+    fallback(8193, 320, 4, 2560, false, 20, 9);
     fallback(16, 256, 4, 2560, false, 20);
     fallback(16, 320, 2, 2560, false, 20);
     fallback(16, 320, 4, 2048, false, 20);
-    fallback(16, 320, 4, 2560, true, 20);
-    fallback(16, 320, 4, 2560, false, 19);
+    fallback(16, 320, 4, 2560, true, 20, 21);
+    fallback(16, 320, 4, 2560, false, 19, 14);
+    fallback(16, 320, 4, 2560, false, 15, 3);
     TilingInfo a5OtherCore;
     ASSERT_TRUE(RunSmallModelRouting(16, 320, 4, 2560, false, 20, "Ascend950", ge::DT_BF16, true, true, a5OtherCore));
-    EXPECT_EQ(a5OtherCore.tilingKey, 3);
+    EXPECT_EQ(a5OtherCore.tilingKey, 14);
 }

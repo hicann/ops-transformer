@@ -12,6 +12,7 @@
  * \file block_attention_residuals_tiling.cpp
  * \brief BlockAttentionResiduals host tiling — CanResidentAllBlocks → RESIDENT / RELOAD；无 FP32-v WS
  */
+#include <string>
 #include "block_attention_residuals_tiling.h"
 
 #include <algorithm>
@@ -98,18 +99,18 @@ ge::graphStatus BlockAttentionResidualsTiling::GetPlatformInfo()
 
 ge::graphStatus BlockAttentionResidualsTiling::GetShapeAttrsInfo()
 {
-    OP_CHECK_IF(CheckContext() != ge::GRAPH_SUCCESS, OP_LOGE(inputParams_.opName, "Invalid context."),
+    OP_CHECK_IF(CheckContext() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(inputParams_.opName, "Invalid context."),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(AnalyzeDtype() != ge::GRAPH_SUCCESS, OP_LOGE(inputParams_.opName, "Invalid dtypes."),
+    OP_CHECK_IF(AnalyzeDtype() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(inputParams_.opName, "Invalid dtypes."),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(AnalyzeShapes() != ge::GRAPH_SUCCESS, OP_LOGE(inputParams_.opName, "Invalid shapes."),
+    OP_CHECK_IF(AnalyzeShapes() != ge::GRAPH_SUCCESS, OP_LOGE_WITHOUT_REPORT(inputParams_.opName, "Invalid shapes."),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(GetValidBlockNum() != ge::GRAPH_SUCCESS, OP_LOGE(inputParams_.opName, "Invalid valid_block_num attr."),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(GetNormEps() != ge::GRAPH_SUCCESS, OP_LOGE(inputParams_.opName, "Invalid norm_eps attr."),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(GetNeedBackward() != ge::GRAPH_SUCCESS, OP_LOGE(inputParams_.opName, "Invalid need_backward attr."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(GetValidBlockNum() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(inputParams_.opName, "Invalid valid_block_num attr."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(GetNormEps() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(inputParams_.opName, "Invalid norm_eps attr."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(GetNeedBackward() != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(inputParams_.opName, "Invalid need_backward attr."), return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -349,15 +350,29 @@ ge::graphStatus BlockAttentionResidualsTiling::AnalyzeDtype()
         return dt == ge::DT_BF16 || dt == ge::DT_FLOAT16 || dt == ge::DT_FLOAT;
     };
     OP_CHECK_IF(!dtypeOk(partialBlockDtype),
-                OP_LOGE(context_->GetNodeName(), "partial_block dtype must be BF16/FP16/FP32"),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "partial_block",
+                                                      std::to_string(static_cast<int>(partialBlockDtype)).c_str(),
+                                                      "expected BF16, FP16 or FP32"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(!dtypeOk(blockDtype), OP_LOGE(context_->GetNodeName(), "block_res dtype must be BF16/FP16/FP32"),
+    OP_CHECK_IF(!dtypeOk(blockDtype),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "block_res",
+                                                      std::to_string(static_cast<int>(blockDtype)).c_str(),
+                                                      "expected BF16, FP16 or FP32"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(!dtypeOk(projDtype), OP_LOGE(context_->GetNodeName(), "proj_weight dtype must be BF16/FP16/FP32"),
+    OP_CHECK_IF(!dtypeOk(projDtype),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "proj_weight",
+                                                      std::to_string(static_cast<int>(projDtype)).c_str(),
+                                                      "expected BF16, FP16 or FP32"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(!dtypeOk(normDtype), OP_LOGE(context_->GetNodeName(), "norm_weight dtype must be BF16/FP16/FP32"),
+    OP_CHECK_IF(!dtypeOk(normDtype),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "norm_weight",
+                                                      std::to_string(static_cast<int>(normDtype)).c_str(),
+                                                      "expected BF16, FP16 or FP32"),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(!dtypeOk(outDtype), OP_LOGE(context_->GetNodeName(), "hidden_states dtype must be BF16/FP16/FP32"),
+    OP_CHECK_IF(!dtypeOk(outDtype),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "hidden_states",
+                                                      std::to_string(static_cast<int>(outDtype)).c_str(),
+                                                      "expected BF16, FP16 or FP32"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(partialBlockDtype != blockDtype || partialBlockDtype != projDtype || partialBlockDtype != normDtype ||
                     partialBlockDtype != outDtype,
@@ -386,10 +401,14 @@ ge::graphStatus BlockAttentionResidualsTiling::AnalyzeShapes()
     const auto& normShape = context_->GetInputShape(NORM_WEIGHT_INDEX)->GetOriginShape();
 
     OP_CHECK_IF(partialBlockShape.GetDimNum() != PARTIAL_BLOCK_DIM,
-                OP_LOGE(context_->GetNodeName(), "partial_block dim num must be %zu", PARTIAL_BLOCK_DIM),
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "partial_block",
+                                             std::to_string(partialBlockShape.GetDimNum()).c_str(),
+                                             std::to_string(PARTIAL_BLOCK_DIM).c_str()),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(blockShape.GetDimNum() != BLOCK_RES_DIM,
-                OP_LOGE(context_->GetNodeName(), "block_res dim num must be %zu", BLOCK_RES_DIM),
+                OP_LOGE_FOR_INVALID_SHAPEDIM(context_->GetNodeName(), "block_res",
+                                             std::to_string(blockShape.GetDimNum()).c_str(),
+                                             std::to_string(BLOCK_RES_DIM).c_str()),
                 return ge::GRAPH_FAILED);
 
     const int64_t numTokens = partialBlockShape.GetDim(0);
@@ -404,18 +423,28 @@ ge::graphStatus BlockAttentionResidualsTiling::AnalyzeShapes()
     tilingData_.numBlocks = numBlocks;
 
     OP_CHECK_IF(blockShape.GetDim(0) != tilingData_.numTokens,
-                OP_LOGE(context_->GetNodeName(), "T mismatch between partial_block and block_res"),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "block_res",
+                                                      Ops::Base::ToString(blockShape).c_str(),
+                                                      "dim 0 must match partial_block dim 0"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(blockShape.GetDim(2) != tilingData_.hiddenSize,
-                OP_LOGE(context_->GetNodeName(), "H mismatch between partial_block and block_res"),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "block_res",
+                                                      Ops::Base::ToString(blockShape).c_str(),
+                                                      "dim 2 must match partial_block dim 1"),
                 return ge::GRAPH_FAILED);
     const bool projShapeOk =
         (projShape.GetDimNum() == 1 && projShape.GetDim(0) == hiddenSize) ||
         (projShape.GetDimNum() == 2 && projShape.GetDim(0) == 1 && projShape.GetDim(1) == hiddenSize);
-    OP_CHECK_IF(!projShapeOk, OP_LOGE(context_->GetNodeName(), "proj_weight shape must be [H] or [1,H]"),
+    OP_CHECK_IF(!projShapeOk,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "proj_weight",
+                                                      Ops::Base::ToString(projShape).c_str(),
+                                                      "expected [H] or [1,H], where H is partial_block dim 1"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(normShape.GetDimNum() != 1 || normShape.GetDim(0) != tilingData_.hiddenSize,
-                OP_LOGE(context_->GetNodeName(), "norm_weight shape must be [H]"), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), "norm_weight",
+                                                      Ops::Base::ToString(normShape).c_str(),
+                                                      "expected [H], where H is partial_block dim 1"),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -429,11 +458,11 @@ ge::graphStatus BlockAttentionResidualsTiling::GetValidBlockNum()
     if (validBlockNum == -1) {
         validBlockNum = tilingData_.numBlocks;
     }
-    OP_CHECK_IF(
-        validBlockNum != tilingData_.numBlocks,
-        OP_LOGE(context_->GetNodeName(), "valid_block_num must be -1 (default, use N) or equal to N(%ld), got %ld",
-                tilingData_.numBlocks, inputValidBlockNum),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(validBlockNum != tilingData_.numBlocks,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context_->GetNodeName(), "valid_block_num", std::to_string(inputValidBlockNum).c_str(),
+                    ("must be -1 or equal to N (" + std::to_string(tilingData_.numBlocks) + ")").c_str()),
+                return ge::GRAPH_FAILED);
     tilingData_.validBlockNum = validBlockNum;
     return ge::GRAPH_SUCCESS;
 }
@@ -444,8 +473,11 @@ ge::graphStatus BlockAttentionResidualsTiling::GetNormEps()
     OP_CHECK_IF(attrs == nullptr, OP_LOGE(context_->GetNodeName(), "attrs is null"), return ge::GRAPH_FAILED);
     const float* normEpsPtr = attrs->GetAttrPointer<float>(ATTR_NORM_EPS_INDEX);
     tilingData_.normEps = (normEpsPtr != nullptr) ? *normEpsPtr : 1e-6F;
-    OP_CHECK_IF(tilingData_.normEps <= 0.0f, OP_LOGE(context_->GetNodeName(), "norm_eps must be > 0"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        tilingData_.normEps <= 0.0f,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "norm_eps",
+                                              std::to_string(tilingData_.normEps).c_str(), "must be greater than zero"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -469,8 +501,12 @@ ge::graphStatus BlockAttentionResidualsTiling::GetNeedBackward()
                 OP_LOGE(context_->GetNodeName(), "need_backward=true requires inv_norm and probs outputs"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(invNormDesc->GetDataType() != ge::DT_FLOAT,
-                OP_LOGE(context_->GetNodeName(), "inv_norm dtype must be FLOAT"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(probsDesc->GetDataType() != ge::DT_FLOAT, OP_LOGE(context_->GetNodeName(), "probs dtype must be FLOAT"),
+                OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "inv_norm",
+                                          std::to_string(static_cast<int>(invNormDesc->GetDataType())).c_str(), "FP32"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(probsDesc->GetDataType() != ge::DT_FLOAT,
+                OP_LOGE_FOR_INVALID_DTYPE(context_->GetNodeName(), "probs",
+                                          std::to_string(static_cast<int>(probsDesc->GetDataType())).c_str(), "FP32"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

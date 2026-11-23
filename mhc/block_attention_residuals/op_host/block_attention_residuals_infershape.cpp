@@ -12,6 +12,7 @@
  * \file block_attention_residuals_infershape.cpp
  * \brief BlockAttentionResiduals infer shape implementation
  */
+#include <string>
 #include "exe_graph/runtime/infer_shape_context.h"
 #include "exe_graph/runtime/shape.h"
 #include "register/op_impl_registry.h"
@@ -58,17 +59,20 @@ static ge::graphStatus InferShapeBlockAttentionResiduals(InferShapeContext* cont
     }
 
     OP_CHECK_IF(partialBlockShape->GetDimNum() != PARTIAL_BLOCK_DIM,
-                OP_LOGE(opName, "partial_block dim num should be %zu, got %zu", PARTIAL_BLOCK_DIM,
-                        partialBlockShape->GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    opName, "partial_block", std::to_string(partialBlockShape->GetDimNum()).c_str(), "rank must be 2"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(blockShape->GetDimNum() != BLOCK_RES_DIM,
-                OP_LOGE(opName, "block_res dim num should be %zu, got %zu", BLOCK_RES_DIM, blockShape->GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    opName, "block_res", std::to_string(blockShape->GetDimNum()).c_str(), "rank must be 3"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(projShape->GetDimNum() != WEIGHT_1D_DIM && projShape->GetDimNum() != WEIGHT_2D_DIM,
-                OP_LOGE(opName, "proj_weight dim num should be 1 or 2, got %zu", projShape->GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    opName, "proj_weight", std::to_string(projShape->GetDimNum()).c_str(), "rank must be 1 or 2"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(normShape->GetDimNum() != WEIGHT_1D_DIM,
-                OP_LOGE(opName, "norm_weight dim num should be %zu, got %zu", WEIGHT_1D_DIM, normShape->GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    opName, "norm_weight", std::to_string(normShape->GetDimNum()).c_str(), "rank must be 1"),
                 return ge::GRAPH_FAILED);
 
     const int64_t numTokens = partialBlockShape->GetDim(0);
@@ -80,12 +84,19 @@ static ge::graphStatus InferShapeBlockAttentionResiduals(InferShapeContext* cont
                 OP_LOGE(opName, "shape range requires T>=0, H>=1 and 1<=N<=%ld", MAX_NUM_BLOCKS),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(blockShape->GetDim(0) != numTokens || blockShape->GetDim(2) != hiddenSize,
-                OP_LOGE(opName, "block_res shape must be [T,N,H]"), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, "block_res", Ops::Base::ToString(*blockShape).c_str(),
+                                                      "expected [T,N,H], where T and H match partial_block"),
+                return ge::GRAPH_FAILED);
     const bool projShapeOk =
         (projShape->GetDimNum() == WEIGHT_1D_DIM && projShape->GetDim(0) == hiddenSize) ||
         (projShape->GetDimNum() == WEIGHT_2D_DIM && projShape->GetDim(0) == 1 && projShape->GetDim(1) == hiddenSize);
-    OP_CHECK_IF(!projShapeOk, OP_LOGE(opName, "proj_weight shape must be [H] or [1,H]"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(normShape->GetDim(0) != hiddenSize, OP_LOGE(opName, "norm_weight shape must be [H]"),
+    OP_CHECK_IF(!projShapeOk,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, "proj_weight", Ops::Base::ToString(*projShape).c_str(),
+                                                      "expected [H] or [1,H], where H is partial_block dim 1"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(normShape->GetDim(0) != hiddenSize,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName, "norm_weight", Ops::Base::ToString(*normShape).c_str(),
+                                                      "expected [H], where H is partial_block dim 1"),
                 return ge::GRAPH_FAILED);
 
     outShape->SetDimNum(PARTIAL_BLOCK_DIM);

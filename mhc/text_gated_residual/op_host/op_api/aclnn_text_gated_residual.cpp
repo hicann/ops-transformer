@@ -232,8 +232,11 @@ aclnnStatus aclnnTextGatedResidualGetWorkspaceSize(const aclTensor* x, const acl
 aclnnStatus aclnnTextGatedResidual(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnTextGatedResidual);
-    CHECK_COND(CommonOpExecutorRun(workspace, workspaceSize, executor, stream) == ACLNN_SUCCESS, ACLNN_ERR_INNER,
-               "TextGatedResidual launch failed.");
+    const auto status = CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
+    if (status != ACLNN_SUCCESS) {
+        OP_LOGE_WITHOUT_REPORT(ACLNN_ERR_INNER, "TextGatedResidual launch failed, status=%d.", status);
+        return ACLNN_ERR_INNER;
+    }
     return ACLNN_SUCCESS;
 }
 
