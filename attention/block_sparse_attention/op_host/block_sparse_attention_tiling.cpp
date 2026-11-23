@@ -900,6 +900,10 @@ ge::graphStatus BSATiling::ParseSparsePattern(gert::TilingContext* bsaContext)
             "blockSparseMask must be provided so that block sparse pattern can be parsed");
         return ge::GRAPH_FAILED;
     }
+    OP_CHECK_IF(blockSparseMaskTensor->GetDataType() != ge::DT_INT8,
+                OP_LOGE_FOR_INVALID_DTYPE(bsaContext->GetNodeName(), "blockSparseMask",
+                                          DataTypeToString(blockSparseMaskTensor->GetDataType()).c_str(), "INT8"),
+                return ge::GRAPH_FAILED);
     if (blockShapeTensor != nullptr) {
         uint32_t blockShapeElemNum = static_cast<uint32_t>(blockShapeTensor->GetShapeSize());
         if (blockShapeElemNum != 2) {
