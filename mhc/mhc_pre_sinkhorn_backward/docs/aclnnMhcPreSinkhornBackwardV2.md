@@ -26,12 +26,12 @@
 - **接口功能**：aclnnMhcPreSinkhornBackwardV2是[aclnnMhcPreSinkhornV2](../../mhc_pre_sinkhorn/docs/aclnnMhcPreSinkhornV2.md)的反向接口。计算对应的梯度反向传播。
 
   - **Cube计算模式**：该接口在Cube中默认使用HF32计算模式（与premix能力合入前一致）。
-    <!-- npu="A3,910b" id10 -->
+    <!-- npu="A3,910b" id7 -->
     - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：可通过可选属性`enableHf32`（V2接口传入，默认true）控制，传入false时切换为FP32计算模式。
-    <!-- end id10 -->
-    <!-- npu="950" id13 -->
-    - <term>Ascend 950PR&950DT系列</term>：产品忽略可选属性`enableHf32`。
-    <!-- end id13 -->
+    <!-- end id7 -->
+    <!-- npu="950" id8 -->
+    - <term>Ascend 950PR&950DT系列</term>：支持通过可选属性`enableHf32`切换Cube计算模式，默认值为`true`，使用HF32计算。传入`false`时使用FP32计算模式。
+    <!-- end id8 -->
 
 - **计算公式**：
 
@@ -285,7 +285,7 @@
     | $B, S, N, C$ | 分别为batch size、sequence length、专家数、特征维度；TND（3维）格式下 B×S 合并为一维 T |
     | $\cdot$ | 点积（内积）或逐元素乘法 |
     | $\odot$ | 逐元素乘法 |
-    | $\mathbf{\sum_{\dim=d,\text{keepdim}=\text{True}}$ | 在指定维度上求和并保持维度 |
+    | $\sum_{\dim=d,\text{keepdim}=\text{True}}$ | 在指定维度上求和并保持维度 |
     | $preMix$ | 可选输入，premix加权系数（通常填上一轮输出的hPre） |
     | $gradPre$ | 可选输入，反向链路上pre的梯度 |
     | $gradPreMix$ | 可选输出，preMix的梯度 |
@@ -590,10 +590,6 @@ aclnnStatus aclnnMhcPreSinkhornBackwardV2(
     </tbody>
     </table>
 
-    <!-- npu="950" id14 -->
-    - <term>Ascend 950PR&950DT系列产品</term>：参数`enableHf32`在当前产品使用场景下无效。
-    <!-- end id14 -->
-
 - **返回值：**
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
@@ -692,26 +688,26 @@ aclnnStatus aclnnMhcPreSinkhornBackwardV2(
 
 - 规格约束：
 
-  <!-- npu="950" id11 -->
+  <!-- npu="950" id9 -->
   - <term>Ascend 950PR&950DT系列产品</term>：N维度支持大于0且不超过8。
-  <!-- end id11 -->
+  <!-- end id9 -->
 
-  <!-- npu="A3,910b" id12 -->
+  <!-- npu="A3,910b" id10 -->
   - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：N维度仅支持4。
-  <!-- end id12 -->
+  <!-- end id10 -->
 
   - C：大于0、小于100000且可以被128整除。
   - sk_iter_count：Sinkhorn迭代次数当前仅支持20。
 
 - 确定性计算：
 
-  <!-- npu="950" id7 -->
+  <!-- npu="950" id11 -->
   - <term>Ascend 950PR&950DT系列产品</term>：aclnnMhcPreSinkhornBackwardV2默认确定性实现。
-  <!-- end id7 -->
+  <!-- end id11 -->
 
-  <!-- npu="A3,910b" id8 -->
+  <!-- npu="A3,910b" id12 -->
   - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：aclnnMhcPreSinkhornBackwardV2默认非确定性实现，支持通过`aclrtSetSysParamOpt`开启确定性。
-  <!-- end id8 -->
+  <!-- end id12 -->
 
 ## 调用示例
 
@@ -950,7 +946,7 @@ int CreateInputTensors(const std::vector<int64_t>& grad_hin_shape, const std::ve
     ret = CreateAclTensorFloat32(pre_mix_host_data, pre_mix_shape, tensors.pre_mix_addr, tensors.pre_mix);
     CHECK_RET(ret == 0, LOG_PRINT("Create pre_mix_tensor failed\n"); return -1);
     ret = CreateAclTensorFloat32(grad_pre_host_data, grad_pre_shape, tensors.grad_pre_addr, tensors.grad_pre);
-    CHECK_RET(ret == 0, LOG_PRINT("Create norm_out_tensor failed\n"); return -1);
+    CHECK_RET(ret == 0, LOG_PRINT("Create grad_pre_tensor failed\n"); return -1);
 
     return 0;
 }
@@ -969,7 +965,7 @@ int CreateOutputTensors(const std::vector<int64_t>& grad_x_shape, const std::vec
     CHECK_RET(ret == 0, LOG_PRINT("Create grad_bias_tensor failed\n"); return -1);
     // V2 第 5 输出: grad_pre_mix(premix 的梯度), 与 pre_mix 同 shape; pre_mix 未传时为全零占位
     ret = CreateAclTensorFloat32Output(grad_pre_mix_shape, tensors.grad_pre_mix_addr, tensors.grad_pre_mix);
-    CHECK_RET(ret == 0, LOG_PRINT("Create grad_bias_tensor failed\n"); return -1);
+    CHECK_RET(ret == 0, LOG_PRINT("Create grad_pre_mix_tensor failed\n"); return -1);
 
     return 0;
 }
