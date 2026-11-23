@@ -13,6 +13,7 @@
  * \brief MMAD block implementation for weight-quant grouped matmul split-M pipeline.
  */
 #pragma once
+#include "../../../common/mega_moe_constants.h"
 #include "../../../common/mega_moe_sync.h"
 #include "../tile/copy_gmm1_concat.h"
 #include "../policy/dispatch_policy_mega_moe.h"
@@ -611,3 +612,191 @@ __aicore__ inline void BLOCK_MMAD_MX_FP8FP4_SPECIALIZATION::SetAicToAiv()
 } // namespace Block
 } // namespace Gemm
 } // namespace Blaze
+
+namespace MegaMoeImpl::GmmKernel {
+
+// 小 M 门控 tile 使用独立的 A/B 环。通用 MMAD 基类仍负责事件生命周期和通用形状。
+template <typename BaseMmad, uint64_t L0TileK>
+class Gmm1Fp4Block : public BaseMmad {
+    using Layout = MegaMoeFp4Gmm1L1Layout;
+    using Fp4 = typename BaseMmad::AType;
+    using Scale = typename BaseMmad::ScaleBType;
+    using Fp4C0 = AscendC::Std::Int<Blaze::Gemm::C0_SIZE_B4>;
+    using ScaleC0 = AscendC::Std::Int<Blaze::Gemm::SCALE_C0>;
+    static constexpr uint16_t B_EVENT_BASE = Layout::A_BUFFER_COUNT;
+    static constexpr uint16_t SCALE_EVENT_BASE = B_EVENT_BASE + Layout::B_BUFFER_COUNT;
+    static_assert(Layout::TILE_M == Blaze::Gemm::MATMUL_MNK_ALIGN && Layout::TILE_N == MegaMoeImpl::L1_TILE_N &&
+                  Layout::TILE_K % L0TileK == 0U);
+    static_assert(Layout::HALF_L1_BYTES * Layout::A_BUFFER_COUNT == AscendC::TOTAL_L1_SIZE);
+    static_assert(SCALE_EVENT_BASE + Layout::SCALE_BUFFER_COUNT ==
+                  2U * Blaze::Gemm::TRIPLE_BUFFER_COUNT + Blaze::Gemm::SCALE_BUFFER_NUM);
+
+public:
+    using BaseMmad::operator();
+
+    __aicore__ inline Gmm1Fp4Block() = default;
+    __aicore__ inline ~Gmm1Fp4Block() = default;
+
+    __aicore__ inline void Init(const typename BaseMmad::ProblemShape& shape,
+                                const typename BaseMmad::MmadParams& params, const Layout* layout)
+    {
+        layout_ = layout;
+        if (layout_ == nullptr) {
+            BaseMmad::Init(shape, params);
+        }
+    }
+
+    template <typename TensorA, typename TensorB, typename TensorScaleA, typename TensorScaleB, typename TensorC>
+    __aicore__ inline void operator()(TensorA gmA, TensorB gmB, TensorScaleA gmScaleA, TensorScaleB gmScaleB,
+                                      TensorC& output, const typename BaseMmad::BlockShape& shape)
+    {
+        if (layout_ == nullptr) {
+            BaseMmad::operator()(gmA, gmB, gmScaleA, gmScaleB, output, shape);
+            return;
+        }
+
+        using namespace asc::te;
+        using namespace Blaze::Gemm;
+        const uint64_t m = get<M_VALUE>(shape);
+        const uint64_t n = Layout::TILE_N;
+        const uint64_t k = get<K_VALUE>(shape);
+        const uint64_t windowK = layout_->scaleK;
+        constexpr uint64_t tileK = Layout::TILE_K;
+        constexpr uint64_t halfN = Layout::TILE_N / BaseMmad::CONCAT_N_FACTOR;
+        const uint64_t l0ScaleK = MxScaleKLen<Fp4>(L0TileK);
+        auto aLayout = make_frame_layout<nz_layout_ptn, Fp4C0>(m, tileK);
+        auto bLayout = make_frame_layout<zn_layout_ptn, Fp4C0>(tileK, n);
+        auto aTile = [&](uint16_t slot) __attribute__((cce_aicore))
+        {
+            return make_tensor(make_mem_ptr<location::l1, Fp4>(slot * Layout::HALF_L1_BYTES), aLayout);
+        };
+        auto bTile = [&](uint16_t slot) __attribute__((cce_aicore))
+        {
+            const uint64_t half = slot % Layout::A_BUFFER_COUNT;
+            const uint64_t indexInHalf = slot / Layout::A_BUFFER_COUNT;
+            return make_tensor(make_mem_ptr<location::l1, Fp4>(half * Layout::HALF_L1_BYTES + Layout::A_SLOT_BYTES +
+                                                               indexInHalf * Layout::B_SLOT_BYTES),
+                               bLayout);
+        };
+
+        const auto copyGm = make_copy(copy_gm_to_l1{});
+        const auto copyConcat = make_copy(Tile::CopyConcatGM2L1{}).with(Tile::CopyConcatGM2L1Params{layout_->fullN, k});
+        auto loadA = [&](uint64_t offset, uint16_t slot) __attribute__((cce_aicore))
+        {
+            PipeWait<PIPE_MTE1, PIPE_MTE2>(slot);
+            copy(copyGm, aTile(slot), gmA.slice(make_coord(0, offset), make_shape(m, tileK)));
+            PipeNotify<PIPE_MTE2, PIPE_MTE1>(slot);
+        };
+        auto loadB = [&](uint64_t offset, uint16_t slot) __attribute__((cce_aicore))
+        {
+            const uint16_t event = B_EVENT_BASE + slot;
+            PipeWait<PIPE_MTE1, PIPE_MTE2>(event);
+            copy(copyConcat, bTile(slot), gmB.slice(make_coord(offset, 0), make_shape(tileK, halfN)));
+            PipeNotify<PIPE_MTE2, PIPE_MTE1>(event);
+        };
+
+        auto l0c = make_tensor(make_mem_ptr<location::l0c, float>(0UL),
+                               make_frame_layout<nz_layout_ptn, AscendC::Std::Int<C0_SIZE_L0C>>(
+                                   Blaze::Gemm::CeilAlign(m, BaseMmad::SPLIT_M_ALIGN), n));
+        const auto copyA = make_copy(copy_l1_to_l0a{});
+        const auto copyB = make_copy(copy_l1_to_l0b{});
+        const auto copyScaleA = make_copy(copy_l1_to_l0scalea{});
+        const auto copyScaleB = make_copy(copy_l1_to_l0scaleb{});
+        constexpr auto mma = make_mmad(mmad_operation{}, Tile::MmadTraitMX{});
+        constexpr uint64_t l0HalfBytes = AscendC::TOTAL_L0A_SIZE / DOUBLE_BUFFER_COUNT;
+        uint16_t l0Slot = 0U;
+
+        for (uint64_t start = 0; start < k; start += windowK) {
+            const uint64_t end = Min(start + windowK, k);
+            const uint64_t scaleSpan = MxScaleKLen<Fp4>(end - start);
+            const uint64_t scaleBase = scaleSlot_ * Layout::HALF_L1_BYTES;
+            const uint16_t scaleEvent = SCALE_EVENT_BASE + scaleSlot_;
+            auto scaleA = make_tensor(make_mem_ptr<location::l1, Scale>(scaleBase + Layout::SCALE_A_OFFSET),
+                                      make_frame_layout<zz_layout_ptn, ScaleC0>(m, scaleSpan));
+            auto scaleB = make_tensor(make_mem_ptr<location::l1, Scale>(scaleBase + layout_->scaleBOffset),
+                                      make_frame_layout<nn_layout_ptn, ScaleC0>(scaleSpan, n));
+            const uint64_t scaleStart = MxScaleKLen<Fp4>(start);
+            PipeWait<PIPE_MTE1, PIPE_MTE2>(scaleEvent);
+            copy(copyGm, scaleA, gmScaleA.slice(make_coord(0, scaleStart), make_shape(m, scaleSpan)));
+            copy(copyConcat, scaleB, gmScaleB.slice(make_coord(scaleStart, 0), make_shape(scaleSpan, halfN)));
+
+            // A0/B0 先入队，供 MTE1 开始计算；随后的 B 可以独立于 A 提前搬运。
+            // 一个窗口恰好占满 B 槽时，先给下一块 A 发起搬运，再补上最后一块 B。
+            const uint64_t bPrefetchCount =
+                end - start == tileK * Layout::B_BUFFER_COUNT ? Layout::B_BUFFER_COUNT - 1U : Layout::B_BUFFER_COUNT;
+            const uint64_t prefetchEnd = Min(end, start + tileK * bPrefetchCount);
+            for (uint64_t offset = start; offset < prefetchEnd; offset += tileK) {
+                const uint16_t slot = (offset - start) / tileK;
+                if (slot < Layout::A_BUFFER_COUNT) {
+                    loadA(offset, slot);
+                }
+                loadB(offset, slot);
+            }
+            for (uint64_t offset = start; offset < end; offset += tileK) {
+                const uint16_t aSlot = ((offset - start) / tileK) % Layout::A_BUFFER_COUNT;
+                const uint16_t bSlot = ((offset - start) / tileK) % Layout::B_BUFFER_COUNT;
+                const uint16_t bEvent = B_EVENT_BASE + bSlot;
+                // 等到 A 就绪也确保本窗口的 scale 已完成 MTE2 搬运。
+                PipeWait<PIPE_MTE2, PIPE_MTE1>(aSlot);
+                PipeWait<PIPE_MTE2, PIPE_MTE1>(bEvent);
+                auto l1a = aTile(aSlot);
+                auto l1b = bTile(bSlot);
+#pragma unroll
+                for (uint64_t innerK = 0; innerK < tileK; innerK += L0TileK) {
+                    const uint16_t cubeDone = M_MTE1_FLAG_0 + l0Slot;
+                    const uint64_t l0Offset = l0Slot * l0HalfBytes;
+                    const uint64_t l0ScaleOffset = l0Offset / GetScaleDivisor<Fp4>();
+                    const uint64_t scaleOffset = MxScaleKLen<Fp4>(offset - start + innerK);
+                    auto l0a = make_tensor(make_mem_ptr<location::l0a, Fp4>(l0Offset),
+                                           make_frame_layout<nz_layout_ptn, Fp4C0>(m, L0TileK));
+                    auto l0b = make_tensor(make_mem_ptr<location::l0b, Fp4>(l0Offset),
+                                           make_frame_layout<zn_layout_ptn, Fp4C0>(L0TileK, n));
+                    auto l0ScaleA = make_tensor(make_mem_ptr<location::l0scalea, Scale>(l0ScaleOffset),
+                                                make_frame_layout<zz_layout_ptn, ScaleC0>(m, l0ScaleK));
+                    auto l0ScaleB = make_tensor(make_mem_ptr<location::l0scaleb, Scale>(l0ScaleOffset),
+                                                make_frame_layout<nn_layout_ptn, ScaleC0>(l0ScaleK, n));
+                    PipeWait<PIPE_M, PIPE_MTE1>(cubeDone);
+                    copy(copyA, l0a, l1a.slice(make_coord(0, innerK), make_shape(m, L0TileK)));
+                    copy(copyB, l0b, l1b.slice(make_coord(innerK, 0), make_shape(L0TileK, n)));
+                    copy(copyScaleA, l0ScaleA, scaleA.slice(make_coord(0, scaleOffset), make_shape(m, l0ScaleK)));
+                    copy(copyScaleB, l0ScaleB, scaleB.slice(make_coord(scaleOffset, 0), make_shape(l0ScaleK, n)));
+                    PipeNotify<PIPE_MTE1, PIPE_M>(l0Slot);
+                    PipeWait<PIPE_MTE1, PIPE_M>(l0Slot);
+
+                    const uint64_t consumedK = offset + innerK;
+                    asc::te::mmad_params params;
+                    params.m = static_cast<uint16_t>(m);
+                    params.n = static_cast<uint16_t>(n);
+                    params.k = L0TileK;
+                    params.unit_flag =
+                        consumedK + L0TileK == k ? unit_flag_mode::enable_update : unit_flag_mode::enable_keep;
+                    params.init_with_zero = consumedK == 0U;
+                    asc::te::mmad(mma.with(params), l0c, l0a, l0b);
+                    PipeNotify<PIPE_M, PIPE_MTE1>(cubeDone);
+                    l0Slot ^= 1U;
+                }
+                PipeNotify<PIPE_MTE1, PIPE_MTE2>(aSlot);
+                PipeNotify<PIPE_MTE1, PIPE_MTE2>(bEvent);
+                const uint64_t nextA = offset + Layout::A_BUFFER_COUNT * tileK;
+                const uint64_t nextB = offset + bPrefetchCount * tileK;
+                if (nextA < end) {
+                    loadA(nextA, aSlot);
+                }
+                if (nextB < end) {
+                    const uint16_t nextBSlot = (bSlot + bPrefetchCount) % Layout::B_BUFFER_COUNT;
+                    loadB(nextB, nextBSlot);
+                }
+            }
+            PipeNotify<PIPE_MTE1, PIPE_MTE2>(scaleEvent);
+            scaleSlot_ ^= 1U;
+        }
+        auto copyOut = make_copy(copy_l0c_to_ub{}, Tile::CopyL0C2UBTraitSplitM{});
+        copy(copyOut.with(l0c_to_ub_params(unit_flag_mode::enable_update)), output, l0c);
+    }
+
+private:
+    const Layout* layout_ = nullptr;
+    // 跨计算 tile 保留 scale 轮转，避免每次都等待槽 0 归还。
+    uint16_t scaleSlot_ = 0U;
+};
+} // namespace MegaMoeImpl::GmmKernel

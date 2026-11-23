@@ -1447,7 +1447,9 @@ TEST_F(MegaMoeArch35TilingTest, H4096_BS128_A4W4_URMA)
 }
 
 static void RunA4W4NzFormatCase(ge::Format weightOneFormat, ge::Format weightTwoFormat, ge::graphStatus expectedStatus,
-                                uint64_t expectedTilingKey, int64_t h = 4096)
+                                uint64_t expectedTilingKey, int64_t h = 4096,
+                                int64_t topoType = MegaMoeImpl::TOPO_TYPE_URMA,
+                                const MegaMoeFp4Gmm1L1Layout* expectedFp4Layout = nullptr)
 {
     struct MegaMoeCompileInfo {
     } compileInfo;
@@ -1499,18 +1501,56 @@ static void RunA4W4NzFormatCase(ge::Format weightOneFormat, ge::Format weightTwo
             {"transpose_weight1", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
             {"transpose_weight2", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
             {"weight1_interleave", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
-            {"topo_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
+            {"topo_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(topoType)},
             {"rank_num_per_server", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
             {"topk_weights_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
         },
         &compileInfo);
     Mc2Hcom::MockValues hcomTopologyMockValues{{"rankNum", 4}};
-    Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, expectedStatus, expectedTilingKey);
+    if (expectedFp4Layout == nullptr) {
+        Mc2ExecuteTestCase(tilingContextPara, hcomTopologyMockValues, expectedStatus, expectedTilingKey);
+        return;
+    }
+
+    Mc2Hcom::MC2HcomTopologyMocker::GetInstance().SetValues(hcomTopologyMockValues);
+    TilingInfo tilingInfo;
+    const bool tilingSucceeded = ExecuteTiling(tilingContextPara, tilingInfo);
+    Mc2Hcom::MC2HcomTopologyMocker::GetInstance().Reset();
+    ASSERT_TRUE(tilingSucceeded);
+    EXPECT_EQ(tilingInfo.tilingKey, expectedTilingKey);
+    ASSERT_GE(tilingInfo.tilingDataSize, sizeof(MegaMoeTilingData));
+    MegaMoeTilingData tilingData{};
+    std::memcpy(&tilingData, tilingInfo.tilingData.get(), sizeof(tilingData));
+    const auto& actualLayout = tilingData.fp4Gmm1L1Layout;
+    EXPECT_EQ(actualLayout.scaleK, expectedFp4Layout->scaleK);
+    EXPECT_EQ(actualLayout.scaleBOffset, expectedFp4Layout->scaleBOffset);
+    EXPECT_EQ(actualLayout.fullN, expectedFp4Layout->fullN);
 }
 
 TEST_F(MegaMoeArch35TilingTest, H4096_BS128_A4W4_NZ_URMA)
 {
-    RunA4W4NzFormatCase(ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ_C0_32, ge::GRAPH_SUCCESS, 1714216UL);
+    const MegaMoeFp4Gmm1L1Layout disabledLayout{};
+    RunA4W4NzFormatCase(ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ_C0_32, ge::GRAPH_SUCCESS, 1714216UL, 4096,
+                        MegaMoeImpl::TOPO_TYPE_URMA, &disabledLayout);
+}
+
+TEST_F(MegaMoeArch35TilingTest, A4W4NzMteEnablesFp4Gmm1L1Layout)
+{
+    // A/B 槽之后是本窗口的 scaleA。H=2048 时 scaleB 从 L1 的 136192 字节处开始。
+    const MegaMoeFp4Gmm1L1Layout minimumKLayout{2048U, 136192U, 2048U};
+    const MegaMoeFp4Gmm1L1Layout maximumHLayout{8192U, 139264U, 2048U};
+    for (const auto& expectedLayout : {minimumKLayout, maximumHLayout}) {
+        SCOPED_TRACE(expectedLayout.scaleK);
+        RunA4W4NzFormatCase(ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ_C0_32, ge::GRAPH_SUCCESS, 665640UL,
+                            expectedLayout.scaleK, MegaMoeImpl::TOPO_TYPE_MTE, &expectedLayout);
+    }
+}
+
+TEST_F(MegaMoeArch35TilingTest, A4W4NzMteDisablesFp4Gmm1L1LayoutBelowMinimumK)
+{
+    const MegaMoeFp4Gmm1L1Layout disabledLayout{};
+    RunA4W4NzFormatCase(ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ_C0_32, ge::GRAPH_SUCCESS, 665640UL, 1536,
+                        MegaMoeImpl::TOPO_TYPE_MTE, &disabledLayout);
 }
 
 TEST_F(MegaMoeArch35TilingTest, UrmaH1088PaddedRecords)

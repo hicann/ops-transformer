@@ -551,6 +551,31 @@ static MegaMoeL1Layout CalcMegaMoeL1Layout(uint64_t maxGmmK)
     return layout;
 }
 
+static MegaMoeFp4Gmm1L1Layout CalcFp4Gmm1L1Layout(const MegaMoeTilingData& tiling)
+{
+    using Layout = MegaMoeFp4Gmm1L1Layout;
+    static_assert(Layout::TILE_N == GMM_TILE_N);
+    const auto& compute = tiling.compute;
+    if (!IsA4W4GmmMode(tiling.moeGmmMode) || IsLayeredTopology(compute.topoType) ||
+        compute.activationOutputDivisor != MemoryLayoutDetail::ACTIVATION_N_HALF ||
+        compute.hiddenDim % Layout::TILE_N != 0U || compute.h < Layout::TILE_K * Layout::B_BUFFER_COUNT ||
+        compute.h % Layout::TILE_K != 0U) {
+        return {};
+    }
+
+    // A/B 槽保留后，剩余空间给 scale。按完整 K tile 取整，并为 scaleB 起点留出对齐空间。
+    constexpr uint32_t SCALE_BYTES_PER_K_TILE =
+        (Layout::TILE_M + Layout::TILE_N) * Layout::TILE_K / MemoryLayoutDetail::MXFP_SCALE_GROUP_NUM;
+    constexpr uint32_t MAX_SCALE_K =
+        (Layout::HALF_L1_BYTES - Layout::SCALE_A_OFFSET - (MemoryLayoutDetail::ALIGN_512 - 1U)) /
+        SCALE_BYTES_PER_K_TILE * Layout::TILE_K;
+    const uint32_t scaleK = std::min(static_cast<uint32_t>(compute.h), MAX_SCALE_K);
+    const uint32_t scaleBOffset = MemoryLayoutDetail::CeilAlign(
+        Layout::SCALE_A_OFFSET + Layout::TILE_M * scaleK / MemoryLayoutDetail::MXFP_SCALE_GROUP_NUM,
+        MemoryLayoutDetail::ALIGN_512);
+    return {scaleK, scaleBOffset, static_cast<uint32_t>(compute.hiddenDim)};
+}
+
 /*
  * 在所有校验和资源规划完成后，统一提交 workspace、block dim、tiling key 及诊断信息。
  */
@@ -562,6 +587,7 @@ static ge::graphStatus CommitTilingResult(gert::TilingContext* context, const Me
     tilingData->a8w4L1Layout = CalcMegaMoeL1Layout(
         std::max(static_cast<uint64_t>(tilingData->compute.h),
                  static_cast<uint64_t>(GetActivationOutputWidth(tilingData->compute.hiddenDim, tilingData->actMode))));
+    tilingData->fp4Gmm1L1Layout = CalcFp4Gmm1L1Layout(*tilingData);
 
     WorkspaceLayout workspaceLayout(tilingData->compute);
     OP_TILING_CHECK(CheckCclBufferCapacity(context, config, tilingData, workspaceLayout, nodeName) != ge::GRAPH_SUCCESS,

@@ -69,6 +69,22 @@ private:
     using CombineBufferConfig = WaveCombineBufferConfig;
     using QuantOutType = typename MegaMoeBase::QuantOutType;
     using ActivationType = typename MegaMoeBase::ActivationType;
+    using MxScaleType = Blaze::Gemm::MxScaleType<QuantOutType>;
+    template <bool IsWeightNz>
+    using GmmContext = typename GmmKernel::Config<false, QuantOutType, QuantOutType, bfloat16_t, MxScaleType,
+                                                  MxScaleType, IsWeightNz, false, false, true>::MmadContext;
+    using Gmm1Context = GmmContext<MoeWeight1Format != FORMAT_ND>;
+    using Gmm2Context = GmmContext<MoeWeight2Format != FORMAT_ND>;
+
+    template <bool IsWeightNz>
+    __aicore__ inline decltype(auto) GetWaveMmadContext()
+    {
+        if constexpr (std::is_void<FinalDerived>::value) {
+            return GmmContext<IsWeightNz>{};
+        } else {
+            return (GetImpl().moeBlockContext_);
+        }
+    }
 
     static constexpr uint32_t GMM1_TILE_M = MegaMoeBase::GMM1_TILE_M;
 
@@ -92,7 +108,7 @@ private:
                                                   ExpertLoopState& gmm1ExpertState, GMMAddrInfo& gmm1AddrInfo,
                                                   const ProblemShape& gmm1WaveProblemShape,
                                                   GmmRuntimeState& runtimeState, uint32_t waveEndTokenIndexInExpert,
-                                                  uint64_t expertRowCount);
+                                                  uint64_t expertRowCount, Gmm1Context& context);
     struct DispatchWaveState {
         ExpertTokenPosition position{};
         ExpertTokenPosition preparedEnd{};
@@ -152,7 +168,7 @@ private:
                                            ExpertLoopState& allCoreCombineExpertState);
     __aicore__ inline void RunGmm2Slice(const ExpertTokenPosition& gmm2Position, uint32_t waveEndTokenIndexInExpert,
                                         const ExpertLoopState& gmm2ExpertState, GMMAddrInfo& gmm2AddrInfo,
-                                        uint32_t& startBlockIdx);
+                                        uint32_t& startBlockIdx, Gmm2Context& context);
     __aicore__ inline void AdvanceGmm2WavePosition(ExpertTokenPosition& gmm2Position,
                                                    uint32_t waveEndTokenIndexInExpert,
                                                    const ExpertLoopState& gmm2ExpertState,
@@ -190,7 +206,7 @@ template <TemplateMegaMoeA8W8WaveTypeClass, typename FinalDerived>
 __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDerived>::RunGmm1ActivationSlice(
     const ExpertTokenPosition& gmm1Position, ExpertLoopState& gmm1ExpertState, GMMAddrInfo& gmm1AddrInfo,
     const ProblemShape& gmm1WaveProblemShape, GmmRuntimeState& runtimeState, uint32_t waveEndTokenIndexInExpert,
-    uint64_t expertRowCount)
+    uint64_t expertRowCount, Gmm1Context& context)
 {
     using QuantScaleOutType = typename MegaMoeBase::MoeQuantConfig::QuantScaleType;
 
@@ -211,7 +227,8 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDer
                    MoeWeight1Format != FORMAT_ND, GMM1_TILE_M, false, true>(
         params_.tilingData->isTopkWeightsPrefetch, epilogueOp_, params_, gmm1WaveProblemShape, gmm1AddrInfo,
         runtimeState.startBlockIdx, runtimeState.vecSetSyncCom, gmmExecutionConfig_.blockJob, waveTokenStartIndex,
-        gmm1Position.expertIdx, runtimeState.pingpongIdx, commonConfig_.activationOutputDivisor, isWholeExpert);
+        gmm1Position.expertIdx, runtimeState.pingpongIdx, commonConfig_.activationOutputDivisor, isWholeExpert,
+        &context);
 }
 
 template <TemplateMegaMoeA8W8WaveTypeClass, typename FinalDerived>
@@ -305,6 +322,8 @@ __aicore__ inline ExpertTokenPosition MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTyp
     ExpertTokenPosition& gmm1Position, ExpertLoopState& gmm1ExpertState, GMMAddrInfo& gmm1AddrInfo,
     GmmRuntimeState& runtimeState)
 {
+    // 一个 GMM1 wave 共用事件和 L1，退出后再交给 GMM2。
+    auto&& context = GetWaveMmadContext<MoeWeight1Format != FORMAT_ND>();
     const auto& workspace = params_.workspace.layout;
     const auto& buffer = params_.workspace.base;
     if constexpr (g_coreType == AIV) {
@@ -348,7 +367,7 @@ __aicore__ inline ExpertTokenPosition MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTyp
             ProblemShape gmm1WaveProblemShape = gmm1ExpertState.problemShape;
             Get<M_VALUE>(gmm1WaveProblemShape) = waveRowCount;
             GetImpl().RunGmm1ActivationSlice(gmm1Position, gmm1ExpertState, gmm1AddrInfo, gmm1WaveProblemShape,
-                                             runtimeState, waveEndTokenIndexInExpert, expertRowCount);
+                                             runtimeState, waveEndTokenIndexInExpert, expertRowCount, context);
         }
 
         processedMGroupCount += problemMGroupCount;
@@ -366,7 +385,7 @@ __aicore__ inline ExpertTokenPosition MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTyp
 template <TemplateMegaMoeA8W8WaveTypeClass, typename FinalDerived>
 __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDerived>::RunGmm2Slice(
     const ExpertTokenPosition& gmm2Position, uint32_t waveEndTokenIndexInExpert, const ExpertLoopState& gmm2ExpertState,
-    GMMAddrInfo& gmm2AddrInfo, uint32_t& startBlockIdx)
+    GMMAddrInfo& gmm2AddrInfo, uint32_t& startBlockIdx, Gmm2Context& context)
 {
     using QuantScaleOutType = typename MegaMoeBase::MoeQuantConfig::QuantScaleType;
 
@@ -399,7 +418,7 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDer
                        MoeWeight2Format != FORMAT_ND, false, GMM1_TILE_M, false, true, false>(
             COMBINE_NO_QUANT, params_.tilingData->isTopkWeightsPrefetch, gmm2WaveProblemShape, gmm2AddrInfo,
             startBlockIdx, gmmExecutionConfig_.blockJob, isWholeExpert, gmm2Position.tokenIndexInExpert, &params_,
-            commonConfig_.activationOutputDivisor, 0U);
+            commonConfig_.activationOutputDivisor, 0U, &context);
     } else {
         SelectRuntimeBool(
             params_.tilingData->combineQuantMode == COMBINE_NO_QUANT, [&](auto notifyTag) __attribute__((cce_aicore)) {
@@ -408,7 +427,7 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDer
                                       decltype(notifyTag)::value>(
                     COMBINE_NO_QUANT, params_.tilingData->isTopkWeightsPrefetch, gmm2WaveProblemShape, gmm2AddrInfo,
                     startBlockIdx, gmmExecutionConfig_.blockJob, isWholeExpert, gmm2Position.tokenIndexInExpert,
-                    &params_, commonConfig_.activationOutputDivisor, 0U);
+                    &params_, commonConfig_.activationOutputDivisor, 0U, &context);
             });
     }
 }
@@ -453,6 +472,7 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDer
     GMMAddrInfo& gmm2AddrInfo, uint32_t& startBlockIdx, uint32_t allCoreCombineExpertIndex,
     ExpertLoopState& allCoreCombineExpertState)
 {
+    auto&& context = GetWaveMmadContext<MoeWeight2Format != FORMAT_ND>();
     const auto& workspace = params_.workspace.layout;
     const auto& buffer = params_.workspace.base;
     if constexpr (g_coreType == AIV) {
@@ -480,7 +500,8 @@ __aicore__ inline void MegaMoeA8W8Wave<TemplateMegaMoeA8W8WaveTypeFunc, FinalDer
         if (gmm2Position.expertIdx == waveEndPosition.expertIdx) {
             waveEndTokenIndexInExpert = waveEndPosition.tokenIndexInExpert;
         }
-        GetImpl().RunGmm2Slice(gmm2Position, waveEndTokenIndexInExpert, gmm2ExpertState, gmm2AddrInfo, startBlockIdx);
+        GetImpl().RunGmm2Slice(gmm2Position, waveEndTokenIndexInExpert, gmm2ExpertState, gmm2AddrInfo, startBlockIdx,
+                               context);
         AdvanceGmm2WavePosition(gmm2Position, waveEndTokenIndexInExpert, gmm2ExpertState, allCoreCombineExpertIndex,
                                 allCoreCombineExpertState);
     }

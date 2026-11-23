@@ -43,6 +43,11 @@ private:
     using MoeQuantConfig = typename MegaMoeBase::MoeQuantConfig;
     using ActivationType = typename MegaMoeBase::ActivationType;
     using QuantScaleOutType = typename MoeQuantConfig::QuantScaleType;
+    using Gmm1Config =
+        GmmKernel::Config<false, typename MoeQuantConfig::QuantOutType, typename MoeQuantConfig::QuantOutType,
+                          bfloat16_t, typename MoeQuantConfig::QuantScaleType, typename MoeQuantConfig::QuantScaleType,
+                          MoeWeight1Format != FORMAT_ND, false, false, true>;
+    using Gmm1Context = typename Gmm1Config::MmadContext;
 
     static constexpr uint32_t GMM1_TILE_M = MegaMoeBase::GMM1_TILE_M;
 
@@ -76,7 +81,8 @@ private:
 
     __aicore__ inline void RunGmm1ActivationForExpert(ExpertLoopState& state, GMMAddrInfo& gmmAddrInfo,
                                                       GmmRuntimeState& runtimeState, uint32_t tokenStartIndexInExpert,
-                                                      uint32_t sliceTokenCount, uint32_t gmm1TilesPerMGroup);
+                                                      uint32_t sliceTokenCount, uint32_t gmm1TilesPerMGroup,
+                                                      Gmm1Context& context);
     __aicore__ inline ExpertTokenPosition DispatchFirstWave();
     __aicore__ inline void DispatchNextWaveExpertSlice(ExpertTokenPosition& dispatchPosition,
                                                        uint32_t& nextDispatchWaveMGroupCount);
@@ -101,7 +107,7 @@ private:
 template <TemplateMegaMoeA4W4WaveTypeClass>
 __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::RunGmm1ActivationForExpert(
     ExpertLoopState& state, GMMAddrInfo& gmmAddrInfo, GmmRuntimeState& runtimeState, uint32_t tokenStartIndexInExpert,
-    uint32_t sliceTokenCount, uint32_t gmm1TilesPerMGroup)
+    uint32_t sliceTokenCount, uint32_t gmm1TilesPerMGroup, Gmm1Context& context)
 {
     const auto& workspace = params_.workspace.layout;
     const auto& buffer = params_.workspace.base;
@@ -118,13 +124,18 @@ __aicore__ inline void MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFunc>::RunGmm1
         tokenStartIndexInExpert);
     ProblemShape sliceProblemShape = state.problemShape;
     Get<M_VALUE>(sliceProblemShape) = sliceTokenCount;
+    // 仅允许完整专家绕过 L2，MMAD 还会检查单 M tile 和搬入对齐。
+    // 输出总宽度与 N tile 对齐，保证门控拼接时 gate/up 两段起点对齐。
+    const bool allowWeightL2Bypass = tokenStartIndexInExpert == 0U &&
+                                     sliceTokenCount == static_cast<uint32_t>(Get<M_VALUE>(state.problemShape)) &&
+                                     commonConfig_.gmm1OutputDim % L1_TILE_N == 0U;
     RunGmm1Generic<typename MoeQuantConfig::QuantOutType, typename MoeQuantConfig::ActivationQuantOutType,
                    typename MoeQuantConfig::QuantOutType, bfloat16_t, typename MoeQuantConfig::QuantScaleType,
                    typename MoeQuantConfig::QuantScaleType, MoeWeight1Format != FORMAT_ND, GMM1_TILE_M, false, true>(
         TopkWeightsPrefetch, epilogueOp_, params_, sliceProblemShape, gmmAddrInfo, runtimeState.startBlockIdx,
         runtimeState.vecSetSyncCom, gmmExecutionConfig_.blockJob,
         static_cast<uint32_t>(state.globalTokenStartIndex) + tokenStartIndexInExpert, state.expertIdx,
-        runtimeState.pingpongIdx, commonConfig_.activationOutputDivisor);
+        runtimeState.pingpongIdx, commonConfig_.activationOutputDivisor, allowWeightL2Bypass, &context);
 }
 
 template <TemplateMegaMoeA4W4WaveTypeClass>
@@ -191,6 +202,8 @@ __aicore__ inline ExpertTokenRange MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFu
     const ExpertTokenPosition& waveBeginPosition, ExpertTokenPosition& dispatchPosition, ExpertLoopState& gmm1State,
     GMMAddrInfo& gmm1AddrInfo, GmmRuntimeState& runtimeState, uint32_t gmm1TilesPerMGroup)
 {
+    // 波内复用 GMM1 的 L1 和事件，析构时归还给 GMM2。
+    Gmm1Context context;
     ExpertTokenRange waveRange{waveBeginPosition, waveBeginPosition};
     uint32_t currentWaveMGroupCount = 0U;
     bool currentWaveNeedsGmm1 = true;
@@ -218,7 +231,7 @@ __aicore__ inline ExpertTokenRange MegaMoeA4W4Wave<TemplateMegaMoeA4W4WaveTypeFu
                 expertTokenCount, mGroupsPerWave_, currentWaveMGroupCount, waveRange.end);
             if (sliceTokenCount != 0U) {
                 RunGmm1ActivationForExpert(gmm1State, gmm1AddrInfo, runtimeState, sliceTokenStartIndexInExpert,
-                                           sliceTokenCount, gmm1TilesPerMGroup);
+                                           sliceTokenCount, gmm1TilesPerMGroup, context);
             }
             currentWaveNeedsGmm1 = IsPositionWithinWave(waveRange.end, currentWaveMGroupCount);
         }

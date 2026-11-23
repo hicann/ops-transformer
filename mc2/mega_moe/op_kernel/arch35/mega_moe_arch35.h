@@ -830,11 +830,11 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::RunSharedExpertGmm1Acti
         } else {
             RunGmm1Generic<typename SharedQuantConfig::QuantOutType, SharedActivationOutType, SharedWeightType,
                            bfloat16_t, SharedQuantScaleType, SharedQuantScaleType, SharedWeight1Format != FORMAT_ND,
-                           GMM1_TILE_M, true, true>(sharedTopkWeightsPrefetch, sharedEpilogueOp_, params_, problemShape,
-                                                    gmmAddrInfo, runtimeState.startBlockIdx, runtimeState.vecSetSyncCom,
-                                                    gmmConfig.blockJob, expertBeforeCnt, sharedExpertIdx,
-                                                    runtimeState.pingpongIdx, commonConfig_.activationOutputDivisor,
-                                                    SharedQuantConfig::AXW_MODE == AxWMode::A8W8, layoutArgs...);
+                           GMM1_TILE_M, true, true>(
+                sharedTopkWeightsPrefetch, sharedEpilogueOp_, params_, problemShape, gmmAddrInfo,
+                runtimeState.startBlockIdx, runtimeState.vecSetSyncCom, gmmConfig.blockJob, expertBeforeCnt,
+                sharedExpertIdx, runtimeState.pingpongIdx, commonConfig_.activationOutputDivisor,
+                SharedQuantConfig::AXW_MODE == AxWMode::A8W8, nullptr, layoutArgs...);
         }
     };
     if (gmmConfig.useStridedInput) {
@@ -1061,7 +1061,7 @@ __aicore__ inline void MegaMoe<TemplateMegaMoeTypeFunc>::RunGmm2CombineForExpert
                             GMM1_TILE_M, false, false, true, decltype(notifyTag)::value>(
                     topkWeightsPrefetch, pipeline, sliceProblemShape, gmmAddrInfo, startBlockIdx,
                     gmmExecutionConfig_.blockJob, expertTokenCount, tokenStartIndexInExpert, &params_,
-                    commonConfig_.activationOutputDivisor);
+                    commonConfig_.activationOutputDivisor, MoeQuantConfig::AXW_MODE == AxWMode::A4W4);
             });
     }
 

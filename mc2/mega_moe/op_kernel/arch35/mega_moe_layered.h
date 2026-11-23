@@ -933,7 +933,8 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::RunGmm1Wi
         RunGmm1Generic<QuantOutType, ActivationQuantOutType, QuantOutType, bfloat16_t, QuantScaleOutType,
                        QuantScaleOutType, Weight1Format != FORMAT_ND, GMM1_TILE_M, IsShared, !IsShared>(
             TopkWeightsPrefetch, epilogue, params_, state.problemShape, gmmAddrInfo, startBlockIdx_, vecSetSyncCom,
-            blockJob, expertRowStart, expertIdx, gmm1PingPongIdx_, activationOutputDivisor_, false, layoutArgs...);
+            blockJob, expertRowStart, expertIdx, gmm1PingPongIdx_, activationOutputDivisor_, false, nullptr,
+            layoutArgs...);
     }
 }
 
@@ -1008,7 +1009,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::GroupMatm
     } else {
         RunGmm2Generic<QuantOutType, QuantOutType, bfloat16_t, QuantScaleOutType, QuantScaleOutType,
                        Weight2Format != FORMAT_ND, true, L1_TILE_M_256, IsShared, !IsShared, false>(
-            CombineQuantMode, TopkWeightsPrefetch, state.problemShape, gmmAddrInfo, startBlockIdx_, false,
+            CombineQuantMode, TopkWeightsPrefetch, state.problemShape, gmmAddrInfo, startBlockIdx_, blockJob, false,
             rowOffsetInExpert, nullptr, activationOutputDivisor_, expertTokenCount);
     }
 }

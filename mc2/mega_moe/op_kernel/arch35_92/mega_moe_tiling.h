@@ -189,6 +189,27 @@ struct MegaMoeL1Layout {
     uint64_t scaleBOffsets[2];
 };
 
+// Arch35 A4W4 小 M 门控拼接。两个半区各放一个 A 槽、两个 B 槽和一对 scale。
+// B 槽的物理顺序为 B0、B2、B1、B3，按逻辑序轮转时在半区间交替。
+struct MegaMoeFp4Gmm1L1Layout {
+    static constexpr uint32_t A_BUFFER_COUNT = 2U;
+    static constexpr uint32_t B_BUFFER_COUNT = 4U;
+    static constexpr uint32_t SCALE_BUFFER_COUNT = 2U;
+    static constexpr uint32_t HALF_L1_BYTES = 256U * 1024U;
+    static constexpr uint32_t TILE_M = 16U;
+    static constexpr uint32_t TILE_N = 256U;
+    static constexpr uint32_t TILE_K = 512U;
+    static constexpr uint32_t ELEMENTS_PER_BYTE =
+        MegaMoeImpl::MemoryLayoutDetail::BITS_PER_BYTE / MegaMoeImpl::MemoryLayoutDetail::FP4_BITS;
+    static constexpr uint32_t A_SLOT_BYTES = TILE_M * TILE_K / ELEMENTS_PER_BYTE;
+    static constexpr uint32_t B_SLOT_BYTES = TILE_N * TILE_K / ELEMENTS_PER_BYTE;
+    static constexpr uint32_t SCALE_A_OFFSET = A_SLOT_BYTES + (B_BUFFER_COUNT / A_BUFFER_COUNT) * B_SLOT_BYTES;
+
+    uint32_t scaleK;
+    uint32_t scaleBOffset;
+    uint32_t fullN;
+};
+
 // BF16 GMM1 使用完整 256×256 计算块，GMM2 保持 128 行分条，不申请 MX scale。
 struct MegaMoeBf16GmmConfig {
     static constexpr uint32_t TILE_M = 256U;
@@ -243,5 +264,7 @@ struct MegaMoeTilingData {
     uint64_t cclBufferSize;
     uint32_t dispatchQuantMode;
     uint32_t topkIndexTypeBytes;
+    // 与 a8w4L1Layout 同属核内 L1 分块配置；尾部追加以保留已有 tiling 字段偏移。
+    MegaMoeFp4Gmm1L1Layout fp4Gmm1L1Layout;
 };
 #endif

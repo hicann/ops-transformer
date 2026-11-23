@@ -23,7 +23,8 @@ __aicore__ inline void Gmm1ExecGeneric(Scheduler& scheduler, const Params& param
                                        const Config& config, uint32_t startLoopIdx, uint32_t tileNum,
                                        ActivationQuantOp& activationQuantOp, int32_t& vecSetSyncCom,
                                        uint32_t expertBeforeCnt, uint32_t expertIdx, uint16_t& pingpongIdx,
-                                       bool allowWeightL2Bypass, const LayoutBundle& layouts)
+                                       bool allowWeightL2Bypass, const LayoutBundle& layouts,
+                                       BlockMmadContext<BlockMmad>* context)
 {
     using KernelConfig = typename Config::KernelConfig;
     using ElementA = typename KernelConfig::ElementAType;
@@ -62,14 +63,21 @@ __aicore__ inline void Gmm1ExecGeneric(Scheduler& scheduler, const Params& param
                                     decltype(gmC), decltype(metaInfoGm)>;
     WorkSetType workSet{scheduler, gmA, gmB, gmScaleA, gmScaleB, gmC, metaInfoGm};
     if constexpr (g_coreType == AscendC::AIC) {
-        BlockMmadContext<BlockMmad> localBlockMmadContext;
-        if (config.topkWeightsPrefetch) {
-            Gmm1AicMmadToGmGeneric<BlockMmadContext<BlockMmad>, IsShared>(
-                workSet, params, gmmAddrInfo, config, startLoopIdx, tileNum, expertIdx, &localBlockMmadContext);
+        auto runMmad = [&](typename KernelConfig::MmadContext & mmadContext) __attribute__((cce_aicore))
+        {
+            if (config.topkWeightsPrefetch) {
+                Gmm1AicMmadToGmGeneric<typename KernelConfig::MmadContext, IsShared>(
+                    workSet, params, gmmAddrInfo, config, startLoopIdx, tileNum, expertIdx, &mmadContext);
+            } else {
+                Gmm1AicMmadGeneric<typename KernelConfig::MmadContext, IsShared>(
+                    workSet, gmmAddrInfo, config, startLoopIdx, tileNum, vecSetSyncCom, pingpongIdx, &mmadContext);
+            }
+        };
+        if (context != nullptr) {
+            runMmad(*context);
         } else {
-            Gmm1AicMmadGeneric<BlockMmadContext<BlockMmad>, IsShared>(workSet, gmmAddrInfo, config, startLoopIdx,
-                                                                      tileNum, vecSetSyncCom, pingpongIdx,
-                                                                      &localBlockMmadContext);
+            typename KernelConfig::MmadContext localContext;
+            runMmad(localContext);
         }
     } else {
         if (config.topkWeightsPrefetch) {
@@ -144,19 +152,25 @@ __aicore__ inline void Gmm1ExecA8W4(Scheduler& scheduler, const Params& params, 
 
 template <typename ElementA, typename EpilogueElementA, typename ElementB, typename ElementC, typename ElementMxScaleA,
           typename ElementMxScaleB, bool IsWeightNZ = false, uint32_t Gmm1TileM = L1_TILE_M_256, bool IsShared = false,
-          bool IsWaveFlagGrained = false, typename BlockEpilogue, typename... LayoutArgs>
+          bool IsWaveFlagGrained = false, typename BlockEpilogue,
+          typename GmmConfig = GmmKernel::Config<false, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB,
+                                                 IsWeightNZ, IsShared, false, IsWaveFlagGrained>,
+          typename... LayoutArgs>
 __aicore__ inline void RunGmm1Generic(bool topkWeightsPrefetch, BlockEpilogue& epilogueOp, const Params& params,
                                       const AscendC::Shape<int64_t, int64_t, int64_t, int64_t>& problemShape,
                                       const GMMAddrInfo& gmmAddrInfo, uint32_t& startBlockIdx, int32_t& vecSetSyncCom,
                                       const BlockJobContext& blockJob, uint32_t expertBeforeCnt, uint32_t expertIdx,
                                       uint16_t& pingpongIdx, uint32_t activationOutputDivisor = ACTIVATION_N_HALF,
-                                      bool allowWeightL2Bypass = false, const LayoutArgs&... layoutArgs)
+                                      bool allowWeightL2Bypass = false,
+                                      typename GmmConfig::MmadContext* context = nullptr,
+                                      const LayoutArgs&... layoutArgs)
 {
-    using GmmConfig = GmmKernel::Config<false, ElementA, ElementB, ElementC, ElementMxScaleA, ElementMxScaleB,
-                                        IsWeightNZ, IsShared, false, IsWaveFlagGrained>;
     auto config = GmmConfig::BuildGmm1ProblemConfig(problemShape, blockJob, Gmm1TileM, activationOutputDivisor);
     config.topkWeightsPrefetch = topkWeightsPrefetch;
     config.activationTileM = topkWeightsPrefetch ? L1_TILE_M_128 : Gmm1TileM;
+    if constexpr (GmmConfig::IS_GENERIC_A4W4 && g_coreType == AIC) {
+        config.fp4Gmm1L1Layout = &params.tilingData->fp4Gmm1L1Layout;
+    }
 
     GmmKernel::BlockScheduler scheduler({config.m, config.schedulerN, config.k},
                                         GmmKernel::BlockScheduler::Params{asc::te::make_coord(
@@ -178,7 +192,7 @@ __aicore__ inline void RunGmm1Generic(bool topkWeightsPrefetch, BlockEpilogue& e
     auto layouts = GmmConfig::BuildLayouts(config, layoutArgs...);
     GmmKernel::Gmm1ExecGeneric<BlockMmad, ElementC, MakeLayoutC, IsShared, IsWaveFlagGrained>(
         scheduler, params, gmmAddrInfo, config, startLoopIdx, tileNum, epilogueOp, vecSetSyncCom, expertBeforeCnt,
-        expertIdx, pingpongIdx, allowWeightL2Bypass, layouts);
+        expertIdx, pingpongIdx, allowWeightL2Bypass, layouts, context);
 
     startBlockIdx = (startBlockIdx + tileNum) % config.blockNum;
 }

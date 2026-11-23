@@ -46,6 +46,9 @@ struct A8W4BlockContext {
     Block* block = nullptr;
 };
 
+template <typename BlockMmad, typename DispatchPolicy = typename BlockMmad::DispatchPolicy>
+struct BlockMmadContext;
+
 // 根据数据类型路径选择对应的 BlockMmad 实现。
 template <bool IsA8W4, typename C>
 struct BlockMmadSelector;
@@ -77,6 +80,16 @@ template <bool IsA8W4, typename ElementA, typename ElementB, typename ElementC, 
 struct Config {
     static constexpr bool IS_SHARED = IsShared;
     static constexpr bool IS_WEIGHT_NZ = IsWeightNZ;
+    static constexpr bool IS_GENERIC_A4W4 = !IsA8W4 && !IsShared && !IsLayered && IsWaveFlagGrained &&
+                                            Std::IsSame<ElementA, fp4x2_e2m1_t>::value &&
+                                            Std::IsSame<ElementB, fp4x2_e2m1_t>::value;
+    // FP4 的 B 每字节存两个元素，门控拼接可在相同的 L0B 容量内扩大 K。
+    static constexpr uint32_t GENERIC_L0_TILE_K =
+        IS_GENERIC_A4W4 ? L0_TILE_K * PackedElementTraits<ElementB>::ELEMENTS_PER_BYTE : L0_TILE_K;
+    static_assert(!IS_GENERIC_A4W4 ||
+                      GENERIC_L0_TILE_K * L1_TILE_N / PackedElementTraits<ElementB>::ELEMENTS_PER_BYTE <=
+                          AscendC::TOTAL_L0B_SIZE / Blaze::Gemm::DOUBLE_BUFFER_COUNT,
+                  "Packed gate/up tile must fit one L0B slot");
     using ElementAType = ElementA;
     using ElementBType = ElementB;
     using ElementCType = ElementC;
@@ -119,7 +132,13 @@ struct Config {
     using LayoutATrait = Te::get_layout_trait<LayoutAType>;
     using LayoutScaleATrait = Te::get_layout_trait<LayoutScaleAType>;
 
+#ifdef MEGA_MOE_ARCH92_DEVICE
     using BlockMmad = typename BlockMmadSelector<IsA8W4, Config>::type;
+#else
+    using BaseMmad = typename BlockMmadSelector<IsA8W4, Config>::type;
+    using BlockMmad = Std::conditional_t<IS_GENERIC_A4W4, Gmm1Fp4Block<BaseMmad, GENERIC_L0_TILE_K>, BaseMmad>;
+#endif
+    using MmadContext = BlockMmadContext<BlockMmad>;
     using L1Params = typename BlockMmad::L1Params;
     using BlockPrologue =
         Std::conditional_t<IsA8W4, Blaze::Gemm::Prologue::BlockPrologue<DispatchPolicy, ElementA, ElementB>, void>;
@@ -299,6 +318,7 @@ struct Config {
         bool topkWeightsPrefetch = false;
         uint8_t combineQuantMode = COMBINE_NO_QUANT;
         BlockMmadTilingConfig blockMmadTiling{};
+        const MegaMoeFp4Gmm1L1Layout* fp4Gmm1L1Layout = nullptr;
     };
 
     struct LayoutBundle {
@@ -384,18 +404,20 @@ struct Config {
 };
 
 // 统一描述一次 BlockMmad::Init 的可变配置，避免 Context 分散保存并逐字段比较。
-// QGMM 的 L1 buffer stage 固定为 2；当前 A/B 的 K 窗口相同，因此只缓存一份 K 长度。
+// A、B 的 L1 K 窗口相同，配置中只保存一份 kL1。
 struct BlockMmadInitConfig {
     uint32_t problemK = 0U;
     uint32_t tileM = 0U;
     uint32_t tileN = 0U;
+    uint32_t l0TileK = L0_TILE_K;
+    bool useFp4L1Layout = false;
     uint64_t kL1 = 0U;
     uint64_t scaleKL1 = 0U;
 
     __aicore__ inline bool operator!=(const BlockMmadInitConfig& other) const
     {
-        return problemK != other.problemK || tileM != other.tileM || tileN != other.tileN || kL1 != other.kL1 ||
-               scaleKL1 != other.scaleKL1;
+        return problemK != other.problemK || tileM != other.tileM || tileN != other.tileN || l0TileK != other.l0TileK ||
+               useFp4L1Layout != other.useFp4L1Layout || kL1 != other.kL1 || scaleKL1 != other.scaleKL1;
     }
 };
 
@@ -403,9 +425,6 @@ enum class GmmStage {
     GMM1,
     GMM2
 };
-
-template <typename BlockMmad, typename DispatchPolicy = typename BlockMmad::DispatchPolicy>
-struct BlockMmadContext;
 
 template <typename BlockMmad>
 struct BlockMmadContext<BlockMmad, Blaze::Gemm::GroupedMatmulWithScaleMx<>> {
@@ -417,13 +436,42 @@ struct BlockMmadContext<BlockMmad, Blaze::Gemm::GroupedMatmulWithScaleMx<>> {
         const auto& tiling = config.blockMmadTiling;
         // GMM1 门控激活按半宽初始化拼接入口；GELU 和 GMM2 使用普通 MMAD 的完整列宽。
         const uint32_t tileN = Stage == GmmStage::GMM1 ? tiling.tileN / config.activationOutputDivisor : tiling.tileN;
-        const BlockMmadInitConfig requestedConfig{config.k, tiling.tileM, tileN, tiling.l1Params.kAL1,
-                                                  tiling.l1Params.scaleKL1};
+        BlockMmadInitConfig requestedConfig{.problemK = config.k,
+                                            .tileM = tiling.tileM,
+                                            .tileN = tileN,
+                                            .kL1 = tiling.l1Params.kAL1,
+                                            .scaleKL1 = tiling.l1Params.scaleKL1};
+        const MegaMoeFp4Gmm1L1Layout* fp4Layout = nullptr;
+#ifndef MEGA_MOE_ARCH92_DEVICE
+        using KernelConfig = typename ProblemConfig::KernelConfig;
+        if constexpr (Stage == GmmStage::GMM1 && KernelConfig::IS_GENERIC_A4W4) {
+            if (config.m > 0U && config.m <= Blaze::Gemm::MATMUL_MNK_ALIGN && config.k % L1_TILE_K == 0U &&
+                config.activationOutputDivisor == ACTIVATION_N_HALF) {
+                requestedConfig.l0TileK = KernelConfig::GENERIC_L0_TILE_K;
+                if (config.fp4Gmm1L1Layout != nullptr && config.fp4Gmm1L1Layout->scaleK != 0U) {
+                    fp4Layout = config.fp4Gmm1L1Layout;
+                    requestedConfig.useFp4L1Layout = true;
+                }
+            }
+        }
+#endif
         if (!initialized_ || initConfig_ != requestedConfig) {
+#ifndef MEGA_MOE_ARCH92_DEVICE
+            if (initialized_) {
+                DrainBeforeReconfigure();
+            }
+#endif
             typename BlockMmad::ProblemShape problemShape{config.m, config.n, config.k, 0};
             typename BlockMmad::MmadParams params{
-                {tiling.tileM, tileN, L0_TILE_K, 0}, tiling.l1Params, false, false, 2U};
-            blockMmad.Init(problemShape, params);
+                {tiling.tileM, tileN, requestedConfig.l0TileK, 0}, tiling.l1Params, false, false};
+#ifndef MEGA_MOE_ARCH92_DEVICE
+            if constexpr (KernelConfig::IS_GENERIC_A4W4) {
+                blockMmad.Init(problemShape, params, fp4Layout);
+            } else
+#endif
+            {
+                blockMmad.Init(problemShape, params);
+            }
             initConfig_ = requestedConfig;
             initialized_ = true;
         }
@@ -431,6 +479,26 @@ struct BlockMmadContext<BlockMmad, Blaze::Gemm::GroupedMatmulWithScaleMx<>> {
     }
 
 private:
+    __aicore__ inline void DrainBeforeReconfigure()
+    {
+        using Layout = MegaMoeFp4Gmm1L1Layout;
+        // MMAD 构造时初始化全部 L1 槽的空闲事件，通用双缓冲未使用的事件仍有初始令牌。
+        constexpr uint16_t numL1Events = Layout::A_BUFFER_COUNT + Layout::B_BUFFER_COUNT + Layout::SCALE_BUFFER_COUNT;
+#pragma unroll
+        for (uint16_t event = 0U; event < numL1Events; ++event) {
+            PipeWait<PIPE_MTE1, PIPE_MTE2>(event);
+        }
+        // MTE1 读完 L1 后，Cube 仍可能在读两个 L0 槽。
+        PipeWait<PIPE_M, PIPE_MTE1>(Blaze::Gemm::M_MTE1_FLAG_0);
+        PipeWait<PIPE_M, PIPE_MTE1>(Blaze::Gemm::M_MTE1_FLAG_1);
+#pragma unroll
+        for (uint16_t event = 0U; event < numL1Events; ++event) {
+            PipeNotify<PIPE_MTE1, PIPE_MTE2>(event);
+        }
+        PipeNotify<PIPE_M, PIPE_MTE1>(Blaze::Gemm::M_MTE1_FLAG_0);
+        PipeNotify<PIPE_M, PIPE_MTE1>(Blaze::Gemm::M_MTE1_FLAG_1);
+    }
+
     BlockMmadInitConfig initConfig_{};
     bool initialized_ = false;
 };

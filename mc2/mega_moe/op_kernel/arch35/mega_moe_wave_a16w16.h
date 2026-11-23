@@ -94,7 +94,7 @@ protected:
                                                   ExpertLoopState& gmm1ExpertState, GMMAddrInfo& gmm1AddrInfo,
                                                   const ProblemShape& gmm1WaveProblemShape,
                                                   GmmRuntimeState& runtimeState, uint32_t waveEndTokenIndexInExpert,
-                                                  uint64_t expertRowCount)
+                                                  uint64_t expertRowCount, Bf16GmmBlockContext& context)
     {
         UpdateMoeExpertGmm1GlobalBuffer<bfloat16_t, bfloat16_t, bfloat16_t, void, 1U, false>(
             this->params_.tilingData->isTopkWeightsPrefetch, this->gmmExecutionConfig_, this->syncWorkspaceLayout_,
@@ -103,7 +103,7 @@ protected:
             this->commonConfig_.gmm1OutputDim / this->commonConfig_.activationOutputDivisor,
             gmm1Position.tokenIndexInExpert);
         Bf16Gmm::RunGmm1<MoeWeight1Format != FORMAT_ND, false>(
-            moeBlockContext_, this->epilogueOp_, gmm1WaveProblemShape, gmm1AddrInfo, this->gmmExecutionConfig_.blockJob,
+            context, this->epilogueOp_, gmm1WaveProblemShape, gmm1AddrInfo, this->gmmExecutionConfig_.blockJob,
             runtimeState, this->commonConfig_.activationOutputDivisor, this->params_.tilingData->isTopkWeightsPrefetch);
         (void)waveEndTokenIndexInExpert;
         (void)expertRowCount;
@@ -111,7 +111,7 @@ protected:
 
     __aicore__ inline void RunGmm2Slice(const ExpertTokenPosition& gmm2Position, uint32_t waveEndTokenIndexInExpert,
                                         const ExpertLoopState& gmm2ExpertState, GMMAddrInfo& gmm2AddrInfo,
-                                        uint32_t& startBlockIdx)
+                                        uint32_t& startBlockIdx, Bf16GmmBlockContext& context)
     {
         UpdateMoeExpertGmm2GlobalBuffer<bfloat16_t, bfloat16_t, void>(
             this->gmmExecutionConfig_, this->syncWorkspaceLayout_, this->params_.workspace.layout,
@@ -122,12 +122,12 @@ protected:
         Get<M_VALUE>(waveShape) = waveEndTokenIndexInExpert - gmm2Position.tokenIndexInExpert;
         if (IsCombineDedupOn(this->params_.tilingData->compute.dedupMode)) {
             Bf16Gmm::RunGmm2<MoeWeight2Format != FORMAT_ND, false, false>(
-                moeBlockContext_, waveShape, gmm2AddrInfo, this->params_, this->gmmExecutionConfig_.blockJob,
-                startBlockIdx, this->commonConfig_.activationOutputDivisor);
+                context, waveShape, gmm2AddrInfo, this->params_, this->gmmExecutionConfig_.blockJob, startBlockIdx,
+                this->commonConfig_.activationOutputDivisor);
         } else {
             Bf16Gmm::RunGmm2<MoeWeight2Format != FORMAT_ND, false, true>(
-                moeBlockContext_, waveShape, gmm2AddrInfo, this->params_, this->gmmExecutionConfig_.blockJob,
-                startBlockIdx, this->commonConfig_.activationOutputDivisor);
+                context, waveShape, gmm2AddrInfo, this->params_, this->gmmExecutionConfig_.blockJob, startBlockIdx,
+                this->commonConfig_.activationOutputDivisor);
         }
     }
 
