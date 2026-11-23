@@ -296,6 +296,13 @@ C++ 调用方和 Torch 扩展须重新编译，使用配套的主算子及 metad
 | max_seqlen_q | int，允许-1或非负值 | cu_seqlens_q和seqused_q均为null或空tensor时必须传入 | 未提供Query长度tensor时，metadata生成须传非负值，主算子须等于q的S维长度 | 提供Query长度tensor时，-1表示未指定 |
 | max_seqlen_kv | int，允许-1或非负值 | 可省略 | 允许-1或非负值 | 当前分页模式要求提供cache_seqlens；-1表示未指定 |
 
+layout_q、layout_kv与SeqLens参数的组合关系：
+
+- 当 `layout_q` 为 TND 时，必须传入 `cu_seqlens_q`，`seqused_q` 和 `max_seqlen_q` 均为可选参数。
+- 当 `layout_q` 为 BSND 或 BNSD 时，不传 `cu_seqlens_q`。`seqused_q` 为可选参数。未传入或传入空的 `seqused_q` 时，metadata 接口的 `max_seqlen_q` 必须为非负值，主算子的 `max_seqlen_q` 必须等于 Query 张量的 S 维长度。
+- `layout_kv` 支持 PA_BBND、PA_BNBD 和 PA_NZ。必须传入 `cache_seqlens` 指定各 batch 的有效 KV 长度，`max_seqlen_kv` 为可选参数。
+- 当 `layout_q` 为 TND 且传入 `seqused_q` 时，第 b 个 batch 的物理 Query 长度为 `cu_seqlens_q[b+1] - cu_seqlens_q[b]`，有效 Query 长度为 `seqused_q[b]`。每个 batch 均须满足 `cu_seqlens_q[b+1] - cu_seqlens_q[b] >= seqused_q[b]`。
+
 #### SoftmaxLSE参数组
 
 | 参数 | 单参数校验 | 存在性校验 | 一致性校验 | 特性交叉校验 |

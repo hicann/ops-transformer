@@ -718,6 +718,10 @@ layout_q、layout_kv与SeqLens参数的组合关系：
 - 当layout_q不为TND时，seqused_q与max_seqlen_q二选一传入，不支持传入cu_seqlens_q；当layout_q为TND时，cu_seqlens_q必须传入，seqused_q与max_seqlen_q均为可选参数。
 - 当layout_kv不为TND且不为PA时，seqused_kv与max_seqlen_kv二选一传入，不支持传入cu_seqlens_kv；当layout_kv为PA时，seqused_kv必须传入，max_seqlen_kv为可选参数；当layout_kv为TND时，cu_seqlens_kv必须传入，seqused_kv与max_seqlen_kv均为可选参数。
 
+- 当 Q 或 KV 使用 TND 布局时，对应的 `cu_seqlens` 相邻差值是每个 batch 的物理长度，`seqused` 的对应元素是有效长度。传入 `seqused` 时，每个 batch b 的有效长度不得超过物理长度。
+  - Q 为 TND 且传入 `seqused_q` 时，`cu_seqlens_q[b+1] - cu_seqlens_q[b] >= seqused_q[b]`。
+  - KV 为 TND 且传入 `seqused_kv` 时，`cu_seqlens_kv[b+1] - cu_seqlens_kv[b] >= seqused_kv[b]`。
+
 #### Sinks参数组
 
 <table style="undefined;table-layout: fixed; width:1625px">

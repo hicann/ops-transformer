@@ -691,6 +691,10 @@ Combination relationship between layout_q, layout_kv, and SeqLens parameters:
 - When layout_q is not TND, pass one of the two: seqused_q and max_seqlen_q; passing cu_seqlens_q is not supported. When layout_q is TND, cu_seqlens_q must be passed in, and both seqused_q and max_seqlen_q are optional parameters.
 - When layout_kv is neither TND nor PA, pass one of the two: seqused_kv or max_seqlen_kv. Passing cu_seqlens_kv is not supported. When layout_kv is PA, seqused_kv must be passed in and max_seqlen_kv is an optional parameter. When layout_kv is TND, cu_seqlens_kv must be passed in and both seqused_kv and max_seqlen_kv are optional parameters.
 
+- For Q or KV in TND layout, the difference between adjacent `cu_seqlens` entries gives the physical length of each batch. If the corresponding `seqused` is provided, it gives the effective length, which must not exceed the physical length for each batch b.
+  - For TND Q with `seqused_q`, `cu_seqlens_q[b+1] - cu_seqlens_q[b] >= seqused_q[b]`.
+  - For TND KV with `seqused_kv`, `cu_seqlens_kv[b+1] - cu_seqlens_kv[b] >= seqused_kv[b]`.
+
 #### Sinks Parameter Group
 
 <table style="undefined;table-layout: fixed; width:1625px">
