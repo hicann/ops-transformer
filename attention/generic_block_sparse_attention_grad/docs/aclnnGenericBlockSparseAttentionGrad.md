@@ -268,7 +268,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
               <tr>
                   <td>cuSeqLengthsQOptional</td>
                   <td>可选输入</td>
-                  <td>每个Batch对应的query序列长度前缀和。</td>
+                  <td>每个batch对应的query序列长度前缀和。</td>
                   <td>layoutQ为"TND"时必须配置；为"BNSD"或"BSND"时传nullptr。</td>
                   <td>INT64</td>
                   <td>ND</td>
@@ -278,7 +278,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
               <tr>
                   <td>cuSeqLengthsKvOptional</td>
                   <td>可选输入</td>
-                  <td>每个Batch对应的key/value序列长度前缀和。</td>
+                  <td>每个batch对应的key/value序列长度前缀和。</td>
                   <td>layoutKv为"TND"时必须配置；为"BNSD"或"BSND"时传nullptr。</td>
                   <td>INT64</td>
                   <td>ND</td>
@@ -378,7 +378,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
                   <td>
                       <ul>
                           <li>当前仅支持0。</li>
-                          <li>0：online softmax和rescale均使用fp32。</li>
+                          <li>0：online softmax和rescale均使用FP32。</li>
                       </ul>
                   </td>
                   <td>INT64</td>
@@ -525,7 +525,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
         <tr>
           <td>ACLNN_ERR_RUNTIME_ERROR</td>
           <td>361001</td>
-          <td>API内部调用npu runtime的接口异常。</td>
+          <td>API内部调用NPU Runtime的接口异常。</td>
         </tr>
       </tbody>
     </table>
@@ -560,7 +560,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
     <tr>
       <td>stream</td>
       <td>输入</td>
-      <td>指定执行任务的Stream流。</td>
+      <td>指定执行任务的Stream。</td>
     </tr>
   </tbody>
   </table>
@@ -582,7 +582,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionGrad(
 
 - 要求`residualBlockMode=0`、`maskType=1`，须先调用[aclnnGenericBlockSparseAttentionGradMetadata](../../generic_block_sparse_attention_grad_metadata/docs/aclnnGenericBlockSparseAttentionGradMetadata.md)生成INT32的`metadataOptional`；两次调用的`layoutSparsePattern`、`residualBlockMode`、`isConsistentTopk`须保持一致。
 - HeadDim固定为128，N1/N2取值范围为[1,128]且N1≥N2、N1%N2=0；blockShapeX=1，blockShapeY≥128且为64的倍数。
-- Softmax LSE：TND为`(T1,N1,1)`，BNSD为`(B,N1,S1,1)`；BSND在Ascend 950（A5）上必须为`(B,N1,S1,1)`，在A2/A3上为`(B,S1,N1,1)`。
+- Softmax LSE：TND为`(T1,N1,1)`，BNSD为`(B,N1,S1,1)`；BSND在Ascend 950PR&950DT系列产品上必须为`(B,N1,S1,1)`，在Atlas A2系列产品、Atlas A3系列产品上为`(B,S1,N1,1)`。
 - `sparseBlockIdx`第4维maxS1应≥`sparseBlockCount`中所有元素的最大值。
 
 **`layoutSparsePattern=0`：**

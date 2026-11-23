@@ -256,7 +256,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     <td>oriXOptional</td>
     <td>输入</td>
     <td>表示未经过FFN（Feed-Forward Neural network）的token数据。</td>
-    <td>在开启copyExpert或开启constExpert的场景下需要本输入数据。可选择传入有效数据或填空指针，当<code>copyExpertNum</code>不为0或<code>constExpertNum</code>不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，数据类型需跟<code>expandX</code>保持一致。</td>
+    <td>在开启copyExpert或开启constExpert的场景下需要本输入数据。可选择传入有效数据或空指针，当<code>copyExpertNum</code>不为0或<code>constExpertNum</code>不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，数据类型需跟<code>expandX</code>保持一致。</td>
     <td>FLOAT16、BFLOAT16</td>
     <td>ND</td>
     <td><code>(BS, H)</code></td>
@@ -295,7 +295,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     <tr>
     <td>performanceInfoOptional</td>
     <td>输入</td>
-    <td>表示本卡等待各卡数据的通信时间，单位为us（微秒）。</td>
+    <td>表示本卡等待各卡数据的通信时间，单位为μs（微秒）。</td>
     <td>单次算子调用各卡通信耗时会累加到该Tensor上，算子内部不进行自动清零，因此用户每次启用此Tensor开始记录耗时前需对Tensor清零。</td>
     <td>INT64</td>
     <td>ND</td>
@@ -435,7 +435,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     <tr>
     <td>groupListType</td>
     <td>输入</td>
-    <td>group List格式，预留参数。</td>
+    <td>groupList格式，预留参数。</td>
     <td>当前版本不支持，传0。</td>
     <td>INT64</td>
     <td>-</td>
@@ -465,7 +465,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     <tr>
     <td>copyExpertNum</td>
     <td>输入</td>
-    <td>copy专家数量。</td>
+    <td>拷贝专家数量。</td>
     <td>-</td>
     <td>INT64</td>
     <td>-</td>
@@ -543,7 +543,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     - zeroExpertNum当commAlg="fullmesh"时，取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
     - copyExpertNum当commAlg="fullmesh"时，取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
     - constExpertNum当前版本不支持，传0即可。
-    - performanceInfoOptional可选择传入有效数据或填空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
+    - performanceInfoOptional可选择传入有效数据或空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
     </details>
     <!-- end id7 -->
 
@@ -569,13 +569,13 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     - commQuantMode取值范围0或2（0表示不量化，2表示int8量化），取值为2仅当tpWorldSize < 2时可开启。
     - expandScalesOptional预留参数，当前版本不支持，传空指针即可。
     - elasticInfoOptional预留参数，当前版本不支持，传空指针即可。
-    - constExpertAlpha1Optional可选择传入有效数据或填空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为<code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
-    - constExpertAlpha2Optional可选择传入有效数据或填空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为<code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
-    - constExpertVOptional可选择传入有效数据或填空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为 <code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
+    - constExpertAlpha1Optional可选择传入有效数据或空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为<code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
+    - constExpertAlpha2Optional可选择传入有效数据或空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为<code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
+    - constExpertVOptional可选择传入有效数据或空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为 <code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
     - zeroExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
     - copyExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
     - constExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的常量专家的ID的值是[<code>moeExpertNum + zeroExpertNum + copyExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>)。
-    - performanceInfoOptional可选择传入有效数据或填空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
+    - performanceInfoOptional可选择传入有效数据或空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
     </details>
     <!-- end id8 -->
 
@@ -601,13 +601,13 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     - commQuantMode取值范围0、2、3或4（0表示不量化，2表示int8量化，3表示mxfp8量化e5m2，4表示mxfp8量化e4m3）。
     - expandScalesOptional预留参数，当前版本不支持，传空指针即可。
     - elasticInfoOptional预留参数，当前版本不支持，传空指针即可。
-    - constExpertAlpha1Optional可选择传入有效数据或填空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为<code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
-    - constExpertAlpha2Optional可选择传入有效数据或填空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为<code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
-    - constExpertVOptional可选择传入有效数据或填空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为 <code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
+    - constExpertAlpha1Optional可选择传入有效数据或空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为<code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
+    - constExpertAlpha2Optional可选择传入有效数据或空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为<code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
+    - constExpertVOptional可选择传入有效数据或空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为 <code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
     - zeroExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的零专家的ID的值是[<code>moeExpertNum</code>, <code>moeExpertNum + zeroExpertNum</code>)。
     - copyExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
     - constExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的常量专家的ID的值是[<code>moeExpertNum + zeroExpertNum + copyExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>)。
-    - performanceInfoOptional可选择传入有效数据或填空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
+    - performanceInfoOptional可选择传入有效数据或空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
     </details>
     <!-- end id9 -->
 
@@ -713,7 +713,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
 - **产品特定约束**：
 
   <!-- npu="A3" id10 -->
-  - <term>Atlas A3系列产品</term>  ：单卡包含双DIE（晶粒/裸片），参数说明中的“本卡”均指单DIE。
+  - <term>Atlas A3系列产品</term>：单卡包含双DIE（晶粒/裸片），参数说明中的“本卡”均指单DIE。
 
   <!-- end id10 -->
 
@@ -852,7 +852,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
 
     - A2示例代码：
 
-        ```Cpp
+        ```cpp
         #include <thread>
         #include <iostream>
         #include <string>
@@ -1293,7 +1293,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
 <!-- end id22 -->
 - 示例代码如下，仅供参考
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>

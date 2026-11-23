@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：完成Stem OAM block-sparse attention中Q侧预处理计算，将按token维拼接存储的变长Q tensor（shape为[total_tokens, H_q, D]）转化为按stem block(128 token)分组的flattened qFlat输出，供后续OAM score计算。
+- 接口功能：完成Stem OAM block-sparse attention中Q侧预处理计算，将变长Q Tensor从paged存储格式转化为按stem block（128个token）分组的flattened qFlat输出，供后续OAM score计算。
 - 计算公式：
 
   阶段1 Scale Fusion:
@@ -97,7 +97,7 @@ aclnnStatus aclnnStemOamPrepVarlenQ(
     <tr>
       <td>q（aclTensor*）</td>
       <td>输入</td>
-      <td>表示变长Q tensor，所有batch的token拼接存储。对应公式中q。</td>
+      <td>表示变长Q Tensor，所有batch的token拼接存储。对应公式中q。</td>
       <td><ul><li>支持空Tensor，空Tensor时直接返回，workspaceSize为0。</li><li>最后一维必须等于128。</li><li>数据类型仅支持FLOAT8_E4M3FN。</li></ul></td>
       <td>FLOAT8_E4M3FN</td>
       <td>ND</td>

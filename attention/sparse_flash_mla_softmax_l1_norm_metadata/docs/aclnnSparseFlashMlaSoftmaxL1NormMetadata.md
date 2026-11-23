@@ -270,7 +270,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
       <td>INT32</td>
       <td>ND</td>
       <td>1维，shape固定为(64,)</td>
-      <td>x</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>workspaceSize</td>
@@ -328,7 +328,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
 
 ## aclnnSparseFlashMlaSoftmaxL1NormMetadata
 
-- **参数说明：**
+- **参数说明**
 
     <table style="undefined;table-layout: fixed; width: 1150px"><colgroup>
     <col style="width: 168px">
@@ -388,7 +388,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
         </colgroup>
         <thead>
             <tr>
-                <th>mask_mode</th>
+                <th>maskMode</th>
                 <th>含义</th>
                 <th>备注</th>
             </tr>
@@ -415,7 +415,7 @@ aclnnStatus aclnnSparseFlashMlaSoftmaxL1NormMetadata(
     - 如果batchSize大于0，优先使用batchSize。
     - 如果batchSize小于等于0，且layoutQ为TND，则通过cuSeqLensQOptional的shape推导batch。
     - 如果batchSize小于等于0，且layoutQ为BSND，则报错。
-  - Seqlen取值规则
+  - SeqLen取值规则
     - TND场景下，通过cuSeqLensQOptional和cuSeqLensKOptional计算每个batch的实际q/k长度。
     - BSND场景下，通过maxSeqLenQ和maxSeqLenK获取q/k长度。
   - layout约束

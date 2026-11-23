@@ -391,7 +391,7 @@ aclnnStatus aclnnUndGenQkvRmsNormRopeCache(
   </tbody>
   </table>
 
-  > 数据类型、shape与属性取值的完整校验统一收敛在tiling一层实现（aclnn单算子路径与图模式最终都会走tiling，避免同一条约束在多处重复实现导致漂移）。代价是这类非法入参不在第一段接口报错，而是在第二段接口`aclnnUndGenQkvRmsNormRopeCache`执行阶段由tiling返回失败，具体原因见host侧日志。
+  > 数据类型、shape与属性取值的完整校验统一收敛在tiling一层实现（aclnn单算子路径与图模式最终都会走tiling，避免同一条约束在多处重复实现导致漂移）。代价是这类非法入参不在第一段接口报错，而是在第二段接口`aclnnUndGenQkvRmsNormRopeCache`执行阶段由tiling返回失败，具体原因见Host侧日志。
 
 ## aclnnUndGenQkvRmsNormRopeCache
 
@@ -451,7 +451,7 @@ aclnnStatus aclnnUndGenQkvRmsNormRopeCache(
     - `(numHeadsQ, numHeadsK, numHeadsV)`仅支持`(8,1,1)`和`(16,2,2)`两种组合。
     - numHeadsQ + numHeadsK + numHeadsV必须等于`undQkv`的第二维N。
     - und_len必须为正数；T = und_len + gen_len必须为正数。
-    - T不设人为上限，真实上限由KV Cache容量决定，需满足blockNum × blockSize ≥ T。上板已验证到T = 64K。
+    - T不设人为上限，真实上限由KV Cache容量决定，需满足blockNum × blockSize ≥ T。上板已验证到T = 64k。
     - blockSize不设限：cache强制为连续BBND，`[Bn, Bs, N, D]`展平后等价`[Bn*Bs, N, D]`，槽位号直接作为扁平行号使用，Bs不参与地址计算，也不参与多核与UB切分。上板已验证Bs ∈ {16, 64, 100, 128, 256, 512}，含非2的幂。
     - `vCacheRef`的Bn、Bs必须与`kCacheRef`一致。
     - `kCacheRef`第三维必须等于numHeadsK，第四维必须等于headDim（128）。

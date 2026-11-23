@@ -29,7 +29,7 @@
   - <term>Atlas A2系列产品</term>：无新增特性。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
-  - <term>Ascend 950PR&950DT系列产品</term>：新增perblock、pertile、mxfp量化方式。新增x1，x2输入支持dtype为`FLOAT8_E4M3FN`、`FLOAT8_E5M2`、HIFLOAT8、`FLOAT4_E2M1`。
+  - <term>Ascend 950PR&950DT系列产品</term>：新增perblock、pertile、MXFP量化方式。新增x1，x2输入支持dtype为`FLOAT8_E4M3FN`、`FLOAT8_E5M2`、`HIFLOAT8`、`FLOAT4_E2M1`。
   <!-- end id8 -->
 
 - **计算公式**：
@@ -80,7 +80,7 @@
 
   - 公式5，perchannel量化 && pertensor量化：
 
-    x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`/HIFLOAT8，x2Scale为UINT64/INT64，可选bias为FLOAT32，out为FLOAT16/BFLOAT16/FLOAT32：
+    x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`/HIFLOAT8，x2Scale为UINT64/INT64，可选biasOptional为FLOAT32，out为FLOAT16/BFLOAT16/FLOAT32：
 
   $$
   output = AllReduce((x1@x2 + biasOptional) * x2Scale + x3Optional)
@@ -88,7 +88,7 @@
 
   - 公式6，pertoken-perchannel量化 && pertoken-pertensor量化：
 
-    x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`/HIFLOAT8，x1ScaleOptional为FLOAT32，x2Scale为FLOAT32，可选bias为FLOAT32, out为FLOAT16/BFLOAT16/FLOAT32：
+    x1，x2为`FLOAT8_E4M3FN`/`FLOAT8_E5M2`/HIFLOAT8，x1ScaleOptional为FLOAT32，x2Scale为FLOAT32，可选biasOptional为FLOAT32, out为FLOAT16/BFLOAT16/FLOAT32：
 
     $$
     output = AllReduce((x1@x2 + biasOptional) * x2Scale * x1ScaleOptional + x3Optional)
@@ -238,7 +238,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
           <td>x3Optional</td>
           <td>输入</td>
           <td>MatMul计算后的add计算，即计算公式中的x3Optional。</td>
-          <td><ul><li>低比特通信场景下仅支持输出为BFLOAT16，且仅支持非空输入，要求数据类型、维度与output的维度一致。</li></ul></td>
+          <td><ul><li>低bit通信场景下仅支持输出为BFLOAT16，且仅支持非空输入，要求数据类型、维度与output的维度一致。</li></ul></td>
           <td>FLOAT16、BFLOAT16、FLOAT32</td>
           <td>ND</td>
           <td>2-3</td>
@@ -247,7 +247,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
         <tr>
           <td>x1ScaleOptional</td>
           <td>输入</td>
-          <td>MatMul计算后的pertoken去量化系数，即计算公式中的x1ScaleOptional。</td>
+          <td>MatMul计算后的pertoken反量化系数，即计算公式中的x1ScaleOptional。</td>
           <td><ul><li>pertoken场景下，x1为(b, m, k)时shape为(b*m)，x1为(m, k)时shape为(m)。</li><li>perblock场景下，x1为(b, m, k)时shape为[b, ceilDiv(m, 128), ceilDiv(k, 128)]，x1为(m, k)时shape为[ceilDiv(m, 128), ceilDiv(k, 128)]。</li><li>数据类型为FLOAT8_E8M0时，shape为[m, ceilDiv(k, 64), 2], x1为FLOAT4_E2M1时，必须保证ceilDiv(k, 32)为偶数。</li></ul></td>
           <td>FLOAT32、FLOAT8_E8M0</td>
           <td>ND</td>
@@ -257,7 +257,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
         <tr>
           <td>x2Scale</td>
           <td>输入</td>
-          <td>MatMul计算后的去量化系数，即计算公式中的x2Scale。</td>
+          <td>MatMul计算后的反量化系数，即计算公式中的x2Scale。</td>
           <td><ul><li>shape在pertensor场景为(1)，perchannel场景为(n)/(1, n)。</li><li>输入为int8且输出为BFLOAT16时，直接将BFLOAT16类型的x2Scale传入本接口。</li><li>输出为FLOAT16且输入为INT8时，x1ScaleOptional不为空，可直接将FLOAT32类型的x2Scale传入本接口，如果x1ScaleOptional为空，则需提前调用TransQuantParamV2算子的aclnn接口来将x2Scale转成INT64/UINT64数据类型。</li><li>数据类型为FLOAT8_E8M0时，仅支持转置，shape为[n, ceilDiv(k, 64), 2]。</li> <li>x2为FLOAT4_E2M1时，必须保证ceilDiv(k, 32)为偶数。</li><li>perblock场景下，x2的shape为[ceilDiv(k, 128), ceilDiv(n, 128)]，x2转置时，x2Scale的shape为[ceilDiv(n, 128), ceilDiv(k, 128)]。</li><li>数据类型为FLOAT8_E8M0时，ceilDiv(k, 64)轴不支持为1。</li></ul></td>
           <td>INT64、UINT64、FLOAT32、BFLOAT16、FLOAT8_E8M0</td>
           <td>ND</td>
@@ -288,7 +288,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
           <td>group</td>
           <td>输入</td>
           <td>通信域名称。</td>
-          <td><ul><li>通过Hccl提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</li></ul></td>
+          <td><ul><li>通过HCCL提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</li></ul></td>
           <td>String</td>
           <td>-</td>
           <td>-</td>
@@ -338,7 +338,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
           <td>commQuantMode</td>
           <td>输入</td>
           <td>静态量化和动态量化的标志位。</td>
-          <td><ul><li>数值为0和1。仅在x1和x2为FLOAT8_E4M3FN或FLOAT8_E5M2时支持1，为1时走Pertile量化Fp8通信场景。</li></ul></td>
+          <td><ul><li>数值为0和1。仅在x1和x2为FLOAT8_E4M3FN或FLOAT8_E5M2时支持1，为1时进入pertile量化FP8通信场景。</li></ul></td>
           <td>INT64</td>
           <td>-</td>
           <td>-</td>
@@ -464,7 +464,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
   - <term>Atlas A2系列产品</term>：`aclnnQuantMatmulAllReduceV4`默认非确定性实现，支持通过配置`HCCL_DETERMINISTIC`环境变量为true开启确定性计算。
   <!-- end id9 -->
   <!-- npu="950" id10 -->
-  - Ascend 950PR&950DT系列产品：`aclnnQuantMatmulAllReduceV4`默认确定性实现。
+  - <term>Ascend 950PR&950DT系列产品</term>：`aclnnQuantMatmulAllReduceV4`默认确定性实现。
   <!-- end id10 -->
 
 - 增量场景不开启MC2，全量场景开启MC2。
@@ -474,7 +474,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
 - 传入的x1、x2、x2Scale或者output不为空指针。
 - x1和x2、x1ScaleOptional、x2Scale、output、biasOptional（非空场景）、x3Optional（非空场景）的数据类型和数据格式需要在支持的范围之内。
 - 传入的commQuantScale1与commQuantScale2需要同时为空指针或同时不为空指针，若传入的commQuantScale1与commQuantScale2同时不为空指针，两个量化参数shape需保持一致，类型需与算子输出类型保持一致，且每张卡输入保持一致。
-- 仅支持hccs链路all mesh组网。
+- 仅支持HCCS链路all mesh组网。
 
     <!-- npu="910b" id11 -->
     - <term>Atlas A2系列产品</term>：支持1、2、4、8卡。
@@ -484,7 +484,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV4(
     <!-- end id12 -->
 
 - 一个模型中的通算融合MC2算子，仅支持相同通信域。
-- INT8和FP8低bit通信仅在通信bound的情况下存在性能收益，计算bound的情况不建议开启INT8或FP8低bit通信，即不建议输入commQuantScale1和commQuantScale2，且commQuantMode输入0。（注：INT8低bit通信指输入为int8且开启commQuantScale1Optional、commQuantScale2Optional；FP8低bit通信指输入为FLOAT8_E4M3FN/FLOAT8_E5M2且开启commQuantMode=1。）
+- INT8和FP8低bit通信仅在通信bound的情况下存在性能收益，计算bound的情况下不建议开启INT8或FP8低bit通信，即不建议输入commQuantScale1和commQuantScale2，且commQuantMode输入0。（注：INT8低bit通信指输入为int8且开启commQuantScale1Optional、commQuantScale2Optional；FP8低bit通信指输入为FLOAT8_E4M3FN/FLOAT8_E5M2且开启commQuantMode=1。）
 - 空tensor支持度：
   - 不支持空tensor。
 - groupSize相关约束：

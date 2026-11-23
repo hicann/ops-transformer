@@ -24,7 +24,7 @@
 ## 功能说明
 
 - **接口功能**：MoE计算中，最后处理合并MoE FFN的输出结果。本接口针对V2接口aclnnMoeFinalizeRoutingV2做出如下变更，请根据实际情况选择合适的接口：
-  1. 兼顾V2原有功能的情况下，增加零计算专家、拷贝专家和常量专家的计算，计算公式变更如下。
+  1. 在兼顾V2原有功能的情况下，增加零计算专家、拷贝专家和常量专家的计算，计算公式变更如下。
 - **计算公式**：
 
 $$
@@ -35,7 +35,7 @@ $$
 
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnMoeFinalizeRoutingV3GetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnMoeFinalizeRoutingV3”接口执行计算。
 
-```c++
+```cpp
 aclnnStatus aclnnMoeFinalizeRoutingV3GetWorkspaceSize(
     const aclTensor *expandedX,
     const aclTensor *expandedRowIdx,
@@ -57,7 +57,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV3GetWorkspaceSize(
     aclOpExecutor  **executor)
 ```
 
-```c++
+```cpp
 aclnnStatus aclnnMoeFinalizeRoutingV3(
     void          *workspace,
     uint64_t       workspaceSize,
@@ -218,6 +218,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV3(
     <td>取值范围与expertIdxOptional一致</td>
     <td>-</td>
     <td>2</td>
+    <td>-</td>
     <td>-</td>
   </tr>
   <tr>

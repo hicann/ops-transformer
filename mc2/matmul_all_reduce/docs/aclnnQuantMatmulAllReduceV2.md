@@ -162,7 +162,7 @@ aclnnStatus aclnnQuantMatmulAllReduceV2(
           <td>group</td>
           <td>输入</td>
           <td>通信域名称。</td>
-          <td>通过Hccl提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
+          <td>通过HCCL提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
           <td>String</td>
           <td>-</td>
           <td>-</td>
@@ -331,20 +331,20 @@ aclnnStatus aclnnQuantMatmulAllReduceV2(
   - <term>Atlas A2系列产品</term>：`aclnnQuantMatmulAllReduceV2`默认非确定性实现，支持通过配置`HCCL_DETERMINISTIC`环境变量为true开启确定性计算。
   <!-- end id9 -->
   <!-- npu="950" id10 -->
-  - Ascend 950PR&950DT系列产品：`aclnnQuantMatmulAllReduceV2`默认确定性实现。
+  - <term>Ascend 950PR&950DT系列产品</term>：`aclnnQuantMatmulAllReduceV2`默认确定性实现。
   <!-- end id10 -->
 
 - 增量场景不开启MC2，全量场景开启MC2。
 - 输入x1可为二维或者三维，且不为空Tensor，其shape为(b, s, k)或者(m, k)。x2必须是二维，且不为空Tensor。其shape为(k, n)，k轴满足mm算子入参要求，k轴相等。
 - m大小不超过2147483647，x1与x2的最后一维大小不超过65535，x1的最后一维指k，x2的最后一维指转置时的k或非转置时的n。
-- bias若非空，shape为(n)。x3若非空，shape大小与output相等。
+- biasOptional若非空，shape为(n)。x3若非空，shape大小与output相等。
 - 当输入x1的shape为(b, s, k)时，输出output的shape为(b, s, n)，当输入x1的shape为(m, k)时，输出output的shape为(m, n)。
 - 传入的x1、x2、dequantScale或者output不为空指针。
-- x1和x2、dequantScale、output、bias（非空场景）、x3（非空场景）的数据类型和数据格式需要在支持的范围之内。
+- x1和x2、dequantScale、output、biasOptional（非空场景）、x3（非空场景）的数据类型和数据格式需要在支持的范围之内。
 - 若输出output类型为FLOAT16，当pertokenScaleOptional为空时，dequantScale的类型为INT64、UINT64；当pertokenScaleOptional不为空时，dequantScale的类型为FLOAT32。
 - 若输出output类型为BFLOAT16，dequantScale的类型为BFLOAT16。
 - x1的shape为(b, s, k)时，pertokenScaleOptional的shape为(b*s)，x1的shape为(m, k)时，pertokenScaleOptional的shape为(m)。
-- 仅支持hccs链路all mesh组网。
+- 仅支持HCCS链路all mesh组网。
 
     <!-- npu="910b" id11 -->
     - <term>Atlas A2系列产品</term>：支持1、2、4、8卡。
@@ -356,8 +356,8 @@ aclnnStatus aclnnQuantMatmulAllReduceV2(
 <!-- npu="910b" id13 -->
 - <term>Atlas A2系列产品</term>：一个模型中的通算融合MC2算子，仅支持相同通信域。
 <!-- end id13 -->
-- 空tensor支持度：
-  - 不支持空tensor。
+- 空Tensor支持度：
+  - 不支持空Tensor。
 
 ## 调用示例
 

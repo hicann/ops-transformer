@@ -181,7 +181,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2(
     <tr>
       <td>sharedInputOptional</td>
       <td>输入</td>
-      <td>moe计算中共享专家的输出，需要与moe专家的输出进行combine操作。</td>
+      <td>MoE计算中共享专家的输出，需要与MoE专家的输出进行combine操作。</td>
       <td>可选参数，支持空指针；为空时不融合共享专家输出。</td>
       <td>BF16</td>
       <td>ND</td>
@@ -191,7 +191,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2(
     <tr>
       <td>logitOptional</td>
       <td>输入</td>
-      <td>moe专家对各个token的logit大小。</td>
+      <td>MoE专家对各个token的logit大小。</td>
       <td>必选参数，不支持空指针；sharedInputOptional为空时仍须提供。</td>
       <td>FLOAT32</td>
       <td>ND</td>
@@ -201,7 +201,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2(
     <tr>
       <td>rowIndexOptional</td>
       <td>输入</td>
-      <td>moe专家输出按照该rowIndex进行combine，其中的值即为combine做scatter add的索引。</td>
+      <td>MoE专家输出按照该rowIndex进行combine，其中的值即为combine做scatter add的索引。</td>
       <td>必选参数，不支持空指针。</td>
       <td>INT64</td>
       <td>ND</td>
@@ -221,7 +221,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV2(
     <tr>
       <td>sharedInputWeight</td>
       <td>输入</td>
-      <td>共享专家与moe专家进行combine的系数，sharedInput先与该参数乘，然后再和moe专家结果累加。</td>
+      <td>共享专家与MoE专家进行combine的系数，sharedInput先与该参数相乘，然后再与MoE专家结果累加。</td>
       <td></td>
       <td>FLOAT32</td>
       <td></td>

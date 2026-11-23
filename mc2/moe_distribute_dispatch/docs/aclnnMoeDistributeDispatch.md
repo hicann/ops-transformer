@@ -140,7 +140,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
     <tr>
     <td>scales</td>
     <td>输入</td>
-    <td>每个专家的平滑权重、融合量化平滑权重的量化系数或量化系数。</td>
+    <td>每个专家的平滑权重、融合量化平滑权重的量化系数。</td>
     <td>要求为2D Tensor。</td>
     <td>FLOAT32</td>
     <td>ND</td>
@@ -411,7 +411,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
         - 不支持`xActiveMask`输入。
         - `sharedExpertNum`当前取值范围[0, 1]，0表示无共享专家，1表示一个共享专家，当前版本仅支持传1。
         - `sharedExpertRankNum`当前取值范围[0, epWorldSize)，不为0时需满足epWorldSize % sharedExpertRankNum = 0。
-        - 当前不支持TP域通信，不支持`groupTp`、`tpWorldSize`、`tpRankId`属性，且`tpSendCounts`为无效内容。
+        - 当前不支持TP域通信，不支持`groupTp`、`tpWorldSize`、`tpRankId`属性，且`tpRecvCounts`为无效内容。
 
     <!-- end id9 -->
 
@@ -598,11 +598,11 @@ aclnnStatus aclnnMoeDistributeDispatch(
 
         2. 将项目拷贝到两台服务器中，并根据机器的device ip配置rank_table_m2.json文件内容。注意两机rank_table_m2.json文件保持一致。
 
-        3. 安装cann包并参考下方指导编译运行。
+        3. 安装CANN包并参考下方指导编译运行。
 
     - 关于rankTable：
 
-        1. 开发者可以通过ranktable文件配置参与集合通信的NPU资源信息，详细配置请参考[《集合通信用户指南》](https://hiascend.com/document/redirect/CannCommunityHcclUg)中“通信功能开发>集群信息配置>ranktable文件配置资源信息”。
+        1. 开发者可以通过ranktable文件配置参与集合通信的NPU资源信息，详细配置请参考《[集合通信用户指南](https://hiascend.com/document/redirect/CannCommunityHcclUg)》中“通信功能开发>集群信息配置>ranktable文件配置资源信息”。
 
         2. 使用`cat /etc/hccn.conf`或者`for i in $(seq 0 7); do echo "===================> dev$i, NPU$((i+1))"; hccn_tool -i $i -ip -g; done`查询机器的device ip。然后参考集合通信文档填写json文件。
 
@@ -623,7 +623,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
     - 机器数量设置：
         两机16卡场景中，需将参数MACHINE_NUM设置为2，即
 
-        ```Cpp
+        ```cpp
         const uint32_t MACHINE_NUM = 2;
         ```
 
@@ -661,7 +661,7 @@ aclnnStatus aclnnMoeDistributeDispatch(
 <!-- npu="950,A3,910b" id17 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>、<term>Ascend 950DT系列产品</term>：
 
-    ```Cpp
+    ```cpp
     #include <thread>
     #include <iostream>
     #include <string>

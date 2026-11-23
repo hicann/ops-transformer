@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：SparseLightningIndexerGradKLLoss算子是LightningIndexer的反向算子，再额外融合了Loss计算功能。LightningIndexer算子将QueryToken和KeyToken之间的最高内在联系的TopK个筛选出来，存放在SparseIndices中，从而减少长序列场景下Attention的计算量，加速长序列网络的推理和训练。
+- 接口功能：SparseLightningIndexerGradKLLoss算子是LightningIndexer的反向算子，额外融合了Loss计算功能。LightningIndexer算子将QueryToken和KeyToken之间的最高内在联系的TopK个筛选出来，存放在SparseIndices中，从而减少长序列场景下Attention的计算量，加速长序列网络的推理和训练。
 
 - aclnnSparseLightningIndexerGradKLLossV2在aclnnSparseLightningIndexerGradKLLoss的基础上新增了sinks参数，sinks用于修正target distribution（p）归一化因子，仅Ascend 950PR&950DT系列产品支持。
 
@@ -245,7 +245,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2(
         <tr>
             <td>queryRopeOptional</td>
             <td>输入</td>
-            <td>MLA rope部分：Query位置编码的输出。</td>
+            <td>MLA RoPE部分：Query位置编码的输出。</td>
             <td>
             <ul>
                 <li>与query的layout维度保持一致。</li>
@@ -260,7 +260,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2(
         <tr>
             <td>keyRopeOptional</td>
             <td>输入</td>
-            <td>MLA rope部分：Key位置编码的输出。</td>
+            <td>MLA RoPE部分：Key位置编码的输出。</td>
             <td>
             <ul>
                 <li>与key的layout维度保持一致。</li>
@@ -490,7 +490,7 @@ aclnnStatus aclnnSparseLightningIndexerGradKLLossV2(
             <tr>
                 <td>ACLNN_ERR_RUNTIME_ERROR</td>
                 <td>361001</td>
-                <td>API内部调用npu runtime的接口异常。</td>
+                <td>API内部调用NPU Runtime的接口异常。</td>
             </tr>
         </tbody>
     </table>

@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：MhcPreBackward是MhcPre的反向算子，MhcPre算子基于一系列计算得到mHC（Manifold-Constrained Hyper-Connections）架构中的$H^{res}$和$H^{post}$投影矩阵以及Atten或MLP层的输入矩阵$h^{in}$。
+- 接口功能：MhcPreBackward是MhcPre的反向算子，MhcPre算子基于一系列计算得到mHC（Manifold-Constrained Hyper-Connections）架构中的$H^{res}$和$H^{post}$投影矩阵以及Attention或MLP层的输入矩阵$h^{in}$。
 
 - 相较于[aclnnMhcPreBackward](aclnnMhcPreBackward.md)接口，此接口新增`opImplMode`参数，用于指定MhcPreBackward算子的计算模式：
   - `opImplMode=0`：在Cube中使用FP32模式计算。
@@ -281,7 +281,7 @@ aclnnStatus aclnnMhcPreBackwardV2(
         <tr>
             <td>gradHIn（aclTensor*）</td>
             <td>输入</td>
-            <td>hIn作为Atten/MLP层的输入。正向输出hIn对应的梯度。</td>
+            <td>hIn作为Attention/MLP层的输入。正向输出hIn对应的梯度。</td>
             <td><ul><li>不支持空Tensor。</li><li>shape为(B, S, D)、(T, D)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；D与`x`的D保持一致。</li></ul></td>
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
@@ -311,7 +311,7 @@ aclnnStatus aclnnMhcPreBackwardV2(
         <tr>
             <td>invRms（aclTensor*）</td>
             <td>输入</td>
-            <td>正向RmsNorm计算的invRms。</td>
+            <td>正向RMSNorm计算的invRms。</td>
             <td><ul><li>不支持空Tensor。</li><li>shape为(B, S)、(T)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
@@ -321,7 +321,7 @@ aclnnStatus aclnnMhcPreBackwardV2(
         <tr>
             <td>hMix（aclTensor*）</td>
             <td>输入</td>
-            <td>正向计算流x@phi的结果。</td>
+            <td>正向计算x@phi的结果。</td>
             <td><ul><li>不支持空Tensor。</li><li>shape为(B, S, 2N+N*N)、(B, S, 2N+N!)、(T, 2N+N*N)、(T, 2N+N!)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；N与`x`的N保持一致。最后一维需与`phi`的第0维（fusionSize）保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
@@ -351,7 +351,7 @@ aclnnStatus aclnnMhcPreBackwardV2(
         <tr>
             <td>gammaOptional（aclTensor*）</td>
             <td>可选输入</td>
-            <td>RmsNorm的缩放系数gamma。</td>
+            <td>RMSNorm的缩放系数gamma。</td>
             <td><ul><li>不支持空Tensor。</li><li>如果传入nullptr，则表示全1的tensor。</li><li>shape为(N ,D)。其中，N与`x`的N保持一致；D与`x`的D保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
@@ -371,7 +371,7 @@ aclnnStatus aclnnMhcPreBackwardV2(
         <tr>
             <td>hcEps（float）</td>
             <td>可选输入</td>
-            <td>HPre的sigmoid后的eps参数。</td>
+            <td>hPre的sigmoid后的eps参数。</td>
             <td>
            <li>建议值为1e-6</li>
             </td>
@@ -434,7 +434,7 @@ aclnnStatus aclnnMhcPreBackwardV2(
             <td>gradGamma（aclTensor*）</td>
             <td>可选输出</td>
             <td>gamma对应的梯度。</td>
-            <td><ul><li>不支持空Tensor。</li><li>当输入gamma不为nullptr时，此变量才会输出。</li><li>与输入gamma的Shape维度保持一致。</li><li>shape为(N, D)。其中，N与`x`的N保持一致；D与`x`的D保持一致。</li></ul></td>
+            <td><ul><li>不支持空Tensor。</li><li>当输入gamma不为nullptr时，此变量才会输出。</li><li>与输入gamma的维度保持一致。</li><li>shape为(N, D)。其中，N与`x`的N保持一致；D与`x`的D保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
             <td>2</td>
@@ -502,7 +502,7 @@ aclnnStatus aclnnMhcPreBackwardV2(
             <tr>
                 <td>ACLNN_ERR_RUNTIME_ERROR</td>
                 <td>361001</td>
-                <td>API内部调用npu runtime的接口异常。</td>
+                <td>API内部调用NPU runtime的接口异常。</td>
             </tr>
         </tbody>
     </table>
@@ -541,7 +541,7 @@ aclnnStatus aclnnMhcPreBackwardV2(
         <tr>
         <td>stream</td>
         <td>输入</td>
-        <td>指定执行任务的Stream流。</td>
+        <td>指定执行任务的Stream。</td>
         </tr>
     </tbody>
     </table>

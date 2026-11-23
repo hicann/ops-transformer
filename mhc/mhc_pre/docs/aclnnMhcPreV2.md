@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 接口功能：基于一系列计算得到MHC架构中hidden层的$H^{res}$和$H^{post}$投影矩阵以及Attention或MLP层的输入矩阵$h^{in}$。
+- 接口功能：基于一系列计算得到mHC架构中hidden层的$H^{res}$和$H^{post}$投影矩阵以及Attention或MLP层的输入矩阵$h^{in}$。
 
 - 相较于[aclnnMhcPre](aclnnMhcPre.md)接口，此接口新增`opImplMode`参数，用于指定MhcPre算子的计算模式：
   - `opImplMode=0`：在Cube中使用FP32模式计算。
@@ -63,7 +63,7 @@
 
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用"aclnnMhcPreV2GetWorkspaceSize"接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用"aclnnMhcPreV2"接口执行计算。
 
-```Cpp
+```cpp
 aclnnStatus aclnnMhcPreV2GetWorkspaceSize(
     const aclTensor *x,
     const aclTensor *phi,
@@ -83,7 +83,7 @@ aclnnStatus aclnnMhcPreV2GetWorkspaceSize(
     aclOpExecutor  **executor)
 ```
 
-```Cpp
+```cpp
 aclnnStatus aclnnMhcPreV2(
     void          *workspace,
     uint64_t       workspaceSize,
@@ -304,7 +304,7 @@ aclnnStatus aclnnMhcPreV2(
     <tr>
     <td> ACLNN_ERR_PARAM_NULLPTR </td>
     <td> 161001 </td>
-    <td>x、phi、alpha、bias、hIn、hPost存在空指针，或alpha=(3)时hRes存在空指针。</td>
+    <td>x、phi、alpha、bias、hIn、hPost存在空指针，或alpha=[3]时hRes存在空指针。</td>
     </tr>
     <tr>
     <td rowspan="3"> ACLNN_ERR_PARAM_INVALID </td>
@@ -320,7 +320,7 @@ aclnnStatus aclnnMhcPreV2(
     <tr>
     <td> ACLNN_ERR_RUNTIME_ERROR </td>
     <td> 361001 </td>
-    <td>API内部调用npu runtime的接口异常。</td>
+    <td>API内部调用NPU Runtime的接口异常。</td>
     </tr>
   </tbody></table>
 
@@ -386,7 +386,7 @@ aclnnStatus aclnnMhcPreV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 #include <iostream>
 #include <vector>
 #include "acl/acl.h"

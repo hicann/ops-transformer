@@ -503,7 +503,7 @@ int main() {
 
   // 调用aclnnMoeFinalizeRoutingV2Grad第一段接口
   ret = aclnnMoeFinalizeRoutingV2GradGetWorkspaceSize(gradY, expandedRowIdx, expandedX, scales, expertIdx, bias,
-                                                      dropPadMode, activeNum, expertNum, expertCapacity, gradExpandedX,gradScales, &workspaceSize, &executor);
+                                                      dropPadMode, activeNum, expertNum, expertCapacity, gradExpandedX, gradScales, &workspaceSize, &executor);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMoeFinalizeRoutingV2GradGetWorkspaceSize failed. ERROR: %d\n", ret);
             return ret);
 

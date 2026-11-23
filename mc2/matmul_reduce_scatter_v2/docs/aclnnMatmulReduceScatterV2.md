@@ -37,13 +37,13 @@
     <!-- end id8 -->
 
 - 计算公式：
-    - 情形1：如果x1和x2数据类型为FLOAT16/BFLOAT16时，对入参x1、x2、bias进行matmul计算后，进行ReduceScatter通信。
+    - 情形1：如果x1和x2数据类型为FLOAT16/BFLOAT16时，对入参x1、x2、bias进行MatMul计算后，进行ReduceScatter通信。
 
         $$
         output=ReduceScatter(x1@x2 + bias_{optional})
         $$
 
-    - 情形2：如果x1和x2数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8的pertensor场景，或者x1和x2数据类型为INT8的perchannel、pertoken场景，且不输出amaxOut，入参x1、x2进行matmul计算和dequant计算后，进行ReduceScatter通信。
+    - 情形2：如果x1和x2数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8的pertensor场景，或者x1和x2数据类型为INT8的perchannel、pertoken场景，且不输出amaxOut，入参x1、x2进行MatMul计算和dequant计算后，进行ReduceScatter通信。
 
         $$
         output=ReduceScatter((x1Scale*x2Scale)*(x1@x2) + bias_{optional})
@@ -123,7 +123,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         <td>x1(aclTensor*)</td>
         <td>输入</td>
         <td>MM左矩阵，即计算公式中的x1。</td>
-        <td>当前版本仅支持两维输入，shape为[m, k]，且仅支持不转置场景。</td>
+        <td>当前版本仅支持二维输入，shape为[m, k]，且仅支持不转置场景。</td>
         <td>FLOAT16、BFLOAT16、FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1、INT8</td>
         <td>ND</td>
         <td>2</td>
@@ -194,7 +194,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         <td>group(char*)</td>
         <td>输入</td>
         <td>通信域名称。</td>
-        <td>通过Hccl提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
+        <td>通过HCCL提供的接口“extern HcclResult HcclGetCommName(HcclComm comm, char* commName);”获取，其中commName即为group。</td>
         <td>-</td>
         <td>-</td>
         <td>-</td>
@@ -264,7 +264,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
         <td>amaxOutOptional(aclTensor*)</td>
         <td>输出</td>
         <td>MM计算的最大值结果，即公式中的amaxOut。</td>
-        <td>当前版本仅支持nullptr或空tensor。</td>
+        <td>当前版本仅支持nullptr或空Tensor。</td>
         <td>FLOAT</td>
         <td>ND</td>
         <td>1</td>
@@ -418,14 +418,14 @@ aclnnStatus aclnnMatmulReduceScatterV2(
 - <term>Ascend 950PR&950DT系列产品</term>：
     - 只支持x2矩阵转置/不转置，x1矩阵仅支持不转置场景。
     - 输入x1为2维，其shape为\(m, k\)，m须为卡数rank\_size的整数倍。
-    - 输入x2为2维，其viewshape必须为\(k, n\)，轴满足mm算子入参要求，k轴相等，且k轴取值范围为\[256, 65535\)。
+    - 输入x2为2维，其viewShape必须为\(k, n\)，轴满足mm算子入参要求，k轴相等，且k轴取值范围为\[256, 65535\)。
     - bias为1维，shape为\(n,\)。
     - 输出为2维，其shape为\(m/rank\_size, n\)，rank\_size为卡数。
-    - 当x1、x2的数据类型为FLOAT16/BFLOAT16时，x1/x2支持的空tensor场景，m和n可以为空，k不可为空，且需满足以下条件：
+    - 当x1、x2的数据类型为FLOAT16/BFLOAT16时，x1/x2支持的空Tensor场景，m和n可以为空，k不可为空，且需满足以下条件：
         - m为空，k不为空，n不为空。
         - m不为空，k不为空，n为空。
         - m为空，k不为空，n为空。
-    - 当x1、x2的数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8/FLOAT4_E2M1时，不支持空tensor。
+    - 当x1、x2的数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2/HIFLOAT8/FLOAT4_E2M1时，不支持空Tensor。
     - 当x1、x2的数据类型为FLOAT16/BFLOAT16/HIFLOAT8/FLOAT4_E2M1时，x1和x2的数据类型需要保持一致。
     - 当x1、x2的数据类型为FLOAT8_E4M3FN/FLOAT8_E5M2时，x1和x2的数据类型可以为其中任意一种。
     - mx量化场景下，x2/x2Scale支持转置/不转置输入。
@@ -441,7 +441,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
     - 输入x2必须是2维，其shape为\(k, n\)，轴满足mm算子入参要求，k轴相等，且k轴取值范围为\[256, 65535\)。
     - bias为1维，shape为\(n,\)。
     - 输出为2维，其shape为\(m/rank\_size, n\), rank\_size为卡数。
-    - 不支持空tensor。
+    - 不支持空Tensor。
     - x1和x2的数据类型需要保持一致。
     - 支持2、4、8卡。
 
@@ -451,7 +451,7 @@ aclnnStatus aclnnMatmulReduceScatterV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考[<<HCCL API (C)>>](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)。
+说明：本示例代码调用了部分HCCL集合通信库接口：HcclGetCommName、HcclCommInitAll、HcclCommDestroy，请参考《[HCCL API (C)](https://hiascend.com/document/redirect/CannCommunityHcclCppApi)》。
 
 <!-- npu="A3,910b" id16 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：

@@ -148,7 +148,7 @@
 
           $S_{i}=Swish(C_{i,act})\odot gate_{i}$ &nbsp;&nbsp;其中$Swish(x)=\frac{x}{1+e^{-x}}$
 
-      - 3.量化输出结果。
+      - 4.量化输出结果。
 
         $Q\_scale_{i} = \frac{max(|S_{i}|)}{127}$
 
@@ -159,7 +159,7 @@
 
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnGroupedMatmulSwigluQuantGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnGroupedMatmulSwigluQuant”接口执行计算。
 
-```Cpp
+```cpp
 aclnnStatus aclnnGroupedMatmulSwigluQuantGetWorkspaceSize(
   const aclTensor *x,
   const aclTensor *weight,
@@ -175,7 +175,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantGetWorkspaceSize(
   aclOpExecutor  **executor)
 ```
 
-```Cpp
+```cpp
 aclnnStatus aclnnGroupedMatmulSwigluQuant(
   void          *workspace,
   uint64_t       workspaceSize,
@@ -259,7 +259,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuant(
       <tr>
         <td>weightScale</td>
         <td rowspan="1">输入</td>
-        <td>右矩阵的量化因子，对应公式中的w_scale。</td>
+        <td>右矩阵的量化缩放因子，对应公式中的w_scale。</td>
         <td>
           <ul>
             <li>首轴长度需与weight的首轴维度相等，尾轴长度需要与weight还原为ND格式的尾轴相同。</li>
@@ -275,7 +275,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuant(
       <tr>
         <td>xScale</td>
         <td rowspan="1">输入</td>
-        <td>左矩阵的量化因子，对应公式中的x_scale。</td>
+        <td>左矩阵的量化缩放因子，对应公式中的x_scale。</td>
         <td>长度需与x的首轴维度相等。</td>
         <td>FLOAT</td>
         <td>ND</td>
@@ -310,7 +310,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuant(
       <tr>
         <td>outputScale</td>
         <td rowspan="1">输出</td>
-        <td>输出的量化因子，对应公式中的Q_scale。</td>
+        <td>输出的量化缩放因子，对应公式中的Q_scale。</td>
         <td>-</td>
         <td>FLOAT</td>
         <td>ND</td>

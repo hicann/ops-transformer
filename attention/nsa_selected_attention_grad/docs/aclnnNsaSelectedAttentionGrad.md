@@ -289,7 +289,7 @@ aclnnStatus aclnnNsaSelectedAttentionGrad(
       <td>输出</td>
       <td>公式中的dQ，表示query的梯度。</td>
       <td>数据类型需要与query一致。</td>
-      <td>FLOAT16、BFLOAT16</td>
+      <td>BFLOAT16、FLOAT16</td>
       <td>ND</td>
       <td>[BNSD]、[BSND]、[BSH]、[SBH]</td>
       <td>√</td>
@@ -297,9 +297,9 @@ aclnnStatus aclnnNsaSelectedAttentionGrad(
     <tr>
       <td>dkOut</td>
       <td>输出</td>
-      <td>公式中的dK，表示keyIn的梯度。</td>
+      <td>公式中的dK，表示key的梯度。</td>
       <td>数据类型需要与query一致。</td>
-      <td>FLOAT16、BFLOAT16</td>
+      <td>BFLOAT16、FLOAT16</td>
       <td>ND</td>
       <td>[BNSD]、[BSND]、[BSH]、[SBH]</td>
       <td>√</td>
@@ -309,7 +309,7 @@ aclnnStatus aclnnNsaSelectedAttentionGrad(
       <td>输出</td>
       <td>公式中的dV，表示value的梯度。</td>
       <td>数据类型需要与query一致。</td>
-      <td>FLOAT16、BFLOAT16</td>
+      <td>BFLOAT16、FLOAT16</td>
       <td>ND</td>
       <td>[BNSD]、[BSND]、[BSH]、[SBH]</td>
       <td>√</td>
@@ -364,7 +364,7 @@ aclnnStatus aclnnNsaSelectedAttentionGrad(
     <tr>
       <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
       <td rowspan="3">161002</td>
-      <td>query、key、value、attentionOut、attentionOutGrad、dqOut、dkOut、dvOut的数据类型不一致，或不是FLOAT16、BFLOAT16。</td>
+      <td>query、key、value、attentionOut、attentionOutGrad、dqOut、dkOut、dvOut的数据类型不一致，或不是BFLOAT16、FLOAT16。</td>
     </tr>
     <tr>
       <td>softmaxMax或softmaxSum的数据类型不是FLOAT32，topkIndices的数据类型不是INT32，或提供的attenMaskOptional的数据类型不是BOOL、UINT8。</td>
@@ -423,7 +423,7 @@ aclnnStatus aclnnNsaSelectedAttentionGrad(
 - 确定性计算：
   - aclnnNsaSelectedAttentionGrad默认非确定性实现，支持通过aclrtSetSysParamOpt开启确定性。
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
-- 输入query、key、value、attentionOut、attentionOutGrad的B（batchsize）必须相等。
+- 输入query、key、value、attentionOut、attentionOutGrad的B（Batch size）必须相等。
 - 输入key、value的N（numHead）必须一致。
 - 输入query、attentionOut、attentionOutGrad的N（numHead）必须一致。
 - 输入value、attentionOut、attentionOutGrad的D（HeadDim）必须一致。
@@ -435,10 +435,10 @@ aclnnStatus aclnnNsaSelectedAttentionGrad(
   - N1：取值范围为1\~128，表示query的headNum。N1必须为N2的整数倍。
   - N2：取值范围为1\~128，表示key、value的headNum。
   - G：取值范围为1\~32。G = N1 / N2。
-  - S：取值范围为1\~128K。对于key、value的S必须大于等于selectedBlockSize * selectedBlockCount，且必须为selectedBlockSize的整数倍。
+  - S：取值范围为1\~128k。对于key、value的S必须大于等于selectedBlockSize * selectedBlockCount，且必须为selectedBlockSize的整数倍。
   - D：取值范围为192或128，支持K和V的D（HeadDim）不相等。
-  - selectedBlockSize支持<=128且满足16的整数倍。
-  - selectedBlockCount：支持[1~128]。总计选择的大小`selectedBlockCount * selectedBlockSize` < 128*64(8K)
+  - selectedBlockSize支持<=128且为16的整数倍。
+  - selectedBlockCount：支持[1~128]。总计选择的大小`selectedBlockCount * selectedBlockSize` < 128*64(8k)
   - Layout为TND时，每个Batch的S2都要大于总计选择的大小`selectedBlockCount * selectedBlockSize`。
 - 关于softmaxMax与softmaxSum参数shape的约束：\[T1, N1, 8\]。
 - 关于topkIndices参数shape的约束：[T1, N2, selectedBlockCount]。

@@ -37,7 +37,7 @@ abbr {
 | 术语 | 简要说明 |
 |------|----------|
 | 非量化 | 左矩阵和右矩阵均为浮点类型直接计算 |
-| 全量化 | 左矩阵和右矩阵均为低精度计算，通过scale还原，详见[《量化介绍》](../../../docs/zh/context/quant_mode_introduction.md) |
+| 全量化 | 左矩阵和右矩阵均为低精度计算，通过scale还原，详见《[量化介绍](../../../docs/zh/context/quant_mode_introduction.md)》 |
 | 伪量化 | 对右矩阵权重进行量化，包括perchannel量化模式 |
 | pertensor | 简称T量化，每个Tensor共用一个相同的量化参数 |
 | perchannel | 简称C量化，量化对象是右矩阵，每个channel分别使用独立的量化参数 |
@@ -140,7 +140,7 @@ $$
 - **V1 → V4**：
 
   <!-- npu="950" id7 -->
-  - Ascend 950PR&950DT系列产品：支持不同分组轴，由groupType表示；非量化支持 x/weight转置；支持静态量化（T-C/T-T）BFLOAT16/FLOAT16/FLOAT32 输出 + bias；支持动态量化（K-C/K-T/T-T/T-C/MX/G-B）BFLOAT16/FLOAT16/FLOAT32 输出 + bias；支持伪量化 weight为 INT4、FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8（INT4 支持 perchannel 和 pergroup，其余仅 perchannel）。
+  - <term>Ascend 950PR&950DT系列产品</term>：支持不同分组轴，由groupType表示；非量化支持 x/weight转置；支持静态量化（T-C/T-T）BFLOAT16/FLOAT16/FLOAT32 输出 + bias；支持动态量化（K-C/K-T/T-T/T-C/MX/G-B）BFLOAT16/FLOAT16/FLOAT32 输出 + bias；支持伪量化 weight为 INT4、FLOAT8_E5M2、FLOAT8_E4M3FN、HIFLOAT8（INT4 支持 perchannel 和 pergroup，其余仅 perchannel）。
   <!-- end id7 -->
   <!-- npu="A3,910b" id10 -->
   - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持不同分组轴，由groupType表示；非量化支持 x/weight转置；支持 x/weight/y 均为单Tensor 非量化 FLOAT32 输入；支持伪量化 weight=INT4（perchannel/pergroup 模式）。
@@ -148,7 +148,7 @@ $$
 
 ## 函数原型
 
-每个算子分为两段式接口，必须先调用 `aclnnGroupedMatmulV5GetWorkspaceSize` 接口获取计算所需 workspace大小以及包含了算子计算流程的执行器，再调用 `aclnnGroupedMatmulV5` 接口执行计算。
+每个算子分为两段式接口，必须先调用 `aclnnGroupedMatmulV5GetWorkspaceSize` 接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用 `aclnnGroupedMatmulV5` 接口执行计算。
 
 ```c++
 aclnnStatus aclnnGroupedMatmulV5GetWorkspaceSize(
@@ -231,7 +231,7 @@ aclnnStatus aclnnGroupedMatmulV5(
 
   aclnnStatus：返回状态码，具体参见 [aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-  第一阶段接口完成入参校验，出现以下场景时报错。
+  第一段接口完成入参校验，出现以下场景时报错。
 
   <!-- 以下表格使用 HTML 格式以支持 rowspan 合并单元格 -->
 
@@ -325,7 +325,7 @@ aclnnGroupedMatmulV5默认确定性实现。
   - 伪量化仅支持 0。
   - 非量化在x、weight、out数据类型为BFLOAT16/FLOAT16，不分组/M轴分组场景下支持传入0/1/2；其余场景仅支持0。
   - 全量化下x、weight数据类型为INT8且out数据类型为BFLOAT16/FLOAT16，静态T-C或动态K-C、scale数据类型为FLOAT32/BFLOAT16时支持0/1/2/4/5（注意3不支持）；其余场景仅支持0。
-- 输入参数 x、weight，输出参数 out在非量化场景支持最多 1024个Tensor，在伪量化支持最多 128个Tensor，在全量化场景最多支持 1个Tensor。
+- 输入参数 x、weight，输出参数 out在非量化场景支持最多1024个Tensor，在伪量化场景支持最多128个Tensor，在全量化场景最多支持1个Tensor。
 
 #### groupType 支持场景
 
@@ -420,7 +420,7 @@ aclnnGroupedMatmulV5默认确定性实现。
 
   | groupType | 子场景 | shape |
   |:---:|:---|:---|
-  | 0/2 | <abbr title="简称C量化，量化对象是右矩阵，每个channel分别使用独立的量化参数">perchannel，输入为INT4时，groupType仅支持0</abbr> | `(g, N)` |
+  | 0/2 | <abbr title="简称C量化，量化对象是右矩阵，每个channel分别使用独立的量化参数">perchannel</abbr>，输入为INT4时，groupType仅支持0 | `(g, N)` |
   | 0/2 | <abbr title="简称T量化，每个Tensor共用一个相同的量化参数">pertensor</abbr> | `(g, 1)` 或 `(g,)` |
 
 - **perTokenScaleOptional shape**：
@@ -473,7 +473,7 @@ aclnnGroupedMatmulV5默认确定性实现。
 <summary>动态量化（G-B）场景约束</summary>
 
 - 以下入参为空：biasOptional、offsetOptional、antiquantScaleOptional、antiquantOffsetOptional、activationInputOptional
-- 计算公式量化blocksize为：当前仅支持gsM=1，gsN=gsK=128。
+- 计算公式中量化blocksize为：当前仅支持gsM=1，gsN=gsK=128。
 - 不为空的参数支持的数据类型组合要满足下表：
 
 | groupType | x | weight | scaleOptional | perTokenScaleOptional | out |
@@ -705,11 +705,11 @@ aclnnGroupedMatmulV5默认确定性实现。
 - **约束说明**
 
   除平台约束外，A8W8场景其余约束如下：
-  - 仅支持groupType=0（M轴分组）
-  - 当前仅支持x、weight、out均为长度为1的TensorList
-  - x不支持转置
-  - x仅支持2维Tensor，Shape为（M，K）
-  - weight仅支持3维Tensor，Shape为（E，K，N）或（E，N，K）
+  - 仅支持groupType=0（M轴分组）。
+  - 当前仅支持x、weight、out均为长度为1的TensorList。
+  - x不支持转置。
+  - x仅支持2维Tensor，Shape为（M，K）。
+  - weight仅支持3维Tensor，Shape为（E，K，N）或（E，N，K）。
   - 如果需要启用定轴算法以优化性能，需同时满足以下输入形状与参数配置条件：
     * 输入形状条件（满足任意一组即可）
 
@@ -784,7 +784,7 @@ aclnnGroupedMatmulV5默认确定性实现。
     - 该场景下，各个专家处理的token数的预期值大于n/4时，即tuningConfigOptional中第一个值大于n/4时，通常会取得更好的性能，此时显存占用会增加 $g \times k \times n$ 字节（其中g为matmul组数即分组数）
   - offset不为空时
     - scale为pergroup与perchannel离线融合后的结果，shape要求为 $[E, quantGroupNum, N]$，其中 $quantGroupNum = k \div quantGroupSize$，当前支持quantGroupSize=64/128/256
-    - 该场景下offsetOptional不为空。非对称量化offsetOptional为计算过程中离线计算辅助结果，即 $antiquantOffset \times scale$，shape要求为 $[E, quantGroupNum, N]$，dtype为FLOAT32
+    - 该场景下offsetOptional不为空。非对称量化offsetOptional为计算过程中离线计算的辅助结果，即 $antiquantOffset \times scale$，shape要求为 $[E, quantGroupNum, N]$，dtype为FLOAT32
     - 该场景不支持使能tuningConfigOptional第二位
   - tuningConfigOptional数组第二个元素可置1，以使能A8W4场景（仅支持perchannel）中weight的特殊格式模板，以优化算子性能（性能优势的shape范围参考：K >= 2048 && N >= 2048）。需要说明的是，该模板要求weight的shape为（E，N，K），然后再对其进行ND2NZ转换后作为算子输入
 

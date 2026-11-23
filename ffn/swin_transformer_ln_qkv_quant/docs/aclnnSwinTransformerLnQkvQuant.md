@@ -89,7 +89,7 @@ aclnnStatus aclnnSwinTransformerLnQkvQuant(
       <th>数据类型</th>
       <th>数据格式</th>
       <th>维度(shape)</th>
-      <th>非连续tensor</th>
+      <th>非连续Tensor</th>
     </tr></thead>
   <tbody>
     <tr>
@@ -324,7 +324,7 @@ aclnnStatus aclnnSwinTransformerLnQkvQuant(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>传入的输入tensor是空指针。</td>
+      <td>传入的Tensor是空指针。</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>

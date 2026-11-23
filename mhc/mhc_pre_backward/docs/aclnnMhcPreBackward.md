@@ -276,7 +276,7 @@ aclnnStatus aclnnMhcPreBackward(
         <tr>
             <td>gradHIn（aclTensor*）</td>
             <td>输入</td>
-            <td>hIn作为Atten/MLP层的输入。正向输出hIn对应的梯度。</td>
+            <td>hIn作为Attention/MLP层的输入。正向输出hIn对应的梯度。</td>
             <td><ul><li>不支持空Tensor。</li><li>shape为(B, S, D)、(T, D)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；D与`x`的D保持一致。</li></ul></td>
             <td>BFLOAT16、FLOAT16</td>
             <td>ND</td>
@@ -306,7 +306,7 @@ aclnnStatus aclnnMhcPreBackward(
         <tr>
             <td>invRms（aclTensor*）</td>
             <td>输入</td>
-            <td>正向RmsNorm计算的invRms。</td>
+            <td>正向RMSNorm计算的invRms。</td>
             <td><ul><li>不支持空Tensor。</li><li>shape为(B, S)、(T)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
@@ -316,7 +316,7 @@ aclnnStatus aclnnMhcPreBackward(
         <tr>
             <td>hMix（aclTensor*）</td>
             <td>输入</td>
-            <td>正向计算流x@phi的结果。</td>
+            <td>正向计算x@phi的结果。</td>
             <td><ul><li>不支持空Tensor。</li><li>shape为(B, S, 2N+N*N)、(B, S, 2N+N!)、(T, 2N+N*N)、(T, 2N+N!)。其中，B与`x`的B保持一致；S与`x`的S保持一致；T=B*S；N与`x`的N保持一致。最后一维需与`phi`的第0维（fusionSize）保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
@@ -346,7 +346,7 @@ aclnnStatus aclnnMhcPreBackward(
         <tr>
             <td>gammaOptional（aclTensor*）</td>
             <td>可选输入</td>
-            <td>RmsNorm的缩放系数gamma。</td>
+            <td>RMSNorm的缩放系数gamma。</td>
             <td><ul><li>不支持空Tensor。</li><li>如果传入nullptr，则表示全1的tensor。</li><li>shape为(N ,D)。其中，N与`x`的N保持一致；D与`x`的D保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
@@ -366,7 +366,7 @@ aclnnStatus aclnnMhcPreBackward(
         <tr>
             <td>hcEps（float）</td>
             <td>可选输入</td>
-            <td>HPre的sigmoid后的eps参数。</td>
+            <td>hPre的sigmoid后的eps参数。</td>
             <td>
            <li>建议值为1e-6</li>
             </td>
@@ -419,7 +419,7 @@ aclnnStatus aclnnMhcPreBackward(
             <td>gradGamma（aclTensor*）</td>
             <td>可选输出</td>
             <td>gamma对应的梯度。</td>
-            <td><ul><li>不支持空Tensor。</li><li>当输入gamma不为nullptr时，此变量才会输出。</li><li>与输入gamma的Shape维度保持一致。</li><li>shape为(N, D)。其中，N与`x`的N保持一致；D与`x`的D保持一致。</li></ul></td>
+            <td><ul><li>不支持空Tensor。</li><li>当输入gamma不为nullptr时，此变量才会输出。</li><li>与输入gamma的维度保持一致。</li><li>shape为(N, D)。其中，N与`x`的N保持一致；D与`x`的D保持一致。</li></ul></td>
             <td>FLOAT32</td>
             <td>ND</td>
             <td>2</td>
@@ -487,7 +487,7 @@ aclnnStatus aclnnMhcPreBackward(
             <tr>
                 <td>ACLNN_ERR_RUNTIME_ERROR</td>
                 <td>361001</td>
-                <td>API内部调用npu runtime的接口异常。</td>
+                <td>API内部调用NPU Runtime的接口异常。</td>
             </tr>
         </tbody>
     </table>

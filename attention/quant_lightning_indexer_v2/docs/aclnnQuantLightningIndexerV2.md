@@ -43,7 +43,7 @@
 
 算子执行接口为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnQuantLightningIndexerV2GetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnQuantLightningIndexerV2”接口执行计算。
 
-```Cpp
+```cpp
 aclnnStatus aclnnQuantLightningIndexerV2GetWorkspaceSize(
     const aclTensor *q,
     const aclTensor *k,
@@ -72,7 +72,7 @@ aclnnStatus aclnnQuantLightningIndexerV2GetWorkspaceSize(
     aclOpExecutor  **executor)
 ```
 
-```Cpp
+```cpp
 aclnnStatus aclnnQuantLightningIndexerV2(
     void          *workspace,
     uint64_t       workspaceSize,
@@ -116,7 +116,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>q</td>
       <td>输入</td>
       <td>公式中量化后的Query。</td>
-      <td>不支持空tensor。</td>
+      <td>不支持空Tensor。</td>
       <td>INT8、FLOAT8_e4m3fn、HIFLOAT8、FLOAT4_e2m1</td>
       <td>ND</td>
       <td>
@@ -133,7 +133,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>公式中量化后的Key。</td>
       <td>
           <ul>
-                <li>不支持空tensor。</li>
+                <li>不支持空Tensor。</li>
                 <li>block_num为PageAttention时block总数，block_size为一个block的token数。</li>
           </ul>
       </td>
@@ -150,7 +150,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>w</td>
       <td>输入</td>
       <td>公式中的权重系数W。</td>
-      <td>不支持空tensor。</td>
+      <td>不支持空Tensor。</td>
       <td>FLOAT16、FLOAT32</td>
       <td>ND</td>
       <td>
@@ -165,7 +165,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>qDescale</td>
       <td>输入</td>
       <td>公式中Query的反量化系数。</td>
-      <td>不支持空tensor。</td>
+      <td>不支持空Tensor。</td>
       <td>FLOAT16、FLOAT32、FLOAT8_e8m0</td>
       <td>ND</td>
       <td>
@@ -181,7 +181,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>kDescale</td>
       <td>输入</td>
       <td>公式中Key的反量化系数。</td>
-      <td>不支持空tensor。</td>
+      <td>不支持空Tensor。</td>
       <td>FLOAT16、FLOAT32、FLOAT8_e8m0</td>
       <td>ND</td>
       <td>
@@ -262,7 +262,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>表示PageAttention中KV存储使用的block映射表。</td>
       <td>
           <ul>
-                <li>不支持空tensor。</li>
+                <li>不支持空Tensor。</li>
                 <li>PageAttention场景下，blockTableOptional必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq。</li>
           </ul>
       </td>
@@ -405,13 +405,13 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>sparseIndicesOut</td>
       <td>输出</td>
       <td>公式中的Indices输出。</td>
-      <td>不支持空tensor。</td>
+      <td>不支持空Tensor。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>
           <ul>
-                <li>layoutQOptional为"BSND"时输出shape为[B, S1, N2, topk]。</li>
-                <li>layoutQOptional为"TND"时输出shape为[T1, N2, topk]。</li>
+                <li>layoutQOptional为“BSND”时输出shape为[B, S1, N2, topk]。</li>
+                <li>layoutQOptional为“TND”时输出shape为[T1, N2, topk]。</li>
           </ul>
       </td>
       <td>x</td>
@@ -422,7 +422,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>公式中的Indices输出对应的value值。</td>
       <td>
           <ul>
-                <li>returnValue为1时输出有效值，无效部分填bf16负无穷；returnValue为0时输出shape为(0,)的空tensor。</li>
+                <li>returnValue为1时输出有效值，无效部分填bf16负无穷；returnValue为0时输出shape为(0,)的空Tensor。</li>
           </ul>
       </td>
       <td>BFLOAT16</td>
@@ -468,7 +468,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 <!-- end id10 -->
 <!-- npu="A3,910b" id11 -->
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-  - `layoutKOptional`支持PA_BBND、TND：q N1为64时仅支持PA_BBND（必须传入sequsedKOptional）；N1为24/32时支持PA_BBND（必须传入sequsedKOptional）或TND（必须传入cuSeqLensKOptional，不支持传入sequsedKOptional）。
+  - `layoutKOptional`支持PA_BBND、TND：q N1为64时仅支持PA_BBND（必须传入sequsedKOptional）；N1为24/32时支持PA_BBND（必须传入sequsedKOptional）或TND（必须传入cuSeqlensKOptional，不支持传入sequsedKOptional）。
   - `quantMode`仅支持2（Per-Token-Head量化）。
   - `cmpRatio`仅支持2的幂次方且范围为[1, 128]，即1/2/4/8/16/32/64/128；N1为24/32时仅支持1。
   - 不支持`outputIdxOffsetOptional`。
@@ -560,7 +560,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 - block_size取值为16的倍数，最大支持1024。
 - 当`layoutKOptional`不为PA_BBND时，`layoutQOptional`和`layoutKOptional`必须一致。
 - 当`quantMode`为3/5时，`qDescale`和`kDescale`的维数分别比`q`和`k`多1，前缀维度保持一致，末两维为(D/64, 2)；D必须为64的倍数，每个scale对应D轴上连续32个逻辑元素。
-- 当传入的参数layoutQOptional为TND时，必须传入cuSeqlensQOptional，如果也传入sequsedQOptional，应保证由sequsedQOptional传入的各个batch的q长度不超过根据cuSeqlensQOptional计算出的各个batch的q序列长度。当某个batch由sequsedQOptional传入的q序列长度seqlen1小于由cuSeqlensQOptional计算出的q长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的q输出的sparseIndicesOut和sparseValuesOut全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。q N1为24或32场景暂不支持TND Padding功能，不应传入sequsedQOptional，传入时接口报错。
+- 当传入的参数layoutQOptional为TND时，必须传入cuSeqlensQOptional，如果也传入sequsedQOptional，应保证由sequsedQOptional传入的各个batch的q长度不超过根据cuSeqlensQOptional计算出的各个batch的q序列长度。当某个batch由sequsedQOptional传入的q序列长度seqlen1小于由cuSeqlensQOptional计算出的q长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的q输出的sparseIndicesOut和sparseValuesOut全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致AI Core执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。q N1为24或32场景暂不支持TND Padding功能，不应传入sequsedQOptional，传入时接口报错。
 - 确定性说明： aclnnQuantLightningIndexerV2默认确定性实现。
 - Batch一致性说明： 默认支持Batch一致性：在输入样本及其计算参数保持不变、配套metadata按当前批次重新生成的条件下，同一样本的sparseIndicesOut及对应sparseValuesOut与所在批次的大小、位置无关。
 
@@ -568,7 +568,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 /**
  * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of

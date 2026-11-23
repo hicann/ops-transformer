@@ -72,7 +72,7 @@
 
   **2. 位置参数解析与cos/sin选取**
 
-  **RoPE位置输入**
+  **RoPE输入**
 
   对batch $b$，当前调用包含的token数为$L_b$。对该batch内第$i$个token，其全局token下标$u$和RoPE位置$p_u$为
 

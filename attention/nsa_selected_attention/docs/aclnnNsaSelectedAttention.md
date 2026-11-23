@@ -63,7 +63,7 @@ aclnnStatus aclnnNsaSelectedAttentionGetWorkspaceSize(
   aclOpExecutor    **executor)
 ```
 
-```c++
+```cpp
 aclnnStatus aclnnNsaSelectedAttention(
   void             *workspace,
   uint64_t          workspaceSize,
@@ -375,18 +375,18 @@ aclnnStatus aclnnNsaSelectedAttention(
 - 输入query、key、value的数据类型必须一致。
 - 输入query、key、value的inputLayout必须一致。
 - sparseMode目前支持0和2。
-- selectedBlockSize支持<=128且满足16的整数倍。
-- selectedBlockCount：支持[1~128]。总计选择的大小`selectedBlockCount * selectedBlockSize` < 128*64(8K)
-- Layout为TND时，每个Batch的S2都要大于总计选择的大小`selectedBlockCount * selectedBlockSize`。
+- selectedBlockSize支持<=128且为16的整数倍。
+- selectedBlockCount：支持[1~128]。总计选择的大小`selectedBlockCount * selectedBlockSize` < 128*64(8k)。
+- inputLayout为TND时，每个Batch的S2都要大于总计选择的大小`selectedBlockCount * selectedBlockSize`。
 - inputLayout目前仅支持TND。
 - 支持输入query的N和key/value的N不相等，但必须成比例关系，即N_q / N_kv必须是非0整数，称为G（group），且需满足G <= 32。
 - 当attenMaskOptional输入为nullptr时，sparseMode参数不生效，固定为全计算。
-- 关于数据shape的约束，以inputLayout的TND举例（注：T等于各batch S的长度累加和。当各batch的S相等时，T=B*S）。其中：
+- 关于数据shape的约束，以inputLayout的TND举例（注：T等于各batch的S的长度累加和。当各batch的S相等时，T=B*S）。其中：
 
   - B（Batch size）：取值范围为1\~1024。
   - N（Head-Num）：取值范围为1\~128。
   - G（Group）：取值范围为1\~32。
-  - S（Seq-Length）：取值范围为1\~128K。同时需要满足S_kv >= selectedBlockSize * selectedBlockCount，且S_kv长度为selectedBlockSize的整数倍。
+  - S（Seq-Length）：取值范围为1\~128k。同时需要满足S_kv >= selectedBlockSize * selectedBlockCount，且S_kv长度为selectedBlockSize的整数倍。
   - D（Head-Dim）：D_qk=192，D_v=128。
 
 ## 调用示例

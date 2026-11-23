@@ -222,7 +222,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     <tr>
       <td>sharedInputOptional（aclTensor *）</td>
       <td>输入</td>
-      <td>moe计算中共享专家的输出，需要与moe专家的输出进行combine操作。</td>
+      <td>MoE计算中共享专家的输出，需要与MoE专家的输出进行combine操作。</td>
       <td>可选参数，支持空指针；为空时不融合共享专家输出。</td>
       <td>BF16</td>
       <td>ND</td>
@@ -232,7 +232,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     <tr>
       <td>logitOptional（aclTensor *）</td>
       <td>输入</td>
-      <td>moe专家对各个token的logit大小。</td>
+      <td>MoE专家对各个token的logit大小。</td>
       <td>必选参数，不支持空指针；sharedInputOptional为空时仍须提供。</td>
       <td>FLOAT32</td>
       <td>ND</td>
@@ -242,7 +242,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     <tr>
       <td>rowIndexOptional（aclTensor *）</td>
       <td>输入</td>
-      <td>moe专家输出按照该rowIndex进行combine，其中的值即为combine做scatter add的索引。</td>
+      <td>MoE专家输出按照该rowIndex进行combine，其中的值即为combine做scatter add的索引。</td>
       <td>必选参数，不支持空指针。</td>
       <td>INT64，INT32</td>
       <td>ND</td>
@@ -262,7 +262,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     <tr>
       <td>sharedInputWeight（float）</td>
       <td>输入</td>
-      <td>共享专家与moe专家进行combine的系数，sharedInput先与该参数相乘，然后再与moe专家结果累加。</td>
+      <td>共享专家与MoE专家进行combine的系数，sharedInput先与该参数相乘，然后再与moe专家结果累加。</td>
       <td></td>
       <td>FLOAT32</td>
       <td></td>
@@ -360,10 +360,10 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     - scaleOptional支持INT64。shape支持三维，维度为(e, 1, n)，e、n和w的e、n一致。
     - biasOptional支持FLOAT32。e、n和w的e、n一致。
     - offsetOptional支持FLOAT32。shape支持三维，维度为(e, 1, n)，e、n和w的e、n一致。
-    - perTokenScaleOptional支持FLOAT32。支持一维，维度为(m)，m和x的m一致。
-    - groupListOptional支持e和w的e一致。
+    - pertokenScaleOptional支持FLOAT32。支持一维，维度为(m)，m和x的m一致。
+    - groupListOptional的e和w的e一致。
     - sharedInputOptional支持二维，维度为(bsdp,n)，bsdp必须小于等于batchSize/e，n和w的n一致。
-    - logitOptional支持m和x的m一致。
+    - logitOptional的m和x的m一致。
     - rowIndexOptional支持INT64、INT32，且m和x的m一致。
     - x1、x2、scaleOptional、biasOptional、pertokenScaleOptional、groupListOptional、logitOptional、rowIndexOptional是必选参数，sharedInputOptional是可选参数。
 
@@ -375,7 +375,7 @@ aclnnStatus aclnnGroupedMatmulFinalizeRoutingV3(
     - scaleOptional支持FLOAT8_E8M0。shape支持四维。x2非转置时维度为(e,Ceil(k/64),n,2)，x2转置时维度为(e,n,Ceil(k/64),2)。数据类型只支持FLOAT8_E8M0，转置属性必须和x2保持一致。
     - biasOptional支持BF16。
     - sharedInputOptional支持二维，维度为(bsdp,n)，bsdp代表batchSize / dataParallelSize，必须小于等于out的第一维batch。
-    - perTokenScaleOptional支持FLOAT8_E8M0。shape支持三维，维度为(m,Ceil(k/64),2)。
+    - pertokenScaleOptional支持FLOAT8_E8M0。shape支持三维，维度为(m,Ceil(k/64),2)。
     - rowIndexOptional仅支持INT64。
     - x1、x2、scaleOptional、pertokenScaleOptional、groupListOptional、logitOptional、rowIndexOptional是必选参数，biasOptional，sharedInputOptional是可选参数。目前暂不支持offsetOptional参数。
     - 当groupListType为0时，groupListOptional须为非负单调非递减数列（累积和），且最后一个值不大于x1中tensor的第一维；当groupListType为1时，groupListOptional须为非负数组（各组大小），且数值的总和不大于x1中tensor的第一维。

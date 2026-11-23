@@ -29,7 +29,7 @@
 
     1. 接收AttentionToFFN算子发送的数据。该数据以ScheduleContext结构体内存排布方式存储。其具体定义参见[调用示例](#调用示例)。该结构体包含CommonArea、ControlArea、AttentionArea、FfnArea域。本接口涉及CommonArea(用于存储配置信息，如session_num、micro_batch_num、micro_batch_size、selected_expert_num)，ControlArea(用于上层控制进程是否退出)，FfnArea域(负责管理本算子计算过程中所需的输入及输出缓冲区，其中token_info_buf字段用来存储该算子的输入信息)。
 
-    2. 扫描token_info_buf存储的信息，当通信数据准备就绪时，本算子开始进行数据整理。整理如下图所示，将layer id、session id、micro batch id、expert ids分别写入layer_ids_buf、session_ids_buf、micro_batch_ids_buf、expert_ids_buf的device内存上。
+    2. 扫描token_info_buf存储的信息，当通信数据准备就绪时，本算子开始进行数据整理。整理如下图所示，将layer id、session id、micro batch id、expert ids分别写入layer_ids_buf、session_ids_buf、micro_batch_ids_buf、expert_ids_buf的Device内存上。
 
       ```mermaid
       graph TB
@@ -114,7 +114,7 @@ $$
 
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnInplaceFfnWorkerSchedulerGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnInplaceFfnWorkerScheduler”接口执行计算。
 
-```Cpp
+```cpp
 aclnnStatus aclnnInplaceFfnWorkerSchedulerGetWorkspaceSize(
     aclTensor*      scheduleContextRef,
     int32_t         syncGroupSize,
@@ -123,7 +123,7 @@ aclnnStatus aclnnInplaceFfnWorkerSchedulerGetWorkspaceSize(
     aclOpExecutor** executor)
 ```
 
-```Cpp
+```cpp
 aclnnStatus aclnnInplaceFfnWorkerScheduler(
     void*          workspace,
     uint64_t       workspaceSize,
@@ -161,7 +161,7 @@ aclnnStatus aclnnInplaceFfnWorkerScheduler(
       <td>scheduleContextRef（aclTensor*）</td>
       <td>输入/输出</td>
       <td>FFN侧接收的待处理数据，表示ScheduleContext信息，详细结构参见调用示例</td>
-      <td>不支持空tensor。</td>
+      <td>不支持空Tensor。</td>
       <td>INT8</td>
       <td>ND</td>
       <td>1维，(1024)</td>
@@ -171,7 +171,7 @@ aclnnStatus aclnnInplaceFfnWorkerScheduler(
       <td>syncGroupSize（int32_t）</td>
       <td>输入</td>
       <td>每个同步组处理的session个数。</td>
-      <td>取值范围为(0，session_num]，session_num表示待处理数据的最大会话数，即调用示例中结构体ScheduleContext中CommonArea域的session_num字段，且session_num必须能被同步组大小整除。</td>
+      <td>取值范围为(0, session_num]，session_num表示待处理数据的最大会话数，即调用示例中结构体ScheduleContext中CommonArea域的session_num字段，且session_num必须能被同步组大小整除。</td>
       <td>INT32</td>
       <td>-</td>
       <td>-</td>
@@ -240,7 +240,7 @@ aclnnStatus aclnnInplaceFfnWorkerScheduler(
     </tr>
     <tr>
       <td>161002</td>
-      <td>参数scheduleContextRef是空tensor。</td>
+      <td>参数scheduleContextRef是空Tensor。</td>
     </tr>
     <tr>
       <td>161002</td>
@@ -300,7 +300,7 @@ aclnnStatus aclnnInplaceFfnWorkerScheduler(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 #include <iostream>
 #include <memory>
 #include <vector>

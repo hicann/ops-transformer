@@ -34,7 +34,7 @@
 
 每个算子分为[两段式接口](../../../docs/zh/context/two_phase_api.md)，必须先调用“aclnnQuantLightningIndexerGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnQuantLightningIndexer”接口执行计算。
 
-```Cpp
+```cpp
 aclnnStatus aclnnQuantLightningIndexerGetWorkspaceSize(
     const aclTensor *query,
     const aclTensor *key,
@@ -57,7 +57,7 @@ aclnnStatus aclnnQuantLightningIndexerGetWorkspaceSize(
     aclOpExecutor   **executor)
 ```
 
-```Cpp
+```cpp
 aclnnStatus aclnnQuantLightningIndexer(
     void             *workspace,
     uint64_t          workspaceSize,
@@ -100,7 +100,7 @@ aclnnStatus aclnnQuantLightningIndexer(
     <td>query</td>
     <td>输入</td>
     <td>公式中的输入Q。</td>
-    <td>不支持空tensor。</td>
+    <td>不支持空Tensor。</td>
     <td>INT8、FLOAT8_E4M3、HIFLOAT8</td>
     <td>ND</td>
     <td>
@@ -117,7 +117,7 @@ aclnnStatus aclnnQuantLightningIndexer(
     <td>公式中的输入K。</td>
     <td>
         <ul>
-                <li>不支持空tensor。</li>
+                <li>不支持空Tensor。</li>
                 <li>blockNum为PageAttention时block总数，blockSize为一个block的token数。</li>
         </ul>
     </td>
@@ -136,7 +136,7 @@ aclnnStatus aclnnQuantLightningIndexer(
     <td>weights</td>
     <td>输入</td>
     <td>公式中的输入W。</td>
-    <td>不支持空tensor。</td>
+    <td>不支持空Tensor。</td>
     <td>FLOAT16、BFLOAT16</td>
     <td>ND</td>
     <td>
@@ -151,7 +151,7 @@ aclnnStatus aclnnQuantLightningIndexer(
     <td>queryDequantScale</td>
     <td>输入</td>
     <td>表示Index Query的反量化系数Scale_Q。</td>
-    <td>不支持空tensor。</td>
+    <td>不支持空Tensor。</td>
     <td>FLOAT、FLOAT16</td>
     <td>ND</td>
     <td>
@@ -166,7 +166,7 @@ aclnnStatus aclnnQuantLightningIndexer(
     <td>keyDequantScale</td>
     <td>输入</td>
     <td>表示Index Key的反量化系数Scale_K。</td>
-    <td>不支持空tensor。</td>
+    <td>不支持空Tensor。</td>
     <td>FLOAT、FLOAT16</td>
     <td>ND</td>
     <td>
@@ -185,10 +185,10 @@ aclnnStatus aclnnQuantLightningIndexer(
     <td>每个Batch中，Query的有效token数。</td>
     <td>
         <ul>
-                <li>不支持空tensor。</li>
+                <li>不支持空Tensor。</li>
                 <li>如果不指定seqlen可传入None，表示和query的shape的S长度相同。</li>
                 <li>该入参中每个Batch的有效token数不超过query中的维度S大小且不小于0，支持长度为B的一维tensor。</li>
-                <li>当layoutQueryOptional为TND时，该入参必须传入，且以该入参元素的数量作为B值，该入参中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
+                <li>当layoutQueryOptional为TND时，该入参必须传入，且以该入参元素的数量作为B值，该入参中每个元素的值表示当前Batch与之前所有Batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
                 <li>不能出现负值。</li>
         </ul>
     </td>
@@ -203,10 +203,10 @@ aclnnStatus aclnnQuantLightningIndexer(
     <td>每个Batch中，Key的有效token数。</td>
     <td>
         <ul>
-                <li>不支持空tensor。</li>
+                <li>不支持空Tensor。</li>
                 <li>如果不指定seqlen可传入None，表示和key的shape的S长度相同。</li>
-                <li> 该参数中每个Batch的有效token数不超过key/value中的维度S大小且不小于0，支持长度为B的一维tensor。</li>
-                <li>当layoutKeyOptional为TND或PA_BSND时，该入参必须传入，layoutKeyOptional为TND，该参数中每个元素的值表示当前batch与之前所有batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
+                <li> 该参数中每个Batch的有效token数不超过key中的维度S大小且不小于0，支持长度为B的一维tensor。</li>
+                <li>当layoutKeyOptional为TND或PA_BSND时，该入参必须传入，当layoutKeyOptional为TND时，该参数中每个元素的值表示当前Batch与之前所有Batch的token数总和，即前缀和，因此后一个元素的值必须大于等于前一个元素的值。</li>
                 <li>不能出现负值。</li>
         </ul>
     </td>
@@ -221,8 +221,8 @@ aclnnStatus aclnnQuantLightningIndexer(
     <td>表示PageAttention中KV存储使用的block映射表。</td>
     <td>
         <ul>
-                <li>不支持空tensor。</li>
-                <li>PageAttention场景下，blockTableOptional必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个batch中最大actualSeqLengthsKeyOptional对应的block数量）</li>
+                <li>不支持空Tensor。</li>
+                <li>PageAttention场景下，blockTableOptional必须为二维，第一维长度需要等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个Batch中最大actualSeqLengthsKeyOptional对应的block数量）</li>
                 <li>blockSize取值为16的倍数，最大支持1024。</li>
         </ul>
     </td>
@@ -298,7 +298,7 @@ aclnnStatus aclnnQuantLightningIndexer(
     <td>
         <ul>
                 <li>sparseMode为0时，代表defaultMask模式。</li>
-                <li>sparseMode为3时，代表rightDownCausal模式的mask，对应以右顶点为划分的下三角场景。</li>
+                <li>sparseMode为3时，代表rightDownCausal模式的Mask，对应以右顶点为划分的下三角场景。</li>
         </ul>
     </td>
     <td>INT64</td>
@@ -330,7 +330,7 @@ aclnnStatus aclnnQuantLightningIndexer(
     <td>out</td>
     <td>输出</td>
     <td>公式中的Indices输出。</td>
-    <td>不支持空tensor。</td>
+    <td>不支持空Tensor。</td>
     <td>INT32</td>
     <td>ND</td>
     <td>
@@ -449,17 +449,17 @@ aclnnStatus aclnnQuantLightningIndexer(
 <!-- npu="A3" id8 -->
 - <term>Atlas A3系列产品</term>：
   - query和key的数据类型支持`INT8`。
-  - 仅支持weights、queryDequantScale、keyDequantScale数据类型为`FLOAT16、FLOAT16、FLOAT16`。
-  - key和keyDequantScale在layoutKeyOptional为PA_BSND时支持0轴非连续，其余轴必须连续。
+  - 仅支持weights、queryDequantScale、keyDequantScale数据类型为`FLOAT16`、`FLOAT16`、`FLOAT16`。
+  - key和keyDequantScale在`layoutKeyOptional`为`PA_BSND`时支持0轴非连续，其余轴必须连续。
 <!-- end id8 -->
 
 <!-- npu="950" id7 -->
-- Ascend 950PR&950DT系列产品：
+- <term>Ascend 950PR&950DT系列产品</term>：
   - query N1仅支持8、16、24、32、64。
-  - query和key的数据类型支持`FLOAT8_E4M3、HIFLOAT8、INT8`。
-  - 当query和key的数据类型为`FLOAT8_E4M3`时，支持weights、queryDequantScale、keyDequantScale的数据类型为`BFLOAT16、FLOAT、FLOAT`或`FLOAT16、FLOAT16、FLOAT16`。
-  - 当query和key的数据类型为`HIFLOAT8`时，仅支持weights、queryDequantScale、keyDequantScale数据类型为`BFLOAT16、FLOAT、FLOAT`。
-  - 当query和key的数据类型为`INT8`时，仅支持weights、queryDequantScale、keyDequantScale数据类型为`FLOAT16、FLOAT16、FLOAT16`。
+  - query和key的数据类型支持`FLOAT8_E4M3`、`HIFLOAT8`、`INT8`。
+  - 当query和key的数据类型为`FLOAT8_E4M3`时，支持`weights`、`queryDequantScale`、`keyDequantScale`的数据类型为`BFLOAT16`、`FLOAT`、`FLOAT`或`FLOAT16`、`FLOAT16`、`FLOAT16`。
+  - 当query和key的数据类型为`HIFLOAT8`时，仅支持`weights`、`queryDequantScale`、`keyDequantScale`数据类型为`BFLOAT16`、`FLOAT`、`FLOAT`。
+  - 当query和key的数据类型为`INT8`时，仅支持`weights`、`queryDequantScale`、`keyDequantScale`数据类型为`FLOAT16`、`FLOAT16`、`FLOAT16`。
 
 <!-- end id7 -->
 
@@ -467,7 +467,7 @@ aclnnStatus aclnnQuantLightningIndexer(
 
 示例代码如下，仅供参考，具体编译和执行过程请参考[编译与运行样例](../../../docs/zh/context/compile_and_run_sample.md)。
 
-```Cpp
+```cpp
 /**
  * Copyright (c) 2026 Huawei Technologies Co., Ltd.
  * This program is free software, you can redistribute it and/or modify it under the terms and conditions of

@@ -140,7 +140,7 @@ aclnnStatus aclnnNsaCompressWithCache(
       <tr>
         <td>actSeqLenOptional</td>
         <td>可选输入</td>
-        <td>每个Batch对应的S大小。</td>
+        <td>每个batch对应的S大小。</td>
         <td>
           <ul style="list-style-type: circle;">
             <li>在TND排布场景下需要该输入，其余场景输入nullptr。</li>
@@ -285,7 +285,7 @@ aclnnStatus aclnnNsaCompressWithCache(
       <td>计算输入和输出的数据类型和格式不在支持的范围内。</td>
     </tr>
     <tr>
-      <td>input、weight、outputCache为空tensor。</td>
+      <td>input、weight、outputCache为空Tensor。</td>
     </tr>
     <tr>
       <td rowspan="6">ACLNN_ERR_INNER_TILING_ERROR</td>
@@ -296,7 +296,7 @@ aclnnStatus aclnnNsaCompressWithCache(
       <td>activeNum、expertNum、expertCapacity的值小于0。</td>
     </tr>
     <tr>
-      <td>compress_block_size、compress_stride不是16的整数倍。</td>
+      <td>compressBlockSize、compressStride不是16的整数倍。</td>
     </tr>
     <tr>
       <td>compress_stride小于等于0。</td>

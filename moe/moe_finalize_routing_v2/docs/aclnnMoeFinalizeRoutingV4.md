@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- **接口功能**：MoE计算中，最后处理合并MoE FFN的输出结果。本接口针对V3接口aclnnMoeFinalizeRoutingV3做出如下变更：在V3基础上新增属性k，支持scalesOptional为空时自定义top-K值。
+- **接口功能**：MoE计算中，最后处理合并MoE FFN的输出结果。本接口针对V3接口aclnnMoeFinalizeRoutingV3做出如下变更：在V3基础上新增属性k，支持在scalesOptional为空时自定义top-K值。
 - **计算公式**：
 
 $$
@@ -204,7 +204,7 @@ aclnnStatus aclnnMoeFinalizeRoutingV4(
   <tr>
     <td>dropPadMode(int64_t)</td>
     <td>输入</td>
-    <td>可选参数，默认值为0。表示是否支持丢弃模式，expandedRowIdx的排列方式。</td>
+    <td>可选参数，默认值为0。表示是否支持丢弃模式，以及expandedRowIdx的排列方式。</td>
     <td>取值范围为[0, 3]。</td>
     <td>-</td>
     <td>-</td>

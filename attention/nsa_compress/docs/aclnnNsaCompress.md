@@ -23,7 +23,7 @@
 
 ## 功能说明
 
-- 算子功能：训练场景下，使用NSA Compress算法减轻long-context的注意力计算，实现在KV序列维度进行压缩。
+- 算子功能：训练场景下，使用NSA Compress算法减轻long-context的注意力计算负担，实现在KV序列维度进行压缩。
 
 - 计算公式：
 
@@ -243,7 +243,7 @@ aclnnStatus aclnnNsaCompress(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>传入input、weight、actSeqLenOptional或output是空指针。</td>
+      <td>传入的input、weight、actSeqLenOptional或output是空指针。</td>
     </tr>
     <tr>
       <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>

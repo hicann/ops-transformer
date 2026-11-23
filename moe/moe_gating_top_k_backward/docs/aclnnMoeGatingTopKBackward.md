@@ -133,7 +133,7 @@ aclnnStatus aclnnMoeGatingTopKBackward(
     <tr>
       <td>xNorm（aclTensor*）</td>
       <td>输入</td>
-      <td>计算的输入，对应公式中的xNorm。</td>
+      <td>待计算的输入，对应公式中的xNorm。</td>
       <td><ul><li>不支持空Tensor。</li><li>要求是一个2D的Tensor，维度为[M,N]。</li><li>最后一维（专家数N）要求大于等于1，并小于等于2048。</li></ul></td>
       <td>FLOAT32</td>
       <td>ND</td>
@@ -193,7 +193,7 @@ aclnnStatus aclnnMoeGatingTopKBackward(
     <tr>
       <td>eps（double）</td>
       <td>输入</td>
-      <td>表示前向计算使用的防除零常数，对应公式中的eps。</td>
+      <td>表示前向计算使用的防止除零常数，对应公式中的eps。</td>
       <td></td>
       <td>-</td>
       <td>-</td>

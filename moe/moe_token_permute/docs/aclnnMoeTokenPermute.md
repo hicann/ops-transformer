@@ -26,7 +26,7 @@
 - **接口功能**：MoE的permute计算，根据索引indices将tokens广播并排序。
 
 - **计算公式**：
-    - paddedMode为`false`时，公式如下，其中topK指一个token选择的专家个数，Indices维度为2时topK等于Indices最后一维大小，Indices维度为1时topK等于1：
+    - paddedMode为`false`时，公式如下，其中topK指一个token选择的专家个数，indices维度为2时topK等于indices最后一维大小，indices维度为1时topK等于1：
 
       $$
       sortedIndicesFirst=argSort(\text{flatten}(Indices))
@@ -104,7 +104,7 @@ aclnnStatus aclnnMoeTokenPermute(
       <td>tokens</td>
       <td>输入</td>
       <td>输入token特征。</td>
-      <td><ul><li>支持空tensor。</li><li>要求为一个维度大于等于2的Tensor，第一维的大小为num_tokens。</li></ul></td>
+      <td><ul><li>支持空Tensor。</li><li>要求为一个维度大于等于2的Tensor，第一维的大小为num_tokens。</li></ul></td>
       <td>FLOAT16、BFLOAT16、FLOAT32、INT8</td>
       <td>ND</td>
       <td>≥2</td>
@@ -114,7 +114,7 @@ aclnnStatus aclnnMoeTokenPermute(
       <td>indices</td>
       <td>输入</td>
       <td>输入indices索引。</td>
-      <td><ul><li>支持空tensor。</li><li>要求shape为2D或1D。</li><li>paddedMode为false时表示每一个输入token对应的topK个专家索引，shape为(num_tokens, topK)或(num_tokens)。</li><li>paddedMode为true时表示每个专家选中的token索引（暂不支持）。</li><li>元素个数小于16777215，值大于等于0且小于16777215。</li></ul></td>
+      <td><ul><li>支持空Tensor。</li><li>要求shape为2D或1D。</li><li>paddedMode为false时表示每一个输入token对应的topK个专家索引，shape为(num_tokens, topK)或(num_tokens)。</li><li>paddedMode为true时表示每个专家选中的token索引（暂不支持）。</li><li>元素个数小于16777215，值大于等于0且小于16777215。</li></ul></td>
       <td>INT32、INT64</td>
       <td>ND</td>
       <td>1或2</td>
@@ -144,7 +144,7 @@ aclnnStatus aclnnMoeTokenPermute(
       <td>permuteTokensOut</td>
       <td>输出</td>
       <td>根据indices进行扩展并排序过的tokens。</td>
-      <td><ul><li>支持空tensor。</li><li>要求是一个维度大于等于2的Tensor，第一维的大小为min(num_tokens * topK, numOutTokens)。</li><li>除第一维外其余维度大小乘积与tokens除第一维外其余维度大小乘积相同。</li><li>数据类型同tokens。</li></ul></td>
+      <td><ul><li>支持空Tensor。</li><li>要求是一个维度大于等于2的Tensor，第一维的大小为min(num_tokens * topK, numOutTokens)。</li><li>除第一维外其余维度大小乘积与tokens除第一维外其余维度大小乘积相同。</li><li>数据类型同tokens。</li></ul></td>
       <td>FLOAT16、BFLOAT16、FLOAT32、INT8</td>
       <td>ND</td>
       <td>≥2</td>
@@ -154,7 +154,7 @@ aclnnStatus aclnnMoeTokenPermute(
       <td>sortedIndicesOut</td>
       <td>输出</td>
       <td>permuteTokensOut和tokens的映射关系。</td>
-      <td><ul><li>支持空tensor。</li><li>要求是一个1D的Tensor，Shape为(num_tokens*topK)。</li></ul></td>
+      <td><ul><li>支持空Tensor。</li><li>要求是一个1D的Tensor，Shape为(num_tokens*topK)。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>1</td>
@@ -186,7 +186,7 @@ aclnnStatus aclnnMoeTokenPermute(
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-  一段接口完成入参校验，出现以下场景时报错：
+  第一段接口完成入参校验，出现以下场景时报错：
   <table style="undefined;table-layout: fixed; width: 1180px">
     <colgroup>
       <col style="width: 250px">
@@ -261,7 +261,7 @@ aclnnStatus aclnnMoeTokenPermute(
       <tr>
         <td>stream</td>
         <td>输入</td>
-        <td>指定执行任务的Stream流。</td>
+        <td>指定执行任务的Stream。</td>
       </tr>
     </tbody>
   </table>
