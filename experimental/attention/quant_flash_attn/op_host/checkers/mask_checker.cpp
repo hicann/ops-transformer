@@ -32,26 +32,26 @@ using std::string;
 using namespace ge;
 using namespace Ops::Base;
 
-ge::graphStatus MaskChecker::CheckSingleParaMaskMode(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus MaskChecker::CheckSingleParaMaskMode(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     // data_type 支持 INT32；支持输入为 0/3/4
     const std::vector<uint32_t> supportedMaskModes = {static_cast<uint32_t>(MaskMode::NO_MASK),
                                                       static_cast<uint32_t>(MaskMode::CAUSAL),
                                                       static_cast<uint32_t>(MaskMode::BAND)};
-    OP_CHECK_IF(std::find(supportedMaskModes.begin(), supportedMaskModes.end(), qfaInfo.maskMode) ==
-                    supportedMaskModes.end(),
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, MASK_MODE_NAME.c_str(),
-                                                      std::to_string(qfaInfo.maskMode).c_str(),
-                                                      "The value of mask_mode must be in {0, 3, 4}"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        std::find(supportedMaskModes.begin(), supportedMaskModes.end(), qfaInfo.maskMode) == supportedMaskModes.end(),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, MASK_MODE_NAME.c_str(),
+                                              std::to_string(qfaInfo.maskMode).c_str(),
+                                              "The value of mask_mode must be in {0, 3, 4}"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MaskChecker::CheckSingleParaAttnMask(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus MaskChecker::CheckSingleParaAttnMask(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     // tensor_type 支持 INT8；tensor_shape 为 (2048, 2048)
-    const gert::Tensor *attnMaskTensor = qfaInfo.opParamInfo.attnMask.tensor;
-    const gert::CompileTimeTensorDesc *attnMaskDesc = qfaInfo.opParamInfo.attnMask.desc;
+    const gert::Tensor* attnMaskTensor = qfaInfo.opParamInfo.attnMask.tensor;
+    const gert::CompileTimeTensorDesc* attnMaskDesc = qfaInfo.opParamInfo.attnMask.desc;
     if (attnMaskTensor == nullptr || attnMaskDesc == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
@@ -65,7 +65,7 @@ ge::graphStatus MaskChecker::CheckSingleParaAttnMask(const QuantFlashAttnTilingI
     }
 
     // shape dim 必须为 2，且 shape 为 (2048, 2048)
-    const gert::Shape &shape = attnMaskTensor->GetStorageShape();
+    const gert::Shape& shape = attnMaskTensor->GetStorageShape();
     OP_CHECK_IF(shape.GetDimNum() != DIM_NUM_2,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, ATTEN_MASK_NAME.c_str(),
                                              (std::to_string(shape.GetDimNum()) + "D").c_str(), "2D"),
@@ -79,7 +79,7 @@ ge::graphStatus MaskChecker::CheckSingleParaAttnMask(const QuantFlashAttnTilingI
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MaskChecker::CheckSingleParaWindowParams(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus MaskChecker::CheckSingleParaWindowParams(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     // data_type 支持 INT32；值需要 >= -1
     // win_left / win_right 为可选属性，默认值为 -1（表示无穷）
@@ -96,7 +96,7 @@ ge::graphStatus MaskChecker::CheckSingleParaWindowParams(const QuantFlashAttnTil
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MaskChecker::CheckSinglePara(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus MaskChecker::CheckSinglePara(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     if (CheckSingleParaMaskMode(qfaInfo) != ge::GRAPH_SUCCESS ||
         CheckSingleParaAttnMask(qfaInfo) != ge::GRAPH_SUCCESS ||
@@ -106,13 +106,13 @@ ge::graphStatus MaskChecker::CheckSinglePara(const QuantFlashAttnTilingInfo &qfa
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MaskChecker::CheckParaExistence(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus MaskChecker::CheckParaExistence(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     (void)qfaInfo;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MaskChecker::CheckMaskModeQuantMode(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus MaskChecker::CheckMaskModeQuantMode(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     if (qfaInfo.opParamInfo.quantMode == nullptr) {
         return ge::GRAPH_SUCCESS; // 存在性校验负责
@@ -125,16 +125,17 @@ ge::graphStatus MaskChecker::CheckMaskModeQuantMode(const QuantFlashAttnTilingIn
                         "MxFP8 only supports mask_mode 0 (NO_MASK) and 3 (CAUSAL), BAND(4) is not supported"),
                     return ge::GRAPH_FAILED);
     } else if (quantModeVal == QUANT_MODE_MXFP4) { // MxFP4
-        OP_CHECK_IF(qfaInfo.maskMode != static_cast<uint32_t>(MaskMode::NO_MASK),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, MASK_MODE_NAME.c_str(),
-                        std::to_string(qfaInfo.maskMode).c_str(),
-                        "MxFP4 only supports mask_mode 0 (NO_MASK)"),
+        OP_CHECK_IF(qfaInfo.maskMode != static_cast<uint32_t>(MaskMode::NO_MASK) &&
+                        qfaInfo.maskMode != static_cast<uint32_t>(MaskMode::CAUSAL),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        qfaInfo.opName, MASK_MODE_NAME.c_str(), std::to_string(qfaInfo.maskMode).c_str(),
+                        "MxFP4 only supports mask_mode 0 (NO_MASK) and 3 (CAUSAL), BAND(4) is not supported"),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MaskChecker::CheckFeature(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus MaskChecker::CheckFeature(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     if (CheckMaskModeQuantMode(qfaInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
@@ -142,7 +143,7 @@ ge::graphStatus MaskChecker::CheckFeature(const QuantFlashAttnTilingInfo &qfaInf
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MaskChecker::CheckMaskModeAttnMaskConsistency(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus MaskChecker::CheckMaskModeAttnMaskConsistency(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     bool attnMaskExists =
         (qfaInfo.opParamInfo.attnMask.tensor != nullptr && qfaInfo.opParamInfo.attnMask.desc != nullptr);
@@ -158,7 +159,7 @@ ge::graphStatus MaskChecker::CheckMaskModeAttnMaskConsistency(const QuantFlashAt
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus MaskChecker::CheckMultiPara(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus MaskChecker::CheckMultiPara(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     if (CheckMaskModeAttnMaskConsistency(qfaInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;

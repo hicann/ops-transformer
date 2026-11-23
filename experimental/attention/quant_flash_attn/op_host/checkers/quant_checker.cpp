@@ -167,13 +167,13 @@ ge::graphStatus QuantChecker::CheckSingleParaPScale(const QuantFlashAttnTilingIn
 ge::graphStatus QuantChecker::CheckSingleParaLayoutQDescale(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     // data_type 支持 STRING；支持输入 BNSD/BSND/TND/N2TGD
-    // FiaLayout 枚举未引入 N2TGD, parser 仅解析 BSND/BNSD/TND, checker 对齐 parser 实际值。
-    const std::vector<FiaLayout> supportedLayouts = {FiaLayout::BNSD, FiaLayout::BSND, FiaLayout::TND};
+    const std::vector<FiaLayout> supportedLayouts = {FiaLayout::BNSD, FiaLayout::BSND, FiaLayout::TND,
+                                                     FiaLayout::N2TGD};
     OP_CHECK_IF(
         std::find(supportedLayouts.begin(), supportedLayouts.end(), qfaInfo.layoutQDescale) == supportedLayouts.end(),
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, LAYOUT_Q_DESCALE_NAME.c_str(),
                                               LayoutToSerialStr(qfaInfo.layoutQDescale).c_str(),
-                                              "The value of layout_q_descale must be in BNSD/BSND/TND"),
+                                              "The value of layout_q_descale must be in BNSD/BSND/TND/N2TGD"),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -215,9 +215,13 @@ struct QuantLayoutConstraintConfig {
     FiaLayout supportedOutLayout;
 };
 
-const std::map<int64_t, QuantLayoutConstraintConfig> QUANT_LAYOUT_CONSTRAINT_TABLE = {
-    {QUANT_MODE_MXFP8, {FiaLayout::TND, {FiaLayout::TND, FiaLayout::BnNBsD, FiaLayout::NZ}, FiaLayout::TND}}, // MxFP8
-    {QUANT_MODE_MXFP4, {FiaLayout::BNSD, {FiaLayout::BNSD}, FiaLayout::BNSD}},                                // MxFP4
+const std::map<int64_t, std::vector<QuantLayoutConstraintConfig>> QUANT_LAYOUT_CONSTRAINT_TABLE = {
+    {QUANT_MODE_MXFP8, {{FiaLayout::TND, {FiaLayout::TND, FiaLayout::BnNBsD, FiaLayout::NZ}, FiaLayout::TND}}}, // MxFP8
+    {QUANT_MODE_MXFP4,
+     {{FiaLayout::BNSD, {FiaLayout::BNSD}, FiaLayout::BNSD},                                     // MxFP4 BNSD
+      {FiaLayout::BNSD, {FiaLayout::BnNBsD, FiaLayout::BnBsND, FiaLayout::NZ}, FiaLayout::BNSD}, // MxFP4 BNSD + PA
+      {FiaLayout::TND, {FiaLayout::TND}, FiaLayout::TND},                                        // MxFP4 TND
+      {FiaLayout::TND, {FiaLayout::BnNBsD, FiaLayout::BnBsND, FiaLayout::NZ}, FiaLayout::TND}}}, // MxFP4 TND + PA
 };
 } // namespace
 
@@ -234,24 +238,23 @@ ge::graphStatus QuantChecker::CheckLayoutConstraint(const QuantFlashAttnTilingIn
                                                       "quant_mode is not supported in layout constraint table"),
                 return ge::GRAPH_FAILED);
 
-    const auto& config = it->second;
-
-    OP_CHECK_IF(qfaInfo.layoutQ != config.supportedQLayout,
-                OP_LOGE(qfaInfo.opName, "When quant_mode is %ld, layout_q must be %s, but got %s", quantModeVal,
-                        LayoutToSerialStr(config.supportedQLayout).c_str(), LayoutToSerialStr(qfaInfo.layoutQ).c_str()),
+    const auto& configs = it->second;
+    const QuantLayoutConstraintConfig* config = nullptr;
+    for (const auto& cfg : configs) {
+        if (qfaInfo.layoutQ == cfg.supportedQLayout && qfaInfo.layoutOut == cfg.supportedOutLayout &&
+            std::find(cfg.supportedKvLayouts.begin(), cfg.supportedKvLayouts.end(), qfaInfo.layoutKV) !=
+                cfg.supportedKvLayouts.end()) {
+            config = &cfg;
+            break;
+        }
+    }
+    OP_CHECK_IF(config == nullptr,
+                OP_LOGE(qfaInfo.opName,
+                        "When quant_mode is %ld, (layout_q, layout_kv, layout_out) combination is unsupported: "
+                        "(%s, %s, %s)",
+                        quantModeVal, LayoutToSerialStr(qfaInfo.layoutQ).c_str(),
+                        LayoutToSerialStr(qfaInfo.layoutKV).c_str(), LayoutToSerialStr(qfaInfo.layoutOut).c_str()),
                 return ge::GRAPH_FAILED);
-
-    OP_CHECK_IF(std::find(config.supportedKvLayouts.begin(), config.supportedKvLayouts.end(), qfaInfo.layoutKV) ==
-                    config.supportedKvLayouts.end(),
-                OP_LOGE(qfaInfo.opName, "When quant_mode is %ld, layout_kv must be in supported list, but got %s",
-                        quantModeVal, LayoutToSerialStr(qfaInfo.layoutKV).c_str()),
-                return ge::GRAPH_FAILED);
-
-    OP_CHECK_IF(
-        qfaInfo.layoutOut != config.supportedOutLayout,
-        OP_LOGE(qfaInfo.opName, "When quant_mode is %ld, layout_out must be %s, but got %s", quantModeVal,
-                LayoutToSerialStr(config.supportedOutLayout).c_str(), LayoutToSerialStr(qfaInfo.layoutOut).c_str()),
-        return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
 }
@@ -284,15 +287,18 @@ ge::graphStatus QuantChecker::CheckKVShape(const QuantFlashAttnTilingInfo& qfaIn
         return ge::GRAPH_SUCCESS;
     }
 
-    // MxFP8 TND: (KV_T, KV_N, D); PA_BNBD: (Bn, KV_N, Bs, D); PA_NZ: (Bn, KV_N, D/32, Bs, 32)
-    // MxFP4 BNSD: (B, KV_N, KV_S, D)
+    // MxFP8 TND: (KV_T, KV_N, D); PA_BNBD: (Bn, KV_N, Bs, D); MxFP4 PA_NZ: (Bn, KV_N, D/64, Bs, 64)
+    // MxFP4 BNSD: (B, KV_N, KV_S, D); PA_BBND: (Bn, Bs, KV_N, D); PA 的 Bn 为 KV cache 块池总数
     std::vector<int64_t> expected;
     if (qfaInfo.layoutKV == FiaLayout::TND) {
         expected = {qfaInfo.keyTSize, qfaInfo.n2Size, qfaInfo.qkHeadDim};
     } else if (qfaInfo.layoutKV == FiaLayout::BnNBsD) {
-        expected = {qfaInfo.maxBlockNumPerBatch, qfaInfo.n2Size, qfaInfo.blockSize, qfaInfo.qkHeadDim};
+        expected = {qfaInfo.totalBlockNum, qfaInfo.n2Size, qfaInfo.blockSize, qfaInfo.qkHeadDim};
+    } else if (qfaInfo.layoutKV == FiaLayout::BnBsND) {
+        expected = {qfaInfo.totalBlockNum, qfaInfo.blockSize, qfaInfo.n2Size, qfaInfo.qkHeadDim};
     } else if (qfaInfo.layoutKV == FiaLayout::NZ) {
-        expected = {qfaInfo.maxBlockNumPerBatch, qfaInfo.n2Size, qfaInfo.qkHeadDim / 32, qfaInfo.blockSize, 32};
+        // MxFP4 PA_NZ (fp4 物理分形): (Bn, KV_N, D/64, Bs, 64 逻辑元素=32B)
+        expected = {qfaInfo.totalBlockNum, qfaInfo.n2Size, qfaInfo.qkHeadDim / 64, qfaInfo.blockSize, 64};
     } else if (qfaInfo.layoutKV == FiaLayout::BNSD) {
         expected = {qfaInfo.bSize, qfaInfo.n2Size, qfaInfo.s2Size, qfaInfo.qkHeadDim};
     } else {
@@ -306,9 +312,9 @@ ge::graphStatus QuantChecker::CheckKVShape(const QuantFlashAttnTilingInfo& qfaIn
     }
     // v 的 D 用 vHeadDim（与 k 的 qkHeadDim 区分）
     if (qfaInfo.layoutKV == FiaLayout::NZ) {
-        expected[2] = qfaInfo.vHeadDim / 32;
+        expected[2] = qfaInfo.vHeadDim / 64;
     } else if (qfaInfo.layoutKV == FiaLayout::TND || qfaInfo.layoutKV == FiaLayout::BnNBsD ||
-               qfaInfo.layoutKV == FiaLayout::BNSD) {
+               qfaInfo.layoutKV == FiaLayout::BnBsND || qfaInfo.layoutKV == FiaLayout::BNSD) {
         expected[expected.size() - 1] = qfaInfo.vHeadDim;
     }
     if (valueShape != nullptr &&
@@ -358,11 +364,13 @@ ge::graphStatus QuantChecker::CheckMxFp4Constraint(const QuantFlashAttnTilingInf
         return ge::GRAPH_SUCCESS;
     }
 
-    // MxFP4: layout_q_descale 仅支持 BNSD
-    OP_CHECK_IF(qfaInfo.layoutQDescale != FiaLayout::BNSD,
+    // MxFP4: TND 统一 N2TGD (S1G 合轴, 任意 G); 非 TND 与 layout_q 一致 (摊平)
+    OP_CHECK_IF((qfaInfo.layoutQ == FiaLayout::TND && qfaInfo.layoutQDescale != FiaLayout::N2TGD) ||
+                    (qfaInfo.layoutQ != FiaLayout::TND && qfaInfo.layoutQDescale != qfaInfo.layoutQ),
                 OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, LAYOUT_Q_DESCALE_NAME.c_str(),
                                                       LayoutToSerialStr(qfaInfo.layoutQDescale).c_str(),
-                                                      "MxFP4 only supports layout_q_descale = BNSD"),
+                                                      "MxFP4 requires N2TGD for TND, otherwise layout_q_descale "
+                                                      "must match layout_q"),
                 return ge::GRAPH_FAILED);
 
     // MxFP4: D 仅支持 128
@@ -451,19 +459,20 @@ ge::graphStatus QuantChecker::CheckQDescaleShape(const QuantFlashAttnTilingInfo&
     uint32_t dimNum = shape->GetStorageShape().GetDimNum();
 
     std::vector<int64_t> expected;
-    if (dimNum == DIM_NUM_4) {
-        // MxFP8 prefill: (Q_T, Q_N, D/64, 2)
-        expected = {qfaInfo.queryTSize, qfaInfo.n1Size, DPerGroup, 2};
-    } else if (dimNum == DIM_NUM_5) {
-        if (qfaInfo.layoutQ == FiaLayout::BNSD) {
-            // MxFP4 BNSD: (B, Q_N, Q_S, D/64, 2)
-            expected = {qfaInfo.bSize, qfaInfo.n1Size, qfaInfo.s1Size, DPerGroup, 2};
-        } else {
-            // MxFP8 decode: (KV_N, Q_T, G, D/64, 2)
-            expected = {qfaInfo.n2Size, qfaInfo.queryTSize, qfaInfo.gSize, DPerGroup, 2};
+    if (qfaInfo.layoutQ == FiaLayout::TND) {
+        // TND 统一 N2TGD: (N_kv, Q_T, G, D/64, 2), 任意 G (G=1 含内)
+        if (dimNum != DIM_NUM_5 || qfaInfo.layoutQDescale != FiaLayout::N2TGD) {
+            OP_LOGE(qfaInfo.opName, "q_descale with layout_q=TND requires 5D N2TGD shape, but got %uD %s.", dimNum,
+                    LayoutToSerialStr(qfaInfo.layoutQDescale).c_str());
+            return ge::GRAPH_FAILED;
         }
+        expected = {qfaInfo.n2Size, qfaInfo.queryTSize, qfaInfo.gSize, DPerGroup, 2};
+    } else if (dimNum == DIM_NUM_5 && qfaInfo.layoutQ == FiaLayout::BNSD) {
+        // BNSD: (B, Q_N, Q_S, D/64, 2)
+        expected = {qfaInfo.bSize, qfaInfo.n1Size, qfaInfo.s1Size, DPerGroup, 2};
     } else {
-        OP_LOGE(qfaInfo.opName, "q_descale shape dim %u is unsupported, expected 4D or 5D.", dimNum);
+        OP_LOGE(qfaInfo.opName, "q_descale shape unsupported: layout_q=%s, %uD.",
+                LayoutToSerialStr(qfaInfo.layoutQ).c_str(), dimNum);
         return ge::GRAPH_FAILED;
     }
 
@@ -483,13 +492,16 @@ ge::graphStatus QuantChecker::CheckKDescaleShape(const QuantFlashAttnTilingInfo&
 
     std::vector<int64_t> expected;
     if (qfaInfo.layoutKV == FiaLayout::TND) {
+        // TND: (KV_T, KV_N, D/64, 2)
         expected = {qfaInfo.keyTSize, qfaInfo.n2Size, DPerGroup, 2};
     } else if (qfaInfo.layoutKV == FiaLayout::BnNBsD) {
-        expected = {qfaInfo.maxBlockNumPerBatch, qfaInfo.n2Size, qfaInfo.blockSize, DPerGroup, 2};
+        expected = {qfaInfo.totalBlockNum, qfaInfo.n2Size, qfaInfo.blockSize, DPerGroup, 2};
+    } else if (qfaInfo.layoutKV == FiaLayout::BnBsND) {
+        expected = {qfaInfo.totalBlockNum, qfaInfo.blockSize, qfaInfo.n2Size, DPerGroup, 2};
     } else if (qfaInfo.layoutKV == FiaLayout::NZ) {
-        expected = {qfaInfo.maxBlockNumPerBatch, qfaInfo.n2Size, qfaInfo.blockSize / 16, DPerGroup, 16, 2};
+        expected = {qfaInfo.totalBlockNum, qfaInfo.n2Size, (qfaInfo.blockSize + 15) / 16, DPerGroup, 16, 2};
     } else if (qfaInfo.layoutKV == FiaLayout::BNSD) {
-        // MxFP4 BNSD: (B, KV_N, KV_S, D/64, 2)
+        // BNSD: (B, KV_N, KV_S, D/64, 2)
         expected = {qfaInfo.bSize, qfaInfo.n2Size, qfaInfo.s2Size, DPerGroup, 2};
     } else {
         OP_LOGE(qfaInfo.opName, "k_descale shape check: kv_layout %s is unsupported.",

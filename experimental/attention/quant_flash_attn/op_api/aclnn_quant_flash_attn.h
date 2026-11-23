@@ -54,8 +54,8 @@ extern "C" {
  * @param maxSeqlenQ          [IN]  ATTR可选。query最大序列长度。INT。-1表示自动推断。
  * @param maxSeqlenKV         [IN]  ATTR可选。kv最大序列长度。INT。-1表示自动推断。
  * @param layoutQ             [IN]  ATTR可选。query的数据布局，支持"BSND"/"BNSD"/"TND"。
- * @param layoutQDescale      [IN]  ATTR可选。q
- * descale的数据布局，支持"BSND"/"BNSD"/"TND"/"N2TGD"。mxfp4不使用，透传保持接口一致。
+ * @param layoutQDescale      [IN]  ATTR可选。q descale的数据布局，支持"BSND"/"BNSD"/"TND"/"N2TGD"。
+ *                                  MxFP4 在 TND 合轴场景使用 N2TGD，其余与 layoutQ 一致。
  * @param layoutKv            [IN]  ATTR可选。key/value的数据布局，支持"BSND"/"TND"/"PA_ND"/"PA_NZ"。
  * @param layoutOut           [IN]  ATTR可选。输出的数据布局，支持"BSND"/"BNSD"/"TND"。
  * @param returnSoftmaxLse    [IN]  ATTR可选。是否输出softmax_lse。BOOL。True输出，False不输出。

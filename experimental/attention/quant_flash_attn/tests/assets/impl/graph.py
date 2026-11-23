@@ -115,6 +115,7 @@ class QuantFlashAttnMxfp4AclGraph(torch.nn.Module):
         seqused_q_t = _none_if_empty(seqused_q)
         seqused_kv_t = _none_if_empty(seqused_kv)
 
+        # MxFP4 不消费 v_tail 三件套, 空 slot 归一化为 None 与 schema 对齐
         def _vtail_none(t):
             if t is None or not isinstance(t, torch.Tensor) or t.numel() == 0:
                 return None
@@ -123,12 +124,6 @@ class QuantFlashAttnMxfp4AclGraph(torch.nn.Module):
         v_tail_arg = _vtail_none(v_tail)
         block_table_tail_arg = _vtail_none(block_table_tail)
         seqused_v_tail_arg = _vtail_none(seqused_v_tail)
-        if seqused_v_tail_arg is not None and all(
-            int(x) == 0 for x in seqused_v_tail_arg.detach().cpu().flatten().tolist()
-        ):
-            v_tail_arg = None
-            block_table_tail_arg = None
-            seqused_v_tail_arg = None
 
         torch.npu.synchronize()
 
@@ -180,6 +175,7 @@ class QuantFlashAttnMxfp4AclGraph(torch.nn.Module):
         self.seqused_kv = seqused_kv_t
         self.sinks = sinks
         self.attn_mask = attn_mask
+        # v_tail 三件套: 空 slot/全零尾长已在上面过滤 (MxFP4 恒空), 保留字段与 op schema 对齐
         self.v_tail = v_tail_arg
         self.block_table_tail = block_table_tail_arg
         self.seqused_v_tail = seqused_v_tail_arg

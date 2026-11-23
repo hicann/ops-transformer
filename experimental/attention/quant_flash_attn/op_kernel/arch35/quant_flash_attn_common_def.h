@@ -100,6 +100,11 @@ struct CommonConstInfo {
     uint32_t logSumExpSize = 0;
 };
 
+// paLayoutType 存 host FiaLayout 枚举原始值 (fia_tiling_shape.h)
+constexpr uint32_t PA_LAYOUT_BBND = 23; // FiaLayout::BnBsND, 块内 (Bs, N, D)
+constexpr uint32_t PA_LAYOUT_BNBD = 12; // FiaLayout::BnNBsD, 块内 (N, Bs, D)
+constexpr uint32_t PA_LAYOUT_NZ = 3;    // FiaLayout::NZ,     块内 (D/32, Bs, 16B) fp4 物理分形
+
 struct PAConstInfo {
     uint32_t blockSize = 0;
     uint32_t maxBlockNumPerBatch = 0;
@@ -115,6 +120,12 @@ struct SinkConstInfo {
 };
 
 struct ConstInfo : CommonConstInfo, PAConstInfo, LseConstInfo, SinkConstInfo {};
+
+// N_kv: 摊平 n2Size=N_q 需除 gRealSize; S1G 合轴 (gSize>1) n2Size 即 N_kv
+__aicore__ inline constexpr uint32_t QfaKvHeadNum(uint32_t n2Size, uint32_t gSize, uint32_t gRealSize)
+{
+    return (gSize > 1) ? n2Size : n2Size / gRealSize;
+}
 
 struct CubeRunInfo {
     uint32_t loop = 0;
@@ -165,6 +176,15 @@ struct VecRunInfo {
     uint32_t actSingleLoopS2Size = 0;
     uint32_t actSingleLoopS2SizeAlign = 0;
     uint32_t actSingleLoopS2SizeAlign64 = 0;
+
+    // FD: 本行 S2 区间为完整 S2 真子区间时 partial 写 workspace 槽 faTmpOutWsPos
+    bool isS2SplitCore = false;
+    uint32_t faTmpOutWsPos = 0;
+
+    // CAUSAL: 逐行阈值 t = (maskBase + kvRow) * gSize - maskRem, lane < t 置 -inf (S1G 合轴 M 行 r=t*G+g)
+    // maskRem = tile 起始行号 gS1*mBaseSize 对 gSize 取余: 逐行阈值按全局行号 r = gS1*mBaseSize + lane 折算
+    int32_t maskBase = 0;
+    int32_t maskRem = 0;
 };
 
 // kernel stream related struct
@@ -191,7 +211,7 @@ public:
         seqUsedParser.Init(seqUsedGmAddr, seqUsedDims, defaultSeqUsedVal);
     }
 
-    __aicore__ inline uint64_t GetActualSeqLength(uint32_t bIdx)
+    __aicore__ inline uint64_t GetActualSeqLength(uint32_t bIdx) const
     {
         if constexpr (LAYOUT_Q == QFA_LAYOUT::TND) {
             return cuSeqLensParser.GetActualSeqLength(bIdx);

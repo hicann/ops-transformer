@@ -17,7 +17,6 @@
 #include <algorithm>
 #include "fia_tiling_shape.h"
 
-
 namespace optiling {
 static const std::map<FiaLayout, std::vector<FiaAxis>> FIA_LAYOUT_AXIS_MAP = {
     {FiaLayout::BSH, {FiaAxis::B, FiaAxis::S, FiaAxis::H}},
@@ -29,7 +28,8 @@ static const std::map<FiaLayout, std::vector<FiaAxis>> FIA_LAYOUT_AXIS_MAP = {
     {FiaLayout::NTD, {FiaAxis::N, FiaAxis::T, FiaAxis::D}},
     {FiaLayout::BS2, {FiaAxis::B, FiaAxis::S2}},
     {FiaLayout::S1S2, {FiaAxis::S1, FiaAxis::S2}},
-    {FiaLayout::BnBsH, {FiaAxis::Bn, FiaAxis::Bs, FiaAxis::H}},
+    {FiaLayout::BnBsH, {FiaAxis::Bn, FiaAxis::Bs, FiaAxis::N, FiaAxis::D}},
+    {FiaLayout::BnBsND, {FiaAxis::Bn, FiaAxis::Bs, FiaAxis::N, FiaAxis::D}},
     {FiaLayout::BnNBsD, {FiaAxis::Bn, FiaAxis::N, FiaAxis::Bs, FiaAxis::D}},
     {FiaLayout::BNS1S2, {FiaAxis::B, FiaAxis::N, FiaAxis::S1, FiaAxis::S2}},
     {FiaLayout::INS1S2, {FiaAxis::CONST, FiaAxis::N, FiaAxis::S1, FiaAxis::S2}},
@@ -42,45 +42,45 @@ static const std::map<FiaLayout, std::vector<FiaAxis>> FIA_LAYOUT_AXIS_MAP = {
     {FiaLayout::S1S1, {FiaAxis::S1}},
 };
 
-static bool equal_to(const int64_t &a, const int64_t &b)
+static bool equal_to(const int64_t& a, const int64_t& b)
 {
     return (a == b);
 }
 
-static bool greater(const int64_t &a, const int64_t &b)
+static bool greater(const int64_t& a, const int64_t& b)
 {
     return (a > b);
 }
 
-static bool greater_equal(const int64_t &a, const int64_t &b)
+static bool greater_equal(const int64_t& a, const int64_t& b)
 {
     return (a >= b);
 }
 
-static bool less(const int64_t &a, const int64_t &b)
+static bool less(const int64_t& a, const int64_t& b)
 {
     return (a < b);
 }
 
-static bool less_equal(const int64_t &a, const int64_t &b)
+static bool less_equal(const int64_t& a, const int64_t& b)
 {
     return (a <= b);
 }
 
-static bool not_equal_to(const int64_t &a, const int64_t &b)
+static bool not_equal_to(const int64_t& a, const int64_t& b)
 {
     return (a != b);
 }
 
-static bool ignore_input(const int64_t &a, const int64_t &b)
+static bool ignore_input(const int64_t& a, const int64_t& b)
 {
     (void)a;
     (void)b;
     return true;
 }
 
-static ge::graphStatus GetLayoutAxes(std::vector<FiaAxis> &layoutAxes, const FiaLayout &layout,
-                                     const std::string &opName, const std::string &funcName)
+static ge::graphStatus GetLayoutAxes(std::vector<FiaAxis>& layoutAxes, const FiaLayout& layout,
+                                     const std::string& opName, const std::string& funcName)
 {
     auto it = FIA_LAYOUT_AXIS_MAP.find(layout);
     if (it == FIA_LAYOUT_AXIS_MAP.end()) {
@@ -109,10 +109,10 @@ std::string LayoutToSerialString(FiaLayout layout)
         {FiaLayout::BSH, "BSH"},       {FiaLayout::BSND, "BSND"},     {FiaLayout::BNSD, "BNSD"},
         {FiaLayout::NZ, "NZ"},         {FiaLayout::TND, "TND"},       {FiaLayout::NBSD, "NBSD"},
         {FiaLayout::NTD, "NTD"},       {FiaLayout::S1S2, "S1S2"},     {FiaLayout::BS2, "BS2"},
-        {FiaLayout::BnBsH, "BnBsH"},   {FiaLayout::BnNBsD, "BnNBsD"}, {FiaLayout::BNS1S2, "BNS1S2"},
-        {FiaLayout::INS1S2, "1NS1S2"}, {FiaLayout::BNS11, "BNS11"},   {FiaLayout::TN1, "TN1"},
-        {FiaLayout::BS1S2, "BS1S2"},   {FiaLayout::B1S1S2, "B1S1S2"}, {FiaLayout::IS1S2, "1S1S2"},
-        {FiaLayout::I1S1S2, "11S1S2"}};
+        {FiaLayout::BnBsH, "BnBsH"},   {FiaLayout::BnBsND, "BnBsND"}, {FiaLayout::BnNBsD, "BnNBsD"},
+        {FiaLayout::BNS1S2, "BNS1S2"}, {FiaLayout::INS1S2, "1NS1S2"}, {FiaLayout::BNS11, "BNS11"},
+        {FiaLayout::TN1, "TN1"},       {FiaLayout::BS1S2, "BS1S2"},   {FiaLayout::B1S1S2, "B1S1S2"},
+        {FiaLayout::IS1S2, "1S1S2"},   {FiaLayout::I1S1S2, "11S1S2"}};
 
     if (layout2Str.find(layout) != layout2Str.end()) {
         return layout2Str.at(layout);
@@ -129,15 +129,15 @@ std::string AxisToSerialString(FiaAxis axis)
     return (idx < sizeof(AXIS_SERIAL_STRINGS) / sizeof(AXIS_SERIAL_STRINGS[0])) ? AXIS_SERIAL_STRINGS[idx] : "UNKNOWN";
 }
 
-bool FiaTilingShape::HasAxis(const FiaAxis &axis) const
+bool FiaTilingShape::HasAxis(const FiaAxis& axis) const
 {
-    const auto &layoutIt = FIA_LAYOUT_AXIS_MAP.find(layout_);
+    const auto& layoutIt = FIA_LAYOUT_AXIS_MAP.find(layout_);
     if (layoutIt == FIA_LAYOUT_AXIS_MAP.end()) {
         return false;
     }
 
-    const std::vector<FiaAxis> &axes = layoutIt->second;
-    const auto &axisIt = std::find(axes.begin(), axes.end(), axis);
+    const std::vector<FiaAxis>& axes = layoutIt->second;
+    const auto& axisIt = std::find(axes.begin(), axes.end(), axis);
     if (axisIt == axes.end()) {
         return false;
     }
@@ -145,22 +145,22 @@ bool FiaTilingShape::HasAxis(const FiaAxis &axis) const
     return true;
 }
 
-size_t FiaTilingShape::GetAxisIdx(const FiaAxis &axis) const
+size_t FiaTilingShape::GetAxisIdx(const FiaAxis& axis) const
 {
     if (HasAxis(axis)) {
-        const std::vector<FiaAxis> &axes = FIA_LAYOUT_AXIS_MAP.find(layout_)->second;
-        const auto &axisIt = std::find(axes.begin(), axes.end(), axis);
+        const std::vector<FiaAxis>& axes = FIA_LAYOUT_AXIS_MAP.find(layout_)->second;
+        const auto& axisIt = std::find(axes.begin(), axes.end(), axis);
         return std::distance(axes.begin(), axisIt);
     }
     return 0;
 }
 
-int64_t FiaTilingShape::GetAxisNum(const FiaAxis &axis) const
+int64_t FiaTilingShape::GetAxisNum(const FiaAxis& axis) const
 {
     return HasAxis(axis) ? shape_.GetDim(GetAxisIdx(axis)) : invalidDimValue_;
 }
 
-ge::graphStatus FiaTilingShape::CheckHasAxis(const FiaAxis &axis, const std::string &funcName) const
+ge::graphStatus FiaTilingShape::CheckHasAxis(const FiaAxis& axis, const std::string& funcName) const
 {
     if (shape_.GetDimNum() == 0) {
         std::string reason = "[" + funcName + "] The shape dim of " + name_ + " cannot be 0";
@@ -228,7 +228,7 @@ std::string FiaTilingShapeCompare::CompareTypeToSerialString(const FiaCompareTyp
     }
 }
 
-std::string FiaTilingShapeCompare::CompareTypeToSerialSymbolString(const FiaCompareType &compareType) const
+std::string FiaTilingShapeCompare::CompareTypeToSerialSymbolString(const FiaCompareType& compareType) const
 {
     switch (compareType) {
         case FiaCompareType::EQUAL:
@@ -248,9 +248,9 @@ std::string FiaTilingShapeCompare::CompareTypeToSerialSymbolString(const FiaComp
     }
 }
 
-ge::graphStatus FiaTilingShapeCompare::GetExpectedShapeSpecial(gert::Shape &shapeExpected,
-                                                               const FiaTilingShapeCompareParam &param,
-                                                               const std::string &funcName) const
+ge::graphStatus FiaTilingShapeCompare::GetExpectedShapeSpecial(gert::Shape& shapeExpected,
+                                                               const FiaTilingShapeCompareParam& param,
+                                                               const std::string& funcName) const
 {
     if (layout_ == FiaLayout::BNS1S2) {
         shapeExpected = gert::Shape({param.B, param.N, param.S1, param.S2});
@@ -281,9 +281,9 @@ ge::graphStatus FiaTilingShapeCompare::GetExpectedShapeSpecial(gert::Shape &shap
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FiaTilingShapeCompare::GetExpectedShape(gert::Shape &shapeExpected,
-                                                        const FiaTilingShapeCompareParam &param,
-                                                        const std::string &funcName) const
+ge::graphStatus FiaTilingShapeCompare::GetExpectedShape(gert::Shape& shapeExpected,
+                                                        const FiaTilingShapeCompareParam& param,
+                                                        const std::string& funcName) const
 {
     if (layout_ == FiaLayout::BSH) {
         shapeExpected = gert::Shape({param.B, param.S, param.H});
@@ -292,7 +292,9 @@ ge::graphStatus FiaTilingShapeCompare::GetExpectedShape(gert::Shape &shapeExpect
     } else if (layout_ == FiaLayout::BNSD) {
         shapeExpected = gert::Shape({param.B, param.N, param.S, param.D});
     } else if (layout_ == FiaLayout::BnBsH) {
-        shapeExpected = gert::Shape({param.Bn, param.Bs, param.H});
+        shapeExpected = gert::Shape({param.Bn, param.Bs, param.N, param.D});
+    } else if (layout_ == FiaLayout::BnBsND) {
+        shapeExpected = gert::Shape({param.Bn, param.Bs, param.N, param.D});
     } else if (layout_ == FiaLayout::BnNBsD) {
         shapeExpected = gert::Shape({param.Bn, param.N, param.Bs, param.D});
     } else if (layout_ == FiaLayout::NZ) {
@@ -309,8 +311,8 @@ ge::graphStatus FiaTilingShapeCompare::GetExpectedShape(gert::Shape &shapeExpect
     return ge::GRAPH_SUCCESS;
 }
 
-FiaCompareType FiaTilingShapeCompare::GetCompareType(const std::map<FiaAxis, FiaCompareType> &compareTypeMap,
-                                                     const FiaAxis &axis) const
+FiaCompareType FiaTilingShapeCompare::GetCompareType(const std::map<FiaAxis, FiaCompareType>& compareTypeMap,
+                                                     const FiaAxis& axis) const
 {
     auto it = compareTypeMap.find(axis);
     auto compareType = FiaCompareType::EQUAL;
@@ -320,9 +322,9 @@ FiaCompareType FiaTilingShapeCompare::GetCompareType(const std::map<FiaAxis, Fia
     return compareType;
 }
 
-ge::graphStatus FiaTilingShapeCompare::GetCompareFunc(const FiaCompareType &compareType,
-                                                      CompareFunc<int64_t> &compareFunc,
-                                                      const std::string &funcName) const
+ge::graphStatus FiaTilingShapeCompare::GetCompareFunc(const FiaCompareType& compareType,
+                                                      CompareFunc<int64_t>& compareFunc,
+                                                      const std::string& funcName) const
 {
     auto it = compareFuncMap_.find(compareType);
     if (it == compareFuncMap_.end()) {
@@ -334,8 +336,8 @@ ge::graphStatus FiaTilingShapeCompare::GetCompareFunc(const FiaCompareType &comp
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FiaTilingShapeCompare::CompareShape(FiaTilingShapeCompareParam &param,
-                                                    const std::string &funcName) const
+ge::graphStatus FiaTilingShapeCompare::CompareShape(FiaTilingShapeCompareParam& param,
+                                                    const std::string& funcName) const
 {
     param.H = param.N * param.D;
     gert::Shape shapeExpected;

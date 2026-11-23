@@ -29,25 +29,27 @@ public:
     SeqLenChecker() = default;
     ~SeqLenChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const QuantFlashAttnTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckParaExistence(const QuantFlashAttnTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckFeature(const QuantFlashAttnTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckMultiPara(const QuantFlashAttnTilingInfo &qfaInfo) override;
+    ge::graphStatus CheckSinglePara(const QuantFlashAttnTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckParaExistence(const QuantFlashAttnTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckFeature(const QuantFlashAttnTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckMultiPara(const QuantFlashAttnTilingInfo& qfaInfo) override;
 
 private:
     // --- SinglePara ---
-    ge::graphStatus CheckSingleParaSequsedQ(const QuantFlashAttnTilingInfo &qfaInfo);
-    ge::graphStatus CheckSingleParaSequsedKv(const QuantFlashAttnTilingInfo &qfaInfo);
-    ge::graphStatus CheckSingleParaCuSeqlensQ(const QuantFlashAttnTilingInfo &qfaInfo);
-    ge::graphStatus CheckSingleParaCuSeqlensKv(const QuantFlashAttnTilingInfo &qfaInfo);
-    ge::graphStatus CheckSingleParaMaxSeqlenQ(const QuantFlashAttnTilingInfo &qfaInfo);
-    ge::graphStatus CheckSingleParaMaxSeqlenKv(const QuantFlashAttnTilingInfo &qfaInfo);
+    ge::graphStatus CheckSingleParaSequsedQ(const QuantFlashAttnTilingInfo& qfaInfo);
+    ge::graphStatus CheckSingleParaSequsedKv(const QuantFlashAttnTilingInfo& qfaInfo);
+    ge::graphStatus CheckSingleParaCuSeqlensQ(const QuantFlashAttnTilingInfo& qfaInfo);
+    ge::graphStatus CheckSingleParaCuSeqlensKv(const QuantFlashAttnTilingInfo& qfaInfo);
+    ge::graphStatus CheckSingleParaMaxSeqlenQ(const QuantFlashAttnTilingInfo& qfaInfo);
+    ge::graphStatus CheckSingleParaMaxSeqlenKv(const QuantFlashAttnTilingInfo& qfaInfo);
 
-    // --- Feature: 非TND时 seqused 与 max_seqlen 至少传1组 ---
-    // 文档约束:
+    // --- Feature: cu_seqlens 布局约束 + 非TND时 seqused 与 max_seqlen 至少传1组 ---
+    // cu_seqlens: TND 必传, 非 TND 禁止传入
+    ge::graphStatus CheckCuSeqlensLayoutConsistency(const QuantFlashAttnTilingInfo& qfaInfo);
+    // 非TND时 seqused 与 max_seqlen 至少传1组:
     //   layout_q 不为 TND 时, seqused_q 与 max_seqlen_q 至少传入其中一个
     //   layout_kv 不为 TND 且不为 PA 场景时, seqused_kv 与 max_seqlen_kv 至少传入其中一个
-    ge::graphStatus CheckSequsedMaxSeqlenAtLeastOne(const QuantFlashAttnTilingInfo &qfaInfo);
+    ge::graphStatus CheckSequsedMaxSeqlenAtLeastOne(const QuantFlashAttnTilingInfo& qfaInfo);
 };
 
 } // namespace quant_flash_attn

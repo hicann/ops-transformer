@@ -82,6 +82,27 @@ constexpr half INV_LN2 = static_cast<half>(1.4426950409f);
 constexpr half NEG_TWO_VALE = static_cast<half>(-2.0f);
 constexpr half TWO_VALE = static_cast<half>(2.0f);
 constexpr half MIN_VALUE = static_cast<half>(-65504.0f);
+// CAUSAL: groupMax snap 链下限 (有限值, 防 -inf 进 Sub 链产生 NaN)
+constexpr half CAUSAL_CLAMP = static_cast<half>(-30000.0f);
+
+// CAUSAL 行前缀 mask: 可见 ⇔ lane >= t (t = (maskBase + kvRow) * causalScale - causalRem),
+// 前缀 lane < t 置 -inf。
+// lane 序号取 lane_idx_reg (0..S1Base-1); t 夹到 [0, S1Base]: 全可见时 Select 原值, 全不可见时全 -inf。
+// 调用处按 tile 全可见与否选择是否实例化 (hasAtten 模板参数): VF 内标量 if 会被谓词化, 不省向量指令。
+// causalScale: M 行号 → s1 行号的折算 (S1G 合轴 r=t*G+g ⇒ gSize; 头轴摊平 ⇒ 1)。
+// causalRem: tile 起始行 gS1*S1Base 对 causalScale 取余 (S1G 合轴时 = gS1*S1Base % gSize)。
+//            逐行阈值按全局行号 r = gS1*S1Base + lane 折算 ⇒ lane >= t*G - (gS1*S1Base % G);
+//            tile 起点整除 G 时余数为 0, 与旧口径一致。
+// 依赖使用处局部量: neg_inf_reg, preg_causal, preg_all_16bit, lane_idx_reg, S1Base (模板参数),
+//                   causalScale / causalRem (入参)
+#define CAUSAL_ROW_MASK(reg, t) \
+    do { \
+        int32_t causal_t_ = static_cast<int32_t>(t) * causalScale - causalRem; \
+        causal_t_ = (causal_t_ < 0) ? 0 : causal_t_; \
+        causal_t_ = (causal_t_ > static_cast<int32_t>(S1Base)) ? static_cast<int32_t>(S1Base) : causal_t_; \
+        Compares<int16_t, CMPMODE::GE>(preg_causal, lane_idx_reg, static_cast<int16_t>(causal_t_), preg_all_16bit); \
+        Select((reg), (reg), neg_inf_reg, preg_causal); \
+    } while (0)
 
 } // namespace Mxfp4Api
 #endif // VF_COMMON_DEF_H_

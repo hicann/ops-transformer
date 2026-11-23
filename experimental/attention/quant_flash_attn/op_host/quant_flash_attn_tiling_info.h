@@ -216,6 +216,7 @@ public:
     // PageAttention
     int64_t blockSize = 0;
     int64_t maxBlockNumPerBatch = 0;
+    int64_t totalBlockNum = 0; // KV cache 块池总数 (k shape 的 Bn 轴)
 
     // mask 信息
     bool attnMaskFlag = false;

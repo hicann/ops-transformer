@@ -27,7 +27,8 @@ using namespace Reg;
 template <bool clear_gmax, typename T, typename T2, bool hasAtten = false, uint16_t S2Base = 256, uint16_t S1Base = 128>
 __simd_vf__ inline void softmax_with_group_max_qs128_kvs256_vf(__ubuf__ T2* pDest, __ubuf__ T* s,
                                                                __ubuf__ T* local_group_max, __ubuf__ T* global_max,
-                                                               __ubuf__ uint8_t* indexesUb)
+                                                               __ubuf__ uint8_t* indexesUb, int32_t causalScale,
+                                                               int32_t maskBase, int32_t causalRem)
 {
     // ====================== 寄存器定义 ======================
     RegTensor<half> src_c0, src_c1, src_c2, src_c3;
@@ -36,6 +37,12 @@ __simd_vf__ inline void softmax_with_group_max_qs128_kvs256_vf(__ubuf__ T2* pDes
     RegTensor<half> next_group_max;
     RegTensor<half> group_gmax;
     RegTensor<uint8_t> idx_nd2nz;
+
+    // CAUSAL mask 专用: -inf 填充值与 s2 padding 一致 (MIN_VALUE*2 溢出 = -inf)
+    RegTensor<half> neg_inf_reg;
+    RegTensor<half> min_val_reg2; // 全 mask 组的 groupMax 填充 (有限 MIN, 避免 -inf 进状态链)
+    MaskReg preg_causal;
+    RegTensor<int16_t> lane_idx_reg; // lane 序号 0..S1Base-1, CAUSAL 行阈值比较用
 
     // 量化专用寄存器
     RegTensor<bfloat16_t> src_bf16_0, src_bf16_1, src_bf16_2, src_bf16_3;
@@ -50,12 +57,22 @@ __simd_vf__ inline void softmax_with_group_max_qs128_kvs256_vf(__ubuf__ T2* pDes
 
     // ====================== 掩码定义 ======================
     MaskReg preg_all_16bit = CreateMask<uint16_t, MaskPattern::ALL>();
+    if constexpr (hasAtten) {
+        Arange<int16_t>(lane_idx_reg, 0);
+    }
     MaskReg preg_all_8bit = CreateMask<uint8_t, MaskPattern::ALL>();
     MaskReg preg_vl128 = CreateMask<uint8_t, MaskPattern::VL128>();
     MaskReg preg_vl128_not;
     MaskNot(preg_vl128_not, preg_vl128, preg_all_8bit);
 
     MaskReg preg_invalid_max;
+
+    // ====================== CAUSAL mask 预处理 ======================
+    if constexpr (hasAtten) {
+        Duplicate(neg_inf_reg, MIN_VALUE); // MIN_VALUE*2 溢出 = -inf, 与 s2 padding 填充一致
+        Muls(neg_inf_reg, neg_inf_reg, TWO_VALE, preg_all_16bit);
+        Duplicate(min_val_reg2, MIN_VALUE); // 全 mask 组的 groupMax (有限值)
+    }
 
     // ====================== 全局最大值初始化 ======================
     if constexpr (clear_gmax) {
@@ -68,18 +85,45 @@ __simd_vf__ inline void softmax_with_group_max_qs128_kvs256_vf(__ubuf__ T2* pDes
 
     // ====================== 预计算：第一个分组的最大值 ======================
     Duplicate(curr_group_max, MIN_VALUE);
-    for (uint16_t iter = 0; iter < ITER_PER_GROUP; ++iter) {
-        LoadAlign(src_c0, s + (iter * S1Base * ROW_SUB_LOOP + 0 * S1Base) * 2);
-        LoadAlign(src_c1, s + (iter * S1Base * ROW_SUB_LOOP + 1 * S1Base) * 2);
-        LoadAlign(src_c2, s + (iter * S1Base * ROW_SUB_LOOP + 2 * S1Base) * 2);
-        LoadAlign(src_c3, s + (iter * S1Base * ROW_SUB_LOOP + 3 * S1Base) * 2);
+    if constexpr (hasAtten) {
+        // 首组保护: 组首行阈值 maskBase >= S1Base 时整组全 mask, 跳过 (curr_group_max
+        // 停在有限 MIN); 否则必须算 max, 全 mask 行由宏的整行 -inf 分支兜底
+        if (maskBase * causalScale - causalRem < static_cast<int32_t>(S1Base)) {
+            for (uint16_t iter = 0; iter < ITER_PER_GROUP; ++iter) {
+                LoadAlign(src_c0, s + (iter * S1Base * ROW_SUB_LOOP + 0 * S1Base) * 2);
+                LoadAlign(src_c1, s + (iter * S1Base * ROW_SUB_LOOP + 1 * S1Base) * 2);
+                LoadAlign(src_c2, s + (iter * S1Base * ROW_SUB_LOOP + 2 * S1Base) * 2);
+                LoadAlign(src_c3, s + (iter * S1Base * ROW_SUB_LOOP + 3 * S1Base) * 2);
 
-        Max(src_c0, src_c0, src_c1, preg_all_16bit);
-        Max(src_c2, src_c2, src_c3, preg_all_16bit);
-        Max(curr_group_max, curr_group_max, src_c0, preg_all_16bit);
-        Max(curr_group_max, curr_group_max, src_c2, preg_all_16bit);
+                CAUSAL_ROW_MASK(src_c0, maskBase + iter * ROW_SUB_LOOP + 0);
+                CAUSAL_ROW_MASK(src_c1, maskBase + iter * ROW_SUB_LOOP + 1);
+                CAUSAL_ROW_MASK(src_c2, maskBase + iter * ROW_SUB_LOOP + 2);
+                CAUSAL_ROW_MASK(src_c3, maskBase + iter * ROW_SUB_LOOP + 3);
+
+                Max(src_c0, src_c0, src_c1, preg_all_16bit);
+                Max(src_c2, src_c2, src_c3, preg_all_16bit);
+                Max(curr_group_max, curr_group_max, src_c0, preg_all_16bit);
+                Max(curr_group_max, curr_group_max, src_c2, preg_all_16bit);
+            }
+        }
+    } else {
+        for (uint16_t iter = 0; iter < ITER_PER_GROUP; ++iter) {
+            LoadAlign(src_c0, s + (iter * S1Base * ROW_SUB_LOOP + 0 * S1Base) * 2);
+            LoadAlign(src_c1, s + (iter * S1Base * ROW_SUB_LOOP + 1 * S1Base) * 2);
+            LoadAlign(src_c2, s + (iter * S1Base * ROW_SUB_LOOP + 2 * S1Base) * 2);
+            LoadAlign(src_c3, s + (iter * S1Base * ROW_SUB_LOOP + 3 * S1Base) * 2);
+
+            Max(src_c0, src_c0, src_c1, preg_all_16bit);
+            Max(src_c2, src_c2, src_c3, preg_all_16bit);
+            Max(curr_group_max, curr_group_max, src_c0, preg_all_16bit);
+            Max(curr_group_max, curr_group_max, src_c2, preg_all_16bit);
+        }
     }
 
+    // CAUSAL clamp: 全 mask lane 使 curr_group_max 出 -inf, 进 Sub 链得 NaN; 钳有限值切断
+    if constexpr (hasAtten) {
+        Maxs(curr_group_max, curr_group_max, CAUSAL_CLAMP, preg_all_16bit);
+    }
     Muls(curr_group_max, curr_group_max, INV_LN2, preg_all_16bit);
     Truncate<T, RoundMode::CAST_FLOOR>(curr_group_max, curr_group_max, preg_all_16bit);
     Max(group_gmax, group_gmax, curr_group_max, preg_all_16bit);
@@ -91,6 +135,26 @@ __simd_vf__ inline void softmax_with_group_max_qs128_kvs256_vf(__ubuf__ T2* pDes
     for (uint16_t i = 0; i < GROUP_COUNT; i++) {
         MaskReg preg_valid_max = UpdateMask<half>(MID_VALID_CNT);
         MaskNot(preg_invalid_max, preg_valid_max, preg_all_16bit);
+        if constexpr (hasAtten) {
+            // 组级全 mask: P=0 + groupMax=MIN 快路径, 防 -inf 进 curr_group_max 产生 NaN
+            if ((maskBase + static_cast<int32_t>(i * ROWS_PER_GROUP)) * causalScale - causalRem >=
+                static_cast<int32_t>(S1Base)) {
+                StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(local_group_max + i * S1Base, min_val_reg2,
+                                                             preg_all_16bit);
+                RegTensor<uint8_t> zero8;
+                Duplicate(zero8, static_cast<uint8_t>(0));
+                for (uint16_t j = 0; j < ITER_PER_GROUP; j += 2) {
+                    StoreAlign(((__ubuf__ uint8_t*&)pDest) + i * 2048 + j * 256, zero8, preg_vl128);
+                    StoreAlign(((__ubuf__ uint8_t*&)pDest) + i * 2048 + j * 256 + 16256, zero8, preg_vl128_not);
+                }
+                for (uint16_t j = 0; j < ITER_PER_GROUP; j += 2) {
+                    StoreAlign(((__ubuf__ uint8_t*&)pDest) + i * 2048 + j * 256 + 128, zero8, preg_vl128);
+                    StoreAlign(((__ubuf__ uint8_t*&)pDest) + i * 2048 + j * 256 + 16384, zero8, preg_vl128_not);
+                }
+                StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(global_max, group_gmax, preg_invalid_max);
+                continue;
+            }
+        }
 
         // 初始化下一个块最大值
         Duplicate(next_group_max, MIN_VALUE);
@@ -102,6 +166,12 @@ __simd_vf__ inline void softmax_with_group_max_qs128_kvs256_vf(__ubuf__ T2* pDes
             LoadAlign(src_n1, s + (rowOffset_next * S1Base + 1 * S1Base) * 2);
             LoadAlign(src_n2, s + (rowOffset_next * S1Base + 2 * S1Base) * 2);
             LoadAlign(src_n3, s + (rowOffset_next * S1Base + 3 * S1Base) * 2);
+            if constexpr (hasAtten) {
+                CAUSAL_ROW_MASK(src_n0, maskBase + rowOffset_next + 0);
+                CAUSAL_ROW_MASK(src_n1, maskBase + rowOffset_next + 1);
+                CAUSAL_ROW_MASK(src_n2, maskBase + rowOffset_next + 2);
+                CAUSAL_ROW_MASK(src_n3, maskBase + rowOffset_next + 3);
+            }
             Max(src_n0, src_n0, src_n1, preg_valid_max);
             Max(src_n2, src_n2, src_n3, preg_valid_max);
             Max(next_group_max, next_group_max, src_n0, preg_valid_max);
@@ -113,6 +183,13 @@ __simd_vf__ inline void softmax_with_group_max_qs128_kvs256_vf(__ubuf__ T2* pDes
             LoadAlign(src_c1, s + (rowOffset_cur * S1Base + 1 * S1Base) * 2);
             LoadAlign(src_c2, s + (rowOffset_cur * S1Base + 2 * S1Base) * 2);
             LoadAlign(src_c3, s + (rowOffset_cur * S1Base + 3 * S1Base) * 2);
+
+            if constexpr (hasAtten) {
+                CAUSAL_ROW_MASK(src_c0, maskBase + rowOffset_cur + 0);
+                CAUSAL_ROW_MASK(src_c1, maskBase + rowOffset_cur + 1);
+                CAUSAL_ROW_MASK(src_c2, maskBase + rowOffset_cur + 2);
+                CAUSAL_ROW_MASK(src_c3, maskBase + rowOffset_cur + 3);
+            }
 
             Sub(src_c0, src_c0, curr_group_max, preg_all_16bit);
             Sub(src_c1, src_c1, curr_group_max, preg_all_16bit);
@@ -159,6 +236,12 @@ __simd_vf__ inline void softmax_with_group_max_qs128_kvs256_vf(__ubuf__ T2* pDes
             LoadAlign(src_n1, s + (rowOffset_next * S1Base + 1 * S1Base) * 2);
             LoadAlign(src_n2, s + (rowOffset_next * S1Base + 2 * S1Base) * 2);
             LoadAlign(src_n3, s + (rowOffset_next * S1Base + 3 * S1Base) * 2);
+            if constexpr (hasAtten) {
+                CAUSAL_ROW_MASK(src_n0, maskBase + rowOffset_next + 0);
+                CAUSAL_ROW_MASK(src_n1, maskBase + rowOffset_next + 1);
+                CAUSAL_ROW_MASK(src_n2, maskBase + rowOffset_next + 2);
+                CAUSAL_ROW_MASK(src_n3, maskBase + rowOffset_next + 3);
+            }
 
             Max(src_n0, src_n0, src_n1, preg_valid_max);
             Max(src_n2, src_n2, src_n3, preg_valid_max);
@@ -171,6 +254,13 @@ __simd_vf__ inline void softmax_with_group_max_qs128_kvs256_vf(__ubuf__ T2* pDes
             LoadAlign(src_c1, s + (rowOffset_cur * S1Base + 1 * S1Base) * 2);
             LoadAlign(src_c2, s + (rowOffset_cur * S1Base + 2 * S1Base) * 2);
             LoadAlign(src_c3, s + (rowOffset_cur * S1Base + 3 * S1Base) * 2);
+
+            if constexpr (hasAtten) {
+                CAUSAL_ROW_MASK(src_c0, maskBase + rowOffset_cur + 0);
+                CAUSAL_ROW_MASK(src_c1, maskBase + rowOffset_cur + 1);
+                CAUSAL_ROW_MASK(src_c2, maskBase + rowOffset_cur + 2);
+                CAUSAL_ROW_MASK(src_c3, maskBase + rowOffset_cur + 3);
+            }
 
             Sub(src_c0, src_c0, curr_group_max, preg_all_16bit);
             Sub(src_c1, src_c1, curr_group_max, preg_all_16bit);
@@ -211,7 +301,10 @@ __simd_vf__ inline void softmax_with_group_max_qs128_kvs256_vf(__ubuf__ T2* pDes
         // ====================== 全局/局部最大值更新 ======================
         StoreAlign<T, Reg::StoreDist::DIST_NORM_B16>(global_max, group_gmax, preg_invalid_max);
 
-        // 下一块最大值归一化
+        // 下一块最大值归一化 (CAUSAL: clamp 掉 -inf lane 防 NaN)
+        if constexpr (hasAtten) {
+            Maxs(next_group_max, next_group_max, CAUSAL_CLAMP, preg_valid_max);
+        }
         Muls(next_group_max, next_group_max, INV_LN2, preg_valid_max);
         Truncate<T, RoundMode::CAST_FLOOR>(next_group_max, next_group_max, preg_valid_max);
         Max(group_gmax, group_gmax, next_group_max, preg_valid_max);
@@ -227,11 +320,10 @@ __simd_vf__ inline void softmax_with_group_max_qs128_kvs256_vf(__ubuf__ T2* pDes
 }
 
 template <bool clear_gmax, typename T, typename T2, bool hasAtten = false, uint16_t S2Base = 256, uint16_t S1Base = 128>
-__aicore__ inline void softmaxWithGroupMaxQs128Kvs256CallVF(const LocalTensor<T2>& dstTensor,
-                                                            const LocalTensor<T>& srcTensor,
-                                                            const LocalTensor<T>& local_group_max,
-                                                            const LocalTensor<T>& global_max,
-                                                            const LocalTensor<uint8_t>& indexesBuf)
+__aicore__ inline void softmaxWithGroupMaxQs128Kvs256CallVF(
+    const LocalTensor<T2>& dstTensor, const LocalTensor<T>& srcTensor, const LocalTensor<T>& local_group_max,
+    const LocalTensor<T>& global_max, const LocalTensor<uint8_t>& indexesBuf, int32_t causalScale = 1,
+    int32_t maskBase = 0, int32_t causalRem = 0)
 {
     __ubuf__ T2* pDest = (__ubuf__ T2*)dstTensor.GetPhyAddr();
     __ubuf__ T* input_x_local_UB = (__ubuf__ T*)srcTensor.GetPhyAddr();
@@ -240,7 +332,7 @@ __aicore__ inline void softmaxWithGroupMaxQs128Kvs256CallVF(const LocalTensor<T2
     __ubuf__ uint8_t* indexesUb = (__ubuf__ uint8_t*)indexesBuf.GetPhyAddr();
 
     softmax_with_group_max_qs128_kvs256_vf<clear_gmax, T, T2, hasAtten, S2Base, S1Base>(
-        pDest, input_x_local_UB, localGroupMax, globalMax, indexesUb);
+        pDest, input_x_local_UB, localGroupMax, globalMax, indexesUb, causalScale, maskBase, causalRem);
 }
 
 } // namespace Mxfp4Api

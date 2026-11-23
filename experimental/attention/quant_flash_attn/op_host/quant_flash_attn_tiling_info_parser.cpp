@@ -482,6 +482,11 @@ ge::graphStatus QuantFlashAttnTilingInfoParser::GetMaxBlockNumPerBatch()
             return ge::GRAPH_FAILED;
         }
         tilingInfo_.maxBlockNumPerBatch = tilingInfo_.opParamInfo.blockTable.tensor->GetStorageShape().GetDim(1);
+        // KV cache 块池总数: k shape 的 Bn 轴 (PA 布局下恒为 dim0)
+        if (tilingInfo_.layoutKV == FiaLayout::BnNBsD || tilingInfo_.layoutKV == FiaLayout::BnBsND ||
+            tilingInfo_.layoutKV == FiaLayout::NZ) {
+            tilingInfo_.totalBlockNum = tilingInfo_.opParamInfo.key.shape->GetStorageShape().GetDim(0);
+        }
     } else {
         tilingInfo_.maxBlockNumPerBatch = 0;
     }
@@ -491,7 +496,7 @@ ge::graphStatus QuantFlashAttnTilingInfoParser::GetMaxBlockNumPerBatch()
 
 ge::graphStatus QuantFlashAttnTilingInfoParser::GetS2SizeForPageAttention()
 {
-    if (GetBlockSize() != ge::GRAPH_SUCCESS && GetMaxBlockNumPerBatch() != ge::GRAPH_SUCCESS) {
+    if (GetBlockSize() != ge::GRAPH_SUCCESS || GetMaxBlockNumPerBatch() != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     tilingInfo_.s2Size = tilingInfo_.blockSize * tilingInfo_.maxBlockNumPerBatch;
@@ -527,15 +532,15 @@ ge::graphStatus QuantFlashAttnTilingInfoParser::GetInAndOutLayout()
         tilingInfo_.layoutQ = itQ->second;
     }
 
-    // layout_q_descale: mxfp4 不使用，保持 BSND 默认；仅做 BSND/BNSD/TND 校验透传，不引入 N2TGD 枚举。
+    // layout_q_descale: S1G 合轴 (TND GQA gSize>1) 用 N2TGD; 其余与 layout_q 一致。
     if (tilingInfo_.opParamInfo.layoutQDescale == nullptr) {
         tilingInfo_.layoutQDescale = FiaLayout::BSND;
     } else {
         const std::map<std::string, FiaLayout> qDescaleLayoutMap = {
-            {"BSND", FiaLayout::BSND}, {"BNSD", FiaLayout::BNSD}, {"TND", FiaLayout::TND}};
+            {"BSND", FiaLayout::BSND}, {"BNSD", FiaLayout::BNSD}, {"TND", FiaLayout::TND}, {"N2TGD", FiaLayout::N2TGD}};
         auto itQDescale = qDescaleLayoutMap.find(tilingInfo_.opParamInfo.layoutQDescale);
         if (itQDescale == qDescaleLayoutMap.end()) {
-            OP_LOGE(tilingInfo_.opName, "Invalid layout_q_descale: %s, only support BSND/BNSD/TND for mxfp4",
+            OP_LOGE(tilingInfo_.opName, "Invalid layout_q_descale: %s, only support BSND/BNSD/TND/N2TGD for mxfp4",
                     tilingInfo_.opParamInfo.layoutQDescale);
             return ge::GRAPH_FAILED;
         }
@@ -546,8 +551,8 @@ ge::graphStatus QuantFlashAttnTilingInfoParser::GetInAndOutLayout()
         tilingInfo_.layoutKV = FiaLayout::BSND;
     } else {
         const std::map<std::string, FiaLayout> kvLayoutMap = {
-            {"BSND", FiaLayout::BSND},     {"BNSD", FiaLayout::BNSD},      {"TND", FiaLayout::TND},
-            {"PA_BBND", FiaLayout::BnBsH}, {"PA_BNBD", FiaLayout::BnNBsD}, {"PA_NZ", FiaLayout::NZ}};
+            {"BSND", FiaLayout::BSND},      {"BNSD", FiaLayout::BNSD},      {"TND", FiaLayout::TND},
+            {"PA_BBND", FiaLayout::BnBsND}, {"PA_BNBD", FiaLayout::BnNBsD}, {"PA_NZ", FiaLayout::NZ}};
         auto itKV = kvLayoutMap.find(tilingInfo_.opParamInfo.layoutKV);
         if (itKV == kvLayoutMap.end()) {
             OP_LOGE(tilingInfo_.opName, "Invalid layoutKV: %s, only support BSND/BNSD/TND/PA_BBND/PA_BNBD/PA_NZ",
@@ -612,7 +617,7 @@ void QuantFlashAttnTilingInfoParser::SetFaShape()
 
 void QuantFlashAttnTilingInfoParser::GetKvStorageMode()
 {
-    bool isPaLayout = (tilingInfo_.layoutKV == FiaLayout::BnBsH || tilingInfo_.layoutKV == FiaLayout::BnNBsD ||
+    bool isPaLayout = (tilingInfo_.layoutKV == FiaLayout::BnBsND || tilingInfo_.layoutKV == FiaLayout::BnNBsD ||
                        tilingInfo_.layoutKV == FiaLayout::NZ);
 
     if (isPaLayout) {

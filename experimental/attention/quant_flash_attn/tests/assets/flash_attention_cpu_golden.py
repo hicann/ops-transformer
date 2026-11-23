@@ -50,6 +50,21 @@ def _resolve_s_dtype(dtype_str: str) -> torch.dtype:
     return _DTYPE_MAP[dtype_str]
 
 
+# fp16 score 饱和统计(测试框架每 case 清零): 用于区分"超 fp16 范围"与"真精度问题"
+SAT_MAX = 0.0
+SAT_N = 0
+
+
+def _sat_record(scores):
+    """记录 clamp 前的 |S| 最大值与超过 fp16 上限(65504)的元素数."""
+    global SAT_MAX, SAT_N
+    if scores is None or scores.numel() == 0:
+        return
+    a = scores.detach().abs()
+    SAT_MAX = max(SAT_MAX, float(a.max().item()))
+    SAT_N += int((a > 65504).sum().item())
+
+
 def _mxfp4_qdq_lastdim(
     t: torch.Tensor, block_size: int = 32, mode: str = "baseline"
 ) -> torch.Tensor:
@@ -523,6 +538,10 @@ def _flash_attn_single_batch_kernel(
 
                 # ★ S 转入 s_dtype, 后续 max/exp/P 都在 s_dtype 算
                 S_ij = S_ij.to(s_torch_dtype)
+                # 对齐 fixpipe 饱和(SetOverflow(0)): fp16 溢出钳到 ±65504, 而非 IEEE inf.
+                if s_torch_dtype == torch.float16:
+                    _sat_record(S_ij)
+                    S_ij = S_ij.clamp(-65504.0, 65504.0)
 
                 # S_ij.numpy().tofile("dump_data/mm1Res.bin")
                 # torch.save(S_ij, 'qk_result_padded.pt')
@@ -635,7 +654,12 @@ def _flash_attn_single_batch_kernel(
                 m_i = m_new
 
             l_safe = torch.where(l_i > 0, l_i, torch.ones_like(l_i))
-            O_i = O_i / torch.where(torch.isnan(l_i), l_i, l_safe).unsqueeze(-1)
+            # 全掩蔽行 (l_i 为 NaN, 如 CAUSAL 下 q 侧无可见 kv): 约定输出 0
+            O_i = torch.where(
+                torch.isnan(l_i).unsqueeze(-1),
+                torch.zeros_like(O_i),
+                O_i / l_safe.unsqueeze(-1),
+            )
             out[h, q_lo:q_hi] = O_i
 
     return out
@@ -732,6 +756,9 @@ def attention_cpu_golden_varlen(
             S = Kh @ Qh.transpose(-1, -2)  # FP32 [Hq, sk, sq]
 
         S = S.to(s_torch_dtype)
+        if s_torch_dtype == torch.float16:
+            _sat_record(S)
+            S = S.clamp(-65504.0, 65504.0)  # 对齐 NPU fixpipe 饱和模式
 
         if causal:
             offset = sk - sq

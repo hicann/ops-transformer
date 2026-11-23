@@ -32,22 +32,22 @@ using std::string;
 using namespace ge;
 using namespace Ops::Base;
 
-bool PagedAttentionChecker::IsPageAttention(const QuantFlashAttnTilingInfo &qfaInfo) const
+bool PagedAttentionChecker::IsPageAttention(const QuantFlashAttnTilingInfo& qfaInfo) const
 {
-    // 仅通过 layout_kv 判断是否为 PA 场景 (BnBsH/BnNBsD/NZ)
-    return (qfaInfo.layoutKV == FiaLayout::BnBsH || qfaInfo.layoutKV == FiaLayout::BnNBsD ||
+    // 仅通过 layout_kv 判断是否为 PA 场景 (BnBsND/BnNBsD/NZ)
+    return (qfaInfo.layoutKV == FiaLayout::BnBsND || qfaInfo.layoutKV == FiaLayout::BnNBsD ||
             qfaInfo.layoutKV == FiaLayout::NZ);
 }
 
-ge::graphStatus PagedAttentionChecker::CheckSingleParaBlockTable(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus PagedAttentionChecker::CheckSingleParaBlockTable(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     // block_table 是否传入的校验属于特性交叉校验列, 此处为空时跳过 dtype/shape 校验
-    const gert::Tensor *blockTableTensor = qfaInfo.opParamInfo.blockTable.tensor;
+    const gert::Tensor* blockTableTensor = qfaInfo.opParamInfo.blockTable.tensor;
     if (blockTableTensor == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
 
-    const gert::CompileTimeTensorDesc *blockTableDesc = qfaInfo.opParamInfo.blockTable.desc;
+    const gert::CompileTimeTensorDesc* blockTableDesc = qfaInfo.opParamInfo.blockTable.desc;
     OP_CHECK_IF(blockTableDesc == nullptr, OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, "TensorDesc of block_table"),
                 return ge::GRAPH_FAILED);
 
@@ -63,7 +63,7 @@ ge::graphStatus PagedAttentionChecker::CheckSingleParaBlockTable(const QuantFlas
     }
 
     // shape dim 校验: 2D
-    const gert::Shape &shape = blockTableTensor->GetStorageShape();
+    const gert::Shape& shape = blockTableTensor->GetStorageShape();
     size_t dimNum = shape.GetDimNum();
     OP_CHECK_IF(dimNum != DIM_NUM_2,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, BLOCK_TABLE_NAME.c_str(),
@@ -84,7 +84,7 @@ ge::graphStatus PagedAttentionChecker::CheckSingleParaBlockTable(const QuantFlas
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PagedAttentionChecker::CheckSinglePara(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus PagedAttentionChecker::CheckSinglePara(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     // block_table 的 dtype/shape
     // 仅 PA 场景下校验 block_table, 通过 layout_kv 判断
@@ -98,26 +98,26 @@ ge::graphStatus PagedAttentionChecker::CheckSinglePara(const QuantFlashAttnTilin
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PagedAttentionChecker::CheckParaExistence(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus PagedAttentionChecker::CheckParaExistence(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     (void)qfaInfo;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PagedAttentionChecker::CheckFeature(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus PagedAttentionChecker::CheckFeature(const QuantFlashAttnTilingInfo& qfaInfo)
 {
-    const gert::Tensor *blockTableTensor = qfaInfo.opParamInfo.blockTable.tensor;
+    const gert::Tensor* blockTableTensor = qfaInfo.opParamInfo.blockTable.tensor;
 
     if (IsPageAttention(qfaInfo)) {
         // 约束1: PA 场景下 block_table 必须不为空
         OP_CHECK_IF(blockTableTensor == nullptr,
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                         qfaInfo.opName, BLOCK_TABLE_NAME.c_str(), "empty",
-                        "When layout_kv is PA (BnBsH/BnNBsD/NZ), block_table must not be empty"),
+                        "When layout_kv is PA (BnBsND/BnNBsD/NZ), block_table must not be empty"),
                     return ge::GRAPH_FAILED);
 
         // 约束2: PA 场景下必须传入 seqused_kv
-        const gert::Tensor *sequsedKvTensor = qfaInfo.opParamInfo.sequsedKv.tensor;
+        const gert::Tensor* sequsedKvTensor = qfaInfo.opParamInfo.sequsedKv.tensor;
         OP_CHECK_IF(
             sequsedKvTensor == nullptr,
             OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(qfaInfo.opName, SEQUSED_KV_NAME.c_str(), "empty",
@@ -125,25 +125,35 @@ ge::graphStatus PagedAttentionChecker::CheckFeature(const QuantFlashAttnTilingIn
             return ge::GRAPH_FAILED);
 
         // 约束3: MxFP8 场景下 blockSize 仅支持 512 或 1024
-        if (qfaInfo.opParamInfo.quantMode != nullptr && *qfaInfo.opParamInfo.quantMode == 1) {
+        if (qfaInfo.opParamInfo.quantMode != nullptr && *qfaInfo.opParamInfo.quantMode == QUANT_MODE_MXFP8) {
             OP_CHECK_IF(qfaInfo.blockSize != 512 && qfaInfo.blockSize != 1024,
                         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                             qfaInfo.opName, "block_size", std::to_string(qfaInfo.blockSize).c_str(),
                             "When quant_mode is MxFP8, block_size must be 512 or 1024"),
                         return ge::GRAPH_FAILED);
         }
+
+        // 约束4: MxFP4 场景下 blockSize 仅支持 64/128/256/512/1024
+        if (qfaInfo.opParamInfo.quantMode != nullptr && *qfaInfo.opParamInfo.quantMode == QUANT_MODE_MXFP4) {
+            OP_CHECK_IF(qfaInfo.blockSize != 64 && qfaInfo.blockSize != 128 && qfaInfo.blockSize != 256 &&
+                            qfaInfo.blockSize != 512 && qfaInfo.blockSize != 1024,
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            qfaInfo.opName, "block_size", std::to_string(qfaInfo.blockSize).c_str(),
+                            "When quant_mode is MxFP4, block_size must be one of 64/128/256/512/1024"),
+                        return ge::GRAPH_FAILED);
+        }
     } else {
-        // 约束4: 非 PA 场景 (含 MxFP4) 下 block_table 不应传入
+        // 约束5: 非 PA 场景 (含 MxFP4) 下 block_table 不应传入
         OP_CHECK_IF(blockTableTensor != nullptr,
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                         qfaInfo.opName, BLOCK_TABLE_NAME.c_str(), "provided",
-                        "When layout_kv is not PA (BnBsH/BnNBsD/NZ), block_table must not be provided"),
+                        "When layout_kv is not PA (BnBsND/BnNBsD/NZ), block_table must not be provided"),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PagedAttentionChecker::CheckMultiPara(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus PagedAttentionChecker::CheckMultiPara(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     (void)qfaInfo;
     return ge::GRAPH_SUCCESS;

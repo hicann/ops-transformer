@@ -61,7 +61,7 @@ INPUT_LAYOUT = "BNSD"  # BNSD / BSND / TND
 LAYOUT_Q_DESCALE = "BSND"  # q descale layout
 LAYOUT_KV = "BNSD"  # kv layout (默认与 INPUT_LAYOUT 一致)
 LAYOUT_OUT = "BNSD"  # attn out layout (默认与 INPUT_LAYOUT 一致)
-KV_STORAGE_MODE = "continue"  # continue / pa_bbh / pa_bnbd / pa_nz
+KV_STORAGE_MODE = "continue"  # continue / pa_bbnd / pa_bnbd / pa_nz
 BLOCK_SIZE = 0  # PA 模式才需要
 
 Q_DTYPE = "fp4_e2m1"
@@ -80,6 +80,7 @@ SOFTMAX_SCALE = None
 DATA_RANGE_Q = 1.0
 DATA_RANGE_K = 1.0
 DATA_RANGE_V = 1.0
+DATA_DIST = "randn"  # randn | uniform | skew, 见 _gen_range_tensor
 
 DEVICE_ID = 0
 
@@ -147,11 +148,21 @@ E8M0_MIN_POSITIVE_BYTE = E8M0_BIAS + E8M0_MIN_POSITIVE_EXP  # 0
 SEED_Q = 54
 SEED_K = 3
 SEED_V = 4
+# 逐行/逐 token 尺度扰动: 让 descale 非均匀(自然数据 descale 恒=125, 会掩蔽 V-scale 通路问题).
+# None=关闭; "logu"=每行乘 2^U(-R,R); "mix"=一半行*2^R, 一半行*2^-R (极端动态范围)
+PER_ROW_SCALE = None
+PER_ROW_SCALE_R = 6
 
 # 物理 S override: generate_data 优先用这两个值作为物理 S (生成 query/key/value
 # 的 S 维), 而不是 max(ACT_SEQ_LENS) / MAX_SEQLEN (后者只决定有效长度).
 _PHYSICAL_S_Q_OVERRIDE = None
 _PHYSICAL_S_KV_OVERRIDE = None
+
+# 可选: TND 非 PA 的 KV 物理打包长度(per-batch). None => 与 act_seq_kv_eff 相同.
+# 用于构造 "packed(cu 区段) 比 seqused 有效长度更长" 的 padding 场景:
+# 数据/k_descale 按 pack_lens 打包(物理行), 有效长度仍由 seqused 决定,
+# v_descale 组数仍按 seqused 向上取整(与 kernel 寻址口径一致).
+PACK_LENS_KV = None
 
 
 def _infer_physical_s_from_tensor(tensor, layout):
@@ -169,6 +180,17 @@ def _infer_physical_s_from_tensor(tensor, layout):
     layout_upper = (layout or "").upper()
     try:
         nd = len(tensor.shape)
+        if layout_upper in ("PA_NZ", "PA_BNBD", "PA_BBND"):
+            # PA 分页布局: 单 batch 物理 S = 每 batch 块数上限 × block_size
+            # (块表形状 (B, max_blocks_per_batch); 各 batch 有效长度由 seqused_kv 给出)
+            if BLOCK_TABLE_SHAPE and len(BLOCK_TABLE_SHAPE) == 2 and BLOCK_SIZE:
+                return int(BLOCK_TABLE_SHAPE[1]) * int(BLOCK_SIZE)
+            # 无块表信息时无法反推每 batch 块数, 交回调用方按有效长度处理
+            return None
+        if nd >= 5:
+            # 兜底: 5 维及以上都是分页打包布局(如 PA_NZ 的 (总块数, N, D/64, bs, 64)),
+            # 没有单 batch S 语义; 若按 BSND 取 shape[1] 会误得 N(常为 1)
+            return None
         if layout_upper in ("BSND", "BSH"):
             if nd < 2:
                 return None
@@ -503,8 +525,8 @@ def transpose_kscale(k_scale, layout):
         raise ValueError(f"Unsupported layout: {layout}")
 
 
-def transpose_qscale(q_scale, layout, n2):
-    """Q scale 重排: BNSD/TND/BSND -> N2TGD-like (n2,B/S,T,G,D//2,2)"""
+def transpose_qscale(q_scale, layout):
+    """Q scale 重排: 保持 layout 物理排列, 末维 (D//2, 2) 两元素一组"""
     if q_scale is None:
         raise ValueError("q_scale cannot be None")
     if not isinstance(q_scale, torch.Tensor):
@@ -515,28 +537,18 @@ def transpose_qscale(q_scale, layout, n2):
                 f"TND layout requires 3D tensor [T,N,D], got dim={q_scale.dim()}"
             )
         T, N, D = q_scale.shape
-        if N % n2 != 0:
-            raise ValueError(f"Total head N={N} must be divisible by n2={n2}")
-        G = N // n2
         if D % 2 != 0:
             raise ValueError(f"Feature dim D={D} must be divisible by 2")
-        q = q_scale.reshape(T, n2, G, D)
-        q = q.reshape(T, n2, G, D // 2, 2)
-        return q.permute(1, 0, 2, 3, 4)
+        return q_scale.reshape(T, N, D // 2, 2)
     elif layout == "BSND":
         if q_scale.dim() != 4:
             raise ValueError(
                 f"BSND layout requires 4D tensor [B,S,N,D], got dim={q_scale.dim()}"
             )
         B, S1, N, D = q_scale.shape
-        if N % n2 != 0:
-            raise ValueError(f"Total head N={N} must be divisible by n2={n2}")
-        G = N // n2
         if D % 2 != 0:
             raise ValueError(f"Feature dim D={D} must be divisible by 2 for MXFP4 pack")
-        tmp = q_scale.reshape(B, S1, n2, G, D)
-        tmp = tmp.reshape(B, S1, n2, G, D // 2, 2)
-        return tmp.permute(2, 0, 1, 3, 4, 5)
+        return q_scale.contiguous().reshape(B, S1, N, D // 2, 2)
     elif layout == "BNSD":
         B, N, S1, D = q_scale.shape
         return q_scale.contiguous().reshape(B, N, S1, D // 2, 2)
@@ -583,8 +595,20 @@ def _parse_datarange(val):
 
 
 def _gen_range_tensor(shape, lo, hi, seed):
-    """randn(seed) -> clamp 到 [lo, hi] -> float32 tensor."""
+    """按 DATA_DIST 生成落在 [lo, hi] 内的 fp32 数据.
+
+    - "randn"(默认): randn 后 clamp. 注意 randn 的 3σ≈3, 因此 |lo|,|hi| >= 3 时 clamp 不生效,
+      实际幅值恒在 ±3 左右 —— 想要真正测大/小量级必须用 "uniform"/"skew".
+    - "uniform": [lo, hi] 均匀填充, 幅值真正到达边界.
+    - "skew": 三次方偏置, 数据挤在 lo 附近并少量到达 hi, 用于制造行内大动态范围.
+    """
     torch.manual_seed(seed)
+    if DATA_DIST == "uniform":
+        u = torch.rand(shape, dtype=torch.float32)
+        return u * (hi - lo) + lo
+    if DATA_DIST == "skew":
+        u = torch.rand(shape, dtype=torch.float32) ** 3
+        return u * (hi - lo) + lo
     t = torch.randn(shape, dtype=torch.float32)
     return t.clamp_(min=lo, max=hi)
 
@@ -617,16 +641,34 @@ def _gen_opt_tensor(shape, dtype_str, datarange_str, seed):
     return t.contiguous()
 
 
+def _cu_seqlens_to_actual(cu_seqlens):
+    """cu_seqlens → 有效长度 (差分还原): [0, 3, 7, 10] → [3, 4, 3]"""
+    if not cu_seqlens or len(cu_seqlens) < 2:
+        return []
+    return [cu_seqlens[i + 1] - cu_seqlens[i] for i in range(len(cu_seqlens) - 1)]
+
+
 def generate_data():
+    global CU_SEQLENS_KV
     n2 = N_kv
     g = G
     num_heads = n2 * g
+    # seqused 缺省时回退 cu_seqlens 差分
+    act_seq_q_src = ACT_SEQ_LENS_Q or _cu_seqlens_to_actual(CU_SEQLENS_Q)
+    act_seq_kv_src = ACT_SEQ_LENS_KV or _cu_seqlens_to_actual(CU_SEQLENS_KV)
     s1, s1_effective, act_seq_q_eff = _resolve_s_with_effective(
-        ACT_SEQ_LENS_Q, MAX_SEQLEN_Q, _PHYSICAL_S_Q_OVERRIDE, B, "Q"
+        act_seq_q_src, MAX_SEQLEN_Q, _PHYSICAL_S_Q_OVERRIDE, B, "Q"
     )
     s2, s2_effective, act_seq_kv_eff = _resolve_s_with_effective(
-        ACT_SEQ_LENS_KV, MAX_SEQLEN_KV, _PHYSICAL_S_KV_OVERRIDE, B, "KV"
+        act_seq_kv_src, MAX_SEQLEN_KV, _PHYSICAL_S_KV_OVERRIDE, B, "KV"
     )
+    if PACK_LENS_KV:
+        s2 = max(PACK_LENS_KV)
+        # 打包长度即物理长度 => cu_seqlens_kv 必须按打包长度给出(否则 cu 与数据自相矛盾).
+        # 这正是"cu 差分 > seqused"的合法场景: 物理打包 256, 有效长度仍由 seqused 决定.
+        CU_SEQLENS_KV = [0] * (B + 1)
+        for _i in range(B):
+            CU_SEQLENS_KV[_i + 1] = CU_SEQLENS_KV[_i] + int(PACK_LENS_KV[_i])
     v_d = V_D
     qk_d = D
 
@@ -637,8 +679,21 @@ def generate_data():
         if LAYOUT_OUT
         else get_attn_out_layout(INPUT_LAYOUT)
     )
-    # kv_layout: 优先用表格 LAYOUT_KV, 否则等于 query_layout
-    kv_layout = get_query_layout(LAYOUT_KV) if LAYOUT_KV else query_layout
+    # kv_layout: 优先用表格 LAYOUT_KV, 否则等于 query_layout; PA 布局映射为算子侧字符串
+    _kv_mode = (KV_STORAGE_MODE or "").lower()
+    if _kv_mode in ("pa_bnbd", "pa_bbnd", "pa_nz"):
+        kv_layout = {"pa_bnbd": "PA_BNBD", "pa_bbnd": "PA_BBND", "pa_nz": "PA_NZ"}[
+            _kv_mode
+        ]
+        # layout_kv 允许三种写法: PA 专用名(PA_NZ)、通用族名(BNSD/BSND, 由存储模式决定实际布局)、空
+        # 只有明确写了不兼容的族(TND/BSND 之外的连续布局)才判冲突
+        _family = (LAYOUT_KV or "").upper()
+        if _family and _family not in ("PA_NZ", "PA_BNBD", "PA_BBND", "BNSD", "BSND"):
+            raise RuntimeError(
+                f"layout_kv({LAYOUT_KV}) 与 kv_storage_mode({KV_STORAGE_MODE}) 冲突"
+            )
+    else:
+        kv_layout = get_query_layout(LAYOUT_KV) if LAYOUT_KV else query_layout
 
     # Q/K/V FP32 数据按 DATA_RANGE_Q/K/V 生成: randn 后 clamp 到 [lo, hi]
     q_lo, q_hi = _parse_datarange(DATA_RANGE_Q)
@@ -647,6 +702,31 @@ def generate_data():
     query = _gen_range_tensor((B, num_heads, s1, qk_d), q_lo, q_hi, SEED_Q)
     key = _gen_range_tensor((B, n2, s2, qk_d), k_lo, k_hi, SEED_K)
     value = _gen_range_tensor((B, n2, s2, v_d), v_lo, v_hi, SEED_V)
+
+    if PER_ROW_SCALE:
+
+        def _apply_scales(t, rows_axis=2, tag=0):
+            shp = t.shape
+            n_rows = shp[rows_axis]
+            if PER_ROW_SCALE == "mix":
+                half = n_rows // 2
+                fac = torch.ones(n_rows, dtype=torch.float32)
+                fac[:half] = 2.0**PER_ROW_SCALE_R
+                fac[half:] = 2.0 ** (-PER_ROW_SCALE_R)
+            else:  # logu
+                # 必须用独立、固定种子的 generator: 原来直接吃全局 RNG, 同一 case 每次跑的行尺度
+                # 都不同 -> 失败无法复现, pa/tnd 对照也失去意义(实测同配置两次 0% vs 63% bad).
+                gen = torch.Generator().manual_seed(7919 + 13 * tag)
+                fac = 2.0 ** torch.empty(n_rows).uniform_(
+                    -PER_ROW_SCALE_R, PER_ROW_SCALE_R, generator=gen
+                )
+            view = [1] * len(shp)
+            view[rows_axis] = n_rows
+            return t * fac.view(view)
+
+        query = _apply_scales(query, tag=0)
+        key = _apply_scales(key, tag=1)
+        value = _apply_scales(value, tag=2)
 
     fp32_bnsd = (query, key, value)
 
@@ -665,7 +745,10 @@ def generate_data():
     key_codes, k_descale = mxfp4_quantize_last(key, quant_axis=-1, mode="baseline")
 
     # V 按 act_seq_lens_kv 分批量化: padding 区域编码填 0, descale 只覆盖有效区域.
-    v_scale_s = MAX_SEQLEN_KV if MAX_SEQLEN_KV >= 0 else s2
+    # v_scale 长度口径 = KV 物理打包长度(与数据/ k_descale 一致), 保证 descale 覆盖全部物理行.
+    # 用 act_seq_kv_eff(有效长度) 会在 packed > seqused 时覆盖不全 -> V 缩放丢失.
+    _pack_lens_for_v = PACK_LENS_KV if PACK_LENS_KV else act_seq_kv_eff
+    v_scale_s = max(int(x) for x in _pack_lens_for_v) if _pack_lens_for_v else s2
     n_blocks_effective = (v_scale_s + 31) // 32
     value_codes_list = []
     v_descale_list = []
@@ -711,21 +794,225 @@ def generate_data():
     )
 
     # Layout 转换 (Q codes + scale 用 query_layout; K/V codes + scale 用 kv_layout)
+    is_pa = KV_STORAGE_MODE in ("pa_bnbd", "pa_bbnd", "pa_nz")
+    # PA 时 kv 数据保持 BNSD 中间形态, 散布在 _pa_scatter 中完成
+    eff_kv_layout = "BNSD" if is_pa else kv_layout
+
     query_codes = rearrange_by_layout(query_codes, query_layout, B, act_seq_q_eff)
-    key_codes = rearrange_by_layout(key_codes, kv_layout, B, act_seq_kv_eff)
-    value_codes = rearrange_by_layout(value_codes, kv_layout, B, act_seq_kv_eff)
+    pack_lens_kv = PACK_LENS_KV if PACK_LENS_KV else act_seq_kv_eff
+    key_codes = rearrange_by_layout(key_codes, eff_kv_layout, B, pack_lens_kv)
+    value_codes = rearrange_by_layout(value_codes, eff_kv_layout, B, pack_lens_kv)
 
     q_descale = rearrange_by_layout(q_descale, query_layout, B, act_seq_q_eff)
-    q_descale = transpose_qscale(q_descale, query_layout, n2)
+    q_descale = transpose_qscale(q_descale, query_layout)
+    if LAYOUT_Q_DESCALE == "N2TGD" and query_layout == "TND":
+        # TND 统一 N2TGD: (T, N_kv*G, D/2, 2) -> (N_kv, T, G, D/2, 2)
+        t_total = q_descale.shape[0]
+        q_descale = (
+            q_descale.reshape(t_total, n2, -1, *q_descale.shape[2:])
+            .permute(1, 0, 2, 3, 4)
+            .contiguous()
+        )
 
-    aligned_seq_lens_kv_k = [(x + 31) // 32 for x in act_seq_kv_eff]
-    k_descale = rearrange_by_layout(k_descale, kv_layout, B, aligned_seq_lens_kv_k)
-    k_descale = transpose_kscale(k_descale, kv_layout)
+    # k_descale 行 = token 行 (per-token scale), 与 K 数据同 narrow 语义
+    k_descale = rearrange_by_layout(k_descale, eff_kv_layout, B, pack_lens_kv)
+    k_descale = transpose_kscale(k_descale, eff_kv_layout)
 
-    aligned_seq_lens_kv_v = [(x + 63) // 64 for x in act_seq_kv_eff]
-    v_descale = rearrange_by_layout(v_descale, kv_layout, B, aligned_seq_lens_kv_v)
+    # v_descale 的拼接长度必须与数据(value_codes)/k_descale 同源(都用 pack_lens_kv),
+    # 否则 packed > seqused 时 v_descale 只取前 seqused/64 组, 后半段 V 无 scale -> V 缩放丢失.
+    aligned_seq_lens_kv_v = [(x + 63) // 64 for x in pack_lens_kv]
+    v_descale = rearrange_by_layout(v_descale, eff_kv_layout, B, aligned_seq_lens_kv_v)
 
     v_descale = v_descale.view(*v_descale.shape[:-1], V_D, 2)
+
+    block_table_t = None
+    if is_pa:
+        block_size = int(BLOCK_SIZE)
+        if block_size <= 0:
+            raise RuntimeError("PA 模式要求 block_size > 0")
+        # 每 batch 需要的块数; 池大小留 2 个冗余块 (全 0), 未用槽位指向冗余块
+        blocks_per_batch = [math.ceil(x / block_size) for x in act_seq_kv_eff]
+        max_blocks = max(blocks_per_batch)
+        spare_cnt = 2
+        total_blocks = sum(blocks_per_batch) + spare_cnt
+        torch.manual_seed(100)
+        perm = torch.randperm(sum(blocks_per_batch), dtype=torch.int32)
+        block_table_t = torch.empty((B, max_blocks), dtype=torch.int32)
+        spare_ids = list(range(sum(blocks_per_batch), total_blocks))
+        idx = 0
+        for b_idx in range(B):
+            row = []
+            for j in range(max_blocks):
+                if j < blocks_per_batch[b_idx]:
+                    row.append(int(perm[idx]))
+                    idx += 1
+                else:
+                    row.append(spare_ids[j % spare_cnt])
+            block_table_t[b_idx] = torch.tensor(row, dtype=torch.int32)
+
+        def scatter_pa(bnsd, tail_shape_fn, fill=0):
+            """BNSD (B,N,S,...) → PA cache (totalBlocks, ...), 尾维按块切散布; fill 为 padding 填充值."""
+            out = torch.full((total_blocks,) + tail_shape_fn(), fill, dtype=bnsd.dtype)
+            src = bnsd  # (B, N, S, ...)
+            for b_idx in range(B):
+                for j in range(blocks_per_batch[b_idx]):
+                    dst_blk = int(block_table_t[b_idx][j])
+                    s0 = j * block_size
+                    # 源按物理 S 截断 (padding 区随块拷入, 与 cache 语义一致)
+                    s1 = min(s0 + block_size, src.shape[2])
+                    out[dst_blk, :, : s1 - s0] = src[b_idx, :, s0:s1]
+            return out
+
+        def scatter_pa_v(v_bnsd, tail_shape_fn, fill=127):
+            """v_descale BNSD (B,N,Sg,D,2) → PA cache, 行=64-token 组, 按组维散布."""
+            out = torch.full(
+                (total_blocks,) + tail_shape_fn(), fill, dtype=v_bnsd.dtype
+            )
+            for b_idx in range(B):
+                for j in range(blocks_per_batch[b_idx]):
+                    dst_blk = int(block_table_t[b_idx][j])
+                    g0 = j * block_groups
+                    g1 = min(g0 + block_groups, v_bnsd.shape[2])
+                    out[dst_blk, :, : g1 - g0] = v_bnsd[b_idx, :, g0:g1]
+            return out
+
+        n_kv = n2
+        d_scale = qk_d // 64  # per-token scale 组数
+        block_groups = (
+            block_size + 63
+        ) // 64  # 块内 64-token 组数, v_descale 每组一行 (D, 2)
+
+        if KV_STORAGE_MODE == "pa_bnbd":
+            # (Bn, N, Bs, ...): 块内 (N, Bs, tail)
+            key_codes = scatter_pa(key_codes, lambda: (n_kv, block_size, qk_d))
+            value_codes = scatter_pa(value_codes, lambda: (n_kv, block_size, qk_d))
+            # k_descale padding 行填 127 (e8m0 最小正数), 避免 NPU 读到 0 byte
+            k_descale = scatter_pa(
+                k_descale, lambda: (n_kv, block_size, d_scale, 2), fill=127
+            )
+            # v_descale: (Bn, N, Bs/64, D, 2), 每组一行 (行内双子组交错, 与 BNSD 打包一致)
+            v_descale = scatter_pa_v(v_descale, lambda: (n_kv, block_groups, V_D, 2))
+        elif KV_STORAGE_MODE == "pa_nz":
+            # PA_NZ (fp4 物理分形, d0=32B): K/V codes (Bn, N, D/64, Bs, 64 逻辑元素→32B),
+            # k_descale (Bn, N, Bs/16, 2, 16, 2), v_descale (Bn, N, D/16, Bs/64, 16, 2)
+            def _pack_nibbles(codes):
+                lo = codes[..., 0::2].to(torch.uint8)
+                hi = codes[..., 1::2].to(torch.uint8)
+                return ((lo & 0x0F) | ((hi & 0x0F) << 4)).contiguous()
+
+            def scatter_pa_nz_kv(codes, fill=0):
+                d1_cnt = qk_d // 64  # D/64 逻辑组 (每单元 64 逻辑元素 = 32B 整块)
+                out = torch.full(
+                    (total_blocks, n_kv, d1_cnt, block_size, 64),
+                    fill,
+                    dtype=codes.dtype,
+                )
+                for b_idx in range(B):
+                    for j in range(blocks_per_batch[b_idx]):
+                        dst_blk = int(block_table_t[b_idx][j])
+                        s0 = j * block_size
+                        s1 = min(s0 + block_size, codes.shape[2])
+                        seg = codes[b_idx, :, s0:s1].reshape(n_kv, s1 - s0, d1_cnt, 64)
+                        out[dst_blk, :, :, : s1 - s0] = seg.permute(
+                            0, 2, 1, 3
+                        )  # (N, d1, rows, 64)
+                # 返回未打包 code (1B/值, 末维 64), 与 ttk CSV 的声明口径一致;
+                # fp4 打包在调算子前由 _pack_fp4_codes 完成
+                return out.to(torch.uint8)
+
+            def scatter_pa_nz_ks(ds, fill=127):
+                t16 = (block_size + 15) // 16
+                # PA_NZ cache 中每个块固定占 t16*16 行; skv 不是 block_size 整数倍时末块行数不足,
+                # 先沿 S 轴按 fill(=127, e8m0 的 2^0) 补齐, 否则 reshape 到 (N, t16, 16, 2, 2)
+                # 会因元素数不匹配直接报 shape 错误(旧实现假设 skv % 16 == 0).
+                blk_rows = t16 * 16
+                need_rows = max(blocks_per_batch) * blk_rows if B else 0
+                if ds.shape[2] < need_rows:
+                    pad = torch.full(
+                        (ds.shape[0], ds.shape[1], need_rows - ds.shape[2])
+                        + tuple(ds.shape[3:]),
+                        fill,
+                        dtype=ds.dtype,
+                    )
+                    ds = torch.cat([ds, pad], dim=2)
+                out = torch.full(
+                    (total_blocks, n_kv, t16, 2, 16, 2), fill, dtype=ds.dtype
+                )
+                for b_idx in range(B):
+                    for j in range(blocks_per_batch[b_idx]):
+                        dst_blk = int(block_table_t[b_idx][j])
+                        s0 = j * blk_rows
+                        seg = ds[b_idx, :, s0 : s0 + blk_rows].reshape(
+                            n_kv, t16, 16, 2, 2
+                        )
+                        out[dst_blk, :, :t16] = seg.permute(
+                            0, 1, 3, 2, 4
+                        )  # (N, t16, d3, lane, p)
+                return out
+
+            def scatter_pa_nz_vs(vs, fill=127):
+                out = torch.full(
+                    (total_blocks, n_kv, V_D // 16, block_groups, 16, 2),
+                    fill,
+                    dtype=vs.dtype,
+                )
+                for b_idx in range(B):
+                    for j in range(blocks_per_batch[b_idx]):
+                        dst_blk = int(block_table_t[b_idx][j])
+                        g0 = j * block_groups
+                        g1 = min(g0 + block_groups, vs.shape[2])
+                        seg = vs[b_idx, :, g0:g1].reshape(
+                            n_kv, g1 - g0, V_D // 16, 16, 2
+                        )
+                        out[dst_blk, :, :, : g1 - g0] = seg.permute(
+                            0, 2, 1, 3, 4
+                        )  # (N, d3, tg, 16, 2)
+                return out
+
+            key_codes = scatter_pa_nz_kv(key_codes)
+            value_codes = scatter_pa_nz_kv(value_codes)
+            k_descale = scatter_pa_nz_ks(k_descale)
+            v_descale = scatter_pa_nz_vs(v_descale)
+        else:  # pa_bbnd: (Bn, Bs, N, ...) 块内 (Bs, N, tail)
+
+            def scatter_pa_bbnd(bnsd, tail_shape, fill=0):
+                out = torch.full(
+                    (total_blocks, block_size, n_kv) + tuple(tail_shape),
+                    fill,
+                    dtype=bnsd.dtype,
+                )
+                for b_idx in range(B):
+                    for j in range(blocks_per_batch[b_idx]):
+                        dst_blk = int(block_table_t[b_idx][j])
+                        s0 = j * block_size
+                        s1 = min(s0 + block_size, bnsd.shape[2])
+                        src_slice = bnsd[b_idx, :, s0:s1]  # (N, rows, *tail)
+                        out[dst_blk, : s1 - s0] = src_slice.permute(
+                            1, 0, *range(2, src_slice.dim())
+                        )  # (rows, N, *tail)
+                return out
+
+            key_codes = scatter_pa_bbnd(key_codes, (qk_d,))
+            value_codes = scatter_pa_bbnd(value_codes, (qk_d,))
+            k_descale = scatter_pa_bbnd(k_descale, (d_scale, 2), fill=127)
+
+            # v_descale BBND: (Bn, Bs/64, N, D, 2), 组维在 N 前
+            def scatter_pa_bbnd_v(v_bnsd):
+                # v_bnsd: (B, N, 组数, D, 2) → (Bn, 组数, N, D, 2)
+                out = torch.full(
+                    (total_blocks, block_groups, n_kv, V_D, 2), 127, dtype=v_bnsd.dtype
+                )
+                for b_idx in range(B):
+                    for j in range(blocks_per_batch[b_idx]):
+                        dst_blk = int(block_table_t[b_idx][j])
+                        g0 = j * block_groups
+                        g1 = min(g0 + block_groups, v_bnsd.shape[2])
+                        out[dst_blk, : g1 - g0] = v_bnsd[b_idx, :, g0:g1].permute(
+                            1, 0, 2, 3
+                        )  # (组,N,D,2)
+                return out
+
+            v_descale = scatter_pa_bbnd_v(v_descale)
 
     # cu_seqlens (TND only): 表格传了就用表格的, 否则用有效长度自动推导
     cu_seqlens_q = (
@@ -745,9 +1032,15 @@ def generate_data():
 
     # 可选 tensor 入参: 有 shape 则按形状生成随机 tensor, 无 shape 传 None
     # 默认 dtype: block_table=int32, p_scale=fp32, sinks=fp32, attn_mask=int8
-    block_table_t = _gen_opt_tensor(
-        BLOCK_TABLE_SHAPE, BLOCK_TABLE_DTYPE or "int32", BLOCK_TABLE_DATARANGE, seed=100
-    )
+    if is_pa:
+        block_table_t = block_table_t.contiguous()
+    else:
+        block_table_t = _gen_opt_tensor(
+            BLOCK_TABLE_SHAPE,
+            BLOCK_TABLE_DTYPE or "int32",
+            BLOCK_TABLE_DATARANGE,
+            seed=100,
+        )
     if P_SCALE_VALUE is not None:
         p_scale_dt = get_dtype(P_SCALE_DTYPE) or torch.float32
         p_scale_t = torch.tensor([float(P_SCALE_VALUE)], dtype=p_scale_dt).reshape(
@@ -779,6 +1072,7 @@ def generate_data():
         attn_mask=attn_mask_t,
         cu_seqlens_q=cu_seqlens_q,
         cu_seqlens_kv=cu_seqlens_kv,
+        # NPU 侧传原始 seqused (可空)
         act_seq_lens_q=list(ACT_SEQ_LENS_Q),
         act_seq_lens_kv=list(ACT_SEQ_LENS_KV),
         s1_physical=s1,
@@ -851,6 +1145,9 @@ def cpu_mxfp4_golden(data_dict):
 
     block_q = 128
     block_kv = 4096
+    causal = (
+        SPARSE_MODE == 3
+    )  # mask_mode=3 (CAUSAL): golden 按 left-padding 语义 (causal_offset=sk-sq)
     if _os.environ.get("QFA_GOLDEN_BACKEND", "").lower() == "npu":
         import flash_attention_npu_golden as _npu_golden_mod
 
@@ -864,6 +1161,7 @@ def cpu_mxfp4_golden(data_dict):
             act_seq_q_eff,
             act_seq_kv_eff,
             softmax_scale=softmax_scale,
+            causal=causal,
             block_q=block_q,
             block_kv=256,  # 对齐 kernel s2BaseSize=256 的 online softmax 分块
             mx_block_size=32,
@@ -880,6 +1178,7 @@ def cpu_mxfp4_golden(data_dict):
             act_seq_q_eff,
             act_seq_kv_eff,
             softmax_scale=softmax_scale,
+            causal=causal,
             quantize=True,
             quantize_p=True,
             block_q=block_q,
@@ -900,6 +1199,17 @@ def cpu_mxfp4_golden(data_dict):
 # ==============================================================================
 # NPU 调用: GRAPH_PATH=0 eager / GRAPH_PATH=7 npugraph_ex
 # ==============================================================================
+def _pack_fp4_codes(t):
+    """未打包 fp4 code(1B/值) -> torch 打包 dtype(2 值/字节), 末维减半."""
+    if t is None or "float4" in str(t.dtype):
+        return t
+    lo = t[..., 0::2].to(torch.uint8)
+    hi = t[..., 1::2].to(torch.uint8)
+    return (((lo & 0x0F) | ((hi & 0x0F) << 4)).contiguous()).view(
+        torch.float4_e2m1fn_x2
+    )
+
+
 def _to_npu(tensor):
     if tensor is None:
         return None
@@ -910,6 +1220,8 @@ def _call_npu_fa_op(data_dict):
     q = _to_npu(data_dict["q"])
     k = _to_npu(data_dict["k"])
     v = _to_npu(data_dict["v"])
+    if KV_STORAGE_MODE == "pa_nz":  # PA_NZ 的 k/v 以未打包 code 生成, 调算子前打包
+        k, v = _pack_fp4_codes(k), _pack_fp4_codes(v)
     q_descale = _to_npu(data_dict["q_descale"])
     k_descale = _to_npu(data_dict["k_descale"])
     v_descale = _to_npu(data_dict["v_descale"])
@@ -970,6 +1282,9 @@ def _call_npu_fa_op(data_dict):
     torch_npu.npu.set_device(int(DEVICE_ID))
     torch.npu.synchronize()
 
+    # TND: metadata 要求 batch_size=None (由 cu_seqlens 推导 B)
+    meta_batch_size = None if query_layout == "TND" else B
+
     metadata = quant_flash_attn_metadata(
         num_heads_q=data_dict["num_heads"],
         num_heads_kv=data_dict["num_key_value_heads"],
@@ -979,7 +1294,7 @@ def _call_npu_fa_op(data_dict):
         cu_seqlens_kv=cu_seqlens_kv_t,
         seqused_q=seqused_q_t,
         seqused_kv=seqused_kv_t,
-        batch_size=B,
+        batch_size=meta_batch_size,
         max_seqlen_q=MAX_SEQLEN_Q,
         max_seqlen_kv=MAX_SEQLEN_KV,
         head_dim_v=V_D,
@@ -1066,7 +1381,7 @@ class Network(nn.Module):
             cu_seqlens_kv=cu_seqlens_kv,
             seqused_q=seqused_q,
             seqused_kv=seqused_kv,
-            batch_size=B,
+            batch_size=None if layout_q == "TND" else B,
             max_seqlen_q=MAX_SEQLEN_Q,
             max_seqlen_kv=MAX_SEQLEN_KV,
             head_dim_v=V_D,
@@ -1294,7 +1609,7 @@ def call_npu_metadata(data_dict):
         cu_seqlens_kv=cu_seqlens_kv_t,
         seqused_q=seqused_q_t,
         seqused_kv=seqused_kv_t,
-        batch_size=B,
+        batch_size=None if query_layout == "TND" else B,
         max_seqlen_q=MAX_SEQLEN_Q,
         max_seqlen_kv=MAX_SEQLEN_KV,
         head_dim_v=V_D,
@@ -1319,6 +1634,8 @@ def call_npu_main(data_dict):
     q = _to_npu(data_dict["q"])
     k = _to_npu(data_dict["k"])
     v = _to_npu(data_dict["v"])
+    if KV_STORAGE_MODE == "pa_nz":  # PA_NZ 的 k/v 以未打包 code 生成, 调算子前打包
+        k, v = _pack_fp4_codes(k), _pack_fp4_codes(v)
     q_descale = _to_npu(data_dict["q_descale"])
     k_descale = _to_npu(data_dict["k_descale"])
     v_descale = _to_npu(data_dict["v_descale"])

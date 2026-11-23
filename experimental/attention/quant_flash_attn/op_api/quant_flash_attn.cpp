@@ -18,19 +18,21 @@ namespace l0op {
 
 OP_TYPE_REGISTER(QuantFlashAttn);
 
-const std::array<const aclTensor *, 2> QuantFlashAttn(
-    const aclTensor *q, const aclTensor *k, const aclTensor *v, const aclTensor *qDescale, const aclTensor *kDescale,
-    const aclTensor *vDescale, const aclTensor *blockTableOptional, const aclTensor *pScaleOptional,
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKvOptional, const aclTensor *sinksOptional, const aclTensor *attnMaskOptional,
-    const aclTensor *metadataOptional, int64_t quantMode, double softmaxScale, int64_t maskMode, int64_t winLeft,
-    int64_t winRight, int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char *layoutQ, const char *layoutQDescale,
-    const char *layoutKv, const char *layoutOut, bool returnSoftmaxLse, aclOpExecutor *executor)
+const std::array<const aclTensor*, 2> QuantFlashAttn(
+    const aclTensor* q, const aclTensor* k, const aclTensor* v, const aclTensor* qDescale, const aclTensor* kDescale,
+    const aclTensor* vDescale, const aclTensor* blockTableOptional, const aclTensor* pScaleOptional,
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedKvOptional, const aclTensor* sinksOptional, const aclTensor* attnMaskOptional,
+    const aclTensor* metadataOptional, const aclTensor* vTailOptional, const aclTensor* blockTableTailOptional,
+    const aclTensor* sequsedVTailOptional, int64_t quantMode, double softmaxScale, int64_t maskMode, int64_t winLeft,
+    int64_t winRight, int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char* layoutQ, const char* layoutQDescale,
+    const char* layoutKv, const char* layoutOut, bool returnSoftmaxLse, aclOpExecutor* executor)
 {
     L0_DFX(QuantFlashAttn, q, k, v, qDescale, kDescale, vDescale, blockTableOptional, pScaleOptional,
            cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, sinksOptional,
-           attnMaskOptional, metadataOptional, quantMode, softmaxScale, maskMode, winLeft, winRight, maxSeqlenQ,
-           maxSeqlenKV, layoutQ, layoutQDescale, layoutKv, layoutOut, returnSoftmaxLse);
+           attnMaskOptional, metadataOptional, vTailOptional, blockTableTailOptional, sequsedVTailOptional, quantMode,
+           softmaxScale, maskMode, winLeft, winRight, maxSeqlenQ, maxSeqlenKV, layoutQ, layoutQDescale, layoutKv,
+           layoutOut, returnSoftmaxLse);
 
     if (blockTableOptional == nullptr) {
         blockTableOptional = executor->AllocTensor(DataType::DT_INT32, Format::FORMAT_ND, Format::FORMAT_ND);
@@ -59,22 +61,33 @@ const std::array<const aclTensor *, 2> QuantFlashAttn(
     if (metadataOptional == nullptr) {
         metadataOptional = executor->AllocTensor(DataType::DT_INT32, Format::FORMAT_ND, Format::FORMAT_ND);
     }
+    if (vTailOptional == nullptr) {
+        vTailOptional = executor->AllocTensor(DataType::DT_BF16, Format::FORMAT_ND, Format::FORMAT_ND);
+    }
+    if (blockTableTailOptional == nullptr) {
+        blockTableTailOptional = executor->AllocTensor(DataType::DT_INT32, Format::FORMAT_ND, Format::FORMAT_ND);
+    }
+    if (sequsedVTailOptional == nullptr) {
+        sequsedVTailOptional = executor->AllocTensor(DataType::DT_INT32, Format::FORMAT_ND, Format::FORMAT_ND);
+    }
 
     auto attentionOutAlloc = executor->AllocTensor(DataType::DT_BF16, Format::FORMAT_ND, Format::FORMAT_ND);
     auto softmaxLseAlloc = executor->AllocTensor(DataType::DT_FLOAT, Format::FORMAT_ND, Format::FORMAT_ND);
 
     // OP_INPUT/OP_ATTR 严格按 op_host def 的顺序与数量下发，保证 tiling 按索引取值正确。
-    // def input 14个(含 p_scale)：q,k,v,q_descale,k_descale,v_descale,block_table,p_scale,
-    //   cu_seqlens_q,cu_seqlens_kv,seqused_q,seqused_kv,sinks,attn_mask,metadata
+    // def input 18个(含 p_scale)：q,k,v,q_descale,k_descale,v_descale,block_table,p_scale,
+    //   cu_seqlens_q,cu_seqlens_kv,seqused_q,seqused_kv,sinks,attn_mask,metadata,v_tail,
+    //   block_table_tail,seqused_v_tail
     // def attr 12个：quant_mode,softmax_scale,mask_mode,win_left,win_right,max_seqlen_q,max_seqlen_kv,
     //   layout_q,layout_q_descale,layout_kv,layout_out,return_softmax_lse(bool)
-    auto ret = INFER_SHAPE(QuantFlashAttn,
-                           OP_INPUT(q, k, v, qDescale, kDescale, vDescale, blockTableOptional, pScaleOptional,
-                                    cuSeqlensQOptional, cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional,
-                                    sinksOptional, attnMaskOptional, metadataOptional),
-                           OP_OUTPUT(attentionOutAlloc, softmaxLseAlloc),
-                           OP_ATTR(quantMode, softmaxScale, maskMode, winLeft, winRight, maxSeqlenQ, maxSeqlenKV,
-                                   layoutQ, layoutQDescale, layoutKv, layoutOut, returnSoftmaxLse));
+    auto ret = INFER_SHAPE(
+        QuantFlashAttn,
+        OP_INPUT(q, k, v, qDescale, kDescale, vDescale, blockTableOptional, pScaleOptional, cuSeqlensQOptional,
+                 cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, sinksOptional, attnMaskOptional,
+                 metadataOptional, vTailOptional, blockTableTailOptional, sequsedVTailOptional),
+        OP_OUTPUT(attentionOutAlloc, softmaxLseAlloc),
+        OP_ATTR(quantMode, softmaxScale, maskMode, winLeft, winRight, maxSeqlenQ, maxSeqlenKV, layoutQ, layoutQDescale,
+                layoutKv, layoutOut, returnSoftmaxLse));
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "QuantFlashAttn InferShape failed.");
         return {nullptr, nullptr};
@@ -84,7 +97,7 @@ const std::array<const aclTensor *, 2> QuantFlashAttn(
         QuantFlashAttn,
         OP_INPUT(q, k, v, qDescale, kDescale, vDescale, blockTableOptional, pScaleOptional, cuSeqlensQOptional,
                  cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, sinksOptional, attnMaskOptional,
-                 metadataOptional),
+                 metadataOptional, vTailOptional, blockTableTailOptional, sequsedVTailOptional),
         OP_OUTPUT(attentionOutAlloc, softmaxLseAlloc),
         OP_ATTR(quantMode, softmaxScale, maskMode, winLeft, winRight, maxSeqlenQ, maxSeqlenKV, layoutQ, layoutQDescale,
                 layoutKv, layoutOut, returnSoftmaxLse));

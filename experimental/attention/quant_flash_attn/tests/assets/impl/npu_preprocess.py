@@ -78,6 +78,11 @@ def build_metadata_arguments(q, k, v, quant_mode, kwargs):
         )
     )
 
+    # TND: metadata 要求 batch_size=None (由 cu_seqlens 推导)
+    batch_size = get_attribute(kwargs, "batch_size", get_attribute(kwargs, "B"))
+    if layout_q in ("TND", "NTD"):
+        batch_size = None
+
     return {
         "num_heads_q": num_heads_q,
         "num_heads_kv": num_heads_kv,
@@ -85,7 +90,7 @@ def build_metadata_arguments(q, k, v, quant_mode, kwargs):
         "quant_mode": int(quant_mode)
         if quant_mode is not None
         else int(get_attribute(kwargs, "quant_mode", 5)),
-        "batch_size": get_attribute(kwargs, "batch_size", get_attribute(kwargs, "B")),
+        "batch_size": batch_size,
         "max_seqlen_q": int(get_attribute(kwargs, "max_seqlen_q", -1)),
         "max_seqlen_kv": int(get_attribute(kwargs, "max_seqlen_kv", -1)),
         "head_dim_v": get_attribute(
@@ -104,7 +109,10 @@ def build_metadata_arguments(q, k, v, quant_mode, kwargs):
 
 def _resolve_metadata_op():
     try:
-        from cann_ops_transformer.ops import quant_flash_attn_metadata
+        # 直接导入实现模块, 避免旧包级别名拦截 quant_mode=5
+        from cann_ops_transformer.ops.attention.quant_flash_attn import (
+            quant_flash_attn_metadata,
+        )
 
         return quant_flash_attn_metadata
     except ImportError:

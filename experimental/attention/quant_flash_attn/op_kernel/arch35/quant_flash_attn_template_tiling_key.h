@@ -23,6 +23,9 @@
 
 #define ASCENDC_TPL_5_BW 5
 #define ASCENDC_TPL_10_BW 10
+#ifndef ASCENDC_TPL_3_BW
+#define ASCENDC_TPL_3_BW 3
+#endif
 
 // ============================== InOutLayoutType（8bit）：q/out 布局组合 ==============================
 #define InOutLayoutType_BSND 0
@@ -43,19 +46,19 @@
 
 // ============================== KvLayoutType（2bit） ==============================
 #define KvLayoutType_NO_PA 0
-#define KvLayoutType_PA_BSND 1
-#define KvLayoutType_PA_BNSD 2
+#define KvLayoutType_PA_BBND 1
+#define KvLayoutType_PA_BNBD 2
 #define KvLayoutType_PA_NZ 3
-#define KvLayoutType_PA_BBND KvLayoutType_PA_BSND
-#define KvLayoutType_PA_BNBD KvLayoutType_PA_BNSD
 
 // mxfp4 DN 侧 KV 存储模式宏名（对齐统一取值域）
 #define KV_STORAGE_MODE_CONTINUE KvLayoutType_NO_PA
-#define KV_STORAGE_MODE_PA_BSND KvLayoutType_PA_BSND
-#define KV_STORAGE_MODE_PA_BNSD KvLayoutType_PA_BNSD
+#define KV_STORAGE_MODE_PA_BBND KvLayoutType_PA_BBND
+#define KV_STORAGE_MODE_PA_BNBD KvLayoutType_PA_BNBD
+#define KV_STORAGE_MODE_PA_NZ KvLayoutType_PA_NZ
 
 // ============================== Config（10bit）：切分配置编码 ==============================
 #define Config_DN_FIXED 0 // mxfp4 DN 不使用切分配置，固定 0
+#define Config_DN_ND 1    // mxfp4 ND（S 行主序，lane=s2）：仅 TND + 无 mask
 #define Config_S1Aligned128_S2Aligned512_DAligned64_DVAligned64 0
 #define Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128 1
 #define Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128 2
@@ -76,6 +79,8 @@ enum class QFA_LAYOUT : uint32_t {
     BSND = LAYOUT_ENUM_BSND,
     BNSD = LAYOUT_ENUM_BNSD,
     TND = LAYOUT_ENUM_TND,
+    BBND = 23, // PA_BBND: block 内 (Bn, Bs, N, D)
+    NZ = 3,    // PA_NZ 块内排布（仅 KV 使用）
 };
 
 template <typename QUANT_T, typename SCALE_T, typename OUT_T, const bool PAGE_ATTENTION = false,
@@ -88,7 +93,7 @@ struct QFAType {
     static constexpr bool pageAttention = PAGE_ATTENTION;
     static constexpr QFA_LAYOUT qLayout = LAYOUT_T;
     static constexpr QFA_LAYOUT kvLayout = KV_LAYOUT_T;
-    static constexpr QFA_LAYOUT outLayout = KV_LAYOUT_T;
+    static constexpr QFA_LAYOUT outLayout = OUT_LAYOUT_T;
     static constexpr bool hasMask = HAS_MASK;
 };
 
@@ -116,7 +121,15 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP4_DN),
                          ASCENDC_TPL_BOOL_SEL(HasAttenMask, 0, 1),
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KV_STORAGE_MODE_CONTINUE,
-                                              KV_STORAGE_MODE_PA_BSND, KV_STORAGE_MODE_PA_BNSD),
+                                              KV_STORAGE_MODE_PA_BBND, KV_STORAGE_MODE_PA_BNBD, KV_STORAGE_MODE_PA_NZ),
+                         ASCENDC_TPL_BOOL_SEL(IsFd, 0), ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
+    // mxfp4 ND (quant_mode=5): TND output, continuous or PA KV (BBND/BNBD/NZ), mask optional
+    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, LAYOUT_ENUM_TND),
+                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, Config_DN_ND),
+                         ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP4_DN),
+                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, 0, 1),
+                         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KV_STORAGE_MODE_CONTINUE,
+                                              KV_STORAGE_MODE_PA_BBND, KV_STORAGE_MODE_PA_BNBD, KV_STORAGE_MODE_PA_NZ),
                          ASCENDC_TPL_BOOL_SEL(IsFd, 0), ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
     // MxFP8 Softmax FP16（quant_mode=3）：单模板组合
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BNSD_BNSD),

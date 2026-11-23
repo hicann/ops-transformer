@@ -65,23 +65,28 @@ __aicore__ inline constexpr QFA_LAYOUT GetOutLayout()
 template <uint8_t Q_OUT_LAYOUT_T, uint8_t KV_STORAGE_MODE>
 __aicore__ inline constexpr QFA_LAYOUT GetKvLayout()
 {
-    static_assert((KV_STORAGE_MODE == KV_STORAGE_MODE_CONTINUE) || (KV_STORAGE_MODE == KV_STORAGE_MODE_PA_BSND) ||
-                      (KV_STORAGE_MODE == KV_STORAGE_MODE_PA_BNSD),
+    static_assert((KV_STORAGE_MODE == KV_STORAGE_MODE_CONTINUE) || (KV_STORAGE_MODE == KV_STORAGE_MODE_PA_BBND) ||
+                      (KV_STORAGE_MODE == KV_STORAGE_MODE_PA_BNBD) || (KV_STORAGE_MODE == KV_STORAGE_MODE_PA_NZ),
                   "Get Key/Value Layout fail, KV_STORAGE_MODE is incorrect");
     if constexpr (KV_STORAGE_MODE == KV_STORAGE_MODE_CONTINUE) {
         return GetQueryLayout<Q_OUT_LAYOUT_T>();
-    } else if constexpr (KV_STORAGE_MODE == KV_STORAGE_MODE_PA_BSND) {
+    } else if constexpr (KV_STORAGE_MODE == KV_STORAGE_MODE_PA_BBND) {
         return QFA_LAYOUT::BSND; // block内的格式类似于BSND
-    } else if constexpr (KV_STORAGE_MODE == KV_STORAGE_MODE_PA_BNSD) {
+    } else if constexpr (KV_STORAGE_MODE == KV_STORAGE_MODE_PA_BNBD) {
         return QFA_LAYOUT::BNSD; // block内的格式类似于BNSD
+    } else if constexpr (KV_STORAGE_MODE == KV_STORAGE_MODE_PA_NZ) {
+        return QFA_LAYOUT::NZ; // block内为 NZ 排布, 搬运分支由 paLayoutType 分派
+    } else {
+        return QFA_LAYOUT::BBND; // ND: (Bn, Bs, N, D), 具体寻址由 tiling 的 paLayoutType 决定
     }
 }
 
 template <uint8_t KV_STORAGE_MODE>
 __aicore__ inline constexpr bool IsPageAttention()
 {
-    static_assert((KV_STORAGE_MODE == KV_STORAGE_MODE_CONTINUE) || (KV_STORAGE_MODE == KV_STORAGE_MODE_PA_BSND) ||
-                      (KV_STORAGE_MODE == KV_STORAGE_MODE_PA_BNSD),
+    static_assert((KV_STORAGE_MODE == KV_STORAGE_MODE_CONTINUE) || (KV_STORAGE_MODE == KV_STORAGE_MODE_PA_BBND) ||
+                      (KV_STORAGE_MODE == KV_STORAGE_MODE_PA_BNBD) || (KV_STORAGE_MODE == KV_STORAGE_MODE_PA_NZ) ||
+                      (KV_STORAGE_MODE == KV_STORAGE_MODE_PA_BBND),
                   "Get PAGE_ATTENTION flag fail, KV_STORAGE_MODE is incorrect");
     return (KV_STORAGE_MODE != KV_STORAGE_MODE_CONTINUE);
 }
@@ -92,12 +97,16 @@ __global__ __aicore__ void quant_flash_attn(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* q_descale,
     __gm__ uint8_t* k_descale, __gm__ uint8_t* v_descale, __gm__ uint8_t* blockTable, __gm__ uint8_t* pScale,
     __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensKv, __gm__ uint8_t* sequsedQ, __gm__ uint8_t* sequsedKv,
-    __gm__ uint8_t* learnableSink, __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata, __gm__ uint8_t* attnOut,
-    __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
+    __gm__ uint8_t* learnableSink, __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata, __gm__ uint8_t* vTail,
+    __gm__ uint8_t* blockTableTail, __gm__ uint8_t* sequsedVTail, __gm__ uint8_t* attnOut, __gm__ uint8_t* softmaxLse,
+    __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     REGISTER_TILING_DEFAULT(QuantFlashAttnTilingData);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
     (void)pScale;
+    (void)vTail;
+    (void)blockTableTail;
+    (void)sequsedVTail;
 
 #if (ORIG_DTYPE_Q == DT_FLOAT4_E2M1) && (ORIG_DTYPE_Q_DESCALE == DT_FLOAT8_E8M0) && (ORIG_DTYPE_ATTN_OUT == DT_BF16)
     if constexpr (QUANT_MODE_T == QFA_MXFP4_DN) {
@@ -108,8 +117,8 @@ __global__ __aicore__ void quant_flash_attn(
         using QFA_T = QFAType<fp4x2_e2m1_t, fp8_e8m0_t, bfloat16_t, IsPageAttention<KV_STORAGE_MODE>(),
                               GetQueryLayout<Q_OUT_LAYOUT_T>(), GetKvLayout<Q_OUT_LAYOUT_T, KV_STORAGE_MODE>(),
                               GetOutLayout<Q_OUT_LAYOUT_T>(), HAS_MASK>;
-        using CubBlock = QuantFlashAttnBlockCubeDn<QFA_T>;
-        using VectorBlock = QuantFlashAttnBlockVectorDn<QFA_T>;
+        using CubBlock = QuantFlashAttnBlockCubeDn<QFA_T, CONFIG_T == Config_DN_ND>;
+        using VectorBlock = QuantFlashAttnBlockVectorDn<QFA_T, CONFIG_T == Config_DN_ND>;
         QuantFlashAttnKernelDn<QFA_T, CubBlock, VectorBlock> op;
         op.Init(query, key, value, q_descale, k_descale, v_descale, blockTable, cuSeqlensQ, cuSeqlensKv, sequsedQ,
                 sequsedKv, attnMask, learnableSink, softmaxLse, attnOut, workspace, metadata, tilingData);
@@ -237,9 +246,13 @@ __aicore__ inline void quant_flash_attn_mxfp8_softmax_fp16(
     __gm__ uint8_t* dequantScaleKey, __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* blockTable,
     __gm__ uint8_t* pScale, __gm__ uint8_t* cuSeqLensQ, __gm__ uint8_t* cuSeqLensKv, __gm__ uint8_t* sequsedQ,
     __gm__ uint8_t* sequsedKv, __gm__ uint8_t* sinks, __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata,
-    __gm__ uint8_t* attnOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
+    __gm__ uint8_t* vTail, __gm__ uint8_t* blockTableTail, __gm__ uint8_t* sequsedVTail, __gm__ uint8_t* attnOut,
+    __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     InitSocState();
+    (void)vTail;
+    (void)blockTableTail;
+    (void)sequsedVTail;
     const __gm__ QuantFlashAttnTilingData* __restrict tilingData =
         (const __gm__ QuantFlashAttnTilingData* __restrict)tiling;
     using CubeBlock = QFA_KERNEL::QuantFlashAttnBlockCubeMxfp8SoftmaxFp16<QFA_KERNEL::QUANT_T, QFA_KERNEL::SCALE_T>;
@@ -259,7 +272,8 @@ __global__ __aicore__ void quant_flash_attn(
     __gm__ uint8_t* dequantScaleKey, __gm__ uint8_t* dequantScaleValue, __gm__ uint8_t* blockTable,
     __gm__ uint8_t* pScale, __gm__ uint8_t* cuSeqLensQ, __gm__ uint8_t* cuSeqLensKv, __gm__ uint8_t* sequsedQ,
     __gm__ uint8_t* sequsedKv, __gm__ uint8_t* sinks, __gm__ uint8_t* attnMask, __gm__ uint8_t* metadata,
-    __gm__ uint8_t* attnOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
+    __gm__ uint8_t* vTail, __gm__ uint8_t* blockTableTail, __gm__ uint8_t* sequsedVTail, __gm__ uint8_t* attnOut,
+    __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     REGISTER_TILING_DEFAULT(QuantFlashAttnTilingData);
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_2);
@@ -268,7 +282,8 @@ __global__ __aicore__ void quant_flash_attn(
     if constexpr (quantMode == QFA_MXFP8_SOFTMAX_FP16) {
         quant_flash_attn_mxfp8_softmax_fp16<inOutLayoutType, config, quantMode, hasAttenMask, KvLayoutType, isFd>(
             query, key, value, dequantScaleQuery, dequantScaleKey, dequantScaleValue, blockTable, pScale, cuSeqLensQ,
-            cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata, attnOut, softmaxLse, workspace, tiling);
+            cuSeqLensKv, sequsedQ, sequsedKv, sinks, attnMask, metadata, vTail, blockTableTail, sequsedVTail, attnOut,
+            softmaxLse, workspace, tiling);
     }
 #endif
 }

@@ -36,6 +36,9 @@ namespace l0op {
  * @param sinksOptional       可学习sink权重（可选，FLOAT32）
  * @param attnMaskOptional    attnMask参数（可选，INT8）
  * @param metadataOptional    预计算tiling元数据（可选，INT32）
+ * @param vTailOptional       V尾块高精度补充输入（可选，BF16）
+ * @param blockTableTailOptional V尾块分页映射表（可选，INT32）
+ * @param sequsedVTailOptional   V尾块各batch实际长度（可选，INT32）
  * @param quantMode           量化模式（int64_t）
  * @param softmaxScale        softmax缩放系数（double）
  * @param maskMode            掩码模式（int64_t）
@@ -52,14 +55,15 @@ namespace l0op {
  * @return std::array<const aclTensor*, 2> [attnOut, softmaxLse]
  *         任意元素为nullptr表示对应输出的InferShape或Launch失败。
  */
-const std::array<const aclTensor *, 2> QuantFlashAttn(
-    const aclTensor *q, const aclTensor *k, const aclTensor *v, const aclTensor *qDescale, const aclTensor *kDescale,
-    const aclTensor *vDescale, const aclTensor *blockTableOptional, const aclTensor *pScaleOptional,
-    const aclTensor *cuSeqlensQOptional, const aclTensor *cuSeqlensKvOptional, const aclTensor *sequsedQOptional,
-    const aclTensor *sequsedKvOptional, const aclTensor *sinksOptional, const aclTensor *attnMaskOptional,
-    const aclTensor *metadataOptional, int64_t quantMode, double softmaxScale, int64_t maskMode, int64_t winLeft,
-    int64_t winRight, int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char *layoutQ, const char *layoutQDescale,
-    const char *layoutKv, const char *layoutOut, bool returnSoftmaxLse, aclOpExecutor *executor);
+const std::array<const aclTensor*, 2> QuantFlashAttn(
+    const aclTensor* q, const aclTensor* k, const aclTensor* v, const aclTensor* qDescale, const aclTensor* kDescale,
+    const aclTensor* vDescale, const aclTensor* blockTableOptional, const aclTensor* pScaleOptional,
+    const aclTensor* cuSeqlensQOptional, const aclTensor* cuSeqlensKvOptional, const aclTensor* sequsedQOptional,
+    const aclTensor* sequsedKvOptional, const aclTensor* sinksOptional, const aclTensor* attnMaskOptional,
+    const aclTensor* metadataOptional, const aclTensor* vTailOptional, const aclTensor* blockTableTailOptional,
+    const aclTensor* sequsedVTailOptional, int64_t quantMode, double softmaxScale, int64_t maskMode, int64_t winLeft,
+    int64_t winRight, int64_t maxSeqlenQ, int64_t maxSeqlenKV, const char* layoutQ, const char* layoutQDescale,
+    const char* layoutKv, const char* layoutOut, bool returnSoftmaxLse, aclOpExecutor* executor);
 
 } // namespace l0op
 

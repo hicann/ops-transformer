@@ -98,7 +98,6 @@ void QuantFlashAttnTilingDn::InitImplParam() {}
 void QuantFlashAttnTilingDn::SplitPolicy()
 {
     CalcNumBlocks(platformInfo_.aicNum);
-    // flashDecodeFlag_ = true; // TODO 原本是根据分核，当前先写死
 }
 
 void QuantFlashAttnTilingDn::GenTilingKey()
@@ -122,16 +121,31 @@ void QuantFlashAttnTilingDn::GenTilingKey()
 
     uint8_t kvStorageMode = KV_STORAGE_MODE_CONTINUE;
     if (tilingInfo_->kvStorageMode == KvStorageMode::PAGE_ATTENTION) {
-        if (tilingInfo_->layoutKV == FiaLayout::BSND) {
-            kvStorageMode = KV_STORAGE_MODE_PA_BSND;
-        } else if (tilingInfo_->layoutKV == FiaLayout::BNSD) {
-            kvStorageMode = KV_STORAGE_MODE_PA_BNSD;
+        if (tilingInfo_->layoutKV == FiaLayout::BSND || tilingInfo_->layoutKV == FiaLayout::BnBsND) {
+            kvStorageMode = KV_STORAGE_MODE_PA_BBND; // PA_BBND 块内排布为 (Bs, N, D)
+        } else if (tilingInfo_->layoutKV == FiaLayout::BNSD || tilingInfo_->layoutKV == FiaLayout::BnNBsD) {
+            kvStorageMode = KV_STORAGE_MODE_PA_BNBD; // PA_BNBD 块内排布为 (N, Bs, D)
+        } else if (tilingInfo_->layoutKV == FiaLayout::NZ) {
+            kvStorageMode = KV_STORAGE_MODE_PA_NZ; // PA_NZ 块内排布为 (D/64, Bs, 64)
         }
     }
 
     bool hasMask = tilingInfo_->attnMaskFlag;
 
-    tilingKey_ = GET_TPL_TILING_KEY(queryOutLayout, Config_DN_FIXED, QFA_MXFP4_DN, hasMask, kvStorageMode, 0);
+    // ND 判据: TND + 任意 KV 布局(PA BBND/BNBD/NZ 或 CONTINUE) + mask 0/3,
+    // 且每个 batch 的 M 行 = S1*G <= 64(连续 KV 同规格已验证)
+    constexpr int64_t ND_MAX_M_ROWS = 64;
+    int64_t bNum = (tilingInfo_->bSize > 0) ? tilingInfo_->bSize : 1;
+    int64_t mRows = (tilingInfo_->maxSeqLenQ >= 0) ? tilingInfo_->maxSeqLenQ : (tilingInfo_->s1Size + bNum - 1) / bNum;
+    bool useNd = false;
+    bool ndMaskOk = (tilingInfo_->maskMode == 0) || (tilingInfo_->maskMode == 3);
+    if ((queryOutLayout == LAYOUT_ENUM_TND) && ndMaskOk && (mRows * tilingInfo_->gSize <= ND_MAX_M_ROWS)) {
+        useNd = true;
+    }
+
+    const uint32_t tplHasMask = static_cast<uint32_t>(hasMask);
+    tilingKey_ = GET_TPL_TILING_KEY(queryOutLayout, useNd ? Config_DN_ND : Config_DN_FIXED, QFA_MXFP4_DN, tplHasMask,
+                                    kvStorageMode, 0);
 }
 
 void QuantFlashAttnTilingDn::CalcNumBlocks(uint32_t aicNum)
@@ -147,7 +161,17 @@ void QuantFlashAttnTilingDn::CalcWorkspaceSize()
 {
     size_t sysWorkspaceSize = platformInfo_.defaultSysWorkspaceSize;
     workspaceSize_ = sysWorkspaceSize;
-    workspaceSize_ += 0;
+
+    // FD partial workspace 三段: accumOut [slot][d=128][m=128] fp32 / sum、max 各 [slot][m=128] 1 个 fp32
+    // 每 AIV 核 head/tail 双槽; 归约按 8 对齐读行可能越过槽尾, 末尾多留一个槽作读窗
+    uint32_t mSize = 128;
+    uint32_t dSize = static_cast<uint32_t>(tilingInfo_->vHeadDim);
+    uint64_t slotNum = static_cast<uint64_t>(numBlocks_) * 2 + 1;
+    uint64_t accumOutSize = slotNum * mSize * dSize * sizeof(float);
+    uint64_t logSumExpSize = slotNum * mSize * sizeof(float); // sum 段; max 段同大
+    workspaceSize_ += accumOutSize + logSumExpSize + logSumExpSize;
+    tilingData_.baseTiling.flashAttnWorkspaceParams.accumOutSize = static_cast<uint32_t>(accumOutSize);
+    tilingData_.baseTiling.flashAttnWorkspaceParams.logSumExpSize = static_cast<uint32_t>(logSumExpSize);
 }
 
 void QuantFlashAttnTilingDn::FillTiling()
@@ -155,8 +179,14 @@ void QuantFlashAttnTilingDn::FillTiling()
     tilingData_.baseTiling.flashAttnBaseParams.bSize = tilingInfo_->bSize;
     tilingData_.baseTiling.flashAttnBaseParams.t1Size = tilingInfo_->queryTSize;
     tilingData_.baseTiling.flashAttnBaseParams.t2Size = tilingInfo_->keyTSize;
-    tilingData_.baseTiling.flashAttnBaseParams.n2Size = tilingInfo_->n1Size;
-    tilingData_.baseTiling.flashAttnBaseParams.gSize = 1;
+    // TND+N2TGD: S1G 合轴, M 轴 = S1*G; 非 TND 头轴摊平
+    if (tilingInfo_->layoutQ == FiaLayout::TND && tilingInfo_->layoutQDescale == FiaLayout::N2TGD) {
+        tilingData_.baseTiling.flashAttnBaseParams.n2Size = tilingInfo_->n1Size / tilingInfo_->gSize;
+        tilingData_.baseTiling.flashAttnBaseParams.gSize = tilingInfo_->gSize;
+    } else {
+        tilingData_.baseTiling.flashAttnBaseParams.n2Size = tilingInfo_->n1Size;
+        tilingData_.baseTiling.flashAttnBaseParams.gSize = 1;
+    }
     tilingData_.baseTiling.flashAttnBaseParams.gRealSize = tilingInfo_->gSize;
     tilingData_.baseTiling.flashAttnBaseParams.s1Size = tilingInfo_->s1Size;
     tilingData_.baseTiling.flashAttnBaseParams.s2Size = tilingInfo_->s2Size;
@@ -183,6 +213,9 @@ void QuantFlashAttnTilingDn::FillTiling()
     tilingData_.baseTiling.flashAttnAttenMaskParams.attenMaskS2Size = (tilingInfo_->maskMode != 0) ? 2048 : 0;
     tilingData_.baseTiling.flashAttnAttenMaskParams.isRowInvalid = true;
 
+    static_assert(static_cast<uint32_t>(FiaLayout::BnBsND) == 23, "PA_LAYOUT_BBND mismatch");
+    static_assert(static_cast<uint32_t>(FiaLayout::BnNBsD) == 12, "PA_LAYOUT_BNBD mismatch");
+    static_assert(static_cast<uint32_t>(FiaLayout::NZ) == 3, "PA_LAYOUT_NZ mismatch");
     tilingData_.baseTiling.flashAttnPageAttentionParams.paLayoutType = (uint8_t)(tilingInfo_->layoutKV);
     tilingData_.baseTiling.flashAttnPageAttentionParams.blockSize = tilingInfo_->blockSize;
     tilingData_.baseTiling.flashAttnPageAttentionParams.maxBlockNumPerBatch = tilingInfo_->maxBlockNumPerBatch;

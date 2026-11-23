@@ -169,12 +169,16 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInitDefault()
             }
         }
     }
-    if (!baseInfo.isCumulativeQuerySeq && sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
+    // 有 seqused 就用 seqused(kernel 侧 GetActualSeqLength 在 TND 下也优先取它);
+    // 累积布局按前缀和写入(GetQuerySeqSize 会对该数组再差分).
+    if (sequsedQ_ != nullptr && sequsedQ_->GetData() != nullptr) {
         batchSize_ = sequsedQ_->GetTensorShape()->GetDimSize(0);
         auto sequsedQ = GetTensorDataAsInt64(sequsedQ_, batchSize_);
         baseInfo.actualQuerySeqSize.resize(batchSize_, maxSeqlenQ_);
+        int64_t queryAcc = 0;
         for (uint32_t i = 0; i < batchSize_; ++i) {
-            baseInfo.actualQuerySeqSize[i] = sequsedQ[i];
+            queryAcc += sequsedQ[i];
+            baseInfo.actualQuerySeqSize[i] = baseInfo.isCumulativeQuerySeq ? queryAcc : sequsedQ[i];
             maxSeqlenQ_ = std::max(static_cast<int64_t>(maxSeqlenQ_), sequsedQ[i]);
         }
     } else if (cuSeqlensQ_ != nullptr && cuSeqlensQ_->GetData() != nullptr) {
@@ -186,12 +190,15 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInitDefault()
             maxSeqlenQ_ = std::max(static_cast<int64_t>(maxSeqlenQ_), cuSeqlensQ[i + 1] - cuSeqlensQ[i]);
         }
     }
-    if (!baseInfo.isCumulativeKvSeq && sequsedKv_ != nullptr && sequsedKv_->GetData() != nullptr) {
+    // KV 侧同 Query: seqused_kv 优先, TND 按前缀和写入.
+    if (sequsedKv_ != nullptr && sequsedKv_->GetData() != nullptr) {
         batchSize_ = sequsedKv_->GetTensorShape()->GetDimSize(0);
         auto sequsedKv = GetTensorDataAsInt64(sequsedKv_, batchSize_);
         baseInfo.actualKvSeqSize.resize(batchSize_, maxSeqlenKv_);
+        int64_t kvAcc = 0;
         for (uint32_t i = 0; i < batchSize_; ++i) {
-            baseInfo.actualKvSeqSize[i] = sequsedKv[i];
+            kvAcc += sequsedKv[i];
+            baseInfo.actualKvSeqSize[i] = baseInfo.isCumulativeKvSeq ? kvAcc : sequsedKv[i];
             maxSeqlenKv_ = std::max(static_cast<int64_t>(maxSeqlenKv_), sequsedKv[i]);
         }
     } else if (cuSeqlensKv_ != nullptr && cuSeqlensKv_->GetData() != nullptr) {
@@ -228,12 +235,19 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInitDefault()
     } else {
         groupSize_ = numHeadsQ_ / numHeadsKv_;
     }
+    // mode5 TND 统一 S1G 合轴 (N2TGD): 任务空间 B×N_kv, 库按 groupSize 折算 M 轴 (G=1 时数值同摊平)
+    if (quantMode_ == 5 && layoutQ_ == "TND" && layoutQDescale_ == "N2TGD") {
+        baseInfo.kvHeadNum = numHeadsKv_;
+    }
     mBaseSize_ = 128;
     s2BaseSize_ = 256;
     param.mBaseSize = mBaseSize_;
     param.s2BaseSize = s2BaseSize_;
-    param.l2Byte = 0U; // sectionNum = 1
-    param.fdOn = false;
+    param.l2Byte = 96U * 1024U * 1024U;
+    // 仅 MxFP4 DN (mode 5) 开启 FD 候选, 是否真的切 S2 由分核代价比较决定;
+    // tolerance 以 128 行满块代价为单位, decode 任务 M 行数小, 取 0 (严格更优才切)
+    param.fdOn = (quantMode_ == 5);
+    param.fdTolerance = 0;
     return true;
 }
 
@@ -495,8 +509,17 @@ bool QuantFlashAttnMetadataCpuKernel::GenMetaDataDefault(SectionStreamKResult& s
     uint32_t sectionNum = splitRes.sectionNum;
     detail::QFaMetaData faMetadata(metaData_->GetData(), sectionNum);
     uint32_t* ptr = (uint32_t*)metaData_->GetData();
-    ptr[1] = mBaseSize_;
-    ptr[2] = s2BaseSize_;
+    // header 语义与 HEAD_* 常量一致: [1]=IS_FD, [2]=mBaseSize, [3]=s2BaseSize; kernel 读 [1] 作 FD 使能
+    bool isFd = false;
+    for (uint32_t sectionId = 0; sectionId < sectionNum; ++sectionId) {
+        if (splitRes.sectionFdResult[sectionId].usedVecNum > 0) {
+            isFd = true;
+            break;
+        }
+    }
+    ptr[1] = isFd ? 1U : 0U;
+    ptr[2] = mBaseSize_;
+    ptr[3] = s2BaseSize_;
     for (uint32_t sectionId = 0; sectionId < sectionNum; ++sectionId) {
         for (uint32_t i = 0; i < AIC_CORE_NUM; ++i) {
             // faMetadata.setQFaMetadata(sectionId, i, optiling::QFA_CORE_ENABLE_INDEX, 0U);

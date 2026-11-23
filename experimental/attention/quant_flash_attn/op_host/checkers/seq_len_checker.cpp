@@ -32,11 +32,11 @@ using std::string;
 using namespace ge;
 using namespace Ops::Base;
 
-ge::graphStatus SeqLenChecker::CheckSingleParaSequsedQ(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckSingleParaSequsedQ(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     // dtype=INT32, format=ND, shape=(B,)
-    const gert::Tensor *tensor = qfaInfo.opParamInfo.sequsedQ.tensor;
-    const gert::CompileTimeTensorDesc *desc = qfaInfo.opParamInfo.sequsedQ.desc;
+    const gert::Tensor* tensor = qfaInfo.opParamInfo.sequsedQ.tensor;
+    const gert::CompileTimeTensorDesc* desc = qfaInfo.opParamInfo.sequsedQ.desc;
     if (tensor == nullptr || desc == nullptr) {
         return ge::GRAPH_SUCCESS; // 可选参数，存在性由 CheckParaExistence 负责
     }
@@ -47,7 +47,7 @@ ge::graphStatus SeqLenChecker::CheckSingleParaSequsedQ(const QuantFlashAttnTilin
     if (CheckFormatSupport(desc, SEQUSED_Q_NAME) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape &shape = tensor->GetStorageShape();
+    const gert::Shape& shape = tensor->GetStorageShape();
     OP_CHECK_IF(shape.GetDimNum() != DIM_NUM_1,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, SEQUSED_Q_NAME.c_str(),
                                              (std::to_string(shape.GetDimNum()) + "D").c_str(), "1D"),
@@ -59,11 +59,11 @@ ge::graphStatus SeqLenChecker::CheckSingleParaSequsedQ(const QuantFlashAttnTilin
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckSingleParaSequsedKv(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckSingleParaSequsedKv(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     // dtype=INT32, format=ND, shape=(B,)
-    const gert::Tensor *tensor = qfaInfo.opParamInfo.sequsedKv.tensor;
-    const gert::CompileTimeTensorDesc *desc = qfaInfo.opParamInfo.sequsedKv.desc;
+    const gert::Tensor* tensor = qfaInfo.opParamInfo.sequsedKv.tensor;
+    const gert::CompileTimeTensorDesc* desc = qfaInfo.opParamInfo.sequsedKv.desc;
     if (tensor == nullptr || desc == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
@@ -74,7 +74,7 @@ ge::graphStatus SeqLenChecker::CheckSingleParaSequsedKv(const QuantFlashAttnTili
     if (CheckFormatSupport(desc, SEQUSED_KV_NAME) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape &shape = tensor->GetStorageShape();
+    const gert::Shape& shape = tensor->GetStorageShape();
     OP_CHECK_IF(shape.GetDimNum() != DIM_NUM_1,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, SEQUSED_KV_NAME.c_str(),
                                              (std::to_string(shape.GetDimNum()) + "D").c_str(), "1D"),
@@ -86,11 +86,11 @@ ge::graphStatus SeqLenChecker::CheckSingleParaSequsedKv(const QuantFlashAttnTili
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensQ(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensQ(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     // dtype=INT32, format=ND, shape=(B+1,)
-    const gert::Tensor *tensor = qfaInfo.opParamInfo.cuSeqlensQ.tensor;
-    const gert::CompileTimeTensorDesc *desc = qfaInfo.opParamInfo.cuSeqlensQ.desc;
+    const gert::Tensor* tensor = qfaInfo.opParamInfo.cuSeqlensQ.tensor;
+    const gert::CompileTimeTensorDesc* desc = qfaInfo.opParamInfo.cuSeqlensQ.desc;
     if (tensor == nullptr || desc == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
@@ -101,7 +101,7 @@ ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensQ(const QuantFlashAttnTil
     if (CheckFormatSupport(desc, CU_SEQLENS_Q_NAME) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape &shape = tensor->GetStorageShape();
+    const gert::Shape& shape = tensor->GetStorageShape();
     OP_CHECK_IF(shape.GetDimNum() != DIM_NUM_1,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, CU_SEQLENS_Q_NAME.c_str(),
                                              (std::to_string(shape.GetDimNum()) + "D").c_str(), "1D"),
@@ -113,11 +113,11 @@ ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensQ(const QuantFlashAttnTil
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensKv(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensKv(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     // dtype=INT32, format=ND, shape=(B+1,)
-    const gert::Tensor *tensor = qfaInfo.opParamInfo.cuSeqlensKv.tensor;
-    const gert::CompileTimeTensorDesc *desc = qfaInfo.opParamInfo.cuSeqlensKv.desc;
+    const gert::Tensor* tensor = qfaInfo.opParamInfo.cuSeqlensKv.tensor;
+    const gert::CompileTimeTensorDesc* desc = qfaInfo.opParamInfo.cuSeqlensKv.desc;
     if (tensor == nullptr || desc == nullptr) {
         return ge::GRAPH_SUCCESS;
     }
@@ -128,7 +128,7 @@ ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensKv(const QuantFlashAttnTi
     if (CheckFormatSupport(desc, CU_SEQLENS_KV_NAME) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    const gert::Shape &shape = tensor->GetStorageShape();
+    const gert::Shape& shape = tensor->GetStorageShape();
     OP_CHECK_IF(shape.GetDimNum() != DIM_NUM_1,
                 OP_LOGE_FOR_INVALID_SHAPEDIM(qfaInfo.opName, CU_SEQLENS_KV_NAME.c_str(),
                                              (std::to_string(shape.GetDimNum()) + "D").c_str(), "1D"),
@@ -140,7 +140,7 @@ ge::graphStatus SeqLenChecker::CheckSingleParaCuSeqlensKv(const QuantFlashAttnTi
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckSingleParaMaxSeqlenQ(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckSingleParaMaxSeqlenQ(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     // data_type 支持 INT32，默认值为 -1
     // 数值约束已移至特性交叉校验(CheckFeature): 非TND时与seqused_q至少传1个
@@ -148,7 +148,7 @@ ge::graphStatus SeqLenChecker::CheckSingleParaMaxSeqlenQ(const QuantFlashAttnTil
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckSingleParaMaxSeqlenKv(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckSingleParaMaxSeqlenKv(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     // data_type 支持 INT32，默认值为 -1
     // 数值约束已移至特性交叉校验(CheckFeature): 非TND非PA时与seqused_kv至少传1个
@@ -156,7 +156,7 @@ ge::graphStatus SeqLenChecker::CheckSingleParaMaxSeqlenKv(const QuantFlashAttnTi
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckSinglePara(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckSinglePara(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     if (CheckSingleParaSequsedQ(qfaInfo) != ge::GRAPH_SUCCESS ||
         CheckSingleParaSequsedKv(qfaInfo) != ge::GRAPH_SUCCESS ||
@@ -169,13 +169,48 @@ ge::graphStatus SeqLenChecker::CheckSinglePara(const QuantFlashAttnTilingInfo &q
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckParaExistence(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckParaExistence(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     (void)qfaInfo;
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckSequsedMaxSeqlenAtLeastOne(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckCuSeqlensLayoutConsistency(const QuantFlashAttnTilingInfo& qfaInfo)
+{
+    // 约束: cu_seqlens_q/kv 在 TND 布局必传, 非 TND 布局禁止传入
+    bool cuSeqlensQExists =
+        (qfaInfo.opParamInfo.cuSeqlensQ.tensor != nullptr && qfaInfo.opParamInfo.cuSeqlensQ.desc != nullptr);
+    if (qfaInfo.layoutQ == FiaLayout::TND) {
+        OP_CHECK_IF(!cuSeqlensQExists, OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, CU_SEQLENS_Q_NAME.c_str()),
+                    return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF(cuSeqlensQExists,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        qfaInfo.opName, CU_SEQLENS_Q_NAME.c_str(), "provided",
+                        ("cu_seqlens_q should not be provided when layout_q is " +
+                         LayoutToSerialString(qfaInfo.layoutQ) + ", only supported in TND layout")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
+    }
+
+    bool cuSeqlensKvExists =
+        (qfaInfo.opParamInfo.cuSeqlensKv.tensor != nullptr && qfaInfo.opParamInfo.cuSeqlensKv.desc != nullptr);
+    if (qfaInfo.layoutKV == FiaLayout::TND) {
+        OP_CHECK_IF(!cuSeqlensKvExists, OP_LOGE_WITH_INVALID_INPUT(qfaInfo.opName, CU_SEQLENS_KV_NAME.c_str()),
+                    return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF(cuSeqlensKvExists,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        qfaInfo.opName, CU_SEQLENS_KV_NAME.c_str(), "provided",
+                        ("cu_seqlens_kv should not be provided when layout_kv is " +
+                         LayoutToSerialString(qfaInfo.layoutKV) + ", only supported in TND layout")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus SeqLenChecker::CheckSequsedMaxSeqlenAtLeastOne(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     // q 侧: layout_q 不为 TND 时, seqused_q 与 max_seqlen_q 至少传1个
     if (qfaInfo.layoutQ != FiaLayout::TND) {
@@ -186,12 +221,12 @@ ge::graphStatus SeqLenChecker::CheckSequsedMaxSeqlenAtLeastOne(const QuantFlashA
                     OP_LOGE(qfaInfo.opName,
                             "When layout_q is %s (not TND), at least one of seqused_q or max_seqlen_q "
                             "must be provided.",
-                            LayoutToSerialStr(qfaInfo.layoutQ).c_str()),
+                            LayoutToSerialString(qfaInfo.layoutQ).c_str()),
                     return ge::GRAPH_FAILED);
     }
 
     // kv 侧: layout_kv 不为 TND 且不为 PA 场景时, seqused_kv 与 max_seqlen_kv 至少传1个
-    bool isPaLayout = (qfaInfo.layoutKV == FiaLayout::BnBsH || qfaInfo.layoutKV == FiaLayout::BnNBsD ||
+    bool isPaLayout = (qfaInfo.layoutKV == FiaLayout::BnBsND || qfaInfo.layoutKV == FiaLayout::BnNBsD ||
                        qfaInfo.layoutKV == FiaLayout::NZ);
     if (qfaInfo.layoutKV != FiaLayout::TND && !isPaLayout) {
         bool sequsedKvExists =
@@ -201,21 +236,24 @@ ge::graphStatus SeqLenChecker::CheckSequsedMaxSeqlenAtLeastOne(const QuantFlashA
                     OP_LOGE(qfaInfo.opName,
                             "When layout_kv is %s (not TND and not PA), at least one of seqused_kv or "
                             "max_seqlen_kv must be provided.",
-                            LayoutToSerialStr(qfaInfo.layoutKV).c_str()),
+                            LayoutToSerialString(qfaInfo.layoutKV).c_str()),
                     return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckFeature(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckFeature(const QuantFlashAttnTilingInfo& qfaInfo)
 {
+    if (CheckCuSeqlensLayoutConsistency(qfaInfo) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     if (CheckSequsedMaxSeqlenAtLeastOne(qfaInfo) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus SeqLenChecker::CheckMultiPara(const QuantFlashAttnTilingInfo &qfaInfo)
+ge::graphStatus SeqLenChecker::CheckMultiPara(const QuantFlashAttnTilingInfo& qfaInfo)
 {
     (void)qfaInfo;
     return ge::GRAPH_SUCCESS;

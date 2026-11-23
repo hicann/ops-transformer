@@ -25,6 +25,7 @@
 #include "quant_flash_attn_tiling_data.h"
 #include "quant_flash_attn_template_tiling_key.h"
 #include "quant_flash_attn_common_def.h"
+#include "quant_flash_attn_block_vec_fd_dn.h"
 #include "../../common/op_kernel/const_def.h"
 
 using namespace optiling;
@@ -88,6 +89,9 @@ public:
     uint32_t updateScaleNum = 3;
     // fd metadata
     FDparams fdParams_;
+    bool enableFlashDecode_ = false;
+    uint32_t coreFirstTmpOutWsPos_ = 0;
+    typename VectorBlock::VecFdBlockType vecFdBlock{constInfo};
 
     // schduler params
     uint64_t actSeqLensKv = 0;
@@ -97,11 +101,21 @@ public:
     uint64_t gS1LoopTimes_ = 0;
     uint32_t curS2Start = 0;
     uint32_t curS2End = 0;
+    // m-tile 级常量: 只依赖 gS1/batch, 提到 s2 循环外算一次
+    uint32_t actM_ = mBaseSize;
+    uint32_t actMAlign128_ = mBaseSize;
+    int32_t maskBase0_ = 0;
+    // CAUSAL: tile 起始行号 = gS1*mBaseSize, 对 gSize 取余 ⇒ 逐行阈值的补偿 (S1G 合轴, gSize 不能整除时非 0)
+    int32_t maskRem_ = 0;
     uint32_t pscaleNum = 0;
     uint32_t incBIdx_ = 0;
     uint32_t curN2Idx_ = 0;
     uint32_t curKvHeadIdx_ = 0;
     uint32_t kvHeadCnt_ = 0;
+
+    // CTRL saturation-mode originals: saved in Init, restored at end of Process
+    int64_t oriSatStrategy_ = 0;
+    int64_t oriFloatSat_ = 0;
 
     SeqLensTool<LAYOUT_Q, SEQLEN_T> qSeqLensTool;
     SeqLensTool<LAYOUT_KV, SEQLEN_T> kvSeqLensTool;
@@ -123,6 +137,8 @@ public:
         this->tilingData = tiling;
 
         sectionNum_ = ((__gm__ uint32_t*)fiaMetaData)[0];
+        // header[1]: 任一 section 存在 FD 归并任务时 AICPU 置 1
+        enableFlashDecode_ = ((__gm__ uint32_t*)fiaMetaData)[1] != 0;
 
         faMetaDataGm.SetGlobalBuffer((__gm__ uint32_t*)(fiaMetaData + FA_METADATA_HEADER_OFFSET),
                                      FA_AIC_CORE_NUM * 16U * sectionNum_);
@@ -131,17 +147,43 @@ public:
                                FLASH_ATTN_METADATA_SIZE * FA_AIC_CORE_NUM * sectionNum_ * sizeof(uint32_t)),
             FA_AIV_CORE_NUM * 16U * sectionNum_);
 
+        // ND 的 FA 段很小, FD B 区在 228K 以上, 用 UB 总容量(248K)作为上界
+
         InitConstInfo();
 
         qSeqLensTool.Init(cuSeqlensQ, constInfo.qCuSeqLensSize, seqUsedQ, constInfo.qSeqUsedSize, constInfo.maxSeqlenQ);
         kvSeqLensTool.Init(cuSeqlensKv, constInfo.kvCuSeqLensSize, seqUsedKv, constInfo.kvSeqUsedSize,
                            constInfo.maxSeqlenKv);
+        // v_scale 段距取 max(seqused_kv): seqused 与 max_seqlen_kv 二选一,
+        // 前者更大时会覆盖不全; 必须在 kvSeqLensTool.Init 之后取.
+        if (constInfo.kvSeqUsedSize > 0) {
+            uint64_t seqUsedMax = 0;
+            for (uint32_t bIdx = 0; bIdx < constInfo.bSize; ++bIdx) {
+                uint64_t len = kvSeqLensTool.seqUsedParser.GetActualSeqLength(bIdx);
+                seqUsedMax = (len > seqUsedMax) ? len : seqUsedMax;
+            }
+            constInfo.maxSeqlenKv = seqUsedMax;
+        }
+
+        // fixpipe 饱和模式: s 超 fp16 上界时饱和到 ±MAX 而非 inf, 避免 softmax 产生 nan.
+#if (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201)
+        // CTRL[60]=0 切 USE_API 使 per-mode 位生效, CTRL[48]=0 为 FLOAT 饱和
+        oriSatStrategy_ = AscendC::GetCtrlSpr<60, 60>();
+        oriFloatSat_ = AscendC::GetCtrlSpr<48, 48>();
+        AscendC::SetCtrlSpr<60, 60>(0);
+        AscendC::SetCtrlSpr<48, 48>(0);
+#else
+        AscendC::AscendCUtils::SetOverflow(0);
+#endif
 
         if ASCEND_IS_AIC {
             cubeBlock.InitInput(query, key, value, dequantScaleQuery, dequantScaleKey, dequantScaleValue, blockTable);
         } else {
-            vectorBlock.InitInput(attentionOut);
+            vectorBlock.InitInput(attentionOut, workspace);
             vectorBlock.ClearOutput();
+            vecFdBlock.InitGlobalTensor(workspace, attentionOut, qSeqLensTool);
+            vecFdBlock.template InitBuffers<VectorBlock::FD_UB_A_OFFSET, VectorBlock::FD_UB_B_OFFSET>();
+            vectorBlock.InitFdMaxStage(VectorBlock::UB_FD_MAX_STAGE_OFFSET);
         }
     }
 
@@ -178,6 +220,7 @@ public:
 
         constInfo.maxSeqlenQ =
             (fiaBaseParams.maxSeqlenQ >= 0) ? static_cast<uint64_t>(fiaBaseParams.maxSeqlenQ) : constInfo.s1Size;
+        // 物理 s2 兜底; max(seqused_kv) 的覆盖在 parser Init 之后(未 Init 时恒返回 0).
         constInfo.maxSeqlenKv =
             (fiaBaseParams.maxSeqlenKv >= 0) ? static_cast<uint64_t>(fiaBaseParams.maxSeqlenKv) : constInfo.s2Size;
         constInfo.scaleValue = static_cast<float>(fiaBaseParams.scaleValue);
@@ -220,6 +263,9 @@ public:
         }
 
         GetFASectionInfo(sectionIdx);
+
+        tileMaxIdx = 3;
+        pscaleNum = 0;
         if ASCEND_IS_AIC {
             CubeRunInfo taskRunInfo[PRELOAD_TASK_CACHE_SIZE] = {};
             FlashAttentionImpl<CubeRunInfo, true>(taskRunInfo);
@@ -236,7 +282,8 @@ public:
         uint64_t taskLoop = 0;
         incBIdx_ = bN2Start_ / constInfo.n2Size;
         curN2Idx_ = bN2Start_ % constInfo.n2Size;
-        curKvHeadIdx_ = curN2Idx_ / constInfo.gRealSize;
+        // S1G (gSize>1): 任务空间 B×N_kv, n2Size 即 N_kv, kvHeadIdx = n2Idx; 摊平按 gRealSize 折算
+        curKvHeadIdx_ = (constInfo.gSize > 1) ? curN2Idx_ : curN2Idx_ / constInfo.gRealSize;
         kvHeadCnt_ = curN2Idx_ % constInfo.gRealSize;
         for (uint32_t bN2 = bN2Start_;; ++bN2) {
             if (bN2 == bN2Start_ || curN2Idx_ == 0) {
@@ -250,8 +297,42 @@ public:
                 uint32_t gS1Begin = (bN2 == bN2Start_) ? gS1OStart_ : 0U;
                 uint32_t gS1Last = (bN2 == bN2End_) ? gS1OEnd_ : static_cast<uint32_t>(gS1LoopTimes_) - 1U;
                 for (uint32_t gS1 = gS1Begin; gS1 <= gS1Last; ++gS1) {
+                    // m-tile 常量: 与 s2 无关, 每 loop 复用
+                    actM_ = mBaseSize;
+                    if (((gS1 + 1) * mBaseSize) > gS1Size_) {
+                        uint64_t tailM = (gS1Size_ > gS1 * mBaseSize) ? (gS1Size_ - gS1 * mBaseSize) : mBaseSize;
+                        actM_ = (tailM < mBaseSize) ? static_cast<uint32_t>(tailM) : mBaseSize;
+                    }
+                    // ND: n 只需对齐到 16(ND_M_ROWS 内), 不再按 128 列白算, 也没有 112 个垃圾 lane;
+                    // DN: PV/Fixpipe 的 N 约束要求 128 对齐
+                    actMAlign128_ = (actM_ + 127) >> 7 << 7;
+                    if (unlikely(constInfo.sparseMode == 3)) {
+                        uint32_t qTileStart =
+                            (constInfo.gSize > 1) ? (gS1 * mBaseSize) / constInfo.gSize : gS1 * mBaseSize;
+                        maskBase0_ = -(static_cast<int32_t>(qTileStart)) -
+                                     (static_cast<int32_t>(actSeqLensKv) - static_cast<int32_t>(actSeqLensQ));
+                        // S1G 合轴: 逐行 s1 号 t = r/gSize (r = gS1*mBaseSize + lane), 故阈值需再减
+                        // rem = (gS1*mBaseSize) % gSize; gSize 整除 tile 起点时 rem=0, 与旧口径一致.
+                        maskRem_ =
+                            static_cast<int32_t>((constInfo.gSize > 1) ? ((gS1 * mBaseSize) % constInfo.gSize) : 0U);
+                    }
                     curS2Start = (bN2 == bN2Start_ && gS1 == gS1OStart_) ? s2OStart_ : 0U;
                     curS2End = (bN2 == bN2End_ && gS1 == gS1OEnd_) ? s2OEnd_ : static_cast<uint32_t>(s2LoopTimes_);
+                    if (HAS_MASK && unlikely(constInfo.sparseMode == 3)) {
+                        // CAUSAL: 行块最大可见 key 之后的 s2 tile 全被 mask, 截断(输出已由 ClearOutput 预置 0);
+                        // 只收缩非空区间, 保证 FD 分核时每个核仍写出 partial
+                        uint64_t rowLast = static_cast<uint64_t>(mBaseSize) * (gS1 + 1) - 1;
+                        rowLast = (rowLast < gS1Size_) ? rowLast : (gS1Size_ - 1);
+                        uint64_t tokenLast = (constInfo.gSize > 1) ? rowLast / constInfo.gSize : rowLast;
+                        int64_t lastKey = static_cast<int64_t>(actSeqLensKv) - static_cast<int64_t>(actSeqLensQ) +
+                                          static_cast<int64_t>(tokenLast);
+                        if (lastKey >= 0) {
+                            uint32_t s2Need = static_cast<uint32_t>((lastKey + s2BaseSize) / s2BaseSize);
+                            if (s2Need > curS2Start && s2Need < curS2End) {
+                                curS2End = s2Need;
+                            }
+                        }
+                    }
                     for (uint32_t s2 = curS2Start; s2 < curS2End; ++s2) {
                         CreateTask(taskLoop, bN2, gS1, s2, taskRunInfo);
                         ExecuteTask<RUNINFO_T, IS_AIC>(taskLoop, taskRunInfo);
@@ -269,6 +350,8 @@ public:
             if (curN2Idx_ == 0) {
                 curKvHeadIdx_ = 0;
                 kvHeadCnt_ = 0;
+            } else if (constInfo.gSize > 1) {
+                curKvHeadIdx_ = curN2Idx_; // S1G: 每任务直取对应 KV 头
             } else if (++kvHeadCnt_ == constInfo.gRealSize) {
                 kvHeadCnt_ = 0;
                 curKvHeadIdx_++;
@@ -401,23 +484,22 @@ public:
         info.gS1Idx = gS1Cur * mBaseSize;
         info.s2Idx = s2Cur * s2BaseSize;
 
-        info.actMSize = mBaseSize;
-        if (((gS1Cur + 1) * mBaseSize) > gS1Size_) {
-            uint64_t tailM = (gS1Size_ > gS1Cur * mBaseSize) ? (gS1Size_ - gS1Cur * mBaseSize) : mBaseSize;
-            info.actMSize = (tailM < mBaseSize) ? static_cast<uint32_t>(tailM) : mBaseSize;
-        }
+        info.actMSize = actM_;
         info.actSingleLoopS2Size = s2BaseSize;
+        info.actSingleLoopS2SizeAlign = s2BaseSize; // s2BaseSize 天然对齐 32/16/64
+        info.actSingleLoopS2SizeAlign16 = s2BaseSize;
+        info.actSingleLoopS2SizeAlign64 = s2BaseSize;
         if (((s2Cur + 1) * s2BaseSize) > actSeqLensKv) {
             info.actSingleLoopS2Size =
                 (actSeqLensKv > (uint64_t)s2Cur * s2BaseSize) ? (actSeqLensKv - (uint64_t)s2Cur * s2BaseSize) : 0;
+            uint32_t actS2 = static_cast<uint32_t>(info.actSingleLoopS2Size);
+            info.actSingleLoopS2SizeAlign = Align(actS2, (uint32_t)AttentionCommon::BYTE_BLOCK); // 统一对齐到32
+            info.actSingleLoopS2SizeAlign16 = Align(actS2, (uint32_t)16);                        // 统一对齐到16
+            info.actSingleLoopS2SizeAlign64 = Align(actS2, (uint32_t)BUFFER_SIZE_BYTE_64B);      // 统一对齐到64
         }
-        info.actSingleLoopS2SizeAlign =
-            Align((uint32_t)info.actSingleLoopS2Size, (uint32_t)AttentionCommon::BYTE_BLOCK);      // 统一对齐到32
-        info.actSingleLoopS2SizeAlign16 = Align((uint32_t)info.actSingleLoopS2Size, (uint32_t)16); // 统一对齐到16
-        info.actSingleLoopS2SizeAlign64 =
-            Align((uint32_t)info.actSingleLoopS2Size, (uint32_t)BUFFER_SIZE_BYTE_64B); // 统一对齐到64
-
-        info.prefetched = (((s2Cur - curS2Start) & 1) == 1);
+        // 按绝对 tile 奇偶配对(而不是相对起点): 让"2 块一次搬"的窗口对齐到 2*s2BaseSize,
+        // PA 下 bs>=512 时窗口即整页, 避免跨页拆成两次 DMA. 首 tile 强制非预取, 保证配对交替成立.
+        info.prefetched = ((s2Cur & 1U) == 1U) && (s2Cur != curS2Start);
         info.pairKVCopyS2Size = info.actSingleLoopS2Size;
         if (!info.prefetched && (s2Cur + 1) < curS2End) {
             uint64_t nextSize = actSeqLensKv - (uint64_t)(s2Cur + 1) * s2BaseSize;
@@ -427,15 +509,16 @@ public:
         info.isFirstS2Loop = ((loop == 0) || (s2Cur == curS2Start));
         info.isLastS2Loop = (s2Cur + 1 == curS2End);
         uint32_t curS2LoopIdx = s2Cur - curS2Start;
-        info.isUpdatePScale = (info.isLastS2Loop || ((curS2LoopIdx + 1) % TILE_N == 0));
-        info.isC2Sync = (curS2LoopIdx % TILE_N == 0);
+        uint32_t phase = curS2LoopIdx & (TILE_N - 1); // TILE_N 为 2 的幂
+        info.isUpdatePScale = (info.isLastS2Loop || (phase + 1 == TILE_N));
+        info.isC2Sync = (phase == 0);
         if (info.isC2Sync) {
             tileMaxIdx = (tileMaxIdx + 1) % 4;
             pscaleNum = (pscaleNum + 1) % 20;
         }
-        info.actMSizeAlign128 = (info.actMSize + 127) >> 7 << 7;
+        info.actMSizeAlign128 = actMAlign128_;
         info.tileMaxIdx = tileMaxIdx;
-        info.pscaleNum = pscaleNum / 10;
+        info.pscaleNum = (pscaleNum >= 10) ? 1 : 0;
     }
 
     __aicore__ inline void CalcVecParams(uint64_t loop, uint32_t bN2Cur, uint32_t gS1Cur, uint32_t s2Cur,
@@ -447,25 +530,30 @@ public:
         info.gS1Idx = gS1Cur * mBaseSize;
         info.curS2LoopIdx = s2Cur - curS2Start; // 在当前核处理的S2的循环下标
 
-        info.actMSize = mBaseSize;
-        if (((gS1Cur + 1) * mBaseSize) > gS1Size_) {
-            uint64_t tailM = (gS1Size_ > gS1Cur * mBaseSize) ? (gS1Size_ - gS1Cur * mBaseSize) : mBaseSize;
-            info.actMSize = (tailM < mBaseSize) ? static_cast<uint32_t>(tailM) : mBaseSize;
-        }
+        info.actMSize = actM_;
         info.actSingleLoopS2Size = s2BaseSize;
+        info.actSingleLoopS2SizeAlign = s2BaseSize; // s2BaseSize 天然对齐 32/64
+        info.actSingleLoopS2SizeAlign64 = s2BaseSize;
         if (((s2Cur + 1) * s2BaseSize) > actSeqLensKv) {
             info.actSingleLoopS2Size =
                 (actSeqLensKv > (uint64_t)s2Cur * s2BaseSize) ? (actSeqLensKv - (uint64_t)s2Cur * s2BaseSize) : 0;
+            uint32_t actS2 = static_cast<uint32_t>(info.actSingleLoopS2Size);
+            info.actSingleLoopS2SizeAlign = Align(actS2, (uint32_t)AttentionCommon::BYTE_BLOCK); // 统一对齐到32
+            info.actSingleLoopS2SizeAlign64 = Align(actS2, (uint32_t)BUFFER_SIZE_BYTE_64B);      // 统一对齐到64
         }
-        info.actSingleLoopS2SizeAlign =
-            Align((uint32_t)info.actSingleLoopS2Size, (uint32_t)AttentionCommon::BYTE_BLOCK); // 统一对齐到32
-        info.actSingleLoopS2SizeAlign64 =
-            Align((uint32_t)info.actSingleLoopS2Size, (uint32_t)BUFFER_SIZE_BYTE_64B); // 统一对齐到64
 
         info.isFirstS2Loop = ((loop == 0) || (s2Cur == curS2Start));
         info.isLastS2Loop = (s2Cur + 1 == curS2End);
-        info.isUpdatePScale = (info.isLastS2Loop || ((info.curS2LoopIdx + 1) % TILE_N == 0));
-        info.isC2Sync = (info.curS2LoopIdx % TILE_N == 0);
+        uint32_t phase = info.curS2LoopIdx & (TILE_N - 1); // TILE_N 为 2 的幂
+        info.isUpdatePScale = (info.isLastS2Loop || (phase + 1 == TILE_N));
+        info.isC2Sync = (phase == 0);
+        if (unlikely(constInfo.sparseMode == 3)) { // CAUSAL: maskBase = k_tile - q_tile - (sk-sq)
+            info.maskBase = static_cast<int32_t>(s2Cur * s2BaseSize) + maskBase0_;
+            info.maskRem = maskRem_;
+        } else {
+            info.maskBase = 0;
+            info.maskRem = 0;
+        }
         if (info.isFirstS2Loop) {
             s2FirstStartVecCore = loop % 2;
         }
@@ -479,8 +567,18 @@ public:
         }
         info.updateScaleNum = updateScaleNum;
         info.tileMaxIdx = tileMaxIdx;
-        info.isS2FirstTilePerCore = (info.curS2LoopIdx % TILE_N / 2 == 0);
-        info.pscaleNum = pscaleNum / 10;
+        info.isS2FirstTilePerCore = (phase < 2);
+        info.pscaleNum = (pscaleNum >= 10) ? 1 : 0;
+        // FD: 本核该行 S2 区间是完整 S2 的真子区间 ⇒ 该行 partial 写 workspace;
+        // 头行用核首槽, 尾行在头行也被切时用第二槽
+        if (enableFlashDecode_) {
+            bool isHeadRow = (bN2Cur == bN2Start_ && gS1Cur == gS1OStart_);
+            bool isTailRow = (bN2Cur == bN2End_ && gS1Cur == gS1OEnd_);
+            bool headSplit = (s2OStart_ != 0);
+            bool tailSplit = (isTailRow && (s2OEnd_ < s2LoopTimes_));
+            info.isS2SplitCore = (isHeadRow && headSplit) || tailSplit;
+            info.faTmpOutWsPos = coreFirstTmpOutWsPos_ + ((!isHeadRow && isTailRow && headSplit) ? 1U : 0U);
+        }
     }
 
     __aicore__ inline void GetFASectionInfo(uint32_t sectionIdx)
@@ -491,6 +589,36 @@ public:
         bN2End_ = faMetaDataGm.GetValue(GetFAMetaDataIndex(constInfo.aicIdx, FLASH_ATTN_BN2_END_INDEX, sectionIdx));
         gS1OEnd_ = faMetaDataGm.GetValue(GetFAMetaDataIndex(constInfo.aicIdx, FLASH_ATTN_M_END_INDEX, sectionIdx));
         s2OEnd_ = faMetaDataGm.GetValue(GetFAMetaDataIndex(constInfo.aicIdx, FLASH_ATTN_S2_END_INDEX, sectionIdx));
+        // 本核首个 FD partial 槽号 (与 fdWorkspaceIdx 同一全局槽空间)
+        coreFirstTmpOutWsPos_ = faMetaDataGm.GetValue(
+            GetFAMetaDataIndex(constInfo.aicIdx, FLASH_ATTN_FIRST_FD_DATA_WORKSPACE_IDX_INDEX, sectionIdx));
+    }
+
+    __aicore__ inline void GetFDSectionInfo(uint32_t sectionIdx)
+    {
+        fdParams_.mLen = fdMetaDataGm.GetValue(GetFDMetaDataIndex(constInfo.aivIdx, FA_FD_M_NUM_INDEX, sectionIdx));
+        fdParams_.fdCoreEnable = fdParams_.mLen > 0 ? 1U : 0U;
+        if (!fdParams_.fdCoreEnable) {
+            return;
+        }
+        fdParams_.fdBN2Idx =
+            fdMetaDataGm.GetValue(GetFDMetaDataIndex(constInfo.aivIdx, FA_FD_BN2_IDX_INDEX, sectionIdx));
+        fdParams_.fdMIdx = fdMetaDataGm.GetValue(GetFDMetaDataIndex(constInfo.aivIdx, FA_FD_M_IDX_INDEX, sectionIdx));
+        fdParams_.fdWorkspaceIdx =
+            fdMetaDataGm.GetValue(GetFDMetaDataIndex(constInfo.aivIdx, FA_FD_WORKSPACE_IDX_INDEX, sectionIdx));
+        fdParams_.fdS2SplitNum =
+            fdMetaDataGm.GetValue(GetFDMetaDataIndex(constInfo.aivIdx, FA_FD_WORKSPACE_NUM_INDEX, sectionIdx));
+        fdParams_.mStart = fdMetaDataGm.GetValue(GetFDMetaDataIndex(constInfo.aivIdx, FA_FD_M_START_INDEX, sectionIdx));
+    }
+
+    __aicore__ inline void FlashDecode(uint32_t sectionIdx)
+    {
+        if (!enableFlashDecode_) {
+            return;
+        }
+        GetFDSectionInfo(sectionIdx);
+        ICachePreLoad(2);
+        vecFdBlock.FlashDecode(fdParams_, vectorBlock.GetFdTransUb());
     }
 
     __aicore__ inline void Process()
@@ -518,7 +646,20 @@ public:
                     CrossCoreWaitFlag<SYNC_MODE_4, PIPE_FIX>(CROSS_CORE_SYNC_V1_C1[1] + 16);
                 }
             }
+            // FD 第二阶段: 仅 AIV 参与归并; SyncAll 仅同步 AIV, AIC 可提前进入下一 section
+            if ASCEND_IS_AIV {
+                if (enableFlashDecode_) {
+                    SyncAll(); // 所有 AIV 的 partial 写 GM 完成后才能开始归并
+                    FlashDecode(sectionIdx);
+                    SyncAll(); // 归并读 workspace 完成后, 才能进入下一 section FA 覆写
+                }
+            }
         }
+#if (__NPU_ARCH__ == 3510 || __NPU_ARCH__ == 9201)
+        // 恢复 CTRL 原值, 避免影响同核后续任务
+        AscendC::SetCtrlSpr<48, 48>(oriFloatSat_);
+        AscendC::SetCtrlSpr<60, 60>(oriSatStrategy_);
+#endif
     }
 };
 

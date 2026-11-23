@@ -55,8 +55,9 @@ aclnnStatus aclnnQuantFlashAttnGetWorkspaceSize(
     aclnnStatus ret = aclnnInnerQuantFlashAttnGetWorkspaceSize(
         q, k, v, qDescale, kDescale, vDescale, blockTableOptional, pScaleOptional, cuSeqlensQOptional,
         cuSeqlensKvOptional, sequsedQOptional, sequsedKvOptional, sinksOptional, attnMaskOptional, metadataOptional,
-        quantMode, softmaxScale, maskMode, winLeft, winRight, maxSeqlenQ, maxSeqlenKV, layoutQ, layoutQDescale,
-        layoutKv, layoutOut, returnSoftmaxLse, attnOut, placeHolder, workspaceSize, executor);
+        vTailOptional, blockTableTailOptional, sequsedVTailOptional, quantMode, softmaxScale, maskMode, winLeft,
+        winRight, maxSeqlenQ, maxSeqlenKV, layoutQ, layoutQDescale, layoutKv, layoutOut, returnSoftmaxLse, attnOut,
+        placeHolder, workspaceSize, executor);
 
     // 销毁占位符
     if (!returnSoftmaxLse) {

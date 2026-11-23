@@ -55,9 +55,10 @@ __aicore__ inline constexpr uint32_t GetBlockElemCnt()
     }
 }
 
-template <typename QFAT>
+template <typename QFAT, const bool ND = false>
 class QuantFlashAttnBlockCubeDn {
 public:
+    static constexpr bool ND_FLAG = ND; // 供 kernel 侧按 ND 调整 M 维对齐
     using QUANT_T = typename QFAT::quantType;
     using SCALE_T = typename QFAT::scaleType;
     using OUT_T = typename QFAT::outputType;
@@ -94,8 +95,13 @@ private:
     GlobalTensor<SCALE_T> keyScaleGm;
     GlobalTensor<SCALE_T> valueScaleGm;
 
-    static constexpr bool DIRECT_KV_COPY = (LAYOUT_KV == QFA_LAYOUT::BNSD) && !PAGE_ATTENTION;
-    static constexpr bool DIRECT_Q_COPY = (LAYOUT_Q == QFA_LAYOUT::BNSD) && !PAGE_ATTENTION;
+    static constexpr bool Q_TND = (LAYOUT_Q == QFA_LAYOUT::TND);
+    static constexpr bool KV_TND = (LAYOUT_KV == QFA_LAYOUT::TND);
+    // PA blockSize ∈ {64..1024} 均为 2 的幂: 页号/块内偏移用移位代替除模
+    uint32_t paBlockShift = 0;
+    uint32_t paBlockMask = 0;
+    uint32_t kvHeadNumCached = 0;
+    DataCopyParams kvNzFullTileParams; // PA_NZ: 整 tile 在同一 page 内的常量搬运参数
     Nd2NzParams qNd2NzParams;
     uint64_t qGmStrideB;
     uint64_t qGmStrideN2;
@@ -118,13 +124,18 @@ private:
     uint64_t vScaleGmStrideS2;
 
     // =================================L1 Buffer=================================
+    // ND: M 维实际恒 <= ND_M_ROWS(与 host 端 ND_MAX_M_ROWS 一致), 按 M 行开缓冲
+    static constexpr uint32_t ND_M_ROWS = 64;
+    // UB 里 P 区的字节数(2 个 chunk, 与 vector block 的 UB_P_BYTES 必须一致)
+    static constexpr uint32_t UB_N_P_BYTES =
+        (ND ? ((ND_M_ROWS * 256U) > 8192U ? (ND_M_ROWS * 256U) : 8192U) : (64U * 256U)) * 2U;
     static constexpr uint32_t L1_Q_SIZE = 128 * 128 / 2;                              // 8K, 2个fp4_e2m1元素为1B
     static constexpr uint32_t L1_Q_DESCALE_SIZE = 128 * (128 / 32) * sizeof(SCALE_T); // 0.5K
     static constexpr uint32_t L1_KV_SIZE = 512 * 128 / 2; // 32K, 2个fp4_e2m1元素为1B, s2单次最大256行
     static constexpr uint32_t L1_KV_DESCALE_SIZE = 512 * (128 / 32) * sizeof(SCALE_T); // 2K
-    static constexpr uint32_t L1_P_SIZE = 128 * 256 / 2;                               // 16K, 2个fp4_e2m1元素为1B
+    static constexpr uint32_t L1_P_SIZE = (ND ? 64U : 128U) * 256U / 2; // ND: 64 行 = 8K, DN: 128 行 = 16K
     static constexpr uint32_t L1_P_DESCALE_SIZE = 128 * 2 * (256 / 64 + 1) * sizeof(SCALE_T); // 1.25K
-    static constexpr uint32_t L1_Q_BUFCNT = 1;
+    static constexpr uint32_t L1_Q_BUFCNT = 1;                                                // 单槽, Q_MUTEX 串行
     static constexpr uint32_t L1_KV_BUFCNT = 4;
     static constexpr uint32_t L1_P_BUFCNT = 20;
 
@@ -172,9 +183,11 @@ private:
     LocalTensor<float> mm2ResUB;
     LocalTensor<half> peerGlobalMaxUB;
 
-    static constexpr uint32_t UB_MM1_RES_OFFSET = 0;
-    static constexpr uint32_t UB_MM2_RES_OFFSET = 128 * 1024;
-    static constexpr uint32_t UB_PEER_GLOBAL_MAX_OFFSET = 229888;
+    static constexpr uint32_t UB_MM1_RES_OFFSET = 0U;
+    static constexpr uint32_t UB_MM2_RES_OFFSET = ((ND ? ND_M_ROWS : 128U) * 256U * 2U * 2U);
+    static constexpr uint32_t UB_PEER_GLOBAL_MAX_OFFSET =
+        ((((ND ? ND_M_ROWS : 128U) * 256U * 2U * 2U) + 128U * 64U * 4U + 2U * 64U * 4U + UB_N_P_BYTES) +
+         (128U * 64U * 4U));
 
     static constexpr uint32_t Q_MUTEX_ID_BASE = 0;
 
@@ -213,7 +226,12 @@ public:
     {
         if constexpr (PAGE_ATTENTION) {
             blockTableGm.SetGlobalBuffer((__gm__ int32_t*)blockTable);
+            while ((1U << paBlockShift) < constInfo.blockSize) {
+                ++paBlockShift;
+            }
+            paBlockMask = constInfo.blockSize - 1U;
         }
+        kvHeadNumCached = QfaKvHeadNum(constInfo.n2Size, constInfo.gSize, constInfo.gRealSize);
 
         headDimInt8 = (constInfo.dSize / GetBlockElemCnt<QUANT_T>()) * GetBlockElemCnt<DATA_T>();
         queryGm.SetGlobalBuffer((__gm__ DATA_T*)query);
@@ -257,7 +275,25 @@ public:
         vScaleSumL1Tensor = LocalTensor<SCALE_T>(TPosition::A1, addrL1Start, V_SCALE_L0A_SIZE); // 1.125K * 1
 
         addrL1Start += V_SCALE_L0A_SIZE;
-        localGlobalMaxL1 = LocalTensor<half>(TPosition::A1, addrL1Start, 256 * 4); // 512b
+        // 不再依赖顺序累加的结果: 与 vector 侧共用 DnL1Map 的常量, 并用 static_assert 锁死两者一致.
+        // ND 下 L1_P_SIZE 变小会让这一段整体前移, 若 vector 侧还硬编码 DN 的偏移,
+        // peer max 就会写到一个没人读的地址(交换静默失效).
+        static_assert(
+            (L1_P_SIZE * L1_P_BUFCNT + 128U * 2U * (256U / 64U + 1U) * 20U + 128U * 128U / 2U + 128U * (128U / 32U) +
+             512U * 128U / 2U * 4U + 512U * (128U / 32U) * 4U + 256U * (128U + 16U) / 2U +
+             (256U / 64U) * ((128U + 16U) / 16U) * 32U) ==
+                L1_P_SIZE * L1_P_BUFCNT + L1_P_DESCALE_SIZE * L1_P_BUFCNT + L1_Q_SIZE * L1_Q_BUFCNT +
+                    L1_Q_DESCALE_SIZE * L1_Q_BUFCNT + L1_KV_SIZE * L1_KV_BUFCNT + L1_KV_DESCALE_SIZE * L1_KV_BUFCNT +
+                    PV_L0A_SIZE + V_SCALE_L0A_SIZE,
+            "Dn(L1_P_SIZE * L1_P_BUFCNT + 128U * 2U * (256U / 64U + 1U) * 20U + 128U * 128U / 2U + 128U * "
+            "(128U / 32U) + 512U * 128U / 2U * 4U + 512U * (128U / 32U) * 4U + 256U * (128U + 16U) / 2U + (256U / 64U) "
+            "* ((128U + 16U) / 16U) * 32U) 与 cube 侧 L1 分段不一致: peer max 会交换到错误地址");
+        localGlobalMaxL1 =
+            LocalTensor<half>(TPosition::A1,
+                              (L1_P_SIZE * L1_P_BUFCNT + 128U * 2U * (256U / 64U + 1U) * 20U + 128U * 128U / 2U +
+                               128U * (128U / 32U) + 512U * 128U / 2U * 4U + 512U * (128U / 32U) * 4U +
+                               256U * (128U + 16U) / 2U + (256U / 64U) * ((128U + 16U) / 16U) * 32U),
+                              256U * 4U);
 
         // L0A
         uint32_t addrL0AStart = 0;
@@ -309,12 +345,20 @@ public:
         mmadQKParams.cmatrixSource = false;
         mmadQKParams.disableGemv = true;
 
-        fixpipeMm1Params.dstStride = 512 / sizeof(half);
+        fixpipeMm1Params.dstStride = 512 / sizeof(half); // S UB 行距 256B, ND/DN 一致
         fixpipeMm1Params.quantPre = QuantMode_t::QF322F16_PRE;
         fixpipeMm1Params.deqScalar = static_cast<uint64_t>(*reinterpret_cast<const int32_t*>(&constInfo.scaleValue));
         fixpipeMm1Params.dualDstCtl = 0;
         fixpipeMm1Params.params.ndNum = 1;
         fixpipeMm1Params.params.dstNdStride = 512 / sizeof(half);
+
+        if constexpr (PAGE_ATTENTION) {
+            // 满 tile(rows == s2BaseSize)时所有字段与块无关, 预构一次
+            kvNzFullTileParams.blockCount = 2;
+            kvNzFullTileParams.blockLen = s2BaseSize;
+            kvNzFullTileParams.dstStride = s2BaseSize;
+            kvNzFullTileParams.srcStride = constInfo.blockSize - s2BaseSize;
+        }
     }
 
     __aicore__ inline void ComputeMm1(const CubeRunInfo& info)
@@ -337,7 +381,7 @@ public:
         if (!info.prefetched) {
             Mutex::Lock<PIPE_MTE2>(KV_MUTEX_ID_BASE + kvBufId * 2);
             Mutex::Lock<PIPE_MTE2>(KV_MUTEX_ID_BASE + kvBufId * 2 + 1);
-            CopyKGmToL1(info);
+            CopyKvGmToL1(info, keyGm);
             CopyKScaleGmToL1(info);
             Mutex::Unlock<PIPE_MTE2>(KV_MUTEX_ID_BASE + kvBufId * 2);
             Mutex::Unlock<PIPE_MTE2>(KV_MUTEX_ID_BASE + kvBufId * 2 + 1);
@@ -369,7 +413,7 @@ public:
                 }
                 Mutex::Unlock<PIPE_M>(QK_L0C_MUTEX_ID_BASE + qkL0cBufId);
                 Mutex::Lock<PIPE_FIX>(QK_L0C_MUTEX_ID_BASE + qkL0cBufId);
-                FixpipeMm1(info, loop, actS2Size); // 128 * 256
+                FixpipeMm1(info, loop, actS2Size, actS2SizeAlign); // 128 * 256
                 Mutex::Unlock<PIPE_FIX>(QK_L0C_MUTEX_ID_BASE + qkL0cBufId);
                 qkL0cBufId = (qkL0cBufId + 1) % 2;
             }
@@ -379,25 +423,35 @@ public:
 
     __aicore__ inline void ComputeMm2(const CubeRunInfo& info)
     {
-        if (info.actSingleLoopS2SizeAlign != info.actSingleLoopS2SizeAlign64) {
-            Mutex::Lock<PIPE_MTE2>(P_FILL_MUTEX_ID);
-            InitConstValueParams<uint16_t> PL1InitParams(
-                1, static_cast<uint16_t>(info.actSingleLoopS2SizeAlign64 - info.actSingleLoopS2SizeAlign), 0, 0x0000);
-            uint32_t l1P_Base_Offset = (info.loop % 20) * L1_P_SIZE;
-            Fill(pL1Tensor[l1P_Base_Offset + info.actSingleLoopS2SizeAlign * 32].template ReinterpretCast<uint16_t>(),
-                 PL1InitParams);
-            if (likely(info.actMSizeAlign128 == mBaseSize)) {
-                Fill(pL1Tensor[l1P_Base_Offset + 2 * info.actSingleLoopS2SizeAlign * 32 + 32 * 32]
+        if constexpr (!ND) {
+            if (info.actSingleLoopS2SizeAlign != info.actSingleLoopS2SizeAlign64) {
+                Mutex::Lock<PIPE_MTE2>(P_FILL_MUTEX_ID);
+                InitConstValueParams<uint16_t> PL1InitParams(
+                    1, static_cast<uint16_t>(info.actSingleLoopS2SizeAlign64 - info.actSingleLoopS2SizeAlign), 0,
+                    0x0000);
+                uint32_t l1P_Base_Offset = (info.loop % 20) * L1_P_SIZE;
+                Fill(pL1Tensor[l1P_Base_Offset + info.actSingleLoopS2SizeAlign * 32]
                          .template ReinterpretCast<uint16_t>(),
                      PL1InitParams);
+                if (likely(info.actMSizeAlign128 == mBaseSize)) {
+                    Fill(pL1Tensor[l1P_Base_Offset + 2 * info.actSingleLoopS2SizeAlign * 32 + 32 * 32]
+                             .template ReinterpretCast<uint16_t>(),
+                         PL1InitParams);
+                }
+                Mutex::Unlock<PIPE_MTE2>(P_FILL_MUTEX_ID);
             }
-            Mutex::Unlock<PIPE_MTE2>(P_FILL_MUTEX_ID);
         }
         uint32_t vBuf = info.prefetched ? vDataBufId : kvBufId;
         uint32_t vHalfA = KV_MUTEX_ID_BASE + vBuf * 2;
         bool needVFill = (info.actSingleLoopS2Size != info.actSingleLoopS2SizeAlign64);
-        Mutex::Lock<PIPE_MTE2>(vHalfA);
-        Mutex::Lock<PIPE_MTE2>(vHalfA + 1);
+        if (info.prefetched) {
+            if (unlikely(needVFill)) {
+                Mutex::Lock<PIPE_MTE2>(vHalfA + 1); // 预取分支内只有 pad Fill, 无 Fill 时无需加锁
+            }
+        } else {
+            Mutex::Lock<PIPE_MTE2>(vHalfA);
+            Mutex::Lock<PIPE_MTE2>(vHalfA + 1);
+        }
         if (needVFill) {
             InitConstValueParams<uint16_t> kvL1InitParams(
                 1, static_cast<uint16_t>((info.actSingleLoopS2SizeAlign64 - info.actSingleLoopS2Size)), 0, 0x0000);
@@ -406,19 +460,25 @@ public:
             Fill(kvL1Tensor[l1V_Base_Offset + vOffset + constInfo.dSize / 4 * info.actSingleLoopS2Size]
                      .template ReinterpretCast<uint16_t>(),
                  kvL1InitParams);
-            Fill(kvL1Tensor[l1V_Base_Offset + vOffset + constInfo.dSize / 4 * info.actSingleLoopS2Size * 2 +
-                            (info.actSingleLoopS2SizeAlign64 - info.actSingleLoopS2Size) * constInfo.dSize / 4]
+            Fill(kvL1Tensor[l1V_Base_Offset + vOffset + constInfo.dSize / 4 * (2 * s2BaseSize) +
+                            constInfo.dSize / 4 * info.actSingleLoopS2Size]
                      .template ReinterpretCast<uint16_t>(),
                  kvL1InitParams);
         }
 
         if (!info.prefetched) {
-            CopyVGmToL1(info);
+            CopyKvGmToL1(info, valueGm);
             CopyVScaleGmToL1(info);
         }
 
-        Mutex::Unlock<PIPE_MTE2>(vHalfA);
-        Mutex::Unlock<PIPE_MTE2>(vHalfA + 1);
+        if (info.prefetched) {
+            if (unlikely(needVFill)) {
+                Mutex::Unlock<PIPE_MTE2>(vHalfA + 1);
+            }
+        } else {
+            Mutex::Unlock<PIPE_MTE2>(vHalfA);
+            Mutex::Unlock<PIPE_MTE2>(vHalfA + 1);
+        }
         if (!info.prefetched) {
             vDataBufId = kvBufId;
             kvBufId = (kvBufId + 1) % L1_KV_BUFCNT;
@@ -476,66 +536,149 @@ public:
 private:
     __aicore__ inline void InitGmCopyConsts()
     {
-        if constexpr (DIRECT_Q_COPY) {
+        const uint32_t kvHeadNum = kvHeadNumCached; // N_kv
+        {
             uint32_t dByte = headDimInt8; // Q数据D维, DATA_T(uint8_t)元素数
             qNd2NzParams.ndNum = 1;
             qNd2NzParams.dValue = dByte;
-            qNd2NzParams.srcDValue = dByte;
             qNd2NzParams.dstNzNStride = 1;
             qNd2NzParams.srcNdMatrixStride = 0;
             qNd2NzParams.dstNzMatrixStride = 0;
-            qGmStrideS1 = dByte;
-            qGmStrideN2 = static_cast<uint64_t>(constInfo.gSize) * constInfo.s1Size * dByte;
-            qGmStrideB = static_cast<uint64_t>(constInfo.n2Size) * qGmStrideN2;
-
-            uint32_t kvHeadNum = constInfo.n2Size / constInfo.gRealSize;
+            if constexpr (Q_TND) {
+                // (T, N_q, D), token 行距 = N_q * dByte (S1G 时 N_q = n2Size*gSize)
+                qNd2NzParams.srcDValue = static_cast<uint64_t>(constInfo.n2Size) * constInfo.gSize * dByte;
+                qGmStrideS1 = static_cast<uint64_t>(constInfo.n2Size) * constInfo.gSize * dByte;
+                qGmStrideN2 = dByte;
+            } else {
+                qNd2NzParams.srcDValue = dByte;
+                qGmStrideS1 = dByte;
+                qGmStrideN2 = static_cast<uint64_t>(constInfo.gSize) * constInfo.s1Size * dByte;
+                qGmStrideB = static_cast<uint64_t>(constInfo.n2Size) * qGmStrideN2;
+            }
 
             uint32_t dScale = constInfo.dSize / MXFP_GROUP_SIZE; // Q/K scale D维, SCALE_T元素数
             qScaleDn2NzParams.dnNum = 1;
             qScaleDn2NzParams.nValue = dScale / 2;
             qScaleDn2NzParams.srcDnMatrixStride = 0;
-            qScaleDn2NzParams.srcDValue = dScale / 2;
             qScaleDn2NzParams.dstNzC0Stride = dScale / 2;
             qScaleDn2NzParams.dstNzNStride = 1;
             qScaleDn2NzParams.dstNzMatrixStride = dScale / 2;
-            qScaleGmStrideS1 = dScale;
-            qScaleGmStrideN2 = static_cast<uint64_t>(constInfo.gSize) * constInfo.s1Size * dScale;
-            qScaleGmStrideB = static_cast<uint64_t>(constInfo.n2Size) * qScaleGmStrideN2;
+            if constexpr (Q_TND) {
+                // q_descale (T, N_q, D/64, 2), token 行距 = N_q * dScale (S1G 时 N_q = n2Size*gSize)
+                qScaleDn2NzParams.srcDValue = static_cast<uint64_t>(constInfo.n2Size) * constInfo.gSize * dScale / 2;
+                qScaleGmStrideS1 = static_cast<uint64_t>(constInfo.n2Size) * constInfo.gSize * dScale;
+                qScaleGmStrideN2 = dScale;
+            } else {
+                qScaleDn2NzParams.srcDValue = dScale / 2;
+                qScaleGmStrideS1 = dScale;
+                qScaleGmStrideN2 = static_cast<uint64_t>(constInfo.gSize) * constInfo.s1Size * dScale;
+                qScaleGmStrideB = static_cast<uint64_t>(constInfo.n2Size) * qScaleGmStrideN2;
+            }
 
             kScaleDn2NzParams.dnNum = 1;
             kScaleDn2NzParams.nValue = dScale / 2;
             kScaleDn2NzParams.srcDnMatrixStride = 0;
-            kScaleDn2NzParams.srcDValue = dScale / 2;
             kScaleDn2NzParams.dstNzC0Stride = dScale / 2;
             kScaleDn2NzParams.dstNzNStride = 1;
             kScaleDn2NzParams.dstNzMatrixStride = dScale / 2;
-            kScaleGmStrideS2 = dScale;
-            kScaleGmStrideN2 = static_cast<uint64_t>(constInfo.s2Size) * dScale;
-            kScaleGmStrideB = static_cast<uint64_t>(kvHeadNum) * kScaleGmStrideN2;
+            if constexpr (KV_TND) {
+                // k_descale (T, N_kv, D/64, 2), token 行距 = N_kv * dScale
+                kScaleDn2NzParams.srcDValue = static_cast<uint64_t>(kvHeadNum) * dScale / 2;
+                kScaleGmStrideS2 = static_cast<uint64_t>(kvHeadNum) * dScale;
+                kScaleGmStrideN2 = dScale;
+            } else if constexpr (PAGE_ATTENTION) {
+                if (constInfo.paLayoutType == PA_LAYOUT_BNBD) {
+                    // k_descale PA_BNBD: (Bn, N, Bs, D/64, 2), token 行距 = dScale, head 段距 = Bs*dScale
+                    kScaleDn2NzParams.srcDValue = dScale / 2;
+                    kScaleGmStrideS2 = dScale;
+                    kScaleGmStrideN2 = static_cast<uint64_t>(constInfo.blockSize) * dScale;
+                } else if (constInfo.paLayoutType == PA_LAYOUT_BBND) {
+                    // k_descale PA_BBND: (Bn, Bs, N, D/64, 2), token 行距 = N_kv*dScale, head 段距 = dScale
+                    kScaleDn2NzParams.srcDValue = static_cast<uint64_t>(kvHeadNum) * dScale / 2;
+                    kScaleGmStrideS2 = static_cast<uint64_t>(kvHeadNum) * dScale;
+                    kScaleGmStrideN2 = dScale;
+                }
+                // PA_NZ 由 CopyKScaleGmToL1 内直拷, 不初始化 Dn2Nz/stride
+                kScaleGmStrideB =
+                    static_cast<uint64_t>(kvHeadNum) * static_cast<uint64_t>(constInfo.blockSize) * dScale;
+            } else if constexpr (LAYOUT_KV == QFA_LAYOUT::BNSD) {
+                kScaleDn2NzParams.srcDValue = dScale / 2;
+                kScaleGmStrideS2 = dScale;
+                kScaleGmStrideN2 = static_cast<uint64_t>(constInfo.s2Size) * dScale;
+                kScaleGmStrideB = static_cast<uint64_t>(kvHeadNum) * kScaleGmStrideN2;
+            }
 
             uint32_t dScaleV = 2 * constInfo.dSize; // V scale D维(2*MXFP_GROUP_SIZE分形)
             vScaleNd2NzParams.ndNum = 1;
             vScaleNd2NzParams.dValue = dScaleV / 2;
-            vScaleNd2NzParams.srcDValue = dScaleV / 2;
-            vScaleNd2NzParams.dstNzC0Stride = s2BaseSize * 2 / 64;
+            // MTE1 块主序交织读
+            vScaleNd2NzParams.dstNzC0Stride = dScaleV / 32;
             vScaleNd2NzParams.dstNzNStride = 1;
             vScaleNd2NzParams.srcNdMatrixStride = 0;
-            vScaleGmStrideS2 = dScaleV;
-            vScaleGmStrideN2 = static_cast<uint64_t>((constInfo.maxSeqlenKv + 63) / 64) * dScaleV;
-            vScaleGmStrideB = static_cast<uint64_t>(kvHeadNum) * vScaleGmStrideN2;
+            if constexpr (KV_TND) {
+                // v_descale (Tg, N_kv, D, 2), group 行距 = N_kv * dScaleV, Tg = Σceil(len_i/64)
+                vScaleNd2NzParams.srcDValue = static_cast<uint64_t>(kvHeadNum) * dScaleV / 2;
+                vScaleGmStrideN2 = dScaleV;
+                vScaleGmStrideS2 = static_cast<uint64_t>(kvHeadNum) * dScaleV;
+            } else if constexpr (PAGE_ATTENTION) {
+                uint32_t blockGroups = (constInfo.blockSize + 63) / 64;
+                if (constInfo.paLayoutType == PA_LAYOUT_BNBD) {
+                    // v_descale PA_BNBD: (Bn, N, ceil(Bs/64), D, 2), 组行距 = dScaleV, head 段距 = 组数*dScaleV
+                    vScaleNd2NzParams.srcDValue = dScaleV / 2;
+                    vScaleGmStrideS2 = dScaleV;
+                    vScaleGmStrideN2 = static_cast<uint64_t>(blockGroups) * dScaleV;
+                } else if (constInfo.paLayoutType == PA_LAYOUT_BBND) {
+                    // v_descale PA_BBND: (Bn, ceil(Bs/64), N, D, 2), 组行距 = N_kv*dScaleV, head 段距 = dScaleV
+                    vScaleNd2NzParams.srcDValue = static_cast<uint64_t>(kvHeadNum) * dScaleV / 2;
+                    vScaleGmStrideS2 = static_cast<uint64_t>(kvHeadNum) * dScaleV;
+                    vScaleGmStrideN2 = dScaleV;
+                }
+                // PA_NZ 由 CopyVScaleGmToL1 内直拷, 不初始化 Nd2Nz/stride
+                vScaleGmStrideB = static_cast<uint64_t>(kvHeadNum) * static_cast<uint64_t>(blockGroups) * dScaleV;
+            } else if constexpr (LAYOUT_KV == QFA_LAYOUT::BNSD) {
+                vScaleNd2NzParams.srcDValue = dScaleV / 2;
+                vScaleGmStrideN2 = static_cast<uint64_t>((constInfo.maxSeqlenKv + 63) / 64) * dScaleV;
+                vScaleGmStrideB = static_cast<uint64_t>(kvHeadNum) * vScaleGmStrideN2;
+                vScaleGmStrideS2 = dScaleV;
+            }
         }
-        if constexpr (DIRECT_KV_COPY) {
+        {
             uint32_t dByte = headDimInt8;
             kvNd2NzParams.ndNum = 1;
             kvNd2NzParams.dValue = dByte;
-            kvNd2NzParams.srcDValue = dByte;
             kvNd2NzParams.dstNzC0Stride = s2BaseSize * 2;
             kvNd2NzParams.dstNzNStride = 1;
             kvNd2NzParams.srcNdMatrixStride = 0;
             kvNd2NzParams.dstNzMatrixStride = 0;
-            kvGmStrideS2 = dByte;
-            kvGmStrideN2 = static_cast<uint64_t>(constInfo.s2Size) * dByte;
-            kvGmStrideB = static_cast<uint64_t>(constInfo.n2Size / constInfo.gRealSize) * kvGmStrideN2;
+            if constexpr (KV_TND) {
+                // (T, N_kv, D), token 行距 = N_kv * dByte
+                kvNd2NzParams.srcDValue = static_cast<uint64_t>(kvHeadNum) * dByte;
+                kvGmStrideS2 = static_cast<uint64_t>(kvHeadNum) * dByte;
+                kvGmStrideN2 = dByte;
+            } else if constexpr (PAGE_ATTENTION) {
+                if (constInfo.paLayoutType == PA_LAYOUT_BNBD) {
+                    // PA_BNBD: (Bn, N, Bs, D), 块内 token 行距 = dByte, head 段距 = Bs*dByte
+                    kvNd2NzParams.srcDValue = dByte;
+                    kvGmStrideS2 = dByte;
+                    kvGmStrideN2 = static_cast<uint64_t>(constInfo.blockSize) * dByte;
+                } else if (constInfo.paLayoutType == PA_LAYOUT_BBND) {
+                    // PA_BBND: (Bn, Bs, N, D), 块内 token 行距 = N_kv*dByte, head 段距 = dByte
+                    kvNd2NzParams.srcDValue = static_cast<uint64_t>(kvHeadNum) * dByte;
+                    kvGmStrideS2 = static_cast<uint64_t>(kvHeadNum) * dByte;
+                    kvGmStrideN2 = dByte;
+                } else if (constInfo.paLayoutType == PA_LAYOUT_NZ) {
+                    // PA_NZ: (Bn, N, D/32, Bs, 16B), 块内 token 行距 = 16B, d1 平面距 = Bs*16B, head 段距 = Bs*64B
+                    kvNd2NzParams.srcDValue = 16;
+                    kvGmStrideS2 = 16;
+                    kvGmStrideN2 = static_cast<uint64_t>(constInfo.blockSize) * 64;
+                }
+                kvGmStrideB = static_cast<uint64_t>(kvHeadNum) * static_cast<uint64_t>(constInfo.blockSize) * dByte;
+            } else if constexpr (LAYOUT_KV == QFA_LAYOUT::BNSD) {
+                kvNd2NzParams.srcDValue = dByte;
+                kvGmStrideS2 = dByte;
+                kvGmStrideN2 = static_cast<uint64_t>(constInfo.s2Size) * dByte;
+                kvGmStrideB = static_cast<uint64_t>(kvHeadNum) * kvGmStrideN2;
+            }
         }
     }
 
@@ -588,34 +731,233 @@ private:
 
     __aicore__ inline void CopyQGmToL1(const CubeRunInfo& info)
     {
+        if constexpr (Q_TND) {
+            if (unlikely(constInfo.gSize > 1)) {
+                CopyQGmToL1S1G(info);
+                return;
+            }
+        }
         qNd2NzParams.nValue = info.actMSize;
         qNd2NzParams.dstNzC0Stride = info.actMSizeAlign128;
-        uint64_t gmOffset = info.bIdx * qGmStrideB + info.n2Idx * qGmStrideN2 + info.gS1Idx * qGmStrideS1;
+        uint64_t gmOffset;
+        if constexpr (Q_TND) {
+            gmOffset = (qSeqLensTool.cuSeqLensParser.GetTBase(info.bIdx) + info.gS1Idx) * qGmStrideS1 +
+                       info.n2Idx * qGmStrideN2;
+        } else {
+            gmOffset = info.bIdx * qGmStrideB + info.n2Idx * qGmStrideN2 + info.gS1Idx * qGmStrideS1;
+        }
         DataCopy(qL1Tensor, queryGm[gmOffset], qNd2NzParams);
     }
 
-    __aicore__ inline void CopyKGmToL1(const CubeRunInfo& info)
+    // S1G 合轴: 行 r=(t,g) t 主序, 目标 L1 布局与摊平 Nd2Nz 一致 (C0 半平面距 actMSizeAlign128*32B)。
+    // N_kv=1 (MQA): (t,g) 行在 GM 连续, 单次 Nd2Nz 直拷; GQA: 对齐 tile 逐 (半平面, g) NDDMA,
+    // 非对齐 tile (r0%G!=0 或尾组) 拆 首残组/整组/尾残组 三段 NDDMA (段内 GM 行连续)。
+    __aicore__ inline void CopyQGmToL1S1G(const CubeRunInfo& info)
     {
-        uint64_t l1BaseOffset = kvBufId * (L1_KV_SIZE / sizeof(DATA_T));
-        uint64_t gmOffset = info.bIdx * kvGmStrideB + info.kvHeadIdx * kvGmStrideN2 + info.s2Idx * kvGmStrideS2;
-        kvNd2NzParams.nValue = info.pairKVCopyS2Size;
-        DataCopy(kvL1Tensor[l1BaseOffset], keyGm[gmOffset], kvNd2NzParams);
+        uint32_t gSize = constInfo.gSize;
+        uint32_t qHeadNum = constInfo.n2Size * gSize;
+        uint64_t tBase = qSeqLensTool.cuSeqLensParser.GetTBase(info.bIdx);
+        qNd2NzParams.nValue = info.actMSize;
+        qNd2NzParams.dstNzC0Stride = info.actMSizeAlign128;
+        if (constInfo.n2Size == 1) {
+            // (t,g) 行 GM 连续: 行距/基址均按 dByte (非 flat 的 qHeadNum 步长)
+            qNd2NzParams.srcDValue = headDimInt8;
+            uint64_t gmOffset = (tBase * gSize + info.gS1Idx) * headDimInt8;
+            DataCopy(qL1Tensor, queryGm[gmOffset], qNd2NzParams);
+            return;
+        }
+        uint32_t r0 = info.gS1Idx;
+        uint32_t m = info.actMSize;
+        uint32_t t0 = r0 / gSize;
+        uint32_t g0 = r0 % gSize;
+        uint64_t colBase = info.n2Idx * gSize * 64ULL;
+        if (g0 == 0 && m % gSize == 0) { // 对齐 tile: 行 r = t*G + g (t-major, 与 qscale/out/mask 一致)
+            uint32_t tCnt = m / gSize;
+            DataCopyParams nddma;
+            nddma.blockLen = 1; // 32B 半行
+            if (gSize == 1) {   // G=1: 行 GM 等距, 单次 NDDMA
+                nddma.blockCount = tCnt;
+                nddma.srcStride = qHeadNum * 2 - 1; // t 间跳 qHeadNum*64B (32B 块)
+                nddma.dstStride = 0;
+                uint64_t headBase = (tBase + t0) * qHeadNum * 64ULL + colBase;
+                for (uint32_t p = 0; p < 2; p++) { // 0=行低 32B (C0), 1=行高 32B
+                    DataCopy(qL1Tensor[p * info.actMSizeAlign128 * 32], queryGm[headBase + p * 32], nddma);
+                }
+            } else {
+                // G>1: NDDMA dstStride>0 不支持, 按 token 逐段 (段内 g 行 GM 连续)
+                nddma.blockCount = gSize;
+                nddma.srcStride = 1; // token 内相邻 g 行距 64B
+                nddma.dstStride = 0;
+                for (uint32_t t = 0; t < tCnt; t++) {
+                    uint64_t src = (tBase + t0 + t) * qHeadNum * 64ULL + colBase;
+                    for (uint32_t p = 0; p < 2; p++) {
+                        DataCopy(qL1Tensor[p * info.actMSizeAlign128 * 32 + t * gSize * 32], queryGm[src + p * 32],
+                                 nddma);
+                    }
+                }
+            }
+            return;
+        }
+        // 非对齐 tile: 段内 (同 token) GM 行连续, 逐段 NDDMA; dst 行号 = 全局行 - r0
+        uint32_t r1 = r0 + m - 1;
+        uint32_t t1 = r1 / gSize;
+        uint32_t g1 = r1 % gSize;
+        DataCopyParams seg;
+        seg.blockLen = 1;
+        seg.srcStride = 1; // token 内相邻 g 行距 64B
+        seg.dstStride = 0;
+        uint32_t rowsA = (t0 == t1) ? m : (gSize - g0);
+        seg.blockCount = rowsA;
+        uint64_t srcA = (tBase + t0) * qHeadNum * 64ULL + colBase + g0 * 64ULL;
+        for (uint32_t p = 0; p < 2; p++) {
+            DataCopy(qL1Tensor[p * info.actMSizeAlign128 * 32], queryGm[srcA + p * 32], seg);
+        }
+        if (t0 < t1) {
+            uint32_t done = rowsA;
+            uint32_t tCntB = t1 - t0 - 1;
+            if (tCntB > 0) {
+                seg.blockCount = tCntB;
+                seg.srcStride = qHeadNum * 2 - 1;
+                seg.dstStride = gSize - 1; // 同 g 的相邻 token 在 L1 间隔 gSize 行 (t-major)
+                uint64_t srcB = (tBase + t0 + 1) * qHeadNum * 64ULL + colBase;
+                for (uint32_t g = 0; g < gSize; g++) {
+                    for (uint32_t p = 0; p < 2; p++) {
+                        DataCopy(qL1Tensor[p * info.actMSizeAlign128 * 32 + (done + g) * 32],
+                                 queryGm[srcB + g * 64ULL + p * 32], seg);
+                    }
+                }
+                done += tCntB * gSize;
+            }
+            seg.blockCount = m - done; // 尾残组: token t1 的 0..g1
+            seg.srcStride = 1;
+            seg.dstStride = 0;
+            uint64_t srcC = (tBase + t1) * qHeadNum * 64ULL + colBase;
+            for (uint32_t p = 0; p < 2; p++) {
+                DataCopy(qL1Tensor[p * info.actMSizeAlign128 * 32 + done * 32], queryGm[srcC + p * 32], seg);
+            }
+        }
     }
 
-    __aicore__ inline void CopyVGmToL1(const CubeRunInfo& info)
+    // PA: 查 blockTable 得物理块号, 拼块内偏移 (head 段 + token 段)
+    __aicore__ inline uint64_t GetKvBlockBase(const CubeRunInfo& info, uint32_t s2Idx, uint64_t blockBytes,
+                                              uint64_t strideN2, uint64_t strideS2)
+    {
+        uint32_t blockIdxInBatch = s2Idx >> paBlockShift;
+        uint32_t bsIdx = s2Idx & paBlockMask;
+        uint64_t blockIdx =
+            static_cast<uint64_t>(blockTableGm.GetValue(info.bIdx * constInfo.maxBlockNumPerBatch + blockIdxInBatch));
+        return blockIdx * blockBytes + info.kvHeadIdx * strideN2 + bsIdx * strideS2;
+    }
+
+    // PA_NZ: 物理块基址 (块字节容量 = kvHeadNum * Bs * 64B)
+    __aicore__ inline uint64_t GetNzBlockBase(const CubeRunInfo& info, uint32_t s2Idx, uint64_t headBytes,
+                                              uint64_t kvHeadNum)
+    {
+        uint32_t blockIdxInBatch = s2Idx >> paBlockShift;
+        uint64_t blockIdx =
+            static_cast<uint64_t>(blockTableGm.GetValue(info.bIdx * constInfo.maxBlockNumPerBatch + blockIdxInBatch));
+        return blockIdx * headBytes * kvHeadNum + info.kvHeadIdx * headBytes + (s2Idx & paBlockMask) * 32;
+    }
+
+    // PA_NZ K/V 数据: 块内 (D/64=2, Bs, 64 逻辑元素=32B), d0=32B 整块。
+    // 分块 NDDMA: blockCount=2 (d1 段), blockLen=copyRowCnt 块(32B), srcStride=Bs-copyRowCnt (段间跳 d1 平面),
+    // dstStride=rowCount-copyRowCnt → L1 = token 行主序 64B(2C0), 行内 C0 按 d1 排列。
+    __aicore__ inline void CopyKvNzGmToL1(const CubeRunInfo& info, const GlobalTensor<DATA_T>& gmTensor,
+                                          uint64_t l1BaseOffset)
+    {
+        uint32_t kvHeadNum = kvHeadNumCached; // N_kv
+        uint64_t headBytes = static_cast<uint64_t>(constInfo.blockSize) * 64;
+        uint32_t copied = 0;
+        uint32_t curS2 = info.s2Idx;
+        while (copied < info.pairKVCopyS2Size) {
+            uint32_t rows = constInfo.blockSize - (curS2 & paBlockMask);
+            if (copied + rows > info.pairKVCopyS2Size) {
+                rows = info.pairKVCopyS2Size - copied;
+            }
+            uint64_t base = GetNzBlockBase(info, curS2, headBytes, kvHeadNum);
+            if (likely(rows == static_cast<uint32_t>(s2BaseSize))) {
+                DataCopy(kvL1Tensor[l1BaseOffset + copied * 32], gmTensor[base], kvNzFullTileParams);
+            } else {
+                DataCopyParams intriParams;
+                intriParams.blockCount = 2;                         // d1 段数 (D/64)
+                intriParams.blockLen = rows;                        // 每段 rows 个 32B 块 (每 token 一块)
+                intriParams.dstStride = s2BaseSize * 2 - rows;      // L1 半平面距 (块)
+                intriParams.srcStride = constInfo.blockSize - rows; // GM 段间跳 d1 平面
+                DataCopy(kvL1Tensor[l1BaseOffset + copied * 32], gmTensor[base], intriParams);
+            }
+            copied += rows;
+            curS2 += rows;
+        }
+    }
+
+    // K/V 共用: PA 时按 block 边界分块查表, 非 PA 时按 TND/BNSD 整块 ND2NZ
+    __aicore__ inline void CopyKvGmToL1(const CubeRunInfo& info, const GlobalTensor<DATA_T>& kvGm)
     {
         uint64_t l1BaseOffset = kvBufId * (L1_KV_SIZE / sizeof(DATA_T));
-        uint64_t gmOffset = info.bIdx * kvGmStrideB + info.kvHeadIdx * kvGmStrideN2 + info.s2Idx * kvGmStrideS2;
         kvNd2NzParams.nValue = info.pairKVCopyS2Size;
-        DataCopy(kvL1Tensor[l1BaseOffset], valueGm[gmOffset], kvNd2NzParams);
+        if constexpr (PAGE_ATTENTION) {
+            if (constInfo.paLayoutType == PA_LAYOUT_NZ) {
+                CopyKvNzGmToL1(info, kvGm, l1BaseOffset);
+                return;
+            }
+            // 按 block 边界分块 ND2NZ, 每块查一次表; L1 行偏移 = copied*32 (每 token 行 64B=2*C0)
+            uint32_t copied = 0;
+            uint32_t curS2 = info.s2Idx;
+            while (copied < info.pairKVCopyS2Size) {
+                uint32_t rows = constInfo.blockSize - (curS2 & paBlockMask);
+                if (copied + rows > info.pairKVCopyS2Size) {
+                    rows = info.pairKVCopyS2Size - copied;
+                }
+                Nd2NzParams chunkParams = kvNd2NzParams; // 局部参数, 防跨异步指令重排
+                chunkParams.nValue = rows;
+                uint64_t gmOffset = GetKvBlockBase(info, curS2, kvGmStrideB, kvGmStrideN2, kvGmStrideS2);
+                DataCopy(kvL1Tensor[l1BaseOffset + copied * 32], kvGm[gmOffset], chunkParams);
+                copied += rows;
+                curS2 += rows;
+            }
+            return;
+        }
+        uint64_t gmOffset;
+        if constexpr (KV_TND) {
+            gmOffset = (kvSeqLensTool.cuSeqLensParser.GetTBase(info.bIdx) + info.s2Idx) * kvGmStrideS2 +
+                       info.kvHeadIdx * kvGmStrideN2;
+        } else if constexpr (LAYOUT_KV == QFA_LAYOUT::BNSD) {
+            gmOffset = info.bIdx * kvGmStrideB + info.kvHeadIdx * kvGmStrideN2 + info.s2Idx * kvGmStrideS2;
+        }
+        DataCopy(kvL1Tensor[l1BaseOffset], kvGm[gmOffset], kvNd2NzParams);
     }
 
     // copy query scale with full s1g
     __aicore__ inline void CopyQScaleGmToL1(const CubeRunInfo& info)
     {
+        if constexpr (Q_TND) { // TND 统一 N2TGD (G=1 含内): fixed n2 的 (t,g) 行 GM 连续, 单次 Dn2Nz
+            CopyQScaleGmToL1S1G(info);
+            return;
+        }
         qScaleDn2NzParams.dValue = info.actMSize;
         uint64_t gmOffset =
             info.bIdx * qScaleGmStrideB + info.n2Idx * qScaleGmStrideN2 + info.gS1Idx * qScaleGmStrideS1;
+        GlobalTensor<bfloat16_t> gmTensorCast;
+        gmTensorCast.SetGlobalBuffer((__gm__ bfloat16_t*)(queryScaleGm[gmOffset].GetPhyAddr()));
+        DataCopy(qDescaleL1Tensor.template ReinterpretCast<bfloat16_t>(), gmTensorCast, qScaleDn2NzParams);
+    }
+
+    // S1G qscale: layout_q_descale=N2TGD (N2,T,G,4B) — fixed n2 的 (t,g) 行 GM 连续 (4B/行)。
+    // L1 布局: nValue=2, dstNzC0Stride=dScaleHalf, dstNzNStride=1
+    __aicore__ inline void CopyQScaleGmToL1S1G(const CubeRunInfo& info)
+    {
+        uint32_t dScaleHalf = constInfo.dSize / MXFP_GROUP_SIZE / 2; // bf16 视图列单位 (2B)
+        qScaleDn2NzParams.dnNum = 1;
+        qScaleDn2NzParams.nValue = dScaleHalf;
+        qScaleDn2NzParams.dValue = info.actMSize;
+        qScaleDn2NzParams.srcDValue = dScaleHalf;
+        qScaleDn2NzParams.srcDnMatrixStride = 0;
+        qScaleDn2NzParams.dstNzC0Stride = dScaleHalf;
+        qScaleDn2NzParams.dstNzNStride = 1;
+        qScaleDn2NzParams.dstNzMatrixStride = 0;
+        uint64_t gmOffset = (static_cast<uint64_t>(constInfo.t1Size) * constInfo.gSize * info.n2Idx +
+                             qSeqLensTool.cuSeqLensParser.GetTBase(info.bIdx) * constInfo.gSize + info.gS1Idx) *
+                            qScaleGmStrideN2;
         GlobalTensor<bfloat16_t> gmTensorCast;
         gmTensorCast.SetGlobalBuffer((__gm__ bfloat16_t*)(queryScaleGm[gmOffset].GetPhyAddr()));
         DataCopy(qDescaleL1Tensor.template ReinterpretCast<bfloat16_t>(), gmTensorCast, qScaleDn2NzParams);
@@ -626,11 +968,72 @@ private:
     {
         uint32_t offset = kvBufId * (L1_KV_DESCALE_SIZE / sizeof(SCALE_T));
         kScaleDn2NzParams.dValue = info.pairKVCopyS2Size;
-        uint64_t gmOffset =
-            info.bIdx * kScaleGmStrideB + info.kvHeadIdx * kScaleGmStrideN2 + info.s2Idx * kScaleGmStrideS2;
+        if constexpr (PAGE_ATTENTION) {
+            if (constInfo.paLayoutType == PA_LAYOUT_NZ) {
+                // PA_NZ k_descale: (Bn, N, Bs/16, 2, 16, 2); 源 cell (t16, d3) 32B 连续, t16 主序与
+                // 消费端 MTE1 MX (xStep=tokens/16, srcStride=2 块) 一致 → 每 chunk 连续 slab 直拷
+                uint32_t copied = 0;
+                uint32_t curS2 = info.s2Idx;
+                uint32_t kvHeadNum = kvHeadNumCached; // N_kv
+                uint64_t headBytes = static_cast<uint64_t>(constInfo.blockSize) * 4;
+                while (copied < info.pairKVCopyS2Size) {
+                    uint32_t rows = constInfo.blockSize - (curS2 & paBlockMask);
+                    if (copied + rows > info.pairKVCopyS2Size) {
+                        rows = info.pairKVCopyS2Size - copied;
+                    }
+                    uint32_t blockIdxInBatch = curS2 >> paBlockShift;
+                    uint64_t blockIdx = static_cast<uint64_t>(
+                        blockTableGm.GetValue(info.bIdx * constInfo.maxBlockNumPerBatch + blockIdxInBatch));
+                    uint64_t src = blockIdx * headBytes * kvHeadNum + info.kvHeadIdx * headBytes +
+                                   ((curS2 & paBlockMask) >> 4) * 64;
+                    // 消费端以 16-token cell 为单位读 k_descale: 末块不足 16 行也要整 cell 拷入,
+                    // 否则尾部 token 读到上一轮残留 scale.
+                    uint32_t cellRows = ((rows + 15U) / 16U) * 16U;
+                    uint32_t curInBlock = curS2 & paBlockMask;
+                    uint32_t availInBlock = constInfo.blockSize - (curInBlock & ~15U);
+                    if (cellRows > availInBlock) {
+                        cellRows = availInBlock;
+                    }
+                    DataCopy(kvDescaleL1Tensor[offset + copied / 16 * 64], keyScaleGm[src], cellRows / 16 * 64);
+                    copied += rows;
+                    curS2 += rows;
+                }
+                return;
+            }
+            uint32_t copied = 0;
+            uint32_t curS2 = info.s2Idx;
+            while (copied < info.pairKVCopyS2Size) {
+                uint32_t rows = constInfo.blockSize - (curS2 & paBlockMask);
+                if (copied + rows > info.pairKVCopyS2Size) {
+                    rows = info.pairKVCopyS2Size - copied;
+                }
+                Dn2NzParams chunkParams = kScaleDn2NzParams; // 局部参数, 防跨异步指令重排
+                chunkParams.dValue = rows;
+                uint64_t gmOffset = GetKvBlockBase(info, curS2, kScaleGmStrideB, kScaleGmStrideN2, kScaleGmStrideS2);
+                GlobalTensor<bfloat16_t> gmTensorCast;
+                gmTensorCast.SetGlobalBuffer((__gm__ bfloat16_t*)(keyScaleGm[gmOffset].GetPhyAddr()));
+                DataCopy(kvDescaleL1Tensor[offset + copied * 4].template ReinterpretCast<bfloat16_t>(), gmTensorCast,
+                         chunkParams);
+                copied += rows;
+                curS2 += rows;
+            }
+            return;
+        }
+        uint64_t gmOffset = 0; // 未支持组合兜底
+        if constexpr (KV_TND) {
+            gmOffset = (kvSeqLensTool.cuSeqLensParser.GetTBase(info.bIdx) + info.s2Idx) * kScaleGmStrideS2 +
+                       info.kvHeadIdx * kScaleGmStrideN2;
+        } else if constexpr (LAYOUT_KV == QFA_LAYOUT::BNSD) {
+            gmOffset = info.bIdx * kScaleGmStrideB + info.kvHeadIdx * kScaleGmStrideN2 + info.s2Idx * kScaleGmStrideS2;
+        }
         GlobalTensor<bfloat16_t> gmTensorCast;
         gmTensorCast.SetGlobalBuffer((__gm__ bfloat16_t*)(keyScaleGm[gmOffset].GetPhyAddr()));
         DataCopy(kvDescaleL1Tensor[offset].template ReinterpretCast<bfloat16_t>(), gmTensorCast, kScaleDn2NzParams);
+    }
+
+    __aicore__ inline static uint32_t NdAlignM(uint32_t actM)
+    {
+        return AttentionCommon::Align(actM, 16U);
     }
 
     __aicore__ inline void LoadQToL0(const CubeRunInfo& info)
@@ -653,10 +1056,19 @@ private:
         loadData2DMxParamsA.dstStride = loadData2DMxParamsA.yStep;
 
         uint32_t qkL0Offset = qkL0abBufId * (QK_L0B_SIZE / sizeof(DATA_T));
-        uint32_t qL1Offset = 0;
-        uint32_t qScaleL1Offset = 0;
-        LoadData(qkL0BTensor[qkL0Offset].ReinterpretCast<QUANT_T>(), qL1Tensor[qL1Offset].ReinterpretCast<QUANT_T>(),
-                 qDescaleL1Tensor[qScaleL1Offset], loadData2DParamsA, loadData2DMxParamsA);
+        if constexpr (ND) {
+            // ND: Q 作 A 操作数 (m=M, k=D); L1 平面行距固定 actMSizeAlign128
+            uint32_t ndM = NdAlignM(info.actMSize);
+            loadData2DParamsA.mStep = ndM / 16;
+            loadData2DParamsA.srcStride = info.actMSizeAlign128 / 16;
+            loadData2DParamsA.dstStride = ndM / 16;
+            loadData2DMxParamsA.xStep = ndM / 16;
+            LoadData(qkL0ATensor[qkL0Offset].ReinterpretCast<QUANT_T>(), qL1Tensor.ReinterpretCast<QUANT_T>(),
+                     qDescaleL1Tensor, loadData2DParamsA, loadData2DMxParamsA);
+            return;
+        }
+        LoadData(qkL0BTensor[qkL0Offset].ReinterpretCast<QUANT_T>(), qL1Tensor.ReinterpretCast<QUANT_T>(),
+                 qDescaleL1Tensor, loadData2DParamsA, loadData2DMxParamsA);
     }
 
     __aicore__ inline void LoadKToL0(const CubeRunInfo& info, uint32_t subLoop, uint32_t actS2SizeAlign)
@@ -673,14 +1085,26 @@ private:
         uint32_t kL1Offset = kDataBufId * (L1_KV_SIZE / sizeof(DATA_T));
 
         uint32_t kScaleL1Offset = kDataBufId * (L1_KV_DESCALE_SIZE / sizeof(SCALE_T));
+        if constexpr (ND) {
+            // ND: K 作 B 操作数 (k=D, n=s2), L1 分形与 DN 的 A 操作数一致
+            LoadData(qkL0BTensor[qkL0Offset].ReinterpretCast<QUANT_T>(),
+                     kvL1Tensor[kL1Offset].ReinterpretCast<QUANT_T>(), kvDescaleL1Tensor[kScaleL1Offset], loadKParamsA,
+                     loadKParamsMx);
+            return;
+        }
         LoadData(qkL0ATensor[qkL0Offset].ReinterpretCast<QUANT_T>(), kvL1Tensor[kL1Offset].ReinterpretCast<QUANT_T>(),
                  kvDescaleL1Tensor[kScaleL1Offset], loadKParamsA, loadKParamsMx);
     }
 
     __aicore__ inline void MatmulQK(const CubeRunInfo& info, uint32_t actS2Size)
     {
-        mmadQKParams.m = actS2Size;
-        mmadQKParams.n = info.actMSizeAlign128;
+        if constexpr (ND) {
+            mmadQKParams.m = NdAlignM(info.actMSize);
+            mmadQKParams.n = actS2Size;
+        } else {
+            mmadQKParams.m = actS2Size;
+            mmadQKParams.n = info.actMSizeAlign128;
+        }
         uint32_t qkL0AOffset = qkL0abBufId * (QK_L0A_SIZE / sizeof(DATA_T));
         uint32_t qkL0BOffset = qkL0abBufId * (QK_L0B_SIZE / sizeof(DATA_T));
         uint32_t qkL0COffset = qkL0cBufId * (QK_L0C_SIZE / sizeof(COMPUTE_T));
@@ -688,15 +1112,29 @@ private:
              qkL0BTensor[qkL0BOffset].ReinterpretCast<QUANT_T>(), mmadQKParams);
     }
 
-    __aicore__ inline void FixpipeMm1(const CubeRunInfo& info, uint32_t subLoop, uint32_t actS2Size)
+    __aicore__ inline void FixpipeMm1(const CubeRunInfo& info, uint32_t subLoop, uint32_t actS2Size,
+                                      uint32_t actS2SizeAlign)
     {
+        uint32_t qkL0COffset = qkL0cBufId * (QK_L0C_SIZE / sizeof(COMPUTE_T));
+        if constexpr (ND) {
+            // ND: L0C 为 [m=M][n=s2], 行主序写 [actM 行][s2] 到 UB, 块 = 32KB (行距 128 half)
+            fixpipeMm1Params.nSize = static_cast<uint16_t>(actS2SizeAlign);
+            fixpipeMm1Params.mSize = static_cast<uint16_t>(info.actMSize);
+            fixpipeMm1Params.srcStride = static_cast<uint16_t>(NdAlignM(info.actMSize));
+            fixpipeMm1Params.dstStride = QK_L0_S2_SPLIT_SIZE;
+            fixpipeMm1Params.subBlockId = info.loop % 2;
+            fixpipeMm1Params.params.srcNdStride = static_cast<uint16_t>((actS2Size + 1) >> 1 << 1);
+            fixpipeMm1Params.params.dstNdStride = QK_L0_S2_SPLIT_SIZE;
+            uint32_t ubOffset = ((info.loop / 2 % 2) * 2 + subLoop) * QK_L0_S2_SPLIT_SIZE * ND_M_ROWS;
+            Fixpipe<half, COMPUTE_T, CFG_ROW_MAJOR_UB>(mm1ResUB[ubOffset], qkL0CTensor[qkL0COffset], fixpipeMm1Params);
+            return;
+        }
         fixpipeMm1Params.nSize = (info.actMSizeAlign128 + 7) >> 3 << 3;
         fixpipeMm1Params.mSize = (actS2Size + 1) >> 1 << 1;
         fixpipeMm1Params.srcStride = ((actS2Size + 15) / 16) * 16;
         fixpipeMm1Params.subBlockId = info.loop % 2;
         fixpipeMm1Params.params.srcNdStride = (actS2Size + 1) >> 1 << 1;
 
-        uint32_t qkL0COffset = qkL0cBufId * (QK_L0C_SIZE / sizeof(COMPUTE_T));
         uint32_t ubOffset = subLoop * QK_L0_S2_SPLIT_SIZE * 256;
         Fixpipe<half, COMPUTE_T, CFG_ROW_MAJOR_UB>(mm1ResUB[info.loop / 2 % 2 * 128 + ubOffset],
                                                    qkL0CTensor[qkL0COffset], fixpipeMm1Params);
@@ -706,9 +1144,80 @@ private:
     {
         uint32_t offset = kvBufId * (L1_KV_DESCALE_SIZE / sizeof(SCALE_T));
         vScaleNd2NzParams.nValue = (info.pairKVCopyS2Size + 63) / 64;
-        vScaleNd2NzParams.dstNzMatrixStride = vScaleNd2NzParams.nValue;
-        uint64_t gmOffset =
-            info.bIdx * vScaleGmStrideB + info.kvHeadIdx * vScaleGmStrideN2 + (info.s2Idx / 64) * vScaleGmStrideS2;
+        if constexpr (PAGE_ATTENTION) {
+            if (constInfo.paLayoutType == PA_LAYOUT_NZ) {
+                // PA_NZ v_descale: (Bn, N, D/16, Bs/64, 16, 2); 源 (d3, tg) 均为 32B 连续块,
+                // L1 目标为 (tg + 8*d3) 个 C0 → 一次 blockCount=8 的搬运覆盖全部 d3 平面
+                uint32_t groupCnt = (info.pairKVCopyS2Size + 63) / 64;
+                uint32_t copied = 0;
+                uint32_t curS2 = info.s2Idx;
+                uint64_t headBytes = static_cast<uint64_t>(constInfo.blockSize) * 4;
+                uint32_t tgPerBlock = 1U << (paBlockShift - 6); // blockSize / 64
+                while (copied < groupCnt) {
+                    uint32_t gRows = tgPerBlock - ((curS2 >> 6) & (tgPerBlock - 1));
+                    if (copied + gRows > groupCnt) {
+                        gRows = groupCnt - copied;
+                    }
+                    uint32_t blockIdxInBatch = curS2 >> paBlockShift;
+                    uint64_t blockIdx = static_cast<uint64_t>(
+                        blockTableGm.GetValue(info.bIdx * constInfo.maxBlockNumPerBatch + blockIdxInBatch));
+                    uint64_t blockBase = blockIdx * headBytes * kvHeadNumCached + info.kvHeadIdx * headBytes;
+                    uint32_t bsIdx = (curS2 & paBlockMask) >> 6;
+                    DataCopyParams vScaleParams;
+                    vScaleParams.blockCount = 8;                 // d3 = D/16 平面数, 每平面 tg 组 32B
+                    vScaleParams.blockLen = gRows;               // 每平面本 chunk 的组数
+                    vScaleParams.srcStride = tgPerBlock - gRows; // 源平面间距 (组)
+                    vScaleParams.dstStride = 8 - gRows;          // L1 相邻 d3 平面间隔 8 个 C0
+                    DataCopy(kvDescaleL1Tensor[offset + copied * 32], valueScaleGm[blockBase + bsIdx * 32],
+                             vScaleParams);
+                    copied += gRows;
+                    curS2 += gRows * 64;
+                }
+                return;
+            }
+            // v_descale 行 = 64-token 组(组不跨块), 每组占 L1 2D 字节
+            uint32_t groupCnt = (info.pairKVCopyS2Size + 63) / 64;
+            uint32_t copied = 0;
+            uint32_t curS2 = info.s2Idx;
+            while (copied < groupCnt) {
+                uint32_t groupsPerBlock = 1U << (paBlockShift - 6); // blockSize / 64
+                uint32_t gRows = groupsPerBlock - ((curS2 >> 6) & (groupsPerBlock - 1));
+                if (copied + gRows > groupCnt) {
+                    gRows = groupCnt - copied;
+                }
+                Nd2NzParams chunkParams = vScaleNd2NzParams; // 局部参数, 防跨异步指令重排
+                chunkParams.nValue = gRows;
+                uint32_t blockIdxInBatch = curS2 >> paBlockShift;
+                uint32_t bsIdx = (curS2 & paBlockMask) >> 6;
+                uint64_t blockIdx = static_cast<uint64_t>(
+                    blockTableGm.GetValue(info.bIdx * constInfo.maxBlockNumPerBatch + blockIdxInBatch));
+                uint64_t gmOffset =
+                    blockIdx * vScaleGmStrideB + info.kvHeadIdx * vScaleGmStrideN2 + bsIdx * vScaleGmStrideS2;
+                GlobalTensor<bfloat16_t> gmTensorCast;
+                gmTensorCast.SetGlobalBuffer((__gm__ bfloat16_t*)(valueScaleGm[gmOffset].GetPhyAddr()));
+                DataCopy(kvDescaleL1Tensor[offset + copied * 32].template ReinterpretCast<bfloat16_t>(), gmTensorCast,
+                         chunkParams);
+                copied += gRows;
+                curS2 += gRows * 64;
+            }
+            return;
+        }
+        uint64_t gmOffset = 0; // 未支持组合兜底
+        if constexpr (KV_TND) {
+            // v_descale 按各自长度拼接: 起点 = Σ_{i<b} ceil(len_i/64),
+            // len_i 取 cu 差分(物理打包长度), 与 descale 分配口径一致.
+            uint64_t vScaleTBase = 0;
+            for (uint32_t i = 0; i < info.bIdx; i++) {
+                // 物理打包长度(cu 差分), 与 v_descale 分配口径一致
+                uint64_t lenI =
+                    kvSeqLensTool.cuSeqLensParser.GetTBase(i + 1) - kvSeqLensTool.cuSeqLensParser.GetTBase(i);
+                vScaleTBase += (lenI + 63) >> 6;
+            }
+            gmOffset = (vScaleTBase + info.s2Idx / 64) * vScaleGmStrideS2 + info.kvHeadIdx * vScaleGmStrideN2;
+        } else if constexpr (LAYOUT_KV == QFA_LAYOUT::BNSD) {
+            gmOffset =
+                info.bIdx * vScaleGmStrideB + info.kvHeadIdx * vScaleGmStrideN2 + (info.s2Idx / 64) * vScaleGmStrideS2;
+        }
         GlobalTensor<bfloat16_t> gmTensorCast;
         gmTensorCast.SetGlobalBuffer((__gm__ bfloat16_t*)(valueScaleGm[gmOffset].GetPhyAddr()));
         DataCopy(kvDescaleL1Tensor[offset].template ReinterpretCast<bfloat16_t>(), gmTensorCast, vScaleNd2NzParams);
@@ -734,6 +1243,17 @@ private:
         load2DMxParamsB.yStep = (info.actSingleLoopS2SizeAlign64 + 63) / 64;
         load2DMxParamsB.srcStride = 5;
         load2DMxParamsB.dstStride = load2DMxParamsB.yStep;
+
+        if constexpr (ND) {
+            // ND: P 在 L1 为 [s2/64 平面][M 行][32B], 与 Q 同构直接作 B 操作数 (k=s2, n=M)
+            // 源: P 槽只装真实 M 行(1 个 16 行步), 平面间隔 512B;
+            // 目的: L0B 仍按 128 列分形排布, dstStride 必须保持 128/16=8, 不能跟着源侧一起缩
+            loadData2DParamsB.mStep = (info.actMSize + 15U) / 16U;
+            loadData2DParamsB.kStep = (info.actSingleLoopS2SizeAlign64 + 63) / 64;
+            loadData2DParamsB.srcStride = loadData2DParamsB.mStep;
+            loadData2DParamsB.dstStride = info.actMSizeAlign128 / 16;
+            loadData2DParamsB.ifTranspose = false;
+        }
 
         uint32_t pvL0BOffset = pvL0abBufId * (PV_L0B_SIZE / sizeof(DATA_T));
         uint32_t pL1Offset = (info.loop % 20) * (L1_P_SIZE / sizeof(DATA_T));
@@ -796,7 +1316,9 @@ private:
         fixpipeParams.srcStride = constInfo.dSize + 16;
         fixpipeParams.dstStride = 64; // mmResUb上两行之间的间隔，单位：element
         fixpipeParams.quantPre = QuantMode_t::NoQuant;
-        fixpipeParams.dualDstCtl = 2; // 双目标模式，按N维度拆分
+        // n=128 时按 N 劈 64+64 给两个 AIV; ND 的 n 收到 16 后无列可劈, 用单目标并显式指定目标 subblock
+        fixpipeParams.dualDstCtl = 2; // N 维按 64+64 拆给两个 AIV
+        fixpipeParams.subBlockId = 0;
 
         uint32_t pvL0COffset = pvL0cBufId * (QK_L0C_SIZE / sizeof(COMPUTE_T));
         Fixpipe<COMPUTE_T, COMPUTE_T, CFG_ROW_MAJOR_UB>(mm2ResUB, pvL0CTensor[pvL0COffset], fixpipeParams);

@@ -19,6 +19,7 @@
 #define QUANT_FLASH_ATTN_BLOCK_VECTOR_DN_H_
 
 #include "vf/vf_softmax_dn_cast_nz_mxfp4_qs128_kvs256.h"
+#include "vf/vf_softmax_nd_cast_nz_mxfp4.h"
 #include "vf/vf_softmax_dn_cast_nz_mxfp4_align_qs128_kvs32.h"
 #include "vf/vf_softmax_dn_cast_nz_mxfp4_align_qs128_kvs32_multi.h"
 #include "vf/vf_nd2nz_indexes_dn_mxfp4.h"
@@ -30,6 +31,7 @@
 
 #include "quant_flash_attn_template_tiling_key.h"
 #include "quant_flash_attn_common_def.h"
+#include "quant_flash_attn_block_vec_fd_dn.h"
 #include "../../common/op_kernel/memcopy/fa_gm_tensor.h"
 #include "../../common/op_kernel/memcopy/fa_ub_tensor.h"
 #include "../../common/op_kernel/memcopy/copy_ub_to_gm.h"
@@ -60,14 +62,14 @@ __aicore__ inline constexpr UbFormat GetOutUbFormat()
     static_assert(
         (LAYOUT_OUT == QFA_LAYOUT::BNSD) || (LAYOUT_OUT == QFA_LAYOUT::BSND) || (LAYOUT_OUT == QFA_LAYOUT::TND),
         "Get OutAttention UB GmFormat fail, LAYOUT is incorrect");
-    if constexpr (LAYOUT_OUT == QFA_LAYOUT::BSND || LAYOUT_OUT == QFA_LAYOUT::TND) {
-        return UbFormat::S1G;
-    } else if constexpr (LAYOUT_OUT == QFA_LAYOUT::BNSD) {
-        return UbFormat::GS1;
+    if constexpr (LAYOUT_OUT == QFA_LAYOUT::TND) {
+        return UbFormat::S1G; // TND: M 行 t-major (r=t*G+g), 写出走 S1G 分支
+    } else {
+        return UbFormat::GS1; // BSND/BNSD 摊平: 行序 GS1
     }
 }
 
-template <typename QFAT>
+template <typename QFAT, const bool ND = false>
 class QuantFlashAttnBlockVectorDn {
 public:
     /* =================编译期常量的基本块信息================= */
@@ -105,21 +107,50 @@ private:
     static constexpr uint32_t ve1ResOffset = 256;
 
     // =================================UB Buffer=================================
-    static constexpr uint32_t UB_S_SIZE = 128 * 256;
-    static constexpr uint32_t UB_PV_SIZE = 128 * 64;
+    // ND: M 维实际恒 <= ND_M_ROWS(与 host 端 ND_MAX_M_ROWS 一致), 全部按 M 行开, 不再按 128
+    static constexpr uint32_t ND_M_ROWS = 64U;
+    static constexpr uint32_t UB_S_SIZE = ((ND ? ND_M_ROWS : 128U) * 256U);
+    static constexpr uint32_t UB_PV_SIZE = 128U * 64U;
     static constexpr uint32_t UB_PSCALE_SIZE = 32 * 5 * 8;
-    static constexpr uint32_t UB_ROWSUM_SIZE = 64;
-    static constexpr uint32_t UB_P_SIZE = 64 * 256;
-    static constexpr uint32_t UB_ATTENTIONOUT_SIZE = 128 * 64;
+    static constexpr uint32_t UB_ROWSUM_SIZE = 64U;
+    static constexpr uint32_t UB_P_SIZE = ND ? ((ND_M_ROWS * 256U) > 8192U ? (ND_M_ROWS * 256U) : 8192U) : (64U * 256U);
+    static constexpr uint32_t UB_ATTENTIONOUT_SIZE = 128U * 64U;
     static constexpr uint32_t UB_ATTENTIONTRANS_SIZE = 128 * 64 * 9 / 8;
-    static constexpr uint32_t UB_MAX_SIZE = 128;
-    static constexpr uint32_t UB_LOCALGROUPMAX_SIZE = 128 * 4;
-    static constexpr uint32_t UB_UPDATE_SIZE = 64;
-    static constexpr uint32_t UB_INDEX_SIZE = 256;
+    static constexpr uint32_t UB_MAX_SIZE = 128U;
+    static constexpr uint32_t UB_LOCALGROUPMAX_SIZE = 128U * 4U;
+    static constexpr uint32_t UB_UPDATE_SIZE = 64U;
+    static constexpr uint32_t UB_INDEX_SIZE = (ND ? 3328U : 256U);
+    static constexpr uint32_t ND_MAX_STAGE_SIZE = 128U * 4U;      // [M][4] 组标量暂存
+    static constexpr uint32_t ND_P_CHUNK_BYTES = ND_M_ROWS * 64U; // 须与 cube 侧 P 读取(actMAlign=128)口径一致
+    static constexpr uint32_t ND_P_PLANE_BYTES = ND_M_ROWS * 32U; // 单平面 = 128 M 行 x 32B
+    static constexpr uint32_t ND_S_CHUNK_SIZE = ND_M_ROWS * 128U; // 每 128 个 s2 的 S, 单位 half
+    static constexpr uint32_t QK_S2_SPLIT_ND = 128;               // ND 下 cube 每个 s2 分片
 
     static constexpr uint32_t UB_S_BUFCNT = 2;
     static constexpr uint32_t UB_PV_BUFCNT = 1;
     static constexpr uint32_t UB_PSCALE_BUFCNT = 8;
+
+public:
+    // UB 地址(本 block 的布局; cube 需要的地址在 cube block 里另有一份)
+    static constexpr uint32_t UB_S_BYTES = UB_S_SIZE * UB_S_BUFCNT * 2U;
+    static constexpr uint32_t UB_P_BYTES = UB_P_SIZE * 2U;
+    static constexpr uint32_t UB_PV_BYTES = UB_PV_SIZE * UB_PV_BUFCNT * 4U;
+    static constexpr uint32_t UB_ROWSUM_BYTES = UB_ROWSUM_SIZE * 4U;
+    static constexpr uint32_t UB_ATTENTIONOUT_BYTES = UB_ATTENTIONOUT_SIZE * 4U;
+    static constexpr uint32_t UB_ATTENTIONOUT_OFFSET = UB_S_BYTES + UB_PV_BYTES + 2U * UB_ROWSUM_BYTES + UB_P_BYTES;
+    static constexpr uint32_t UB_PEER_GMAX_BYTES = 128U * 4U * sizeof(half);
+    static constexpr uint32_t UB_PEER_GMAX_OFFSET = UB_ATTENTIONOUT_OFFSET + UB_ATTENTIONOUT_BYTES;
+    static constexpr uint32_t UB_ND2NZ_IDX_OFFSET =
+        UB_PEER_GMAX_OFFSET + 128U * 4U * 2U + 128U * 2U + 128U * 4U * 20U * 2U + 128U * 4U * 2U + 64U * 4U * 4U;
+    static constexpr uint32_t UB_FD_MAX_STAGE_OFFSET =
+        ND ? (UB_ND2NZ_IDX_OFFSET + UB_INDEX_SIZE + ND_MAX_STAGE_SIZE) : (UB_ATTENTIONOUT_OFFSET - 4096U);
+    // FD 的 UB 预留(AIV 侧): ND 的 FA 只用到 ~111KB, 182KB 起留给 FD
+    using VecFdBlockType = QuantFlashAttnBlockVecFdDn<QFAT>;
+    static constexpr uint32_t FD_UB_BASE = 229888U;
+    static constexpr uint32_t FD_UB_A_OFFSET = FD_UB_BASE - VecFdBlockType::GetFdAUbBytes();
+    static constexpr uint32_t FD_UB_B_OFFSET = FD_UB_BASE + UB_PEER_GMAX_BYTES;
+
+private:
     static constexpr uint32_t UB_ROWSUM_BUFCNT = 1;
     static constexpr uint32_t UB_P_BUFCNT = 2;
     static constexpr uint32_t UB_ATTENTIONOUT_BUFCNT = 1;
@@ -151,15 +182,20 @@ private:
     LocalTensor<half> softmaxMaxUB;
     LocalTensor<float> updateScaleUB;
     LocalTensor<uint8_t> nd2nzIndexUB;
+    LocalTensor<half> ndMaxStageUB;
 
     LocalTensor<float> sumFDUB;
     LocalTensor<half> maxFDUB;
 
     // =================================L1 Buffer=================================
-    static constexpr uint32_t L1_P_SIZE = 128 * 256 / 2;      // 16K, 2个fp4_e2m1元素为1B
-    static constexpr uint32_t L1_P_DESCALE_SIZE = 32 * 5 * 8; // 1.25K
+    static constexpr uint32_t L1_P_SIZE = (ND ? 64U : 128U) * 256U / 2; // ND: 64 行 = 8K, DN: 128 行 = 16K
+    static constexpr uint32_t L1_P_DESCALE_SIZE = 32 * 5 * 8;           // 1.25K
     static constexpr uint32_t L1_P_BUFCNT = 20;
-    static constexpr uint32_t L1_GLOBAL_MAX_OFFSET = 520832;
+    // 与 cube 侧共用同一套 L1 段偏移(禁止硬编码): ND 下该段比 DN 前移 286720B
+    static constexpr uint32_t L1_GLOBAL_MAX_OFFSET =
+        ((ND ? ND_M_ROWS : 128U) * 256U / 2U * 20U + 128U * 2U * (256U / 64U + 1U) * 20U + 128U * 128U / 2U +
+         128U * (128U / 32U) + 512U * 128U / 2U * 4U + 512U * (128U / 32U) * 4U + 256U * (128U + 16U) / 2U +
+         (256U / 64U) * ((128U + 16U) / 16U) * 32U);
 
     LocalTensor<uint8_t> pL1Tensor;
     LocalTensor<uint8_t> pScaleL1;
@@ -173,6 +209,11 @@ private:
     static constexpr bool OUT_IS_TND = IS_TND<LAYOUT_OUT>();
     FaGmTensor<OUT_T, OUT_FORMAT, SEQLEN_T, OUT_IS_TND> outGmTensor;
     CopyAttenOutUbToGm<OUT_T, OUT_FORMAT, GetOutUbFormat<LAYOUT_OUT>()> AttenOutUbToGm;
+    // FD partial workspace
+    GlobalTensor<float> fdAccumOutFdGm; // [slot][d=128][m=128] fp32 未归一化局部分子
+    GlobalTensor<float> fdSumFdGm;      // [slot][m] fp32 局部分母
+    GlobalTensor<float> fdMaxFdGm;      // [slot][m] fp32 局部行 max (ln 域)
+    LocalTensor<float> fdMaxStage_;     // FA 侧 max partial 暂存 [m=64] fp32
 
     static constexpr uint32_t SYNC_VEC1_RES_BUF0_MUTEX_ID = 17;
     static constexpr uint32_t SYNC_VEC1_RES_BUF1_MUTEX_ID = 18;
@@ -182,6 +223,7 @@ private:
     static constexpr uint32_t SYNC_GMAX_UB_TO_L1_BUF3_MUTEX_ID = 22;
     static constexpr uint32_t SYNC_ATTN_BUF_MUTEX_ID = 23;
     static constexpr uint32_t SYNC_INIT_OUTPUT_MUTEX_ID = 24;
+    static constexpr uint32_t FD_MAX_STAGE_FLOATS = 64U;
 
 public:
     // 初始化 Vec Block 层
@@ -191,11 +233,27 @@ public:
           qSeqLensTool(qSeqLensTool),
           kvSeqLensTool(kvSeqLensTool){};
 
-    __aicore__ inline void InitInput(__gm__ uint8_t* attentionOut)
+    __aicore__ inline void InitInput(__gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace)
     {
         // 初始化 attentionOut GM Buffer 及 GmTensor
         InitAttentionOutBuffer(constInfo.bSize, constInfo.n2Size, constInfo.gSize, constInfo.s1Size, constInfo.dSize,
                                qSeqLensTool, outGmTensor, attentionOut);
+        // FD partial workspace 三段: accumOut [slot][d=128][m=128] fp32 / sum、max 各 [slot][m=128] 1 个 fp32
+        fdAccumOutFdGm.SetGlobalBuffer((__gm__ float*)workspace);
+        fdSumFdGm.SetGlobalBuffer((__gm__ float*)(workspace + constInfo.accumOutSize));
+        fdMaxFdGm.SetGlobalBuffer((__gm__ float*)(workspace + constInfo.accumOutSize + constInfo.logSumExpSize));
+    }
+
+    // FD 归约复用的转置暂存 (FA 段结束后空闲)
+    __aicore__ inline LocalTensor<float> GetFdTransUb()
+    {
+        return attentionTransUB.template ReinterpretCast<float>();
+    }
+
+    // FA 侧 max partial 暂存绑到 FD 独占区, 与 FA 段 UB 不再共用
+    __aicore__ inline void InitFdMaxStage(uint32_t ubOffset)
+    {
+        fdMaxStage_ = LocalTensor<float>(TPosition::VECIN, ubOffset, FD_MAX_STAGE_FLOATS);
     }
 
     // 初始化 UB
@@ -207,7 +265,9 @@ public:
         addrL1Start += L1_P_SIZE * L1_P_BUFCNT;
         pScaleL1 = LocalTensor<uint8_t>(TPosition::A1, addrL1Start, L1_P_DESCALE_SIZE * L1_P_BUFCNT); // 1K * 20 = 20K
 
-        localGlobalMaxL1 = LocalTensor<half>(TPosition::A1, L1_GLOBAL_MAX_OFFSET, LOCAL_GLOBAL_MAX_SIZE);
+        // 长度按 4 槽 x 2 subblock x 128 half 声明: 旧代码只声明了 128 half,
+        // 而写入索引最大到 tileMaxIdx*256 + 128 = 896, 越界声明
+        localGlobalMaxL1 = LocalTensor<half>(TPosition::A1, L1_GLOBAL_MAX_OFFSET, 256U * 4U);
 
         // =================================UB Tensor Init=================================
         uint32_t addrUBStart = 0;
@@ -262,8 +322,16 @@ public:
         addrUBStart += UB_UPDATE_SIZE * UB_UPDATE_BUFCNT * sizeof(float);
         nd2nzIndexUB = LocalTensor<uint8_t>(TPosition::VECCALC, addrUBStart, UB_INDEX_SIZE * UB_INDEX_BUFCNT);
 
+        addrUBStart += UB_INDEX_SIZE * UB_INDEX_BUFCNT * sizeof(uint8_t);
+        if constexpr (ND) {
+            ndMaxStageUB = LocalTensor<half>(TPosition::VECCALC, addrUBStart, ND_MAX_STAGE_SIZE);
+        }
+
         // ================================= Init Value =================================
         Mxfp4Api::InitIndexesAndDuplicateCallVF<half>(nd2nzIndexUB, localGlobalMaxUB);
+        if constexpr (ND) {
+            Mxfp4Api::InitNdIndexesCallVF<half>(nd2nzIndexUB);
+        }
     }
 
     __aicore__ inline void ComputeVec1(const VecRunInfo& runInfo)
@@ -274,56 +342,127 @@ public:
         }
         Mutex::Lock<PIPE_V>(SYNC_VEC1_RES_BUF0_MUTEX_ID + buffIdx);
 
-        LocalTensor<uint8_t> vec1Res = vec1ResUB[buffIdx * ve1ResOffset];
-        LocalTensor<half> mm1Res = mm1ResUB[buffIdx * mm1ResOffset];
+        LocalTensor<uint8_t> vec1Res = vec1ResUB[buffIdx * (ND ? UB_P_SIZE : ve1ResOffset)];
+        LocalTensor<half> mm1Res = mm1ResUB[buffIdx * (ND ? UB_S_SIZE : mm1ResOffset)];
         LocalTensor<half> localGrpMax = GetLocalGrpMaxUbByLoopIdx(runInfo.loop);
         LocalTensor<half> localGlobalMax = GetLocalGlobalMaxUbByCurIdx(runInfo.tileMaxIdx);
-        if (unlikely(runInfo.isFirstS2Loop)) {
-            if (likely(runInfo.actMSize == s1BaseSize &&
-                       runInfo.actSingleLoopS2Size == s2BaseSize)) { // s1=128, s2=256 softmax
-                Mxfp4Api::softmaxWithGroupMaxQs128Kvs256CallVF<true, half, uint8_t, false, s2BaseSize, s1BaseSize>(
-                    vec1Res, mm1Res, localGrpMax, localGlobalMax, nd2nzIndexUB);
-            } else {
-                // s2 padding 32 multi
-                if (runInfo.actSingleLoopS2Size != runInfo.actSingleLoopS2SizeAlign) {
-                    Mxfp4Api::Mm1ResPrePaddingAlignKvs32MultiCallVF<half>(
-                        mm1Res, static_cast<uint16_t>(runInfo.actSingleLoopS2Size),
-                        static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign));
-                    PipeBarrier<PIPE_V>();
+        if constexpr (ND) {
+            // 每个 128 个 s2 一片: P 分形直接按 [平面][行][32B] 写, 组标量写 4 组 x 128 M
+            uint32_t actM4 = (runInfo.actMSize + 3) / 4 * 4;
+            for (uint32_t c = 0; c < 2; ++c) {
+                uint32_t s2Done = c * QK_S2_SPLIT_ND;
+                if (s2Done >= runInfo.actSingleLoopS2Size) {
+                    break;
                 }
-                // softmax
-                if (runInfo.actSingleLoopS2SizeAlign == AttentionCommon::BYTE_BLOCK) { // softmax_padding_32
-                    Mxfp4Api::SoftmaxWithGroupMaxAlignQs128Kvs32CallVF<true, half, uint8_t, false>(
-                        vec1Res, mm1Res, localGrpMax, localGlobalMax, nd2nzIndexUB);
-                } else { // softmax_padding_32_multi >= 64
-                    Mxfp4Api::SoftmaxWithGroupMaxAlignQs128Kvs32MultiCallVF<true, half, uint8_t, false>(
-                        vec1Res, mm1Res, localGrpMax, localGlobalMax, nd2nzIndexUB,
-                        static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign),
-                        static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign64));
+                uint32_t s2Rest = runInfo.actSingleLoopS2Size - s2Done;
+                uint32_t actS2c = s2Rest < QK_S2_SPLIT_ND ? s2Rest : QK_S2_SPLIT_ND;
+                LocalTensor<uint8_t> pChunk = vec1Res[c * ND_P_CHUNK_BYTES];
+                LocalTensor<half> sChunk = mm1Res[c * ND_S_CHUNK_SIZE];
+                LocalTensor<half> grpMaxC = localGrpMax[c * SINGLE_GROUP_MAX_SPACE_SIZE];
+                // CAUSAL: 本 tile 全可见时用无 mask 实例, 否则用带掩码实例
+                const bool ndAllVisible = (!HAS_MASK) || ((runInfo.maskBase + static_cast<int32_t>(s2BaseSize) - 1) *
+                                                              static_cast<int32_t>(constInfo.gSize) <=
+                                                          0);
+                if (runInfo.isFirstS2Loop && c == 0) {
+                    if (ndAllVisible) {
+                        Mxfp4Api::softmaxNdCastNzMxfp4CallVF<true, false, half, uint8_t>(
+                            pChunk, sChunk, ndMaxStageUB, grpMaxC, localGlobalMax, nd2nzIndexUB, actM4, actS2c,
+                            runInfo.maskBase, static_cast<int32_t>(constInfo.gSize), s2Done);
+                    } else {
+                        Mxfp4Api::softmaxNdCastNzMxfp4CallVF<true, true, half, uint8_t>(
+                            pChunk, sChunk, ndMaxStageUB, grpMaxC, localGlobalMax, nd2nzIndexUB, actM4, actS2c,
+                            runInfo.maskBase, static_cast<int32_t>(constInfo.gSize), s2Done);
+                    }
+                } else {
+                    if (ndAllVisible) {
+                        Mxfp4Api::softmaxNdCastNzMxfp4CallVF<false, false, half, uint8_t>(
+                            pChunk, sChunk, ndMaxStageUB, grpMaxC, localGlobalMax, nd2nzIndexUB, actM4, actS2c,
+                            runInfo.maskBase, static_cast<int32_t>(constInfo.gSize), s2Done);
+                    } else {
+                        Mxfp4Api::softmaxNdCastNzMxfp4CallVF<false, true, half, uint8_t>(
+                            pChunk, sChunk, ndMaxStageUB, grpMaxC, localGlobalMax, nd2nzIndexUB, actM4, actS2c,
+                            runInfo.maskBase, static_cast<int32_t>(constInfo.gSize), s2Done);
+                    }
                 }
             }
         } else {
-            if (likely(runInfo.actMSize == s1BaseSize &&
-                       runInfo.actSingleLoopS2Size == s2BaseSize)) { // s1=128, s2=256 softmax
-                Mxfp4Api::softmaxWithGroupMaxQs128Kvs256CallVF<false, half, uint8_t, false, s2BaseSize, s1BaseSize>(
-                    vec1Res, mm1Res, localGrpMax, localGlobalMax, nd2nzIndexUB);
-            } else {
-                // s2 padding 32 multi
-                if (runInfo.actSingleLoopS2Size != runInfo.actSingleLoopS2SizeAlign) {
-                    Mxfp4Api::Mm1ResPrePaddingAlignKvs32MultiCallVF<half>(
-                        mm1Res, static_cast<uint16_t>(runInfo.actSingleLoopS2Size),
-                        static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign));
-                    PipeBarrier<PIPE_V>();
+            // CAUSAL: 全可见 tile (末行阈值 <= 0) 走无 mask 编译实例, 逐行 mask 开销整块不生成
+            // 逐行阈值 = (maskBase + kvRow)*gSize - maskRem, 取 tile 内最大 kvRow 判全可见
+            bool tileAllVisible =
+                (runInfo.maskBase + static_cast<int32_t>(s2BaseSize) - 1) * static_cast<int32_t>(constInfo.gSize) -
+                    runInfo.maskRem <=
+                0;
+            // CAUSAL: maskBase = k_tile - q_tile - (sk-sq), 逐行阈值 t = maskBase + kvRow,
+            // 可见 ⇔ lane >= t*gSize - maskRem (lane 为 tile 内 M 行号; S1G 合轴 r=gS1*mBaseSize+lane)
+            if (unlikely(runInfo.isFirstS2Loop)) {
+                if (likely(runInfo.actMSize == s1BaseSize &&
+                           runInfo.actSingleLoopS2Size == s2BaseSize)) { // s1=128, s2=256 softmax
+                    if (HAS_MASK && tileAllVisible) {
+                        Mxfp4Api::softmaxWithGroupMaxQs128Kvs256CallVF<true, half, uint8_t, false, s2BaseSize,
+                                                                       s1BaseSize>(
+                            vec1Res, mm1Res, localGrpMax, localGlobalMax, nd2nzIndexUB,
+                            static_cast<int32_t>(constInfo.gSize), runInfo.maskBase, runInfo.maskRem);
+                    } else {
+                        Mxfp4Api::softmaxWithGroupMaxQs128Kvs256CallVF<true, half, uint8_t, HAS_MASK, s2BaseSize,
+                                                                       s1BaseSize>(
+                            vec1Res, mm1Res, localGrpMax, localGlobalMax, nd2nzIndexUB,
+                            static_cast<int32_t>(constInfo.gSize), runInfo.maskBase, runInfo.maskRem);
+                    }
+                } else {
+                    // s2 padding 32 multi
+                    if (runInfo.actSingleLoopS2Size != runInfo.actSingleLoopS2SizeAlign) {
+                        Mxfp4Api::Mm1ResPrePaddingAlignKvs32MultiCallVF<half>(
+                            mm1Res, static_cast<uint16_t>(runInfo.actSingleLoopS2Size),
+                            static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign));
+                        PipeBarrier<PIPE_V>();
+                    }
+                    // softmax
+                    if (runInfo.actSingleLoopS2SizeAlign == AttentionCommon::BYTE_BLOCK) { // softmax_padding_32
+                        Mxfp4Api::SoftmaxWithGroupMaxAlignQs128Kvs32CallVF<true, half, uint8_t, HAS_MASK>(
+                            vec1Res, mm1Res, localGrpMax, localGlobalMax, nd2nzIndexUB,
+                            static_cast<int32_t>(constInfo.gSize), runInfo.maskBase, runInfo.maskRem);
+                    } else { // softmax_padding_32_multi >= 64
+                        Mxfp4Api::SoftmaxWithGroupMaxAlignQs128Kvs32MultiCallVF<true, half, uint8_t, HAS_MASK>(
+                            vec1Res, mm1Res, localGrpMax, localGlobalMax, nd2nzIndexUB,
+                            static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign),
+                            static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign64),
+                            static_cast<int32_t>(constInfo.gSize), runInfo.maskBase, runInfo.maskRem);
+                    }
                 }
-                // softmax
-                if (runInfo.actSingleLoopS2SizeAlign == AttentionCommon::BYTE_BLOCK) { // softmax_padding_32
-                    Mxfp4Api::SoftmaxWithGroupMaxAlignQs128Kvs32CallVF<false, half, uint8_t, false>(
-                        vec1Res, mm1Res, localGrpMax, localGlobalMax, nd2nzIndexUB);
-                } else { // softmax_padding_32_multi >= 64
-                    Mxfp4Api::SoftmaxWithGroupMaxAlignQs128Kvs32MultiCallVF<false, half, uint8_t, false>(
-                        vec1Res, mm1Res, localGrpMax, localGlobalMax, nd2nzIndexUB,
-                        static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign),
-                        static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign64));
+            } else {
+                if (likely(runInfo.actMSize == s1BaseSize &&
+                           runInfo.actSingleLoopS2Size == s2BaseSize)) { // s1=128, s2=256 softmax
+                    if (HAS_MASK && tileAllVisible) {
+                        Mxfp4Api::softmaxWithGroupMaxQs128Kvs256CallVF<false, half, uint8_t, false, s2BaseSize,
+                                                                       s1BaseSize>(
+                            vec1Res, mm1Res, localGrpMax, localGlobalMax, nd2nzIndexUB,
+                            static_cast<int32_t>(constInfo.gSize), runInfo.maskBase, runInfo.maskRem);
+                    } else {
+                        Mxfp4Api::softmaxWithGroupMaxQs128Kvs256CallVF<false, half, uint8_t, HAS_MASK, s2BaseSize,
+                                                                       s1BaseSize>(
+                            vec1Res, mm1Res, localGrpMax, localGlobalMax, nd2nzIndexUB,
+                            static_cast<int32_t>(constInfo.gSize), runInfo.maskBase, runInfo.maskRem);
+                    }
+                } else {
+                    // s2 padding 32 multi
+                    if (runInfo.actSingleLoopS2Size != runInfo.actSingleLoopS2SizeAlign) {
+                        Mxfp4Api::Mm1ResPrePaddingAlignKvs32MultiCallVF<half>(
+                            mm1Res, static_cast<uint16_t>(runInfo.actSingleLoopS2Size),
+                            static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign));
+                        PipeBarrier<PIPE_V>();
+                    }
+                    // softmax
+                    if (runInfo.actSingleLoopS2SizeAlign == AttentionCommon::BYTE_BLOCK) { // softmax_padding_32
+                        Mxfp4Api::SoftmaxWithGroupMaxAlignQs128Kvs32CallVF<false, half, uint8_t, HAS_MASK>(
+                            vec1Res, mm1Res, localGrpMax, localGlobalMax, nd2nzIndexUB,
+                            static_cast<int32_t>(constInfo.gSize), runInfo.maskBase, runInfo.maskRem);
+                    } else { // softmax_padding_32_multi >= 64
+                        Mxfp4Api::SoftmaxWithGroupMaxAlignQs128Kvs32MultiCallVF<false, half, uint8_t, HAS_MASK>(
+                            vec1Res, mm1Res, localGrpMax, localGlobalMax, nd2nzIndexUB,
+                            static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign),
+                            static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign64),
+                            static_cast<int32_t>(constInfo.gSize), runInfo.maskBase, runInfo.maskRem);
+                    }
                 }
             }
         }
@@ -331,8 +470,25 @@ public:
         Mutex::Unlock<PIPE_V>(SYNC_VEC1_RES_BUF0_MUTEX_ID + buffIdx);
         Mutex::Lock<PIPE_MTE3>(SYNC_VEC1_RES_BUF0_MUTEX_ID + buffIdx);
 
-        if (likely(runInfo.actMSize == s1BaseSize &&
-                   runInfo.actSingleLoopS2Size == s2BaseSize)) { // s1=128, s2=256 softmax
+        if constexpr (ND) {
+            // P 在 L1 为 [s2/64 平面][M 行][32B], UB 侧为 [M 行][s2 的 fp4] 密排,
+            // 按 32B 跨步各搬一个平面 (源行距 64B, 目的行距 32B)
+            uint32_t rows = (runInfo.actMSize + 3) / 4 * 4;
+            for (uint32_t c = 0; c < 2; ++c) {
+                if (c * QK_S2_SPLIT_ND >= runInfo.actSingleLoopS2Size) {
+                    break;
+                }
+                // L1 的 P 区: 每个 chunk 的 plane 按实际 actM 行数(512B 粒度)分配
+                // 每个 chunk 的 plane 跟随实际 actM 行数(×512B), 与 cube 端 LoadPToL0 的 srcStride 对齐
+                const uint32_t l1Plane = (rows + 15U) / 16U * 512U; // 按实际 actM 行数(512B 粒度)
+                const uint32_t l1Chunk = l1Plane * 2U;
+                LocalTensor<uint8_t> pL1 = pL1Tensor[(runInfo.loop % 20) * L1_P_SIZE + c * l1Chunk];
+                LocalTensor<uint8_t> pUb = vec1Res[c * ND_P_CHUNK_BYTES];
+                DataCopy(pL1, pUb, {static_cast<uint16_t>(rows), 1, 1, 0});
+                DataCopy(pL1[l1Plane], pUb[32], {static_cast<uint16_t>(rows), 1, 1, 0});
+            }
+        } else if (likely(runInfo.actMSize == s1BaseSize &&
+                          runInfo.actSingleLoopS2Size == s2BaseSize)) { // s1=128, s2=256 softmax
             DataCopy(pL1Tensor[(runInfo.loop % 20) * (128 * 256 / 2)], vec1Res,
                      {static_cast<uint16_t>(runInfo.actSingleLoopS2SizeAlign / 4), 8, 8, 0});
         } else {
@@ -381,6 +537,10 @@ public:
                                                                     urs, constInfo.subBlockIdx);
             }
             PipeBarrier<PIPE_V>();
+            // FD: softmaxMaxUB 会被后续任务覆盖, 最终 max 须当场写 workspace 槽
+            if (unlikely(runInfo.isLastS2Loop && runInfo.isS2SplitCore)) {
+                CopyFdMaxOut(runInfo);
+            }
             return;
         }
 
@@ -421,12 +581,73 @@ public:
         }
         Mutex::Unlock<PIPE_MTE3>(SYNC_VEC1_RES_BUF0_MUTEX_ID);
         Mutex::Unlock<PIPE_MTE3>(SYNC_VEC1_RES_BUF1_MUTEX_ID);
+        // FD: softmaxMaxUB 会被后续任务覆盖, 最终 max 须当场写 workspace 槽
+        if (unlikely(runInfo.isLastS2Loop && runInfo.isS2SplitCore)) {
+            CopyFdMaxOut(runInfo);
+        }
+    }
+
+    // FD max partial: softmaxMaxUB 本 subblock 行段 [sub*64, +actM) 转 fp32 后写 workspace 槽
+    // (softmaxMaxUB 会被后续任务覆盖, 须在 UpdatePScale 出终值处当场写)
+    // 暂存借用 FA reuse 区 (与 pscaleUB/attentionTransUB 同区), 必须持 vec1Res 所有权锁: V 写一段、MTE3 读一段
+    __aicore__ inline void CopyFdMaxOut(const VecRunInfo& runInfo)
+    {
+        uint32_t vec2MBaseSize = s1BaseSize / 2;
+        uint32_t rowBase = constInfo.subBlockIdx * vec2MBaseSize;
+        uint32_t actDealMSize = (constInfo.subBlockIdx == 0) ?
+                                    (runInfo.actMSize < vec2MBaseSize ? runInfo.actMSize : vec2MBaseSize) :
+                                    (runInfo.actMSize > vec2MBaseSize ? runInfo.actMSize - vec2MBaseSize : 0);
+        if (actDealMSize == 0) {
+            return;
+        }
+        uint64_t slotRow = (uint64_t)runInfo.faTmpOutWsPos * s1BaseSize + rowBase;
+        Mutex::Lock<PIPE_V>(SYNC_VEC1_RES_BUF0_MUTEX_ID);
+        Mutex::Lock<PIPE_V>(SYNC_VEC1_RES_BUF1_MUTEX_ID);
+        Cast(fdMaxStage_, softmaxMaxUB[rowBase], RoundMode::CAST_NONE, actDealMSize);
+        // 管线 max 为 log2 域, 归约侧按 exp(差值) 重标定, 此处换算到 ln 域存储
+        Muls(fdMaxStage_, fdMaxStage_, Mxfp4Api::LN2, actDealMSize);
+        Mutex::Unlock<PIPE_V>(SYNC_VEC1_RES_BUF0_MUTEX_ID);
+        Mutex::Unlock<PIPE_V>(SYNC_VEC1_RES_BUF1_MUTEX_ID);
+        Mutex::Lock<PIPE_MTE3>(SYNC_VEC1_RES_BUF0_MUTEX_ID);
+        Mutex::Lock<PIPE_MTE3>(SYNC_VEC1_RES_BUF1_MUTEX_ID);
+        DataCopyExtParams params{1, static_cast<uint32_t>(actDealMSize * sizeof(float)), 0, 0, 0};
+        DataCopyPad(fdMaxFdGm[slotRow], fdMaxStage_, params);
+        Mutex::Unlock<PIPE_MTE3>(SYNC_VEC1_RES_BUF0_MUTEX_ID);
+        Mutex::Unlock<PIPE_MTE3>(SYNC_VEC1_RES_BUF1_MUTEX_ID);
+    }
+
+    // FD partial 写出: acc 槽存未归一化局部分子 (attentionOutUB [d=128][m=64] fp32 → [slot][d=128][m=128]),
+    // sum 紧凑 1 fp32/行; max 已在 UpdatePScale 写出, 最终 out 由归并 pass 合成
+    __aicore__ inline void CopyFdPartialOut(const VecRunInfo& runInfo, uint32_t actDealMSize)
+    {
+        uint32_t mSize = s1BaseSize / 2;
+        uint32_t rowBase = constInfo.subBlockIdx * mSize;
+        uint64_t slotRow = (uint64_t)runInfo.faTmpOutWsPos * s1BaseSize + rowBase;
+        // acc/sum 均由 V 段产出, 经 attn buffer mutex 把 V 完成态传给 MTE3
+        Mutex::Unlock<PIPE_V>(SYNC_ATTN_BUF_MUTEX_ID);
+        Mutex::Lock<PIPE_MTE3>(SYNC_ATTN_BUF_MUTEX_ID);
+        // acc: UB [d][m] 行距 256B → GM [d][m=128] 行距 512B, 只落本 subblock 的 m 段
+        DataCopyExtParams accParams{static_cast<uint16_t>(constInfo.dSize),
+                                    static_cast<uint32_t>(mSize * sizeof(float)), 0,
+                                    static_cast<uint32_t>(mSize * sizeof(float)), 0};
+        DataCopyPad(fdAccumOutFdGm[(uint64_t)runInfo.faTmpOutWsPos * dBaseSize * s1BaseSize + rowBase], attentionOutUB,
+                    accParams);
+        // sum 紧凑 fp32 槽直出 (槽内每行 1 个 fp32; globalRowsumUB 为本 subblock 行段)
+        DataCopyExtParams compactParams{1, static_cast<uint32_t>(actDealMSize * sizeof(float)), 0, 0, 0};
+        DataCopyPad(fdSumFdGm[slotRow], globalRowsumUB, compactParams);
+        Mutex::Unlock<PIPE_MTE3>(SYNC_ATTN_BUF_MUTEX_ID);
     }
 
     __aicore__ inline void ComputeVec2(const VecRunInfo& runInfo)
     {
         LocalTensor<float> urs = GetUpdateScaleByCurIdx(runInfo.updateScaleNum);
 
+        // 锁与数值初始化必须分开判定：
+        //   锁：沿用 master 的"前 16 个 tile 都取锁"语义。本 subblock 在 actDealMSize==0 的收尾路径
+        //       有一次未配对的 Unlock，依赖这段超配的锁计数；若收紧成"只首 tile 取锁"，两个 AIV
+        //       子块变成严格互斥，持有方等 peer 数据、peer 等锁 → 死锁
+        //       （实测 B=33/4K、B=64/64K 必挂，与 FD、与 batch>核数均无关）。
+        //   数值：只有本核 s2 循环的第一个 tile 做初始化，其后一律累加。
         if (unlikely(runInfo.curS2LoopIdx / 16 == 0)) {
             Mutex::Lock<PIPE_V>(SYNC_ATTN_BUF_MUTEX_ID);
             Mxfp4Api::processUpdate<false>(attentionOutUB, mm2ResUB, urs, globalRowsumUB, localRowsumUB);
@@ -441,6 +662,14 @@ public:
                 actDealMSize = runInfo.actMSize < vec2MBaseSize ? 0 : (runInfo.actMSize - vec2MBaseSize);
             }
             PipeBarrier<PIPE_V>();
+            if (unlikely(runInfo.isS2SplitCore)) { // FD: 本行 S2 被切, partial 写 workspace, 最终 out 由归并 pass 写出
+                if (actDealMSize != 0) {
+                    CopyFdPartialOut(runInfo, actDealMSize);
+                } else {
+                    Mutex::Unlock<PIPE_V>(SYNC_ATTN_BUF_MUTEX_ID);
+                }
+                return;
+            }
             if (actDealMSize != 0) {
                 Mutex::Lock<PIPE_V>(SYNC_VEC1_RES_BUF0_MUTEX_ID);
                 Mutex::Lock<PIPE_V>(SYNC_VEC1_RES_BUF1_MUTEX_ID);
@@ -488,7 +717,8 @@ public:
 
     __aicore__ inline void InitOutputSingleCore()
     {
-        int64_t tSize = constInfo.bSize * constInfo.s1Size;
+        int64_t tSize =
+            (LAYOUT_Q == QFA_LAYOUT::TND) ? static_cast<int64_t>(constInfo.t1Size) : constInfo.bSize * constInfo.s1Size;
 
         int64_t totalOutputSize = tSize * constInfo.n2Size * constInfo.gSize * constInfo.dSizeV;
         int64_t singleCoreSize =

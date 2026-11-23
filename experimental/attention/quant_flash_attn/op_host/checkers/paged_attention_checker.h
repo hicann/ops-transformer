@@ -29,15 +29,15 @@ public:
     PagedAttentionChecker() = default;
     ~PagedAttentionChecker() override = default;
 
-    ge::graphStatus CheckSinglePara(const QuantFlashAttnTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckParaExistence(const QuantFlashAttnTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckFeature(const QuantFlashAttnTilingInfo &qfaInfo) override;
-    ge::graphStatus CheckMultiPara(const QuantFlashAttnTilingInfo &qfaInfo) override;
+    ge::graphStatus CheckSinglePara(const QuantFlashAttnTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckParaExistence(const QuantFlashAttnTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckFeature(const QuantFlashAttnTilingInfo& qfaInfo) override;
+    ge::graphStatus CheckMultiPara(const QuantFlashAttnTilingInfo& qfaInfo) override;
 
 private:
-    ge::graphStatus CheckSingleParaBlockTable(const QuantFlashAttnTilingInfo &qfaInfo);
-    // 仅通过 layout_kv 判断是否为 PA 场景 (BnBsH/BnNBsD/NZ)
-    bool IsPageAttention(const QuantFlashAttnTilingInfo &qfaInfo) const;
+    ge::graphStatus CheckSingleParaBlockTable(const QuantFlashAttnTilingInfo& qfaInfo);
+    // 仅通过 layout_kv 判断是否为 PA 场景 (BnBsND/BnNBsD/NZ)
+    bool IsPageAttention(const QuantFlashAttnTilingInfo& qfaInfo) const;
 };
 
 } // namespace quant_flash_attn

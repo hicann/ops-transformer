@@ -173,6 +173,9 @@ def _snap_local_p_quantize_codes(
     # 与 kernel 行为对齐: S 全 -inf 时 max 保持 -inf (kernel 侧 MIN_VALUE*INV_LN2 也溢出 -inf),
     # P = exp(-inf - (-inf)) = NaN 传播到输出, 不再用 zeros_like 钳位兜底.
     m_block_scaled = S_reshape.max(dim=-1).values  # max of SCALED S (fp16)
+    # 对齐 kernel 的 Maxs(curr_group_max, CAUSAL_CLAMP): 全 mask 块 max 钳到有限值, 保证 P=0.
+    CAUSAL_CLAMP = torch.tensor(-30000.0, dtype=src_dtype, device=device)
+    m_block_scaled = torch.maximum(m_block_scaled, CAUSAL_CLAMP)
     # fp16 域乘法: -inf 保持 -inf, 正常值与 kernel 舍入一致 (不加多余 cast)
     K_block = (m_block_scaled * INV_LN2).floor()
     m_block_snap = (K_block - 2) * LN2  # [..., n_blk], on log2 grid
