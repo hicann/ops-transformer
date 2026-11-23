@@ -93,8 +93,8 @@
     | A4W4-FP | FLOAT4_E2M1        | FLOAT4_E2M1            |
 
     - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持上表中A8W8-FP场景。
-    - <term>Ascend 950PR&950DT系列产品</term>：不支持上表中A16W16、A8W8-INT、A8W4-INT场景。
-    - <term>Ascend 950PR&950DT系列产品</term>的dispatch阶段有两条路径：`dispatchQuantMode` = 4时，按下文各量化场景的描述由算子内部对BF16的`x`做MX逐组量化；`dispatchQuantMode` = 0时为预量化直通，`x`已经是量化后的数据、缩放因子由`scales`入参给出，算子跳过下文第一阶段的量化步骤，直接用`x`与`scales`参与后续矩阵乘，其余阶段与下文一致。
+    - <term>Ascend 950PR&950DT系列产品</term>：不支持上表中A8W8-INT、A8W4-INT场景。
+    - <term>Ascend 950PR&950DT系列产品</term>的dispatch阶段有三条路径：`dispatchQuantMode` = 4时，按下文各量化场景的描述由算子内部对BF16的`x`做MX逐组量化；`dispatchQuantMode` = 0且`dispatchQuantOutDtype`为23、24或296时为预量化直通，`x`已经是量化后的数据、缩放因子由`scales`入参给出，算子跳过下文第一阶段的量化步骤，直接用`x`与`scales`参与后续矩阵乘；`dispatchQuantMode` = 0、`x`为BF16且`dispatchQuantOutDtype`保持默认值DT_UNDEFINED时为A16W16非量化直通，算子全程不做量化与反量化，`scales`、`weightScales1`、`weightScales2`均传入空指针。其余阶段与下文一致。
     - <term>Ascend 950PR&950DT系列产品</term>：MoE专家与共享专家可以采用不同的权重类型与量化类型，共享专家的量化输出类型由`sharedExpertQuantOutDtype`指定，未显式配置时与`dispatchQuantOutDtype`一致。
 
     <details>
@@ -460,7 +460,7 @@
     Y[i] = \sum_{k=0}^{K-1} W[i,\, k] \cdot O[\pi(i,\, k)] + \sum_{s=0}^{\text{sharedExpertNumPerRank}-1} O^{\mathrm{shared}}_s[i]
     $$
 
-    说明：对每个 Token $i$，根据排序后的路由索引 $\pi(i,k)$ 从聚合后的专家结果中取出对应行，按 `topkWeights` 中的权重逐元素加权累加，再直接加上各共享专家对当前 token 的输出，得到最终输出 $Y$。未启用共享专家时，共享专家求和项为零。
+    说明：对每个 Token $i$，根据排序后的路由索引 $\pi(i,k)$ 从聚合后的专家结果中取出对应行，按 `topkWeights` 中的权重逐元素加权累加，再直接加上各共享专家对当前 token 的输出，得到最终输出 $Y$。未启用共享专家时，共享专家求和项为零。`topkIds` 中取 -1 的位置不参与上式求和；某个 Token 的 topK 个位置全为 -1 时，该 Token 的输出为全 0，且不叠加共享专家输出（-1 的支持范围详见约束说明）。
 
     其中，$X$ 表示参数 `x`，$W$ 表示参数 `topkWeights`，$W_1$ 表示参数 `weight1`，$W_2$ 表示参数 `weight2`，$Y$ 表示参数 `y`，$E_{\text{local}}$ 表示 `localMoeExpertNum = moeExpertNum / epWorldSize`（每个 Rank 的路由 MoE 专家数），$K$ 表示 `topkIds` 的第二维度。
 
@@ -540,7 +540,7 @@
     Y[i] = \sum_{k=0}^{K-1} W[i,k] \cdot O[\pi(i,k)] + \sum_{s=0}^{\text{sharedExpertNumPerRank}-1} O^{\mathrm{shared}}_s[i],
     $$
 
-    未启用共享专家时，共享专家求和项为零。最终输出 $Y$ 的数据类型为 BF16。A8W4-FP 的主要数据类型流为：`BF16 -> MXFP8 E4M3 -> A8W4 GMM1 -> MXFP8 E4M3 -> A8W4 GMM2 -> BF16`。
+    未启用共享专家时，共享专家求和项为零。`topkIds` 中取 -1 的位置不参与上式求和；某个 Token 的 topK 个位置全为 -1 时，该 Token 的输出为全 0，且不叠加共享专家输出（-1 的支持范围详见约束说明）。最终输出 $Y$ 的数据类型为 BF16。A8W4-FP 的主要数据类型流为：`BF16 -> MXFP8 E4M3 -> A8W4 GMM1 -> MXFP8 E4M3 -> A8W4 GMM2 -> BF16`。
     </details>
 
     <details>
@@ -599,7 +599,7 @@
     Y[i] = \sum_{k=0}^{K-1} W[i,k] \cdot O[\pi(i,k)] + \sum_{s=0}^{\text{sharedExpertNumPerRank}-1} O^{\mathrm{shared}}_s[i],
     $$
 
-    未启用共享专家时，共享专家求和项为零。最终输出 $Y$ 的数据类型为 BF16。A4W4-FP 的完整数据类型流为：`BF16 -> MXFP4 E2M1 -> A4W4 GMM1 -> MXFP8 E4M3 -> A8W4 GMM2 -> BF16`。其中所有 MX 缩放因子的类型均为 `FLOAT8_E8M0`，量化粒度均为 32 个连续元素。
+    未启用共享专家时，共享专家求和项为零。`topkIds` 中取 -1 的位置不参与上式求和；某个 Token 的 topK 个位置全为 -1 时，该 Token 的输出为全 0，且不叠加共享专家输出（-1 的支持范围详见约束说明）。最终输出 $Y$ 的数据类型为 BF16。A4W4-FP 的完整数据类型流为：`BF16 -> MXFP4 E2M1 -> A4W4 GMM1 -> MXFP8 E4M3 -> A8W4 GMM2 -> BF16`。其中所有 MX 缩放因子的类型均为 `FLOAT8_E8M0`，量化粒度均为 32 个连续元素。
     </details>
 
 ## 参数说明
@@ -709,14 +709,14 @@
    <td>sharedWeight1</td>
    <td>可选输入</td>
    <td>共享专家网络第一线性层的权重矩阵（包括门控与上投影），用于将输入映射至中间维度，输出供给激活函数。数据类型可以与MoE专家第一线性层权重weight1不同，支持MoE专家与共享专家采用不同的权重类型与量化类型（如MoE专家W8配共享专家W4、MoE专家W4配共享专家W8）；sharedWeight1与sharedWeight2的数据类型必须一致。</td>
-   <td>FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1</td>
+   <td>BF16、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1</td>
    <td>ND、FRACTAL_NZ、FORMAT_FRACTAL_NZ_C0_32</td>
   </tr>
   <tr>
    <td>sharedWeight2</td>
    <td>可选输入</td>
    <td>共享专家网络第二线性层的权重矩阵，负责将激活后的中间特征投影回隐藏维度。数据类型可以与MoE专家第二线性层权重weight2不同，取值要求同sharedWeight1。</td>
-   <td>FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1</td>
+   <td>BF16、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1</td>
    <td>ND、FRACTAL_NZ、FORMAT_FRACTAL_NZ_C0_32</td>
   </tr>
   <tr>
@@ -785,14 +785,14 @@
   <tr>
    <td>dispatchQuantOutDtype</td>
    <td>可选属性</td>
-   <td>dispatch量化后输出的数据类型。支持1（INT8）、23（FLOAT8_E5M2）、24（FLOAT8_E4M3FN）、296（FLOAT4_E2M1）。默认值为DT_UNDEFINED。dispatchQuantMode为4时该属性表示算子内量化的输出类型；预量化直通场景（dispatchQuantMode为0且该属性为23、24或296）下表示预量化x的逻辑类型，此时必须与x的实际数据类型一致。各产品实际支持的取值范围详见约束说明。</td>
+   <td>dispatch量化后输出的数据类型。支持1（INT8）、23（FLOAT8_E5M2）、24（FLOAT8_E4M3FN）、296（FLOAT4_E2M1）。默认值为DT_UNDEFINED。dispatchQuantMode为4时该属性表示算子内量化的输出类型；预量化直通场景（dispatchQuantMode为0且该属性为23、24或296）下表示预量化x的逻辑类型，此时必须与x的实际数据类型一致。各产品实际支持的取值范围、以及A16W16非量化场景（dispatchQuantMode为0且x为BF16）下对该属性的要求详见约束说明。</td>
    <td>INT64</td>
    <td></td>
   </tr>
   <tr>
    <td>sharedExpertQuantOutDtype</td>
    <td>可选属性</td>
-   <td>共享专家输入的量化数据类型。默认值为DT_UNDEFINED，表示与dispatchQuantOutDtype保持一致；显式配置时支持23（FLOAT8_E5M2）、24（FLOAT8_E4M3FN）、296（FLOAT4_E2M1），用于共享专家与MoE专家采用不同量化配置的场景。预量化直通（dispatchQuantMode为0）场景下只能取DT_UNDEFINED或与dispatchQuantOutDtype相同。</td>
+   <td>共享专家输入的量化数据类型。默认值为DT_UNDEFINED，表示与dispatchQuantOutDtype保持一致；显式配置时支持23（FLOAT8_E5M2）、24（FLOAT8_E4M3FN）、296（FLOAT4_E2M1）、27（BFLOAT16），用于共享专家与MoE专家采用不同量化配置的场景，其中27（BFLOAT16）对应A16W16场景、与保持默认值等效。预量化直通（dispatchQuantMode为0且dispatchQuantOutDtype为23、24或296）场景下只能取DT_UNDEFINED或与dispatchQuantOutDtype相同。各产品实际支持的取值范围详见约束说明。</td>
    <td>INT64</td>
    <td></td>
   </tr>
@@ -922,6 +922,7 @@
   - <term>Atlas A2系列产品</term>：多机通信域要求交换机组网，不支持双机直连组网。
   - <term>Atlas A3系列产品</term>：多机通信域要求在一个超节点内，不支持双机直连组网和跨超节点组网。
   - <term>Ascend 950PR&950DT系列产品</term>：`topoType` = 0、1时仅使用UB Memory通信协议；`topoType` = 2（URMA与RoCE混合拓扑）下UB域内使用UB Memory通信协议、UB域之间使用RoCE。
+  - <term>Ascend 950PR&950DT系列产品</term>：`topoType` = 2（URMA与RoCE混合拓扑）要求算子包构建时配套的算子编程开发工具包与通信基础库版本均不低于9.3.0，Layered拓扑（`topoType` = 1或2）整体要求均不低于9.2.0。低于该版本的算子包不包含对应拓扑的执行分支，此时tiling阶段不会拦截、kernel不执行任何计算，`y`与`expertTokenNums`不会被写入，算子也不会主动报错或回退；使用这两类拓扑前请先确认算子包的配套组件版本。
 
 - **参数约束**：
   - **<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>**：
@@ -964,14 +965,16 @@
     - `numMaxTokensPerRank`取值范围[1, UINT32_MAX]且所有Rank配置一致，建议设置为`sym_buffer`复用期间所有Rank可能出现的最大单卡`BS`。设置越大，内部申请的通信内存越多。
     - `H`（`x`.dim1）范围[1024, 8192]，且各量化场景、各通信拓扑均要求`H`为64的倍数（`topoType` = 0的MTE拓扑与`topoType` = 1、2的Layered拓扑口径一致）。A4W4-FP场景仅支持`weight1`为FRACTAL_NZ格式。
     - `topK`（`topkIds`.dim1）支持[1, 32]。
+    - `topkIds`的元素除[0, `moeExpertNum`)外还支持-1，表示该位置的路由被关闭：该位置不参与dispatch发送、也不参与combine加权累加，`topkWeights`中对应位置的权重不参与计算、取值任意（建议填0），无需对剩余有效权重重新归一化；某个token的topK个位置全为-1时该token的输出为全0，且不叠加共享专家输出。`topkWeightsType` = 1（topkWeights前移）下同样不发送关闭位置。仅`topoType` = 0（MTE拓扑）支持-1，Layered拓扑（`topoType` = 1或2）不支持。算子不校验`topkIds`的元素值，取值合法性由调用方保证。
     - `localMoeExpertNum`（= `moeExpertNum` / `epWorldSize`）范围 [1, 1024]；共享专家数`sharedExpertNumPerRank`另按 [0, 4] 单独约束，不计入该上限。
     - `intermediateHidden`为`weight1`的Linear1输出宽度的一半，范围[256, 4096]且128对齐（即该输出宽度为 2 × `intermediateHidden`，范围[512, 8192]且256对齐），取值范围与`activation`无关。门控激活（"swiglu"、"swiglustep"、"swigluoai"、"situglu"）将该宽度按gate、up各分一半，激活输出宽度为`intermediateHidden`；"gelu"为逐元素激活、不拆分，激活输出宽度即 2 × `intermediateHidden`。
     - `epWorldSize`范围 [2, 1024]。
     - `moeExpertNum`范围 [`epWorldSize`, 2048]，且`moeExpertNum` % `epWorldSize` == 0。
-    - `maxRecvTokenNum`范围 [0, `numMaxTokensPerRank` × `epWorldSize` × min(`topK`, `localMoeExpertNum`)]，建议保持默认值0，由接口自动计算接收容量。实际生效的接收行数（取默认值0时为自动计算结果）必须不超过UINT32_MAX，超出时算子在tiling阶段报错，不做静默截断。
-    - `dispatchQuantOutDtype`仅支持23（FLOAT8_E5M2）或24（FLOAT8_E4M3FN）或296（FLOAT4_E2M1）。
+    - `maxRecvTokenNum`范围 [0, `numMaxTokensPerRank` × `epWorldSize` × min(`topK`, `localMoeExpertNum`)]，建议保持默认值0，由接口自动计算接收容量。实际生效的接收行数（取默认值0时为自动计算结果）必须不超过UINT32_MAX，超出时算子在tiling阶段报错，不做静默截断。取默认值0时的自动计算结果即为该上界。
+    - `dispatchQuantOutDtype`支持23（FLOAT8_E5M2）、24（FLOAT8_E4M3FN）、296（FLOAT4_E2M1），或保持默认值DT_UNDEFINED。取23、24、296为量化场景，具体落到A8W8-FP、A8W4-FP还是A4W4-FP由该取值与`weight1`、`weight2`的数据类型及format共同决定（23对应A8W8-FP；24对应A8W8-FP或A8W4-FP；296对应A4W4-FP；完整配套关系见「MXFP量化场景约束」）；A16W16场景必须保持DT_UNDEFINED，显式传入任何数据类型（含27（BFLOAT16））都会在tiling阶段报错。
     - `dispatchQuantMode`取值为0或4。4表示算子内部对BF16的`x`做MX逐组量化（group size = 32，量化缩放因子类型为FLOAT8_E8M0），对应A8W8-FP、A8W4-FP、A4W4-FP场景；0表示预量化直通，即`x`已经是量化后的数据、算子内部不再量化，缩放因子由`scales`入参给出。
-    - 预量化直通（`dispatchQuantMode` = 0）的约束：`x`的数据类型必须与`dispatchQuantOutDtype`指定的逻辑类型一致；`scales`为必选；仅支持`topoType` = 0（MTE拓扑）；`sharedExpertQuantOutDtype`只能取DT_UNDEFINED或与`dispatchQuantOutDtype`相同。
+    - 预量化直通（`dispatchQuantMode` = 0且`dispatchQuantOutDtype`为23、24或296）的约束：`x`的数据类型必须与`dispatchQuantOutDtype`指定的逻辑类型一致；`scales`为必选；仅支持`topoType` = 0（MTE拓扑）；`sharedExpertQuantOutDtype`只能取DT_UNDEFINED或与`dispatchQuantOutDtype`相同。
+    - A16W16非量化直通（`dispatchQuantMode` = 0且`x`为BF16）的约束：`dispatchQuantOutDtype`必须保持默认值DT_UNDEFINED；`weight1`、`weight2`必须同为BF16，启用共享专家时`sharedWeight1`、`sharedWeight2`也必须同为BF16，不允许MoE专家与共享专家一侧为A16W16、另一侧为量化场景；`weightScales1`、`weightScales2`、`sharedWeightScales1`、`sharedWeightScales2`与`scales`均必须传入空指针；`sharedExpertQuantOutDtype`取DT_UNDEFINED或27（BFLOAT16）均可，两者等效；同一专家组内`weight1`与`weight2`的format必须同为ND或同为FRACTAL_NZ，MoE专家组与共享专家组的format可以不同，共ND/ND、ND/NZ、NZ/ND、NZ/NZ四种组合；仅支持`topoType` = 0（MTE拓扑），`combineQuantMode`必须为0。以上任一条不满足，算子在tiling阶段报错，不做静默回退。
     - `combineQuantMode`取值为0、3、4，0表示非量化，3表示MXFP float8_e5m2类型，4表示MXFP float8_e4m3类型
     - `commAlg`为预留参数，请保持默认空字符串""。
     - `y`的数据类型固定为BF16。
@@ -985,15 +988,16 @@
     - Layered拓扑（`topoType` = 1或2）下，`activation`仅支持"swiglu"、"situglu"和"gelu"，不支持"swiglustep"和"swigluoai"。
     - `topkWeightsType`取值为0或1，0表示关闭topkWeights前移，1表示开启。
     - `combineCommMode`取值为0、1或2，0表示关闭combine阶段通信去重，1表示开启MTE拓扑下的卡内去重，2表示开启Layered拓扑下的Server内归约及域间二级回传。两种开启方式按拓扑分流：MTE拓扑只接受0或1，Layered拓扑只接受0或2，配错一律在tiling阶段报错。是否开启完全由调用方决定，算子内部不做收益裁决；所有Rank必须配置相同取值，否则跨卡的通信记录布局不一致会导致读写错位。适用场景：`topK`较大、同一token命中同卡多个专家的比例较高、性能瓶颈在通信的形状，开启后收益明显；专家数多且瓶颈在计算的形状可能没有收益甚至变慢，建议按实际形状实测后再决定。
-    - `combineCommMode` = 1时的能力约束（不满足时算子在tiling阶段直接报错并提示改回0，不做静默回退）：仅支持`topoType` = 0（MTE拓扑）；`combineQuantMode`必须为0（combine不量化）；`topkWeightsType` = 0时不支持预量化`x`；`numMaxTokensPerRank`需满足 `numMaxTokensPerRank` ≤ 128 × min(512, ⌊4608 / `topK`⌋)（例如`topK` = 32时上限为18432，`topK` ≤ 9时上限为65536）。
-    - `combineCommMode` = 1时，同一token在同一张卡上的多个专家输出改为在该卡按FP32累加后一次转BF16发送，累加顺序与中间取整次数与关闭态不同，因此`y`与`combineCommMode` = 0的结果不逐位相同，差异属BF16累加顺序不同带来的正常误差；需要与关闭态逐位一致时请使用`combineCommMode` = 0。
+    - `combineCommMode` = 1时的能力约束（不满足时算子在tiling阶段直接报错，不做静默回退；报错会指出越界的参数并给出可执行的改法）：仅支持`topoType` = 0（MTE拓扑），Layered拓扑（`topoType` = 1或2）的去重请改用`combineCommMode` = 2；`combineQuantMode`必须为0（combine不量化），不支持与combine侧MX量化（`combineQuantMode` = 3或4）叠加；`combineCommMode` = 1、`topkWeightsType` = 0、预量化`x`这三者不能同时成立，开启卡内去重又要用预量化`x`时把`topkWeightsType`置为1即可（`topkWeightsType` = 1叠加预量化`x`是支持的，被拦截的只有`topkWeightsType` = 0这一种组合）；`numMaxTokensPerRank`需满足 `numMaxTokensPerRank` ≤ 128 × min(512, ⌊4608 / `topK`⌋)，该上限来自去重预处理在片上缓冲的分块容量、`topK`越大上限越小（常用取值：`topK` ≤ 9时上限65536，`topK` = 16时上限36864，`topK` = 32时上限18432），超限时报错会直接给出当前`topK`下的具体上限值。
+    - `combineCommMode` = 1时，同一token在同一张卡上的多个专家输出改为在该卡按FP32累加后一次转BF16发送，累加顺序与中间取整次数与关闭态不同，因此`y`与`combineCommMode` = 0的结果不逐位相同；在存在数值抵消的元素上相对偏差可能明显放大。需要与关闭态逐位一致时请使用`combineCommMode` = 0；切换该开关后请按目标形状重新做精度验证。
     - `combineCommMode` = 2时的能力约束（不满足时算子在tiling阶段直接报错，不做静默回退）：仅支持Layered拓扑（`topoType` = 1或2）；`combineQuantMode`必须为0（combine不量化）。该模式下同一域内各Rank的贡献先发往本域中继Rank归约，再由域间同编号中继回传聚合结果，累加路径与`combineCommMode` = 0不同，因此`y`与关闭态不逐位相同。
-    - `weightScales1`和`weightScales2`为必选输入，数据类型必须为FLOAT8_E8M0。
-    - `weight1`和`weight2`的数据类型必须一致，且仅支持FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1。此处的「一致」指同一专家组内部一致，MoE专家与共享专家之间可以采用不同的权重类型与量化类型。
-    - MoE专家与共享专家的量化配置不同时，仅`topoType` = 0（MTE拓扑）支持。
+    - A8W8-FP、A8W4-FP、A4W4-FP场景下`weightScales1`和`weightScales2`为必选输入，数据类型必须为FLOAT8_E8M0；A16W16场景下两者必须传入空指针，传入非空张量时算子在tiling阶段报错。
+    - `weight1`和`weight2`的数据类型必须一致，且仅支持BF16、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1，其中BF16对应A16W16场景。此处的「一致」指同一专家组内部一致，MoE专家与共享专家之间可以采用不同的权重类型与量化类型。
+    - MoE专家与共享专家的量化配置不同时，仅`topoType` = 0（MTE拓扑）支持；A16W16场景不允许两组配置不同，MoE专家与共享专家必须同时为A16W16。
     - `topkWeights`数据类型仅支持BF16或FP32。
     - `xActiveMask`当前版本不支持非空输入，需传入空指针。
     - `scales`仅在预量化直通（`dispatchQuantMode` = 0且`dispatchQuantOutDtype`为FLOAT8_E5M2、FLOAT8_E4M3FN或FLOAT4_E2M1）场景为必选，shape为(`BS`, CeilDiv(`H`, 32))，数据类型必须为FLOAT8_E8M0；其余场景必须传入空指针。
+    - A16W16场景的`weight1`、`weight2`、`sharedWeight1`、`sharedWeight2`的shape与TensorList布局与下文「MXFP量化场景约束」一致，区别仅在于该场景不需要`weightScales1`、`weightScales2`、`sharedWeightScales1`、`sharedWeightScales2`。
 
   - **MXFP量化场景约束**：
       - `weight1` shape为(`localMoeExpertNum`, 2 × `intermediateHidden`, `H`)，`weight2` shape为(`localMoeExpertNum`, `H`, `intermediateHidden`)。

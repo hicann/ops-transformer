@@ -114,7 +114,7 @@
   - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：支持A16W16、A8W8-INT和A8W4-INT场景。
   <!-- end id7 -->
   <!-- npu="950" id8 -->
-  - <term>Ascend 950PR&950DT系列产品</term>：支持A8W8-FP、A8W4-FP和A4W4-FP场景。
+  - <term>Ascend 950PR&950DT系列产品</term>：支持A16W16、A8W8-FP、A8W4-FP和A4W4-FP场景。
   <!-- end id8 -->
 
     <details>
@@ -483,7 +483,7 @@
     Y[i] = \sum_{k=0}^{K-1} W[i,\, k] \cdot O[\pi(i,\, k)] + \sum_{s=0}^{\text{shared\_expert\_num\_per\_rank}-1} O^{\mathrm{shared}}_s[i]
     $$
 
-    说明：对每个 Token $i$，根据排序后的路由索引 $\pi(i,k)$ 从聚合后的专家结果中取出对应行，按 `topk_weights` 中的权重逐元素加权累加，再直接加上各共享专家对当前 token 的输出，得到最终输出 $Y$。未启用共享专家时，共享专家求和项为零。
+    说明：对每个 Token $i$，根据排序后的路由索引 $\pi(i,k)$ 从聚合后的专家结果中取出对应行，按 `topk_weights` 中的权重逐元素加权累加，再直接加上各共享专家对当前 token 的输出，得到最终输出 $Y$。未启用共享专家时，共享专家求和项为零。topk_ids 中取 -1 的位置不参与上式求和；某个 Token 的 num_topk 个位置全为 -1 时，该 Token 的输出为全 0，且不叠加共享专家输出（-1 的支持范围详见约束说明）。
 
     其中，$X$ 表示参数 `x`，$W$ 表示参数 `topk_weights`，$W_1$ 表示参数 `l1_weights`，$W_2$ 表示参数 `l2_weights`，$Y$ 表示参数 `y`，$E_{\text{local}}$ 表示 `local_moe_expert_num = num_experts / ep_world_size`（每个 Rank 的路由 MoE 专家数），$K$ 表示 `topk_ids` 的第二维度。
 
@@ -563,7 +563,7 @@
     Y[i] = \sum_{k=0}^{K-1} W[i,k] \cdot O[\pi(i,k)] + \sum_{s=0}^{\text{shared\_expert\_num\_per\_rank}-1} O^{\mathrm{shared}}_s[i],
     $$
 
-    未启用共享专家时，共享专家求和项为零。最终输出 $Y$ 的数据类型为 BF16。A8W4-FP 的主要数据类型流为：`BF16 -> MXFP8 E4M3 -> A8W4 GMM1 -> MXFP8 E4M3 -> A8W4 GMM2 -> BF16`。
+    未启用共享专家时，共享专家求和项为零。topk_ids 中取 -1 的位置不参与上式求和；某个 Token 的 num_topk 个位置全为 -1 时，该 Token 的输出为全 0，且不叠加共享专家输出（-1 的支持范围详见约束说明）。最终输出 $Y$ 的数据类型为 BF16。A8W4-FP 的主要数据类型流为：`BF16 -> MXFP8 E4M3 -> A8W4 GMM1 -> MXFP8 E4M3 -> A8W4 GMM2 -> BF16`。
     </details>
 
     <details>
@@ -622,7 +622,7 @@
     Y[i] = \sum_{k=0}^{K-1} W[i,k] \cdot O[\pi(i,k)] + \sum_{s=0}^{\text{shared\_expert\_num\_per\_rank}-1} O^{\mathrm{shared}}_s[i],
     $$
 
-    未启用共享专家时，共享专家求和项为零。最终输出 $Y$ 的数据类型为 BF16。A4W4-FP 的完整数据类型流为：`BF16 -> MXFP4 E2M1 -> A4W4 GMM1 -> MXFP8 E4M3 -> A8W4 GMM2 -> BF16`。其中所有 MX 缩放因子的类型均为 `FLOAT8_E8M0`，量化粒度均为 32 个连续元素。
+    未启用共享专家时，共享专家求和项为零。topk_ids 中取 -1 的位置不参与上式求和；某个 Token 的 num_topk 个位置全为 -1 时，该 Token 的输出为全 0，且不叠加共享专家输出（-1 的支持范围详见约束说明）。最终输出 $Y$ 的数据类型为 BF16。A4W4-FP 的完整数据类型流为：`BF16 -> MXFP4 E2M1 -> A4W4 GMM1 -> MXFP8 E4M3 -> A8W4 GMM2 -> BF16`。其中所有 MX 缩放因子的类型均为 `FLOAT8_E8M0`，量化粒度均为 32 个连续元素。
     </details>
     <!-- end id23 -->
 
@@ -742,7 +742,7 @@ sym_buffer.update_group(group) -> None
         <td>dispatch_quant_out_dtype</td>
         <td>torch.dtype 或 int</td>
         <td>可选</td>
-        <td>dispatch量化后输出的数据类型。支持torch.int8、torch.FLOAT8_E5M2、torch.float8_e4m3fn、torch_npu.float4_e2m1fn_x2。其中FLOAT4_E2M1只能传类型枚举torch_npu.float4_e2m1fn_x2（int，取值296），不能传torch.dtype。dispatch_quant_mode为4时该参数表示算子内量化的输出类型；预量化直通场景（dispatch_quant_mode为0且该参数为FLOAT8_E5M2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）下表示预量化x的逻辑类型，此时必须与x的实际数据类型一致。各产品支持的取值、以及该参数是否必须显式指定见约束说明。默认值为None。</td>
+        <td>dispatch量化后输出的数据类型。支持torch.int8、torch.bfloat16、torch.float8_e5m2、torch.float8_e4m3fn、torch_npu.float4_e2m1fn_x2。其中FLOAT4_E2M1只能传类型枚举torch_npu.float4_e2m1fn_x2（int，取值296），不能传torch.dtype。dispatch_quant_mode为4时该参数表示算子内量化的输出类型；预量化直通场景（dispatch_quant_mode为0且该参数为torch.float8_e5m2、torch.float8_e4m3fn或torch_npu.float4_e2m1fn_x2）下表示预量化x的逻辑类型，此时必须与x的实际数据类型一致；各产品支持的取值、该参数是否必须显式指定、以及A16W16非量化场景（dispatch_quant_mode为0且x为bfloat16）下该参数怎么传，均见约束说明。默认值为None。</td>
     </tr>
     <tr>
         <td>combine_quant_mode</td>
@@ -779,10 +779,14 @@ sym_buffer.update_group(group) -> None
 <!-- end id33 -->
 
 <!-- npu="950" id29 -->
-- <term>Ascend 950PR&950DT系列产品</term>：`dispatch_quant_out_dtype`必须显式指定，保持默认值None会在创建`sym_buffer`时直接报错。
+- <term>Ascend 950PR&950DT系列产品</term>：`dispatch_quant_out_dtype`在两处的要求相反，不要混用。
+  - **算子属性层：不用传。** A16W16非量化场景（`dispatch_quant_mode` = 0且`x`为bfloat16）下算子属性要求为DT_UNDEFINED，`mega_moe`会按`x`的实际类型自动置为缺省，调用方不需要、也不应显式传入。
+  - **容量查询层：必须传。** `get_symm_buffer_for_mega_moe`创建`sym_buffer`的阶段还没有`x`可供推导类型，该参数是通信容量计算中唯一的类型来源——它决定dispatch记录的存储位宽（BF16为16bit、FP8为8bit、FP4为4bit）；容量查询按安全上界兜底的只是此刻尚未知的特征（核数、共享专家数、权重模式），并不包含该类型。因此A16W16场景必须显式传入torch.bfloat16（容量按BF16口径计算），保持默认值None会被参数校验直接拒绝。
 <!-- end id29 -->
 
 ### mega_moe
+
+下表中带上角标的数据类型或参数表示部分产品不支持，具体差异见下方各产品说明。
 
 <!-- npu="A3,910b" id9 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：不支持参数表上角标<sup>1</sup>的描述，不支持的参数使用默认值即可。
@@ -855,10 +859,10 @@ sym_buffer.update_group(group) -> None
         <td>(num_tokens, num_topk)</td>
     </tr>
     <tr>
-        <td rowspan="6">l1_weights</td>
-        <td rowspan="6">list[Tensor]</td>
-        <td rowspan="6">必选</td>
-        <td rowspan="6">MoE专家网络第一线性层的权重矩阵（包括门控与上投影），用于将输入映射至中间维度，输出供给激活函数。单卡MoE 专家数为 <code>local_moe_expert_num</code>。</td>
+        <td rowspan="7">l1_weights</td>
+        <td rowspan="7">list[Tensor]</td>
+        <td rowspan="7">必选</td>
+        <td rowspan="7">MoE专家网络第一线性层的权重矩阵（包括门控与上投影），用于将输入映射至中间维度，输出供给激活函数。单卡MoE 专家数为 <code>local_moe_expert_num</code>。</td>
         <td>bfloat16<sup>2</sup></td>
         <td>ND</td>
         <td>(hidden, 2 × intermediate_hidden)</td>
@@ -889,10 +893,15 @@ sym_buffer.update_group(group) -> None
         <td>(local_moe_expert_num, 2 × intermediate_hidden, hidden / 2)</td>
     </tr>
     <tr>
-        <td rowspan="6">l2_weights</td>
-        <td rowspan="6">list[Tensor]</td>
-        <td rowspan="6">必选</td>
-        <td rowspan="6">MoE专家网络第二线性层的权重矩阵，负责将激活后的中间特征投影回隐藏维度。数据类型与l1_weights一致。单卡 MoE 专家数为 <code>local_moe_expert_num</code>。</td>
+        <td>bfloat16<sup>1</sup></td>
+        <td>ND/FRACTAL_NZ</td>
+        <td>(local_moe_expert_num, 2 × intermediate_hidden, hidden)</td>
+    </tr>
+    <tr>
+        <td rowspan="7">l2_weights</td>
+        <td rowspan="7">list[Tensor]</td>
+        <td rowspan="7">必选</td>
+        <td rowspan="7">MoE专家网络第二线性层的权重矩阵，负责将激活后的中间特征投影回隐藏维度。数据类型与l1_weights一致。单卡 MoE 专家数为 <code>local_moe_expert_num</code>。</td>
         <td>bfloat16<sup>2</sup></td>
         <td>ND</td>
         <td>(intermediate_hidden, hidden)</td>
@@ -921,6 +930,11 @@ sym_buffer.update_group(group) -> None
         <td>FLOAT4_E2M1(uint8)<sup>1</sup></td>
         <td>FORMAT_FRACTAL_NZ_C0_32</td>
         <td>(local_moe_expert_num, hidden, intermediate_hidden / 2)</td>
+    </tr>
+    <tr>
+        <td>bfloat16<sup>1</sup></td>
+        <td>ND/FRACTAL_NZ</td>
+        <td>(local_moe_expert_num, hidden, intermediate_hidden)</td>
     </tr>
     <tr>
         <td>sym_buffer</td>
@@ -1023,10 +1037,10 @@ sym_buffer.update_group(group) -> None
         <td>不涉及</td>
     </tr>
     <tr>
-        <td rowspan="3">shared_l1_weights</td>
-        <td rowspan="3">list[Tensor]</td>
-        <td rowspan="3">可选</td>
-        <td rowspan="3">共享专家网络第一线性层的权重矩阵（包括门控与上投影），用于将输入映射至中间维度，输出供给激活函数。数据类型可以与MoE专家第一线性层权重l1_weights不同，支持MoE专家与共享专家采用不同的权重类型与量化类型（如MoE专家W8配共享专家W4、MoE专家W4配共享专家W8）；shared_l1_weights与shared_l2_weights的数据类型必须一致。该混合配置仅topo_type为0（MTE拓扑）时支持。</td>
+        <td rowspan="4">shared_l1_weights</td>
+        <td rowspan="4">list[Tensor]</td>
+        <td rowspan="4">可选</td>
+        <td rowspan="4">共享专家网络第一线性层的权重矩阵（包括门控与上投影），用于将输入映射至中间维度，输出供给激活函数。数据类型可以与MoE专家第一线性层权重l1_weights不同，支持MoE专家与共享专家采用不同的权重类型与量化类型（如MoE专家W8配共享专家W4、MoE专家W4配共享专家W8）；shared_l1_weights与shared_l2_weights的数据类型必须一致。该混合配置仅topo_type为0（MTE拓扑）时支持，且A16W16场景下两组必须同时为bfloat16。</td>
         <td>FLOAT8_E5M2</td>
         <td>ND</td>
         <td>(shared_expert_num_per_rank, 2 × intermediate_hidden, hidden)</td>
@@ -1042,10 +1056,15 @@ sym_buffer.update_group(group) -> None
         <td>(shared_expert_num_per_rank, 2 × intermediate_hidden, hidden / 2)</td>
     </tr>
     <tr>
-        <td rowspan="3">shared_l2_weights</td>
-        <td rowspan="3">list[Tensor]</td>
-        <td rowspan="3">可选</td>
-        <td rowspan="3">共享专家网络第二线性层的权重矩阵，负责将激活后的中间特征投影回隐藏维度。数据类型可以与MoE专家第二线性层权重l2_weights不同，取值要求同shared_l1_weights。</td>
+        <td>bfloat16</td>
+        <td>ND/FRACTAL_NZ</td>
+        <td>(shared_expert_num_per_rank, 2 × intermediate_hidden, hidden)</td>
+    </tr>
+    <tr>
+        <td rowspan="4">shared_l2_weights</td>
+        <td rowspan="4">list[Tensor]</td>
+        <td rowspan="4">可选</td>
+        <td rowspan="4">共享专家网络第二线性层的权重矩阵，负责将激活后的中间特征投影回隐藏维度。数据类型可以与MoE专家第二线性层权重l2_weights不同，取值要求同shared_l1_weights。</td>
         <td>FLOAT8_E5M2</td>
         <td>ND</td>
         <td>(shared_expert_num_per_rank, hidden, intermediate_hidden)</td>
@@ -1059,6 +1078,11 @@ sym_buffer.update_group(group) -> None
         <td>FLOAT4_E2M1(uint8)</td>
         <td>FORMAT_FRACTAL_NZ_C0_32</td>
         <td>(shared_expert_num_per_rank, hidden, intermediate_hidden / 2)</td>
+    </tr>
+    <tr>
+        <td>bfloat16</td>
+        <td>ND/FRACTAL_NZ</td>
+        <td>(shared_expert_num_per_rank, hidden, intermediate_hidden)</td>
     </tr>
     <tr>
         <td>shared_l1_weights_sf</td>
@@ -1112,7 +1136,7 @@ sym_buffer.update_group(group) -> None
 
 - **weight1_type**（int，可选）：权重1的逻辑数据类型。A8W8-FP场景可选，默认从l1_weights的Tensor数据类型推导；A8W4-FP和A4W4-FP场景必须设置为float4_e2m1fn_x2对应的类型枚举。取值必须与weight2_type一致。
 - **weight2_type**（int，可选）：权重2的逻辑数据类型。A8W8-FP场景可选，默认从l2_weights的Tensor数据类型推导；A8W4-FP和A4W4-FP场景必须设置为float4_e2m1fn_x2对应的类型枚举。取值必须与weight1_type一致。
-- **shared_expert_quant_out_dtype**（torch.dtype 或 int，可选）：共享专家输入的量化数据类型。默认值为None，表示与dispatch_quant_out_dtype保持一致；显式配置时支持float8_e5m2、float8_e4m3fn、torch_npu.float4_e2m1fn_x2，用于共享专家与MoE专家采用不同量化配置的场景。预量化直通（dispatch_quant_mode为0）场景下只能取None或与dispatch_quant_out_dtype相同。
+- **shared_expert_quant_out_dtype**（torch.dtype 或 int，可选）：共享专家输入的量化数据类型。默认值为None，表示与dispatch_quant_out_dtype保持一致；显式配置时支持float8_e5m2、float8_e4m3fn、torch_npu.float4_e2m1fn_x2、torch.bfloat16，用于共享专家与MoE专家采用不同量化配置的场景，其中torch.bfloat16对应A16W16场景、与保持默认值等效。预量化直通（dispatch_quant_mode为0且dispatch_quant_out_dtype为FP8或FP4类型）场景下只能取None或与dispatch_quant_out_dtype相同。
 - **shared_weight1_type**（int，可选）：共享专家第一线性层权重的逻辑数据类型，取值与weight1_type同口径。默认值为None，表示与weight1_type一致；MoE专家与共享专家采用不同权重类型（如MoE专家W8配共享专家W4）时必须显式设置。
 - **shared_weight2_type**（int，可选）：共享专家第二线性层权重的逻辑数据类型，取值与weight2_type同口径。默认值为None，表示与weight2_type一致；取值必须与shared_weight1_type一致。
 <!-- end id22 -->
@@ -1274,7 +1298,7 @@ sym_buffer.update_group(group) -> None
     </table>
 
   <!-- npu="950" id21 -->
-  - <term>Ascend 950PR&950DT系列产品</term>：MXFP场景支持两种TensorList布局。对于`l1_weights`、`l2_weights`、`l1_weights_sf`和`l2_weights_sf`，逐专家布局下四个TensorList的长度均为`local_moe_expert_num`，权重列表中的Tensor为二维，权重缩放因子列表中的Tensor为三维；堆叠布局下四个TensorList的长度均为1，权重Tensor为三维，权重缩放因子Tensor为四维，且各Tensor的dim0均为`local_moe_expert_num`。四个输入必须采用同一种布局；启用共享专家时，对应的四个共享专家输入也必须采用与MoE专家相同的布局。
+  - <term>Ascend 950PR&950DT系列产品</term>：A16W16与MXFP场景支持两种TensorList布局。对于`l1_weights`、`l2_weights`、`l1_weights_sf`和`l2_weights_sf`，逐专家布局下四个TensorList的长度均为`local_moe_expert_num`、每个元素是该专家的一份权重或缩放因子；堆叠布局下四个TensorList的长度均为1、唯一元素的首维为`local_moe_expert_num`。采用哪种布局由`l1_weights`中Tensor的维数决定，**启用共享专家时`shared_l1_weights`、`shared_l2_weights`、`shared_l1_weights_sf`和`shared_l2_weights_sf`必须与MoE专家侧采用同一种布局**，不可一侧逐专家、另一侧堆叠；两组的权重format仍可以不同。A16W16场景不需要缩放因子，只涉及权重两个TensorList。
   <!-- end id21 -->
   <!-- npu="A3,910b" id27 -->
   - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：`l1_weights`、`l2_weights`、`l1_weights_sf`、`l2_weights_sf`仅支持逐专家布局，四个TensorList的长度均为`num_experts_per_rank`（= `num_experts` / `ep_world_size`，与`local_moe_expert_num`同值）。
@@ -1475,38 +1499,41 @@ sym_buffer.update_group(group) -> None
     - `num_max_tokens_per_rank`取值范围[1, UINT32_MAX]，所有Rank取值必须一致，建议设置为`sym_buffer`复用期间所有Rank可能出现的最大单卡token数。超过原上界时需使用更大的上界重新创建`sym_buffer`。
     - hidden为逻辑隐藏维，范围[1024, 8192]，且各量化场景、各通信拓扑均要求hidden为64的倍数（topo_type = 0的MTE拓扑与topo_type = 1、2的Layered拓扑口径一致）。非打包类型下hidden = x.dim1，float4_e2m1以uint8打包传入时x.dim1 = hidden / 2。A4W4-FP场景仅支持l1_weights为FRACTAL_NZ格式。
     - num_topk（topk_ids.dim1）支持[1, 32]。
+    - topk_ids的元素除[0, num_experts)外还支持-1，表示该位置的路由被关闭：该位置不参与dispatch发送、也不参与combine加权累加，topk_weights中对应位置的权重不参与计算、取值任意（建议填0），无需对剩余有效权重重新归一化；某个token的num_topk个位置全为-1时该token的输出为全0，且不叠加共享专家输出。topk_weights_type = 1（topk_weights前移）下同样不发送关闭位置。仅topo_type = 0（MTE拓扑）支持-1，Layered拓扑（topo_type = 1或2）不支持。算子不校验topk_ids的元素值，取值合法性由调用方保证。
     - local_moe_expert_num（= num_experts / ep_world_size）范围 [1, 1024]；shared_expert_num_per_rank 另按 [0, 4] 单独约束，不计入该上限。
     - intermediate_hidden为l1_weights的Linear1输出宽度的一半，范围[256, 4096]且128对齐（即该输出宽度为2 × intermediate_hidden，范围[512, 8192]且256对齐），取值范围与`activation`无关。门控激活将该宽度按gate、up各分一半，激活输出宽度为intermediate_hidden；"gelu"为逐元素激活、不拆分，激活输出宽度即2 × intermediate_hidden。
     - ep_world_size范围 [2, 1024]。
     - num_experts范围 [ep_world_size, 2048]，且num_experts % ep_world_size == 0。
     - max_recv_token_num范围 [0, num_max_tokens_per_rank × ep_world_size × min(num_topk, local_moe_expert_num)]；建议保持默认值0，由接口自动计算接收容量。实际生效的接收行数（取默认值0时为自动计算结果）必须不超过UINT32_MAX，超出时算子在tiling阶段报错，不做静默截断。
-    - dispatch_quant_out_dtype仅支持torch.FLOAT8_E5M2、torch.float8_e4m3fn或torch_npu.float4_e2m1fn_x2（该值是整型枚举，取值296；FLOAT4_E2M1只能以该整型枚举传入，不能传torch.dtype）。
+    - dispatch_quant_out_dtype支持torch.float8_e5m2、torch.float8_e4m3fn、torch_npu.float4_e2m1fn_x2（该值是整型枚举，取值296；FLOAT4_E2M1只能以该整型枚举传入，不能传torch.dtype），以及A16W16场景的torch.bfloat16。
     - dispatch_quant_mode取值为0或4。4表示算子内部对bfloat16的x做MX逐组量化（group size = 32，量化缩放因子类型为FLOAT8_E8M0），对应A8W8-FP、A8W4-FP、A4W4-FP场景；0表示预量化直通，即x已经是量化后的数据、算子内部不再量化，缩放因子由scales入参给出。
-    - 预量化直通（dispatch_quant_mode = 0）的约束：x的数据类型必须与dispatch_quant_out_dtype指定的逻辑类型一致；scales为必选；仅支持topo_type = 0（MTE拓扑），Layered拓扑（topo_type = 1或2）均不支持；shared_expert_quant_out_dtype只能取None或与dispatch_quant_out_dtype相同。
+    - 预量化直通（dispatch_quant_mode = 0且dispatch_quant_out_dtype为FLOAT8_E5M2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）的约束：x的数据类型必须与dispatch_quant_out_dtype指定的逻辑类型一致；scales为必选；仅支持topo_type = 0（MTE拓扑），Layered拓扑（topo_type = 1或2）均不支持；shared_expert_quant_out_dtype只能取None或与dispatch_quant_out_dtype相同。
     - x_active_mask当前版本必须传入None，不支持非空输入。
     - scales仅在预量化直通（dispatch_quant_mode = 0且dispatch_quant_out_dtype为FLOAT8_E5M2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）场景为必选，数据类型为FLOAT8_E8M0，shape为(num_tokens, CeilDiv(hidden, 32))；其余场景必须传入None。
+    - A16W16非量化直通（dispatch_quant_mode = 0且x为bfloat16）的约束：创建`sym_buffer`时dispatch_quant_out_dtype传torch.bfloat16（下发算子时自动改为缺省）；l1_weights、l2_weights必须同为bfloat16，启用共享专家时shared_l1_weights、shared_l2_weights也必须同为bfloat16，不允许MoE专家与共享专家一侧为A16W16、另一侧为量化场景；l1_weights_sf、l2_weights_sf、shared_l1_weights_sf、shared_l2_weights_sf与scales均必须传入None；shared_expert_quant_out_dtype取None或torch.bfloat16均可，两者等效；同一专家组内两层权重的format必须同为ND或同为FRACTAL_NZ，MoE专家组与共享专家组的format可以不同，共ND/ND、ND/NZ、NZ/ND、NZ/NZ四种组合；仅支持topo_type = 0（MTE拓扑），combine_quant_mode必须为0。以上任一条不满足，算子在tiling阶段报错，不做静默回退。
     - combine_quant_mode当前支持0（非量化）、3（MX模式FLOAT8_E5M2类型）、4（MX模式float8_e4m3类型）。
     - comm_alg为预留参数，保持默认空字符串""即可。
     - y的数据类型固定为bfloat16。
     - **通信去重约束**：
         - combine_comm_mode取值为0、1或2：0表示关闭combine阶段通信去重，1表示MTE卡内去重，2表示URMA或URMA+RoCE混合拓扑的Server内归约及域间二级回传。两种开启方式按拓扑分流：MTE拓扑只接受0或1，Layered拓扑只接受0或2，配错一律在tiling阶段报错。模式2要求combine_quant_mode=0，且y与模式0不逐位相同。是否开启完全由调用方决定，算子内部不做收益裁决。适用场景：num_topk较大、同一token命中同卡多个专家的比例较高、性能瓶颈在通信的形状，开启后收益明显；专家数多且瓶颈在计算的形状可能没有收益甚至变慢，建议按实际形状实测后再决定。
         - combine_comm_mode在`get_symm_buffer_for_mega_moe`处设置，`mega_moe`调用时从`sym_buffer`继承，无需重复传入；同一通信域内所有Rank必须配置相同取值，否则跨卡的通信记录布局不一致会导致读写错位。
-        - combine_comm_mode = 1（开启combine卡内去重）有以下四条能力约束。任一条不满足，算子都在tiling阶段直接报错，不做静默回退，需要调用方把combine_comm_mode改回0。
+        - combine_comm_mode = 1（开启combine卡内去重）有以下四条能力约束。任一条不满足，算子都在tiling阶段直接报错，不做静默回退；报错会指出越界的那个参数并给出可执行的改法。
             - **拓扑**：仅支持topo_type = 0（MTE拓扑）。topo_type = 1或2（Layered拓扑）下不支持combine_comm_mode = 1，该拓扑的去重请使用combine_comm_mode = 2。
             - **combine量化**：combine_quant_mode必须为0（combine不量化）。combine_comm_mode = 1不支持与combine侧MX量化（combine_quant_mode = 3或4）叠加。
             - **预量化x**：combine_comm_mode = 1、topk_weights_type = 0、预量化x，这三者不能同时成立。此处的预量化x指预量化直通场景（dispatch_quant_mode = 0且dispatch_quant_out_dtype为FLOAT8_E5M2、float8_e4m3fn或torch_npu.float4_e2m1fn_x2）下传入的已量化x。开启combine卡内去重又要用预量化x时，请把topk_weights_type置为1（topk_weights_type = 1叠加预量化x是支持的，被拦截的只有topk_weights_type = 0这一种组合）。
             - **单卡token数上限**：num_max_tokens_per_rank ≤ 128 × min(512, ⌊4608 / num_topk⌋)。该上限来自去重预处理（prepass）在UB上的分块容量，num_topk越大上限越小。常用取值：num_topk ≤ 9时上限65536，num_topk = 16时上限36864，num_topk = 32时上限18432。超限时报错会直接给出当前num_topk下的具体上限值。
         - combine_comm_mode = 1时，同一token在同一张卡上的多个专家输出改为在该卡按float32累加后一次转bfloat16发送，累加顺序与中间取整次数与关闭态不同，因此y与combine_comm_mode = 0的结果不逐位相同。偏差来源是bfloat16累加顺序与中间取整次数的差异，在存在数值抵消的元素上相对偏差可能明显放大；需要与关闭态逐位一致时请使用combine_comm_mode = 0，切换该开关后请按目标形状重新做精度验证。
     - 门控激活下l1_weights的Linear1输出维等于2 × intermediate_hidden、l2_weights的输入维等于intermediate_hidden；"gelu"下l1_weights的Linear1输出维等于2 × intermediate_hidden、l2_weights的输入维等于2 × intermediate_hidden。不满足时算子在tiling阶段报错。
-    - l1_weights_sf和l2_weights_sf不可为空指针。
+    - A8W8-FP、A8W4-FP、A4W4-FP场景下l1_weights_sf和l2_weights_sf不可为None；A16W16场景下两者必须传入None，传入非空张量时算子在tiling阶段报错。
     - local_moe_expert_num = num_experts / ep_world_size；启用共享专家时，shared_expert_num_per_rank = shared_l1_weights.dim0；num_experts_per_rank = shared_expert_num_per_rank + local_moe_expert_num，未启用共享专家时 shared_expert_num_per_rank = 0。
     - shared_expert_num_per_rank范围 [0, 4]。
     - topo_type由通信域上下文自动推导。0表示MTE拓扑，1表示URMA跨超节点拓扑，2表示域内URMA、域间RoCE的混合拓扑。
     - URMA+RoCE混合拓扑要求UB域等宽且域内group rank连续，rank_num_per_server表示每个UB域的rank数，取值范围[1, ep_world_size]且必须整除ep_world_size（该校验对topo_type = 1与2同时生效），不满足时算子在tiling阶段报错；域内使用UB_CTP，域间使用RoCE，由extension查询RankGraph决定，不按物理主机数推断。支持combine_comm_mode=0（普通回传）或2（Server内归约及域间二级回传）；模式2要求combine_quant_mode=0，域内贡献通过URMA WriteWithNotifyNbi发送，域间聚合结果通过RoCE batch WriteNbi回传。
+    - topo_type = 2（URMA与RoCE混合拓扑）要求算子包构建时配套的算子编程开发工具包与通信基础库版本均不低于9.3.0，Layered拓扑（topo_type = 1或2）整体要求均不低于9.2.0。低于该版本的算子包不包含对应拓扑的执行分支，此时tiling阶段不会拦截、kernel不执行任何计算，y与expert_token_nums不会被写入，算子也不会主动报错或回退；使用这两类拓扑前请先确认算子包的配套组件版本。
     - Layered拓扑（topo_type为1或2）下，`activation`仅支持"swiglu"、"situglu"和"gelu"，不支持"swiglustep"和"swigluoai"。
     - topk_weights_type取值为0或1，0表示关闭topk_weights前移，1表示开启。
     - 通信buffer由`get_symm_buffer_for_mega_moe`自动计算并申请，用户无需自行计算或设置`ccl_buffer_size`。
-    - l1_weights和l2_weights的数据类型必须一致，且仅支持FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1。
+    - l1_weights和l2_weights的数据类型必须一致，且仅支持bfloat16、FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1，其中bfloat16对应A16W16场景。
     - topk_weights数据类型仅支持BF16或FP32。
 
     - **MXFP量化场景约束**：
@@ -1519,7 +1546,7 @@ sym_buffer.update_group(group) -> None
         - A8W4-FP场景下，FLOAT4_E2M1类型的l1_weights必须使用FORMAT_FRACTAL_NZ_C0_32格式；A4W4-FP场景下，FLOAT4_E2M1类型的l1_weights必须使用FRACTAL_NZ格式。两种场景的l2_weights均必须使用FORMAT_FRACTAL_NZ_C0_32格式。启用共享专家时，shared_l1_weights和shared_l2_weights的格式按共享专家自身的量化类型确定（W8走ND或FRACTAL_NZ、W4走FRACTAL_NZ或FORMAT_FRACTAL_NZ_C0_32），与l1_weights、l2_weights的格式可以不同。
         - A8W8-FP场景下，l1_weights和l2_weights必须同为FLOAT8_E5M2或同为FLOAT8_E4M3FN，`weight1_type`和`weight2_type`可省略并从权重Tensor的数据类型推导。A8W4-FP和A4W4-FP场景下，两层权重均为FLOAT4_E2M1，必须显式将`weight1_type`和`weight2_type`设置为`float4_e2m1fn_x2`对应的类型枚举，且两者一致。
         - x_active_mask必须为None；dispatch_quant_mode = 4（算子内部量化）时scales必须为None，dispatch_quant_mode = 0（预量化直通）时scales为必选。
-    - 支持三种计算场景（A8W8-FP、A8W4-FP、A4W4-FP），不同场景下可选入参（缩放因子、偏置等）的必需性及数据类型有严格配套要求。调用时必须根据所选场景完整提供对应参数，不可混用或遗漏，配套关系见下表。下表按dispatch_quant_mode = 4（算子内部量化）列出；dispatch_quant_mode = 0（预量化直通）时，x的数据类型改为与dispatch_quant_out_dtype相同（FLOAT8_E5M2、FLOAT8_E4M3FN或FLOAT4_E2M1），scales为必选且数据类型为FLOAT8_E8M0，y仍为BFLOAT16，其余各列不变。
+    - 支持四种计算场景（A16W16、A8W8-FP、A8W4-FP、A4W4-FP），不同场景下可选入参（缩放因子、偏置等）的必需性及数据类型有严格配套要求。调用时必须根据所选场景完整提供对应参数，不可混用或遗漏，配套关系见下表。下表按dispatch_quant_mode = 4（算子内部量化）列出A8W8-FP、A8W4-FP、A4W4-FP三种量化场景；dispatch_quant_mode = 0（预量化直通）时，x的数据类型改为与dispatch_quant_out_dtype相同（FLOAT8_E5M2、FLOAT8_E4M3FN或FLOAT4_E2M1），scales为必选且数据类型为FLOAT8_E8M0，y仍为BFLOAT16，其余各列不变。A16W16场景单独列为表内第一行，其dispatch_quant_mode固定为0。
         <table>
         <thead>
             <tr>
@@ -1538,6 +1565,19 @@ sym_buffer.update_group(group) -> None
         </thead>
         <tbody>
             <tr>
+            <td><strong>A16W16</strong></td>
+            <td>BFLOAT16</td>
+            <td>BFLOAT16</td>
+            <td>BFLOAT16</td>
+            <td>–</td>
+            <td>–</td>
+            <td>–</td>
+            <td>–</td>
+            <td>BFLOAT16</td>
+            <td>0</td>
+            <td>torch.bfloat16</td>
+            </tr>
+            <tr>
             <td><strong>A8W8-FP</strong></td>
             <td>BFLOAT16</td>
             <td>FLOAT8_E5M2</td>
@@ -1548,7 +1588,7 @@ sym_buffer.update_group(group) -> None
             <td>–</td>
             <td>BFLOAT16</td>
             <td>4</td>
-            <td>torch.FLOAT8_E5M2</td>
+            <td>torch.float8_e5m2</td>
             </tr>
             <tr>
             <td><strong>A8W8-FP</strong></td>
@@ -1599,7 +1639,7 @@ sym_buffer.update_group(group) -> None
             </tr>
         </tfoot>
         </table>
-    - **共享专家独立量化的支持组合**：启用共享专家（shared_expert_num_per_rank > 0）时，MoE专家与共享专家的量化场景**各自独立确定**，可以取不同场景（例如MoE专家走A8W4-FP、共享专家走A8W8-FP）。**两组取不同量化配置仅在topo_type = 0（MTE拓扑）下支持**，topo_type = 1或2下两组的量化场景与量化输出类型必须完全相同，否则算子在tiling阶段报错。每一组的场景由该组自己的「量化输出类型 + 权重数据类型 + 两层权重format」三者共同决定，对应关系见下表；在上述拓扑前提下两组各自按下表任取一行，算子不再对组合本身做额外限制，但仍须同时满足表下方的四条跨组约束。
+    - **共享专家独立量化的支持组合**：启用共享专家（shared_expert_num_per_rank > 0）时，MoE专家与共享专家的量化场景**各自独立确定**，可以取不同场景（例如MoE专家走A8W4-FP、共享专家走A8W8-FP）。**两组取不同量化配置仅在topo_type = 0（MTE拓扑）下支持**，topo_type = 1或2下两组的量化场景与量化输出类型必须完全相同，否则算子在tiling阶段报错。每一组的场景由该组自己的「量化输出类型 + 权重数据类型 + 两层权重format」三者共同决定，对应关系见下表；在上述拓扑前提下两组各自按下表任取一行，算子不再对组合本身做额外限制，但仍须同时满足表下方的五条跨组约束。**A16W16是例外：该场景下两组必须同时取A16W16行，不在「任取一行」的范围内。**
         <table>
         <thead>
             <tr>
@@ -1611,6 +1651,13 @@ sym_buffer.update_group(group) -> None
             </tr>
         </thead>
         <tbody>
+            <tr>
+            <td><strong>A16W16</strong></td>
+            <td>torch.bfloat16（或缺省None）</td>
+            <td>bfloat16</td>
+            <td>ND 或 FRACTAL_NZ</td>
+            <td>与第一层权重相同</td>
+            </tr>
             <tr>
             <td><strong>A8W8-FP</strong></td>
             <td>FLOAT8_E5M2</td>
@@ -1654,12 +1701,13 @@ sym_buffer.update_group(group) -> None
         </tfoot>
         </table>
 
-        跨组约束（四条，均在tiling阶段校验）：
+        跨组约束（五条，均在tiling阶段校验）：
 
         - 两组量化配置不同（场景不同或量化输出类型不同）时，仅支持topo_type = 0（MTE拓扑）；topo_type = 1或2下两组的量化配置必须完全相同。
         - 预量化直通（dispatch_quant_mode = 0）时，shared_expert_quant_out_dtype只能取None或与dispatch_quant_out_dtype相同，即此时两组的**量化输出类型必须一致**，仅**权重类型**仍可不同。
         - 共享专家的权重类型由shared_weight1_type、shared_weight2_type指定，省略时从shared_l1_weights、shared_l2_weights的数据类型推导；W4场景（权重为FLOAT4_E2M1）下必须显式指定为float4_e2m1fn_x2对应的类型枚举，且两者一致。
         - shared_expert_quant_out_dtype默认值None表示与dispatch_quant_out_dtype保持一致；两组的权重format各自按本组场景取值，可以不同（例如MoE专家为FORMAT_FRACTAL_NZ_C0_32、共享专家为ND）。
+        - A16W16场景下两组必须同时为A16W16：l1_weights、l2_weights、shared_l1_weights、shared_l2_weights全部为bfloat16，不允许一侧A16W16、另一侧量化；此时shared_expert_quant_out_dtype取None或torch.bfloat16均可。
 
   <!-- end id18 -->
 
