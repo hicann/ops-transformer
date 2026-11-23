@@ -90,6 +90,9 @@ constexpr uint32_t MSA_AIV_PER_AIC = 2;
 constexpr uint32_t MSA_A5_S_PING_ROWS = MSA_ROW_TILE_M / MSA_AIV_PER_AIC;
 constexpr uint32_t MSA_A5_S_PING_ELEM_NUM = MSA_A5_S_PING_ROWS * MSA_BLOCK_SIZE;
 constexpr uint32_t MSA_A5_S_PING_BYTES = MSA_A5_S_PING_ELEM_NUM * static_cast<uint32_t>(sizeof(float));
+// block16 一次 MMAD 最多并几个 128 列窗。nWin=4 时 L0C 单级放下 128×512。
+constexpr uint32_t MSA_BLOCK16_MAX_WIN_GROUP = 4;
+constexpr uint32_t MSA_A5_S_PING_BYTES_B16 = MSA_A5_S_PING_ROWS * MSA_BLOCK16_MAX_WIN_GROUP * MSA_BLOCK_SIZE * 2U;
 // UB 手工布局 512B 对齐。
 constexpr uint32_t MSA_UB_ALIGN_BYTES = 512;
 
@@ -174,9 +177,10 @@ constexpr uint16_t MSA_FLAG_K_READY_3 = 6;
 // Ascend 950 MIX：MODE4 下 AIC 分别给两个 AIV 置位，flagId+16。
 constexpr uint32_t MSA_A5_SYNC_MODE4 = 4;
 constexpr uint16_t MSA_A5_AIV_FLAG_OFFSET = 16;
-constexpr uint16_t MSA_A5_FLAG_CV = 0; // Cube→Vector：S 已在 GM/UB
-constexpr uint16_t MSA_A5_FLAG_VC = 2; // Vector→Cube：UB slot 可覆盖
-constexpr uint16_t MSA_A5_FLAG_K = 4;  // Vector→Cube：K scratch 就绪
+constexpr uint16_t MSA_A5_FLAG_CV = 0;       // Cube→Vector：S 已在 GM/UB
+constexpr uint16_t MSA_A5_FLAG_VC = 2;       // Vector→Cube：UB slot 可覆盖
+constexpr uint16_t MSA_A5_FLAG_K = 4;        // Vector→Cube：K scratch 就绪
+constexpr uint16_t MSA_A5_FLAG_L1B_FREE = 5; // Cube→Vector0：L1B 单槽可覆盖
 
 // TND 保持打包行：globalRow * D。BSND 在 batch 内同样是 (token, head) 连续行。
 MSA_FN uint64_t MsaQueryTileElem(uint32_t queryLayout, uint32_t batchIdx, uint32_t cuQStart, uint32_t mStart,
@@ -203,16 +207,10 @@ MSA_FN uint64_t MsaSeqKeyBlockElem(uint32_t keyLayout, uint32_t batchIdx, uint32
     return static_cast<uint64_t>(cuKStart + localTok) * numKvHeads * headDim;
 }
 
-// block16 一次 MMAD 最多并几个 128 列窗。nWin=4 + N512：L0C 单级 128×512。
-constexpr uint32_t MSA_BLOCK16_MAX_WIN_GROUP = 4;
-constexpr uint32_t MSA_A5_S_PING_BYTES_B16 = MSA_A5_S_PING_ROWS * MSA_BLOCK16_MAX_WIN_GROUP * MSA_BLOCK_SIZE * 2U;
-
-constexpr uint32_t MSA_MX_GROUP = 32;
-
 } // namespace MsaIndexScoreNs
 
 // TilingKey：按 query dtype × key 是否 int8 分支。
-// 模式编号同时用于 Host 选路与 schMode 模板注册；保持已有数值编码。
+// 模式编号同时用于 Host 选路与 schMode 模板注册；保持库上已有的数值编码。
 #define MSA_TILING_KEY_BF16 0
 #define MSA_TILING_KEY_FP16 1
 #define MSA_TILING_KEY_BF16_INT8 2
@@ -220,7 +218,7 @@ constexpr uint32_t MSA_MX_GROUP = 32;
 #define MSA_TILING_KEY_HIFLOAT8 4
 #define MSA_TILING_KEY_FP8_E5M2 5
 #define MSA_TILING_KEY_FP8_E4M3FN 6
-// 块长 16（BSND/BNSD，或 BBND/BNBD 页长 16）：独立 TilingKey，128 路径保持原样。
+// 块长 16（BSND/BNSD，或 BBND/BNBD 页长 16）：独立 TilingKey。
 #define MSA_TILING_KEY_BF16_BLK16 7
 #define MSA_TILING_KEY_FP16_BLK16 8
 // 950：max 之后再做 topk。A2/A3 的 13/14 只预留，本阶段 tiling 不发出。
@@ -230,10 +228,45 @@ constexpr uint32_t MSA_MX_GROUP = 32;
 #define MSA_TILING_KEY_FP8_E4M3FN_TOPK 12
 #define MSA_TILING_KEY_BF16_TOPK_A2 13
 #define MSA_TILING_KEY_FP16_TOPK_A2 14
+#define MSA_TILING_KEY_MXFP4 15
+#define MSA_TILING_KEY_MXFP4_BLK16 16
+#define MSA_TILING_KEY_MXFP4_TOPK 18
+#define MSA_TILING_KEY_MXFP4_PREFILL 19
+#define MSA_TILING_KEY_MXFP4_LATENCY 23
+
+// 块长 16 的 FP8、压缩页和直读模式。
+#define MSA_TILING_KEY_FP8_E4M3FN_BLK16 44
+#define MSA_TILING_KEY_FP8_E5M2_BLK16 45
+#define MSA_TILING_KEY_FP8_E4M3FN_COMPRESSED_PAGE 46
+#define MSA_TILING_KEY_FP8_E5M2_COMPRESSED_PAGE 47
+#define MSA_TILING_KEY_BF16_COMPRESSED_PAGE 48
+#define MSA_TILING_KEY_FP16_COMPRESSED_PAGE 49
+#define MSA_TILING_KEY_FP8_E4M3FN_PIPELINED 50
+#define MSA_TILING_KEY_FP8_E5M2_PIPELINED 51
+#define MSA_TILING_KEY_FP8_E4M3FN_PIPELINED_TOPK 52
+#define MSA_TILING_KEY_FP8_E5M2_PIPELINED_TOPK 53
+#define MSA_TILING_KEY_FP8_E4M3FN_BALANCED 54
+#define MSA_TILING_KEY_FP8_E5M2_BALANCED 55
+#define MSA_TILING_KEY_FP8_E4M3FN_BALANCED_TOPK 56
+#define MSA_TILING_KEY_FP8_E5M2_BALANCED_TOPK 57
+#define MSA_TILING_KEY_FP8_E4M3FN_PIPELINED_BYPASS 58
+#define MSA_TILING_KEY_FP8_E5M2_PIPELINED_BYPASS 59
+#define MSA_TILING_KEY_FP8_E4M3FN_PIPELINED_TOPK_BYPASS 60
+#define MSA_TILING_KEY_FP8_E5M2_PIPELINED_TOPK_BYPASS 61
+#define MSA_TILING_KEY_FP8_E4M3FN_BALANCED_BYPASS 62
+#define MSA_TILING_KEY_FP8_E5M2_BALANCED_BYPASS 63
+#define MSA_TILING_KEY_FP8_E4M3FN_BALANCED_TOPK_BYPASS 64
+#define MSA_TILING_KEY_FP8_E5M2_BALANCED_TOPK_BYPASS 65
+#define MSA_TILING_KEY_BF16_DIRECT_FLOAT 66
+#define MSA_TILING_KEY_FP16_DIRECT_FLOAT 67
+
+constexpr uint32_t MSA_MX_GROUP = 32;
+constexpr uint32_t MSA_BLOCK16_MX_SCALE_SCRATCH_BYTES = 64U * 1024U;
 
 constexpr uint32_t MSA_RETURN_SCORE = 0;
 constexpr uint32_t MSA_RETURN_INDICES = 1;
 constexpr uint32_t MSA_RETURN_INDICES_VALUES = 2;
+constexpr uint32_t MSA_BLOCK16_TOPK = 128;
 constexpr uint32_t MSA_TOPK_DEFAULT = 16;
 constexpr uint32_t MSA_TOPK_MAX = 128;
 constexpr uint32_t MSA_TOPK_TRUNK = 1024;
@@ -270,11 +303,5 @@ MSA_FN constexpr uint32_t MsaAlignUpPow2(uint32_t value, uint32_t align)
 {
     return (value + align - 1U) & ~(align - 1U);
 }
-
-#define MSA_TILING_KEY_MXFP4 15
-#define MSA_TILING_KEY_MXFP4_BLK16 16
-#define MSA_TILING_KEY_MXFP4_TOPK 18
-#define MSA_TILING_KEY_MXFP4_PREFILL 19
-#define MSA_TILING_KEY_MXFP4_LATENCY 23
 
 #endif // MSA_INDEX_SCORE_COMMON_H

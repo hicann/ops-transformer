@@ -39,9 +39,11 @@ ACLNN_API aclnnStatus aclnnMsaIndexScoreV2GetWorkspaceSize(
     const aclTensor* queryScaleOptional, const aclTensor* keyScaleOptional, const aclTensor* attenMaskOptional,
     const aclTensor* actualSeqQlenOptional, const aclTensor* actualSeqKlenOptional, char* layoutKeyOptional,
     int64_t sparseMode, int64_t initBlocks, int64_t localBlocks, char* layoutQueryOptional, int64_t poolBlockSize,
-    int64_t compressFactor, const aclTensor* score, uint64_t* workspaceSize, aclOpExecutor** executor)
+    int64_t returnChoice, int64_t topk, int64_t compressFactor, const aclTensor* score, const aclTensor* sparseIndices,
+    const aclTensor* sparseValues, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    if (score == nullptr) {
+    // Score is optional only when V2 returns fused TopK outputs.
+    if (returnChoice == 0 && score == nullptr) {
         return ACLNN_ERR_PARAM_NULLPTR;
     }
     // 缺省归一：空 / 空串回落 TND；poolBlockSize 非正数回落 128（host tiling 再做 16/128 白名单校验）。
@@ -52,7 +54,8 @@ ACLNN_API aclnnStatus aclnnMsaIndexScoreV2GetWorkspaceSize(
     const aclnnStatus ret = aclnnInnerMsaIndexScoreGetWorkspaceSize(
         query, key, startLoc, blockTableOptional, queryScaleOptional, keyScaleOptional, attenMaskOptional,
         actualSeqQlenOptional, actualSeqKlenOptional, layoutKeyOptional, sparseMode, initBlocks, localBlocks,
-        layoutQuery, poolBlockSizeNorm, 0, 16, compressFactor, score, nullptr, nullptr, workspaceSize, executor);
+        layoutQuery, poolBlockSizeNorm, returnChoice, topk, compressFactor, score, sparseIndices, sparseValues,
+        workspaceSize, executor);
     return ret;
 }
 

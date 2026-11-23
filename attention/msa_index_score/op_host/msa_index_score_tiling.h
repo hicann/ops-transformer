@@ -87,6 +87,11 @@ TILING_DATA_FIELD_DEF(uint32_t, topk)
 TILING_DATA_FIELD_DEF(uint32_t, scoreWorkspaceElems)
 // MXFP4 score template: 0=N256, 1=N512.
 TILING_DATA_FIELD_DEF(uint32_t, mxFp4WideN)
+// Extensions for the pool_block_size=16 path.
+TILING_DATA_FIELD_DEF(uint32_t, compressFactor)
+TILING_DATA_FIELD_DEF(uint32_t, rowsPerBlock)
+TILING_DATA_FIELD_DEF(uint32_t, totalTasks)
+TILING_DATA_FIELD_DEF(uint64_t, mxScaleScratchOffset)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(MsaIndexScore, MsaIndexScoreTilingData)
 
@@ -99,7 +104,9 @@ struct MsaIndexScoreInfo {
     uint32_t numQHeads = 0;
     uint32_t numKvHeads = 0;
     uint32_t headDim = 0;
-    uint32_t poolBlockSize = 0;
+    uint32_t poolBlockSize = 128;
+    uint32_t compressFactor = 1;
+    uint32_t rowsPerBlock = 128;
     uint32_t maxBlocksPerBatch = 0;
     uint32_t numPages = 0;
     uint32_t sparseMode = 3;

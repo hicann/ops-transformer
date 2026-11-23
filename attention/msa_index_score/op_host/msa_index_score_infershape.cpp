@@ -19,6 +19,7 @@
 
 #include <cstring>
 #include "../op_kernel/msa_index_score_common.h"
+#include "msa_index_score_output.h"
 
 using MsaIndexScoreNs::MSA_KEY_LAYOUT_BBND;
 using MsaIndexScoreNs::MSA_KEY_LAYOUT_BNBD;
@@ -43,13 +44,13 @@ constexpr uint32_t MSA_QUERY_DIM_NUM = 3;
 constexpr uint32_t MSA_KEY_TND_DIM_NUM = 3;
 constexpr uint32_t MSA_KEY_PA_DIM_NUM = 4;
 constexpr uint32_t MSA_BLOCK_TABLE_DIM_NUM = 2;
-constexpr uint32_t MSA_SCORE_DIM_BLOCK = 2;
 constexpr int64_t MSA_KLEN_PREFIX_MIN = 2; // actual_seq_klen 为 [B+1]
 constexpr uint32_t MSA_ATTR_LAYOUT_KEY = 0;
 constexpr uint32_t MSA_ATTR_LAYOUT_QUERY = 4;
 constexpr uint32_t MSA_ATTR_POOL_BLOCK_SIZE = 5;
 constexpr uint32_t MSA_ATTR_RETURN_CHOICE = 6;
 constexpr uint32_t MSA_ATTR_TOPK = 7;
+constexpr uint32_t MSA_ATTR_COMPRESS_FACTOR = 8;
 constexpr int64_t MSA_SCORE_STRIDE_ALIGN = 16;
 constexpr int64_t MSA_BLOCK_SIZE = 128;
 constexpr int64_t MSA_BLOCK16_SIZE = 16;
@@ -71,9 +72,10 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
     const gert::Shape* keyShape = context->GetInputShape(MSA_KEY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
     const gert::Shape* blockTableShape = context->GetOptionalInputShape(MSA_BLOCK_TABLE_INDEX);
-    gert::Shape* scoreShape = context->GetOutputShape(0);
-    gert::Shape* indicesShape = context->GetOutputShape(1);
-    gert::Shape* valuesShape = context->GetOutputShape(2);
+    using namespace MsaIndexScoreOutput;
+    auto* scoreShape = context->GetOutputShape(RuntimeIndex(context, SCORE));
+    auto* indicesShape = context->GetOutputShape(RuntimeIndex(context, INDICES));
+    auto* valuesShape = context->GetOutputShape(RuntimeIndex(context, VALUES));
 
     auto attrs = context->GetAttrs();
     const char* layoutKeyPtr = (attrs != nullptr) ? attrs->GetStr(MSA_ATTR_LAYOUT_KEY) : nullptr;
@@ -87,8 +89,11 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
     OP_CHECK_IF(returnChoice != 0 && returnChoice != 1 && returnChoice != 2,
                 OP_LOGE(context, "return_choice must be 0, 1 or 2, got %ld.", returnChoice), return ge::GRAPH_FAILED);
     const int64_t* topkPtr = (attrs != nullptr) ? attrs->GetInt(MSA_ATTR_TOPK) : nullptr;
-    const int64_t topk = (topkPtr == nullptr || *topkPtr <= 0) ? 16 : *topkPtr;
-    if (returnChoice == 0 && scoreShape == nullptr) {
+    const int64_t topk = topkPtr == nullptr ? MSA_TOPK_DEFAULT : *topkPtr;
+    const bool topkOut = returnChoice != MSA_RETURN_SCORE;
+    OP_CHECK_IF(topkOut && (topk < 1 || topk > MSA_TOPK_MAX),
+                OP_LOGE(context, "topk must be in [1, %u], got %ld.", MSA_TOPK_MAX, topk), return ge::GRAPH_FAILED);
+    if (!topkOut && scoreShape == nullptr) {
         OP_LOGE(context, "score is required when return_choice=0.");
         return ge::GRAPH_FAILED;
     }
@@ -99,6 +104,21 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
                 OP_LOGE(context, "pool_block_size must be %ld or %ld, got %ld.", MSA_BLOCK_SIZE, MSA_BLOCK16_SIZE,
                         poolBlockSizeAttr),
                 return ge::GRAPH_FAILED);
+    const bool block16 = poolBlockSizeAttr == MSA_BLOCK16_SIZE;
+    const int64_t* compressPtr = attrs == nullptr ? nullptr : attrs->GetInt(MSA_ATTR_COMPRESS_FACTOR);
+    const int64_t compressFactor = compressPtr == nullptr ? 1 : *compressPtr;
+    if (block16) {
+        OP_CHECK_IF(compressFactor < 1 || compressFactor > MSA_BLOCK16_SIZE || MSA_BLOCK16_SIZE % compressFactor != 0,
+                    OP_LOGE(context, "compress_factor(%ld) must divide pool_block_size=16.", compressFactor),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(topkOut && topk != MSA_BLOCK16_TOPK,
+                    OP_LOGE(context, "pool_block_size=16 requires topk=%u, got %ld.", MSA_BLOCK16_TOPK, topk),
+                    return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF(compressFactor != 1, OP_LOGE(context, "compress_factor only supports 1, got %ld.", compressFactor),
+                    return ge::GRAPH_FAILED);
+    }
+    const int64_t rowsPerBlock = poolBlockSizeAttr / compressFactor;
     uint32_t keyLayout = MSA_KEY_LAYOUT_BBND;
     uint32_t queryLayout = MSA_QUERY_LAYOUT_TND;
     if (std::strcmp(layoutKey, "TND") == 0) {
@@ -194,13 +214,13 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
                         context->GetNodeName(), "block_table",
                         (std::to_string(blockTableShape->GetDimNum()) + "D").c_str(), "block_table must have 2 dims"),
                     return ge::GRAPH_FAILED);
-        // 页长仍须整除 pool_block_size：一个打分块从同一张物理页连续取出。
+        // 一个打分块从同一张物理页连续取出。
         const int64_t pageLen = (std::strcmp(layoutKey, "BBND") == 0) ? keyShape->GetDim(1) : keyShape->GetDim(2);
-        OP_CHECK_IF(pageLen <= 0 || poolBlockSizeAttr <= 0 || pageLen % poolBlockSizeAttr != 0,
-                    OP_LOGE(context, "BBND/BNBD page size(%ld) must be a positive multiple of pool_block_size(%ld).",
-                            pageLen, poolBlockSizeAttr),
+        OP_CHECK_IF(pageLen <= 0 || pageLen % rowsPerBlock != 0,
+                    OP_LOGE(context, "BBND/BNBD page size(%ld) must be a positive multiple of block rows(%ld).",
+                            pageLen, rowsPerBlock),
                     return ge::GRAPH_FAILED);
-        maxBlocks = blockTableShape->GetDim(1) * (pageLen / poolBlockSizeAttr);
+        maxBlocks = blockTableShape->GetDim(1) * (pageLen / rowsPerBlock);
     } else {
         const size_t expectRank = (keyLayout == MSA_KEY_LAYOUT_TND) ? MSA_KEY_TND_DIM_NUM : MSA_KEY_PA_DIM_NUM;
         OP_CHECK_IF(keyShape->GetDimNum() != expectRank,
@@ -242,10 +262,10 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
             }
         } else if (keyLayout == MSA_KEY_LAYOUT_TND) {
             const int64_t totalK = keyShape->GetDim(0);
-            maxBlocks = (totalK + seqBlock - 1) / seqBlock;
+            maxBlocks = (totalK + rowsPerBlock - 1) / rowsPerBlock;
         } else {
             const int64_t seq = (keyLayout == MSA_KEY_LAYOUT_BSND) ? keyShape->GetDim(1) : keyShape->GetDim(2);
-            maxBlocks = (seq + seqBlock - 1) / seqBlock;
+            maxBlocks = (seq + rowsPerBlock - 1) / rowsPerBlock;
         }
         const auto* queryDesc = context->GetInputDesc(MSA_QUERY_INDEX);
         const auto* keyDesc = context->GetInputDesc(MSA_KEY_INDEX);
@@ -271,38 +291,9 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
     // pool_block_size=16 再做 head 间 max，每个块只剩一个分数，head 维为 1。
     const int64_t scoreHeads = (poolBlockSizeAttr == MSA_BLOCK16_SIZE) ? 1 : numQHeads;
     const int64_t scoreStride = RoundUpTo(maxBlocks, MSA_SCORE_STRIDE_ALIGN);
-    if (scoreShape != nullptr) {
-        scoreShape->SetDimNum(MSA_QUERY_DIM_NUM);
-        scoreShape->SetDim(0, scoreHeads);
-        scoreShape->SetDim(1, totalQ); // 1: totalQ
-        scoreShape->SetDim(MSA_SCORE_DIM_BLOCK, scoreStride);
-    }
-    auto setEmpty = [](gert::Shape* shape) {
-        if (shape == nullptr) {
-            return;
-        }
-        shape->SetDimNum(1);
-        shape->SetDim(0, 0);
-    };
-    if (returnChoice == 0) {
-        setEmpty(indicesShape);
-        setEmpty(valuesShape);
-    } else if (returnChoice == 1 || returnChoice == 2) {
-        if (indicesShape != nullptr) {
-            indicesShape->SetDimNum(MSA_QUERY_DIM_NUM);
-            indicesShape->SetDim(0, scoreHeads);
-            indicesShape->SetDim(1, totalQ);
-            indicesShape->SetDim(2, topk);
-        }
-        if (returnChoice == 2 && valuesShape != nullptr) {
-            valuesShape->SetDimNum(MSA_QUERY_DIM_NUM);
-            valuesShape->SetDim(0, scoreHeads);
-            valuesShape->SetDim(1, totalQ);
-            valuesShape->SetDim(2, topk);
-        } else {
-            setEmpty(valuesShape);
-        }
-    }
+    SetShape(scoreShape, !topkOut, scoreHeads, totalQ, scoreStride);
+    SetShape(indicesShape, topkOut, scoreHeads, totalQ, topk);
+    SetShape(valuesShape, returnChoice == MSA_RETURN_INDICES_VALUES, scoreHeads, totalQ, topk);
 
     OP_LOGI(context->GetNodeName(), "MsaIndexScore InferShape end.");
     return ge::GRAPH_SUCCESS;
@@ -312,10 +303,19 @@ static ge::graphStatus InferDataTypeMsaIndexScore(gert::InferDataTypeContext* co
 {
     OP_CHECK_IF(context == nullptr, OP_LOGE("MsaIndexScore", "InferDataTypeContext is nullptr!"),
                 return ge::GRAPH_FAILED);
-    // score 恒为 fp32：Cube 以 fp32 累加，下游 topk 直接消费 fp32。
-    context->SetOutputDataType(0, ge::DT_FLOAT);
-    context->SetOutputDataType(1, ge::DT_INT32);
-    context->SetOutputDataType(2, ge::DT_FLOAT);
+    // 块长 16 的 score 写出为 fp16。块长 128 仍是 fp32。TopK 的 sparse_values 保持 fp32。
+    ge::DataType scoreType = ge::DT_FLOAT;
+    const auto* attrs = context->GetAttrs();
+    if (attrs != nullptr) {
+        const int64_t* pool = attrs->GetInt(MSA_ATTR_POOL_BLOCK_SIZE);
+        if (pool != nullptr && *pool == static_cast<int64_t>(MSA_BLOCK16_SIZE)) {
+            scoreType = ge::DT_FLOAT16;
+        }
+    }
+    using namespace MsaIndexScoreOutput;
+    context->SetOutputDataType(RuntimeIndex(context, SCORE), scoreType);
+    context->SetOutputDataType(RuntimeIndex(context, INDICES), ge::DT_INT32);
+    context->SetOutputDataType(RuntimeIndex(context, VALUES), ge::DT_FLOAT);
     return ge::GRAPH_SUCCESS;
 }
 

@@ -24,6 +24,7 @@
 #if (__CCE_AICORE__ == 310)
 #include "arch35/msa_index_score_kernel_arch35.h"
 #include "arch35/msa_mxfp4_kernel.h"
+#include "arch35/fp8_pipeline/msa_fp8_pipeline_adapter.h"
 #else
 #include "arch22/msa_index_score_kernel_arch22.h"
 #endif
@@ -50,6 +51,34 @@ using namespace MsaIndexScoreNs;
 #define MSA_INVOKE_KERNEL_TOPK(ElementQ) \
     do { \
         MsaIndexScoreKernel<ElementQ, false, false, (MSA_A5_USE_C2UB != 0), false, false, true> op; \
+        op.Init(query, key, blockTable, keyScale, actualSeqQlen, actualSeqKlen, startLoc, score, sparseIndices, \
+                sparseValues, userWs, tilingData); \
+        op.Process(); \
+    } while (0)
+
+#define MSA_INVOKE_KERNEL_COMPRESSED_PAGE(ElementQ) \
+    do { \
+        MsaIndexScoreKernel<ElementQ, false, true, (MSA_A5_USE_C2UB != 0), false, false, false, false, false, true> \
+            op; \
+        op.Init(query, key, blockTable, keyScale, actualSeqQlen, actualSeqKlen, startLoc, score, sparseIndices, \
+                sparseValues, userWs, tilingData); \
+        op.Process(); \
+    } while (0)
+
+#define MSA_INVOKE_KERNEL_FP8_PIPELINED(ElementQ, Fused, Balanced, Bypass) \
+    do { \
+        if (!RunNativeFp8Pipeline<ElementQ, Fused, Balanced, Bypass>(query, key, blockTable, actualSeqQlen, \
+                                                                     actualSeqKlen, score, userWs, sparseIndices, \
+                                                                     sparseValues, tilingData)) { \
+            MSA_INVOKE_KERNEL_COMPRESSED_PAGE(ElementQ); \
+        } \
+    } while (0)
+
+#define MSA_INVOKE_KERNEL_DIRECT_FLOAT(ElementQ) \
+    do { \
+        MsaIndexScoreKernel<ElementQ, false, true, (MSA_A5_USE_C2UB != 0), false, false, false, false, false, true, \
+                            true> \
+            op; \
         op.Init(query, key, blockTable, keyScale, actualSeqQlen, actualSeqKlen, startLoc, score, sparseIndices, \
                 sparseValues, userWs, tilingData); \
         op.Process(); \
@@ -110,7 +139,7 @@ __global__ __aicore__ void msa_index_score(GM_ADDR query, GM_ADDR key, GM_ADDR s
     } else if constexpr (schMode == MSA_TILING_KEY_MXFP4_BLK16) {
         MsaMxFp4Kernel<> op;
         op.Init(query, key, blockTable, queryScale, keyScale, actualSeqQlen, actualSeqKlen, startLoc, score, userWs,
-                tilingData);
+                tilingData, sparseIndices, sparseValues);
         op.ProcessBlock16();
     } else if constexpr (schMode == MSA_TILING_KEY_MXFP4_PREFILL) {
         MsaMxFp4Kernel<> op;
@@ -122,6 +151,54 @@ __global__ __aicore__ void msa_index_score(GM_ADDR query, GM_ADDR key, GM_ADDR s
         op.Init(query, key, blockTable, queryScale, keyScale, actualSeqQlen, actualSeqKlen, startLoc, score, userWs,
                 tilingData);
         op.ProcessLatency();
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E4M3FN_BLK16) {
+        MSA_INVOKE_KERNEL_BLK16(fp8_e4m3fn_t);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E4M3FN_COMPRESSED_PAGE) {
+        MSA_INVOKE_KERNEL_COMPRESSED_PAGE(fp8_e4m3fn_t);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E4M3FN_PIPELINED) {
+        MSA_INVOKE_KERNEL_FP8_PIPELINED(fp8_e4m3fn_t, false, false, false);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E4M3FN_PIPELINED_TOPK) {
+        MSA_INVOKE_KERNEL_FP8_PIPELINED(fp8_e4m3fn_t, true, false, false);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E4M3FN_BALANCED) {
+        MSA_INVOKE_KERNEL_FP8_PIPELINED(fp8_e4m3fn_t, false, true, false);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E4M3FN_BALANCED_TOPK) {
+        MSA_INVOKE_KERNEL_FP8_PIPELINED(fp8_e4m3fn_t, true, true, false);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E4M3FN_PIPELINED_BYPASS) {
+        MSA_INVOKE_KERNEL_FP8_PIPELINED(fp8_e4m3fn_t, false, false, true);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E4M3FN_PIPELINED_TOPK_BYPASS) {
+        MSA_INVOKE_KERNEL_FP8_PIPELINED(fp8_e4m3fn_t, true, false, true);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E4M3FN_BALANCED_BYPASS) {
+        MSA_INVOKE_KERNEL_FP8_PIPELINED(fp8_e4m3fn_t, false, true, true);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E4M3FN_BALANCED_TOPK_BYPASS) {
+        MSA_INVOKE_KERNEL_FP8_PIPELINED(fp8_e4m3fn_t, true, true, true);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E5M2_BLK16) {
+        MSA_INVOKE_KERNEL_BLK16(fp8_e5m2_t);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E5M2_COMPRESSED_PAGE) {
+        MSA_INVOKE_KERNEL_COMPRESSED_PAGE(fp8_e5m2_t);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E5M2_PIPELINED) {
+        MSA_INVOKE_KERNEL_FP8_PIPELINED(fp8_e5m2_t, false, false, false);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E5M2_PIPELINED_TOPK) {
+        MSA_INVOKE_KERNEL_FP8_PIPELINED(fp8_e5m2_t, true, false, false);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E5M2_BALANCED) {
+        MSA_INVOKE_KERNEL_FP8_PIPELINED(fp8_e5m2_t, false, true, false);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E5M2_BALANCED_TOPK) {
+        MSA_INVOKE_KERNEL_FP8_PIPELINED(fp8_e5m2_t, true, true, false);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E5M2_PIPELINED_BYPASS) {
+        MSA_INVOKE_KERNEL_FP8_PIPELINED(fp8_e5m2_t, false, false, true);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E5M2_PIPELINED_TOPK_BYPASS) {
+        MSA_INVOKE_KERNEL_FP8_PIPELINED(fp8_e5m2_t, true, false, true);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E5M2_BALANCED_BYPASS) {
+        MSA_INVOKE_KERNEL_FP8_PIPELINED(fp8_e5m2_t, false, true, true);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP8_E5M2_BALANCED_TOPK_BYPASS) {
+        MSA_INVOKE_KERNEL_FP8_PIPELINED(fp8_e5m2_t, true, true, true);
+    } else if constexpr (schMode == MSA_TILING_KEY_BF16_COMPRESSED_PAGE) {
+        MSA_INVOKE_KERNEL_COMPRESSED_PAGE(bfloat16_t);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP16_COMPRESSED_PAGE) {
+        MSA_INVOKE_KERNEL_COMPRESSED_PAGE(half);
+    } else if constexpr (schMode == MSA_TILING_KEY_BF16_DIRECT_FLOAT) {
+        MSA_INVOKE_KERNEL_DIRECT_FLOAT(bfloat16_t);
+    } else if constexpr (schMode == MSA_TILING_KEY_FP16_DIRECT_FLOAT) {
+        MSA_INVOKE_KERNEL_DIRECT_FLOAT(half);
 #endif
     }
 }

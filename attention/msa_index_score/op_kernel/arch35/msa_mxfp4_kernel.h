@@ -73,7 +73,7 @@ public:
 
     __aicore__ inline void ProcessBlock16()
     {
-        Run<true, true>();
+        Run<true, false>();
     }
 
 private:

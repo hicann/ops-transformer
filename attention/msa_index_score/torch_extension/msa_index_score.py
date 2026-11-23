@@ -52,7 +52,7 @@ def _normalize_layout_key(layout_key: Optional[str]) -> str:
 class MsaIndexScoreOpBuilder(OpBuilder):
     def __init__(self):
         super(MsaIndexScoreOpBuilder, self).__init__(
-            "msa_index_score", category="attention"
+            "_msa_index_score", category="attention"
         )
 
     def sources(self):
@@ -61,9 +61,9 @@ class MsaIndexScoreOpBuilder(OpBuilder):
 
     def schema(self) -> str:
         # Positional order must match the public Python API: query, key, start_loc.
-        # cann_ops_transformer.__init__ re-exports torch.ops once the schema exists.
+        # Keep the Python entry point separate from the single-output dispatcher.
         return (
-            "msa_index_score(Tensor query, Tensor key, Tensor start_loc, "
+            "_msa_index_score(Tensor query, Tensor key, Tensor start_loc, "
             "Tensor? block_table=None, Tensor? query_scale=None, Tensor? key_scale=None, "
             "Tensor? atten_mask=None, Tensor? actual_seq_qlen=None, Tensor? actual_seq_klen=None, "
             '*, str layout_key="BBND", int sparse_mode=3, int init_blocks=0, int local_blocks=1, '
@@ -282,7 +282,7 @@ def msa_index_score(
         if return_choice == 1:
             return outputs[0]
         return outputs[0], outputs[1]
-    return torch.ops.cann_ops_transformer.msa_index_score(
+    return torch.ops.cann_ops_transformer._msa_index_score(
         query,
         key,
         start_loc,

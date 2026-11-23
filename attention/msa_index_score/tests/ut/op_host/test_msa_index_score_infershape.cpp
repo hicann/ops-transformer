@@ -306,3 +306,59 @@ TEST_F(MsaIndexScoreProto, MsaIndexScore_inferdtype)
         EXPECT_EQ(context->GetOutputDataType(2), f32Dtype);
     }
 }
+
+TEST_F(MsaIndexScoreProto, MsaIndexScore_infershape_optional_outputs)
+{
+    using Description = gert::InfershapeContextPara::TensorDescription;
+    using Ops::Transformer::AnyValue;
+    const std::vector<Description> inputs = {
+        {{{32, 8, 128}, {32, 8, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        {{{2, 128, 1, 128}, {2, 128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},
+        {{{1, 2}, {1, 2}}, ge::DT_INT32, ge::FORMAT_ND},
+        {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        {{{0}, {0}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        {{{0}, {0}}, ge::DT_INT8, ge::FORMAT_ND},
+        {{{2}, {2}}, ge::DT_INT32, ge::FORMAT_ND},
+        {{{1}, {1}}, ge::DT_INT32, ge::FORMAT_ND},
+    };
+    const std::vector<uint32_t> inputInstances(inputs.size(), 1);
+    for (const int64_t pool : {128, 16}) {
+        const int64_t heads = pool == 16 ? 1 : 8;
+        const int64_t topk = pool == 16 ? 128 : 7;
+        const int64_t compressFactor = pool == 16 ? 4 : 1;
+        const int64_t stride = pool == 16 ? 64 : 16;
+        const ge::DataType scoreType = pool == 16 ? ge::DT_FLOAT16 : ge::DT_FLOAT;
+        const std::vector<Description> outputs = {
+            {{{}, {}}, scoreType, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        };
+        const std::vector<int64_t> empty = {0};
+        const std::vector<int64_t> score = {heads, 32, stride};
+        const std::vector<int64_t> selected = {heads, 32, topk};
+        for (const int64_t mode : {0, 1, 2}) {
+            SCOPED_TRACE(testing::Message() << "pool=" << pool << " return_choice=" << mode);
+            const std::vector<gert::InfershapeContextPara::OpAttr> attrs = {
+                {"layout_key", AnyValue::CreateFrom<std::string>("BBND")},
+                {"sparse_mode", AnyValue::CreateFrom<int64_t>(0)},
+                {"init_blocks", AnyValue::CreateFrom<int64_t>(0)},
+                {"local_blocks", AnyValue::CreateFrom<int64_t>(0)},
+                {"layout_query", AnyValue::CreateFrom<std::string>("TND")},
+                {"pool_block_size", AnyValue::CreateFrom<int64_t>(pool)},
+                {"return_choice", AnyValue::CreateFrom<int64_t>(mode)},
+                {"topk", AnyValue::CreateFrom<int64_t>(topk)},
+                {"compress_factor", AnyValue::CreateFrom<int64_t>(compressFactor)},
+            };
+            gert::InfershapeContextPara full("MsaIndexScore", inputs, outputs, attrs);
+            ExecuteTestCase(full, ge::GRAPH_SUCCESS,
+                            {mode == 0 ? score : empty, mode == 0 ? empty : selected, mode == 2 ? selected : empty});
+
+            if (mode == 2) {
+                gert::InfershapeContextPara compact("MsaIndexScore", inputs, {outputs[1], outputs[2]}, attrs,
+                                                    inputInstances, {0, 1, 1});
+                ExecuteTestCase(compact, ge::GRAPH_SUCCESS, {selected, selected});
+            }
+        }
+    }
+}

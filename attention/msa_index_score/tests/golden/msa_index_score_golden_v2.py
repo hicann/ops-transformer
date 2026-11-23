@@ -15,10 +15,12 @@
 
 - sparse_mode=0：无因果，仅 actual_seq_klen 截断
 - sparse_mode=3：rightDownCausal，visible_end = actual_seq_klen - q_len + t_off + 1
-- local_mask：窗口锚在请求的 start_loc 上，同一请求的每个 token 共用。
-  另外要求 blk < visibleEndBlk。visibleEndBlk 用该行所在 128 行 M-tile 的最后一行计算。
+- 块长 16：块内与跨 head 两次 max，乘以 D**(-0.5) * log2(e) 后转为 FP16。
+  score 保留真实分值，强制选块只作用于 TopK。
+- 块长 128：local_mask 锚在请求的 start_loc 上，并要求 blk < visibleEndBlk。
 """
 
+import math
 from dataclasses import dataclass
 from typing import Optional
 
@@ -141,9 +143,10 @@ def msa_index_score_golden_v2(inputs):
             k = key.astype(np.float32)[:, 0, :, :]
         else:
             k = key.astype(np.float32)[:, :, 0, :]
-        # 分页逻辑块数是页表宽度。score 末维按这个宽度 16 对齐，超出页表的列保持 -inf。
+        # 页表宽度是物理页数。逻辑块数 = 页数 × (页长 / pool_block_size)，与 kernel 写回列一致。
         page_size = int(key.shape[2] if is_bnbd else key.shape[1])
-        max_blocks = int(block_table.shape[1]) if block_table is not None else 1
+        page_count = int(block_table.shape[1]) if block_table is not None else 1
+        max_blocks = page_count * (page_size // pool_block_size)
     score_stride = round_up(max_blocks, SCORE_STRIDE_ALIGN)
     is_quant = np.issubdtype(key.dtype, np.integer)
 
@@ -175,7 +178,8 @@ def msa_index_score_golden_v2(inputs):
             kv = int(actual_seq_klen[b])
         num_blocks = (kv + pool_block_size - 1) // pool_block_size if kv > 0 else 0
         if not is_tnd and block_table is not None:
-            num_blocks = min(num_blocks, int(block_table.shape[1]))
+            logical_limit = int(block_table.shape[1]) * (page_size // pool_block_size)
+            num_blocks = min(num_blocks, logical_limit)
         q_block = int(start_loc[b])
         local_start = max(0, q_block + 1 - int(local_blocks))
 
@@ -206,10 +210,14 @@ def msa_index_score_golden_v2(inputs):
                 if pool_block_size == 16:
                     # 先在每个 head 内做 block maxpool，再对该 block 取 head 间 max。
                     # 归约结果只留在 head 0，返回前丢掉其余 head。
-                    out[0, t, blk] = s.max(axis=1).max()
+                    out[0, t, blk] = np.float16(
+                        s.max() * np.float32(q.shape[-1] ** -0.5 * math.log2(math.e))
+                    )
                 else:
                     out[:, t, blk] = s.max(axis=1)
 
+            if pool_block_size == 16:
+                continue
             total_rows = q_len * num_q_heads
             for h in range(num_q_heads):
                 visible_end_blk = _tile_visible_end_blk(
@@ -230,9 +238,8 @@ def msa_index_score_golden_v2(inputs):
                         boost = LOCAL_SCORE_INIT
                     if local_start <= blk <= q_block:
                         boost = LOCAL_SCORE_LOCAL
-                    if boost is not None and (pool_block_size != 16 or h == 0):
-                        dst_h = 0 if pool_block_size == 16 else h
-                        out[dst_h, t, blk] = boost
+                    if boost is not None:
+                        out[h, t, blk] = boost
 
     if pool_block_size == 16:
         return out[:1].copy()

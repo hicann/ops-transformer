@@ -19,7 +19,7 @@
  * 长 KV decode（q4 × 275 page，950 S-split）、
  * 长序列多 S-tile 轮转、block_table 乱序、
  * 无效尾填充、q_len/kv_len=0 的 mixed-batch pad、bf16 / fp16 双 dtype、
- * int8 key 前融合反量化、PA BNBD、TND packed key、A2/A3 与 950 PA key dim0 非连续。
+ * PA BNBD、TND packed key、A2/A3 与 950 PA key dim0 非连续。
  */
 
 #include <algorithm>
@@ -36,6 +36,21 @@
 #include "acl/acl.h"
 #include "aclnnop/aclnn_msa_index_score_v2.h"
 #include "securec.h"
+
+extern "C" aclnnStatus aclnnInnerMsaIndexScoreGetWorkspaceSize(
+    const aclTensor*, const aclTensor*, const aclTensor*, const aclTensor*, const aclTensor*, const aclTensor*,
+    const aclTensor*, const aclTensor*, const aclTensor*, char*, int64_t, int64_t, int64_t, char*, int64_t, int64_t,
+    int64_t, int64_t, const aclTensor*, const aclTensor*, const aclTensor*, uint64_t*, aclOpExecutor**);
+extern "C" aclnnStatus aclnnInnerMsaIndexScore(void*, uint64_t, aclOpExecutor*, aclrtStream);
+static aclnnStatus MsaWorkspace(const aclTensor* q, const aclTensor* k, const aclTensor* bt, const aclTensor* ks,
+                                const aclTensor* mask, const aclTensor* qlen, const aclTensor* klen,
+                                const aclTensor* start, const aclTensor* qs, char* lk, int64_t sm, int64_t ib,
+                                int64_t lb, char* lq, int64_t pool, int64_t mode, int64_t cf, const aclTensor* score,
+                                const aclTensor* indices, const aclTensor* values, uint64_t* ws, aclOpExecutor** exec)
+{
+    return aclnnMsaIndexScoreV2GetWorkspaceSize(q, k, start, bt, qs, ks, mask, qlen, klen, lk, sm, ib, lb, lq, pool,
+                                                mode, 128, cf, mode == 0 ? score : nullptr, indices, values, ws, exec);
+}
 
 namespace {
 
@@ -121,6 +136,7 @@ int64_t ResolvedMaxSeq(int64_t configured, const std::vector<int32_t>& lens)
 
 // PA 页长 16。原有路径为 BLOCK_SIZE(128)。
 constexpr int64_t kBlock16Size = 16;
+constexpr int64_t kBlock16TopK = 128;
 
 std::string LayoutKeyName(KeyLayout layout)
 {
@@ -160,8 +176,8 @@ struct TestCase {
     std::vector<int32_t> qLen;     // 每个请求的 query 长度
     std::vector<int32_t> kvLen;    // 每个请求可见的 kv 长度
     std::vector<int32_t> startLoc; // 当前 query 所在逻辑 block 索引（local_mask）
-    bool useBf16;
-    bool useInt8Key; // true: key=int8，scale=[NP,N_kv,P] 或 TND [T2,N2]
+    bool useBf16 = false;
+    bool useInt8Key = false; // true: key=int8，scale=[NP,N_kv,P] 或 TND [T2,N2]
     int64_t sparseMode = kSparseModeRightDown;
     KeyLayout keyLayout = KeyLayout::BBND;
     // 0=无；1=float8_e4m3fn；2=float8_e5m2。仅 950，query/key 同型。
@@ -176,6 +192,12 @@ struct TestCase {
     // BSND/BNSD 的定长 S。0 表示取该侧各请求长度的最大值。大于实际长度时尾部是 padding。
     int64_t qMaxSeq = 0;
     int64_t kMaxSeq = 0;
+    // 0：比对完整 score。1：比对 sparse_indices。2：再比对同序 sparse_values。
+    int64_t returnScore = 0;
+    // 1：key 未压缩。大于 1 时 kvLen 是压缩前 token 数，key 里只有 ceil(kvLen / compressFactor) 行。
+    int64_t compressFactor = 1;
+    int64_t initBlocks = 0;
+    int64_t localBlocks = 1;
 };
 
 template <typename T>
@@ -215,6 +237,19 @@ int64_t CeilDivI64(int64_t a, int64_t b)
 int64_t RoundUpI64(int64_t a, int64_t b)
 {
     return CeilDivI64(a, b) * b;
+}
+
+// compress_factor>1 时 BSND/BNSD 的 S 是压缩行槽，不是原始 token 数。
+int64_t CompressedKSeq(const TestCase& tc)
+{
+    if (tc.kMaxSeq > 0) {
+        return tc.kMaxSeq;
+    }
+    int64_t seq = 0;
+    for (int32_t len : tc.kvLen) {
+        seq = std::max<int64_t>(seq, len <= 0 ? 0 : CeilDivI64(len, tc.compressFactor));
+    }
+    return seq;
 }
 
 constexpr int32_t kRowTileM = 128;
@@ -426,6 +461,96 @@ private:
     std::vector<aclTensor*> tensors_;
 };
 
+/// compress_factor>1：kvLen 是压缩前 token 数，key 按 ceil(token/cf) 行存放。
+/// 行 c 覆盖 token [c*cf, (c+1)*cf)，可见当且仅当 c*cf <= position。
+float TopKScoreScale(int64_t headDim);
+
+void ComputeGoldenCompressed(const TestCase& tc, const std::vector<int32_t>& actualSeqQlen,
+                             const std::vector<int32_t>& actualSeqKlen, const std::vector<int32_t>& blockTable,
+                             int64_t maxBlocks, int64_t scoreStride, int64_t totalQ, const std::vector<float>& queryF,
+                             const std::vector<float>& keyF, std::vector<float>& golden, int64_t blockLen)
+{
+    const int64_t cf = tc.compressFactor;
+    const int64_t rowsPerBlock = blockLen / cf;
+    const int64_t batch = static_cast<int64_t>(tc.qLen.size());
+    golden.assign(static_cast<size_t>(tc.numQHeads * totalQ * scoreStride), kNegInf);
+    int64_t cuRows = 0;
+    for (int64_t b = 0; b < batch; ++b) {
+        const int32_t qBegin = actualSeqQlen[b];
+        const int32_t qLen = actualSeqQlen[b + 1] - qBegin;
+        const int32_t tokenLen = tc.kvLen[b];
+        const int64_t kc = tokenLen <= 0 ? 0 : CeilDivI64(tokenLen, cf);
+        const int64_t numBlocks = tokenLen <= 0 ? 0 : CeilDivI64(tokenLen, blockLen);
+        const int64_t rowBase = (tc.keyLayout == KeyLayout::TND) ? cuRows : 0;
+        for (int32_t tOff = 0; tOff < qLen; ++tOff) {
+            const int32_t t = qBegin + tOff;
+            int32_t visibleRows = static_cast<int32_t>(kc);
+            if (tc.sparseMode == kSparseModeRightDown) {
+                const int32_t position = tokenLen - qLen + tOff;
+                visibleRows = position < 0 ? 0 : position / static_cast<int32_t>(cf) + 1;
+            }
+            if (visibleRows > static_cast<int32_t>(kc)) {
+                visibleRows = static_cast<int32_t>(kc);
+            }
+            for (int64_t h = 0; h < tc.numQHeads; ++h) {
+                for (int64_t blk = 0; blk < numBlocks; ++blk) {
+                    const int64_t row0 = blk * rowsPerBlock;
+                    float best = 0.0F;
+                    bool any = false;
+                    for (int64_t r = row0; r < row0 + rowsPerBlock && r < visibleRows; ++r) {
+                        float acc = 0.0F;
+                        for (int64_t d = 0; d < tc.headDim; ++d) {
+                            int64_t keyIdx = 0;
+                            if (tc.keyLayout == KeyLayout::TND) {
+                                keyIdx = ((rowBase + r) * NUM_KV_HEADS) * tc.headDim + d;
+                            } else if (IsBatchSeqLayout(tc.keyLayout)) {
+                                const int64_t kSeq = CompressedKSeq(tc);
+                                keyIdx = (tc.keyLayout == KeyLayout::BNSD) ?
+                                             (b * NUM_KV_HEADS * kSeq + r) * tc.headDim + d :
+                                             (b * kSeq * NUM_KV_HEADS + r * NUM_KV_HEADS) * tc.headDim + d;
+                            } else {
+                                // 页长按压缩行计。一个打分块占 rowsPerBlock 行，多块共享同一物理页。
+                                const int64_t pageSlot = r / blockLen;
+                                const int64_t rowInPage = r % blockLen;
+                                const int32_t page = blockTable[static_cast<size_t>(b * maxBlocks + pageSlot)];
+                                keyIdx = (tc.keyLayout == KeyLayout::BNBD) ?
+                                             (static_cast<int64_t>(page) * NUM_KV_HEADS * blockLen + rowInPage) *
+                                                     tc.headDim +
+                                                 d :
+                                             ((static_cast<int64_t>(page) * blockLen + rowInPage) * NUM_KV_HEADS) *
+                                                     tc.headDim +
+                                                 d;
+                            }
+                            acc +=
+                                queryF[((t * tc.numQHeads) + h) * tc.headDim + d] * keyF[static_cast<size_t>(keyIdx)];
+                        }
+                        if (!any || acc > best) {
+                            best = acc;
+                            any = true;
+                        }
+                    }
+                    if (any) {
+                        golden[(h * totalQ + t) * scoreStride + blk] = best;
+                    }
+                }
+            }
+            for (int64_t blk = 0; blk < numBlocks; ++blk) {
+                float m = golden[static_cast<size_t>(t * scoreStride + blk)];
+                for (int64_t h = 1; h < tc.numQHeads; ++h) {
+                    m = std::max(m, golden[static_cast<size_t>((h * totalQ + t) * scoreStride + blk)]);
+                }
+                if (m > kNegInf) {
+                    golden[static_cast<size_t>(t * scoreStride + blk)] =
+                        aclFloat16ToFloat(aclFloatToFloat16(m * TopKScoreScale(tc.headDim)));
+                }
+            }
+        }
+        cuRows += kc;
+        (void)actualSeqKlen;
+    }
+    golden.resize(static_cast<size_t>(totalQ * scoreStride));
+}
+
 /// CPU 参考：score = Maxpool[(scale·)Q@Kᵀ + atten_mask] + local_mask
 void ComputeGolden(const TestCase& tc, const std::vector<int32_t>& actualSeqQlen,
                    const std::vector<int32_t>& actualSeqKlen, const std::vector<int32_t>& blockTable, int64_t maxBlocks,
@@ -433,6 +558,11 @@ void ComputeGolden(const TestCase& tc, const std::vector<int32_t>& actualSeqQlen
                    const std::vector<float>& keyF, const std::vector<float>& deqScale, std::vector<float>& golden,
                    int64_t blockLen)
 {
+    if (tc.compressFactor > 1) {
+        ComputeGoldenCompressed(tc, actualSeqQlen, actualSeqKlen, blockTable, maxBlocks, scoreStride, totalQ, queryF,
+                                keyF, golden, blockLen);
+        return;
+    }
     const int64_t batch = static_cast<int64_t>(tc.qLen.size());
     golden.assign(static_cast<size_t>(tc.numQHeads * totalQ * scoreStride), kNegInf);
     const bool batchSeqKey = IsBatchSeqLayout(tc.keyLayout);
@@ -466,8 +596,9 @@ void ComputeGolden(const TestCase& tc, const std::vector<int32_t>& actualSeqQlen
         const int32_t kvLen = tc.kvLen[b];
         const int64_t numBlocks = CeilDivI64(kvLen, blockLen);
         const int32_t qBlock = tc.startLoc[b];
-        const int32_t localStart =
-            (qBlock + 1 > static_cast<int32_t>(kLocalBlocks)) ? (qBlock + 1 - static_cast<int32_t>(kLocalBlocks)) : 0;
+        const int32_t localStart = (qBlock + 1 > static_cast<int32_t>(tc.localBlocks)) ?
+                                       (qBlock + 1 - static_cast<int32_t>(tc.localBlocks)) :
+                                       0;
         int32_t cuK = 0;
         if (tc.keyLayout == KeyLayout::TND) {
             cuK = actualSeqKlen[b];
@@ -514,34 +645,40 @@ void ComputeGolden(const TestCase& tc, const std::vector<int32_t>& actualSeqQlen
                     }
                     golden[(h * totalQ + t) * scoreStride + blk] = best;
                 }
-                const int32_t totalRows = qLen * static_cast<int32_t>(tc.numQHeads);
-                const int32_t visEndBlk = VisibleEndBlkOfRow(
-                    tOff * static_cast<int32_t>(tc.numQHeads) + static_cast<int32_t>(h), totalRows,
-                    static_cast<int32_t>(tc.numQHeads), tc.sparseMode, kvLen, qLen, blockLen, numBlocks);
-                for (int64_t blk = 0; blk < numBlocks; ++blk) {
-                    if (blk >= visEndBlk) {
-                        continue;
-                    }
-                    float boost = 0.0F;
-                    if (blk < kInitBlocks) {
-                        boost = kLocalScoreInit;
-                    }
-                    if (blk >= localStart && blk <= qBlock) {
-                        boost = kLocalScoreLocal;
-                    }
-                    if (boost != 0.0F) {
-                        golden[(h * totalQ + t) * scoreStride + blk] = boost;
-                    }
-                }
             }
             if (headMax) {
-                // head 间 max 之后每个块一个分数，只留在 head 0。函数返回前丢掉其余 head。
+                // 块长 16 在跨 head 归约后缩放，score 保留前缀和局部块的真实分数。
                 for (int64_t blk = 0; blk < numBlocks; ++blk) {
                     float m = golden[static_cast<size_t>(t * scoreStride + blk)];
                     for (int64_t h = 1; h < tc.numQHeads; ++h) {
                         m = std::max(m, golden[static_cast<size_t>((h * totalQ + t) * scoreStride + blk)]);
                     }
-                    golden[static_cast<size_t>(t * scoreStride + blk)] = m;
+                    if (m > kNegInf) {
+                        golden[static_cast<size_t>(t * scoreStride + blk)] =
+                            aclFloat16ToFloat(aclFloatToFloat16(m * TopKScoreScale(tc.headDim)));
+                    }
+                }
+            } else {
+                const int32_t totalRows = qLen * static_cast<int32_t>(tc.numQHeads);
+                for (int64_t h = 0; h < tc.numQHeads; ++h) {
+                    const int32_t visEndBlk = VisibleEndBlkOfRow(
+                        tOff * static_cast<int32_t>(tc.numQHeads) + static_cast<int32_t>(h), totalRows,
+                        static_cast<int32_t>(tc.numQHeads), tc.sparseMode, kvLen, qLen, blockLen, numBlocks);
+                    for (int64_t blk = 0; blk < numBlocks; ++blk) {
+                        if (blk >= visEndBlk) {
+                            continue;
+                        }
+                        float boost = 0.0F;
+                        if (blk < tc.initBlocks) {
+                            boost = kLocalScoreInit;
+                        }
+                        if (blk >= localStart && blk <= qBlock) {
+                            boost = kLocalScoreLocal;
+                        }
+                        if (boost != 0.0F) {
+                            golden[(h * totalQ + t) * scoreStride + blk] = boost;
+                        }
+                    }
                 }
             }
         }
@@ -549,6 +686,76 @@ void ComputeGolden(const TestCase& tc, const std::vector<int32_t>& actualSeqQlen
     if (headMax) {
         golden.resize(static_cast<size_t>(totalQ * scoreStride));
     }
+}
+
+// D^-0.5 * log2(e)。与 kernel TopKScoreScale 同一张表。
+float TopKScoreScale(int64_t headDim)
+{
+    constexpr float kScale[8] = {
+        0.3606737554073334F, 0.255034863948822F,   0.20823509991168976F, 0.1803368777036667F,
+        0.1612982153892517F, 0.14724445343017578F, 0.13632187247276306F, 0.127517431974411F,
+    };
+    if (headDim >= 16 && headDim <= 128 && (headDim % 16) == 0) {
+        return kScale[headDim / 16 - 1];
+    }
+    return 1.0F;
+}
+
+// 短行按块号输出。长行验证强制块、选中集合和最大块号所在位置。
+bool CompareTopK(const TestCase& tc, const std::vector<int32_t>& indices, const std::vector<float>& values,
+                 const std::vector<float>& score, int64_t totalQ, int64_t scoreStride, float atol, float rtol)
+{
+    for (int64_t t = 0; t < totalQ; ++t) {
+        const auto row = score.cbegin() + t * scoreStride;
+        const int64_t visible = std::find_if(row, row + scoreStride, [](float v) { return v <= kNegInf; }) - row;
+        const int64_t keep = std::min<int64_t>(visible, kBlock16TopK);
+        const int64_t localBegin = std::max<int64_t>(visible - tc.localBlocks, 0);
+        const int64_t initEnd = std::min<int64_t>(tc.initBlocks, localBegin);
+        auto forced = [&](int64_t id) {
+            return id < std::min(initEnd, keep) || (id >= localBegin && id - localBegin < keep - initEnd);
+        };
+        std::vector<bool> selected(static_cast<size_t>(visible), false);
+        float lowestSelected = std::numeric_limits<float>::infinity();
+        int32_t maxBlock = -1;
+        bool ok = true;
+        for (int64_t rank = 0; rank < kBlock16TopK; ++rank) {
+            const auto pos = static_cast<size_t>(t * kBlock16TopK + rank);
+            const int32_t id = indices[pos];
+            if (rank >= keep) {
+                ok &= id == -1 && (values.empty() || (std::isinf(values[pos]) && values[pos] < 0.0F));
+                continue;
+            }
+            if (id < 0 || id >= visible || selected[static_cast<size_t>(id)]) {
+                ok = false;
+                continue;
+            }
+            selected[static_cast<size_t>(id)] = true;
+            maxBlock = std::max(maxBlock, id);
+            if (visible <= kBlock16TopK) {
+                ok &= id == rank;
+            }
+            if (!forced(id)) {
+                lowestSelected = std::min(lowestSelected, row[id]);
+            }
+            if (!values.empty()) {
+                ok &= std::fabs(values[pos] - row[id]) <= atol + rtol * std::fabs(row[id]);
+            }
+        }
+        if (keep != 0) {
+            ok &= indices[static_cast<size_t>(t * kBlock16TopK + keep - 1)] == maxBlock;
+        }
+        for (int64_t id = 0; id < visible; ++id) {
+            if (!selected[static_cast<size_t>(id)]) {
+                ok &= !forced(id) && row[id] <= lowestSelected + atol + rtol * std::fabs(lowestSelected);
+            }
+        }
+        if (!ok) {
+            (void)printf("  [%s] TopK mismatch for query token %ld -> FAIL\n", tc.name.c_str(), t);
+            return false;
+        }
+    }
+    (void)printf("  [%s] TopK matches the CPU reference -> PASS\n", tc.name.c_str());
+    return true;
 }
 
 void PrintVec(const std::string& tag, const float* data, int64_t n)
@@ -719,7 +926,10 @@ bool RunCase(const TestCase& tc, aclrtStream stream, bool isAscend950)
     const bool isPa = IsPaLayout(tc.keyLayout);
     const bool isTnd = (tc.keyLayout == KeyLayout::TND);
     const bool batchSeqKey = IsBatchSeqLayout(tc.keyLayout);
-    const int64_t kSeq = batchSeqKey ? ResolvedMaxSeq(tc.kMaxSeq, tc.kvLen) : 0;
+    // compress_factor>1 时 S 维是压缩行。cf=1 仍用原始 token 长度，避免改动原用例。
+    const int64_t kSeq = (batchSeqKey && tc.compressFactor > 1) ?
+                             CompressedKSeq(tc) :
+                             (batchSeqKey ? ResolvedMaxSeq(tc.kMaxSeq, tc.kvLen) : 0);
     const int64_t qSeq = (tc.queryLayout == QueryLayout::TND) ? 0 : ResolvedMaxSeq(tc.qMaxSeq, tc.qLen);
     int64_t totalK = 0;
     std::vector<int32_t> actualSeqKlenPrefix(static_cast<size_t>(batch + 1), 0);
@@ -728,6 +938,13 @@ bool RunCase(const TestCase& tc, aclrtStream stream, bool isAscend950)
             actualSeqKlenPrefix[b + 1] = actualSeqKlenPrefix[b] + tc.kvLen[b];
         }
         totalK = actualSeqKlenPrefix[batch];
+        // actual_seq_klen 的前缀和仍是原始 token。TND 的 key 只存 ceil 后的压缩行。
+        if (tc.compressFactor > 1 && isTnd) {
+            totalK = 0;
+            for (int64_t b = 0; b < batch; ++b) {
+                totalK += tc.kvLen[b] <= 0 ? 0 : CeilDivI64(tc.kvLen[b], tc.compressFactor);
+            }
+        }
     }
     int64_t keyTokens = tc.numPages * blockLen;
     if (batchSeqKey) {
@@ -899,12 +1116,28 @@ bool RunCase(const TestCase& tc, aclrtStream stream, bool isAscend950)
         attenMaskT = buf.Create(attenMaskHost, {kAttenMaskSize, kAttenMaskSize}, ACL_INT8);
     }
 
-    std::vector<float> scoreInit(static_cast<size_t>(scoreHeads * totalQ * scoreStride), 0.0F);
+    const bool topkOut = tc.returnScore != 0;
+    const size_t scoreCount = topkOut ? 0 : static_cast<size_t>(scoreHeads * totalQ * scoreStride);
     void* scoreDev = nullptr;
-    aclTensor* scoreT = buf.Create(scoreInit, scoreShape, ACL_FLOAT, &scoreDev);
+    aclTensor* scoreT = nullptr;
+    if (!topkOut) {
+        if (blockLen == kBlock16Size) {
+            scoreT = buf.Create(std::vector<uint16_t>(scoreCount), scoreShape, ACL_FLOAT16, &scoreDev);
+        } else {
+            scoreT = buf.Create(std::vector<float>(scoreCount), scoreShape, ACL_FLOAT, &scoreDev);
+        }
+    }
+    std::vector<int32_t> indexInit(topkOut ? static_cast<size_t>(totalQ * kBlock16TopK) : 0, -1);
+    void* indexDev = nullptr;
+    aclTensor* indexT = topkOut ? buf.Create(indexInit, {1, totalQ, kBlock16TopK}, ACL_INT32, &indexDev) : nullptr;
+    std::vector<float> valueInit((tc.returnScore == 2) ? static_cast<size_t>(totalQ * kBlock16TopK) : 0, 0.0F);
+    void* valueDev = nullptr;
+    aclTensor* valueT =
+        (tc.returnScore == 2) ? buf.Create(valueInit, {1, totalQ, kBlock16TopK}, ACL_FLOAT, &valueDev) : nullptr;
 
     if (queryT == nullptr || keyT == nullptr || actualSeqQlenT == nullptr || actualSeqKlenT == nullptr ||
-        startLocT == nullptr || scoreT == nullptr || (isPa && blockTableT == nullptr) ||
+        startLocT == nullptr || (!topkOut && scoreT == nullptr) || (topkOut && indexT == nullptr) ||
+        (tc.returnScore == 2 && valueT == nullptr) || (isPa && blockTableT == nullptr) ||
         (tc.sparseMode == kSparseModeRightDown && attenMaskT == nullptr)) {
         (void)printf("  [%s] create tensor failed -> FAIL\n", tc.name.c_str());
         return false;
@@ -925,11 +1158,16 @@ bool RunCase(const TestCase& tc, aclrtStream stream, bool isAscend950)
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor = nullptr;
     void* workspaceAddr = nullptr;
-    int ret = aclnnMsaIndexScoreV2GetWorkspaceSize(
-        queryT, keyT, startLocT, blockTableT, nullptr, scaleT, attenMaskT, actualSeqQlenT, actualSeqKlenT, layoutKeyBuf,
-        tc.sparseMode, kInitBlocks, kLocalBlocks, layoutQueryBuf, blockLen, 1, scoreT, &workspaceSize, &executor);
+    int ret =
+        MsaWorkspace(queryT, keyT, blockTableT, scaleT, attenMaskT, actualSeqQlenT, actualSeqKlenT, startLocT, nullptr,
+                     layoutKeyBuf, tc.sparseMode, tc.initBlocks, tc.localBlocks, layoutQueryBuf, blockLen,
+                     tc.returnScore, tc.compressFactor, scoreT, indexT, valueT, &workspaceSize, &executor);
     if (ret != ACL_SUCCESS) {
         (void)printf("  [%s] GetWorkspaceSize failed, ERROR %d -> FAIL\n", tc.name.c_str(), ret);
+        const char* err = aclGetRecentErrMsg();
+        if (err != nullptr) {
+            (void)printf("    %s\n", err);
+        }
         return false;
     }
     if (workspaceSize > 0ULL && aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST) != ACL_SUCCESS) {
@@ -943,19 +1181,53 @@ bool RunCase(const TestCase& tc, aclrtStream stream, bool isAscend950)
         return false;
     }
     (void)printf("  [%s] kernel launched, synchronizing...\n", tc.name.c_str());
-    (void)aclrtSynchronizeStream(stream);
-    (void)printf("  [%s] synchronized\n", tc.name.c_str());
+    ret = aclrtSynchronizeStream(stream);
 
-    std::vector<float> actual(scoreInit.size(), 0.0F);
-    (void)aclrtMemcpy(actual.data(), actual.size() * sizeof(float), scoreDev, actual.size() * sizeof(float),
-                      ACL_MEMCPY_DEVICE_TO_HOST);
     if (workspaceAddr != nullptr) {
         (void)aclrtFree(workspaceAddr);
     }
+    if (ret != ACL_SUCCESS) {
+        (void)printf("  [%s] synchronize failed, ERROR %d -> FAIL\n", tc.name.c_str(), ret);
+        return false;
+    }
+    (void)printf("  [%s] synchronized\n", tc.name.c_str());
 
     std::vector<float> golden;
     ComputeGolden(tc, actualSeqQlen, isPa ? tc.kvLen : actualSeqKlenPrefix, blockTable, maxBlocks, scoreStride, totalQ,
                   queryF, keyF, deqScale, golden, blockLen);
+    if (topkOut) {
+        std::vector<int32_t> actualIdx(indexInit.size(), 0);
+        if (aclrtMemcpy(actualIdx.data(), actualIdx.size() * sizeof(int32_t), indexDev,
+                        actualIdx.size() * sizeof(int32_t), ACL_MEMCPY_DEVICE_TO_HOST) != ACL_SUCCESS) {
+            (void)printf("  [%s] copy indices failed -> FAIL\n", tc.name.c_str());
+            return false;
+        }
+        std::vector<float> actualVal(valueInit.size(), 0.0F);
+        if (!actualVal.empty() &&
+            aclrtMemcpy(actualVal.data(), actualVal.size() * sizeof(float), valueDev, actualVal.size() * sizeof(float),
+                        ACL_MEMCPY_DEVICE_TO_HOST) != ACL_SUCCESS) {
+            (void)printf("  [%s] copy values failed -> FAIL\n", tc.name.c_str());
+            return false;
+        }
+        return CompareTopK(tc, actualIdx, actualVal, golden, totalQ, scoreStride, isFp8 ? kAtolFp8 : kAtol,
+                           isFp8 ? kRtolFp8 : kRtol);
+    }
+
+    std::vector<float> actual(scoreCount, 0.0F);
+    if (scoreCount > 0 && blockLen == kBlock16Size) {
+        std::vector<uint16_t> raw(scoreCount);
+        if (aclrtMemcpy(raw.data(), scoreCount * sizeof(uint16_t), scoreDev, scoreCount * sizeof(uint16_t),
+                        ACL_MEMCPY_DEVICE_TO_HOST) != ACL_SUCCESS) {
+            return false;
+        }
+        constexpr uint16_t kFp16NegInf = 0xFC00U;
+        std::transform(raw.cbegin(), raw.cend(), actual.begin(), [](uint16_t bits) {
+            return bits == kFp16NegInf ? -std::numeric_limits<float>::infinity() : aclFloat16ToFloat(bits);
+        });
+    } else if (scoreCount > 0 && aclrtMemcpy(actual.data(), scoreCount * sizeof(float), scoreDev,
+                                             scoreCount * sizeof(float), ACL_MEMCPY_DEVICE_TO_HOST) != ACL_SUCCESS) {
+        return false;
+    }
     if (tc.name.find("debug-trace") != std::string::npos) {
         PrintTracePipeline(tc, actualSeqQlen, blockTable, maxBlocks, scoreStride, totalQ, queryF, keyF, deqScale,
                            actual);
@@ -965,7 +1237,7 @@ bool RunCase(const TestCase& tc, aclrtStream stream, bool isAscend950)
 
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
     setvbuf(stdout, nullptr, _IONBF, 0);
 #if defined(__linux__)
@@ -983,7 +1255,7 @@ int main()
     }
 
     // startLoc 为逻辑 block 索引；因果由 sparseMode=3（rightDownCausal）承担。
-    const std::vector<TestCase> cases = {
+    std::vector<TestCase> cases = {
         // name                       Hq   D    pages  qLen           kvLen         startLoc(block) bf16  int8
         {"L0-debug-trace", 2, 16, 2, {2}, {5}, {16}, false, false},
         {"L0-prefill-aligned", 8, 128, 8, {32}, {256}, {1}, false, false},
@@ -1461,14 +1733,168 @@ int main()
          2},
     };
 
+    // 块长 16 的 TopK。returnScore=0 比对完整 score；=1 比对 indices；=2 再比对分数。
+    // 短 KV 不足 128 块，检查 -1 / -inf 填充。长 KV 超过 128 块，并在单 token 上触发分段合并。
+    auto addTopK = [&](const char* name, bool useBf16, int64_t returnScore, std::vector<int32_t> qLen,
+                       std::vector<int32_t> kvLen, std::vector<int32_t> startLoc, int64_t pages, KeyLayout keyLayout,
+                       QueryLayout queryLayout, int64_t sparseMode, int64_t qMaxSeq) {
+        TestCase tc;
+        tc.name = name;
+        tc.numQHeads = 16;
+        tc.headDim = 128;
+        tc.numPages = pages;
+        tc.qLen = std::move(qLen);
+        tc.kvLen = std::move(kvLen);
+        tc.startLoc = std::move(startLoc);
+        tc.useBf16 = useBf16;
+        tc.useInt8Key = false;
+        tc.fp8Kind = 0;
+        tc.keyDim0Gap = 1;
+        tc.tableWidth = 0;
+        tc.sparseMode = sparseMode;
+        tc.keyLayout = keyLayout;
+        tc.poolBlockSize = kBlock16Size;
+        tc.queryLayout = queryLayout;
+        tc.qMaxSeq = qMaxSeq;
+        tc.returnScore = returnScore;
+        cases.push_back(std::move(tc));
+    };
+    addTopK("TOPK-blk16-fp16-score-short", false, 0, {2}, {40}, {1}, 8, KeyLayout::BBND, QueryLayout::TND,
+            kSparseModeRightDown, 0);
+    addTopK("TOPK-blk16-bf16-score-short", true, 0, {2}, {40}, {1}, 8, KeyLayout::BBND, QueryLayout::TND,
+            kSparseModeRightDown, 0);
+    addTopK("TOPK-blk16-fp16-idx-short", false, 1, {2}, {40}, {1}, 8, KeyLayout::BBND, QueryLayout::TND,
+            kSparseModeRightDown, 0);
+    addTopK("TOPK-blk16-fp16-val-short", false, 2, {2}, {40}, {1}, 8, KeyLayout::BBND, QueryLayout::TND,
+            kSparseModeRightDown, 0);
+    addTopK("TOPK-blk16-bf16-val-short", true, 2, {2}, {40}, {1}, 8, KeyLayout::BBND, QueryLayout::TND,
+            kSparseModeRightDown, 0);
+    addTopK("TOPK-blk16-fp16-score-long", false, 0, {1}, {3200}, {199}, 200, KeyLayout::BBND, QueryLayout::TND,
+            kSparseModeRightDown, 0);
+    addTopK("TOPK-blk16-bf16-score-long", true, 0, {1}, {3200}, {199}, 200, KeyLayout::BBND, QueryLayout::TND,
+            kSparseModeRightDown, 0);
+    addTopK("TOPK-blk16-fp16-tnd-score", false, 0, {8, 4}, {256, 80}, {4, 2}, 0, KeyLayout::TND, QueryLayout::TND,
+            kSparseModeRightDown, 0);
+    addTopK("TOPK-blk16-bf16-tnd-score", true, 0, {2}, {48}, {1}, 0, KeyLayout::TND, QueryLayout::TND,
+            kSparseModeRightDown, 0);
+    // M=128 的一整个 tile、KV 盖满 4 个 direct 窗。bf16 的 L0C 只够 N=128，必须逐窗。
+    addTopK("TOPK-blk16-bf16-tnd-wide", true, 0, {8}, {512}, {31}, 0, KeyLayout::TND, QueryLayout::TND,
+            kSparseModeRightDown, 0);
+    addTopK("TOPK-blk16-bf16-tnd-4k-val", true, 2, {1}, {4096}, {255}, 0, KeyLayout::TND, QueryLayout::TND,
+            kSparseModeRightDown, 0);
+    addTopK("TOPK-blk16-bf16-sparse0-score", true, 0, {8}, {160}, {5}, 16, KeyLayout::BBND, QueryLayout::TND,
+            kSparseModeDefault, 0);
+    addTopK("TOPK-blk16-fp16-val-long", false, 2, {1}, {3200}, {199}, 200, KeyLayout::BBND, QueryLayout::TND,
+            kSparseModeRightDown, 0);
+    addTopK("TOPK-blk16-bf16-val-long", true, 2, {1}, {3200}, {199}, 200, KeyLayout::BBND, QueryLayout::TND,
+            kSparseModeRightDown, 0);
+    addTopK("TOPK-blk16-fp16-tnd-val", false, 2, {8, 4}, {256, 80}, {4, 2}, 0, KeyLayout::TND, QueryLayout::TND,
+            kSparseModeRightDown, 0);
+    addTopK("TOPK-blk16-bf16-tnd-idx", true, 1, {2}, {48}, {1}, 0, KeyLayout::TND, QueryLayout::TND,
+            kSparseModeRightDown, 0);
+    addTopK("TOPK-blk16-fp16-bsnd-val", false, 2, {8}, {160}, {4}, 16, KeyLayout::BBND, QueryLayout::BSND,
+            kSparseModeRightDown, 16);
+    addTopK("TOPK-blk16-bf16-sparse0-val", true, 2, {8}, {160}, {5}, 16, KeyLayout::BBND, QueryLayout::TND,
+            kSparseModeDefault, 0);
+    // 18 个 token 压成 5 行。位置 14 只看见前 4 行，第二块保持 -inf。
+    {
+        TestCase tc;
+        tc.name = "L0-cf4-tail-tnd";
+        tc.numQHeads = 16;
+        tc.headDim = 128;
+        tc.numPages = 0;
+        tc.qLen = {18};
+        tc.kvLen = {18};
+        tc.startLoc = {0};
+        tc.useBf16 = false;
+        tc.keyLayout = KeyLayout::TND;
+        tc.poolBlockSize = kBlock16Size;
+        tc.compressFactor = 4;
+        tc.initBlocks = 0;
+        tc.localBlocks = 0;
+        cases.push_back(std::move(tc));
+    }
+    // 两段都是 10 个 token，压缩后各 3 行。第二段从第 3 行开始，不是 20/4=5。
+    {
+        TestCase tc;
+        tc.name = "L0-cf4-tail-tnd-b2";
+        tc.numQHeads = 16;
+        tc.headDim = 128;
+        tc.numPages = 0;
+        tc.qLen = {10, 6};
+        tc.kvLen = {10, 10};
+        tc.startLoc = {0, 0};
+        tc.useBf16 = false;
+        tc.keyLayout = KeyLayout::TND;
+        tc.poolBlockSize = kBlock16Size;
+        tc.compressFactor = 4;
+        tc.initBlocks = 0;
+        tc.localBlocks = 0;
+        cases.push_back(std::move(tc));
+    }
+    // compress_factor=4：对齐、尾块、长 decode、bf16、sparse0、init/local、TopK、BSND/BNSD、分页。
+    auto addCf4 = [&](const char* name, bool useBf16, int64_t returnScore, std::vector<int32_t> qLen,
+                      std::vector<int32_t> kvLen, KeyLayout keyLayout, QueryLayout queryLayout, int64_t pages,
+                      int64_t sparseMode, int64_t initBlocks, int64_t localBlocks) {
+        TestCase tc;
+        tc.name = name;
+        tc.numQHeads = 16;
+        tc.headDim = 128;
+        tc.numPages = pages;
+        tc.qLen = std::move(qLen);
+        tc.kvLen = std::move(kvLen);
+        tc.startLoc.assign(tc.qLen.size(), 0);
+        tc.useBf16 = useBf16;
+        tc.useInt8Key = false;
+        tc.fp8Kind = 0;
+        tc.keyDim0Gap = 1;
+        tc.tableWidth = 0;
+        tc.sparseMode = sparseMode;
+        tc.keyLayout = keyLayout;
+        tc.queryLayout = queryLayout;
+        tc.poolBlockSize = kBlock16Size;
+        tc.compressFactor = 4;
+        tc.returnScore = returnScore;
+        tc.initBlocks = initBlocks;
+        tc.localBlocks = localBlocks;
+        cases.push_back(std::move(tc));
+    };
+    addCf4("L0-cf4-align-tnd", false, 0, {64}, {64}, KeyLayout::TND, QueryLayout::TND, 0, kSparseModeRightDown, 0, 0);
+    addCf4("L0-cf4-prefill-tail-tnd", false, 0, {18}, {66}, KeyLayout::TND, QueryLayout::TND, 0, kSparseModeRightDown,
+           0, 0);
+    addCf4("L0-cf4-decode-long-tnd", false, 0, {1}, {4098}, KeyLayout::TND, QueryLayout::TND, 0, kSparseModeRightDown,
+           0, 1);
+    addCf4("L0-cf4-tail-tnd-bf16", true, 0, {18}, {18}, KeyLayout::TND, QueryLayout::TND, 0, kSparseModeRightDown, 0,
+           0);
+    addCf4("L0-cf4-sparse0-tnd", false, 0, {4}, {18}, KeyLayout::TND, QueryLayout::TND, 0, kSparseModeDefault, 0, 0);
+    addCf4("L0-cf4-local-tnd", false, 0, {8}, {80}, KeyLayout::TND, QueryLayout::TND, 0, kSparseModeRightDown, 1, 2);
+    addCf4("L0-cf4-topk-idx-tnd", false, 1, {2}, {200}, KeyLayout::TND, QueryLayout::TND, 0, kSparseModeRightDown, 0,
+           1);
+    addCf4("L0-cf4-topk-val-tnd", false, 2, {2}, {200}, KeyLayout::TND, QueryLayout::TND, 0, kSparseModeRightDown, 0,
+           1);
+    addCf4("L0-cf4-tail-tnd-uneven", false, 0, {6, 3}, {18, 7}, KeyLayout::TND, QueryLayout::TND, 0,
+           kSparseModeRightDown, 0, 0);
+    addCf4("L0-cf4-tail-bsnd", false, 0, {6, 2}, {18, 7}, KeyLayout::BSND, QueryLayout::BSND, 0, kSparseModeRightDown,
+           0, 0);
+    addCf4("L0-cf4-tail-bnsd", true, 0, {4}, {22}, KeyLayout::BNSD, QueryLayout::BNSD, 0, kSparseModeRightDown, 0, 1);
+    addCf4("L0-cf4-tail-bbnd", false, 0, {3}, {80}, KeyLayout::BBND, QueryLayout::TND, 8, kSparseModeRightDown, 0, 0);
+    addCf4("L0-cf4-tail-bnbd", false, 0, {1}, {70}, KeyLayout::BNBD, QueryLayout::TND, 8, kSparseModeRightDown, 0, 1);
+    addCf4("L0-cf4-pa-b2", false, 0, {2, 2}, {40, 18}, KeyLayout::BBND, QueryLayout::TND, 8, kSparseModeRightDown, 0,
+           0);
+
     size_t passed = 0;
     size_t ran = 0;
     size_t skipped = 0;
     const char* socName = aclrtGetSocName();
     const std::string soc = (socName == nullptr) ? "" : socName;
     const bool isAscend950 = (soc.find("950") != std::string::npos) || (soc.find("910_95") != std::string::npos);
-    (void)printf("running %zu MsaIndexScore cases (soc=%s)\n", cases.size(), soc.empty() ? "?" : soc.c_str());
+    const char* only = (argc > 1) ? argv[1] : nullptr;
+    (void)printf("running %zu MsaIndexScore cases (soc=%s%s%s)\n", cases.size(), soc.empty() ? "?" : soc.c_str(),
+                 only == nullptr ? "" : " filter=", only == nullptr ? "" : only);
     for (const auto& tc : cases) {
+        if (only != nullptr && tc.name.find(only) == std::string::npos) {
+            continue;
+        }
         if (tc.fp8Kind != 0 && !isAscend950) {
             (void)printf("  [%s] SKIP: FP8 is Ascend 950 only\n", tc.name.c_str());
             ++skipped;
@@ -1488,6 +1914,10 @@ int main()
         if (RunCase(tc, stream, isAscend950)) {
             ++passed;
         }
+    }
+    if (only != nullptr && ran == 0) {
+        (void)printf("[FAIL] no case matches %s\n", only);
+        return -1;
     }
     const std::string extra = (skipped == 0) ? "" : (" (skipped " + std::to_string(skipped) + ")");
     (void)printf("%s: %zu/%zu cases passed%s\n", passed == ran ? "[PASS]" : "[FAIL]", passed, ran, extra.c_str());

@@ -15,6 +15,7 @@
  */
 
 #include "msa_index_score_tiling.h"
+#include "msa_index_score_output.h"
 #include "../op_kernel/msa_index_score_common.h"
 
 #include <cstring>
@@ -40,6 +41,25 @@ constexpr uint32_t MSA_DIM_2 = 2;
 constexpr uint32_t MSA_DIM_3 = 3;
 constexpr uint32_t MSA_RANK_1D = 1;
 constexpr uint32_t MSA_QLEN_MIN_DIM0 = 2; // prefix-sum 长度至少为 B+1
+
+inline bool UseBalancedFp8Schedule(uint32_t totalQ, uint32_t scoreStride, uint32_t cores)
+{
+    if (cores == 0U || totalQ == 0U) {
+        return false;
+    }
+    const uint64_t groups = (static_cast<uint64_t>(totalQ) + 7U) / 8U;
+    const uint64_t tiles = (static_cast<uint64_t>(scoreStride) + 63U) / 64U;
+    if (tiles < 32U) {
+        return false;
+    }
+    const uint64_t oldMax =
+        groups < cores ? (tiles + cores / groups - 1U) / (cores / groups) : ((groups + cores - 1U) / cores) * tiles;
+    const uint64_t newMax = (groups * tiles + cores - 1U) / cores;
+    // With an exact two-way (or deeper) split, adjacent cores can share a
+    // request without extra Q reloads. Keep this mapping for long segments.
+    const bool evenLocality = groups < cores && cores % groups == 0U && oldMax == newMax && newMax >= 64U;
+    return evenLocality || (oldMax >= newMax + 8U && newMax * 5U <= oldMax * 4U);
+}
 
 inline bool IsFp8ComputeDtype(ge::DataType dt)
 {
@@ -190,6 +210,39 @@ inline uint32_t EstMxFp4WideN(gert::TilingContext* context, const MsaIndexScoreI
 }
 
 // 手写 op_api 对未传的可选输入给 AllocTensor 空占位（0 维）。占位视同未传。
+inline uint32_t EstExactTotalTasks(gert::TilingContext* context, const MsaIndexScoreInfo& info, uint32_t kvChunks)
+{
+    if (kvChunks > 1U || info.totalQ == 0U) {
+        return 0U;
+    }
+    const uint32_t heads = info.numQHeads == 0U ? 1U : info.numQHeads;
+    auto qlenTensor = context->GetOptionalInputTensor(MSA_IDX_ACTUAL_SEQ_QLEN);
+    if (IsHostVisibleTensor(qlenTensor)) {
+        const int32_t* data = qlenTensor->GetData<int32_t>();
+        if (data != nullptr) {
+            uint32_t total = 0U;
+            for (uint32_t b = 0; b < info.batch; ++b) {
+                int32_t q = data[b + 1U] - data[b];
+                if (q < 0) {
+                    q = 0;
+                }
+                if (info.qMaxSeq > 0U && q > static_cast<int32_t>(info.qMaxSeq)) {
+                    q = static_cast<int32_t>(info.qMaxSeq);
+                }
+                const uint32_t rows = static_cast<uint32_t>(q) * heads;
+                total += (rows + MSA_ROW_TILE_M - 1U) / MSA_ROW_TILE_M;
+            }
+            return total;
+        }
+    }
+    if (info.batch <= 1U) {
+        const uint32_t rows = info.totalQ * heads;
+        return (rows + MSA_ROW_TILE_M - 1U) / MSA_ROW_TILE_M;
+    }
+    return 0U;
+}
+
+// 手写 op_api 对未传的可选输入给 AllocTensor 空占位（0 维）。占位视同未传。
 inline bool IsOptionalProvided(const gert::StorageShape* shape)
 {
     return shape != nullptr && shape->GetStorageShape().GetDimNum() > 0;
@@ -204,15 +257,10 @@ struct MsaIrOutput {
 inline MsaIrOutput IrOutputAt(gert::TilingContext* context, size_t irIndex)
 {
     MsaIrOutput out;
-    const auto* node = context->GetComputeNodeInfo();
-    if (node == nullptr || irIndex >= node->GetIrOutputsNum()) {
+    const size_t runtime = MsaIndexScoreOutput::RuntimeIndex(context, irIndex);
+    if (runtime == MsaIndexScoreOutput::ABSENT) {
         return out;
     }
-    const auto* inst = node->GetOutputInstanceInfo(irIndex);
-    if (inst == nullptr || inst->GetInstanceNum() == 0U) {
-        return out;
-    }
-    const size_t runtime = inst->GetInstanceStart();
     out.shape = context->GetOutputShape(runtime);
     out.desc = context->GetOutputDesc(runtime);
     return out;
@@ -222,6 +270,10 @@ inline MsaIrOutput IrOutputAt(gert::TilingContext* context, size_t irIndex)
 // score 末维是对齐后的输出宽度，分页时只作不超过已分配 score 的钳位。
 inline uint32_t LogicalBlockLimit(const MsaIndexScoreInfo& info)
 {
+    if (info.poolBlockSize == MSA_BLOCK16_SIZE && MsaIsPaKeyLayout(info.keyLayout) && info.tableWidth > 0U) {
+        const uint64_t blocks = static_cast<uint64_t>(info.tableWidth) * (info.pageSize / info.rowsPerBlock);
+        return blocks < info.maxBlocksPerBatch ? static_cast<uint32_t>(blocks) : info.maxBlocksPerBatch;
+    }
     if (MsaIsPaKeyLayout(info.keyLayout) && info.tableWidth > 0U && info.tableWidth < info.maxBlocksPerBatch) {
         return info.tableWidth;
     }
@@ -497,30 +549,37 @@ inline uint32_t EstKvChunks(const MsaIndexScoreInfo& info, uint32_t aicNum, uint
     return chunks;
 }
 
-// 950 块长 16：host 读不到逐条长度，packedM 只能按 packed+batch 估，再除 aicNum 会把核丢掉
-// （8 条请求时 32/9=3，只派出 24 个任务）。改成把核数当预算下发，kernel 在 Init 里按真实
-// M-task 数重算每个 M-tile 的 chunk 数。其余 SoC 与块长 128 返回 0，保持原路径。
-inline uint32_t EstChunkBudget(const MsaIndexScoreInfo& info, uint32_t aicNum)
+// 950：M-task 填不满 AIC 且可见 KV stile 足够时，沿 S 切开打满核。
+// 取 2 的幂里 makespan 最小的 chunks，上限 32，独立于最终选择器。
+// A2/A3 仍走 EstKvChunksA2。
+inline uint32_t EstBlock16KvChunks(const MsaIndexScoreInfo& info, uint32_t aicNum, uint32_t packedM, uint32_t visBlocks)
 {
-    if (!info.isAscend950 || info.poolBlockSize != MSA_BLOCK16_SIZE) {
-        return 0U;
-    }
-    return aicNum;
-}
-
-// 预算路径下 kernel 的任务数由真实长度决定，host 只给一个不小于它的上界：
-// 任务数 = Σ_b mTiles_b × min(chunks, nStiles_b) ≤ packedM × nStiles，再截到 aicNum。
-inline uint32_t EstLaunchAicBudget(uint32_t aicNum, uint32_t packedM, uint32_t visBlocks)
-{
-    const uint32_t nStiles = (visBlocks + MSA_BLOCKS_PER_STILE - 1U) / MSA_BLOCKS_PER_STILE;
-    if (nStiles == 0U || packedM == 0U) {
+    if (packedM == 0U || aicNum == 0U) {
         return 1U;
     }
-    const uint64_t est = static_cast<uint64_t>(packedM) * static_cast<uint64_t>(nStiles);
-    if (est >= static_cast<uint64_t>(aicNum)) {
-        return aicNum;
+    const bool oneTilePerReq = OneTilePerRequest(info, aicNum);
+    if (packedM >= aicNum && !oneTilePerReq) {
+        return 1U;
     }
-    return static_cast<uint32_t>(est);
+    const uint32_t nStiles = (visBlocks + MSA_BLOCKS_PER_STILE - 1U) / MSA_BLOCKS_PER_STILE;
+    if (nStiles <= 1U) {
+        return 1U;
+    }
+    uint32_t mTasks = oneTilePerReq ? info.batch : packedM;
+    if (mTasks == 0U || mTasks >= aicNum) {
+        return 1U;
+    }
+    // Score production uses the same makespan policy for score and IRS selection outputs.
+    uint32_t bestChunks = 1U;
+    uint32_t bestSpan = ((mTasks + aicNum - 1U) / aicNum) * nStiles;
+    for (uint32_t chunks = 2U; chunks <= nStiles && chunks <= 32U; chunks *= 2U) {
+        const uint32_t span = ChunkSpan(mTasks, chunks, aicNum, nStiles);
+        if (span < bestSpan) {
+            bestSpan = span;
+            bestChunks = chunks;
+        }
+    }
+    return bestChunks;
 }
 
 inline uint32_t EstLaunchAic(uint32_t aicNum, uint32_t packedM, uint32_t kvChunks)
@@ -687,9 +746,56 @@ ge::graphStatus ParseLayoutQueryAttr(gert::TilingContext* context, const char* l
     return ge::GRAPH_SUCCESS;
 }
 
+// 块长 16 的 score 末维固定为 TopK 宽度，不能再拿来当扫描上界。
+// 这里按 KV / 页表算出对齐后的逻辑块数，与改 shape 之前的 score 末维一致。
+// actual_seq_klen 是原始 token 数，块数按 pool_block_size 切。读不到长度时退回 key 的压缩行容量。
+inline uint32_t ResolveBlock16ScanStride(gert::TilingContext* context, const MsaIndexScoreInfo& info)
+{
+    uint64_t maxBlocks = 0;
+    const uint32_t rowsPerBlock = info.rowsPerBlock;
+    const uint32_t tokenBlock = info.poolBlockSize == 0U ? rowsPerBlock : info.poolBlockSize;
+    if (MsaIsPaKeyLayout(info.keyLayout)) {
+        if (rowsPerBlock != 0U) {
+            maxBlocks = static_cast<uint64_t>(info.tableWidth) * (info.pageSize / rowsPerBlock);
+        }
+    } else {
+        const gert::Tensor* klenTensor = context->GetOptionalInputTensor(MSA_IDX_ACTUAL_SEQ_KLEN);
+        const int32_t* data = nullptr;
+        if (IsHostVisibleTensor(klenTensor)) {
+            data = klenTensor->GetData<int32_t>();
+        }
+        if (data != nullptr) {
+            for (uint32_t b = 0; b < info.batch; ++b) {
+                const int32_t kv = data[b + 1U] - data[b];
+                if (kv <= 0 || tokenBlock == 0U) {
+                    continue;
+                }
+                const uint64_t blocks = (static_cast<uint64_t>(kv) + tokenBlock - 1U) / tokenBlock;
+                if (blocks > maxBlocks) {
+                    maxBlocks = blocks;
+                }
+            }
+        } else if (info.keyLayout == MSA_KEY_LAYOUT_TND && rowsPerBlock != 0U) {
+            maxBlocks = (static_cast<uint64_t>(info.totalK) + rowsPerBlock - 1U) / rowsPerBlock;
+        } else if (rowsPerBlock != 0U) {
+            maxBlocks = (static_cast<uint64_t>(info.kMaxSeq) + rowsPerBlock - 1U) / rowsPerBlock;
+        }
+    }
+    if (maxBlocks == 0U) {
+        maxBlocks = 1U;
+    }
+    if (maxBlocks > std::numeric_limits<uint32_t>::max()) {
+        maxBlocks = std::numeric_limits<uint32_t>::max();
+    }
+    return RoundUpU32(static_cast<uint32_t>(maxBlocks), MSA_SCORE_STRIDE_ALIGN);
+}
+
 // return_choice!=0 时没有用户 score。末维与 InferShape 相同：逻辑块数 16 对齐。
 uint32_t DeriveAlignedMaxBlocks(gert::TilingContext* context, const MsaIndexScoreInfo& info)
 {
+    if (info.poolBlockSize == MSA_BLOCK16_SIZE) {
+        return ResolveBlock16ScanStride(context, info);
+    }
     uint32_t raw = 0;
     const uint32_t pool = (info.poolBlockSize == 0U) ? MSA_BLOCK_SIZE : info.poolBlockSize;
     if (MsaIsPaKeyLayout(info.keyLayout)) {
@@ -790,6 +896,7 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                 OP_LOGE(context, "pool_block_size must be %u or %u, got %u.", MSA_BLOCK_SIZE, MSA_BLOCK16_SIZE,
                         poolBlockSizeAttr),
                 return ge::GRAPH_FAILED);
+    const bool logicalBlock16 = poolBlockSizeAttr == MSA_BLOCK16_SIZE;
     const int64_t* returnChoicePtr = attrs->GetInt(MSA_ATTR_RETURN_CHOICE);
     const int64_t returnChoice = (returnChoicePtr == nullptr) ? 0 : *returnChoicePtr;
     OP_CHECK_IF(returnChoice != static_cast<int64_t>(MSA_RETURN_SCORE) &&
@@ -803,20 +910,27 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
         OP_CHECK_IF(!info.isAscend950,
                     OP_LOGE(context, "return_choice=%ld is only supported on Ascend 950.", returnChoice),
                     return ge::GRAPH_FAILED);
-        OP_CHECK_IF(poolBlockSizeAttr == MSA_BLOCK16_SIZE,
-                    OP_LOGE(context, "return_choice=%ld does not support pool_block_size=16.", returnChoice),
-                    return ge::GRAPH_FAILED);
         const int64_t* topkPtr = attrs->GetInt(MSA_ATTR_TOPK);
         const int64_t topkVal = (topkPtr == nullptr) ? static_cast<int64_t>(MSA_TOPK_DEFAULT) : *topkPtr;
         OP_CHECK_IF(topkVal < 1 || topkVal > static_cast<int64_t>(MSA_TOPK_MAX),
                     OP_LOGE(context, "topk must be in [1, 128], got %ld.", topkVal), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(logicalBlock16 && topkVal != MSA_BLOCK16_TOPK,
+                    OP_LOGE(context, "pool_block_size=16 requires topk=%u.", MSA_BLOCK16_TOPK),
+                    return ge::GRAPH_FAILED);
         info.topk = static_cast<uint32_t>(topkVal);
     }
-    // compress_factor 只做接口预留。1 为不压缩，计算路径与原先一致。
     const int64_t* compressFactorPtr = attrs->GetInt(MSA_ATTR_COMPRESS_FACTOR);
     const int64_t compressFactor = (compressFactorPtr == nullptr) ? 1 : *compressFactorPtr;
-    OP_CHECK_IF(compressFactor != 1, OP_LOGE(context, "compress_factor only supports 1, got %ld.", compressFactor),
-                return ge::GRAPH_FAILED);
+    if (logicalBlock16) {
+        OP_CHECK_IF(compressFactor < 1 || compressFactor > MSA_BLOCK16_SIZE || MSA_BLOCK16_SIZE % compressFactor != 0,
+                    OP_LOGE(context, "compress_factor(%ld) must divide pool_block_size=16.", compressFactor),
+                    return ge::GRAPH_FAILED);
+        info.compressFactor = static_cast<uint32_t>(compressFactor);
+    } else {
+        OP_CHECK_IF(compressFactor != 1, OP_LOGE(context, "compress_factor only supports 1, got %ld.", compressFactor),
+                    return ge::GRAPH_FAILED);
+    }
+    info.rowsPerBlock = poolBlockSizeAttr / info.compressFactor;
     const bool batchKey128 = (info.keyLayout == MSA_KEY_LAYOUT_BSND || info.keyLayout == MSA_KEY_LAYOUT_BNSD) &&
                              poolBlockSizeAttr == MSA_BLOCK_SIZE;
     if (MsaIsSeqKeyLayout(info.keyLayout)) {
@@ -892,9 +1006,18 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
         }
         // score 的 T1 决定 head 步长。return_choice!=0 时没有 score，totalQ 保持前缀和或 B*S。
         if (info.returnChoice != MSA_RETURN_SCORE) {
-            // 非 TND query 的 TopK 仍用上面算好的 totalQ。
+            if (logicalBlock16 && !qPrefixApplied) {
+                const auto* indices = IrOutputAt(context, MsaIndexScoreOutput::INDICES).shape;
+                if (indices != nullptr && indices->GetStorageShape().GetDimNum() == MSA_QUERY_DIM_NUM) {
+                    const int64_t tokens = indices->GetStorageShape().GetDim(MSA_DIM_1);
+                    OP_CHECK_IF(tokens < 0 || tokens > info.totalQ,
+                                OP_LOGE(context, "sparse_indices T1(%ld) exceeds batch*S(%u).", tokens, info.totalQ),
+                                return ge::GRAPH_FAILED);
+                    info.totalQ = static_cast<uint32_t>(tokens);
+                }
+            }
         } else {
-            const gert::StorageShape* scoreShapeEarly = context->GetOutputShape(0);
+            const gert::StorageShape* scoreShapeEarly = IrOutputAt(context, MsaIndexScoreOutput::SCORE).shape;
             OP_CHECK_NULL_WITH_CONTEXT(context, scoreShapeEarly);
             const gert::Shape& scoreEarly = scoreShapeEarly->GetStorageShape();
             OP_CHECK_IF(scoreEarly.GetDimNum() != MSA_QUERY_DIM_NUM,
@@ -939,7 +1062,7 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
     if (MsaIsSeqKeyLayout(info.keyLayout)) {
         // 块长来自 pool_block_size。TND 与非 V2 的 BSND/BNSD 为 128；V2 的 BSND/BNSD 为 16。
         info.poolBlockSize = poolBlockSizeAttr;
-        info.pageSize = poolBlockSizeAttr;
+        info.pageSize = info.rowsPerBlock;
         info.numPages = 0;
         info.kMaxSeq = 0;
         OP_CHECK_IF(IsOptionalProvided(blockTableShape), OP_LOGE(context, "non-paged key must not pass block_table."),
@@ -1036,14 +1159,21 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                                 info.headDim),
                         return ge::GRAPH_FAILED);
         }
-        OP_CHECK_IF(pageSize != MSA_BLOCK_SIZE && pageSize != MSA_BLOCK16_SIZE,
-                    OP_LOGE(context, "BBND/BNBD page size must be %u or %u, got %u.", MSA_BLOCK_SIZE, MSA_BLOCK16_SIZE,
-                            pageSize),
+        // The key shape describes stored compressed rows, not original tokens.
+        // A model page of 128 tokens occupies 128/compressFactor key rows.
+        const bool compressedPage =
+            logicalBlock16 && info.compressFactor > 1U && pageSize == MSA_BLOCK_SIZE / info.compressFactor;
+        OP_CHECK_IF(pageSize != MSA_BLOCK_SIZE && pageSize != MSA_BLOCK16_SIZE && !compressedPage,
+                    OP_LOGE(context, "BBND/BNBD page size must be %u, %u, or 128/compress_factor for pool16, got %u.",
+                            MSA_BLOCK_SIZE, MSA_BLOCK16_SIZE, pageSize),
                     return ge::GRAPH_FAILED);
-        OP_CHECK_IF(poolBlockSizeAttr > pageSize,
-                    OP_LOGE(context, "pool_block_size(%u) must not exceed BBND/BNBD page size(%u).", poolBlockSizeAttr,
-                            pageSize),
-                    return ge::GRAPH_FAILED);
+        // 页长按 key 行计，与打分块对齐的是 rowsPerBlock 而非 pool_block_size。
+        OP_CHECK_IF(
+            info.rowsPerBlock > pageSize || (pageSize % info.rowsPerBlock) != 0U,
+            OP_LOGE(context,
+                    "pool_block_size/compress_factor(%u) must divide BBND/BNBD page size(%u) and not exceed it.",
+                    info.rowsPerBlock, pageSize),
+            return ge::GRAPH_FAILED);
         info.poolBlockSize = poolBlockSizeAttr;
         info.pageSize = pageSize;
         OP_CHECK_IF(klen.GetDimNum() != MSA_RANK_1D || static_cast<uint32_t>(klen.GetDim(MSA_DIM_0)) != info.batch,
@@ -1062,15 +1192,17 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
     const gert::StorageShape* scoreShape = scoreOutIr.shape;
     const gert::StorageShape* indicesShape = indicesOutIr.shape;
     const gert::StorageShape* valuesShape = valuesOutIr.shape;
-    const bool hasScore = IsOptionalProvided(scoreShape);
-    const bool hasIndices = IsOptionalProvided(indicesShape);
-    const bool hasValues = IsOptionalProvided(valuesShape);
+    const bool hasScore = MsaIndexScoreOutput::IsPresent(scoreShape);
+    const bool hasIndices = MsaIndexScoreOutput::IsPresent(indicesShape);
+    const bool hasValues = MsaIndexScoreOutput::IsPresent(valuesShape);
     if (info.returnChoice == MSA_RETURN_SCORE) {
         OP_CHECK_IF(!hasScore, OP_LOGE(context, "outputs do not match return_choice=%u.", info.returnChoice),
                     return ge::GRAPH_FAILED);
         OP_CHECK_IF(hasIndices || hasValues,
                     OP_LOGE(context, "outputs do not match return_choice=%u.", info.returnChoice),
                     return ge::GRAPH_FAILED);
+        OP_CHECK_IF(logicalBlock16 && (scoreOutIr.desc == nullptr || scoreOutIr.desc->GetDataType() != ge::DT_FLOAT16),
+                    OP_LOGE(context, "pool_block_size=16 score dtype must be float16."), return ge::GRAPH_FAILED);
         const gert::Shape& scOut = scoreShape->GetStorageShape();
         OP_CHECK_IF(scOut.GetDimNum() != MSA_QUERY_DIM_NUM,
                     OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "score",
@@ -1099,7 +1231,7 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                     .c_str()),
             return ge::GRAPH_FAILED);
         OP_CHECK_NULL_WITH_CONTEXT(context, scoreOutIr.desc);
-        OP_CHECK_IF(scoreOutIr.desc->GetDataType() != ge::DT_FLOAT,
+        OP_CHECK_IF(!logicalBlock16 && scoreOutIr.desc->GetDataType() != ge::DT_FLOAT,
                     OP_LOGE(context, "fp16 score is reserved and not supported."), return ge::GRAPH_FAILED);
     } else {
         const bool outputsOk = !hasScore && hasIndices &&
@@ -1112,10 +1244,11 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
         const gert::Shape& idxOut = indicesShape->GetStorageShape();
         const auto* idxDesc = indicesOutIr.desc;
         OP_CHECK_NULL_WITH_CONTEXT(context, idxDesc);
+        const uint32_t outputHeads = logicalBlock16 ? 1U : info.numQHeads;
         const bool idxOk =
             idxOut.GetDimNum() == MSA_QUERY_DIM_NUM && idxDesc->GetDataType() == ge::DT_INT32 &&
             static_cast<ge::Format>(ge::GetPrimaryFormat(idxDesc->GetStorageFormat())) == ge::FORMAT_ND &&
-            static_cast<uint32_t>(idxOut.GetDim(MSA_DIM_0)) == info.numQHeads &&
+            static_cast<uint32_t>(idxOut.GetDim(MSA_DIM_0)) == outputHeads &&
             static_cast<uint32_t>(idxOut.GetDim(MSA_DIM_1)) == info.totalQ &&
             static_cast<uint32_t>(idxOut.GetDim(MSA_DIM_2)) == info.topk;
         if (!idxOk) {
@@ -1127,7 +1260,7 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                     "format=%d heads=%u totalQ=%u topk=%u.",
                     idxOut.GetDimNum(), idxOut.GetDimNum() > 0 ? idxOut.GetDim(0) : -1,
                     idxOut.GetDimNum() > 1 ? idxOut.GetDim(1) : -1, idxOut.GetDimNum() > 2 ? idxOut.GetDim(2) : -1,
-                    dtype, fmt, info.numQHeads, info.totalQ, info.topk);
+                    dtype, fmt, outputHeads, info.totalQ, info.topk);
             return ge::GRAPH_FAILED;
         }
         if (info.returnChoice == MSA_RETURN_INDICES_VALUES) {
@@ -1147,7 +1280,6 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
     }
     // 块长 16：TND 16、BSND/BNSD，以及 BBND/BNBD 页长 16，仅 Ascend 950。
     // 取值白名单与 BSND/BNSD 组合已在 attr 解析处校验，PA 页长已与 attr 交叉校验。
-    const bool logicalBlock16 = info.poolBlockSize == MSA_BLOCK16_SIZE;
     OP_CHECK_IF(logicalBlock16 && !info.isAscend950,
                 OP_LOGE(context, "pool_block_size=%u is only supported on Ascend 950.", MSA_BLOCK16_SIZE),
                 return ge::GRAPH_FAILED);
@@ -1213,16 +1345,18 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                                                           .c_str(),
                                                       "hifloat8 query with hifloat8 key is not supported yet"),
                 return ge::GRAPH_FAILED);
-    // 打分块长 16（TND 16、BSND/BNSD、页长 16 的两级 maxpool）仅 fp16 / bf16；int8 与 FP8 固定 128。
+    // 块长16支持fp16/bf16、无scale的FP8 E4M3FN/E5M2及MXFP4；int8/hifloat8保持128。
     OP_CHECK_IF(info.poolBlockSize == MSA_BLOCK16_SIZE && !info.isMxFp4 &&
-                    (info.isQuant || IsFp8ComputeDtype(info.queryDtype) || IsFp8ComputeDtype(info.keyDtype)),
-                OP_LOGE(context, "pool_block_size=%u supports fp16 / bf16 only.", MSA_BLOCK16_SIZE),
+                    (info.isQuant || info.queryDtype == ge::DT_HIFLOAT8 || info.keyDtype == ge::DT_HIFLOAT8),
+                OP_LOGE(context, "pool_block_size=%u supports fp16 / bf16 / float8_e4m3fn / float8_e5m2 / MXFP4 only.",
+                        MSA_BLOCK16_SIZE),
                 return ge::GRAPH_FAILED);
-    // PA 存储页长 16（M3 短页存储）同样仅 950 上的 fp16 / bf16。
-    OP_CHECK_IF(info.pageSize == MSA_BLOCK16_SIZE && !info.isMxFp4 &&
-                    (info.isQuant || IsFp8ComputeDtype(info.queryDtype) || IsFp8ComputeDtype(info.keyDtype)),
-                OP_LOGE(context, "BBND/BNBD page size %u supports fp16 / bf16 only.", MSA_BLOCK16_SIZE),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        info.pageSize == MSA_BLOCK16_SIZE && !info.isMxFp4 &&
+            (info.isQuant || info.queryDtype == ge::DT_HIFLOAT8 || info.keyDtype == ge::DT_HIFLOAT8),
+        OP_LOGE(context, "BBND/BNBD page size %u supports fp16 / bf16 / float8_e4m3fn / float8_e5m2 / MXFP4 only.",
+                MSA_BLOCK16_SIZE),
+        return ge::GRAPH_FAILED);
     if (info.isMxFp4) {
         OP_CHECK_IF(info.numKvHeads != 1, OP_LOGE(context, "MXFP4 x MXFP4 requires numKvHeads == 1."),
                     return ge::GRAPH_FAILED);
@@ -1377,6 +1511,17 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
     OP_CHECK_IF(info.initBlocks > logicalBlocks || info.localBlocks > logicalBlocks,
                 OP_LOGE(context, "init_blocks/local_blocks must be <= logical blocks(%u).", logicalBlocks),
                 return ge::GRAPH_FAILED);
+    // 参考 select_blocks：可见块超过 topk 时，前缀加局部必须放进 128，否则报错。
+    if (logicalBlock16 && info.returnChoice != MSA_RETURN_SCORE &&
+        info.initBlocks + info.localBlocks > MSA_BLOCK16_TOPK) {
+        const uint32_t vis = EstMaxVisibleBlocks(context, info);
+        OP_CHECK_IF(
+            vis > MSA_BLOCK16_TOPK,
+            OP_LOGE(context,
+                    "init_blocks(%u)+local_blocks(%u) exceed topk %u while some token can see more than %u blocks.",
+                    info.initBlocks, info.localBlocks, MSA_BLOCK16_TOPK, MSA_BLOCK16_TOPK),
+            return ge::GRAPH_FAILED);
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -1390,16 +1535,19 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
                                                       "the platform must report at least one AI core"),
                 return ge::GRAPH_FAILED);
 
+    const bool logicalBlock16 = info.poolBlockSize == MSA_BLOCK16_SIZE;
+    const bool block16Mx = logicalBlock16 && info.isMxFp4;
     const uint32_t scoreBlockStride = RoundUpU32(info.maxBlocksPerBatch, MSA_SCORE_STRIDE_ALIGN);
     // 950 C_to_UB：S 不进 GM；int8/TND 尾页仍要一页 K scratch。A2 与 950 回退（MSA_A5_USE_C2UB=0）走 8-stage S。
-    const uint32_t sElemBytes = info.isQuant ? sizeof(float) : sizeof(uint16_t);
+    const uint32_t sElemBytes = (info.isQuant || logicalBlock16) ? sizeof(float) : sizeof(uint16_t);
     const bool c2ub = info.isAscend950 && (MSA_A5_USE_C2UB != 0);
     const uint32_t sWsBytes = c2ub ? 0U : (aicNum * MSA_WORKSPACE_STAGES * MSA_STILE_ELEM_NUM * sElemBytes);
     // BSND 的尾窗可能越过 key 末尾（仅最后一个 batch），与 TND 尾页一样走 scratch 补零。
     const bool paBlock16 = (info.keyLayout == MSA_KEY_LAYOUT_BBND || info.keyLayout == MSA_KEY_LAYOUT_BNBD) &&
                            info.poolBlockSize == MSA_BLOCK16_SIZE;
     // 非 MX 块长 16 的 8 个 page 不连续，先收到 scratch 再做 128 列 GEMM。
-    const bool useKScratch = !info.isMxFp4 && (info.isQuant || MsaIsSeqKeyLayout(info.keyLayout) || paBlock16);
+    const bool useKScratch =
+        block16Mx || (!info.isMxFp4 && (info.isQuant || MsaIsSeqKeyLayout(info.keyLayout) || paBlock16));
     uint32_t scratchElemBytes = sizeof(uint16_t);
     if (info.isMxFp4 || (info.isAscend950 && !info.isQuant && IsFp8ComputeDtype(info.queryDtype))) {
         scratchElemBytes = 1U;
@@ -1409,30 +1557,29 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
     // 块长 16 的 C2UB 用两槽：Cube 读当前窗时 Vector 预取下一窗。
     if (!info.isAscend950 && info.isQuant) {
         kScratchElems *= MSA_K_SCRATCH_STAGES_A2;
-    } else if (c2ub && info.poolBlockSize == MSA_BLOCK16_SIZE) {
-        kScratchElems *= MSA_A5_S_STAGES;
     }
     const uint32_t kScratchBytes = useKScratch ? (aicNum * kScratchElems * scratchElemBytes) : 0U;
     const uint32_t kScratchOffsetElems = sWsBytes / sizeof(float);
     // 非 MX 的 BSND/BNSD M-tile 先收成连续 (token, head) 再给 Cube。
-    const uint32_t qScratchBytes = (!info.isMxFp4 && info.queryLayout != MSA_QUERY_LAYOUT_TND) ?
+    const uint32_t qScratchBytes = ((!info.isMxFp4 || block16Mx) && info.queryLayout != MSA_QUERY_LAYOUT_TND) ?
                                        (aicNum * MSA_ROW_TILE_M * info.headDim * scratchElemBytes) :
                                        0U;
     const uint32_t qScratchElemOff = (qScratchBytes == 0U) ? 0U : ((sWsBytes + kScratchBytes) / scratchElemBytes);
 
     uint32_t launchAic = aicNum;
     uint32_t kvChunks = 1U;
-    uint32_t chunkBudget = 0U;
     if (info.totalQ == 0U) {
         launchAic = 1U;
     } else {
         const uint32_t packedM = EstPackedMTasks(info, aicNum);
         const uint32_t visBlocks = EstMaxVisibleBlocks(context, info);
-        kvChunks = info.isMxFp4 ? EstMxFp4KvChunks(info, aicNum, packedM, visBlocks) :
-                                  EstKvChunks(info, aicNum, packedM, visBlocks);
-        chunkBudget = info.isMxFp4 ? 0U : EstChunkBudget(info, aicNum);
-        launchAic = (chunkBudget > 0U) ? EstLaunchAicBudget(aicNum, packedM, visBlocks) :
-                                         EstLaunchAic(aicNum, packedM, kvChunks);
+        if (logicalBlock16) {
+            kvChunks = EstBlock16KvChunks(info, aicNum, packedM, visBlocks);
+        } else {
+            kvChunks = info.isMxFp4 ? EstMxFp4KvChunks(info, aicNum, packedM, visBlocks) :
+                                      EstKvChunks(info, aicNum, packedM, visBlocks);
+        }
+        launchAic = EstLaunchAic(aicNum, packedM, kvChunks);
     }
 
     MsaIndexScoreTilingData tilingData;
@@ -1456,8 +1603,11 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
     tilingData.set_keyLayout(info.keyLayout);
     tilingData.set_totalK(info.totalK);
     tilingData.set_kvChunks(kvChunks);
-    tilingData.set_chunkBudget(chunkBudget);
-    tilingData.set_mxFp4WideN(EstMxFp4WideN(context, info));
+    tilingData.set_chunkBudget(0U);
+    tilingData.set_compressFactor(info.compressFactor);
+    tilingData.set_rowsPerBlock(info.rowsPerBlock);
+    tilingData.set_totalTasks(logicalBlock16 ? EstExactTotalTasks(context, info, kvChunks) : 0U);
+    tilingData.set_mxFp4WideN(block16Mx ? 0U : EstMxFp4WideN(context, info));
     tilingData.set_queryLayout(info.queryLayout);
     tilingData.set_qMaxSeq(info.qMaxSeq);
     tilingData.set_kMaxSeq(info.kMaxSeq);
@@ -1491,14 +1641,20 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
         return ge::GRAPH_FAILED;
     }
     tilingData.set_strideKvBlock(strideKvBlock);
-    tilingData.set_strideOutHead(info.totalQ * scoreBlockStride);
-    tilingData.set_strideOutToken(scoreBlockStride);
+    const uint32_t outStride =
+        logicalBlock16 && info.returnChoice != MSA_RETURN_SCORE ? MSA_BLOCK16_TOPK : scoreBlockStride;
+    tilingData.set_strideOutHead(info.totalQ * outStride);
+    tilingData.set_strideOutToken(outStride);
     tilingData.set_kScratchOffsetElems(kScratchOffsetElems);
 
     size_t userBytes =
         static_cast<size_t>(sWsBytes) + static_cast<size_t>(kScratchBytes) + static_cast<size_t>(qScratchBytes);
     if (info.isAscend950 && sWsBytes == 0U && kScratchBytes == 0U) {
         userBytes += 64U;
+    }
+    tilingData.set_mxScaleScratchOffset(block16Mx ? userBytes : 0U);
+    if (block16Mx) {
+        userBytes += MSA_BLOCK16_MX_SCALE_SCRATCH_BYTES;
     }
     uint32_t scoreWorkspaceElems = 0;
     size_t scoreBytes = 0;
@@ -1513,10 +1669,11 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
         OP_CHECK_IF(scoreBlockStride != 0U && info.totalQ > std::numeric_limits<uint32_t>::max() / scoreBlockStride,
                     OP_LOGE(context, "TopK score head stride exceeds uint32 range."), return ge::GRAPH_FAILED);
         const size_t headElems = static_cast<size_t>(info.totalQ) * scoreBlockStride;
-        OP_CHECK_IF(info.numQHeads != 0U && headElems > (maxSize - aligned) / sizeof(float) / info.numQHeads,
+        const uint32_t scoreHeads = logicalBlock16 ? 1U : info.numQHeads;
+        OP_CHECK_IF(scoreHeads != 0U && headElems > (maxSize - aligned) / sizeof(float) / scoreHeads,
                     OP_LOGE(context, "TopK score workspace size overflows."), return ge::GRAPH_FAILED);
         scoreWorkspaceElems = static_cast<uint32_t>(aligned / sizeof(float));
-        scoreBytes = headElems * info.numQHeads * sizeof(float);
+        scoreBytes = headElems * scoreHeads * sizeof(float);
         userBytes = aligned + scoreBytes;
     }
     tilingData.set_returnChoice(info.returnChoice);
@@ -1565,7 +1722,56 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
         }
     } else if (info.poolBlockSize == MSA_BLOCK16_SIZE) {
         // 块长 16（TND 16 / BSND/BNSD / 页长 16，两级 maxpool）独占 TilingKey，128 路径保持原样。
-        tilingKey = (info.queryDtype == ge::DT_BF16) ? MSA_TILING_KEY_BF16_BLK16 : MSA_TILING_KEY_FP16_BLK16;
+        if (info.queryDtype == ge::DT_FLOAT8_E4M3FN) {
+            tilingKey = MSA_TILING_KEY_FP8_E4M3FN_BLK16;
+        } else if (info.queryDtype == ge::DT_FLOAT8_E5M2) {
+            tilingKey = MSA_TILING_KEY_FP8_E5M2_BLK16;
+        } else {
+            tilingKey = (info.queryDtype == ge::DT_BF16) ? MSA_TILING_KEY_BF16_BLK16 : MSA_TILING_KEY_FP16_BLK16;
+        }
+        // Keep legacy page128/sequence kernels free of compressed-page checks.
+        if (MsaIsPaKeyLayout(info.keyLayout) && info.compressFactor > 1U && info.pageSize < MSA_BLOCK_SIZE &&
+            info.pageSize == MSA_BLOCK_SIZE / info.compressFactor) {
+            if (info.queryDtype == ge::DT_FLOAT8_E4M3FN) {
+                tilingKey = MSA_TILING_KEY_FP8_E4M3FN_COMPRESSED_PAGE;
+            } else if (info.queryDtype == ge::DT_FLOAT8_E5M2) {
+                tilingKey = MSA_TILING_KEY_FP8_E5M2_COMPRESSED_PAGE;
+            } else {
+                tilingKey = info.queryDtype == ge::DT_BF16 ? MSA_TILING_KEY_BF16_COMPRESSED_PAGE :
+                                                             MSA_TILING_KEY_FP16_COMPRESSED_PAGE;
+            }
+            if (info.compressFactor == 4U && info.numQHeads == 16U && info.numKvHeads == 1U && info.headDim == 128U &&
+                info.queryLayout == MSA_QUERY_LAYOUT_TND) {
+                const bool balanced = UseBalancedFp8Schedule(info.totalQ, scoreBlockStride, launchAic);
+                // q8 decode: streaming K bypasses allocation on the legacy
+                // schedule or beyond L2 capacity. Preserve q1/short-K/prefill
+                // reuse and use literal cache hints in independent instances.
+                const uint64_t keyBytes = static_cast<uint64_t>(info.batch) * scoreBlockStride * 4U * 128U;
+                const bool bypass = info.totalQ == static_cast<uint64_t>(info.batch) * 8U &&
+                                    scoreBlockStride >= 2048U && keyBytes >= 96ULL * 1024U * 1024U &&
+                                    (!balanced || keyBytes >= 128ULL * 1024U * 1024U);
+                if (info.queryDtype == ge::DT_FLOAT8_E4M3FN || info.queryDtype == ge::DT_FLOAT8_E5M2) {
+                    // Key layout: dtype + fused(2) + balanced(4) + bypass(8).
+                    tilingKey = (info.queryDtype == ge::DT_FLOAT8_E4M3FN ? MSA_TILING_KEY_FP8_E4M3FN_PIPELINED :
+                                                                           MSA_TILING_KEY_FP8_E5M2_PIPELINED) +
+                                (info.returnChoice == MSA_RETURN_SCORE ? 0U : 2U) + (balanced ? 4U : 0U) +
+                                (bypass ? 8U : 0U);
+                }
+            }
+        }
+        // Keep established full-window binaries unchanged. The new N128 loader
+        // serves compressed PA pages and shape-visible sequential tails.
+        if ((info.queryDtype == ge::DT_BF16 || info.queryDtype == ge::DT_FLOAT16) && info.headDim <= MSA_K_TILE) {
+            const bool smallPage = MsaIsPaKeyLayout(info.keyLayout) && info.pageSize < MSA_BLOCK_SIZE;
+            const uint32_t seqRows = info.keyLayout == MSA_KEY_LAYOUT_TND ? info.totalK : info.kMaxSeq;
+            const bool tail = MsaIsSeqKeyLayout(info.keyLayout) && seqRows % MSA_BLOCK_SIZE != 0U;
+            const bool fastBnsd = info.numQHeads == 16U && info.headDim == 128U && info.qMaxSeq == 8U;
+            const bool qGather = info.queryLayout == MSA_QUERY_LAYOUT_BNSD && !fastBnsd;
+            if (smallPage || tail || qGather) {
+                tilingKey = info.queryDtype == ge::DT_BF16 ? MSA_TILING_KEY_BF16_DIRECT_FLOAT :
+                                                             MSA_TILING_KEY_FP16_DIRECT_FLOAT;
+            }
+        }
     } else if (info.isQuant) {
         tilingKey = MSA_TILING_KEY_FP16_INT8;
     } else if (info.queryDtype == ge::DT_HIFLOAT8) {
@@ -1577,7 +1783,7 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
     } else {
         tilingKey = (info.queryDtype == ge::DT_BF16) ? MSA_TILING_KEY_BF16 : MSA_TILING_KEY_FP16;
     }
-    if (info.returnChoice != MSA_RETURN_SCORE) {
+    if (!logicalBlock16 && info.returnChoice != MSA_RETURN_SCORE) {
         if (info.isMxFp4) {
             tilingKey = MSA_TILING_KEY_MXFP4_TOPK;
         } else if (info.queryDtype == ge::DT_BF16) {
@@ -1596,8 +1802,8 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
     context->SetTilingKey(tilingKey);
     OP_LOGI(context->GetNodeName(),
             "MsaIndexScore tilingKey=%lu headDim=%u layout=%u strideKvBlock=%u launchAic=%u kvChunks=%u "
-            "chunkBudget=%u aicNum=%u",
-            tilingKey, info.headDim, info.keyLayout, strideKvBlock, launchAic, kvChunks, chunkBudget, aicNum);
+            "aicNum=%u",
+            tilingKey, info.headDim, info.keyLayout, strideKvBlock, launchAic, kvChunks, aicNum);
     return ge::GRAPH_SUCCESS;
 }
 } // namespace

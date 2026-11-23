@@ -23,35 +23,50 @@
 
 #include <type_traits>
 
-#include "../catlass/msa_catlass.hpp"
-#include "../catlass/arch/msa_arch.hpp"
-#include "../catlass/arch/msa_resource.hpp"
-#include "../catlass/msa_coord.hpp"
-#include "../catlass/msa_matrix_coord.hpp"
-#include "../catlass/msa_gemm_coord.hpp"
-#include "../catlass/layout/msa_layout.hpp"
-#include "../catlass/gemm/msa_gemm_helper.hpp"
-#include "../catlass/gemm/tile/msa_tile_copy.hpp"
-#include "../catlass/gemm/tile/msa_tile_mmad.hpp"
+#include "catlass/msa_catlass.hpp"
+#include "catlass/arch/msa_arch.hpp"
+#include "catlass/arch/msa_resource.hpp"
+#include "catlass/msa_coord.hpp"
+#include "catlass/msa_matrix_coord.hpp"
+#include "catlass/msa_gemm_coord.hpp"
+#include "catlass/layout/msa_layout.hpp"
+#include "catlass/gemm/msa_gemm_helper.hpp"
+#include "catlass/gemm/tile/msa_tile_copy.hpp"
+#include "catlass/gemm/tile/msa_tile_mmad.hpp"
 
 #include "../msa_index_score_common.h"
 #include "../msa_index_score_task.h"
 
 namespace MsaIndexScoreNs {
 
+// Ordinary kernels keep their pre-gather object layout. Only the direct
+// BNSD loaders carry mutable gather coordinates; the disabled base is empty.
+template <bool ENABLED>
+struct MsaBnsdGatherState {};
+
+template <>
+struct MsaBnsdGatherState<true> {
+    uint32_t qGatherHeads_ = 0U;
+    uint32_t qGatherSeq_ = 0U;
+    uint32_t qGatherRow_ = 0U;
+};
+
 template <class AType_, class BType_, class CType_, uint32_t STAGES_IN = MSA_L1B_STAGES_FP16,
-          bool USE_UNIT_FLAG_ = false, bool IS_MXFP4_ = false, bool MXFP4_N512_ = false, bool MX_FIXED_TILE_ = false,
-          bool GROUP_N256_ = false>
-class MsaBlockMmad {
+          bool USE_UNIT_FLAG_ = false, bool IS_MX_ = false, bool EXTERNAL_L1B_ = false, bool IS_MXFP4_ = false,
+          bool MXFP4_N512_ = false, bool GROUP_FP32_UB_ = false, bool DIRECT_FLOAT_Q_ = false, bool GROUP_N256_ = false,
+          bool MX_FIXED_TILE = false>
+class MsaBlockMmad : private MsaBnsdGatherState<IS_MXFP4_ || DIRECT_FLOAT_Q_> {
 public:
+    static constexpr bool IS_MX = IS_MX_;
+    static constexpr bool DIRECT_FLOAT_Q = DIRECT_FLOAT_Q_;
     static constexpr bool IS_MXFP4 = IS_MXFP4_;
-    // Core only enables this for MXFP4 block128 C2UB: packed K<=64,
-    // Mround<=128 and grouped Nround<=the selected L1_N (256 or512).
-    static constexpr bool MX_FIXED_TILE = MX_FIXED_TILE_;
-    static constexpr bool GROUP_N256 = GROUP_N256_;
     static_assert(!MX_FIXED_TILE || IS_MXFP4, "fixed-tile specialization requires MXFP4");
+    static constexpr bool GROUP_N256 = GROUP_N256_;
     // 只有四页 fp16 行放得进每个 AIV 的 32KB ping 时才用 N=512，并把 L0 第二级让出去。
     static constexpr bool MXFP4_WIDE = IS_MXFP4 && MXFP4_N512_;
+    // 块长 16 的 fp16/bf16：L0C 的 FP32 按 head 分组写进 UB，maxpool 不再经过 F322F16。
+    static constexpr bool GROUP_FP32_UB = GROUP_FP32_UB_;
+    static constexpr bool EXTERNAL_L1B = EXTERNAL_L1B_;
     using ArchTag = Catlass::Arch::AtlasA5;
     using ElementA = typename AType_::Element;
     using LayoutA = typename AType_::Layout;
@@ -77,8 +92,11 @@ public:
     using L1AAlignHelper = Catlass::Gemm::helper::L1AlignHelper<ElementA, LayoutA>;
     using L1BAlignHelper = Catlass::Gemm::helper::L1AlignHelper<ElementB, LayoutB>;
 
-    // K (B) L1 stages are selected by the caller. The int8 scratch path uses two stages
-    // to avoid racing the next vector cast; other paths use the configured FP16 stages.
+    // K (B) 的 L1 流水级数。非量化 3 级：fixpipe 减半（fp16 S）后 MTE2 的逐页延迟
+    // （~390ns，L2 命中）会成为新的关键路径，加深一级让 MTE2 提前两页预取。
+    // int8 保持 2 级：K 源是每 stile 复用的 per-core scratch，AIV 下一 stile 的 cast
+    // 会重写该区，更深的预取与 cast 重写产生竞态（实测 STAGES=3 下 int8 崩溃）。
+    // L1 占用：A 32KB + 3×32KB B = 128KB / 512KB。
     static constexpr uint32_t STAGES = STAGES_IN;
     // 非量化路径开 unit flag：mmad 与 fixpipe 的依赖交给硬件互锁，省掉每页
     // M_FIX/FIX_M 四次标量 set/wait。标量因此能在 cube 完成前就发出下一页的
@@ -121,13 +139,16 @@ public:
         for (uint32_t i = 0; i < STAGES; ++i) {
             l1BTensorList_[i] = resource.l1Buf.template GetBufferByByte<ElementB>(l1BOffset + L1B_SIZE * i);
             l1BEventList_[i] = static_cast<int32_t>(i + STAGES);
-            AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventList_[i]);
+            if constexpr (!EXTERNAL_L1B) {
+                AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventList_[i]);
+            }
         }
-
-        if constexpr (IS_MXFP4) {
-            static_assert(L1A_SIZE + L1B_SIZE * STAGES == MsaMxL1Layout<STAGES, MXFP4_WIDE>::SCALE_A_OFFSET,
-                          "AIC/AIV MX scale handoff layout must match");
-            const uint32_t scaleBase = MsaMxL1Layout<STAGES, MXFP4_WIDE>::SCALE_A_OFFSET;
+        if constexpr (EXTERNAL_L1B) {
+            static_assert(STAGES == 1U, "external L1B producer requires a single slot");
+            // 首块 L1B 视为空闲。构造时 SetFlag 会在 AIV 进入 Wait 之前被丢掉，首轮改成 AIV 不等 free。
+        }
+        if constexpr (IS_MX) {
+            const uint32_t scaleBase = l1BOffset + L1B_SIZE * STAGES;
             l1ScaleA_ = resource.l1Buf.template GetBufferByByte<fp8_e8m0_t>(scaleBase);
             for (uint32_t i = 0; i < STAGES; ++i) {
                 l1ScaleBList_[i] = resource.l1Buf.template GetBufferByByte<fp8_e8m0_t>(scaleBase + L1_SCALE_A_SIZE +
@@ -136,7 +157,8 @@ public:
         }
         // L0A 槽 0 专供常驻 Q：不预置 M_MTE1，改用 LoadA 内「Set+Wait 成对」自平衡，
         // 避免计数型 flag 让 MTE1 用构造时的余额提前放行、覆盖仍被 mmad 读取的 Q。
-        // 槽 1 仅供窄路径的多 K-tile 回退；宽路径不使用该槽，故不预置其同步事件。
+        // 槽 1：窄路径作 kTileCount>1 回退（预置 + 析构等待）；MXFP4_WIDE 的 M-split
+        // 把后半片 Q 也常驻到槽 1，同样走 Set+Wait，故不预置以免与双驻留抢余额。
         for (uint32_t i = 0; i < L0A_STAGES; ++i) {
             l0ATensorList_[i] = resource.l0ABuf.template GetBufferByByte<ElementA>(L0A_PINGPONG_BUF_SIZE * i);
             l0AEventList_[i] = static_cast<int32_t>(i);
@@ -156,19 +178,13 @@ public:
         }
     }
 
-    __aicore__ inline void SetBnsdQueryGather(uint32_t heads, uint32_t seq, uint32_t row)
-    {
-        qGatherHeads_ = heads;
-        qGatherSeq_ = seq;
-        qGatherRow_ = row;
-    }
-
     __aicore__ inline ~MsaBlockMmad()
     {
-        for (uint32_t i = 0; i < STAGES; ++i) {
-            AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventList_[i]);
+        if constexpr (!EXTERNAL_L1B) {
+            for (uint32_t i = 0; i < STAGES; ++i) {
+                AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventList_[i]);
+            }
         }
-
         if constexpr (!MXFP4_WIDE) {
             AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0AEventList_[L0A_FALLBACK_ID]);
         }
@@ -180,12 +196,33 @@ public:
         }
     }
 
+    __aicore__ inline void SetBnsdQueryGather(uint32_t heads, uint32_t seq, uint32_t row)
+    {
+        if constexpr (IS_MXFP4 || DIRECT_FLOAT_Q) {
+            this->qGatherHeads_ = heads;
+            this->qGatherSeq_ = seq;
+            this->qGatherRow_ = row;
+        }
+    }
+
+    __aicore__ inline void SetBnsdQuery(uint32_t sequence)
+    {
+        bnsdQuerySequence_ = sequence;
+    }
+
     __aicore__ inline void operator()(const AscendC::GlobalTensor<ElementA>& gmA, const LayoutA& layoutA,
                                       const AscendC::GlobalTensor<ElementB>& gmB, const LayoutB& layoutB,
                                       const AscendC::GlobalTensor<ElementC>& gmC, const LayoutC& layoutC,
                                       const Catlass::GemmCoord& actualShape, bool needLoadL1, uint32_t loadN = 0U,
-                                      bool bLoaded = false)
+                                      bool bLoaded = false, uint32_t l0aSlot = L0A_RESIDENT_ID)
     {
+        if constexpr (IS_MXFP4 && GROUP_FP32_UB && !MXFP4_WIDE && !USE_UNIT_FLAG && !EXTERNAL_L1B) {
+            if (storeToUb_ && !needLoadL1 && actualShape.m() == 128U && actualShape.n() == 256U &&
+                actualShape.k() == 64U && (loadN == 0U || loadN == 256U)) {
+                ComputeFullFp4Tile(gmB, layoutB, bLoaded, l0aSlot);
+                return;
+            }
+        }
         const uint32_t mRound = RoundUp<L1AAlignHelper::M_ALIGNED>(actualShape.m());
         const uint32_t nRound = RoundUp<L1BAlignHelper::N_ALIGNED>(actualShape.n());
         // 尾块只从 GM 读有效列。Mmad 的 N 仍按整块，多余列由 epilogue 在取 max 前盖掉。
@@ -201,31 +238,35 @@ public:
         // headDim <= L1_K（实际场景恒成立）时整块 Q 一次进 L0A，可跨 page 复用；
         // 否则退回逐 page 重搬 A 的通用路径。
         const bool qResident =
-            MX_FIXED_TILE ? true : ((kTileCount == 1U) && (mPartLoop == 1U) && (CeilDiv<L1_K>(kActual) == 1U));
+            MX_FIXED_TILE || ((kTileCount == 1U) && (mPartLoop == 1U) && (CeilDiv<L1_K>(kActual) == 1U));
+        // MXFP4_WIDE M-split：前/后半片 Q 分别驻留槽 0/1，跨窗复用、避免每窗重载。
+        const uint32_t aSlot = (l0aSlot < L0A_STAGES) ? l0aSlot : L0A_RESIDENT_ID;
 
         if (needLoadL1) {
-            // L1A overwrite is protected by MTE1_MTE2, L0A by M_MTE1 below.
+            if constexpr (IS_MX && !IS_MXFP4) {
+                AscendC::PipeBarrier<PIPE_ALL>();
+            }
             auto layoutTileA = layoutA.GetTileLayout(Catlass::MakeCoord(actualShape.m(), actualShape.k()));
             AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(l1AEvent_);
             AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1AEvent_);
             if constexpr (IS_MXFP4) {
-                if (qGatherHeads_ != 0U) {
+                if (this->qGatherHeads_ != 0U) {
                     // BNSD head segments are gathered into token-major rows directly in L1.
                     // Segment boundaries are multiples of16 rows, including E8M0 DN2NZ tiles.
                     const uint32_t groups = kActual * 2U / MSA_MX_GROUP;
                     for (uint32_t r = 0U; r < actualShape.m();) {
-                        const uint32_t logical = qGatherRow_ + r;
-                        const uint32_t token = logical / qGatherHeads_;
-                        const uint32_t head = logical % qGatherHeads_;
-                        const uint32_t rows = Min(qGatherHeads_ - head, actualShape.m() - r);
-                        const uint64_t srcRow = static_cast<uint64_t>(head) * qGatherSeq_ + token;
-                        const LayoutA source(rows, kActual, qGatherSeq_ * kActual);
+                        const uint32_t logical = this->qGatherRow_ + r;
+                        const uint32_t token = logical / this->qGatherHeads_;
+                        const uint32_t head = logical % this->qGatherHeads_;
+                        const uint32_t rows = Min(this->qGatherHeads_ - head, actualShape.m() - r);
+                        const uint64_t srcRow = static_cast<uint64_t>(head) * this->qGatherSeq_ + token;
+                        const LayoutA source(rows, kActual, this->qGatherSeq_ * kActual);
                         const Catlass::MatrixCoord dstRow{r, 0U};
                         copyGmToL1A_(l1ATensor_[layoutAInL1.GetOffset(dstRow)], gmA[srcRow * kActual], layoutAInL1,
                                      source);
-                        if (qGatherHeads_ % 16U == 0U) {
+                        if (this->qGatherHeads_ % 16U == 0U) {
                             CopyScaleGmToL1(l1ScaleA_[r * groups], gmScaleA_[srcRow * groups], rows, kActual * 2U,
-                                            qGatherSeq_ * (groups / 2U));
+                                            this->qGatherSeq_ * (groups / 2U));
                         } // Other head counts receive their complete NZ scale tile from AIV UB.
 
                         r += rows;
@@ -235,27 +276,53 @@ public:
                     CopyScaleGmToL1(l1ScaleA_, gmScaleA_, actualShape.m(), kActual * 2U);
                 }
             } else {
-                copyGmToL1A_(l1ATensor_, gmA, layoutAInL1, layoutTileA);
+                if (bnsdQuerySequence_ != 0U && actualShape.m() % 16U == 0U && kActual == (IS_MXFP4 ? 64U : 128U)) {
+                    CopyBnsdQueryToL1(gmA, actualShape.m() / 16U);
+                } else if constexpr (DIRECT_FLOAT_Q) {
+                    if (this->qGatherHeads_ != 0U) {
+                        for (uint32_t r = 0U; r < actualShape.m();) {
+                            const uint32_t logical = this->qGatherRow_ + r;
+                            const uint32_t token = logical / this->qGatherHeads_;
+                            const uint32_t head = logical % this->qGatherHeads_;
+                            const uint32_t rows = Min(this->qGatherHeads_ - head, actualShape.m() - r);
+                            const uint64_t srcRow = static_cast<uint64_t>(head) * this->qGatherSeq_ + token;
+                            const LayoutA source(rows, kActual, this->qGatherSeq_ * kActual);
+                            const Catlass::MatrixCoord dstRow{r, 0U};
+                            copyGmToL1A_(l1ATensor_[layoutAInL1.GetOffset(dstRow)], gmA[srcRow * kActual], layoutAInL1,
+                                         source);
+                            r += rows;
+                        }
+                    } else {
+                        copyGmToL1A_(l1ATensor_, gmA, layoutAInL1, layoutTileA);
+                    }
+                } else {
+                    copyGmToL1A_(l1ATensor_, gmA, layoutAInL1, layoutTileA);
+                    if constexpr (IS_MX) {
+                        CopyScaleGmToL1(l1ScaleA_, gmScaleA_, actualShape.m(), IS_MXFP4 ? kActual * 2U : kActual);
+                    }
+                }
             }
             AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1AEvent_);
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(l1AEvent_);
             if (qResident) {
-                // 本 M-tile 的 Q 一次搬进 L0A 槽 0 并驻留：省掉每页 32KB 的 L1→L0A
+                // 本 M-tile 的 Q 一次搬进选定 L0A 槽并驻留：省掉每页 32KB 的 L1→L0A
                 // 搬运与两次标量同步。先让 MTE1 等上一轮 mmad 读完该槽。
-                AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0AEventList_[L0A_RESIDENT_ID]);
-                AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0AEventList_[L0A_RESIDENT_ID]);
+                AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0AEventList_[aSlot]);
+                AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0AEventList_[aSlot]);
                 LayoutAInL0 layoutAInL0 = LayoutAInL0::template MakeLayout<ElementA>(mRound, kActual);
-                if constexpr (IS_MXFP4) {
-                    LoadMxL1ToL0A(l0ATensorList_[L0A_RESIDENT_ID], l1ATensor_, l1ScaleA_, mRound, kActual);
+                if constexpr (IS_MX) {
+                    LoadMxL1ToL0A(l0ATensorList_[aSlot], l1ATensor_, l1ScaleA_, mRound, kActual);
                 } else {
-                    copyL1ToL0A_(l0ATensorList_[L0A_RESIDENT_ID], l1ATensor_, layoutAInL0, layoutAInL1);
+                    copyL1ToL0A_(l0ATensorList_[aSlot], l1ATensor_, layoutAInL0, layoutAInL1);
                 }
-                AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(l0AEventList_[L0A_RESIDENT_ID]);
-                AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(l0AEventList_[L0A_RESIDENT_ID]);
+                AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(l0AEventList_[aSlot]);
+                AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(l0AEventList_[aSlot]);
             }
         }
 
-        if (!bLoaded) {
+        if constexpr (EXTERNAL_L1B) {
+            AscendC::CrossCoreWaitFlag<MSA_A5_SYNC_MODE4, PIPE_MTE1>(MSA_A5_FLAG_K);
+        } else if (!bLoaded) {
             LoadBTile(gmB, layoutB, kActual, nLoad);
         }
 
@@ -268,16 +335,17 @@ public:
         for (uint32_t kLoopIdx = 0; kLoopIdx < kTileCount; ++kLoopIdx) {
             const uint32_t l1ListIdNext = (l1ListId_ + 1 < STAGES) ? (l1ListId_ + 1) : 0;
             uint32_t kActualNext = 0;
-
-            if (kLoopIdx < kTileCount - 1) {
-                const uint32_t kLoopIdxNext = kLoopIdx + 1;
-                kActualNext = (kLoopIdxNext < kTileCount - 1) ? L1_K : (actualShape.k() - kLoopIdxNext * L1_K);
-                Catlass::MatrixCoord gmTileBOffset{kLoopIdxNext * L1_K, 0};
-                auto gmTileB = gmB[layoutB.GetOffset(gmTileBOffset)];
-                AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventList_[l1ListIdNext]);
-                auto layoutTileB = layoutB.GetTileLayout(Catlass::MakeCoord(kActualNext, actualShape.n()));
-                copyGmToL1B_(l1BTensorList_[l1ListIdNext], gmTileB, layoutBInL1, layoutTileB);
-                AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventList_[l1ListIdNext]);
+            if constexpr (!EXTERNAL_L1B) {
+                if (kLoopIdx < kTileCount - 1) {
+                    const uint32_t kLoopIdxNext = kLoopIdx + 1;
+                    kActualNext = (kLoopIdxNext < kTileCount - 1) ? L1_K : (actualShape.k() - kLoopIdxNext * L1_K);
+                    Catlass::MatrixCoord gmTileBOffset{kLoopIdxNext * L1_K, 0};
+                    auto gmTileB = gmB[layoutB.GetOffset(gmTileBOffset)];
+                    AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventList_[l1ListIdNext]);
+                    auto layoutTileB = layoutB.GetTileLayout(Catlass::MakeCoord(kActualNext, actualShape.n()));
+                    copyGmToL1B_(l1BTensorList_[l1ListIdNext], gmTileB, layoutBInL1, layoutTileB);
+                    AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventList_[l1ListIdNext]);
+                }
             }
 
             auto l1ATensor = l1ATensor_;
@@ -288,7 +356,7 @@ public:
                 const uint32_t mPartActual = (mPartIdx < mPartLoop - 1) ? L1_M : (mRound - mPartIdx * L1_M);
                 for (uint32_t kPartIdx = 0; kPartIdx < kPartLoop; ++kPartIdx) {
                     const uint32_t kPartActual = (kPartIdx < kPartLoop - 1) ? L1_K : (kActual - kPartIdx * L1_K);
-                    auto l0ATile = l0ATensorList_[qResident ? L0A_RESIDENT_ID : L0A_FALLBACK_ID];
+                    auto l0ATile = l0ATensorList_[qResident ? aSlot : L0A_FALLBACK_ID];
                     if (!qResident) {
                         LayoutAInL0 layoutAInL0 = LayoutAInL0::template MakeLayout<ElementA>(mPartActual, kPartActual);
                         Catlass::MatrixCoord l1AOffset{mPartIdx * L1_M, kPartIdx * L1_K + kLoopIdx * L1_K};
@@ -308,18 +376,22 @@ public:
                         Catlass::MatrixCoord l1BOffset{kPartIdx * L1_K, nPartIdx * L1_N};
                         auto l1BTile = l1BTensor[layoutBInL1.GetOffset(l1BOffset)];
                         AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0BEventList_[l0BListId_]);
-
-                        if ((kPartIdx == 0) && (nPartIdx == 0)) {
-                            AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventList_[l1ListId_]);
+                        if constexpr (!EXTERNAL_L1B) {
+                            if ((kPartIdx == 0) && (nPartIdx == 0)) {
+                                AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventList_[l1ListId_]);
+                            }
                         }
-
-                        if constexpr (IS_MXFP4) {
+                        if constexpr (IS_MX) {
                             LoadMxL1ToL0B(l0BTile, l1BTile, l1ScaleBList_[l1ListId_], nPartActual, kPartActual);
                         } else {
                             copyL1ToL0B_(l0BTile, l1BTile, layoutBInL0, layoutBInL1);
                         }
                         if ((kPartIdx == kPartLoop - 1) && (nPartIdx == nPartLoop - 1)) {
-                            AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventList_[l1ListId_]);
+                            if constexpr (EXTERNAL_L1B) {
+                                AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_MTE1>(MSA_A5_FLAG_L1B_FREE);
+                            } else {
+                                AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventList_[l1ListId_]);
+                            }
                         }
                         AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
                         Catlass::MatrixCoord l0COffset{mPartIdx * L1_M, nPartIdx * L1_N};
@@ -332,16 +404,20 @@ public:
                                               (kPartIdx == kPartLoop - 1) && (nPartIdx == nPartLoop - 1);
                             unitFlag = last ? 0b11 : 0b10;
                         }
-                        if constexpr (IS_MXFP4) {
+                        if constexpr (IS_MX) {
                             AscendC::MmadParams mmadParams;
                             mmadParams.m = mPartActual;
                             mmadParams.n = nPartActual;
-                            mmadParams.k = kPartActual * 2U;
+                            mmadParams.k = IS_MXFP4 ? (kPartActual * 2U) : kPartActual;
                             mmadParams.unitFlag = unitFlag;
                             mmadParams.cmatrixInitVal = initC;
                             mmadParams.disableGemv = true;
-                            AscendC::MmadMx(l0CTile, l0ATile.template ReinterpretCast<fp4x2_e2m1_t>(),
-                                            l0BTile.template ReinterpretCast<fp4x2_e2m1_t>(), mmadParams);
+                            if constexpr (IS_MXFP4) {
+                                AscendC::MmadMx(l0CTile, l0ATile.template ReinterpretCast<fp4x2_e2m1_t>(),
+                                                l0BTile.template ReinterpretCast<fp4x2_e2m1_t>(), mmadParams);
+                            } else {
+                                AscendC::MmadMx(l0CTile, l0ATile, l0BTile, mmadParams);
+                            }
                             if ((mPartActual / 16U) * (nPartActual / 16U) < 10U) {
                                 AscendC::PipeBarrier<PIPE_M>();
                             }
@@ -386,14 +462,43 @@ public:
     /// VC 下沉配套：把挂起的 L0C 结果 Fixpipe 到 UB，再释放 FIX_M / 推进 L0C 槽。
     /// earlyCv=true 时在 fp16 双路 Fixpipe 之间提前发 CV0/CV1；调用方勿再重复 SetFlag CV。
     __aicore__ inline void FlushStoreToUb(const AscendC::LocalTensor<float>& ubC, uint32_t cvPing = 0,
-                                          bool earlyCv = false)
+                                          bool earlyCv = false, int32_t vcPing = -1)
     {
         ubC_ = ubC;
         earlyCv_ = earlyCv;
-        syncPing_ = cvPing;
+        earlyCvPing_ = cvPing;
+        vcPing_ = vcPing;
         l0CListId_ = pendingL0CListId_;
         StoreToUb(pendingStoreShape_);
         l0CListId_ = (pendingL0CListId_ + 1 < L0C_STAGES) ? (pendingL0CListId_ + 1) : 0;
+        earlyCv_ = false;
+    }
+
+    /// 把挂起的 L0C 里 [colBase, colBase+nCols) 写成 FP32 面板。同一块 L0C 可以切多次。
+    /// 只有第一片等 M_FIX，只有最后一片发 FIX_M 并推进 L0C 槽，中间片不能放下一轮 MMAD 进来。
+    __aicore__ inline void FlushFp32Slice(const AscendC::LocalTensor<float>& ubC, uint32_t colBase, uint32_t nCols,
+                                          uint32_t cvPing, bool waitMFix, bool releaseL0C)
+    {
+        ubC_ = ubC;
+        earlyCv_ = true;
+        earlyCvPing_ = cvPing;
+        l0CListId_ = pendingL0CListId_;
+        const uint32_t mEven = (pendingStoreShape_.m() + 1U) & ~1U;
+        const uint32_t nAlign = (nCols + 7U) & ~7U;
+        const uint32_t mRound = RoundUp<L1AAlignHelper::M_ALIGNED>(pendingStoreShape_.m());
+        if (waitMFix) {
+            if constexpr (!USE_UNIT_FLAG) {
+                AscendC::SetFlag<AscendC::HardEvent::M_FIX>(l0CEventList_[l0CListId_]);
+                AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(l0CEventList_[l0CListId_]);
+            }
+        }
+        StoreGroupFp32Ub(pendingStoreShape_, mRound, mEven, nAlign, colBase);
+        if (releaseL0C) {
+            if constexpr (!USE_UNIT_FLAG) {
+                AscendC::SetFlag<AscendC::HardEvent::FIX_M>(l0CEventList_[l0CListId_]);
+            }
+            l0CListId_ = (pendingL0CListId_ + 1 < L0C_STAGES) ? (pendingL0CListId_ + 1) : 0;
+        }
         earlyCv_ = false;
     }
 
@@ -406,26 +511,27 @@ public:
                                              const Catlass::GemmCoord& actualShape, bool needLoadL1,
                                              uint32_t splitGroup = 1U, int32_t vcPing = -1)
     {
-        ComputeToUb(gmA, layoutA, gmB, layoutB, ubC, actualShape, needLoadL1, splitGroup, 0U, false, false,
-                    static_cast<uint32_t>(vcPing));
+        ComputeToUb(gmA, layoutA, gmB, layoutB, ubC, actualShape, needLoadL1, splitGroup, 0U, false, L0A_RESIDENT_ID,
+                    false, 0U, vcPing);
     }
 
     __aicore__ inline void ComputeToUb(const AscendC::GlobalTensor<ElementA>& gmA, const LayoutA& layoutA,
                                        const AscendC::GlobalTensor<ElementB>& gmB, const LayoutB& layoutB,
                                        const AscendC::LocalTensor<float>& ubC, const Catlass::GemmCoord& actualShape,
                                        bool needLoadL1, uint32_t splitGroup = 1U, uint32_t loadN = 0U,
-                                       bool bLoaded = false, bool earlyCv = false,
-                                       uint32_t cvPing = (IS_MXFP4 ? 0U : ~0U))
+                                       bool bLoaded = false, uint32_t l0aSlot = L0A_RESIDENT_ID, bool earlyCv = false,
+                                       uint32_t cvPing = 0U, int32_t vcPing = -1)
     {
         storeToUb_ = true;
         deferStore_ = false;
         ubC_ = ubC;
         splitGroup_ = splitGroup;
         earlyCv_ = earlyCv;
-        syncPing_ = cvPing;
+        earlyCvPing_ = cvPing;
+        vcPing_ = vcPing;
         AscendC::GlobalTensor<ElementC> dummyGm;
         const LayoutC dummyLayout(actualShape.m(), actualShape.n(), actualShape.n());
-        operator()(gmA, layoutA, gmB, layoutB, dummyGm, dummyLayout, actualShape, needLoadL1, loadN, bLoaded);
+        operator()(gmA, layoutA, gmB, layoutB, dummyGm, dummyLayout, actualShape, needLoadL1, loadN, bLoaded, l0aSlot);
         storeToUb_ = false;
         earlyCv_ = false;
     }
@@ -434,14 +540,14 @@ public:
     __aicore__ inline void MmadToL0C(const AscendC::GlobalTensor<ElementA>& gmA, const LayoutA& layoutA,
                                      const AscendC::GlobalTensor<ElementB>& gmB, const LayoutB& layoutB,
                                      const Catlass::GemmCoord& actualShape, bool needLoadL1, uint32_t splitGroup = 1U,
-                                     uint32_t loadN = 0U, bool bLoaded = false)
+                                     uint32_t loadN = 0U, bool bLoaded = false, uint32_t l0aSlot = L0A_RESIDENT_ID)
     {
         storeToUb_ = true;
         deferStore_ = true;
         splitGroup_ = splitGroup;
         AscendC::GlobalTensor<ElementC> dummyGm;
         const LayoutC dummyLayout(actualShape.m(), actualShape.n(), actualShape.n());
-        operator()(gmA, layoutA, gmB, layoutB, dummyGm, dummyLayout, actualShape, needLoadL1, loadN, bLoaded);
+        operator()(gmA, layoutA, gmB, layoutB, dummyGm, dummyLayout, actualShape, needLoadL1, loadN, bLoaded, l0aSlot);
         storeToUb_ = false;
         deferStore_ = false;
     }
@@ -452,12 +558,13 @@ public:
                                          const AscendC::GlobalTensor<fp8_e8m0_t>& gmScaleB,
                                          const AscendC::LocalTensor<float>& ubC, const Catlass::GemmCoord& actualShape,
                                          bool needLoadL1, uint32_t splitGroup = 1U, uint32_t loadN = 0U,
-                                         bool bLoaded = false, bool earlyCv = false, uint32_t cvPing = 0U)
+                                         bool bLoaded = false, uint32_t l0aSlot = L0A_RESIDENT_ID, bool earlyCv = false,
+                                         uint32_t cvPing = 0U)
     {
         gmScaleA_ = gmScaleA;
         gmScaleB_ = gmScaleB;
-        ComputeToUb(gmA, layoutA, gmB, layoutB, ubC, actualShape, needLoadL1, splitGroup, loadN, bLoaded, earlyCv,
-                    cvPing);
+        ComputeToUb(gmA, layoutA, gmB, layoutB, ubC, actualShape, needLoadL1, splitGroup, loadN, bLoaded, l0aSlot,
+                    earlyCv, cvPing);
     }
 
     __aicore__ inline void MmadToL0CMx(const AscendC::GlobalTensor<ElementA>& gmA, const LayoutA& layoutA,
@@ -465,11 +572,43 @@ public:
                                        const AscendC::GlobalTensor<fp8_e8m0_t>& gmScaleA,
                                        const AscendC::GlobalTensor<fp8_e8m0_t>& gmScaleB,
                                        const Catlass::GemmCoord& actualShape, bool needLoadL1, uint32_t splitGroup = 1U,
-                                       uint32_t loadN = 0U, bool bLoaded = false)
+                                       uint32_t loadN = 0U, bool bLoaded = false, uint32_t l0aSlot = L0A_RESIDENT_ID)
     {
         gmScaleA_ = gmScaleA;
         gmScaleB_ = gmScaleB;
-        MmadToL0C(gmA, layoutA, gmB, layoutB, actualShape, needLoadL1, splitGroup, loadN, bLoaded);
+        MmadToL0C(gmA, layoutA, gmB, layoutB, actualShape, needLoadL1, splitGroup, loadN, bLoaded, l0aSlot);
+    }
+
+    // 只把当前槽的 K（和 scale）从 GM 搬进 L1，不占 UB、不启动 MMAD。
+    // 调用方可以在等 AIV 交还上一组 UB 之前发出，让 MTE2 叠在 Vector epilogue 上。
+    __aicore__ inline void LoadBToL1(const AscendC::GlobalTensor<ElementB>& gmB, const LayoutB& layoutB,
+                                     const AscendC::GlobalTensor<fp8_e8m0_t>& gmScaleB,
+                                     const Catlass::GemmCoord& actualShape, uint32_t loadN = 0U)
+    {
+        gmScaleB_ = gmScaleB;
+        const uint32_t nLoad = (loadN == 0U || loadN > actualShape.n()) ? actualShape.n() : loadN;
+        const uint32_t kActual = MX_FIXED_TILE ? actualShape.k() : Min(actualShape.k(), L1_K);
+        LoadBTile(gmB, layoutB, kActual, nLoad);
+    }
+
+    // Assemble two complete MXFP4 windows from unrelated physical pages in L1.
+    __aicore__ inline void LoadBPairToL1(const AscendC::GlobalTensor<ElementB>& gmB0,
+                                         const AscendC::GlobalTensor<ElementB>& gmB1,
+                                         const AscendC::GlobalTensor<fp8_e8m0_t>& scale0,
+                                         const AscendC::GlobalTensor<fp8_e8m0_t>& scale1, uint32_t kActual,
+                                         uint32_t strideK)
+    {
+        constexpr uint32_t nPart = MSA_BLOCK_SIZE;
+        auto layoutBInL1 = LayoutBInL1::template MakeLayout<ElementB>(L1_K, L1_N);
+        const LayoutB layoutPart(kActual, nPart, strideK);
+        const uint32_t dstOffset = layoutBInL1.GetOffset(Catlass::MakeCoord(0U, nPart));
+        AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventList_[l1ListId_]);
+        copyGmToL1B_(l1BTensorList_[l1ListId_], gmB0, layoutBInL1, layoutPart);
+        copyGmToL1B_(l1BTensorList_[l1ListId_][dstOffset], gmB1, layoutBInL1, layoutPart);
+        const uint32_t kLogical = kActual * 2U;
+        CopyScaleGmToL1(l1ScaleBList_[l1ListId_], scale0, nPart, kLogical);
+        CopyScaleGmToL1(l1ScaleBList_[l1ListId_][nPart * (kLogical / MSA_MX_GROUP)], scale1, nPart, kLogical);
+        AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventList_[l1ListId_]);
     }
 
     // 把一页 K 追加到当前 L1B 槽的 nOffset 列。first 申请槽，last 才发布 MTE2_MTE1。
@@ -489,20 +628,6 @@ public:
         }
     }
 
-    // 只把当前槽的 K（和 scale）从 GM 搬进 L1，不占 UB、不启动 MMAD。
-    // 调用方可以在等 AIV 交还上一组 UB 之前发出，让 MTE2 叠在 Vector epilogue 上。
-    __aicore__ inline void LoadBToL1(const AscendC::GlobalTensor<ElementB>& gmB, const LayoutB& layoutB,
-                                     const AscendC::GlobalTensor<fp8_e8m0_t>& gmScaleB,
-                                     const Catlass::GemmCoord& actualShape, uint32_t loadN = 0U)
-    {
-        gmScaleB_ = gmScaleB;
-        const uint32_t nLoad = (loadN == 0U || loadN > actualShape.n()) ? actualShape.n() : loadN;
-        const uint32_t kActual = Min(actualShape.k(), L1_K);
-        LoadBTile(gmB, layoutB, kActual, nLoad);
-    }
-
-    // A logical block128 group can contain unrelated physical PA pages.
-    // Acquire the slot once, append each page in logical N order, publish only after the final copy.
     __aicore__ inline void LoadBPageToL1(const AscendC::GlobalTensor<ElementB>& gmB, const LayoutB& layoutB,
                                          const AscendC::GlobalTensor<fp8_e8m0_t>& gmScaleB, uint32_t kActual,
                                          uint32_t nOffset, bool first, bool last, uint32_t rows = MSA_BLOCK_SIZE)
@@ -526,6 +651,43 @@ public:
 private:
     static constexpr AscendC::FixpipeConfig MSA_CFG_ROW_MAJOR_UB = {AscendC::CO2Layout::ROW_MAJOR, true};
 
+    // The resident-Q M3 tile has fixed M/N/K. Avoid generic tiling/layout arithmetic
+    // on every steady-state iteration, while retaining the same hardware events.
+    __aicore__ inline void ComputeFullFp4Tile(const AscendC::GlobalTensor<ElementB>& gmB, const LayoutB& layoutB,
+                                              bool bLoaded, uint32_t aSlot)
+    {
+        const Catlass::GemmCoord shape{128U, 256U, 64U};
+        if (!bLoaded) {
+            LoadBTile(gmB, layoutB, 64U, 256U);
+        }
+        AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(l0CEventList_[l0CListId_]);
+        AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0BEventList_[l0BListId_]);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventList_[l1ListId_]);
+        LoadMxL1ToL0B(l0BTensorList_[l0BListId_], l1BTensorList_[l1ListId_], l1ScaleBList_[l1ListId_], 256U, 64U);
+        AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventList_[l1ListId_]);
+        AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
+        AscendC::MmadParams p;
+        p.m = 128U;
+        p.n = 256U;
+        p.k = 128U;
+        p.cmatrixInitVal = true;
+        p.disableGemv = true;
+        p.unitFlag = 0U;
+        AscendC::MmadMx(l0CTensorList_[l0CListId_], l0ATensorList_[aSlot].template ReinterpretCast<fp4x2_e2m1_t>(),
+                        l0BTensorList_[l0BListId_].template ReinterpretCast<fp4x2_e2m1_t>(), p);
+        AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0BEventList_[l0BListId_]);
+        l0BListId_ = (l0BListId_ + 1U < L0B_STAGES) ? l0BListId_ + 1U : 0U;
+        l1ListId_ = (l1ListId_ + 1U < STAGES) ? l1ListId_ + 1U : 0U;
+        if (deferStore_) {
+            pendingStoreShape_ = shape;
+            pendingL0CListId_ = l0CListId_;
+        } else {
+            StoreToUb(shape);
+            l0CListId_ = (l0CListId_ + 1U < L0C_STAGES) ? l0CListId_ + 1U : 0U;
+        }
+    }
+
     __aicore__ inline void LoadBTile(const AscendC::GlobalTensor<ElementB>& gmB, const LayoutB& layoutB,
                                      uint32_t kActual, uint32_t nLoad)
     {
@@ -533,10 +695,38 @@ private:
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventList_[l1ListId_]);
         auto layoutTileB = layoutB.GetTileLayout(Catlass::MakeCoord(kActual, nLoad));
         copyGmToL1B_(l1BTensorList_[l1ListId_], gmB, layoutBInL1, layoutTileB);
-        if constexpr (IS_MXFP4) {
-            CopyScaleGmToL1(l1ScaleBList_[l1ListId_], gmScaleB_, nLoad, kActual * 2U);
+        if constexpr (IS_MX) {
+            CopyScaleGmToL1(l1ScaleBList_[l1ListId_], gmScaleB_, nLoad, IS_MXFP4 ? (kActual * 2U) : kActual);
         }
         AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventList_[l1ListId_]);
+    }
+
+    __aicore__ inline void CopyBnsdQueryToL1(const AscendC::GlobalTensor<ElementA>& gmA, uint32_t tokens)
+    {
+        // Interleave 16 head matrices into token-major NZ rows directly in L1.
+        AscendC::Nd2NzParams query{};
+        query.ndNum = 16U;
+        query.nValue = tokens;
+        query.dValue = IS_MXFP4 ? 64U : 128U;
+        query.srcNdMatrixStride = bnsdQuerySequence_ * query.dValue;
+        query.srcDValue = query.dValue;
+        query.dstNzC0Stride = 128U;
+        query.dstNzNStride = 16U;
+        query.dstNzMatrixStride = 32U / sizeof(ElementA);
+        AscendC::DataCopy(l1ATensor_, gmA, query);
+        if constexpr (IS_MXFP4) {
+            AscendC::Dn2NzParams scale{};
+            scale.dnNum = tokens;
+            scale.dValue = 16U;
+            scale.nValue = 2U;
+            scale.srcDnMatrixStride = 2U;
+            scale.srcDValue = bnsdQuerySequence_ * 2U;
+            scale.dstNzC0Stride = 2U;
+            scale.dstNzNStride = 1U;
+            scale.dstNzMatrixStride = 32U;
+            AscendC::DataCopy(l1ScaleA_.template ReinterpretCast<half>(), gmScaleA_.template ReinterpretCast<half>(),
+                              scale);
+        }
     }
 
     __aicore__ inline void CopyScaleGmToL1(const AscendC::LocalTensor<fp8_e8m0_t>& l1Scale,
@@ -621,16 +811,73 @@ private:
         }
     }
 
+    /// 块长 16：按 head 分组把 FP32 点积写成每 AIV 的 [mSub, 64] 面板。nSize 沿用 64 的上限。
+    /// colBase 从 L0C 的第 colBase 列开始取，MXFP4 宽窗用它把 N=512 切成 ping 放得下的片段。
+    __aicore__ inline void StoreGroupFp32Ub(const Catlass::GemmCoord& actualShape, uint32_t mRound, uint32_t mEven,
+                                            uint32_t nAlign, uint32_t colBase = 0U)
+    {
+        uint32_t m0 = 0;
+        uint32_t m1 = 0;
+        MsaC2UbGroupSplit(actualShape.m(), splitGroup_, m0, m1);
+        constexpr uint32_t N_PER_ND = 64;
+        const uint32_t ndNum = (nAlign > N_PER_ND) ? (nAlign / N_PER_ND) : 1U;
+        const uint32_t srcNd = ((mEven + 15U) / 16U) * N_PER_ND;
+        // srcNdStride 是 Fixpipe 自己的面板步长。指针按下标走，一列占 ((m+15)/16)*16 个元素，
+        // 和 srcNdStride 不是同一个单位。colBase=0 时偏移为 0，N=128 的路径不变。
+        const uint32_t elemOff = colBase * ((mEven + 15U) / 16U) * 16U;
+        auto l0 = l0CTensorList_[l0CListId_][elemOff];
+        AscendC::FixpipeParamsC310<AscendC::CO2Layout::ROW_MAJOR> fp;
+        fp.srcStride = mRound;
+        fp.dualDstCtl = 0;
+        fp.quantPre = QuantMode_t::NoQuant;
+        fp.nSize = (ndNum > 1U) ? N_PER_ND : nAlign;
+        fp.dstStride = fp.nSize;
+        fp.params.ndNum = ndNum;
+        fp.params.srcNdStride = srcNd;
+        // m0==m1 时两路 AIV 一次写出，写出类型仍是 FP32。MX 的 N=256 与 bf16/fp16 的 N=128 都走这里。
+        // 不等分的尾块继续下面的两路 Fixpipe。
+        if (m0 == m1 && m0 > 0U) {
+            fp.mSize = m0 + m1;
+            fp.dualDstCtl = 1;
+            fp.params.dstNdStride = static_cast<uint16_t>(m0 * fp.nSize);
+            AscendC::Fixpipe<float, float, MSA_CFG_ROW_MAJOR_UB>(ubC_, l0, fp);
+            if (earlyCv_) {
+                AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_CV + earlyCvPing_);
+                AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_CV + earlyCvPing_ +
+                                                                       MSA_A5_AIV_FLAG_OFFSET);
+            }
+            return;
+        }
+        if (m0 > 0U) {
+            fp.mSize = m0;
+            fp.subBlockId = false;
+            fp.params.dstNdStride = static_cast<uint16_t>(m0 * fp.nSize);
+            AscendC::Fixpipe<float, float, MSA_CFG_ROW_MAJOR_UB>(ubC_, l0, fp);
+        }
+        if (earlyCv_) {
+            AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_CV + earlyCvPing_);
+        }
+        if (m1 > 0U) {
+            fp.mSize = m1;
+            fp.subBlockId = true;
+            fp.params.dstNdStride = static_cast<uint16_t>(m1 * fp.nSize);
+            AscendC::Fixpipe<float, float, MSA_CFG_ROW_MAJOR_UB>(ubC_, l0[m0 * 16U], fp);
+        }
+        if (earlyCv_) {
+            AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_CV + earlyCvPing_ +
+                                                                   MSA_A5_AIV_FLAG_OFFSET);
+        }
+    }
+
     __aicore__ inline void StoreToUb(const Catlass::GemmCoord& actualShape)
     {
-        if constexpr (!IS_MXFP4) {
-            if (syncPing_ != ~0U) {
-                AscendC::CrossCoreWaitFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_VC + syncPing_);
-                AscendC::CrossCoreWaitFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_VC + syncPing_ +
-                                                                        MSA_A5_AIV_FLAG_OFFSET);
+        if constexpr (!IS_MXFP4 && !GROUP_FP32_UB) {
+            if (vcPing_ >= 0) {
+                const uint32_t ping = static_cast<uint32_t>(vcPing_);
+                AscendC::CrossCoreWaitFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_VC + ping);
+                AscendC::CrossCoreWaitFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_VC + ping + MSA_A5_AIV_FLAG_OFFSET);
             }
         }
-
         const uint32_t mEven = (actualShape.m() + 1U) & ~1U;
         const uint32_t nAlign = (actualShape.n() + 7U) & ~7U;
         const uint32_t mRound = RoundUp<L1AAlignHelper::M_ALIGNED>(actualShape.m());
@@ -638,7 +885,10 @@ private:
             AscendC::SetFlag<AscendC::HardEvent::M_FIX>(l0CEventList_[l0CListId_]);
             AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(l0CEventList_[l0CListId_]);
         }
-        if constexpr (sizeof(ElementC) == 2) {
+        if constexpr (GROUP_FP32_UB) {
+            (void)mEven;
+            StoreGroupFp32Ub(actualShape, mRound, mEven, nAlign);
+        } else if constexpr (sizeof(ElementC) == 2) {
             uint32_t m0 = 0;
             uint32_t m1 = 0;
             MsaC2UbGroupSplit(actualShape.m(), splitGroup_, m0, m1);
@@ -659,7 +909,7 @@ private:
             }
             // 提前 CV0：AIV0 数据就位后立即放行，可与第二路 Fixpipe 重叠归约。
             if (earlyCv_) {
-                AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_CV + syncPing_);
+                AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_CV + earlyCvPing_);
             }
             if (m1 > 0U) {
                 fp.mSize = m1;
@@ -667,7 +917,7 @@ private:
                 AscendC::Fixpipe<half, float, MSA_CFG_ROW_MAJOR_UB>(ubH, l0CTensorList_[l0CListId_][m0 * 16U], fp);
             }
             if (earlyCv_) {
-                AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_CV + syncPing_ +
+                AscendC::CrossCoreSetFlag<MSA_A5_SYNC_MODE4, PIPE_FIX>(MSA_A5_FLAG_CV + earlyCvPing_ +
                                                                        MSA_A5_AIV_FLAG_OFFSET);
             }
         } else {
@@ -706,14 +956,12 @@ private:
     AscendC::LocalTensor<ElementA> l0ATensorList_[L0A_STAGES];
     AscendC::LocalTensor<ElementB> l0BTensorList_[L0B_STAGES];
     AscendC::LocalTensor<ElementAccumulator> l0CTensorList_[L0C_STAGES];
+    uint32_t bnsdQuerySequence_{0U};
     int32_t l1AEvent_{0};
     int32_t l1BEventList_[STAGES]{};
     int32_t l0AEventList_[L0A_STAGES]{};
     int32_t l0BEventList_[L0B_STAGES]{};
     int32_t l0CEventList_[L0C_STAGES]{};
-    uint32_t qGatherHeads_{0U};
-    uint32_t qGatherSeq_{0U};
-    uint32_t qGatherRow_{0U};
     uint32_t l1ListId_{0};
     uint32_t l0BListId_{0};
     uint32_t l0CListId_{0};
@@ -726,8 +974,8 @@ private:
     bool storeToUb_{false};
     bool deferStore_{false};
     bool earlyCv_{false};
-    // MX uses this ping for early CV; native uses it for deferred VC.
-    uint32_t syncPing_{IS_MXFP4 ? 0U : ~0U};
+    uint32_t earlyCvPing_{0};
+    int32_t vcPing_{-1};
     uint32_t splitGroup_{1U};
     uint32_t pendingL0CListId_{0};
     Catlass::GemmCoord pendingStoreShape_{};

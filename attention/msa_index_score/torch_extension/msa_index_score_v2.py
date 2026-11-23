@@ -21,8 +21,9 @@ DEFAULT_LOCAL_BLOCKS = 1
 DEFAULT_LAYOUT_KEY = "BBND"
 SUPPORTED_LAYOUT_KEYS = ("TND", "BSND", "BNSD", "BBND", "BNBD")
 SEQ_LAYOUT_KEYS = ("TND", "BSND", "BNSD")
-# block16 跨 head 归约；block128 按各 head 分别输出。
+# BSND/BNSD，以及 BBND/BNBD 页长 16。TND 固定 128，每个 head 只做一次块内 maxpool。
 BLOCK16_SIZE = 16
+BLOCK16_TOPK = 128
 PA_BLOCK_SIZE = 128
 
 
@@ -50,29 +51,41 @@ def _batch_key128_max_blocks(query, key, layout, actual_seq_klen, pool_block_siz
     return max(1, max_blocks)
 
 
+def _is_batch_key128(layout, query_layout, pool_block_size):
+    return (
+        layout in ("BSND", "BNSD")
+        and query_layout == "TND"
+        and int(pool_block_size) == PA_BLOCK_SIZE
+    )
+
+
 def _resolve_pool_block_size(
-    layout: str, key: torch.Tensor, pool_block_size: int, query_layout: str = "TND"
+    layout: str,
+    key: torch.Tensor,
+    pool_block_size: int,
+    query_layout: str = "TND",
+    *,
+    compress_factor: int = 1,
 ) -> int:
-    """pool_block_size 只允许 16 / 128；BSND/BNSD K 的 block128 要求 TND Q。
-    存储页长（key 的页维度）与打分块长解耦，但打分块不能超过存储页容量。"""
     pool_block_size = int(pool_block_size)
     if pool_block_size not in (BLOCK16_SIZE, PA_BLOCK_SIZE):
+        raise ValueError(f"pool_block_size must be 16 or 128, got {pool_block_size}")
+    cf = int(compress_factor)
+    if cf < 1 or pool_block_size % cf or (pool_block_size == PA_BLOCK_SIZE and cf != 1):
         raise ValueError(
-            f"pool_block_size must be {BLOCK16_SIZE} or {PA_BLOCK_SIZE}, got {pool_block_size}"
+            "compress_factor must divide pool_block_size and compression requires pool_block_size=16"
         )
     if layout in ("BSND", "BNSD"):
-        if pool_block_size != BLOCK16_SIZE and not (
-            query_layout == "TND" and pool_block_size == PA_BLOCK_SIZE
+        if pool_block_size != BLOCK16_SIZE and not _is_batch_key128(
+            layout, query_layout, pool_block_size
         ):
-            raise ValueError(
-                f"BSND/BNSD requires pool_block_size={BLOCK16_SIZE}, got {pool_block_size}"
-            )
-        return pool_block_size
-    if layout not in SEQ_LAYOUT_KEYS:
+            raise ValueError("pool_block_size=128 requires TND query for BSND/BNSD key")
+    elif layout not in SEQ_LAYOUT_KEYS:
         page = int(key.size(2) if layout == "BNBD" else key.size(1))
-        if pool_block_size > page:
+        rows_per_block = pool_block_size // cf
+        if page < rows_per_block or page % rows_per_block:
             raise ValueError(
-                f"pool_block_size({pool_block_size}) must not exceed BBND/BNBD page size({page})"
+                f"pool_block_size/compress_factor({rows_per_block}) must divide physical page rows({page})"
             )
     return pool_block_size
 
@@ -134,7 +147,7 @@ def _normalize_layout_key(layout_key: Optional[str]) -> str:
 class MsaIndexScoreV2OpBuilder(OpBuilder):
     def __init__(self):
         super(MsaIndexScoreV2OpBuilder, self).__init__(
-            "msa_index_score_v2", category="attention"
+            "_msa_index_score_v2", category="attention"
         )
 
     def sources(self):
@@ -142,14 +155,14 @@ class MsaIndexScoreV2OpBuilder(OpBuilder):
         return ["csrc/attention/msa_index_score_v2.cpp"]
 
     def schema(self) -> str:
-        # Positional order must match the public Python API: query, key, start_loc.
-        # cann_ops_transformer.__init__ re-exports torch.ops once the schema exists.
+        # Keep the Python entry point separate from the single-output dispatcher.
         return (
-            "msa_index_score_v2(Tensor query, Tensor key, Tensor start_loc, "
-            "Tensor? block_table=None, Tensor? query_scale=None, Tensor? key_scale=None, "
-            "Tensor? atten_mask=None, Tensor? actual_seq_qlen=None, Tensor? actual_seq_klen=None, "
-            '*, str layout_key="BBND", int sparse_mode=3, int init_blocks=0, int local_blocks=1, '
-            'str layout_query="TND", int pool_block_size=128, int compress_factor=1) -> Tensor'
+            "_msa_index_score_v2(Tensor query, Tensor key, Tensor start_loc, "
+            "Tensor? block_table=None, Tensor? query_scale=None, Tensor? key_scale=None, Tensor? atten_mask=None, "
+            "Tensor? actual_seq_qlen=None, Tensor? actual_seq_klen=None, "
+            '*, str layout_key="BBND", '
+            'int sparse_mode=3, int init_blocks=0, int local_blocks=1, str layout_query="TND", '
+            "int pool_block_size=128, int return_choice=0, int topk=16, int compress_factor=1) -> Tensor"
         )
 
     def register_meta(self):
@@ -158,12 +171,12 @@ class MsaIndexScoreV2OpBuilder(OpBuilder):
             query: torch.Tensor,
             key: torch.Tensor,
             start_loc: torch.Tensor,
-            block_table: Optional[torch.Tensor] = None,
-            query_scale: Optional[torch.Tensor] = None,
-            key_scale: Optional[torch.Tensor] = None,
-            atten_mask: Optional[torch.Tensor] = None,
-            actual_seq_qlen: Optional[torch.Tensor] = None,
-            actual_seq_klen: Optional[torch.Tensor] = None,
+            block_table: Optional[torch.Tensor],
+            query_scale: Optional[torch.Tensor],
+            key_scale: Optional[torch.Tensor],
+            atten_mask: Optional[torch.Tensor],
+            actual_seq_qlen: Optional[torch.Tensor],
+            actual_seq_klen: Optional[torch.Tensor],
             *,
             layout_key: str = DEFAULT_LAYOUT_KEY,
             sparse_mode: int = DEFAULT_SPARSE_MODE,
@@ -171,11 +184,10 @@ class MsaIndexScoreV2OpBuilder(OpBuilder):
             local_blocks: int = DEFAULT_LOCAL_BLOCKS,
             layout_query: str = "TND",
             pool_block_size: int = 128,
+            return_choice: int = 0,
+            topk: int = 16,
             compress_factor: int = 1,
         ):
-            torch._check(
-                compress_factor == 1, lambda: "compress_factor only supports 1"
-            )
             layout_query = _normalize_layout_query(layout_query)
             torch._check(
                 query.dim() == (3 if layout_query == "TND" else 4),
@@ -185,15 +197,29 @@ class MsaIndexScoreV2OpBuilder(OpBuilder):
                 query, layout_query, actual_seq_qlen
             )
             layout = _normalize_layout_key(layout_key)
-            if layout in SEQ_LAYOUT_KEYS:
+            batch_key128 = _is_batch_key128(layout, layout_query, pool_block_size)
+            if layout in SEQ_LAYOUT_KEYS and not batch_key128:
                 torch._check(
-                    layout == layout_query
-                    or (
-                        layout in ("BSND", "BNSD")
-                        and layout_query == "TND"
-                        and pool_block_size == PA_BLOCK_SIZE
-                    ),
+                    layout == layout_query,
                     lambda: "non-paged key layout must match layout_query",
+                )
+            blk = _resolve_pool_block_size(
+                layout,
+                key,
+                pool_block_size,
+                layout_query,
+                compress_factor=compress_factor,
+            )
+            if int(return_choice) in (1, 2):
+                torch._check(
+                    1 <= int(topk) <= 128
+                    and (blk != BLOCK16_SIZE or int(topk) == BLOCK16_TOPK),
+                    lambda: "Invalid topk for the selected pool_block_size",
+                )
+                return torch.empty(
+                    (1 if blk == BLOCK16_SIZE else num_q_heads, total_q, int(topk)),
+                    dtype=torch.int32 if int(return_choice) == 1 else torch.float32,
+                    device="meta",
                 )
             if layout not in SEQ_LAYOUT_KEYS:
                 torch._check(
@@ -203,43 +229,35 @@ class MsaIndexScoreV2OpBuilder(OpBuilder):
                 torch._check(
                     block_table.dim() == 2, lambda: "block_table must be 2D [B, MB]"
                 )
-                blk = _resolve_pool_block_size(
-                    layout, key, pool_block_size, layout_query
-                )
                 page = int(key.size(2) if layout == "BNBD" else key.size(1))
-                max_blocks = int(block_table.size(1)) * (page // blk)
+                max_blocks = max(
+                    1,
+                    int(block_table.size(1)) * (page // (blk // int(compress_factor))),
+                )
             else:
                 torch._check(
                     actual_seq_klen is not None and actual_seq_klen.dim() == 1,
-                    lambda: "layout_key=TND requires actual_seq_klen [B+1]",
+                    lambda: "non-paged key requires actual_seq_klen [B+1]",
                 )
-                if (
-                    layout in ("BSND", "BNSD")
-                    and layout_query == "TND"
-                    and pool_block_size == PA_BLOCK_SIZE
-                ):
+                if batch_key128:
                     max_blocks = _batch_key128_max_blocks(
-                        query, key, layout, actual_seq_klen, pool_block_size
+                        query, key, layout, actual_seq_klen, blk
                     )
                 else:
                     pref = [int(v) for v in actual_seq_klen.tolist()]
-                    blk = _resolve_pool_block_size(
-                        layout, key, pool_block_size, layout_query
+                    max_blocks = max(
+                        1,
+                        max(
+                            ((r - l + blk - 1) // blk for l, r in zip(pref, pref[1:])),
+                            default=0,
+                        ),
                     )
-                    max_blocks = 0
-                    for i in range(len(pref) - 1):
-                        kv = pref[i + 1] - pref[i]
-                        blocks = 0 if kv <= 0 else (kv + blk - 1) // blk
-                        if blocks > max_blocks:
-                            max_blocks = blocks
-                    if max_blocks <= 0:
-                        max_blocks = 1
             score_stride = _round_up(int(max_blocks), SCORE_STRIDE_ALIGN)
-            blk = _resolve_pool_block_size(layout, key, pool_block_size, layout_query)
             score_heads = 1 if blk == BLOCK16_SIZE else num_q_heads
+            score_dtype = torch.float16 if blk == BLOCK16_SIZE else torch.float32
             return torch.empty(
                 (score_heads, total_q, score_stride),
-                dtype=torch.float32,
+                dtype=score_dtype,
                 device="meta",
             )
 
@@ -261,12 +279,12 @@ def _msa_index_score_v2(
     query: torch.Tensor,
     key: torch.Tensor,
     start_loc: torch.Tensor,
-    block_table: Optional[torch.Tensor] = None,
-    query_scale: Optional[torch.Tensor] = None,
-    key_scale: Optional[torch.Tensor] = None,
-    atten_mask: Optional[torch.Tensor] = None,
-    actual_seq_qlen: Optional[torch.Tensor] = None,
-    actual_seq_klen: Optional[torch.Tensor] = None,
+    block_table: Optional[torch.Tensor],
+    query_scale: Optional[torch.Tensor],
+    key_scale: Optional[torch.Tensor],
+    atten_mask: Optional[torch.Tensor],
+    actual_seq_qlen: Optional[torch.Tensor],
+    actual_seq_klen: Optional[torch.Tensor],
     *,
     layout_key: str = DEFAULT_LAYOUT_KEY,
     sparse_mode: int = DEFAULT_SPARSE_MODE,
@@ -274,16 +292,23 @@ def _msa_index_score_v2(
     local_blocks: int = DEFAULT_LOCAL_BLOCKS,
     layout_query: str = "TND",
     pool_block_size: int = 128,
+    return_choice: int = 0,
+    topk: int = 16,
     compress_factor: int = 1,
 ) -> torch.Tensor:
     layout = _normalize_layout_key(layout_key)
     layout_query = _normalize_layout_query(layout_query)
     pool_block_size = _resolve_pool_block_size(
-        layout, key, pool_block_size, layout_query
+        layout,
+        key,
+        pool_block_size,
+        layout_query,
+        compress_factor=compress_factor,
     )
     if layout == "BBND" and key.dim() == 3 and int(key.size(1)) == 128:
         key = key.unsqueeze(2)
-    return _get_op_module().msa_index_score_v2(
+    # The C++ wrapper follows the PR15456 tensor order.
+    score, indices, _values = _get_op_module().msa_index_score_v2(
         query,
         key,
         start_loc,
@@ -299,8 +324,11 @@ def _msa_index_score_v2(
         local_blocks,
         layout_query,
         pool_block_size,
+        return_choice,
+        topk,
         compress_factor,
     )
+    return indices if int(return_choice) != 0 else score
 
 
 def msa_index_score_v2(
@@ -320,62 +348,65 @@ def msa_index_score_v2(
     local_blocks: int = DEFAULT_LOCAL_BLOCKS,
     layout_query: str = "TND",
     pool_block_size: int = 128,
+    return_choice: int = 0,
+    topk: int = 16,
     compress_factor: int = 1,
-) -> torch.Tensor:
-    """MSA Index Branch block score，封装 aclnnMsaIndexScoreV2。
+):
+    """调用 aclnnMsaIndexScoreV2，计算每个逻辑块的分数或返回 TopK。
 
-    950 额外支持 query/key 同型
-    ``torch_npu.hifloat8`` / ``torch.float8_e5m2`` / ``torch.float8_e4m3fn``（无 key_scale）。
-    key 布局由 ``layout_key`` 指定：PA BBND ``[NP, P, N2, D]``、BNBD ``[NP, N2, P, D]``、
-    TND ``[T2, N2, D]``、BSND ``[B, S2, N2, D]``、BNSD ``[B, N2, S2, D]``。
-    query 由 ``layout_query`` 指定 TND / BSND / BNSD，默认 TND。TND K要求TND Q；BSND/BNSD K可配同布局Q（block16）或TND Q（block128）；
-    分页 key 可配任意 query。BSND、BNSD 仅 Ascend 950，逻辑块长16支持fp16、bf16、MXFP4；TND Q配BSND/BNSD K还支持block128。
-    ``pool_block_size`` 是每个 score 归约的 token 数，只允许 16 / 128，默认 128。
-    与 BBND / BNBD 的存储页长不是同一个量；分页时不能超过页长。
-    128 走原单次块内 maxpool（TND 默认）；16仅Ascend950，支持fp16、bf16、MXFP4，
-    先在每个 head 内对 block 取 max，再对每个 block 取 head 间 max，
-    score 的 head 维为 1。query 的 head 数必须整除 128。
-    允许 ``q_len`` / ``kv_len`` 为 0（含整 batch）：跳过该请求的 QK；Ascend 950 上空 KV 的 score 为 ``-FLT_MAX``。
+    query 支持 TND、BSND、BNSD。非分页 key 与 query 布局一致，
+    块长 128 也支持 TND query 配 BSND/BNSD key。分页 key 支持 BBND、BNBD，
+    需要传入 block_table。长度张量可放在 CPU 或 NPU，图捕获时使用 NPU 长度张量。
 
-    Args:
-        query: 由layout_query指定形状；支持float16/bfloat16，950还支持FP8和配套E8M0的MXFP4
-        key: 与 ``layout_key`` 对应；非量化须与 query 同 dtype；int8 仅 fp16 query + key_scale
-        start_loc: ``[B]``，当前 query 所在逻辑 block 索引（local_mask）
-        block_table: ``[B, MB]``，BBND/BNBD 必选；TND / BSND / BNSD 不传
-        query_scale: MXFP4必填的独立Q E8M0 group32系数，其他类型传None。
-        key_scale: MXFP4为独立K E8M0 group32系数；int8反量化为FP32。PA 为 ``[NP, N2, P]``；TND 为 ``[T2, N2]``；非量化 / FP8 为 None
-        atten_mask: sparse_mode=3 时 ``[2048, 2048]`` int8
-        actual_seq_qlen: query 前缀和 ``[B+1]``
-        actual_seq_klen: PA 为各请求 S2 ``[B]``；TND / BSND / BNSD 为 key 前缀和 ``[B+1]``
-        layout_key: ``TND`` / ``BSND`` / ``BNSD`` / ``BBND`` / ``BNBD``，默认 ``BBND``
-        sparse_mode: 0 或 3
-        init_blocks / local_blocks: local_mask 强制选块；与 Triton raw score 对齐时置 0
-        pool_block_size: 打分池化块长，只允许 16 / 128，默认 128。BSND/BNSD同布局Q时为16，配TND Q时可为128；
-            BBND / BNBD 不能超过存储页长。
+    块长 128 按 head 取块内最大值。Ascend 950 支持块长 16，先取块内最大值，
+    再取跨 head 最大值并缩放。FP8 的 query 与 key 类型相同且不传 scale，
+    MXFP4 则需要分别传入 query_scale 和 key_scale（每 32 个元素一组 E8M0）。
+    块长 16 支持 compress_factor > 1，实际序列长度仍按压缩前的 token 数传入。
 
-        compress_factor: 与PR15456一致，目前仅支持1。
-
-    Returns:
-        ``pool_block_size=16`` 时 ``[1, T1, RoundUp(MB, 16)]``，否则 ``[N1, T1, RoundUp(MB, 16)]``，float32
+    return_choice 为 0 时返回 score，块长 128 为 float32，块长 16 为 float16。
+    在 Ascend 950 上，为 1 时返回 int32 索引，为 2 时返回索引和 float32 分值。
+    块长 128 的 topk 支持 1 到 128，块长 16 的 topk 固定为 128。
     """
     layout_query = _normalize_layout_query(layout_query)
     layout_key = _normalize_layout_key(layout_key)
     if (
         layout_key in SEQ_LAYOUT_KEYS
         and layout_key != layout_query
-        and not (
-            layout_key in ("BSND", "BNSD")
-            and layout_query == "TND"
-            and pool_block_size == PA_BLOCK_SIZE
-        )
+        and not _is_batch_key128(layout_key, layout_query, pool_block_size)
     ):
         raise ValueError(
             f"non-paged key layout must match layout_query, got query={layout_query} key={layout_key}"
         )
     pool_block_size = _resolve_pool_block_size(
-        layout_key, key, pool_block_size, layout_query
+        layout_key,
+        key,
+        pool_block_size,
+        layout_query,
+        compress_factor=compress_factor,
     )
-    return torch.ops.cann_ops_transformer.msa_index_score_v2(
+    if int(return_choice) == 2:
+        _score, indices, values = _get_op_module().msa_index_score_v2(
+            query,
+            key,
+            start_loc,
+            block_table,
+            query_scale,
+            key_scale,
+            atten_mask,
+            actual_seq_qlen,
+            actual_seq_klen,
+            layout_key,
+            sparse_mode,
+            init_blocks,
+            local_blocks,
+            layout_query,
+            pool_block_size,
+            int(return_choice),
+            int(topk),
+            int(compress_factor),
+        )
+        return indices, values
+    return torch.ops.cann_ops_transformer._msa_index_score_v2(
         query,
         key,
         start_loc,
@@ -391,5 +422,7 @@ def msa_index_score_v2(
         local_blocks=local_blocks,
         layout_query=layout_query,
         pool_block_size=pool_block_size,
-        compress_factor=compress_factor,
+        return_choice=int(return_choice),
+        topk=int(topk),
+        compress_factor=int(compress_factor),
     )

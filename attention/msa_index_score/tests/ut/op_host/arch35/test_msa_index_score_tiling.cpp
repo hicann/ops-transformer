@@ -27,7 +27,6 @@ namespace {
 constexpr uint64_t MSA_KEY_BF16 = 0;
 constexpr uint64_t MSA_KEY_FP16 = 1;
 constexpr uint64_t MSA_KEY_FP16_INT8 = 3;
-constexpr uint64_t MSA_KEY_HIFLOAT8 = 4;
 constexpr uint64_t MSA_KEY_FP8_E5M2 = 5;
 constexpr uint64_t MSA_KEY_FP8_E4M3FN = 6;
 constexpr uint64_t MSA_UB_950 = 262144;
@@ -90,16 +89,12 @@ struct MsaTilingSpec {
     std::string layout{"BBND"};
     std::string layoutQuery{"TND"};
     int64_t poolBlockSize{128};
+    int64_t compressFactor{1};
+    int64_t returnScore{0};
+    int64_t topk{128};
     int64_t sparseMode{0};
     int64_t initBlocks{0};
     int64_t localBlocks{1};
-    int64_t returnChoice{0};
-    int64_t topk{16};
-    bool hasScore{true};
-    bool hasIndices{false};
-    bool hasValues{false};
-    std::vector<int64_t> indicesShape{};
-    std::vector<int64_t> valuesShape{};
 };
 
 gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocParam& soc, void* compileInfo)
@@ -107,9 +102,7 @@ gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocPa
     std::vector<gert::TilingContextPara::TensorDescription> inputs;
     inputs.push_back(Present(spec.queryShape, spec.queryDtype));
     inputs.push_back(Present(spec.keyShape, spec.keyDtype));
-    inputs.push_back(spec.startLocShape.empty() ? Absent(ge::DT_INT32) : Present(spec.startLocShape, ge::DT_INT32));
     inputs.push_back(spec.hasBlockTable ? Present(spec.blockTableShape, ge::DT_INT32) : Absent(ge::DT_INT32));
-    inputs.push_back(Absent(ge::DT_FLOAT)); // query_scale，当前预留
     inputs.push_back(spec.hasScale ? Present(spec.scaleShape, ge::DT_FLOAT) : Absent(ge::DT_FLOAT));
     inputs.push_back(spec.hasMask ? Present({2048, 2048}, ge::DT_INT8) : Absent(ge::DT_INT8));
     inputs.push_back(spec.qlenShape.empty() ? Absent(ge::DT_INT32) : Present(spec.qlenShape, ge::DT_INT32));
@@ -120,11 +113,26 @@ gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocPa
                                                        true, const_cast<int32_t*>(spec.klenData.data()));
     }
     inputs.push_back(klenDesc);
+    inputs.push_back(spec.startLocShape.empty() ? Absent(ge::DT_INT32) : Present(spec.startLocShape, ge::DT_INT32));
+    inputs.push_back(Absent(ge::DT_FLOAT)); // query_scale
+    const auto oldInputs = inputs;
+    inputs = {oldInputs[0], oldInputs[1], oldInputs[7], oldInputs[2], oldInputs[8],
+              oldInputs[3], oldInputs[4], oldInputs[5], oldInputs[6]};
 
     std::vector<gert::TilingContextPara::TensorDescription> outputs;
-    outputs.push_back(spec.hasScore ? Present(spec.scoreShape, ge::DT_FLOAT) : Absent(ge::DT_FLOAT));
-    outputs.push_back(spec.hasIndices ? Present(spec.indicesShape, ge::DT_INT32) : Absent(ge::DT_INT32));
-    outputs.push_back(spec.hasValues ? Present(spec.valuesShape, ge::DT_FLOAT) : Absent(ge::DT_FLOAT));
+    const ge::DataType scoreDtype = spec.poolBlockSize == 16 ? ge::DT_FLOAT16 : ge::DT_FLOAT;
+    if (spec.returnScore == 0) {
+        outputs.push_back(Present(spec.scoreShape, scoreDtype));
+    } else {
+        // Legacy pool128 TopK omits score; block16 keeps its empty score placeholder.
+        outputs.push_back(spec.poolBlockSize == 16 ? Present({0}, scoreDtype) : Absent(scoreDtype));
+        outputs.push_back(
+            Present({spec.poolBlockSize == 16 ? 1 : spec.queryShape[1], spec.scoreShape[1], spec.topk}, ge::DT_INT32));
+        outputs.push_back(spec.returnScore == 2 ? Present({spec.poolBlockSize == 16 ? 1 : spec.queryShape[1],
+                                                           spec.scoreShape[1], spec.topk},
+                                                          ge::DT_FLOAT) :
+                                                  Absent(ge::DT_FLOAT));
+    }
 
     std::vector<gert::TilingContextPara::OpAttr> attrs = {
         {"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>(spec.layout)},
@@ -133,8 +141,9 @@ gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocPa
         {"local_blocks", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.localBlocks)},
         {"layout_query", Ops::Transformer::AnyValue::CreateFrom<std::string>(spec.layoutQuery)},
         {"pool_block_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.poolBlockSize)},
-        {"return_choice", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.returnChoice)},
-        {"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.topk)}};
+        {"return_choice", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.returnScore)},
+        {"topk", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.topk)},
+        {"compress_factor", Ops::Transformer::AnyValue::CreateFrom<int64_t>(spec.compressFactor)}};
 
     return gert::TilingContextPara("MsaIndexScore", inputs, outputs, attrs, compileInfo, soc.socVersion, soc.coreNum,
                                    soc.ubSize, MSA_TILING_CAP);
@@ -191,7 +200,7 @@ TEST_P(MsaIndexScoreTilingArch35, bbnd_bf16_causal_success)
     RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, MSA_KEY_BF16);
 }
 
-TEST_P(MsaIndexScoreTilingArch35, bbnd_fp16_int8_rejected)
+TEST_P(MsaIndexScoreTilingArch35, bbnd_fp16_int8_reserved)
 {
     MsaTilingSpec spec;
     spec.keyDtype = ge::DT_INT8;
@@ -322,9 +331,9 @@ TEST_P(MsaIndexScoreTilingArch35, bsnd_pool16_v2_success)
     spec.keyShape = {1, 64, 1, 128};
     spec.hasBlockTable = false;
     spec.klenShape = {2};
-    // 块长 16 做 head 间 max，score 的 head 维为 1。
+    // 块长16跨head归约；K仅64行，选择独立N128尾窗直搬路径。
     spec.scoreShape = {1, 32, 16};
-    RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, 8);
+    RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, 35);
 }
 
 TEST_P(MsaIndexScoreTilingArch35, causal_without_mask_fail)
@@ -454,7 +463,141 @@ TEST_F(MsaIndexScoreTilingFp8Arch35, ascend950_fp8_e5m2_success)
     RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, MSA_KEY_FP8_E5M2);
 }
 
-TEST_F(MsaIndexScoreTilingFp8Arch35, ascend950_hifloat8_rejected)
+TEST_F(MsaIndexScoreTilingFp8Arch35, block16_plain_fp8_all_layouts)
+{
+    for (const auto dtype : {ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2}) {
+        for (const std::string layout : {"TND", "BSND", "BNSD", "BBND", "BNBD"}) {
+            SCOPED_TRACE(layout);
+            MsaTilingSpec spec;
+            spec.queryDtype = dtype;
+            spec.keyDtype = dtype;
+            spec.layout = layout;
+            spec.poolBlockSize = 16;
+            spec.scoreShape = {1, 32, 16};
+            if (layout == "TND") {
+                spec.keyShape = {256, 1, 128};
+                spec.hasBlockTable = false;
+                spec.klenShape = {2};
+            } else if (layout == "BSND" || layout == "BNSD") {
+                spec.layoutQuery = layout;
+                spec.queryShape =
+                    layout == "BSND" ? std::vector<int64_t>{1, 32, 8, 128} : std::vector<int64_t>{1, 8, 32, 128};
+                spec.keyShape =
+                    layout == "BSND" ? std::vector<int64_t>{1, 256, 1, 128} : std::vector<int64_t>{1, 1, 256, 128};
+                spec.hasBlockTable = false;
+                spec.klenShape = {2};
+            } else if (layout == "BNBD") {
+                spec.keyShape = {2, 1, 128, 128};
+            }
+            RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, dtype == ge::DT_FLOAT8_E4M3FN ? 44 : 45);
+        }
+    }
+}
+
+TEST_F(MsaIndexScoreTilingFp8Arch35, block16_plain_fp8_page16)
+{
+    MsaTilingSpec spec;
+    spec.queryDtype = ge::DT_FLOAT8_E4M3FN;
+    spec.keyDtype = ge::DT_FLOAT8_E4M3FN;
+    spec.poolBlockSize = 16;
+    spec.keyShape = {16, 16, 1, 128};
+    spec.blockTableShape = {1, 16};
+    spec.scoreShape = {1, 32, 16};
+    RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, 44);
+}
+
+TEST_F(MsaIndexScoreTilingFp8Arch35, compressed_physical_page_rows)
+{
+    for (int64_t cf : {2, 4, 8, 16}) {
+        MsaTilingSpec spec;
+        spec.queryDtype = ge::DT_FLOAT8_E4M3FN;
+        spec.keyDtype = ge::DT_FLOAT8_E4M3FN;
+        spec.poolBlockSize = 16;
+        spec.compressFactor = cf;
+        spec.keyShape = {16, 128 / cf, 1, 128};
+        spec.blockTableShape = {1, 16};
+        spec.scoreShape = {1, 32, 128};
+        RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, 46);
+    }
+}
+
+TEST_F(MsaIndexScoreTilingFp8Arch35, native_pipeline_dispatch)
+{
+    for (auto dtype : {ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2}) {
+        MsaTilingSpec spec;
+        spec.queryDtype = dtype;
+        spec.keyDtype = dtype;
+        spec.queryShape = {8, 16, 128};
+        spec.keyShape = {16, 32, 1, 128};
+        spec.poolBlockSize = 16;
+        spec.compressFactor = 4;
+        spec.blockTableShape = {1, 16};
+        spec.scoreShape = {1, 8, 128};
+        RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, dtype == ge::DT_FLOAT8_E4M3FN ? 50 : 51);
+        for (int64_t mode : {1, 2}) {
+            spec.returnScore = mode;
+            RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, dtype == ge::DT_FLOAT8_E4M3FN ? 52 : 53);
+        }
+        spec.returnScore = 0;
+        spec.layoutQuery = "BNSD";
+        spec.queryShape = {1, 16, 8, 128};
+        RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, dtype == ge::DT_FLOAT8_E4M3FN ? 46 : 47);
+        spec.layoutQuery = "TND";
+        spec.queryShape = {8, 16, 128};
+        spec.keyShape = {16, 32, 2, 128};
+        RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, dtype == ge::DT_FLOAT8_E4M3FN ? 46 : 47);
+    }
+}
+
+TEST_F(MsaIndexScoreTilingFp8Arch35, balanced_pipeline_dispatch)
+{
+    const MsaSocParam soc32{"Ascend950", "Ascend950", 32, MSA_UB_950, true};
+    for (auto dtype : {ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E5M2}) {
+        for (int64_t batch : {1, 2, 3, 4, 8, 12, 15, 16, 17, 18, 20, 22, 24, 28, 31, 32, 33, 40, 48, 64}) {
+            MsaTilingSpec spec;
+            spec.queryDtype = spec.keyDtype = dtype;
+            spec.queryShape = {batch * 8, 16, 128};
+            spec.keyShape = {batch * 1024, 32, 1, 128};
+            spec.blockTableShape = {batch, 1024};
+            spec.qlenShape = {batch + 1};
+            spec.klenShape = spec.startLocShape = {batch};
+            spec.scoreShape = {1, batch * 8, 8192};
+            spec.poolBlockSize = 16;
+            spec.compressFactor = 4;
+            const bool balanced = batch == 12 || batch == 16 || batch == 17 || batch == 18 || batch == 20 ||
+                                  batch == 22 || batch == 24 || batch == 33 || batch == 40 || batch == 48;
+            for (int64_t mode : {0, 1, 2}) {
+                spec.returnScore = mode;
+                const bool bypass = batch >= 24 && (!balanced || batch >= 32);
+                const uint64_t key = (balanced ? 54 : 50) + (bypass ? 8 : 0) + (dtype == ge::DT_FLOAT8_E5M2 ? 1 : 0) +
+                                     (mode == 0 ? 0 : 2);
+                RunTiling(spec, soc32, ge::GRAPH_SUCCESS, key);
+            }
+            spec.returnScore = 0;
+            spec.keyShape = {batch * 16, 32, 1, 128};
+            spec.blockTableShape = {batch, 16};
+            spec.scoreShape = {1, batch * 8, 128};
+            RunTiling(spec, soc32, ge::GRAPH_SUCCESS, dtype == ge::DT_FLOAT8_E4M3FN ? 50 : 51);
+        }
+    }
+}
+
+TEST_F(MsaIndexScoreTilingFp8Arch35, block16_plain_fp8_rejects_scale_and_mixed_types)
+{
+    MsaTilingSpec spec;
+    spec.queryDtype = ge::DT_FLOAT8_E4M3FN;
+    spec.keyDtype = ge::DT_FLOAT8_E4M3FN;
+    spec.poolBlockSize = 16;
+    spec.scoreShape = {1, 32, 16};
+    spec.hasScale = true;
+    spec.scaleShape = {2, 1, 128};
+    RunTiling(spec, kSoc950, ge::GRAPH_FAILED);
+    spec.hasScale = false;
+    spec.keyDtype = ge::DT_FLOAT8_E5M2;
+    RunTiling(spec, kSoc950, ge::GRAPH_FAILED);
+}
+
+TEST_F(MsaIndexScoreTilingFp8Arch35, ascend950_hifloat8_reserved)
 {
     MsaTilingSpec spec;
     spec.queryDtype = ge::DT_HIFLOAT8;
@@ -462,58 +605,83 @@ TEST_F(MsaIndexScoreTilingFp8Arch35, ascend950_hifloat8_rejected)
     RunTiling(spec, kSoc950, ge::GRAPH_FAILED);
 }
 
-TEST_F(MsaIndexScoreTilingFp8Arch35, ascend950_bf16_topk_indices_and_values)
+TEST_F(MsaIndexScoreTilingFp8Arch35, float_direct_dispatch_preserves_full_window_keys)
+{
+    for (auto dtype : {ge::DT_BF16, ge::DT_FLOAT16}) {
+        for (int64_t mode : {0, 1, 2}) {
+            MsaTilingSpec spec;
+            spec.queryDtype = dtype;
+            spec.keyDtype = dtype;
+            spec.queryShape = {8, 16, 128};
+            spec.keyShape = {4, 128, 1, 128};
+            spec.poolBlockSize = 16;
+            spec.compressFactor = 4;
+            spec.blockTableShape = {1, 4};
+            spec.scoreShape = {1, 8, 128};
+            spec.returnScore = mode;
+            const uint64_t original = dtype == ge::DT_BF16 ? 7U : 8U;
+            const uint64_t direct = dtype == ge::DT_BF16 ? 66U : 67U;
+            RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, original);
+            spec.keyShape = {16, 32, 1, 128};
+            spec.blockTableShape = {1, 16};
+            RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, direct);
+            spec.layout = "TND";
+            spec.hasBlockTable = false;
+            spec.klenShape = {2};
+            spec.keyShape = {132, 1, 128};
+            spec.scoreShape = {1, 8, 48};
+            RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, direct);
+            spec.keyShape = {256, 1, 128};
+            spec.scoreShape = {1, 8, 64};
+            RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, original);
+            spec.layout = "BNSD";
+            spec.layoutQuery = "BNSD";
+            spec.queryShape = {1, 16, 17, 128};
+            spec.keyShape = {1, 1, 256, 128};
+            spec.scoreShape = {1, 17, 64};
+            RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, direct);
+            spec.queryShape = {1, 16, 8, 128};
+            spec.scoreShape = {1, 8, 64};
+            RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, original);
+        }
+    }
+}
+
+TEST_F(MsaIndexScoreTilingFp8Arch35, pr15456_per_head_topk)
+{
+    for (auto dtype : {ge::DT_BF16, ge::DT_FLOAT16, ge::DT_FLOAT8_E5M2, ge::DT_FLOAT8_E4M3FN}) {
+        for (int64_t k : {1, 16, 128}) {
+            MsaTilingSpec spec;
+            spec.queryDtype = dtype;
+            spec.keyDtype = dtype;
+            spec.returnScore = 2;
+            spec.topk = k;
+            const uint64_t key = dtype == ge::DT_BF16        ? 9 :
+                                 dtype == ge::DT_FLOAT16     ? 10 :
+                                 dtype == ge::DT_FLOAT8_E5M2 ? 11 :
+                                                               12;
+            RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, key);
+        }
+    }
+}
+
+TEST_F(MsaIndexScoreTilingFp8Arch35, pool128_uses_default_tiling_key)
 {
     MsaTilingSpec spec;
     spec.queryDtype = ge::DT_BF16;
     spec.keyDtype = ge::DT_BF16;
+    spec.queryShape = {8, 16, 128};
+    spec.keyShape = {4, 1, 128, 128};
+    spec.blockTableShape = {1, 4};
+    spec.scoreShape = {16, 8, 16};
+    spec.layout = "BNBD";
     spec.sparseMode = 3;
     spec.hasMask = true;
-    spec.returnChoice = 2;
-    spec.topk = 16;
-    spec.hasScore = false;
-    spec.hasIndices = true;
-    spec.hasValues = true;
-    spec.indicesShape = {8, 32, 16};
-    spec.valuesShape = {8, 32, 16};
-    RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, 9);
-}
-
-TEST_F(MsaIndexScoreTilingFp8Arch35, ascend950_fp8_e4m3_topk_indices)
-{
-    MsaTilingSpec spec;
-    spec.queryDtype = ge::DT_FLOAT8_E4M3FN;
-    spec.keyDtype = ge::DT_FLOAT8_E4M3FN;
-    spec.returnChoice = 1;
-    spec.topk = 32;
-    spec.hasScore = false;
-    spec.hasIndices = true;
-    spec.indicesShape = {8, 32, 32};
-    RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, 12);
-}
-
-TEST_F(MsaIndexScoreTilingFp8Arch35, ascend950_topk_pool16_rejected)
-{
-    MsaTilingSpec spec;
-    spec.returnChoice = 1;
-    spec.poolBlockSize = 16;
-    spec.hasScore = false;
-    spec.hasIndices = true;
-    spec.indicesShape = {1, 32, 16};
-    RunTiling(spec, kSoc950, ge::GRAPH_FAILED);
-}
-
-TEST_F(MsaIndexScoreTilingFp8Arch35, ascend950_topk_out_of_range_rejected)
-{
-    MsaTilingSpec spec;
-    spec.returnChoice = 3;
-    RunTiling(spec, kSoc950, ge::GRAPH_FAILED);
-    spec.returnChoice = 1;
-    spec.topk = 0;
-    spec.hasScore = false;
-    spec.hasIndices = true;
-    spec.indicesShape = {8, 32, 16};
-    RunTiling(spec, kSoc950, ge::GRAPH_FAILED);
-    spec.topk = 129;
+    for (int64_t pool : {128, 0, -1}) {
+        spec.poolBlockSize = pool;
+        RunTiling(spec, kSoc950, ge::GRAPH_SUCCESS, MSA_KEY_BF16);
+    }
+    spec.poolBlockSize = 0;
+    spec.compressFactor = 4;
     RunTiling(spec, kSoc950, ge::GRAPH_FAILED);
 }

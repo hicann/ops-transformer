@@ -118,7 +118,7 @@ if _TORCHAIR_AVAILABLE:
         )
 
     @register_fx_node_ge_converter(
-        torch.ops.cann_ops_transformer.msa_index_score.default
+        torch.ops.cann_ops_transformer._msa_index_score.default
     )
     def convert_msa_index_score(
         query: Tensor,
