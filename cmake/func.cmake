@@ -280,6 +280,7 @@ function(op_add_subdirectory OP_LIST OP_DIR_LIST)
                 file(GLOB MC2_CANNDEV_OPS_HOST_CMAKE_FILES
                 "${CMAKE_CURRENT_SOURCE_DIR}/mc2/**/op_host/CMakeLists.txt"
                 "${CMAKE_CURRENT_SOURCE_DIR}/mc2/**/framework/CMakeLists.txt"
+                "${CMAKE_CURRENT_SOURCE_DIR}/mc2/**/op_dsl/CMakeLists.txt"
                 "${CMAKE_CURRENT_SOURCE_DIR}/mc2/tools/**/op_host/CMakeLists.txt"
                 "${CMAKE_CURRENT_SOURCE_DIR}/mc2/tools/**/framework/CMakeLists.txt"
                 )
@@ -305,6 +306,11 @@ function(op_add_subdirectory OP_LIST OP_DIR_LIST)
         if ("${OP_CMAKE_FILE}" MATCHES "op_host")
             get_filename_component(OP_HOST_DIR "${OP_CMAKE_FILE}" DIRECTORY)
             get_filename_component(OP_DIR "${OP_HOST_DIR}" DIRECTORY)
+        elseif ("${OP_CMAKE_FILE}" MATCHES "/op_dsl/CMakeLists.txt$")
+            # DSL-only operators carry no op_host tree; op_dsl/ belongs to the
+            # operator directory one level up (e.g. mc2/moonep/op_dsl).
+            get_filename_component(OP_DSL_DIR "${OP_CMAKE_FILE}" DIRECTORY)
+            get_filename_component(OP_DIR "${OP_DSL_DIR}" DIRECTORY)
         else()
             get_filename_component(OP_DIR "${OP_CMAKE_FILE}" DIRECTORY)
         endif()
@@ -903,7 +909,8 @@ function(enable_cannbotdsl_kernel op_name source_dir)
     file(GLOB_RECURSE _sources CONFIGURE_DEPENDS "${_source_dir}/*.py")
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${_sources} "${_builder}")
     set(_env "ASCEND_HOME_PATH=${ASCEND_CANN_PACKAGE_PATH}"
-        TORCH_DEVICE_BACKEND_AUTOLOAD=0 PYTHONDONTWRITEBYTECODE=1)
+        TORCH_DEVICE_BACKEND_AUTOLOAD=0 PYTHONDONTWRITEBYTECODE=1
+        "PYTHONPATH=${_source_dir}:$ENV{PYTHONPATH}")
     set(_cache "$ENV{CANNBOTDSL_CACHE_DIR}")
     if("${_cache}" STREQUAL "")
         set(_cache "${CMAKE_BINARY_DIR}/cannbot_dsl/lowering-cache")
