@@ -362,9 +362,6 @@ struct RunInfo {
 
     int64_t preTokensLeftUp = 0;
     int64_t nextTokensLeftUp = 0;
-
-    uint64_t qPaddingBeginOffset = 0;
-    uint64_t kvPaddingBeginOffset = 0;
 };
 
 struct CommonConstInfo {
