@@ -46,4 +46,47 @@ TEST(NsaCompressAttentionInferApiTest, RejectsMismatchedValueDtypeAtWorkspaceQue
     EXPECT_EQ(errors.front().error_id, "EZ1001");
     EXPECT_NE(errors.front().error_message.find("Input K or V data type is invalid"), std::string::npos);
 }
+
+TEST(NsaCompressAttentionInferApiTest, ChecksTndBatchSizeIndependentlyOfPackedTokenCount)
+{
+    const struct {
+        int64_t batchSize;
+        int64_t tokens;
+        int64_t querySeqLen;
+        aclnnStatus expectedStatus;
+    } cases[] = {
+        {2500, 10000, 4, ACLNN_SUCCESS},    {2501, 10004, 4, ACLNN_SUCCESS},
+        {10000, 40000, 4, ACLNN_SUCCESS},   {10001, 10001, 1, ACLNN_ERR_PARAM_INVALID},
+        {0, 1, 1, ACLNN_ERR_PARAM_INVALID},
+    };
+
+    auto key = TensorDesc({1, 128, 192}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclType();
+    auto value = TensorDesc({1, 128, 128}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclType();
+    ASSERT_TRUE(key && value);
+    for (const auto& testCase : cases) {
+        const int64_t tokens = testCase.tokens;
+        SCOPED_TRACE(testing::Message() << "B=" << testCase.batchSize << ", T=" << tokens);
+        auto query = TensorDesc({tokens, 1, 192}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclType();
+        auto blockTable = TensorDesc({testCase.batchSize, 1}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
+        auto queryLengths = IntArrayDesc(std::vector<int64_t>(testCase.batchSize, testCase.querySeqLen)).ToAclType();
+        auto cmpLengths = IntArrayDesc(std::vector<int64_t>(testCase.batchSize, 3)).ToAclType();
+        auto selLengths = IntArrayDesc(std::vector<int64_t>(testCase.batchSize, 64)).ToAclType();
+        auto output = TensorDesc({tokens, 1, 128}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclType();
+        auto topKOutput = TensorDesc({tokens, 1, 1}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
+        ASSERT_TRUE(query && blockTable && queryLengths && cmpLengths && selLengths && output && topKOutput);
+
+        char layout[] = "TND";
+        uint64_t workspaceSize = 0;
+        aclOpExecutor* executor = nullptr;
+        const auto status = aclnnNsaCompressAttentionInferGetWorkspaceSize(
+            query.get(), key.get(), value.get(), nullptr, blockTable.get(), queryLengths.get(), cmpLengths.get(),
+            selLengths.get(), nullptr, 1, 1, 64, 1, 32, 16, 0.088388, layout, 128, 0, output.get(), topKOutput.get(),
+            &workspaceSize, &executor);
+        EXPECT_EQ(status, testCase.expectedStatus);
+        EXPECT_EQ(executor != nullptr, testCase.expectedStatus == ACLNN_SUCCESS);
+        if (executor != nullptr) {
+            aclDestroyAclOpExecutor(executor);
+        }
+    }
+}
 } // namespace

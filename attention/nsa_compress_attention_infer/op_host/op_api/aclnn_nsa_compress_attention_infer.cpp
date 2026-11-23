@@ -110,10 +110,11 @@ static bool nsaCompressAttentionInferCheckDataType(const aclTensor* query, const
 
 aclnnStatus nsaCompressAttentionInferValidateParam(const aclTensor* query, const aclTensor* key, const aclTensor* value,
                                                    const aclTensor* blockTableOptional, const aclTensor* output,
-                                                   const aclTensor* topKOutput)
+                                                   const aclTensor* topKOutput, const char* layoutOptional)
 {
-    Shape qShape = query->GetViewShape();
-    auto batchSize = qShape[0];
+    const auto& batchShape =
+        strcmp(layoutOptional, "TND") == 0 ? blockTableOptional->GetViewShape() : query->GetViewShape();
+    const auto batchSize = batchShape[0];
     if (batchSize > 10000U || batchSize < 1U) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "batchSize %ld not in  [1, 10000], please check", batchSize);
         return ACLNN_ERR_PARAM_INVALID;
@@ -195,8 +196,8 @@ aclnnStatus aclnnNsaCompressAttentionInferGetWorkspaceSize(
                                                  layoutOptional, output, topKOutput, workspaceSize) != ACLNN_SUCCESS) {
         return ACLNN_ERR_PARAM_NULLPTR;
     }
-    CHECK_RET(nsaCompressAttentionInferValidateParam(query, key, value, blockTableOptional, output, topKOutput) ==
-                  ACLNN_SUCCESS,
+    CHECK_RET(nsaCompressAttentionInferValidateParam(query, key, value, blockTableOptional, output, topKOutput,
+                                                     layoutOptional) == ACLNN_SUCCESS,
               ACLNN_ERR_PARAM_INVALID);
     L2_DFX_PHASE_1(aclnnNsaCompressAttentionInfer,
                    DFX_IN(query, key, value, attentionMaskOptional, blockTableOptional, actualQSeqLenOptional,
