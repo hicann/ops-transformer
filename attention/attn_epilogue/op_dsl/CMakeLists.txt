@@ -7,7 +7,3 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 
 add_op_to_compiled_list()
-
-if(BUILD_OPEN_PROJECT)
-    enable_cannbotdsl_kernel(attn_epilogue "${CMAKE_CURRENT_LIST_DIR}")
-endif()
