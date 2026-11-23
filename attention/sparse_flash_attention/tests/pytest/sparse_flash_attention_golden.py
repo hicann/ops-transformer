@@ -18,6 +18,7 @@ import copy
 import generate_tensor_data
 
 SFA_S2_BASE_SIZE = 128
+SFA_CUBE_K_GROUP = 16
 SFA_S2_TAIL_MIN_ORIGIN = 64
 NEGATIVE_MIN_VALUE_FP32 = -torch.finfo(torch.float32).max
 
@@ -736,24 +737,38 @@ def online_softmax_bmm2(scale_res, v_sparse, sinks, q_dtype, quantize_exp):
     return bmm2_res, running_max[:, None], running_sum[:, None]
 
 
+def _bmm1_fp16_cpu_reference(q_curr, k_sparse):
+    """Compute FP16-input dot products with grouped FP32 compensated summation."""
+    q = q_curr.float()
+    k = k_sparse.float()
+    acc = torch.zeros((q.shape[0], k.shape[0]), dtype=torch.float32, device=q.device)
+
+    for start in range(0, q.shape[-1], SFA_CUBE_K_GROUP):
+        high = acc.clone()
+        low = torch.zeros_like(high)
+
+        for index in range(start, start + SFA_CUBE_K_GROUP):
+            term = q[:, None, index] * k[None, :, index]
+            total = high + term
+            # Recover the addition residual with the larger-magnitude addend first.
+            correction = torch.where(
+                torch.abs(high) >= torch.abs(term),
+                (high - total) + term,
+                (term - total) + high,
+            )
+            low = low + correction
+            high = total
+
+        acc = high + low
+
+    return acc
+
+
 def bmm1(q_curr, k_sparse, calc_dtype):
-    # 极值输入（如 key_rope=BF16 上界）下 bmm1 真值可能超出 fp32 表示范围，
-    # 此时采用 NPU matmul 结果
-    # 其他场景保持 CPU matmul
-    cpu_matmul = torch.matmul(q_curr.float(), k_sparse.float().T)
-    if calc_dtype is not torch.bfloat16:
-        return cpu_matmul
-    try:
-        if not (hasattr(torch, "npu") and torch.npu.is_available()):
-            return cpu_matmul
-        device = torch.device("npu")
-        q_dev = q_curr.to(device=device, dtype=torch.bfloat16)
-        k_dev = k_sparse.to(device=device, dtype=torch.bfloat16)
-        npu_matmul = torch.matmul(q_dev, k_dev.T).float().cpu()
-        keep = torch.isfinite(npu_matmul) & torch.isfinite(cpu_matmul)
-        return torch.where(keep, cpu_matmul, npu_matmul)
-    except Exception:
-        return cpu_matmul
+    """Use FP32 compensated accumulation for supported FP16 head sizes."""
+    if calc_dtype == torch.float16 and q_curr.shape[-1] in (512, 576):
+        return _bmm1_fp16_cpu_reference(q_curr, k_sparse)
+    return torch.matmul(q_curr.float(), k_sparse.float().T)
 
 
 def _t_increattention_bnsd(fa_param, quantize_exp=True):
