@@ -110,6 +110,7 @@ if(UT_TEST_ALL OR OP_HOST_UT)
       platform
       gtest
       unified_dlog
+      error_manager
   )
 
   ## exec ophost ut exe
