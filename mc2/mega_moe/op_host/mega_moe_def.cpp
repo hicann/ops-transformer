@@ -368,6 +368,20 @@ public:
         DefineArch92WeightSignatures(aicore_config_arch92);
         this->AICore().AddConfig("ascend960dt", aicore_config_arch92);
 
+        const std::vector<ge::DataType> ioTypes = {
+            ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16,
+            ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16,
+            ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16};
+        const std::vector<ge::DataType> weightTypes = {
+            ge::DT_INT4, ge::DT_INT4, ge::DT_INT4, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_FLOAT16,
+            ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16, ge::DT_INT8, ge::DT_INT8,
+            ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8};
+        const std::vector<ge::Format> weightFormats = {
+            ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ,
+            ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND,
+            ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND, ge::FORMAT_ND,
+            ge::FORMAT_ND, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ};
+
         OpAICoreConfig aicore_config_arch22;
         aicore_config_arch22.Input("context")
             .ParamType(REQUIRED)
@@ -376,9 +390,7 @@ public:
             .AutoContiguous();
         aicore_config_arch22.Input("x")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16})
+            .DataType(ioTypes)
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         aicore_config_arch22.Input("topk_ids")
@@ -388,30 +400,17 @@ public:
             .AutoContiguous();
         aicore_config_arch22.Input("topk_weights")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT, ge::DT_FLOAT,
-                       ge::DT_BF16, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,
-                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         aicore_config_arch22.Input("weight1")
             .ParamType(DYNAMIC)
-            .DataType({ge::DT_INT4, ge::DT_INT4, ge::DT_INT4, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_FLOAT16,
-                       ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16, ge::DT_INT8, ge::DT_INT8,
-                       ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8})
-            .Format({ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ,
-                     ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND,
-                     ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND, ge::FORMAT_ND,
-                     ge::FORMAT_ND, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ})
+            .DataType(weightTypes)
+            .Format(weightFormats)
             .IgnoreContiguous();
         aicore_config_arch22.Input("weight2")
             .ParamType(DYNAMIC)
-            .DataType({ge::DT_INT4, ge::DT_INT4, ge::DT_INT4, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_FLOAT16,
-                       ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16, ge::DT_INT8, ge::DT_INT8,
-                       ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8})
-            .Format({ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ,
-                     ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND,
-                     ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND, ge::FORMAT_ND,
-                     ge::FORMAT_ND, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ})
+            .DataType(weightTypes)
+            .Format(weightFormats)
             .IgnoreContiguous();
         aicore_config_arch22.Input("weight_scales1")
             .ParamType(DYNAMIC)
@@ -445,23 +444,13 @@ public:
             .AutoContiguous();
         aicore_config_arch22.Input("shared_weight1")
             .ParamType(DYNAMIC)
-            .DataType({ge::DT_INT4, ge::DT_INT4, ge::DT_INT4, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_FLOAT16,
-                       ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16, ge::DT_INT8, ge::DT_INT8,
-                       ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8})
-            .Format({ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ,
-                     ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND,
-                     ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND, ge::FORMAT_ND,
-                     ge::FORMAT_ND, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ})
+            .DataType(weightTypes)
+            .Format(weightFormats)
             .IgnoreContiguous();
         aicore_config_arch22.Input("shared_weight2")
             .ParamType(DYNAMIC)
-            .DataType({ge::DT_INT4, ge::DT_INT4, ge::DT_INT4, ge::DT_INT32, ge::DT_INT32, ge::DT_INT32, ge::DT_FLOAT16,
-                       ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16, ge::DT_INT8, ge::DT_INT8,
-                       ge::DT_INT8, ge::DT_INT8, ge::DT_INT8, ge::DT_INT8})
-            .Format({ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ,
-                     ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND, ge::FORMAT_ND, ge::FORMAT_ND,
-                     ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_ND, ge::FORMAT_ND,
-                     ge::FORMAT_ND, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ, ge::FORMAT_FRACTAL_NZ})
+            .DataType(weightTypes)
+            .Format(weightFormats)
             .IgnoreContiguous();
         aicore_config_arch22.Input("shared_weight_scales1")
             .ParamType(DYNAMIC)
@@ -491,9 +480,7 @@ public:
 
         aicore_config_arch22.Output("y")
             .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16, ge::DT_FLOAT16, ge::DT_BF16, ge::DT_BF16})
+            .DataType(ioTypes)
             .FormatList({ge::FORMAT_ND});
         aicore_config_arch22.Output("expert_token_nums")
             .ParamType(REQUIRED)
@@ -510,7 +497,41 @@ public:
             .ExtendCfgInfo("prebuildPattern.value", "Opaque")
             .ExtendCfgInfo("jitCompile.flag", "static_false")
             .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel");
-        this->AICore().AddConfig("ascend910_93", aicore_config_arch22);
+
+        // A3 adds shared-expert signatures and allows either top-k weight dtype.
+        OpAICoreConfig aicore_config_a3;
+        aicore_config_a3 = aicore_config_arch22;
+        aicore_config_arch22.Input("topk_weights")
+            .DataType({ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT, ge::DT_FLOAT,
+                       ge::DT_BF16, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,
+                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16, ge::DT_FLOAT});
+        aicore_config_a3.Input("topk_weights").DataTypeList({ge::DT_BF16, ge::DT_FLOAT});
+
+        // Each added signature uses BF16 x and y.
+        auto a3IoTypes = ioTypes;
+        a3IoTypes.insert(a3IoTypes.end(), 4, ge::DT_BF16);
+
+        // Ordered signatures: mixed NZ/NZ, routed W8/shared W4, routed W4/shared W8, then mixed NZ/ND.
+        auto a3RoutedTypes = weightTypes;
+        a3RoutedTypes.insert(a3RoutedTypes.end(), {ge::DT_INT8, ge::DT_INT8, ge::DT_INT4, ge::DT_INT8});
+        auto a3SharedW1Types = weightTypes;
+        a3SharedW1Types.insert(a3SharedW1Types.end(), {ge::DT_INT8, ge::DT_INT4, ge::DT_INT8, ge::DT_INT8});
+        auto a3SharedW2Types = weightTypes;
+        a3SharedW2Types.insert(a3SharedW2Types.end(), {ge::DT_BF16, ge::DT_INT4, ge::DT_INT8, ge::DT_BF16});
+
+        auto a3WeightFormats = weightFormats;
+        a3WeightFormats.insert(a3WeightFormats.end(), 4, ge::FORMAT_FRACTAL_NZ);
+        auto a3SharedW2Formats = a3WeightFormats;
+        a3SharedW2Formats.back() = ge::FORMAT_ND;
+
+        aicore_config_a3.Input("x").DataType(a3IoTypes);
+        aicore_config_a3.Input("weight1").DataType(a3RoutedTypes).Format(a3WeightFormats);
+        aicore_config_a3.Input("weight2").DataType(a3RoutedTypes).Format(a3WeightFormats);
+        aicore_config_a3.Input("shared_weight1").DataType(a3SharedW1Types).Format(a3WeightFormats);
+        aicore_config_a3.Input("shared_weight2").DataType(a3SharedW2Types).Format(a3SharedW2Formats);
+        aicore_config_a3.Output("y").DataType(a3IoTypes);
+
+        this->AICore().AddConfig("ascend910_93", aicore_config_a3);
         this->AICore().AddConfig("ascend910b", aicore_config_arch22);
     }
 };

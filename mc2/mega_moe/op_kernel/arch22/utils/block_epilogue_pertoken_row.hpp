@@ -25,6 +25,8 @@
 #include "catlass/detail/callback.hpp"
 #include "catlass/epilogue/block/block_epilogue.hpp"
 
+#include "shared_w8_dequant.hpp"
+
 namespace Catlass::Epilogue::Block {
 
 template <uint32_t UB_STAGES_, class CType_, class LayoutPerTokenScale_, class DType_, class TileCopy_>
@@ -46,7 +48,8 @@ public:
     static constexpr uint32_t SCALE_INPUT_COUNT = 256;
     static constexpr uint32_t SCALE_INPUT_BYTES = SCALE_INPUT_COUNT * sizeof(float);
 
-    static_assert((std::is_same_v<ElementC, half> || std::is_same_v<ElementC, bfloat16_t>) &&
+    static_assert((std::is_same_v<ElementC, half> || std::is_same_v<ElementC, bfloat16_t> ||
+                   std::is_same_v<ElementC, int32_t>) &&
                       (std::is_same_v<ElementD, half> || std::is_same_v<ElementD, bfloat16_t>),
                   "The element type template parameters of BlockEpilogue are wrong");
     static_assert(std::is_same_v<LayoutC, layout::RowMajor> &&
@@ -56,6 +59,11 @@ public:
 
     using CopyGmToUbC = typename TileCopy_::CopyGmToUbC;
     using CopyUbToGmD = typename TileCopy_::CopyUbToGmD;
+
+    CATLASS_DEVICE void SetWeightScales(__gm__ uint64_t* scales)
+    {
+        weightScales_.SetGlobalBuffer(scales);
+    }
 
     struct Params {
         __gm__ int32_t* ptrTokenPerExpert{nullptr};
@@ -168,6 +176,10 @@ public:
 
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(eventUbCMTE2VList[ubListId]);
             AscendC::Cast(ubCFp32, ubC, AscendC::RoundMode::CAST_NONE, blockN);
+            if constexpr (std::is_same_v<ElementC, int32_t>) {
+                detail::ApplySharedW8Scale(ubCFp32, ubC, weightScales_, 0, blockN, blockN, eventUbCVMTE2List[ubListId],
+                                           eventUbCMTE2VList[ubListId]);
+            }
             AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[ubListId]);
 
             AscendC::SetFlag<AscendC::HardEvent::S_V>(0);
@@ -190,9 +202,32 @@ public:
         }
     }
 
+    CATLASS_DEVICE
+    void SharedExpert(AscendC::GlobalTensor<ElementC> const& gmC, MatrixCoord const& shapeC,
+                      AscendC::GlobalTensor<ElementPerTokenScale> const& gmPerTokenScale,
+                      AscendC::GlobalTensor<ElementD> const& gmD, uint32_t epilogueCoreNum)
+    {
+        SetFlag();
+        const uint32_t coreIdx = get_block_idx() + get_subblockid() * get_block_num();
+        const uint32_t blockM = shapeC.row();
+        const uint32_t blockN = shapeC.column();
+        if (coreIdx < epilogueCoreNum) {
+            const uint32_t rowsPerCore = blockM / epilogueCoreNum;
+            const uint32_t remainder = blockM % epilogueCoreNum;
+            const uint32_t rowCount = coreIdx < remainder ? rowsPerCore + 1U : rowsPerCore;
+            const uint32_t rowStart = coreIdx * rowsPerCore + (coreIdx < remainder ? coreIdx : remainder);
+            if (rowCount > 0U) {
+                operator()(gmC[static_cast<uint64_t>(rowStart) * blockN], MatrixCoord{rowCount, blockN},
+                           gmPerTokenScale[rowStart], gmD[static_cast<uint64_t>(rowStart) * blockN]);
+            }
+        }
+        Finalize();
+    }
+
 private:
     Params params;
 
+    AscendC::GlobalTensor<uint64_t> weightScales_;
     AscendC::LocalTensor<ElementC> ubCList[UB_STAGES];
     AscendC::LocalTensor<ElementD> ubDList[UB_STAGES];
 

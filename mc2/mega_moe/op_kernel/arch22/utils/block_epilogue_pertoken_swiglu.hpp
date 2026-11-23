@@ -24,6 +24,8 @@
 #include "swiglu_epilogue_common.hpp"
 #include "dispatch_policy_custom.hpp"
 
+#include "shared_w8_dequant.hpp"
+
 namespace Catlass::Epilogue::Block {
 
 namespace detail {
@@ -67,7 +69,8 @@ public:
     static_assert(BUFFER_SIZE + Activation::MIN_SHARED_TMP_BYTES <= ArchTag::UB_SIZE,
                   "The tiled activation buffers and workspace exceed UB capacity");
 
-    static_assert((std::is_same_v<ElementC, half> || std::is_same_v<ElementC, bfloat16_t>) &&
+    static_assert((std::is_same_v<ElementC, half> || std::is_same_v<ElementC, bfloat16_t> ||
+                   std::is_same_v<ElementC, int32_t>) &&
                       (std::is_same_v<ElementD, float> || std::is_same_v<ElementD, int8_t> ||
                        std::is_same_v<ElementD, half> || std::is_same_v<ElementD, bfloat16_t>),
                   "The element type template parameters of BlockEpilogue are wrong");
@@ -80,6 +83,11 @@ public:
     using CopyUbToGmD = typename TileCopy_::CopyUbToGmD;
     using CopyUbToGmDequantScale =
         Epilogue::Tile::CopyUb2Gm<ArchTag, Gemm::GemmType<ElementPerTokenScale, LayoutPerTokenScale>>;
+
+    CATLASS_DEVICE void SetWeightScales(__gm__ uint64_t* scales)
+    {
+        weightScales_.SetGlobalBuffer(scales);
+    }
 
     struct Params {
         __gm__ ElementPerTokenScale* ptrPerTokenScale{nullptr};
@@ -207,7 +215,8 @@ public:
                     LoadTile(gmTileC, branchLength, nextOffset, TileLength(branchLength, nextOffset),
                              gmmOutPreRowStride, nextStage);
                 }
-                ComputeLoadedTile(currentStage, tileLength, perTokenScale, true, activationClamp);
+                ComputeLoadedTile(currentStage, tileLength, tileOffset, branchLength, perTokenScale, true,
+                                  activationClamp);
                 AccumulateRowAbsMax(currentStage, tileLength);
                 currentStage = nextStage;
             }
@@ -238,7 +247,8 @@ public:
                         LoadTile(gmTileC, branchLength, nextOffset, TileLength(branchLength, nextOffset),
                                  gmmOutPreRowStride, nextStage);
                     }
-                    ComputeLoadedTile(currentStage, tileLength, perTokenScale, true, activationClamp);
+                    ComputeLoadedTile(currentStage, tileLength, tileOffset, branchLength, perTokenScale, true,
+                                      activationClamp);
                     QuantizeAndCopyTile(currentStage, gmTileD[tileOffset], tileLength, quantMultiplier);
                     currentStage = nextStage;
                 }
@@ -264,7 +274,8 @@ public:
                     float activationClamp = 0.0f, uint32_t activationCode = 0,
                     float activationParams1 = SwigluOaiActivation::DEFAULT_ALPHA,
                     float activationParams2 = SituActivation::DEFAULT_BETA, uint32_t gmmOutPreRowStride = 1,
-                    Callback&& callback = Callback{})
+                    Callback&& callback = Callback{},
+                    const AscendC::GlobalTensor<ElementPerTokenScale>* inputScale = nullptr)
     {
         activationCode_ = activationCode;
         activationParams1_ = activationParams1;
@@ -281,6 +292,13 @@ public:
         for (uint32_t loopIdx = loopStartIdx; loopIdx < loopStartIdx + tasksForIdx; ++loopIdx) {
             auto gmTileC = gmC[loopIdx * gmmOutPreRowStride];
             auto gmTileD = gmD[loopIdx * branchLength];
+            // INT8 GMM1 -> BF16 GMM2: dequantize before activation, then
+            // round directly to BF16. There is no second dynamic quantization.
+            ElementPerTokenScale perTokenScale = 1.0f;
+            if (inputScale != nullptr) {
+                perTokenScale = ::Catlass::Epilogue::Block::detail::ReadSwigluInputScale<SCALE_INPUT_COUNT>(
+                    ubPerTokenScaleInput, *inputScale, loopIdx, loopStartIdx, tasksForIdx);
+            }
             uint32_t tileCount = TileCount(branchLength);
             uint32_t currentStage = 0;
             LoadTile(gmTileC, branchLength, 0, TileLength(branchLength, 0), gmmOutPreRowStride, currentStage);
@@ -293,7 +311,8 @@ public:
                     LoadTile(gmTileC, branchLength, nextOffset, TileLength(branchLength, nextOffset),
                              gmmOutPreRowStride, nextStage);
                 }
-                ComputeLoadedTile(currentStage, tileLength, 1.0f, false, activationClamp);
+                ComputeLoadedTile(currentStage, tileLength, tileOffset, branchLength, perTokenScale,
+                                  inputScale != nullptr, activationClamp);
                 CopyDirectTile(currentStage, gmTileD[tileOffset], tileLength);
                 currentStage = nextStage;
             }
@@ -325,11 +344,12 @@ public:
                     uint32_t epilogueCoreNum = 40, float activationClamp = 0.0f, uint32_t activationCode = 0,
                     float activationParams1 = SwigluOaiActivation::DEFAULT_ALPHA,
                     float activationParams2 = SituActivation::DEFAULT_BETA, uint32_t gmmOutPreRowStride = 1,
-                    Callback&& callback = Callback{})
+                    Callback&& callback = Callback{},
+                    const AscendC::GlobalTensor<ElementPerTokenScale>* inputScale = nullptr)
     {
         (void)resource;
         operator()(gmC, shapeC, gmD, epilogueCoreNum, activationClamp, activationCode, activationParams1,
-                   activationParams2, gmmOutPreRowStride, static_cast<Callback&&>(callback));
+                   activationParams2, gmmOutPreRowStride, static_cast<Callback&&>(callback), inputScale);
     }
 
 private:
@@ -392,14 +412,20 @@ private:
     }
 
     CATLASS_DEVICE
-    void ComputeLoadedTile(uint32_t stageId, uint32_t tileLength, ElementPerTokenScale perTokenScale,
-                           bool applyPerTokenScale, float activationClamp)
+    void ComputeLoadedTile(uint32_t stageId, uint32_t tileLength, uint32_t tileOffset, uint32_t branchLength,
+                           ElementPerTokenScale perTokenScale, bool applyPerTokenScale, float activationClamp)
     {
         auto& ubC = ubCList[stageId];
         auto& ubGate = ubGateFp32List[stageId];
         auto& ubUp = ubUpFp32List[stageId];
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(eventUbCMTE2VList[stageId]);
         Activation::PrepareBranches(ubGate, ubUp, ubC, TILE_LENGTH, tileLength);
+        if constexpr (std::is_same_v<ElementC, int32_t>) {
+            ApplySharedW8Scale(ubGate, ubC, weightScales_, tileOffset, tileLength, 2 * TILE_LENGTH,
+                               eventUbCVMTE2List[stageId], eventUbCMTE2VList[stageId]);
+            ApplySharedW8Scale(ubUp, ubC, weightScales_, branchLength + tileOffset, tileLength, 2 * TILE_LENGTH,
+                               eventUbCVMTE2List[stageId], eventUbCMTE2VList[stageId]);
+        }
         AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[stageId]);
         if (applyPerTokenScale) {
             AscendC::SetFlag<AscendC::HardEvent::S_V>(0);
@@ -473,6 +499,7 @@ private:
         AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(eventUbDMTE3VList[stageId]);
     }
 
+    AscendC::GlobalTensor<uint64_t> weightScales_;
     AscendC::LocalTensor<ElementC> ubCList[UB_STAGES];
     AscendC::LocalTensor<ElementD> ubDList[UB_STAGES];
     AscendC::LocalTensor<float> ubGateFp32List[UB_STAGES];

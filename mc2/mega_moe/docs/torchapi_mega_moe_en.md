@@ -994,7 +994,7 @@ By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all produc
         <td>N/A</td>
     </tr>
     <tr>
-        <td rowspan="3">shared_l1_weights<sup>1</sup></td>
+        <td rowspan="3">shared_l1_weights</td>
         <td rowspan="3">list[Tensor]</td>
         <td rowspan="3">Optional</td>
         <td rowspan="3">Weight matrix of the first linear layer of the shared expert network (including gating and up projection). It maps the input to the intermediate dimension, and the output is fed to the activation function. Its logical data type must be the same as that of l1_weights, the first linear layer weight of MoE experts.</td>
@@ -1013,7 +1013,7 @@ By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all produc
         <td>(shared_expert_num_per_rank, 2 × intermediate_hidden, hidden / 2)</td>
     </tr>
     <tr>
-        <td rowspan="3">shared_l2_weights<sup>1</sup></td>
+        <td rowspan="3">shared_l2_weights</td>
         <td rowspan="3">list[Tensor]</td>
         <td rowspan="3">Optional</td>
         <td rowspan="3">Weight matrix of the second linear layer of the shared expert network. It projects the activated intermediate features back to the hidden dimension. Its data type must be the same as the logical data type of l2_weights, the weight of the second linear layer of MoE experts.</td>
@@ -1032,7 +1032,7 @@ By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all produc
         <td>(shared_expert_num_per_rank, hidden, intermediate_hidden / 2)</td>
     </tr>
     <tr>
-        <td>shared_l1_weights_sf<sup>1</sup></td>
+        <td>shared_l1_weights_sf</td>
         <td>list[Tensor]</td>
         <td>Optional</td>
         <td>Quantization scale factor of the weight matrix of the first linear layer in the shared expert network.</td>
@@ -1041,7 +1041,7 @@ By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all produc
         <td>(shared_expert_num_per_rank, 2 × intermediate_hidden, CeilDiv(hidden, 64), 2)</td>
     </tr>
     <tr>
-        <td>shared_l2_weights_sf<sup>1</sup></td>
+        <td>shared_l2_weights_sf</td>
         <td>list[Tensor]</td>
         <td>Optional</td>
         <td>Quantization scale factor of the weight matrix of the second linear layer in the shared expert network.</td>
@@ -1050,7 +1050,7 @@ By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all produc
         <td>(shared_expert_num_per_rank, hidden, CeilDiv(intermediate_hidden, 64), 2)</td>
     </tr>
     <tr>
-        <td>shared_l1_bias<sup>1,2</sup></td>
+        <td>shared_l1_bias<sup>2</sup></td>
         <td>list[Tensor]</td>
         <td>Optional</td>
         <td>Bias of the first linear layer of the shared expert network, currently not supported.</td>
@@ -1059,7 +1059,7 @@ By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all produc
         <td>(2 × intermediate_hidden, )</td>
     </tr>
     <tr>
-        <td>shared_l2_bias<sup>1, 2</sup></td>
+        <td>shared_l2_bias<sup>2</sup></td>
         <td>list[Tensor]</td>
         <td>Optional</td>
         <td>Bias of the second linear layer of the shared expert network, currently not supported.</td>
@@ -1422,6 +1422,19 @@ By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all produc
     - When deduplication is enabled, the num_tokens (`x`.dim0) of each rank must be exactly the same; inconsistent num_tokens (even if all values are not less than 1024) causes the operator to hang or produce misaligned results due to inconsistent communication chunk rounds or tail-chunk layout strides across ranks.
     - When `combine_comm_mode` = 1, the outputs of multiple experts hit by the same token on the same rank are first accumulated with FP32 weighting on that rank and merged into one row before being sent: compared with the disabled state, in addition to the cross-expert accumulation order, the weighting position and the number of intermediate roundings also change (disabled state: each expert output is quantized to BF16 first and then multiplied by the topk weight; enabled state: FP32 weighted accumulation throughout and a single rounding at the end). Therefore, the result may differ even when `num_topk` = 1; it is a normal difference that `y` is not bitwise identical to that of `combine_comm_mode` = 0, and the enabled state is usually closer to the reference value. Use `combine_comm_mode` = 0 when bitwise consistency with the disabled state is required.
     - Applicable scenarios: shapes with a large `num_topk`, a high proportion of the same token hitting multiple experts on the same rank, and a performance bottleneck in communication benefit significantly after deduplication is enabled; low-benefit shapes such as small batches are automatically reverted by the benefit gating (deduplication is not enabled), so the caller does not need to evaluate each shape; for edge shapes near the gating boundary, it is recommended to run actual measurement before deciding.
+    - Each rank supports 0 to 2 local shared experts. Omit shared weights to run only the routed experts. When shared experts are enabled, `combine_comm_mode` must be 0. Each shared expert runs the FFN on every local token without cross-rank Dispatch. Its output is added directly to the routed output without applying routing weights. `x_active_mask` filters only routed tokens.
+    - Use the following shared weight and quantization combinations. UINT64 scales encode matrix multiplication dequantization parameters. Only when both shared weights are INT4, pass FLOAT32 W4A8 quantization compensation for each layer through `shared_l1_bias` and `shared_l2_bias`, respectively. The compensation has the same meaning as for routed experts.
+
+      | Routed weights | Shared W1 / W2 | W1 / W2 formats | Shared quantization inputs |
+      | --- | --- | --- | --- |
+      | BF16 | BF16 / BF16 | ND / ND | Omit scales and biases |
+      | INT8 or INT4 | INT8 / INT8 | NZ / NZ | Pass UINT64 scales for both layers and omit biases |
+      | INT8 or INT4 | INT4 / INT4 | NZ / NZ | Pass UINT64 scales and FLOAT32 compensation for both layers |
+      | INT8 | INT8 / BF16 | NZ / ND | Pass only the UINT64 `shared_l1_weights_sf` |
+
+    - Within a call, all shared W1 tensors must have the same dtype and format. The same rule applies to all shared W2 tensors. Each layer's weight list and any required scale and bias lists must have one entry per shared expert.
+    - All shared experts must have the same FFN intermediate width `I_s`. The routed width `I_r` and shared width `I_s` are configured independently and follow the same size constraints. Target-device accuracy validation for different widths is pending.
+    - Shared experts support `swiglu`, `swiglustep`, `swigluoai`, and `situglu` with the same activation parameters as routed experts.
   <!-- end id35 -->
   <!-- npu="950" id18 -->
   - **<term>Ascend 950PR&950DT products</term>:**

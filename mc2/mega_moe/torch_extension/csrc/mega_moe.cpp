@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <initializer_list>
 #include <limits>
 #include "aclnn_common.h"
 #if __has_include("aclnnop/mega_moe_layout_arch92.h")
@@ -26,6 +27,7 @@ const int DIM_TWO = 2;
 const int64_t PACKED_FLOAT4_ELEMENTS_PER_BYTE = 2;
 constexpr int64_t GE_DTYPE_UNDEFINED = 28;
 constexpr int64_t INT4_PER_INT32 = 8;
+constexpr size_t A3_MAX_SHARED_EXPERT_NUM = 2U;
 
 struct MegaMoeWeightList {
     at::TensorList tensors;
@@ -76,6 +78,19 @@ static MegaMoeWeightList MakeWeightList(at::TensorList tensors, aclDataType dtyp
     bool packedInt4 = isArch22 && !tensors.empty() && tensors[0].scalar_type() == at::kInt &&
                       (dtype == ACL_INT32 || dtype == ACL_INT4);
     return {tensors, packedInt4 ? ACL_INT4 : dtype, packedInt4};
+}
+
+static void CheckA3SharedWeightDtype(const MegaMoeWeightList& weights, const char* name)
+{
+    const aclDataType expectedStorageDtype = weights.packedInt4 ? ACL_INT32 : weights.dtype;
+    for (size_t i = 0; i < weights.tensors.size(); ++i) {
+        const auto& tensor = weights.tensors[i];
+        TORCH_CHECK(tensor.defined(), name, "[", i, "] must be defined.");
+        const auto dtype = tensor.scalar_type();
+        TORCH_CHECK(ConvertToAclDataType(dtype) == expectedStorageDtype, name, "[", i,
+                    "] dtype must match the expected storage dtype (ACL dtype ", static_cast<int>(expectedStorageDtype),
+                    "), but got ", dtype, ".");
+    }
 }
 
 static void CheckNpuInput(const at::Tensor& tensor, const std::string& name, const char* socName)
@@ -284,8 +299,9 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
                                      maskBuffer};
     const c10::OptionalDeviceGuard deviceGuard(x.device());
     const char* socName = aclrtGetSocName();
-    const bool isArch22 = socName != nullptr && (std::strstr(socName, "Ascend910B") != nullptr ||
-                                                 std::strstr(socName, "Ascend910_93") != nullptr);
+    const bool isA3 = socName != nullptr && std::strstr(socName, "Ascend910_93") != nullptr;
+    const bool isArch22 = isA3 || (socName != nullptr && std::strstr(socName, "Ascend910B") != nullptr);
+
     const bool isArch35_92 = socName != nullptr && (std::strstr(socName, "Ascend950") != nullptr ||
                                                     std::strstr(socName, "Ascend960DT") != nullptr);
     CheckMegaMoeInputs(inputs, epWorldSize, moeExpertNum, socName, isArch35_92);
@@ -397,17 +413,33 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
     TensorListWrapper bias1Wrapper = {bias1Ref, aclDataType::ACL_FLOAT};
     TensorListWrapper bias2Wrapper = {bias2Ref, aclDataType::ACL_FLOAT};
 
+    TORCH_CHECK(!(isArch22 && combineCommMode == 1 && sharedWeight1.has_value() && !sharedWeight1.value().empty() &&
+                  sharedWeight1.value()[0].numel() != 0),
+                "combine_comm_mode=1 with shared experts is not supported; set combine_comm_mode=0");
     at::TensorList sharedWeight1Ref = toTensorList(sharedWeight1);
     at::TensorList sharedWeight2Ref = toTensorList(sharedWeight2);
+    if (isA3) {
+        TORCH_CHECK(
+            sharedWeight1Ref.size() <= A3_MAX_SHARED_EXPERT_NUM && sharedWeight2Ref.size() <= A3_MAX_SHARED_EXPERT_NUM,
+            "Atlas A3 supports at most ", A3_MAX_SHARED_EXPERT_NUM, " local shared experts per rank.");
+    }
     at::TensorList sharedWeightScales1Ref = toTensorList(sharedWeightScales1);
     at::TensorList sharedWeightScales2Ref = toTensorList(sharedWeightScales2);
     at::TensorList sharedBias1Ref = toTensorList(sharedBias1);
     at::TensorList sharedBias2Ref = toTensorList(sharedBias2);
 
+    // Arch22 shared experts own their dtypes. Inheriting routed INT32/INT4 here
+    // would describe W8 shared storage as packed W4 before host tiling sees it.
     aclDataType sharedWeight1RefDtype =
-        sharedWeight1Type.has_value() ? GetAclDataType(sharedWeight1Type.value()) : weight1RefDtype;
+        sharedWeight1Type.has_value() ?
+            GetAclDataType(sharedWeight1Type.value()) :
+            (isArch22 && !sharedWeight1Ref.empty() ? ConvertToAclDataType(sharedWeight1Ref[0].scalar_type()) :
+                                                     weight1RefDtype);
     aclDataType sharedWeight2RefDtype =
-        sharedWeight2Type.has_value() ? GetAclDataType(sharedWeight2Type.value()) : weight2RefDtype;
+        sharedWeight2Type.has_value() ?
+            GetAclDataType(sharedWeight2Type.value()) :
+            (isArch22 && !sharedWeight2Ref.empty() ? ConvertToAclDataType(sharedWeight2Ref[0].scalar_type()) :
+                                                     weight2RefDtype);
     if (isArch35_92) {
         CheckWeightDtype(sharedWeight1Ref, sharedWeight1RefDtype, "shared_l1_weights", socName);
         CheckWeightDtype(sharedWeight2Ref, sharedWeight2RefDtype, "shared_l2_weights", socName);
@@ -415,6 +447,11 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
 
     MegaMoeWeightList sharedWeight1Wrapper = MakeWeightList(sharedWeight1Ref, sharedWeight1RefDtype, isArch22);
     MegaMoeWeightList sharedWeight2Wrapper = MakeWeightList(sharedWeight2Ref, sharedWeight2RefDtype, isArch22);
+    if (isA3) {
+        // The ACL list conversion applies one dtype to every entry.
+        CheckA3SharedWeightDtype(sharedWeight1Wrapper, "shared_l1_weights");
+        CheckA3SharedWeightDtype(sharedWeight2Wrapper, "shared_l2_weights");
+    }
     TensorListWrapper sharedBias1Wrapper = {sharedBias1Ref, aclDataType::ACL_FLOAT};
     TensorListWrapper sharedBias2Wrapper = {sharedBias2Ref, aclDataType::ACL_FLOAT};
 
@@ -440,7 +477,6 @@ std::tuple<at::Tensor, at::Tensor> NpuMegaMoe(
               maxRecvTokenNum, dispatchQuantMode, dispatchQuantResultType, sharedExpertQuantResultType,
               combineQuantMode, commAlgPtr, numMaxTokensPerRank, activationPtr, activationParams, topoTypeValue,
               rankNumPerServerValue, topkWeightsType, combineCommMode, y, expertTokenNums);
-
     return std::tie(y, expertTokenNums);
 }
 
@@ -925,13 +961,14 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
                         epWorldSize == 32 || epWorldSize == 48 || epWorldSize == 64 || epWorldSize == 96 ||
                         epWorldSize == 128,
                     "ep_world_size only support {2, 4, 8, 16, 32, 48, 64, 96, 128} on A2/A3, but got ", epWorldSize);
-        TORCH_CHECK(hidden >= 1024 && hidden <= 8192 && hidden % 512 == 0,
-                    "hidden only support [1024, 8192] and hidden % 512 == 0 on A2/A3, but got ", hidden);
+        TORCH_CHECK(hidden >= 1024 && hidden <= 8192 && hidden % ALIGN_512 == 0,
+                    "hidden must be in [1024, 8192] and 512-aligned on A2/A3, but got ", hidden);
         TORCH_CHECK(numMaxTokensPerRank >= 1, "num_max_tokens_per_rank should be >= 1 on A2/A3, but got ",
                     numMaxTokensPerRank);
         TORCH_CHECK(moeExpertNum >= 1 && moeExpertNum <= 2048,
                     "moe_expert_num only support [1, 2048] on A2/A3, but got ", moeExpertNum);
-        TORCH_CHECK(numTopk >= 1 && numTopk <= 16, "num_topk only support [1, 16] on A2/A3, but got ", numTopk);
+        TORCH_CHECK(numTopk >= 1 && numTopk <= 16 && numTopk <= moeExpertNum,
+                    "num_topk must be in [1, 16] and no greater than moe_expert_num on A2/A3, but got ", numTopk);
         TORCH_CHECK(dispatchQuantMode == 0 || dispatchQuantMode == 2 || dispatchQuantMode == 4,
                     "dispatch_quant_mode only support {0, 2, 4} on A2/A3, but got ", dispatchQuantMode);
 
@@ -944,7 +981,7 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
                     "combine_comm_mode=1 (combine dedup) currently supports only the W4A8 (A8W4-INT) quant "
                     "path on Atlas A3, which requires dispatch_quant_mode=2; set combine_comm_mode=0 otherwise");
 
-        bool isQuantRouting = (dispatchQuantMode == 4);
+        bool isQuantRouting = (dispatchQuantMode == 2 || dispatchQuantMode == 4);
         // max_recv_token_num 为 0 时自动计算为 bs * epWorldSize * min(topK, expertPerRank)，
         if (maxRecvTokenNum == 0) {
             int64_t expertPerRank = moeExpertNum / epWorldSize;

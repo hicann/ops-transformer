@@ -44,7 +44,11 @@ __forceinline__[host, aicore] void MoeTokenUnpermuteTiling(int32_t m, int32_t n,
     uint32_t outTokens = m / topK;
     tilingData.tokens_core_length = I64(outTokens / coreNum);
     tilingData.tokens_core_remain = I64(outTokens % coreNum);
-    tilingData.tokens_splited_length = I64(min(tilingData.tokens_core_length, (int64_t)600));
+    // Remainder cores process one token even when the base per-core count is
+    // zero. Keep capacity nonzero for division below and for indices/probs UB
+    // queues; a zero-byte queue would alias the next allocation (outque).
+    tilingData.tokens_splited_length =
+        tilingData.tokens_core_length > 0 ? I64(min(tilingData.tokens_core_length, (int64_t)600)) : I64(1);
     tilingData.tokens_splited_num = I64(tilingData.tokens_core_length / tilingData.tokens_splited_length);
     tilingData.tokens_splited_remain = I64(tilingData.tokens_core_length % tilingData.tokens_splited_length);
     tilingData.buffer_num = 4;

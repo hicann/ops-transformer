@@ -30,6 +30,8 @@ using namespace Mc2Tiling;
 #define SOC_ASCEND910B 0
 #define SOC_ASCEND910_93 1
 
+constexpr uint32_t MEGA_MOE_A3_MAX_SHARED_EXPERT_NUM = 2U;
+
 struct MegaMoeA2A3TilingData {
     uint32_t M;
     uint32_t K;
@@ -65,6 +67,11 @@ struct MegaMoeA2A3TilingData {
 
     uint32_t isQuantRouting;
     uint32_t isW4A8;
+    uint32_t sharedExpertNum;
+    uint32_t sharedGmm2Bf16;
+    uint32_t sharedIsQuant;
+    uint32_t sharedIsW4A8;
+    uint64_t sharedWorkspaceOffset;
 
     int32_t activationOutDtype;
     uint32_t weight1Interleave;
@@ -87,6 +94,8 @@ struct MegaMoeA2A3TilingData {
     int64_t distTokenFirstPosSize;     // workspace FP 表段字节数
     int64_t distTokenLastPosSize;      // workspace LP 表段字节数
     int64_t dedupRowMetaSize;          // workspace rowMeta 段字节数
+    // Independent shared intermediate width (2 * I_s).
+    uint32_t sharedN;
 };
 
 struct MegaMoeTilingDataQuant {

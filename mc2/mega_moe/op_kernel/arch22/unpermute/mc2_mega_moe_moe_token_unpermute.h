@@ -18,16 +18,24 @@
 
 #include "kernel_operator.h"
 #include "mc2_mega_moe_moe_token_unpermute_tiling.h"
+#include "mc2_mega_moe_moe_token_unpermute_ub_budget.h"
 using namespace AscendC;
 
-template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS = 0>
+// A3 must opt in explicitly; the default preserves the legacy A2 hidden tiling.
+template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS = 0, bool UseA3UbBudget = false>
 class KernelMoeTokenUnpermute {
+    static_assert(!UseA3UbBudget || BLOCKED_COLUMNS == 0 ||
+                      MoeTokenUnpermuteUbBudget::TILE_ALIGN_BYTES % BLOCKED_COLUMNS == 0,
+                  "A3 UB tiling must preserve routed column blocks");
+
 public:
     __aicore__ inline KernelMoeTokenUnpermute() {}
 
     __aicore__ inline void Init(GM_ADDR permuted_tokens, GM_ADDR sorted_indices, GM_ADDR probs,
                                 GM_ADDR unpermuted_tokens, const MoeTokenUnpermuteTilingData* __restrict tiling_data,
-                                bool useAllVectorCore = false);
+                                bool useAllVectorCore = false, GM_ADDR shared_tokens = nullptr,
+                                uint32_t shared_expert_num = 0, GM_ADDR x_active_mask = nullptr,
+                                int64_t shared_token_count = 0, int64_t shared_token_base = 0);
     __aicore__ inline void Process();
 
 protected:
@@ -42,19 +50,25 @@ protected:
     template <bool FIRST>
     __aicore__ inline void AccumulateValidToken(T2 tokenIndex, int64_t probIndex, int64_t hIndex, int64_t hLength);
     __aicore__ inline void CopyTokenIn(const T2 in_token_index, const int64_t h_index, const int64_t h_length);
+    __aicore__ inline void CopySharedTokenIn(const int64_t shared_expert_index, const int64_t out_token_index,
+                                             const int64_t h_index, const int64_t h_length);
     __aicore__ inline void CalFirstToken(const float prob_value, const int64_t h_length);
     __aicore__ inline void CalToken(const float prob_value, const int64_t h_length);
+    __aicore__ inline void CalSharedToken(const int64_t h_length);
     __aicore__ inline void CopyOut(const int64_t out_token_index, const int64_t h_index, const int64_t h_length);
 
     TPipe pipe;
     TQue<QuePosition::VECIN, 1> tokens_inque, indices_inque, probs_inque;
     TBuf<TPosition::VECCALC> temp_buffer0, temp_buffer1, temp_buffer2;
+    TBuf<TPosition::VECCALC> shared_sum_buffer, branch_round_buffer;
     TQue<QuePosition::VECOUT, 1> outque;
-    GlobalTensor<T1> tokensGM, outGM;
+    GlobalTensor<T1> tokensGM, sharedTokensGM, outGM;
     GlobalTensor<T2> indicesGM;
     GlobalTensor<T3> probsGM;
     LocalTensor<T2> indicesLocal;
     LocalTensor<float> token_tensor0, token_tensor1, probs_tensor;
+    LocalTensor<float> shared_sum_tensor;
+    LocalTensor<T1> branch_round_tensor;
     DataCopyPadExtParams<T1> extParams1{false, 0, 0, 0};
     DataCopyPadExtParams<T2> extParams2{false, 0, 0, 0};
     DataCopyPadExtParams<T3> extParams3{false, 0, 0, 0};
@@ -66,6 +80,9 @@ protected:
     int64_t hidden_size;
     int64_t top_k;
     int64_t num_out_tokens;
+    int64_t out_token_count;
+    int64_t out_token_offset;
+    uint32_t shared_expert_num;
     int64_t hidden_splited_length;
     int64_t hidden_splited_num;
     int64_t hidden_splited_remain;
@@ -78,10 +95,11 @@ protected:
     int32_t blockNum;
 };
 
-template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS>
-__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS>::Init(
+template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS, bool UseA3UbBudget>
+__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS, UseA3UbBudget>::Init(
     GM_ADDR permuted_tokens, GM_ADDR sorted_indices, GM_ADDR probs, GM_ADDR unpermuted_tokens,
-    const MoeTokenUnpermuteTilingData* __restrict tiling_data, bool useAllVectorCore)
+    const MoeTokenUnpermuteTilingData* __restrict tiling_data, bool useAllVectorCore, GM_ADDR shared_tokens,
+    uint32_t shared_expert_num, GM_ADDR x_active_mask, int64_t shared_token_count, int64_t shared_token_base)
 {
     if (useAllVectorCore) {
         this->blockIdx = get_block_idx() + get_subblockid() * get_block_num();
@@ -95,7 +113,11 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMN
         return;
     }
     ASSERT(blockNum != 0 && "block dim can not be zero!");
+    this->shared_expert_num = shared_expert_num;
+    (void)x_active_mask;
     LoadTilingData(tiling_data);
+    // Shared output is expert-major over the full batch, not the routed chunk.
+    this->out_token_count = shared_token_count > 0 ? shared_token_count : this->num_out_tokens / this->top_k;
 
     int64_t block_length = this->tokens_core_length * this->top_k;
 
@@ -109,11 +131,15 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMN
     this->outGM.SetGlobalBuffer((__gm__ T1*)unpermuted_tokens + out_block_offset,
                                 this->tokens_core_length * this->hidden_size);
 
+    this->out_token_offset = shared_token_base + out_block_offset / this->hidden_size;
+    if (this->shared_expert_num > 0U) {
+        this->sharedTokensGM.SetGlobalBuffer((__gm__ T1*)shared_tokens);
+    }
     InitLocalBuffers(tiling_data, probs, block_offset, block_length);
 };
 
-template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS>
-__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS>::LoadTilingData(
+template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS, bool UseA3UbBudget>
+__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS, UseA3UbBudget>::LoadTilingData(
     const MoeTokenUnpermuteTilingData* __restrict tiling_data)
 {
     this->hidden_size = tiling_data->hidden_size;
@@ -122,6 +148,28 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMN
     this->hidden_splited_length = tiling_data->hidden_splited_length;
     this->hidden_splited_num = tiling_data->hidden_splited_num;
     this->hidden_splited_remain = tiling_data->hidden_splited_remain;
+    if constexpr (!IsSameType<T1, float>::value) {
+        if (this->shared_expert_num > 0U) {
+            // Bound all hidden-dimension buffers, including the independent
+            // shared accumulator and rounding scratch. Token/index tiling is unchanged.
+            // A3 opts into the UB budget; A2 keeps the legacy 1024 limit by default.
+            // The A3 limit is derived from the UB budget rather than hardcoded: a fixed
+            // 1024 cut H=7168 into 7 passes and sliced the routed summation along with
+            // it, while the shared buffers only raise the per-element cost from 18 to
+            // 24 bytes. Needs shared_expert_num and T1/T2/T3/PROBS, so it cannot live
+            // in MoeTokenUnpermuteTiling().
+            MoeTokenUnpermuteUbBudget::HiddenTiling fromTiling{this->hidden_splited_length, this->hidden_splited_num,
+                                                               this->hidden_splited_remain};
+            const MoeTokenUnpermuteUbBudget::HiddenTiling clamped =
+                MoeTokenUnpermuteUbBudget::ClampHiddenTiling<UseA3UbBudget>(
+                    fromTiling, this->hidden_size, tiling_data->tokens_splited_length * tiling_data->top_k,
+                    tiling_data->buffer_num, static_cast<int64_t>(sizeof(T1)), static_cast<int64_t>(sizeof(T2)),
+                    static_cast<int64_t>(sizeof(T3)), PROBS, PROBS && !IsSameType<T3, float>::value, true);
+            this->hidden_splited_length = clamped.length;
+            this->hidden_splited_num = clamped.num;
+            this->hidden_splited_remain = clamped.remain;
+        }
+    }
     this->tokens_core_length = tiling_data->tokens_core_length;
     this->tokens_core_remain = tiling_data->tokens_core_remain;
     this->tokens_splited_length = tiling_data->tokens_splited_length;
@@ -134,8 +182,8 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMN
     }
 }
 
-template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS>
-__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS>::InitLocalBuffers(
+template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS, bool UseA3UbBudget>
+__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS, UseA3UbBudget>::InitLocalBuffers(
     const MoeTokenUnpermuteTilingData* __restrict tiling_data, GM_ADDR probs, int64_t blockOffset, int64_t blockLength)
 {
     int64_t hidden_splited_length_align512 = (this->hidden_splited_length + ALIGN_512 - 1) & ~(ALIGN_512 - 1);
@@ -149,6 +197,12 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMN
         this->pipe.InitBuffer(temp_buffer1, hidden_splited_length_align512 * sizeof(float));
         this->token_tensor0 = this->temp_buffer0.template Get<float>();
         this->token_tensor1 = this->temp_buffer1.template Get<float>();
+        if (this->shared_expert_num > 0U) {
+            this->pipe.InitBuffer(shared_sum_buffer, hidden_splited_length_align512 * sizeof(float));
+            this->pipe.InitBuffer(branch_round_buffer, hidden_splited_length_align512 * sizeof(T1));
+            this->shared_sum_tensor = this->shared_sum_buffer.template Get<float>();
+            this->branch_round_tensor = this->branch_round_buffer.template Get<T1>();
+        }
     }
 
     if constexpr (PROBS) {
@@ -161,8 +215,8 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMN
     }
 }
 
-template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS>
-__aicore__ inline int64_t KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS>::CoreElementOffset(
+template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS, bool UseA3UbBudget>
+__aicore__ inline int64_t KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS, UseA3UbBudget>::CoreElementOffset(
     int64_t elementsPerToken) const
 {
     const int64_t blockLength = tokens_core_length * elementsPerToken;
@@ -172,8 +226,8 @@ __aicore__ inline int64_t KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COL
     return blockLength * blockIdx;
 }
 
-template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS>
-__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS>::Process()
+template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS, bool UseA3UbBudget>
+__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS, UseA3UbBudget>::Process()
 {
     if (blockIdx >= blockNum) {
         return;
@@ -187,8 +241,8 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMN
     }
 }
 
-template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS>
-__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS>::CalMultiOutToken(
+template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS, bool UseA3UbBudget>
+__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS, UseA3UbBudget>::CalMultiOutToken(
     const int64_t out_offset, const int64_t out_tokens_number)
 {
     this->indicesLocal = this->indices_inque.template AllocTensor<T2>();
@@ -223,8 +277,8 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMN
     }
 }
 
-template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS>
-__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS>::CalSingleOutToken(
+template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS, bool UseA3UbBudget>
+__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS, UseA3UbBudget>::CalSingleOutToken(
     const int64_t start_token, const int64_t out_token_idx)
 {
     for (int64_t h_index = 0; h_index < this->hidden_splited_num; ++h_index) {
@@ -236,8 +290,8 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMN
     }
 }
 
-template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS>
-__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS>::CalPartOutToken(
+template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS, bool UseA3UbBudget>
+__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS, UseA3UbBudget>::CalPartOutToken(
     const int64_t start_token, const int64_t h_index, const int64_t h_length, const int64_t out_token_index)
 {
     if constexpr (IsSameType<T1, float>::value) {
@@ -267,13 +321,54 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMN
         }
     }
 
+    if (this->shared_expert_num > 0U) {
+        const int64_t global_out_token_index = this->out_token_offset + out_token_index;
+        if constexpr (!IsSameType<T1, float>::value) {
+            // Match the unfused reference's rounding boundaries:
+            // T1(T1(routed sum) + T1(shared sum)), not T1(routed sum + shared sum).
+            // The distinction matters when the two branches nearly cancel.
+            // VECCALC scratch has a fixed lifetime. Input/output queues remain
+            // exclusively GM transfer queues and never hold saved branch values.
+            PipeBarrier<PIPE_V>();
+            Cast(this->branch_round_tensor, this->token_tensor0, RoundMode::CAST_RINT, h_length);
+            PipeBarrier<PIPE_V>();
+            Cast(this->token_tensor0, this->branch_round_tensor, RoundMode::CAST_NONE, h_length);
+            PipeBarrier<PIPE_V>();
+
+            // Keep token_tensor0 as the rounded routed result throughout.
+            Duplicate(this->shared_sum_tensor, 0.0f, h_length);
+            for (uint32_t shared_idx = 0U; shared_idx < this->shared_expert_num; ++shared_idx) {
+                CopySharedTokenIn(shared_idx, global_out_token_index, h_index, h_length);
+                LocalTensor<T1> tokensLocal = this->tokens_inque.template DeQue<T1>();
+                PipeBarrier<PIPE_V>();
+                Cast(this->token_tensor1, tokensLocal, RoundMode::CAST_NONE, h_length);
+                PipeBarrier<PIPE_V>();
+                this->tokens_inque.FreeTensor(tokensLocal);
+                Add(this->shared_sum_tensor, this->shared_sum_tensor, this->token_tensor1, h_length);
+                PipeBarrier<PIPE_V>();
+            }
+
+            Cast(this->branch_round_tensor, this->shared_sum_tensor, RoundMode::CAST_RINT, h_length);
+            PipeBarrier<PIPE_V>();
+            Cast(this->token_tensor1, this->branch_round_tensor, RoundMode::CAST_NONE, h_length);
+            PipeBarrier<PIPE_V>();
+            Add(this->token_tensor0, this->token_tensor0, this->token_tensor1, h_length);
+        } else {
+            for (uint32_t shared_idx = 0U; shared_idx < this->shared_expert_num; ++shared_idx) {
+                CopySharedTokenIn(shared_idx, global_out_token_index, h_index, h_length);
+                PipeBarrier<PIPE_V>();
+                CalSharedToken(h_length);
+            }
+        }
+    }
+
     // Write out the computed result
     CopyOut(out_token_index, h_index, h_length);
 }
 
-template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS>
+template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS, bool UseA3UbBudget>
 template <bool FIRST>
-__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS>::AccumulateValidToken(
+__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS, UseA3UbBudget>::AccumulateValidToken(
     T2 tokenIndex, int64_t probIndex, int64_t hIndex, int64_t hLength)
 {
     float probsValue = 0;
@@ -290,10 +385,9 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMN
     }
 }
 
-template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS>
-__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS>::CopyTokenIn(const T2 in_token_index,
-                                                                                                const int64_t h_index,
-                                                                                                const int64_t h_length)
+template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS, bool UseA3UbBudget>
+__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS, UseA3UbBudget>::CopyTokenIn(
+    const T2 in_token_index, const int64_t h_index, const int64_t h_length)
 {
     LocalTensor<T1> tokensLocal = this->tokens_inque.template AllocTensor<T1>();
     if constexpr (BLOCKED_COLUMNS > 0) {
@@ -320,8 +414,24 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMN
     this->tokens_inque.template EnQue(tokensLocal);
 }
 
-template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS>
-__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS>::CalFirstToken(
+template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS, bool UseA3UbBudget>
+__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS, UseA3UbBudget>::CopySharedTokenIn(
+    const int64_t shared_expert_index, const int64_t out_token_index, const int64_t h_index, const int64_t h_length)
+{
+    LocalTensor<T1> tokensLocal = this->tokens_inque.template AllocTensor<T1>();
+    int64_t offset = (shared_expert_index * this->out_token_count + out_token_index) * this->hidden_size +
+                     h_index * this->hidden_splited_length;
+    if (likely((h_length * sizeof(T1)) % BLOCK_SIZE == 0)) {
+        DataCopy(tokensLocal, this->sharedTokensGM[offset], h_length);
+    } else {
+        this->copyParams.blockLen = h_length * sizeof(T1);
+        DataCopyPad(tokensLocal, this->sharedTokensGM[offset], this->copyParams, this->extParams1);
+    }
+    this->tokens_inque.template EnQue(tokensLocal);
+}
+
+template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS, bool UseA3UbBudget>
+__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS, UseA3UbBudget>::CalFirstToken(
     const float prob_value, const int64_t h_length)
 {
     LocalTensor<T1> tokensLocal = this->tokens_inque.template DeQue<T1>();
@@ -341,9 +451,9 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMN
     }
 }
 
-template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS>
-__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS>::CalToken(const float prob_value,
-                                                                                             const int64_t h_length)
+template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS, bool UseA3UbBudget>
+__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS, UseA3UbBudget>::CalToken(
+    const float prob_value, const int64_t h_length)
 {
     LocalTensor<T1> tokensLocal = this->tokens_inque.template DeQue<T1>();
 
@@ -366,8 +476,25 @@ __aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMN
     }
 }
 
-template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS>
-__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS>::CopyOut(
+template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS, bool UseA3UbBudget>
+__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS, UseA3UbBudget>::CalSharedToken(
+    const int64_t h_length)
+{
+    LocalTensor<T1> tokensLocal = this->tokens_inque.template DeQue<T1>();
+
+    if constexpr (!IsSameType<T1, float>::value) {
+        Cast(this->token_tensor1, tokensLocal, RoundMode::CAST_NONE, h_length);
+        this->tokens_inque.FreeTensor(tokensLocal);
+        PipeBarrier<PIPE_V>();
+        Add(this->token_tensor0, this->token_tensor0, this->token_tensor1, h_length);
+    } else {
+        Add(this->token_tensor0, this->token_tensor0, tokensLocal, h_length);
+        this->tokens_inque.FreeTensor(tokensLocal);
+    }
+}
+
+template <typename T1, typename T2, typename T3, bool PROBS, uint32_t BLOCKED_COLUMNS, bool UseA3UbBudget>
+__aicore__ inline void KernelMoeTokenUnpermute<T1, T2, T3, PROBS, BLOCKED_COLUMNS, UseA3UbBudget>::CopyOut(
     const int64_t out_token_index, const int64_t h_index, const int64_t h_length)
 {
     LocalTensor<T1> temp_out_tensors;

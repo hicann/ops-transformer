@@ -284,6 +284,114 @@ public:
         DrainScaleBuffers(scaleBatchIndex);
     }
 
+    // Dense shared-expert variant. Bias already points at one expert tensor, so
+    // no routed cumsum/group lookup is required.
+    CATLASS_DEVICE
+    void SharedExpert(AscendC::GlobalTensor<ElementC> const& gmC, MatrixCoord const& shapeC,
+                      AscendC::GlobalTensor<ElementPerTokenScale> const& gmPerTokenScale1,
+                      AscendC::GlobalTensor<float> const& weightAux, AscendC::GlobalTensor<ElementD> const& gmD,
+                      AscendC::GlobalTensor<ElementPerTokenScale> const& gmPerTokenScale2,
+                      Arch::Resource<ArchTag> const& resource, uint32_t epilogueCoreNum = 40,
+                      float activationClamp = 0.0f, uint32_t activationCode = 0,
+                      float activationParams1 = SwigluOaiActivation::DEFAULT_ALPHA,
+                      float activationParams2 = SituActivation::DEFAULT_BETA, uint32_t gmmOutPreRowStride = 1)
+    {
+        (void)resource;
+        activationCode_ = activationCode;
+        activationParams1_ = activationParams1;
+        activationParams2_ = activationParams2;
+        uint32_t blockM = shapeC.row();
+        uint32_t branchLength = shapeC.column() / 2;
+        uint32_t loopStartIdx = 0;
+        uint32_t tasksForIdx = 0;
+        if (!GetTaskRange(blockM, epilogueCoreNum, loopStartIdx, tasksForIdx)) {
+            return;
+        }
+        uint32_t scaleBatchStart = loopStartIdx;
+        uint32_t scaleBatchCount = 0;
+        uint32_t scaleBatchIndex = 0;
+        Duplicate(xLowI16Tensor, static_cast<int16_t>(0x0F0F), 128);
+        PipeBarrier<PIPE_V>();
+
+        constexpr float DEFAULT_MUL_SCALE = 16.0f;
+        for (uint32_t loopIdx = loopStartIdx; loopIdx < loopStartIdx + tasksForIdx; ++loopIdx) {
+            auto gmTileC = gmC[loopIdx * gmmOutPreRowStride * 2];
+            auto gmTileD = gmD[loopIdx * branchLength];
+            uint32_t scaleOffsetInBatch = (loopIdx - loopStartIdx) % SCALE_INPUT_COUNT;
+            if (scaleOffsetInBatch == 0) {
+                const uint32_t remain = tasksForIdx - (loopIdx - loopStartIdx);
+                const uint32_t copyCount = remain < SCALE_INPUT_COUNT ? remain : SCALE_INPUT_COUNT;
+                AscendC::DataCopyPad(ubPerTokenScaleInput, gmPerTokenScale1[loopIdx],
+                                     {1U, static_cast<uint32_t>(copyCount * sizeof(ElementPerTokenScale)), 0U, 0U, 0U},
+                                     {false, 0U, 0U, 0.0f});
+                AscendC::SetFlag<AscendC::HardEvent::MTE2_S>(0);
+                AscendC::WaitFlag<AscendC::HardEvent::MTE2_S>(0);
+            }
+            ElementPerTokenScale perTokenScale = ubPerTokenScaleInput.GetValue(scaleOffsetInBatch);
+            uint32_t tileCount = TileCount(branchLength);
+            uint32_t currentStage = 0;
+            LoadTile(gmTileC, weightAux, branchLength, 0, TileLength(branchLength, 0), gmmOutPreRowStride,
+                     currentStage);
+            ResetRowAbsMax();
+            for (uint32_t tileIdx = 0; tileIdx < tileCount; ++tileIdx) {
+                uint32_t tileOffset = tileIdx * TILE_LENGTH;
+                uint32_t tileLength = TileLength(branchLength, tileOffset);
+                uint32_t nextStage = NextStage(currentStage);
+                uint32_t nextOffset = tileOffset + TILE_LENGTH;
+                if (nextOffset < branchLength) {
+                    LoadTile(gmTileC, weightAux, branchLength, nextOffset, TileLength(branchLength, nextOffset),
+                             gmmOutPreRowStride, nextStage);
+                }
+                ComputeLoadedTile(currentStage, tileLength, perTokenScale, activationClamp, DEFAULT_MUL_SCALE);
+                AccumulateRowAbsMax(tileLength);
+                currentStage = nextStage;
+            }
+
+            ElementPerTokenScale rowAbsMax = ReadRowAbsMax();
+            uint32_t scaleStage = scaleBatchIndex % SCALE_BUFFER_COUNT;
+            if (scaleBatchCount == 0 && scaleBatchIndex >= SCALE_BUFFER_COUNT) {
+                WaitScaleBuffer(scaleStage);
+            }
+            ubPerTokenScaleOutputList[scaleStage].SetValue(scaleBatchCount, rowAbsMax / 127.0f);
+            ElementPerTokenScale quantMultiplier = rowAbsMax > 0.0f ? 127.0f / rowAbsMax : 0.0f;
+            AscendC::SetFlag<AscendC::HardEvent::S_V>(0);
+            AscendC::WaitFlag<AscendC::HardEvent::S_V>(0);
+
+            currentStage = 0;
+            if (tileCount == 1) {
+                QuantizeAndCopyTile(0, gmTileD, branchLength, 0, TileLength(branchLength, 0), quantMultiplier);
+            } else {
+                LoadTile(gmTileC, weightAux, branchLength, 0, TileLength(branchLength, 0), gmmOutPreRowStride,
+                         currentStage);
+                for (uint32_t tileIdx = 0; tileIdx < tileCount; ++tileIdx) {
+                    uint32_t tileOffset = tileIdx * TILE_LENGTH;
+                    uint32_t tileLength = TileLength(branchLength, tileOffset);
+                    uint32_t nextStage = NextStage(currentStage);
+                    uint32_t nextOffset = tileOffset + TILE_LENGTH;
+                    if (nextOffset < branchLength) {
+                        LoadTile(gmTileC, weightAux, branchLength, nextOffset, TileLength(branchLength, nextOffset),
+                                 gmmOutPreRowStride, nextStage);
+                    }
+                    ComputeLoadedTile(currentStage, tileLength, perTokenScale, activationClamp, DEFAULT_MUL_SCALE);
+                    QuantizeAndCopyTile(currentStage, gmTileD, branchLength, tileOffset, tileLength, quantMultiplier);
+                    currentStage = nextStage;
+                }
+            }
+            ++scaleBatchCount;
+            if (scaleBatchCount == SCALE_BATCH_COUNT) {
+                FlushScaleBatch(gmPerTokenScale2, scaleBatchStart, scaleBatchCount, scaleStage);
+                scaleBatchStart += scaleBatchCount;
+                scaleBatchCount = 0;
+                ++scaleBatchIndex;
+            }
+        }
+        if (scaleBatchCount > 0) {
+            FlushScaleBatch(gmPerTokenScale2, scaleBatchStart, scaleBatchCount, scaleBatchIndex % SCALE_BUFFER_COUNT);
+            ++scaleBatchIndex;
+        }
+        DrainScaleBuffers(scaleBatchIndex);
+    }
+
 private:
     CATLASS_DEVICE
     bool GetTaskRange(uint32_t blockM, uint32_t epilogueCoreNum, uint32_t& loopStartIdx, uint32_t& tasksForIdx)
@@ -440,8 +548,10 @@ private:
         auto xLowHalfTensor2 = xLowHalfTensor[TILE_LENGTH];
         uint32_t lenVk = (tileLength / 2) / 128;
         uint32_t lastLenVk = (tileLength % 256) / 2;
-        And(xLowHalfTensor.template ReinterpretCast<int16_t>(), ubD.template ReinterpretCast<int16_t>(), xLowI16Tensor,
-            128, lenVk, {1, 1, 1, 8, 8, 0});
+        if (lenVk > 0) {
+            And(xLowHalfTensor.template ReinterpretCast<int16_t>(), ubD.template ReinterpretCast<int16_t>(),
+                xLowI16Tensor, 128, lenVk, {1, 1, 1, 8, 8, 0});
+        }
         if (lastLenVk > 0) {
             And(xLowHalfTensor[lenVk * 128].template ReinterpretCast<int16_t>(),
                 ubD[lenVk * 256].template ReinterpretCast<int16_t>(), xLowI16Tensor, lastLenVk, 1, {1, 1, 1, 8, 8, 0});

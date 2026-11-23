@@ -86,6 +86,12 @@ constexpr uint32_t BIAS2_INDEX = 9;          // GMM2 的 bias（OPTIONAL）
 constexpr uint32_t X_ACTIVE_MASK_INDEX = 10; // token 活跃掩码（OPTIONAL）
 constexpr uint32_t SCALES_INDEX = 11;        // 额外 scale（OPTIONAL）
 constexpr uint32_t MASK_BUFFER_INDEX = 18;   // rank 通信掩码（OPTIONAL）
+constexpr uint32_t SHARED_WEIGHT1_INDEX = 12;
+constexpr uint32_t SHARED_WEIGHT2_INDEX = 13;
+constexpr uint32_t SHARED_WEIGHT_SCALES1_INDEX = 14;
+constexpr uint32_t SHARED_WEIGHT_SCALES2_INDEX = 15;
+constexpr uint32_t SHARED_BIAS1_INDEX = 16;
+constexpr uint32_t SHARED_BIAS2_INDEX = 17;
 
 // 输出 tensor 索引
 constexpr uint32_t OUTPUT_Y_INDEX = 0;                 // 输出 y，shape = [M, K]
@@ -779,8 +785,26 @@ static ge::graphStatus MegaMoeA2A3CheckAttrAndSetTiling(gert::TilingContext* con
 // 获取指定 DynamicInput 的 TensorList 长度
 static uint32_t GetDynamicInputTensorListLen(gert::TilingContext* context, uint32_t inputIndex)
 {
-    uint32_t listLen = 0;
-    while (context->GetDynamicInputTensor(inputIndex, ++listLen) != nullptr) {
+    uint32_t listLen = 0U;
+    while (context->GetDynamicInputTensor(inputIndex, listLen) != nullptr) {
+        ++listLen;
+    }
+    return listLen;
+}
+
+// 获取指定 DynamicInput 的有效 TensorList 长度。aclnn 会将未提供的 DynamicInput 转换为
+// 单个 shape={0} 的 placeholder；tiling 需要将该 placeholder 还原为逻辑空列表。
+static uint32_t GetEffectiveDynamicInputTensorListLen(gert::TilingContext* context, uint32_t inputIndex)
+{
+    const uint32_t listLen = GetDynamicInputTensorListLen(context, inputIndex);
+    if (listLen != 1U) {
+        return listLen;
+    }
+
+    const gert::StorageShape* firstTensorShape = context->GetDynamicInputShape(inputIndex, 0U);
+    if (firstTensorShape != nullptr && firstTensorShape->GetStorageShape().GetDimNum() == ONE_DIM &&
+        firstTensorShape->GetStorageShape().GetDim(0) == 0) {
+        return 0U;
     }
     return listLen;
 }
@@ -1177,6 +1201,13 @@ static ge::graphStatus CheckWeightScaleInput(gert::TilingContext* context, uint3
             OP_LOGE_FOR_INVALID_SHAPEDIM(K_OP_NAME, tensorName.c_str(),
                                          std::to_string(sTensorI->GetOriginShape().GetDimNum()).c_str(), "1D"),
             return GRAPH_FAILED);
+        const int64_t scaleDim0 = sTensorI->GetStorageShape().GetDim(0);
+        OP_TILING_CHECK(
+            scaleDim0 != dim1Expected,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                K_OP_NAME, tensorName.c_str(), Ops::Base::ToString(sTensorI->GetStorageShape()).c_str(),
+                (std::string("dim0 must equal ") + dim1Name + " (" + std::to_string(dim1Expected) + ")").c_str()),
+            return GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -1231,6 +1262,181 @@ static ge::graphStatus CheckBiasInput(gert::TilingContext* context, uint32_t inp
     return ge::GRAPH_SUCCESS;
 }
 
+static ge::graphStatus CheckSharedWeightList(gert::TilingContext* context, uint32_t inputIndex, const char* inputName,
+                                             uint32_t sharedExpertNum, ge::DataType expectedDataType,
+                                             ge::Format expectedFormat, int64_t expectedDim0, int64_t expectedDim1)
+{
+    for (uint32_t i = 0; i < sharedExpertNum; ++i) {
+        std::string tensorName = std::string(inputName) + "[" + std::to_string(i) + "]";
+        auto tensor = context->GetDynamicInputTensor(inputIndex, i);
+        auto desc = context->GetDynamicInputDesc(inputIndex, i);
+        OP_TILING_CHECK(tensor == nullptr || desc == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, tensorName.c_str()),
+                        return GRAPH_FAILED);
+        OP_TILING_CHECK(
+            tensor->GetOriginShape().GetDimNum() != TWO_DIMS,
+            OP_LOGE_FOR_INVALID_SHAPEDIM(K_OP_NAME, tensorName.c_str(),
+                                         std::to_string(tensor->GetOriginShape().GetDimNum()).c_str(), "2D"),
+            return GRAPH_FAILED);
+        OP_TILING_CHECK(desc->GetDataType() != expectedDataType,
+                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(K_OP_NAME, tensorName.c_str(),
+                                                              Ops::Base::ToString(desc->GetDataType()).c_str(),
+                                                              "The dtype must match the selected shared GMM mode."),
+                        return GRAPH_FAILED);
+        ge::Format format = static_cast<ge::Format>(ge::GetPrimaryFormat(desc->GetStorageFormat()));
+        OP_TILING_CHECK(format != expectedFormat,
+                        OP_LOGE_FOR_INVALID_FORMAT(K_OP_NAME, tensorName.c_str(), Ops::Base::ToString(format).c_str(),
+                                                   Ops::Base::ToString(expectedFormat).c_str()),
+                        return GRAPH_FAILED);
+        const auto& shape = tensor->GetStorageShape();
+        OP_TILING_CHECK(
+            shape.GetDim(0) != expectedDim0 || shape.GetDim(1) != expectedDim1,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                K_OP_NAME, tensorName.c_str(), Ops::Base::ToString(shape).c_str(),
+                ("shape must be [" + std::to_string(expectedDim0) + ", " + std::to_string(expectedDim1) + "]").c_str()),
+            return GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+static ge::graphStatus CheckSharedExpertInputs(gert::TilingContext* context, int64_t hiddenSize, uint32_t& n,
+                                               ge::DataType routedWeightDataType, ge::Format routedWeightFormat,
+                                               uint32_t& sharedExpertNum, uint32_t& sharedGmm2Bf16,
+                                               uint32_t& sharedIsQuant, uint32_t& sharedIsW4A8)
+{
+    sharedGmm2Bf16 = 0U;
+    // 使用逻辑长度：aclnn 为未提供的 DynamicInput 创建的 shape={0} placeholder 不代表共享专家。
+    const uint32_t sharedWeight1Num = GetEffectiveDynamicInputTensorListLen(context, SHARED_WEIGHT1_INDEX);
+    const uint32_t sharedWeight2Num = GetEffectiveDynamicInputTensorListLen(context, SHARED_WEIGHT2_INDEX);
+    const uint32_t sharedScale1Num = GetEffectiveDynamicInputTensorListLen(context, SHARED_WEIGHT_SCALES1_INDEX);
+    const uint32_t sharedScale2Num = GetEffectiveDynamicInputTensorListLen(context, SHARED_WEIGHT_SCALES2_INDEX);
+    const uint32_t sharedBias1Num = GetEffectiveDynamicInputTensorListLen(context, SHARED_BIAS1_INDEX);
+    const uint32_t sharedBias2Num = GetEffectiveDynamicInputTensorListLen(context, SHARED_BIAS2_INDEX);
+
+    OP_TILING_CHECK(sharedWeight1Num != sharedWeight2Num,
+                    OP_LOGE_FOR_INVALID_TENSORNUMS_WITH_REASON(
+                        K_OP_NAME, "shared_weight1, shared_weight2",
+                        (std::to_string(sharedWeight1Num) + ", " + std::to_string(sharedWeight2Num)).c_str(),
+                        "The shared weight tensor list lengths must be the same."),
+                    return GRAPH_FAILED);
+    OP_TILING_CHECK(sharedWeight1Num > MEGA_MOE_A3_MAX_SHARED_EXPERT_NUM,
+                    OP_LOGE_FOR_INVALID_TENSORNUM(K_OP_NAME, "shared_weight1", sharedWeight1Num, "in [0, 2]"),
+                    return GRAPH_FAILED);
+
+    if (sharedWeight1Num == 0U) {
+        OP_TILING_CHECK(sharedScale1Num != 0U || sharedScale2Num != 0U || sharedBias1Num != 0U || sharedBias2Num != 0U,
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(K_OP_NAME, "shared expert scales/biases", "present",
+                                                              "shared weights must be provided first"),
+                        return GRAPH_FAILED);
+        sharedExpertNum = 0U;
+        return ge::GRAPH_SUCCESS;
+    }
+
+    OP_TILING_CHECK(mc2tiling::GetSocVersion(context) != "Ascend910_93",
+                    OP_LOGE(K_OP_NAME, "Shared experts are supported only on Ascend910_93 for Arch22."),
+                    return GRAPH_FAILED);
+
+    const auto sharedW1Desc = context->GetDynamicInputDesc(SHARED_WEIGHT1_INDEX, 0);
+    const auto sharedW1Shape = context->GetDynamicInputShape(SHARED_WEIGHT1_INDEX, 0);
+    OP_TILING_CHECK(
+        sharedW1Desc == nullptr || sharedW1Shape == nullptr || sharedW1Shape->GetStorageShape().GetDimNum() != TWO_DIMS,
+        OP_LOGE(K_OP_NAME, "Shared weight1 must be a 2D expert tensor."), return GRAPH_FAILED);
+    const auto weightDataType = sharedW1Desc->GetDataType();
+    const auto weightFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(sharedW1Desc->GetStorageFormat()));
+    OP_TILING_CHECK(weightFormat != routedWeightFormat,
+                    OP_LOGE(K_OP_NAME, "Shared/routed weight formats must match; dtype and I may differ."),
+                    return GRAPH_FAILED);
+    const int64_t sharedN = sharedW1Shape->GetStorageShape().GetDim(1);
+    OP_TILING_CHECK(sharedN < 2 * MIN_INTERMEDIATE_HIDDEN || sharedN % (2 * INTERMEDIATE_HIDDEN_ALIGN) != 0,
+                    OP_LOGE(K_OP_NAME, "Shared I must be >= 512 and aligned to 256."), return GRAPH_FAILED);
+    OP_TILING_CHECK(mc2tiling::GetSocVersion(context) != "Ascend910_93" &&
+                        (sharedN != n || weightDataType != routedWeightDataType || weightFormat != routedWeightFormat),
+                    OP_LOGE(K_OP_NAME, "Independent shared dtype/I requires A3."), return GRAPH_FAILED);
+    n = static_cast<uint32_t>(sharedN);
+    OP_TILING_CHECK(
+        weightDataType != ge::DT_BF16 && weightDataType != ge::DT_INT8 && weightDataType != ge::DT_INT4,
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(K_OP_NAME, "shared_weight1", Ops::Base::ToString(weightDataType).c_str(),
+                                              "Arch22 shared experts support DT_BF16, DT_INT8 and DT_INT4 only."),
+        return GRAPH_FAILED);
+
+    const bool isQuantized = weightDataType == ge::DT_INT8 || weightDataType == ge::DT_INT4;
+    const bool isW4A8 = weightDataType == ge::DT_INT4;
+    sharedIsQuant = isQuantized ? 1U : 0U;
+    sharedIsW4A8 = isW4A8 ? 1U : 0U;
+    auto sharedW2Desc = context->GetDynamicInputDesc(SHARED_WEIGHT2_INDEX, 0);
+    OP_TILING_CHECK(sharedW2Desc == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_OP_NAME, "shared_weight2"),
+                    return GRAPH_FAILED);
+    const bool mixedInt8Bf16 = weightDataType == ge::DT_INT8 && sharedW2Desc->GetDataType() == ge::DT_BF16;
+    OP_TILING_CHECK(mixedInt8Bf16 && routedWeightDataType != ge::DT_INT8,
+                    OP_LOGE(K_OP_NAME, "Legacy INT8/BF16 shared mixed pair requires INT8 routing."),
+                    return GRAPH_FAILED);
+    const auto sharedW2Format = static_cast<ge::Format>(ge::GetPrimaryFormat(sharedW2Desc->GetStorageFormat()));
+    // A3 mixed GMM2 accepts native BF16 ND as well as the legacy BF16 NZ.
+    // Other modes (including A2) retain their existing format contract.
+    const bool mixedNd = mixedInt8Bf16 && mc2tiling::GetSocVersion(context) == "Ascend910_93" &&
+                         weightFormat == ge::FORMAT_FRACTAL_NZ && sharedW2Format == ge::FORMAT_ND;
+    OP_TILING_CHECK(sharedW2Format != weightFormat && !mixedNd,
+                    OP_LOGE(K_OP_NAME, "Only A3 INT8/BF16 shared experts allow NZ gateup with ND down."),
+                    return GRAPH_FAILED);
+    const uint32_t expectedScale2Num = mixedInt8Bf16 ? 0U : sharedWeight1Num;
+    if (isQuantized) {
+        OP_TILING_CHECK(sharedScale1Num != sharedWeight1Num || sharedScale2Num != expectedScale2Num,
+                        OP_LOGE_FOR_INVALID_TENSORNUMS_WITH_REASON(
+                            K_OP_NAME, "shared_weight_scales1/shared_weight_scales2, shared_weight1",
+                            (std::to_string(sharedScale1Num) + "/" + std::to_string(sharedScale2Num) + ", " +
+                             std::to_string(sharedWeight1Num))
+                                .c_str(),
+                            "Each quantized shared GMM requires scales; BF16 shared GMM2 must not have scales."),
+                        return GRAPH_FAILED);
+        OP_TILING_CHECK(CheckWeightScaleInput(context, SHARED_WEIGHT_SCALES1_INDEX, "shared_weight_scales1",
+                                              sharedWeight1Num, n, "N") != ge::GRAPH_SUCCESS,
+                        OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Check shared_weight_scales1 failed."),
+                        return GRAPH_FAILED);
+        OP_TILING_CHECK(
+            !mixedInt8Bf16 && CheckWeightScaleInput(context, SHARED_WEIGHT_SCALES2_INDEX, "shared_weight_scales2",
+                                                    sharedWeight1Num, hiddenSize, "hidden_size") != ge::GRAPH_SUCCESS,
+            OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Check shared_weight_scales2 failed."), return GRAPH_FAILED);
+    } else {
+        OP_TILING_CHECK(sharedScale1Num != 0U || sharedScale2Num != 0U,
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(K_OP_NAME, "shared expert scales", "present",
+                                                              "BF16 shared experts do not use scales"),
+                        return GRAPH_FAILED);
+    }
+
+    if (isW4A8) {
+        OP_TILING_CHECK(sharedBias1Num != sharedWeight1Num || sharedBias2Num != sharedWeight1Num,
+                        OP_LOGE_FOR_INVALID_TENSORNUMS_WITH_REASON(
+                            K_OP_NAME, "shared_bias1/shared_bias2, shared_weight1",
+                            (std::to_string(sharedBias1Num) + "/" + std::to_string(sharedBias2Num) + ", " +
+                             std::to_string(sharedWeight1Num))
+                                .c_str(),
+                            "INT4 shared experts require one bias tensor per shared expert."),
+                        return GRAPH_FAILED);
+        OP_TILING_CHECK(
+            CheckBiasInput(context, SHARED_BIAS1_INDEX, "shared_bias1", sharedWeight1Num, n, "N") != ge::GRAPH_SUCCESS,
+            OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Check shared_bias1 failed."), return GRAPH_FAILED);
+        OP_TILING_CHECK(CheckBiasInput(context, SHARED_BIAS2_INDEX, "shared_bias2", sharedWeight1Num, hiddenSize,
+                                       "hidden_size") != ge::GRAPH_SUCCESS,
+                        OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Check shared_bias2 failed."), return GRAPH_FAILED);
+    } else {
+        OP_TILING_CHECK(sharedBias1Num != 0U || sharedBias2Num != 0U,
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(K_OP_NAME, "shared expert biases", "present",
+                                                              "Bias is supported only for INT4 shared experts"),
+                        return GRAPH_FAILED);
+    }
+
+    OP_TILING_CHECK(CheckSharedWeightList(context, SHARED_WEIGHT1_INDEX, "shared_weight1", sharedWeight1Num,
+                                          weightDataType, weightFormat, hiddenSize, n) != ge::GRAPH_SUCCESS,
+                    OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Check shared_weight1 failed."), return GRAPH_FAILED);
+    OP_TILING_CHECK(CheckSharedWeightList(context, SHARED_WEIGHT2_INDEX, "shared_weight2", sharedWeight2Num,
+                                          mixedInt8Bf16 ? ge::DT_BF16 : weightDataType, sharedW2Format, n / 2,
+                                          hiddenSize) != ge::GRAPH_SUCCESS,
+                    OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Check shared_weight2 failed."), return GRAPH_FAILED);
+
+    sharedExpertNum = sharedWeight1Num;
+    sharedGmm2Bf16 = mixedInt8Bf16 ? 1U : 0U;
+    return ge::GRAPH_SUCCESS;
+}
+
 static ge::graphStatus CheckWeightScalesForType(gert::TilingContext* context, ge::DataType w1DataType,
                                                 uint32_t expertPerRank, uint32_t N, int64_t hiddenSize)
 {
@@ -1259,15 +1465,8 @@ static ge::graphStatus CheckWeightScalesForType(gert::TilingContext* context, ge
                         OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "CheckWeightScaleInput for weight_scales2 failed."),
                         return GRAPH_FAILED);
     } else {
-        uint32_t weight1ListLen = GetDynamicInputTensorListLen(context, WEIGHT_SCALES1_INDEX);
-        uint32_t weight2ListLen = GetDynamicInputTensorListLen(context, WEIGHT_SCALES2_INDEX);
-        // 若tensor为空placeholder（shape为0，由CreateEmptyTensor创建），视为未提供
-        bool hasWeight1Scale =
-            (weight1ListLen > 0U) && (context->GetDynamicInputDesc(WEIGHT_SCALES1_INDEX, 0) != nullptr) &&
-            (context->GetDynamicInputShape(WEIGHT_SCALES1_INDEX, 0)->GetStorageShape().GetDim(0) > 0);
-        bool hasWeight2Scale =
-            (weight2ListLen > 0U) && (context->GetDynamicInputDesc(WEIGHT_SCALES2_INDEX, 0) != nullptr) &&
-            (context->GetDynamicInputShape(WEIGHT_SCALES2_INDEX, 0)->GetStorageShape().GetDim(0) > 0);
+        const bool hasWeight1Scale = GetEffectiveDynamicInputTensorListLen(context, WEIGHT_SCALES1_INDEX) > 0U;
+        const bool hasWeight2Scale = GetEffectiveDynamicInputTensorListLen(context, WEIGHT_SCALES2_INDEX) > 0U;
         OP_TILING_CHECK(hasWeight1Scale || hasWeight2Scale,
                         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
                             K_OP_NAME, "weight_scales1/weight_scales2", "present",
@@ -1292,13 +1491,8 @@ static ge::graphStatus CheckBiasForType(gert::TilingContext* context, ge::DataTy
             CheckBiasInput(context, BIAS2_INDEX, "bias2", expertPerRank, hiddenSize, "hiddenSize") != ge::GRAPH_SUCCESS,
             OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "CheckBiasInput for bias2 failed."), return GRAPH_FAILED);
     } else {
-        uint32_t bias1ListLen = GetDynamicInputTensorListLen(context, BIAS1_INDEX);
-        uint32_t bias2ListLen = GetDynamicInputTensorListLen(context, BIAS2_INDEX);
-        // 若tensor为空placeholder（shape为0，由CreateEmptyTensor创建），视为未提供
-        bool hasBias1 = (bias1ListLen > 0U) && (context->GetDynamicInputDesc(BIAS1_INDEX, 0) != nullptr) &&
-                        (context->GetDynamicInputShape(BIAS1_INDEX, 0)->GetStorageShape().GetDim(0) > 0);
-        bool hasBias2 = (bias2ListLen > 0U) && (context->GetDynamicInputDesc(BIAS2_INDEX, 0) != nullptr) &&
-                        (context->GetDynamicInputShape(BIAS2_INDEX, 0)->GetStorageShape().GetDim(0) > 0);
+        const bool hasBias1 = GetEffectiveDynamicInputTensorListLen(context, BIAS1_INDEX) > 0U;
+        const bool hasBias2 = GetEffectiveDynamicInputTensorListLen(context, BIAS2_INDEX) > 0U;
         OP_TILING_CHECK(hasBias1 || hasBias2,
                         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(K_OP_NAME, "bias1/bias2", "present",
                                                               "bias is supported only when weight1/weight2 is INT4"),
@@ -1343,10 +1537,9 @@ static ge::graphStatus CheckRoutingInputShapes(gert::TilingContext* context, int
 
 static ge::graphStatus CheckWeightInputShapes(gert::TilingContext* context, MegaMoeA2A3TilingData& info,
                                               int64_t hiddenSize, uint32_t& N, uint32_t& expertPerRank,
-                                              ge::DataType& w1DataType)
+                                              ge::DataType& w1DataType, ge::Format& w1Format)
 {
     // ==================== 6. weight1 输入校验 ====================
-    ge::Format w1Format = ge::FORMAT_RESERVED;
     OP_TILING_CHECK(CheckWeight1Input(context, hiddenSize, N, expertPerRank, w1DataType, w1Format) != ge::GRAPH_SUCCESS,
                     OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "CheckWeight1Input failed."), return GRAPH_FAILED);
 
@@ -1378,7 +1571,9 @@ static ge::graphStatus MegaMoeA2A3CheckShapeAndSetTiling(gert::TilingContext* co
     uint32_t N = 0;
     uint32_t expertPerRank = 0;
     ge::DataType w1DataType = ge::DT_UNDEFINED;
-    if (CheckWeightInputShapes(context, info, hiddenSize, N, expertPerRank, w1DataType) != ge::GRAPH_SUCCESS) {
+    ge::Format w1Format = ge::FORMAT_RESERVED;
+    if (CheckWeightInputShapes(context, info, hiddenSize, N, expertPerRank, w1DataType, w1Format) !=
+        ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
@@ -1400,13 +1595,22 @@ static ge::graphStatus MegaMoeA2A3CheckShapeAndSetTiling(gert::TilingContext* co
     OP_TILING_CHECK(scalesStorageShape != nullptr, OP_LOGE_FOR_INVALID_VALUE(K_OP_NAME, "scales", "not null", "null"),
                     return GRAPH_FAILED);
 
-    // ==================== 14. 设置 tiling data ====================
+    // ==================== 14. shared expert 输入校验 ====================
+    uint32_t sharedExpertNum = 0U;
+    info.sharedN = N;
+    OP_TILING_CHECK(
+        CheckSharedExpertInputs(context, hiddenSize, info.sharedN, w1DataType, w1Format, sharedExpertNum,
+                                info.sharedGmm2Bf16, info.sharedIsQuant, info.sharedIsW4A8) != ge::GRAPH_SUCCESS,
+        OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "CheckSharedExpertInputs failed."), return GRAPH_FAILED);
+
+    // ==================== 15. 设置 tiling data ====================
     info.M = static_cast<uint32_t>(bs);
     info.N = N;
     info.K = static_cast<uint32_t>(hiddenSize);
     info.expertPerRank = expertPerRank;
     info.topK = static_cast<uint32_t>(topK);
     info.listLen = expertPerRank;
+    info.sharedExpertNum = sharedExpertNum;
 
     OP_LOGD(K_INNER_DEBUG, "bs=%u", info.M);
     OP_LOGD(K_INNER_DEBUG, "K=%u", info.K);
@@ -1414,6 +1618,7 @@ static ge::graphStatus MegaMoeA2A3CheckShapeAndSetTiling(gert::TilingContext* co
     OP_LOGD(K_INNER_DEBUG, "expertPerRank=%u", info.expertPerRank);
     OP_LOGD(K_INNER_DEBUG, "topK=%u", info.topK);
     OP_LOGD(K_INNER_DEBUG, "listLen=%u", info.listLen);
+    OP_LOGD(K_INNER_DEBUG, "sharedExpertNum=%u", info.sharedExpertNum);
     OP_LOGD(K_INNER_DEBUG, "isActiveMask=%d", static_cast<int>(isActiveMask));
 
     return ge::GRAPH_SUCCESS;
@@ -1653,11 +1858,14 @@ static void SetA3WorkspaceSize(const MegaMoeA2A3TilingData& info, uint32_t n2, u
     megeMoeWorkspace =
         permuteCountsSize +                               // prologue 每核计数区
         MOE_PERMUTE_CHUNK * info.topK * sizeof(int32_t) + // expandedRowIdx（单 chunk，逐 chunk 复用）
-        numChunks * // cumsum（按 chunk 数分配，不复用，规避 AIC 跨 chunk cache 陈旧读）
-            info.worldSize * info.worldSize * info.expertPerRank * sizeof(int32_t) +
+        // GetValue caches 64 bytes: never share a line across chunk generations.
+        numChunks *
+            ops::CeilAlign(
+                static_cast<uint64_t>(info.worldSize) * info.worldSize * info.expertPerRank * sizeof(int32_t), 64UL) +
         // 接收侧轮表区：每 (chunk, round) 独立一份 [cumsumMM_r | tokenPerExpert_r | preSumBeforeRank_r]，
         // 各 EP*expertPerRank int32（cumsumMM_r 与 GetCumsumForMMAIV 输出同紧凑布局）
-        numChunks * info.recvRoundsMax * 3UL * info.worldSize * info.expertPerRank * sizeof(int32_t) +
+        numChunks * info.recvRoundsMax * 3UL *
+            ops::CeilAlign(static_cast<uint64_t>(info.worldSize) * info.expertPerRank * sizeof(int32_t), 64UL) +
         recvBudget * std::max(info.N, n2) * sizeof(int16_t) +                          // GMM1&2 Out
         recvBudget * std::max(info.K, k2) * sizeof(int16_t) +                          // GMM1&2 input
         (info.worldSize * (info.expertPerRank + 16 - 1) / 16 * 16 * sizeof(int32_t)) + // SumBeforeRank
@@ -1700,18 +1908,17 @@ static void SetA2WorkspaceSize(const MegaMoeA2A3TilingData& info, uint32_t n2, u
     }
 }
 
-static ge::graphStatus StoreMegaMoeCommonTiling(gert::TilingContext* context, MegaMoeA2A3TilingData& info,
-                                                MegaMoeTilingDataQuant* tilingData)
+static ge::graphStatus StoreMegaMoeCommonTiling(gert::TilingContext* context, MegaMoeA2A3TilingData& info)
 {
     if (info.isQuantRouting != 0U) {
         MegaMoeTilingDataQuant* quantTilingData = context->GetTilingData<MegaMoeTilingDataQuant>();
-        OP_TILING_CHECK(tilingData == nullptr,
+        OP_TILING_CHECK(quantTilingData == nullptr,
                         OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Failed to get quant tiling data."),
                         return ge::GRAPH_FAILED);
         quantTilingData->common = info;
     } else {
         MegaMoeTilingDataNonQuant* nonQuantTilingData = context->GetTilingData<MegaMoeTilingDataNonQuant>();
-        OP_TILING_CHECK(tilingData == nullptr,
+        OP_TILING_CHECK(nonQuantTilingData == nullptr,
                         OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "Failed to get non-quant tiling data."),
                         return ge::GRAPH_FAILED);
         nonQuantTilingData->common = info;
@@ -1731,9 +1938,14 @@ static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext* context)
                     return ge::GRAPH_FAILED);
     OP_LOGI(K_INNER_DEBUG, "MegaMoeA2A3 get tilingData.");
     MegaMoeA2A3TilingData& info = tilingData->common;
+    info = {};
     OP_LOGI(K_INNER_DEBUG, "MegaMoeA2A3 get tilingData info.");
 
     if (CheckAndSetCommonTiling(context, info) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (ret != ge::GRAPH_SUCCESS && info.sharedExpertNum > 0U) {
+        OP_LOGE(K_OP_NAME, "Shared stages require batch scheduling for barriers.");
         return ge::GRAPH_FAILED;
     }
 
@@ -1816,6 +2028,10 @@ static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext* context)
                                                   "supports only the W4A8 (A8W4-INT) quant path on Atlas A3; "
                                                   "set combine_comm_mode=0 on this configuration"),
             return ge::GRAPH_FAILED);
+        OP_TILING_CHECK(combineCommMode == 1 && info.sharedExpertNum != 0U,
+                        OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "[DEDUP] combine_comm_mode=1 with shared experts is not "
+                                                              "supported; set combine_comm_mode=0"),
+                        return ge::GRAPH_FAILED);
         if (combineCommMode == 1) {
             const int64_t chunkTokens = std::min(static_cast<int64_t>(info.M), MOE_PERMUTE_CHUNK);
             const MegaMoeDedup::DedupFeasibility feasibility = MegaMoeDedup::CheckDedupFeasible(
@@ -1865,11 +2081,62 @@ static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext* context)
         }
     }
 
-    if (StoreMegaMoeCommonTiling(context, info, tilingData) != ge::GRAPH_SUCCESS) {
+    info.sharedWorkspaceOffset = std::max(megeMoeWorkspace, static_cast<uint64_t>(initRoutingWorkspace));
+    uint64_t sharedExpertWorkspace = 0UL;
+    if (info.sharedExpertNum > 0U) {
+        const auto alignSharedBuffer = [](uint64_t size) {
+            constexpr uint64_t sharedBufferAlignment = static_cast<uint64_t>(ALIGN_512);
+            return (size + sharedBufferAlignment - 1UL) / sharedBufferAlignment * sharedBufferAlignment;
+        };
+        // Shared GMM1 C and GMM2 C are not live at the same time and reuse the
+        // larger buffer. W4A8 uses two logical M rows for its high/low nibbles.
+        const uint64_t msdFactor = info.sharedIsW4A8 != 0U ? 2UL : 1UL;
+        const bool sharedW8Pair = archCode == SOC_ASCEND910_93 && info.sharedIsQuant != 0U && info.sharedIsW4A8 == 0U &&
+                                  info.sharedGmm2Bf16 == 0U;
+        const uint64_t cElementSize = sharedW8Pair ? sizeof(int32_t) : sizeof(int16_t);
+        const uint64_t sharedGmmBuffer = alignSharedBuffer(static_cast<uint64_t>(info.sharedExpertNum) * info.M *
+                                                           std::max(info.sharedN, info.K) * cElementSize * msdFactor);
+        const uint64_t activationElementSize =
+            info.sharedIsQuant != 0U && info.sharedGmm2Bf16 == 0U ? sizeof(int8_t) : sizeof(int16_t);
+        const uint64_t sharedActivationBuffer = alignSharedBuffer(static_cast<uint64_t>(info.sharedExpertNum) * info.M *
+                                                                  (info.sharedN / 2U) * activationElementSize);
+        sharedExpertWorkspace = sharedGmmBuffer + sharedActivationBuffer;
+
+        if (info.sharedIsQuant != 0U) {
+            // Dense X is quantized once and reused by every shared expert.
+            const uint64_t sharedInputBuffer =
+                alignSharedBuffer(static_cast<uint64_t>(info.M) * info.K * sizeof(int8_t));
+            const uint64_t sharedInputScaleBuffer = alignSharedBuffer(static_cast<uint64_t>(info.M) * sizeof(float));
+            const uint64_t sharedActivationScaleBuffer =
+                alignSharedBuffer(static_cast<uint64_t>(info.sharedExpertNum) * info.M * sizeof(float));
+            // The quantized GMM2 AIV epilogue publishes BF16 into a separate
+            // result buffer, avoiding in-place W4A8 high/low-row aliasing.
+            const uint64_t sharedResultBuffer =
+                alignSharedBuffer(static_cast<uint64_t>(info.sharedExpertNum) * info.M * info.K * sizeof(int16_t));
+            sharedExpertWorkspace +=
+                sharedInputBuffer + sharedInputScaleBuffer + sharedActivationScaleBuffer + sharedResultBuffer;
+        }
+        if (archCode == SOC_ASCEND910_93) {
+            OP_TILING_CHECK(info.sharedWorkspaceOffset > UINT64_MAX - (ALIGN_512 - 1),
+                            OP_LOGE(K_OP_NAME, "A3 shared workspace alignment overflow"), return ge::GRAPH_FAILED);
+            info.sharedWorkspaceOffset = alignSharedBuffer(info.sharedWorkspaceOffset);
+            OP_TILING_CHECK(info.sharedWorkspaceOffset > UINT64_MAX - SYSTEM_NEED_WORKSPACE ||
+                                sharedExpertWorkspace > UINT64_MAX - SYSTEM_NEED_WORKSPACE - info.sharedWorkspaceOffset,
+                            OP_LOGE(K_OP_NAME, "A3 shared workspace size overflow"), return ge::GRAPH_FAILED);
+        }
+    }
+
+    workSpaces[0] = SYSTEM_NEED_WORKSPACE + info.sharedWorkspaceOffset + sharedExpertWorkspace;
+
+    if (StoreMegaMoeCommonTiling(context, info) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
 
-    workSpaces[0] = SYSTEM_NEED_WORKSPACE + std::max(megeMoeWorkspace, initRoutingWorkspace);
+    if (archCode == SOC_ASCEND910_93) {
+        OP_LOGD(K_INNER_DEBUG, "[A3_ROUTE] key=%llu shared=%u m=%u topK=%u recvBudget=%llu",
+                static_cast<unsigned long long>(context->GetTilingKey()), info.sharedExpertNum, info.M, info.topK,
+                static_cast<unsigned long long>(info.recvRoundBudget));
+    }
 
     OP_LOGI(K_INNER_DEBUG, "Leave MegaMoeA2A3 tiling func.");
     return ge::GRAPH_SUCCESS;

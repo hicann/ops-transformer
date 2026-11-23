@@ -94,8 +94,9 @@ public:
 
     using ElementAccumulator =
         typename Gemm::helper::ElementAccumulatorSelector<ElementA, ElementB>::ElementAccumulator;
+    static constexpr bool USE_FIXPIPE_SCALE = std::is_same_v<ElementA, int8_t> && !std::is_same_v<ElementC, int32_t>;
     using CopyL0CToGm =
-        std::conditional_t<std::is_same_v<ElementA, int8_t>,
+        std::conditional_t<USE_FIXPIPE_SCALE,
                            std::conditional_t<NEED_L1_TO_FP_,
                                               Gemm::Tile::CopyL0CToGm<ArchTag, ElementAccumulator, CType_,
                                                                       Gemm::Tile::ScaleGranularity::PER_CHANNEL>,
@@ -132,9 +133,8 @@ public:
     static_assert(std::is_same_v<LayoutC, layout::RowMajor>, "LayoutC only support RowMajor yet!");
 
     // Check L1TileShape
-    static_assert((std::is_same_v<ElementA, int8_t> ?
-                       (L1A_TILE_SIZE + L1B_TILE_SIZE + L1S_TILE_SIZE) * L1_STAGES <= ArchTag::L1_SIZE :
-                       (L1A_TILE_SIZE + L1B_TILE_SIZE) * L1_STAGES <= ArchTag::L1_SIZE),
+    static_assert((USE_FIXPIPE_SCALE ? (L1A_TILE_SIZE + L1B_TILE_SIZE + L1S_TILE_SIZE) * L1_STAGES <= ArchTag::L1_SIZE :
+                                       (L1A_TILE_SIZE + L1B_TILE_SIZE) * L1_STAGES <= ArchTag::L1_SIZE),
                   "L1TileShape exceeding the L1 space for the given data type");
 
     // Check L0TileShape
@@ -156,7 +156,9 @@ public:
         ptrSoftFlagBase_ = flagPtr;
         expertPerRank_ = expertPerRank;
         InitL1(resource, l1BufAddrStart);
-        FixpipeScale::Init(resource, fpAddrStart);
+        if constexpr (USE_FIXPIPE_SCALE) {
+            FixpipeScale::Init(resource, fpAddrStart);
+        }
         InitL0A(resource);
         InitL0B(resource);
         InitL0C(resource);
@@ -186,7 +188,7 @@ public:
         for (uint32_t i = 0; i < L0C_STAGES; ++i) {
             AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(l0CEventList[i]);
         }
-        if constexpr (std::is_same_v<ElementA, int8_t>) {
+        if constexpr (USE_FIXPIPE_SCALE) {
             AscendC::WaitFlag<AscendC::HardEvent::FIX_MTE2>(0);
         }
     }
@@ -331,7 +333,7 @@ private:
         }
         uint32_t l1SOffset = l1BOffset + L1B_TILE_SIZE * L1_STAGES;
         l1EndOffset_ = l1SOffset;
-        if constexpr (std::is_same_v<ElementA, int8_t>) {
+        if constexpr (USE_FIXPIPE_SCALE) {
             l1STensor = resource.l1Buf.template GetBufferByByte<uint64_t>(l1SOffset);
             AscendC::SetFlag<AscendC::HardEvent::FIX_MTE2>(0);
             l1EndOffset_ += L1S_TILE_SIZE;
@@ -470,7 +472,7 @@ private:
 
         if (params.isKLoopLast) {
             auto layoutCInGm = params.layoutCInGm;
-            if constexpr (std::is_same_v<ElementA, int8_t>) {
+            if constexpr (USE_FIXPIPE_SCALE) {
                 auto layoutScale = params.layoutScale;
                 auto layoutTileS = layoutScale.GetTileLayout(MakeCoord(layoutCInGm.shape(1)));
                 AscendC::WaitFlag<AscendC::HardEvent::FIX_MTE2>(0);
@@ -483,21 +485,21 @@ private:
             if constexpr (!ENABLE_UNIT_FLAG) {
                 AscendC::SetFlag<AscendC::HardEvent::M_FIX>(l0CEventList[l0CListId]);
                 AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(l0CEventList[l0CListId]);
-                if constexpr (std::is_same_v<ElementA, int8_t>) {
+                if constexpr (USE_FIXPIPE_SCALE) {
                     copyL0CToGm(params.gmBlockC, l0CTensor, l1STensor, layoutCInGm, layoutCInL0);
                 } else {
                     copyL0CToGm(params.gmBlockC, l0CTensor, layoutCInGm, layoutCInL0);
                 }
                 AscendC::SetFlag<AscendC::HardEvent::FIX_M>(l0CEventList[l0CListId]);
             } else {
-                if constexpr (std::is_same_v<ElementA, int8_t>) {
+                if constexpr (USE_FIXPIPE_SCALE) {
                     copyL0CToGm(params.gmBlockC, l0CTensor, l1STensor, layoutCInGm, layoutCInL0, 0b11);
                 } else {
                     copyL0CToGm(params.gmBlockC, l0CTensor, layoutCInGm, layoutCInL0, 0b11);
                 }
             }
             l0CListId = (l0CListId + 1 < L0C_STAGES) ? (l0CListId + 1) : 0;
-            if constexpr (!NEED_L1_TO_FP_ && std::is_same_v<ElementA, int8_t>) {
+            if constexpr (!NEED_L1_TO_FP_ && USE_FIXPIPE_SCALE) {
                 AscendC::SetFlag<AscendC::HardEvent::FIX_MTE2>(0);
             }
 

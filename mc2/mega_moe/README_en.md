@@ -945,6 +945,19 @@ English | [简体中文](./README.md)
       - When deduplication is enabled, the `BS` of all cards must be exactly the same; inconsistent `BS` (even if all values are not less than 1024) causes the operator to hang or produce misaligned results due to inconsistent communication chunk rounds or tail-chunk layout strides across cards.
       - When `combineCommMode` = 1, the outputs of multiple experts hit by the same token on the same card are first accumulated with FP32 weighting on that card and merged into one row before being sent: compared with the disabled state, in addition to the cross-expert accumulation order, the weighting position and the number of intermediate roundings also change (disabled state: each expert output is quantized to BF16 first and then multiplied by the topk weight; enabled state: FP32 weighted accumulation throughout and a single rounding at the end). Therefore, the result may differ even when `num_topk` = 1; it is a normal difference that `y` is not bitwise identical to that of `combineCommMode` = 0, and the enabled state is usually closer to the reference value. Use `combineCommMode` = 0 when bitwise consistency with the disabled state is required.
       - Applicable scenarios: shapes with a large `topK`, a high proportion of the same token hitting multiple experts on the same card, and a performance bottleneck in communication benefit significantly after deduplication is enabled; low-benefit shapes such as small batches are automatically reverted by the benefit gating (deduplication is not enabled), so the caller does not need to evaluate each shape; for edge shapes near the gating boundary, it is recommended to run actual measurement before deciding.
+      - Each rank supports 0 to 2 local shared experts. Omit shared weights to run only the routed experts. When shared experts are enabled, `combineCommMode` must be 0. Each shared expert runs the FFN on every local token without cross-rank Dispatch. Its output is added directly to the routed output without applying routing weights. `xActiveMask` filters only routed tokens.
+      - Use the following shared weight and quantization combinations. UINT64 scales encode matrix multiplication dequantization parameters. Only when both shared weights are INT4, pass FLOAT32 W4A8 quantization compensation for each layer through `sharedBias1` and `sharedBias2`, respectively. The compensation has the same meaning as for routed experts.
+
+        | Routed weights | Shared W1 / W2 | W1 / W2 formats | Shared quantization inputs |
+        | --- | --- | --- | --- |
+        | BF16 | BF16 / BF16 | ND / ND | Omit scales and biases |
+        | INT8 or INT4 | INT8 / INT8 | NZ / NZ | Pass UINT64 scales for both layers and omit biases |
+        | INT8 or INT4 | INT4 / INT4 | NZ / NZ | Pass UINT64 scales and FLOAT32 compensation for both layers |
+        | INT8 | INT8 / BF16 | NZ / ND | Pass only the UINT64 `sharedWeightScales1` |
+
+      - Within a call, all shared W1 tensors must have the same dtype and format. The same rule applies to all shared W2 tensors. Each layer's weight list and any required scale and bias lists must have one entry per shared expert.
+      - All shared experts must have the same FFN intermediate width `I_s`. The routed width `I_r` and shared width `I_s` are configured independently and follow the same size constraints. Target-device accuracy validation for different widths is pending.
+      - Shared experts support `swiglu`, `swiglustep`, `swigluoai`, and `situglu` with the same activation parameters as routed experts.
     - The data type of `y` is the same as that of `x`.
 
   - **<term>Ascend 950PR&950DT products</term>**:

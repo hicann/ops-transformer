@@ -1023,7 +1023,7 @@ sym_buffer.update_group(group) -> None
         <td>不涉及</td>
     </tr>
     <tr>
-        <td rowspan="3">shared_l1_weights<sup>1</sup></td>
+        <td rowspan="3">shared_l1_weights</td>
         <td rowspan="3">list[Tensor]</td>
         <td rowspan="3">可选</td>
         <td rowspan="3">共享专家网络第一线性层的权重矩阵（包括门控与上投影），用于将输入映射至中间维度，输出供给激活函数。数据类型可以与MoE专家第一线性层权重l1_weights不同，支持MoE专家与共享专家采用不同的权重类型与量化类型（如MoE专家W8配共享专家W4、MoE专家W4配共享专家W8）；shared_l1_weights与shared_l2_weights的数据类型必须一致。该混合配置仅topo_type为0（MTE拓扑）时支持。</td>
@@ -1042,7 +1042,7 @@ sym_buffer.update_group(group) -> None
         <td>(shared_expert_num_per_rank, 2 × intermediate_hidden, hidden / 2)</td>
     </tr>
     <tr>
-        <td rowspan="3">shared_l2_weights<sup>1</sup></td>
+        <td rowspan="3">shared_l2_weights</td>
         <td rowspan="3">list[Tensor]</td>
         <td rowspan="3">可选</td>
         <td rowspan="3">共享专家网络第二线性层的权重矩阵，负责将激活后的中间特征投影回隐藏维度。数据类型可以与MoE专家第二线性层权重l2_weights不同，取值要求同shared_l1_weights。</td>
@@ -1061,7 +1061,7 @@ sym_buffer.update_group(group) -> None
         <td>(shared_expert_num_per_rank, hidden, intermediate_hidden / 2)</td>
     </tr>
     <tr>
-        <td>shared_l1_weights_sf<sup>1</sup></td>
+        <td>shared_l1_weights_sf</td>
         <td>list[Tensor]</td>
         <td>可选</td>
         <td>共享专家网络第一线性层的权重矩阵的量化缩放因子。</td>
@@ -1070,7 +1070,7 @@ sym_buffer.update_group(group) -> None
         <td>(shared_expert_num_per_rank, 2 × intermediate_hidden, CeilDiv(hidden, 64), 2)</td>
     </tr>
     <tr>
-        <td>shared_l2_weights_sf<sup>1</sup></td>
+        <td>shared_l2_weights_sf</td>
         <td>list[Tensor]</td>
         <td>可选</td>
         <td>共享专家网络第二线性层的权重矩阵的量化缩放因子。</td>
@@ -1079,7 +1079,7 @@ sym_buffer.update_group(group) -> None
         <td>(shared_expert_num_per_rank, hidden, CeilDiv(intermediate_hidden, 64), 2)</td>
     </tr>
     <tr>
-        <td>shared_l1_bias<sup>1,2</sup></td>
+        <td>shared_l1_bias<sup>2</sup></td>
         <td>list[Tensor]</td>
         <td>可选</td>
         <td>共享专家网络第一线性层的偏置，暂不支持。</td>
@@ -1088,7 +1088,7 @@ sym_buffer.update_group(group) -> None
         <td>(2 × intermediate_hidden, )</td>
     </tr>
     <tr>
-        <td>shared_l2_bias<sup>1，2</sup></td>
+        <td>shared_l2_bias<sup>2</sup></td>
         <td>list[Tensor]</td>
         <td>可选</td>
         <td>共享专家网络第二线性层的偏置，暂不支持。</td>
@@ -1454,6 +1454,19 @@ sym_buffer.update_group(group) -> None
     - 开启去重时要求各卡的num_tokens（`x`.dim0）完全一致；num_tokens不一致（即使均不小于1024）会因各卡通信chunk轮次或尾chunk布局步长不一致导致算子挂起或结果错位。
     - `combine_comm_mode` = 1时，同一token在同一张卡上命中的多个专家输出改为在该卡按FP32加权累加后合并为一行再发送：与关闭态相比，除跨专家累加顺序外，加权位置与中间舍入次数也发生变化（关闭态：各专家输出先量化为BF16再乘以topk权重；开启态：FP32全程加权累加、末端一次舍入），因此即使`num_topk` = 1结果也可能不同；`y`与`combine_comm_mode` = 0不逐位相同属正常差异，且开启态通常更接近参考值；需要与关闭态逐位一致时请使用`combine_comm_mode` = 0。
     - 适用场景：`num_topk`较大、同一token命中同卡多个专家的比例较高、性能瓶颈在通信的形状，开启后收益明显；小batch等低收益形状由收益门控自动回退（不开启去重），无需调用方逐形状判断，门控边界附近的边缘形状建议实测后再决定。
+    - 每个 rank 支持 0～2 个本地共享专家。未传共享权重时仅计算路由专家。启用共享专家时，`combine_comm_mode` 必须为 0。共享专家对本 rank 的全部 token 执行 FFN，无需跨卡 Dispatch。结果直接累加到路由专家输出，不乘路由权重。`x_active_mask` 仅筛选路由 token。
+    - 共享专家权重与量化参数按下表配套。UINT64 scale 用于矩阵乘反量化。仅当两层共享权重均为 INT4 时，必须通过 `shared_l1_bias` 和 `shared_l2_bias` 分别传入两层的 FLOAT32 W4A8 量化补偿，定义与路由专家相同。
+
+      | 路由专家权重 | 共享 W1 / W2 | W1 / W2 格式 | 共享量化参数 |
+      | --- | --- | --- | --- |
+      | BF16 | BF16 / BF16 | ND / ND | 不传 scale 或 bias |
+      | INT8 或 INT4 | INT8 / INT8 | NZ / NZ | 两层均传 UINT64 scale，不传 bias |
+      | INT8 或 INT4 | INT4 / INT4 | NZ / NZ | 两层均传 UINT64 scale 和 FLOAT32 量化补偿 |
+      | INT8 | INT8 / BF16 | NZ / ND | 仅传 UINT64 `shared_l1_weights_sf` |
+
+    - 单次调用中，各共享专家的 W1 须具有相同的数据类型和格式，W2 也须满足该要求。每层的权重列表及该层所需的 scale、bias 列表均与共享专家一一对应。
+    - 所有共享专家的 FFN 中间维度 `I_s` 必须相同。`I_s` 与路由专家的中间维度 `I_r` 可独立配置，两者遵循相同的取值约束。两者不同时的目标设备精度尚待验收。
+    - 共享专家支持 `swiglu`、`swiglustep`、`swigluoai` 和 `situglu`，激活参数与路由专家相同。
   <!-- end id35 -->
   <!-- npu="950" id18 -->
   - **<term>Ascend 950PR&950DT系列产品</term>：**

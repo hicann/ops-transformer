@@ -58,6 +58,64 @@ static aclnnStatus RunActivationParamCase(const char* activation, const std::vec
     return ut.TestGetWorkspaceSize(&workspaceSize);
 }
 
+static aclnnStatus RunArch22SharedQuantCase(bool isInt4)
+{
+    constexpr int64_t kMoeExpertNum = 2;
+    constexpr int64_t kSharedExpertNum = 2;
+    const aclDataType weightDtype = isInt4 ? ACL_INT32 : ACL_INT8;
+    const int64_t packedFactor = isInt4 ? 8 : 1;
+
+    auto contextDesc = TensorDesc({1}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 1);
+    auto xDesc = TensorDesc({1, 1024}, ACL_BF16, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto topkIdsDesc = TensorDesc({1, 2}, ACL_INT32, ACL_FORMAT_ND).ValueRange(0, 1);
+    auto topkWeightsDesc = TensorDesc({1, 2}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(0, 1);
+
+    TensorListDesc weight1Descs(kMoeExpertNum,
+                                TensorDesc({2048, 1024 / packedFactor}, weightDtype, ACL_FORMAT_ND).ValueRange(-1, 1));
+    TensorListDesc weight2Descs(kMoeExpertNum,
+                                TensorDesc({1024, 1024 / packedFactor}, weightDtype, ACL_FORMAT_ND).ValueRange(-1, 1));
+    TensorListDesc weightScales1Descs(kMoeExpertNum, TensorDesc({2048}, ACL_UINT64, ACL_FORMAT_ND).ValueRange(0, 2));
+    TensorListDesc weightScales2Descs(kMoeExpertNum, TensorDesc({1024}, ACL_UINT64, ACL_FORMAT_ND).ValueRange(0, 2));
+
+    TensorListDesc sharedWeight1Descs(
+        kSharedExpertNum, TensorDesc({2048, 1024 / packedFactor}, weightDtype, ACL_FORMAT_ND).ValueRange(-1, 1));
+    TensorListDesc sharedWeight2Descs(
+        kSharedExpertNum, TensorDesc({1024, 1024 / packedFactor}, weightDtype, ACL_FORMAT_ND).ValueRange(-1, 1));
+    TensorListDesc sharedWeightScales1Descs(kSharedExpertNum,
+                                            TensorDesc({2048}, ACL_UINT64, ACL_FORMAT_ND).ValueRange(0, 2));
+    TensorListDesc sharedWeightScales2Descs(kSharedExpertNum,
+                                            TensorDesc({1024}, ACL_UINT64, ACL_FORMAT_ND).ValueRange(0, 2));
+    TensorListDesc bias1Descs(kMoeExpertNum, TensorDesc({2048}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1));
+    TensorListDesc bias2Descs(kMoeExpertNum, TensorDesc({1024}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1));
+    TensorListDesc sharedBias1Descs(kSharedExpertNum, TensorDesc({2048}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1));
+    TensorListDesc sharedBias2Descs(kSharedExpertNum, TensorDesc({1024}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1));
+
+    auto yDesc = TensorDesc({1, 1024}, ACL_BF16, ACL_FORMAT_ND);
+    auto expertTokenNumsDesc = TensorDesc({kMoeExpertNum}, ACL_INT32, ACL_FORMAT_ND);
+    auto activationParamsDesc = FloatArrayDesc(std::vector<float>{std::numeric_limits<float>::max()});
+
+    uint64_t workspaceSize = 0;
+    if (isInt4) {
+        auto ut = OP_API_UT(
+            aclnnMegaMoe,
+            INPUT(contextDesc, xDesc, topkIdsDesc, topkWeightsDesc, weight1Descs, weight2Descs, weightScales1Descs,
+                  weightScales2Descs, bias1Descs, bias2Descs, nullptr, nullptr, sharedWeight1Descs, sharedWeight2Descs,
+                  sharedWeightScales1Descs, sharedWeightScales2Descs, sharedBias1Descs, sharedBias2Descs, nullptr,
+                  kMoeExpertNum, 2, 2097152, 0, 0, 0, 0, 0, "", 0, "swiglu", activationParamsDesc, 0, 2, 0, 0),
+            OUTPUT(yDesc, expertTokenNumsDesc));
+        return ut.TestGetWorkspaceSize(&workspaceSize);
+    }
+
+    auto ut = OP_API_UT(
+        aclnnMegaMoe,
+        INPUT(contextDesc, xDesc, topkIdsDesc, topkWeightsDesc, weight1Descs, weight2Descs, weightScales1Descs,
+              weightScales2Descs, nullptr, nullptr, nullptr, nullptr, sharedWeight1Descs, sharedWeight2Descs,
+              sharedWeightScales1Descs, sharedWeightScales2Descs, nullptr, nullptr, nullptr, kMoeExpertNum, 2, 2097152,
+              0, 0, 0, 0, 0, "", 0, "swiglu", activationParamsDesc, 0, 2, 0, 0),
+        OUTPUT(yDesc, expertTokenNumsDesc));
+    return ut.TestGetWorkspaceSize(&workspaceSize);
+}
+
 TEST_F(AclnnMegaMoeTest, activation_param_domain)
 {
     constexpr float kMax = std::numeric_limits<float>::max();
@@ -71,6 +129,27 @@ TEST_F(AclnnMegaMoeTest, activation_param_domain)
     EXPECT_EQ(RunActivationParamCase("swigluoai", {kMax, 0.0f, -1.0f}), ACLNN_ERR_RUNTIME_ERROR);
     EXPECT_EQ(RunActivationParamCase("situglu", {4.0f}), ACLNN_ERR_RUNTIME_ERROR);
     EXPECT_EQ(RunActivationParamCase("situglu", {4.0f, 25.0f}), ACLNN_ERR_RUNTIME_ERROR);
+}
+
+TEST_F(AclnnMegaMoeTest, arch22_int8_shared_expert_inputs_are_forwarded)
+{
+    op::SetPlatformSocVersion(op::SocVersion::ASCEND910_93);
+    const aclnnStatus ret = RunArch22SharedQuantCase(false);
+    op::SetPlatformSocVersion(op::SocVersion::ASCEND950);
+    // Like activation_param_domain, this is a wrapper acceptance smoke test:
+    // the mock runtime cannot execute the inner op. Shape validation is covered
+    // by the arch22 tiling tests; numerical correctness requires device tests.
+    EXPECT_EQ(ret, ACLNN_ERR_RUNTIME_ERROR);
+}
+
+TEST_F(AclnnMegaMoeTest, arch22_packed_int32_weight_lists_wrapper_smoke)
+{
+    op::SetPlatformSocVersion(op::SocVersion::ASCEND910_93);
+    const aclnnStatus ret = RunArch22SharedQuantCase(true);
+    op::SetPlatformSocVersion(op::SocVersion::ASCEND950);
+    // ACLNN forwards the packed INT32 routed and shared weight lists as supplied.
+    // This smoke test checks the error returned by the mocked inner operator.
+    EXPECT_EQ(ret, ACLNN_ERR_RUNTIME_ERROR);
 }
 
 TEST_F(AclnnMegaMoeTest, dav3510_nullptr_context)

@@ -17,6 +17,8 @@
 #ifndef MOE_PERMUTE_PROLOGUE_DEDUP_HPP
 #define MOE_PERMUTE_PROLOGUE_DEDUP_HPP
 
+#include <type_traits>
+
 #if ASC_DEVKIT_MAJOR >= 9
 #include "basic_api/kernel_basic_intf.h"
 #else
@@ -28,7 +30,7 @@
 
 namespace MegaMoeDedup {
 
-template <class ElementSrc_>
+template <class ElementSrc_, class ElementTopkWeights = float>
 class DedupPrologue {
 public:
     using ArchTag = Catlass::Arch::AtlasA2; // 与基线 prologue policy 一致
@@ -144,7 +146,7 @@ public:
 
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementSrc> const& gmX, AscendC::GlobalTensor<int32_t> const& gmTopkIds,
-                    AscendC::GlobalTensor<float> const& gmProbs, AscendC::GlobalTensor<ElementDst>& gmA,
+                    AscendC::GlobalTensor<ElementTopkWeights> const& gmProbs, AscendC::GlobalTensor<ElementDst>& gmA,
                     AscendC::GlobalTensor<int32_t>& gmPackSlots, AscendC::GlobalTensor<float>& gmPackProbs,
                     AscendC::GlobalTensor<int32_t>& gmTokenPerExpert, GM_ADDR workspaceCountsAddr,
                     GM_ADDR workspaceExpandRowIdxAddr, GM_ADDR xActiveMaskAddr = nullptr)
@@ -352,8 +354,9 @@ private:
     // 卡序列（topK 展开序首现）中目标卡的序数——D 区 token 块槽位因子；本函数同时把
     // 「首现 → token·K̂ + rankOrdinal / 其余 -1」写入行索引表供 unpermute 使用
     CATLASS_DEVICE
-    void ScatterAndPackDirect(AscendC::GlobalTensor<float> const& gmProbs, AscendC::GlobalTensor<int32_t>& gmPackSlots,
-                              AscendC::GlobalTensor<float>& gmPackProbs, int64_t tokenStartIdx, int64_t tokenEndIdx)
+    void ScatterAndPackDirect(AscendC::GlobalTensor<ElementTopkWeights> const& gmProbs,
+                              AscendC::GlobalTensor<int32_t>& gmPackSlots, AscendC::GlobalTensor<float>& gmPackProbs,
+                              int64_t tokenStartIdx, int64_t tokenEndIdx)
     {
         const int64_t n = params_.streamLen;
         const int64_t topk = params_.numTopk;
@@ -362,10 +365,19 @@ private:
         const int64_t ep = params_.numExperts / params_.expertsPerRank;
         const int64_t kHat = (topk < ep) ? topk : ep;
         const int64_t tokensCurCore = tokenEndIdx - tokenStartIdx;
-        AscendC::DataCopyExtParams probsCopyParams{1, static_cast<uint32_t>(tokensCurCore * topk * sizeof(float)), 0, 0,
-                                                   0};
-        AscendC::DataCopyPadExtParams<float> probsPadParams{false, 0, 0, 0};
-        AscendC::DataCopyPad(probsSlice, gmProbs[tokenStartIdx * topk], probsCopyParams, probsPadParams);
+        const uint32_t probsCount = static_cast<uint32_t>(tokensCurCore * topk);
+        const uint32_t probsBytes = probsCount * sizeof(ElementTopkWeights);
+        AscendC::DataCopyExtParams probsCopyParams{1, probsBytes, 0, 0, 0};
+        AscendC::DataCopyPadExtParams<ElementTopkWeights> probsPadParams{false, 0, 0, 0};
+        if constexpr (std::is_same_v<ElementTopkWeights, float>) {
+            AscendC::DataCopyPad(probsSlice, gmProbs[tokenStartIdx * topk], probsCopyParams, probsPadParams);
+        } else {
+            // The row-index table is populated after the weights have been widened.
+            auto source = rowIdxRun.template ReinterpretCast<ElementTopkWeights>();
+            AscendC::DataCopyPad(source, gmProbs[tokenStartIdx * topk], probsCopyParams, probsPadParams);
+            AscendC::PipeBarrier<PIPE_ALL>();
+            AscendC::Cast(probsSlice, source, AscendC::RoundMode::CAST_NONE, probsCount);
+        }
         AscendC::PipeBarrier<PIPE_ALL>();
         // 桶基址：run DMA 的 UB 源地址须 32B 对齐，故每桶垫 ≤7 元素；GM 布局不受影响
         int32_t acc = 0;
