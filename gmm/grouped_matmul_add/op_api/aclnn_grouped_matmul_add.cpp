@@ -247,6 +247,9 @@ static aclnnStatus aclnnGroupedMatmulAddGetWorkspaceSizeCommon(gmm_add_advanced:
         return ACLNN_SUCCESS;
     }
 
+    CHECK_COND(IsContiguous(params.yRef), ACLNN_ERR_PARAM_INVALID,
+               "In op [%s], when non-quant, [%s] must be a contiguous tensor, non-contiguous tensor is not supported.",
+               opName, "yRef");
     CHECK_COND(ParamsDataContiguous(params, executorPtr, opName) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID,
                "In op [%s], when non-quant, ParamsDataContiguous failed.", opName);
     auto result = l0op::GroupedMatmulAdd(params.x, params.weight, params.groupList, params.yRef, params.transposeX,

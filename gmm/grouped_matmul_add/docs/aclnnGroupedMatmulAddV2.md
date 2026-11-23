@@ -83,7 +83,7 @@ aclnnStatus aclnnGroupedMatmulAddV2(
       <th>数据类型</th>
       <th>数据格式</th>
       <th style="white-space: nowrap">维度（shape）</th>
-      <th>非连续的Tensor</th>
+      <th>非连续Tensor</th>
     </tr>
   </thead>
   <tbody>
@@ -190,7 +190,7 @@ aclnnStatus aclnnGroupedMatmulAddV2(
       <td>FLOAT32</td>
       <td>ND</td>
       <td>3</td>
-      <td>-</td>
+      <td>×</td>
     </tr>
     <tr>
       <td>workspaceSize（uint64_t）</td>
