@@ -132,8 +132,15 @@ cann_ops_transformer.generic_block_sparse_attention(
 | `FP4_E2M1_DYNAMIC_CX` | 4 | A4C4 CX，Q/K/P group32、V per-channel |
 | `FP8_E4M3_STATIC_CAST_P` | 5 | FP8_E4M3 静态 cast P |
 | `MXFP8_E4M3_PER_CHANNEL_V` | 6 | A8C8：Q/K 按 D 维每 32 个元素使用一个 E8M0 scale，V 按 channel 量化；须显式指定 softmax_precision=0。 |
-| `INT8_FULL_QUANT` | 7 | <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8 全量化，四个外部 scale 均必传 |
+| `INT8_FULL_QUANT` | 7 | INT8 全量化，四个外部 scale 均必传 |
 | `Q_FP8_PER_TENSOR_KV_FP4_PER_TOKEN_PER_GROUP` | 8 | Q 为 FP8 E4M3FN，K/V 为打包的 FP4 E2M1，K/V scale 为 BF16。 |
+
+<!-- npu="A3,910b" id17 -->
+- <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>支持非量化（0）和INT8全量化（7）。
+<!-- end id17 -->
+<!-- npu="950" id18 -->
+- <term>Ascend 950PR&950DT系列产品</term>支持非量化（0）、A4C4（4）、常规FP8（5）、A8C8（6）和A8C4（8）。
+<!-- end id18 -->
 
 ### mask_mode 枚举
 
@@ -215,10 +222,10 @@ cann_ops_transformer.generic_block_sparse_attention(
 | block_shape | list[int] | 必选 | 稀疏块形状 `[block_x, block_y]`；A4C4使用[1,Y]，Y∈{4,8,16,32,64,128}。 | int64 | - | 长度为2 |
 | metadata | Tensor | 必选 | 必须传入`generic_block_sparse_attention_metadata`生成的配套任务切分结果 | int32 | ND | (1024,) |
 | attn_mask | Tensor | 可选 | mask_mode=0/1时须为None；mask_mode=3（Union）时须为INT32 exactMask | bool/int32 | ND | Union: (KV_N, G, U×block_y) |
-| q_dequant_scale | Tensor | INT8、A4C4必传 | quant_mode=0/5/8为None；quant_mode=7的<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8须传连续、有限且大于0的float32 Tensor；A4C4（模式4）必传E8M0或uint8编码。 | float32/float8_e8m0fnu/uint8 | ND | TND: [Q_T,Q_N]；BSND: [B,Q_S,Q_N]；BNSD: [B,Q_N,Q_S] <br>A4C4：[scale形状](#a4c4quantmode4)。 |
-| k_dequant_scale | Tensor | INT8和`quant_mode=8`必传；A4C4必传 | quant_mode=0/5为None；quant_mode=7的<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8须传连续、有限且大于0的float32；A4C4（模式4）必传E8M0或uint8编码。 Tensor | float32/bfloat16/uint8 | ND | PA_BBND/PA_BNBD: [num_blocks,KV_N,128]；TND: [KV_N,KV_T]；BSND/BNSD: [B,KV_N,KV_S]<br>`quant_mode=8` 时，按 K/V 的逻辑形状将末轴 D 替换为 8。 <br>A4C4：[scale形状](#a4c4quantmode4)。 |
-| v_dequant_scale | Tensor | INT8和`quant_mode=8`必传；A4C4必传 | quant_mode=0/5为None；quant_mode=7的<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8须传连续、有限且大于0的float32；A4C4（模式4）必传E8M0或uint8编码。 Tensor | float32/bfloat16/uint8 | ND | [KV_N,D]<br>`quant_mode=8` 时，按 K/V 的逻辑形状将末轴 D 替换为 8。 <br>A4C4：[scale形状](#a4c4quantmode4)。 |
-| p_quant_scale | Tensor | INT8必传 | quant_mode=0/5/8为None；quant_mode=7的<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8须传连续、有限且大于0的float32 Tensor | float32 | ND | [1] |
+| q_dequant_scale | Tensor | INT8、A4C4必传 | quant_mode=0/5/8为None；INT8全量化（quant_mode=7）须传连续、有限且大于0的float32 Tensor；A4C4（模式4）必传E8M0或uint8编码。 | float32/float8_e8m0fnu/uint8 | ND | TND: [Q_T,Q_N]；BSND: [B,Q_S,Q_N]；BNSD: [B,Q_N,Q_S] <br>A4C4：[scale形状](#a4c4quantmode4)。 |
+| k_dequant_scale | Tensor | INT8和`quant_mode=8`必传；A4C4必传 | quant_mode=0/5为None；INT8全量化（quant_mode=7）须传连续、有限且大于0的float32；A4C4（模式4）必传E8M0或uint8编码。 Tensor | float32/bfloat16/uint8 | ND | PA_BBND/PA_BNBD: [num_blocks,KV_N,128]；TND: [KV_N,KV_T]；BSND/BNSD: [B,KV_N,KV_S]<br>`quant_mode=8` 时，按 K/V 的逻辑形状将末轴 D 替换为 8。 <br>A4C4：[scale形状](#a4c4quantmode4)。 |
+| v_dequant_scale | Tensor | INT8和`quant_mode=8`必传；A4C4必传 | quant_mode=0/5为None；INT8全量化（quant_mode=7）须传连续、有限且大于0的float32；A4C4（模式4）必传E8M0或uint8编码。 Tensor | float32/bfloat16/uint8 | ND | [KV_N,D]<br>`quant_mode=8` 时，按 K/V 的逻辑形状将末轴 D 替换为 8。 <br>A4C4：[scale形状](#a4c4quantmode4)。 |
+| p_quant_scale | Tensor | INT8必传 | quant_mode=0/5/8为None；INT8全量化（quant_mode=7）须传连续、有限且大于0的float32 Tensor | float32 | ND | [1] |
 | cu_seqlens_q | Tensor | 条件必选 | TND必须传入Q存储长度前缀和；BSND/BNSD不使用，建议传入None；第一个元素为0 | int64 | ND | (B+1,) |
 | cu_seqlens_kv | Tensor | 条件必选 | TND KV必须传入KV存储长度前缀和；BSND/BNSD不使用，建议传入None；PA_BBND/PA_BNBD必须为None | int64 | ND | (B+1,) |
 | seqused_q | Tensor | 条件必选 | BSND/BNSD 必传。TND 下，非量化或 `quant_mode=8` 时可选，INT8 时传 `None`。表示每个 batch 的实际 Q 长度。 | int32 | ND | (B,) |
@@ -524,7 +531,7 @@ cann_ops_transformer.generic_block_sparse_attention(
             <ul>
                 <li>maxKvBlockCount：容量上限见<a href="#产品差异约束">产品差异约束</a></li>
                 <li>非union：block_shape=[1,Y]；union（mask_mode=3）：block_shape=[unionSize,Y]，unionSize当前仅支持8。</li>
-                <li>block_shape=[1,Y]或上述 Union 形态。<term>Ascend 950PR&950DT系列产品</term>非量化与常规 FP8（quant_mode=5，非union）支持1≤Y≤128的任意整数；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>非量化支持1、2、4、8、16、32、64、128。</li>
+                <li>Y的取值范围见表后说明。</li>
             </ul>
         </td>
     </tr>
@@ -653,7 +660,7 @@ mask_mode参数解释见「mask_mode 枚举」。
             <td>
                 <ul>
                     <li>data_type支持INT</li>
-                    <li>支持0（非因果）、1（causal）；<term>Ascend 950PR&950DT系列产品</term> 及<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>的非量化场景另支持3（union），适用范围见<a href="#产品差异约束">产品差异约束</a></li>
+                    <li>支持0（非因果）、1（causal）。模式3（union）的适用范围见<a href="#产品差异约束">产品差异约束</a></li>
                 </ul>
             </td>
             <td>可选输入，默认值为1</td>
@@ -848,7 +855,7 @@ quant_mode参数解释见「quant_mode 枚举」。
     <tbody>
         <tr>
             <td>quant_mode</td>
-            <td>data_type支持INT；当前支持0（非量化）、4（A4C4）、5（FP8）、6（MXFP8）、7（A2/A3 INT8）和8（A8C4）。</td>
+            <td>data_type支持INT；当前支持0（非量化）、4（A4C4）、5（FP8）、6（MXFP8）、7（INT8全量化）和8（A8C4）。</td>
             <td>可选输入，默认值为0</td>
             <td rowspan="5">
                 <ul>
@@ -867,7 +874,7 @@ quant_mode参数解释见「quant_mode 枚举」。
             <td rowspan="3">
                 <ul>
                     <li>quant_mode=0/5 须为 None。quant_mode=8 时，Q scale 固定为 1.0，q_dequant_scale 传 None，K/V scale 为 BF16，形状见入参表。</li>
-                    <li>非量化场景须为None；<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8场景必须提供float32 Tensor</li>
+                    <li>非量化场景须为None；INT8场景必须提供float32 Tensor</li>
                 </ul>
             </td>
             <td rowspan="3">可选参数</td>
@@ -915,7 +922,7 @@ quant_mode参数解释见「quant_mode 枚举」。
             <td>
                 <ul>
                     <li>data_type仅支持BOOL</li>
-                    <li>非量化（quant_mode=0）、A4C4（quant_mode=4）及<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8（quant_mode=7）和 A8C4（quant_mode=8）均支持 False 和 True；<term>Ascend 950PR&950DT系列产品</term> 高精 FP8（quant_mode=5、softmax_precision=0、D=128）支持False/True；<term>Ascend 950PR&950DT系列产品</term> 低精 FP8（quant_mode=5、softmax_precision=1）仅支持False</li>
+                    <li>非量化（quant_mode=0）、A4C4（quant_mode=4）、INT8（quant_mode=7）和 A8C4（quant_mode=8）均支持 False 和 True；高精 FP8（quant_mode=5、softmax_precision=0、D=128）支持False/True；低精 FP8（quant_mode=5、softmax_precision=1）仅支持False</li>
                 </ul>
             </td>
             <td>可选属性，默认值为False</td>

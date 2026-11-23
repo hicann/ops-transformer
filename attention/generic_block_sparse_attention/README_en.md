@@ -110,28 +110,28 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
     <tr>
       <td>qDequantScaleOptional</td>
       <td>Optional input</td>
-      <td><term>Atlas A2 products</term> and <term>Atlas A3 products</term> INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: TND: [Tq,qHeadNum]; BSND: [B,Sq,qHeadNum]; BNSD: [B,qHeadNum,Sq]. For Ascend 950PR&950DT products A8C8 (quantType=6), an E8M0 scale is required; see the A8C8 quantization contract for its shape. For quantType=0/5/8, pass nullptr. A4C4 (quantType=4) requires FLOAT8_E8M0; see the <a href="./docs/aclnnGenericBlockSparseAttention_en.md#a4c4quanttype4">A4C4</a> scale shapes.</td>
-      <td>FLOAT32 (<term>Atlas A2 products</term> and <term>Atlas A3 products</term> INT8) or FLOAT8_E8M0 (Ascend 950PR&950DT products A8C8/A4C4)</td>
+      <td>INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: TND: [Tq,qHeadNum]; BSND: [B,Sq,qHeadNum]; BNSD: [B,qHeadNum,Sq]. For A8C8 (quantType=6), an E8M0 scale is required; see the A8C8 quantization contract for its shape. For quantType=0/5/8, pass nullptr. A4C4 (quantType=4) requires FLOAT8_E8M0; see the <a href="./docs/aclnnGenericBlockSparseAttention_en.md#a4c4quanttype4">A4C4</a> scale shapes.</td>
+      <td>FLOAT32 (INT8) or FLOAT8_E8M0 (A8C8/A4C4)</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>kDequantScaleOptional</td>
       <td>Optional input</td>
-      <td><term>Atlas A2 products</term> and <term>Atlas A3 products</term> INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: PA_BBND/PA_BNBD: [numBlocks,kvHeadNum,128]; TND: [kvHeadNum,Tkv]; BSND/BNSD: [B,kvHeadNum,Sk]. For Ascend 950PR&950DT products A8C8 (quantType=6), an E8M0 scale is required; see the A8C8 quantization contract for its shape. For quantType=0/5, pass nullptr. A8C4 requires an independent BFLOAT16 scale. A4C4 (quantType=4) requires FLOAT8_E8M0; see the <a href="./docs/aclnnGenericBlockSparseAttention_en.md#a4c4quanttype4">A4C4</a> scale shapes.</td>
-      <td>FLOAT32 (<term>Atlas A2 products</term> and <term>Atlas A3 products</term> INT8) or FLOAT8_E8M0 (Ascend 950PR&950DT products A8C8/A4C4), BFLOAT16 (A8C4)</td>
+      <td>INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: PA_BBND/PA_BNBD: [numBlocks,kvHeadNum,128]; TND: [kvHeadNum,Tkv]; BSND/BNSD: [B,kvHeadNum,Sk]. For A8C8 (quantType=6), an E8M0 scale is required; see the A8C8 quantization contract for its shape. For quantType=0/5, pass nullptr. A8C4 requires an independent BFLOAT16 scale. A4C4 (quantType=4) requires FLOAT8_E8M0; see the <a href="./docs/aclnnGenericBlockSparseAttention_en.md#a4c4quanttype4">A4C4</a> scale shapes.</td>
+      <td>FLOAT32 (INT8) or FLOAT8_E8M0 (A8C8/A4C4), BFLOAT16 (A8C4)</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>vDequantScaleOptional</td>
       <td>Optional input</td>
-      <td><term>Atlas A2 products</term> and <term>Atlas A3 products</term> INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: [kvHeadNum,D]. For Ascend 950PR&950DT products A8C8 (quantType=6), an E8M0 scale is required; see the A8C8 quantization contract for its shape. For quantType=0/5, pass nullptr. A8C4 requires an independent BFLOAT16 scale. A4C4 (quantType=4) requires FLOAT8_E8M0; see the <a href="./docs/aclnnGenericBlockSparseAttention_en.md#a4c4quanttype4">A4C4</a> scale shapes.</td>
-      <td>FLOAT32 (<term>Atlas A2 products</term> and <term>Atlas A3 products</term> INT8) or FLOAT8_E8M0 (Ascend 950PR&950DT products A8C8/A4C4), BFLOAT16 (A8C4)</td>
+      <td>INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: [kvHeadNum,D]. For A8C8 (quantType=6), an E8M0 scale is required; see the A8C8 quantization contract for its shape. For quantType=0/5, pass nullptr. A8C4 requires an independent BFLOAT16 scale. A4C4 (quantType=4) requires FLOAT8_E8M0; see the <a href="./docs/aclnnGenericBlockSparseAttention_en.md#a4c4quanttype4">A4C4</a> scale shapes.</td>
+      <td>FLOAT32 (INT8) or FLOAT8_E8M0 (A8C8/A4C4), BFLOAT16 (A8C4)</td>
       <td>ND</td>
     </tr>
     <tr>
       <td>pQuantScaleOptional</td>
       <td>Optional input</td>
-      <td><term>Atlas A2 products</term> and <term>Atlas A3 products</term> INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: [1]. For Ascend 950PR&950DT products A8C8 (quantType=6), P scale is optional FLOAT32 [1], default 16.0. For quantType=0/4/5/8, pass nullptr.</td>
+      <td>INT8 quantization (quantType=7) requires this scale as a contiguous, positive, finite FLOAT32 Tensor. INT8 shape: [1]. For A8C8 (quantType=6), P scale is optional FLOAT32 [1], default 16.0. For quantType=0/4/5/8, pass nullptr.</td>
       <td>FLOAT</td>
       <td>ND</td>
     </tr>
@@ -152,7 +152,7 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
     <tr>
       <td>sequsedQOptional</td>
       <td>Conditionally required input</td>
-      <td>Actual valid query length in each batch. The shape is [B,]. It is required for BSND/BNSD and optional for TND. If it is not passed for TND, the storage length obtained by differencing cu is used. For INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7), TND Q requires nullptr; BSND/BNSD still require this input.</td>
+      <td>Actual valid query length in each batch. The shape is [B,]. It is required for BSND/BNSD and optional for TND. If it is not passed for TND, the storage length obtained by differencing cu is used. For INT8 (quantType=7), TND Q requires nullptr; BSND/BNSD still require this input.</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -173,7 +173,7 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
     <tr>
       <td>blockShape</td>
       <td>Attribute</td>
-      <td>Sparse block shape [blockShapeX, blockShapeY]. Non-union: [1,Y]; union (maskType=3): [8,Y] (currently only 8). On <term>Ascend 950PR&950DT products</term>, non-quantized and regular FP8 (non-union quantType=5) inputs support any integer blockShapeY from 1 to 128; A8C8 supports only the full-tile configurations listed below (Y=4, 8, 16, 32, 64 or 128). Non-quantized inputs on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> support 1, 2, 4, 8, 16, 32, 64, and 128. A4C4 (quantType=4) uses [1,Y] with Y in {4,8,16,32,64,128}.</td>
+      <td>Sparse block shape [blockShapeX, blockShapeY]. Non-union: [1,Y]; union (maskType=3): [8,Y] (currently only 8). See the product-specific notes below for the supported values of Y. A4C4 (quantType=4) uses [1,Y] with Y in {4,8,16,32,64,128}.</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -208,14 +208,14 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
     <tr>
       <td>maskType</td>
       <td>Attribute</td>
-      <td>Mask type. Supports 0 (non-causal) and 1 (causal); <term>Ascend 950PR&950DT products</term> and non-quantized inputs on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> also support 3 (union). For the scope of application, see <a href="#product-specific-constraints">Product-Specific Constraints</a>.</td>
+      <td>Mask type. Supports 0 (non-causal) and 1 (causal). For mask type 3 (Union), see <a href="#product-specific-constraints">Product-Specific Constraints</a>.</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
     <tr>
       <td>quantType</td>
       <td>Attribute</td>
-      <td>Quantization type: 0 for non-quantized inputs, 4 for Ascend 950PR&950DT products A4C4 (MXFP4 CX), 5 for Ascend 950PR&950DT products FP8, 6 for Ascend 950PR&950DT products A8C8, 7 for <term>Atlas A2 products</term> and <term>Atlas A3 products</term> INT8, and 8 for Ascend 950PR&950DT products A8C4. Values 1, 2, and 3 are reserved and unsupported. See product-specific constraints.</td>
+      <td>Quantization type: 0 for non-quantized inputs, 4 for A4C4 (MXFP4 CX), 5 for FP8, 6 for A8C8, 7 for INT8, and 8 for A8C4. Values 1, 2, and 3 are reserved and unsupported. See product-specific constraints.</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -229,7 +229,7 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
     <tr>
       <td>softmaxPrecision</td>
       <td>Attribute</td>
-      <td>Softmax computation precision level. The value is 0 or 1. INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7) requires softmaxPrecision=0.</td>
+      <td>Softmax computation precision level. The value is 0 or 1. INT8 (quantType=7) requires softmaxPrecision=0.</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -250,7 +250,7 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
     <tr>
       <td>returnSoftmaxlse</td>
       <td>Attribute</td>
-      <td>Whether to output softmaxLse. Non-quantized inputs (quantType=0) and A4C4 (quantType=4), INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7) support 0 or 1. On <term>Ascend 950PR&950DT products</term>, high-precision FP8 (regular and Union, quantType=5, softmaxPrecision=0, D=128), A8C8 (quantType=6), and A8C4 (quantType=8) support 0 or 1; regular low-precision FP8 (quantType=5, softmaxPrecision=1) supports only 0.</td>
+      <td>Whether to output softmaxLse. Non-quantized inputs (quantType=0) and A4C4 (quantType=4), and INT8 (quantType=7) support 0 or 1. High-precision FP8 (regular and Union, quantType=5, softmaxPrecision=0, D=128), A8C8 (quantType=6), and A8C4 (quantType=8) support 0 or 1; regular low-precision FP8 (quantType=5, softmaxPrecision=1) supports only 0.</td>
       <td>INT64</td>
       <td>-</td>
     </tr>
@@ -278,15 +278,23 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
     <tr>
       <td>softmaxLseOptional</td>
       <td>Output</td>
-      <td>Softmax log-sum-exp result. Supported for non-quantized inputs (quantType=0), A4C4 (quantType=4), INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7), and, on <term>Ascend 950PR&950DT products</term>, high-precision FP8 (regular and Union, quantType=5, softmaxPrecision=0, D=128), A8C8 (quantType=6), and A8C4 (quantType=8). When returnSoftmaxlse=1, a FLOAT32 Tensor is required, with shape [Tq,qHeadNum,1] for TND or [B,qHeadNum,Sq,1] for BSND/BNSD. When returnSoftmaxlse=0, pass nullptr. Regular low-precision FP8 on <term>Ascend 950PR&950DT products</term> (quantType=5, softmaxPrecision=1) does not support LSE output.</td>
+      <td>Softmax log-sum-exp result. Supported for non-quantized inputs (quantType=0), A4C4 (quantType=4), INT8 (quantType=7), high-precision FP8 (regular and Union, quantType=5, softmaxPrecision=0, D=128), A8C8 (quantType=6), and A8C4 (quantType=8). When returnSoftmaxlse=1, a FLOAT32 Tensor is required, with shape [Tq,qHeadNum,1] for TND or [B,qHeadNum,Sq,1] for BSND/BNSD. When returnSoftmaxlse=0, pass nullptr. Regular low-precision FP8 (quantType=5, softmaxPrecision=1) does not support LSE output.</td>
       <td>FLOAT</td>
       <td>ND</td>
     </tr>
   </tbody>
 </table>
 
-- Sparse block shape [blockShapeX, blockShapeY]: non-union uses X=1; union (maskType=3) uses X=8. For <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, Y supports 1, 2, 4, 8, 16, 32, 64, and 128.
-- For <term>Ascend 950PR&950DT products</term>, non-quant and regular FP8 use `X=1` with `1≤Y≤128`; Union uses `[8,Y]` (`1≤Y≤128`). `A8C8` (`quantType=6`) supports only `[1,4]`, `[1,8]`, `[1,16]`, `[1,32]`, `[1,64]` or `[1,128]`. Union does not support `quantType=6`.
+<!-- npu="A3,910b" id7 -->
+- <term>Atlas A2 products</term> and <term>Atlas A3 products</term>:
+  - `quantType` supports 0 (non-quantized) and 7 (INT8 full quantization).
+  - With non-quantized inputs, blockShapeY supports 1, 2, 4, 8, 16, 32, 64, and 128. Mask type 3 (Union) is also supported.
+<!-- end id7 -->
+<!-- npu="950" id8 -->
+- <term>Ascend 950PR&950DT products</term>:
+  - `quantType` supports 0 (non-quantized), 4 (A4C4), 5 (FP8), 6 (A8C8), and 8 (A8C4).
+  - In non-Union scenarios with non-quantized or regular FP8 inputs, blockShapeY can be any integer from 1 to 128. Union (maskType=3) uses `blockShape=[8,Y]` with `1≤Y≤128`. A8C8 supports `blockShape=[1,Y]` with Y in {4, 8, 16, 32, 64, 128} under the full-tile constraints and does not support Union.
+<!-- end id8 -->
 
 ## Constraints
 
