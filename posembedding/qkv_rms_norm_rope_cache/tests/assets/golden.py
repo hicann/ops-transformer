@@ -25,6 +25,8 @@ PA_NZ 分片;本 golden 只按"输入张量语义 + 输出张量语义"逐步拼
 rope(half-and-half) -> quant -> scatter,布局从 cache 的 shape 反推。
 """
 
+import logging
+
 import numpy as np
 import torch
 
@@ -32,6 +34,8 @@ __spec__ = {
     "qkv_rms_norm_rope_cache": "QkvRmsNormRopeCacheKernelSpec",
     "aclnnQkvRmsNormRopeCache": "QkvRmsNormRopeCacheAclnnSpec",
     "torch.ops.npu.npu_qkv_rms_norm_rope_cache": "QkvRmsNormRopeCacheTorchSpec",
+    # torch_npu.npu_* 是 e2e 用例 CSV 的 api_name 形式；torch.ops.npu.* 是另一套命名，两者都保留以兼容。
+    "torch_npu.npu_qkv_rms_norm_rope_cache": "QkvRmsNormRopeCacheTorchSpec",
 }
 
 _TOL = {
@@ -350,6 +354,34 @@ def _fill_optional(tensors, dtypes):
     return out
 
 
+# `_Compose.__call__` 的入参名兼容表,顺序 = `_impl` 的形参序。
+#
+# 两条通路的传参形态不同:
+#   · GEIR 走**位置参数**(def.cpp 蛇形名),`tensors` 直接对齐 `_impl` 形参;
+#   · aclnn 走**具名参数**:ttk 服务端 `bind_params`
+#     (`ttk/core_modules/common/xpu/binding.py:56`)按形参名绑定,而
+#     `__call__(self, *tensors, **kwargs)` 没有具名形参 —— 所有输入都落进
+#     kwargs、`tensors` 为空,13 个实参全 None,`_impl` 里 `qkv.to(f32)`
+#     抛 `AttributeError: 'NoneType' object has no attribute 'to'`。
+# aclnn 的输入名取自 C 头文件(`aclnn_qkv_rms_norm_rope_cache.h`)驼峰,
+# 且可选张量带 `Optional` 后缀;两套命名都要收。
+_COMPOSE_INPUT_ALIASES = (
+    ("qkv", ("qkv",)),
+    ("q_gamma", ("q_gamma", "qGamma")),
+    ("k_gamma", ("k_gamma", "kGamma")),
+    ("cos", ("cos",)),
+    ("sin", ("sin",)),
+    ("index", ("index",)),
+    ("q_out", ("q_out", "qOut")),
+    ("k_cache", ("k_cache", "kCache")),
+    ("v_cache", ("v_cache", "vCache")),
+    ("k_scale", ("k_scale", "kScale", "kScaleOptional")),
+    ("v_scale", ("v_scale", "vScale", "vScaleOptional")),
+    ("k_offset", ("k_offset", "kOffset", "kOffsetOptional")),
+    ("v_offset", ("v_offset", "vOffset", "vOffsetOptional")),
+)
+
+
 class _Compose:
     """竞品标杆:用 torch 原生算子拼等价语义,在远端 A100 上执行。
 
@@ -496,19 +528,61 @@ class _Compose:
 
         编译失败或运行期异常都逐实例回退 eager —— 三方腿宁可慢,也不能静默缺腿。
         实测 A100 + torch 2.13:编译结果与 eager 逐位一致(max diff 0.0)。
+
+        入参按「位置优先、具名兜底」装配:`bind_params`
+        (`ttk/core_modules/common/xpu/binding.py:56`)对本签名
+        `(*tensors, **kwargs)` 会把所有输入都塞进 kwargs(位置参数为空),
+        故 aclnn 通路必须按 `_COMPOSE_INPUT_ALIASES` 从具名参数补齐 13 个张量;
+        GEIR 通路本就传位置参数,行为保持不变。
         """
         args = list(tensors[:13])
+        if len(args) < 13:
+            # 具名通路(aclnn)补齐:逐槽按别名表从 kwargs 取值,只补位置参数
+            # 不足的那一段 —— 已有位置参数优先,不被 kwargs 覆盖。
+            provided, still_none = [], []
+            for canon, names in _COMPOSE_INPUT_ALIASES[len(args) :]:
+                val = None
+                for n in names:
+                    if n in kwargs:
+                        val = kwargs[n]
+                        break
+                args.append(val)
+                (provided if val is not None else still_none).append(canon)
+            if still_none:
+                logging.warning(
+                    "_Compose: positional args=%d (<13), 具名补齐 provided=%s still_none=%s "
+                    "(accepted kwargs=%s)",
+                    len(tensors),
+                    provided,
+                    still_none,
+                    sorted(
+                        k
+                        for k in kwargs
+                        if k in {n for _, ns in _COMPOSE_INPUT_ALIASES for n in ns}
+                    ),
+                )
         args += [None] * (13 - len(args))
+        # ⚠️ aclnn 通路的属性名同样来自 C 头文件(`qkvSize`/`headNums` 驼峰),
+        # 而 `__init__` 只认 def.cpp 蛇形,不补的话 `_impl` 在
+        # `[int(v) for v in self.qkv_size]` 处对 None 迭代。这里只在缺失时兜底,
+        # GEIR 已带蛇形值 → 原行为不变。
+        picked = _pick(kwargs)
+        if self.qkv_size is None:
+            self.qkv_size = _as_int_list(picked.get("qkv_size"))
+        if self.head_nums is None:
+            self.head_nums = _as_int_list(picked.get("head_nums"))
+
         if self._compiled is None:
             try:
                 self._compiled = torch.compile(self._impl, dynamic=True)
             except Exception:
                 self._compiled = self._impl
         try:
-            return self._compiled(*args)
+            outs = self._compiled(*args)
         except Exception:
             self._compiled = self._impl
-            return self._impl(*args)
+            outs = self._impl(*args)
+        return outs
 
 
 def _to_npu_array(a):
@@ -956,12 +1030,18 @@ class QkvRmsNormRopeCacheTorchSpec:
         ]  # torch schema 只返回 3 个(q_out / k / v)
 
     def customize_inputs(*inputs, **kwargs):
-        """e2e 通路:与 aclnn 同理,index 需原地改写(返回值被 TTK 丢弃)。"""
+        """e2e 通路:与 aclnn 同理,index 需原地改写。
+
+        TTK 契约(core_modules/framework_api/input_generate.py):返回 None 表示原地写法,
+        插件只做就地改写即可。本算子签名含 qkv_size / head_nums 两个 int list,若返回
+        list(inputs),deep_flatten 会把这两个 list 也展开(9 张量 + 4 + 3 = 16),与 CSV 的
+        13 个张量槽对不上,触发 "customize_inputs returned 16 tensor(s), expected 13"。
+        """
         index = inputs[5] if len(inputs) > 5 else None
         new = _prepare(list(inputs), **kwargs)
         if index is not None and hasattr(index, "copy_"):
             index.copy_(new[5])
-        return list(inputs)
+        return None
 
     third_party = {"torch": _Compose}
     tolerance = _TOL

@@ -102,14 +102,12 @@ static bool CheckA5DtypeValid(const aclTensor* qkv, const aclTensor* qGamma, con
     return true;
 }
 
-// arch35(A5)：format 仅支持 ND(否则会被 Contiguous 隐式转换)、不支持空 Tensor
-static bool CheckFormatAndSizeValid(const aclTensor* tensor, const char* name)
+// arch35(A5)：此处仅拦截空 Tensor。
+static bool CheckSizeValid(const aclTensor* tensor, const char* name)
 {
     if (tensor == nullptr) {
         return true;
     }
-    OP_CHECK(tensor->GetViewFormat() == op::Format::FORMAT_ND && tensor->GetStorageFormat() == op::Format::FORMAT_ND,
-             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Tensor %s only supports ND format.", name), return false);
     OP_CHECK(tensor->Numel() > 0, OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Tensor %s must not be empty.", name), return false);
     return true;
 }
@@ -135,7 +133,7 @@ static bool CheckA5FormatAndSizeValid(const aclTensor* qkv, const aclTensor* qGa
                                         "qOutBeforeQuant", "kOutBeforeQuant", "vOutBeforeQuant"};
     // clang-format on
     for (size_t i = 0U; i < sizeof(tensors) / sizeof(tensors[0]); ++i) {
-        if (!CheckFormatAndSizeValid(tensors[i], names[i])) {
+        if (!CheckSizeValid(tensors[i], names[i])) {
             return false;
         }
     }
