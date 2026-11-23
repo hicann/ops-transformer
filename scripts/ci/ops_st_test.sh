@@ -409,10 +409,7 @@ parse_ops_from_filelist() {
     while IFS= read -r file_line; do
         [[ -z "${file_line}" ]] && continue
         file_line=$(echo "${file_line}" | sed 's/^[MADRC]\t//')
-        # Docs-only changes under experimental/ must not trigger the ST gate:
-        # the experimental package has no testable artifact and the experimental
-        # path has no st_skip.flag, so ST would fail closed instead of skipping.
-        if [[ "${file_line}" == experimental/* && "${file_line}" == *.md ]]; then
+        if is_docs_or_tooling_path "${file_line}"; then
             continue
         fi
         local op_name=$(extract_op_from_path "${file_line}" "${op_categories}")
@@ -446,8 +443,6 @@ run_ci_st_check() {
 
     if [[ -z "${ops_list}" ]]; then
         print_warning "No operators parsed from ${pr_file}, skip st_950"
-        echo "need_st=no"
-        return 0
     fi
 
     # <category>/common/... parses to a pseudo op (<category>.common) that has no
@@ -477,7 +472,9 @@ run_ci_st_check() {
     if [[ -n "${mainline_ops}${exp_ops}" ]]; then
         echo "need_st=yes"
     else
-        print_warning "ci_st_check: no runnable operator in ${pr_file}, skip st_950"
+        if [[ -n "${ops_list}" ]]; then
+            print_warning "ci_st_check: no runnable operator in ${pr_file}, skip st_950"
+        fi
         echo "need_st=no"
     fi
     return 0
@@ -520,7 +517,7 @@ usage() {
     echo "    --case_path     (Optional) Custom base path for test cases. If specified, st_path will be {case_path}/\${op_type}/\${op_name}"
     echo "    --testcase, -t  (Optional) Specify testcase name(s) to run (comma-separated). Mutually exclusive; cannot specify both or repeat."
     echo "    --update_ttk    (Optional) Force re-download ops-test-kit by removing existing directory and cloning again."
-    echo "    --ci_st_check   (Optional) Must be used ONLY with --pr_filelist. Parse pr_filelist and decide whether ST is needed; prints 'need_st=yes|no' to stdout and exits (no env/ttk required)."
+    echo "    --ci_st_check   (Optional) Must be used ONLY with --pr_filelist. Parse pr_filelist and decide whether ST is needed; prints 'mainline=yes|no', 'experimental=yes|no', 'need_st=yes|no' to stdout and exits (no env/ttk required)."
     echo "    assets cases    TTK e2e tables under tests/assets[/testcase|/cases] are discovered in addition to tests/st;"
     echo "                    they run with the assets directory as --plugin. Set ST_RUN_PERF_CASES=1 to also run '*perf*' tables."
     echo "    e2e mode        All op categories: tables named '*_graph.csv' run with -c; '*_dyngraph.csv' run with -d."
@@ -779,6 +776,15 @@ is_invalid_case_table() {
     csv_base=$(basename "$1" .csv | tr '[:upper:]' '[:lower:]')
     case "${csv_base}" in
         *exception*|*invalid*) return 0 ;;
+    esac
+    return 1
+}
+
+# Documentation and repository-level tooling do not exercise operator code.
+# Keep operator sources, tests and CMakeLists.txt in the ST scope.
+is_docs_or_tooling_path() {
+    case "$1" in
+        *.md|*.rst|README*|docs/*|*/docs/*|scripts/*|.gitcode/*) return 0 ;;
     esac
     return 1
 }
