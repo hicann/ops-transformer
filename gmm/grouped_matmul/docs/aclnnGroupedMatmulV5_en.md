@@ -464,7 +464,6 @@ aclnnStatus aclnnGroupedMatmulV5(
 | 2 | (K/64 + g, M, 2). The start address offset is the same as that of scale.|
 
 - When x is FLOAT4_E2M1: for groupType=0, K must be an even number and K ≠ 2; for groupType=2, the M axis of x must be an even number, and when K=1, neither M nor N can be 2. When weight is not transposed, N must be an even number.
-- When x is FLOAT4_E2M1 and groupType=2, only the ND format is supported for weight.
 
 </details>
 

@@ -464,7 +464,6 @@ aclnnGroupedMatmulV5默认确定性实现。
 | 2 | `(K/64 + g, M, 2)`，起始地址偏移与scale同理 |
 
 - x为 FLOAT4_E2M1 时：groupType=0 场景 K须为偶数且 K≠2；groupType=2 场景 x的M轴须为偶数，且 K=1 时 M和N均不能为2。weight 非转置时 N须为偶数。
-- x为 FLOAT4_E2M1 且 groupType=2 时，weight 仅支持ND格式。
 
 </details>
 
