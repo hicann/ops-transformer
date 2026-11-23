@@ -8,23 +8,14 @@
 
 """Fused local attention output projection for NG=8/2/1 and ND/NZ weights."""
 
-from collections import OrderedDict
 from dataclasses import dataclass
 from functools import lru_cache
 from math import gcd
 import inspect
-import threading
 
 import cannbotdsl as dsl
-import torch
-
-try:
-    import torch_npu  # noqa: F401 -- register NPU tensors when backend autoload is disabled
-except ImportError:
-    # DSL host/kernel collection may run in a build-only Python without torch_npu.
-    pass
 from cannbotdsl import Buffer, Constexpr, RegLayout, dtypes, make_layout
-from cannbotdsl.aot import export
+from cannbotdsl.aot import compile_cache, export
 from cannbotdsl.ring_buffer import RingBuffer
 from cannbotdsl.lang.constexpr import const_expr
 from cannbotdsl.lang.control_flow import range as dsl_range
@@ -36,8 +27,10 @@ from cannbotdsl.ops import reg
 from cannbotdsl.ops.arch import (
     get_block_idx,
     get_block_num,
+    get_ctrl,
     get_subblock_dim,
     get_subblock_id,
+    set_ctrl,
 )
 from cannbotdsl.ops.matmul import matmul
 from cannbotdsl.ops.memcpy import copy_options, mem_copy
@@ -68,6 +61,7 @@ QUANT_GROUP = 32
 MX_DIVISOR = 64
 FP8 = dtypes.float8_e4m3fn
 E8M0 = dtypes.float8_e8m0
+_L1_NZ_STRIPE_BYTES = 32768
 
 # Cube tiling granularity and legal tile bounds (elements, not bytes).
 BASE_M_ALIGN = 16
@@ -155,6 +149,7 @@ class ProjectionTiles:
     rows: int
     first_n: int
     second_n: int
+    step: int = 0
 
 
 @dataclass(frozen=True)
@@ -232,7 +227,7 @@ def _quant_scales(buffers, ch, m16, vl16b, vl16u):
     one = reg.vdups(1, dtypes.uint8, mask=vl16b)
     even_mask = reg.veqs(reg.vbitwise_and(idx, one, mask=vl16b), 0, mask=vl16b)
     # Scale bytes and reciprocals share the same group exponent reduction.
-    ureg_s = reg.vstore_unalign_begin(buffers.scales)
+    ureg_s = reg.vsqueeze_and_storeunalign_init(buffers.scales)
     for chunk in dsl_range(0, ch, 1):
         x0, x1 = reg.vload_deinterleave(buffers.source, chunk * 256)
         a0 = reg.vbitwise_and(reg.vreinterpret(x0, dtypes.uint16), em, mask=m16)
@@ -242,8 +237,7 @@ def _quant_scales(buffers, ch, m16, vl16b, vl16u):
         e = reg.vmaxs(reg.vshr(gm, 7, mask=m16), 8, mask=m16)
         sb = reg.vsub(e, c8, mask=m16)
         sb8 = reg.vcast(sb, dtypes.uint8, mask=m16, reg_layout=RegLayout.ZERO)
-        sqz = reg.vsqueeze_and_storeunalign_init(sb8, mask=even_mask)
-        reg.vsqueeze_and_storeunalign(buffers.scales, 0, sqz, ureg_s)
+        reg.vsqueeze_and_storeunalign(buffers.scales, 0, sb8, ureg_s, mask=even_mask)
         rev = reg.vshl(reg.vsub(c262, e, mask=m16), 7, mask=m16)
         rev = reg.vselect(
             reg.vdups(0, dtypes.uint16, mask=m16),
@@ -320,6 +314,7 @@ def _operand_channel(
     offset=0,
     data_format=None,
     element_bytes=1,
+    padding=0,
 ):
     """Build an owned channel or identically laid out views of shared storage."""
     if storage is None:
@@ -327,7 +322,7 @@ def _operand_channel(
             location, shape, dtype, depth=depth, data_format=data_format
         )
     buffers = []
-    stride = shape[0] * shape[1] * element_bytes
+    stride = shape[0] * shape[1] * element_bytes + padding
     for slot in range(depth):
         buffers.append(
             _REINTERPRET(
@@ -625,14 +620,25 @@ class MatmulMx:
         else:
             sa_shape, sa_format = (self.base_m, self.scale_k // 32), "zn"
         sb_shape = (self.sk_full, self.base_n)
+        # The 0.8 NZ GM->L1 raw copy zero-fills one 32 KiB stripe past the
+        # destination view. Reserve that stripe per slot so the fill cannot
+        # overwrite the adjacent stage's scales.
+        b_padding = _L1_NZ_STRIPE_BYTES if self.weight_nz and reuse_n else 0
         b_addr = self.base_m * self.k_l1 * 2
-        sa_addr = (self.base_m + reuse_n) * self.k_l1 * 2
+        sa_addr = (self.base_m + reuse_n) * self.k_l1 * 2 + 2 * b_padding
         sb_addr = sa_addr + self.base_m * self.sk_full
         self.l1_a = _operand_channel(
             storage, MemLoc.L1, a_shape, FP8, 2, data_format="nz"
         )
         self.l1_b = _operand_channel(
-            storage, MemLoc.L1, b_shape, FP8, 2, offset=b_addr, data_format="nz"
+            storage,
+            MemLoc.L1,
+            b_shape,
+            FP8,
+            2,
+            offset=b_addr,
+            data_format="nz",
+            padding=b_padding,
         )
         self.l1_sa = _operand_channel(
             storage, MemLoc.L1, sa_shape, E8M0, 1, offset=sa_addr, data_format=sa_format
@@ -1054,58 +1060,14 @@ class RopeQuant:
         )
 
 
-_SCRATCH = OrderedDict()
-SCRATCH_LOCK = threading.RLock()
-_CACHE_LIMIT = 8
-
-
-def get_scratch(device, t, capture, ng=NG):
-    """Reuse four byte workspaces per device/stream/shape; capture allocates in its graph pool."""
-    stream = torch.npu.current_stream(device)
-    key = (device, stream.npu_stream, t, ng)
-    # Capture gets graph-pool storage, independent of eager calls and other graphs.
-    with SCRATCH_LOCK:
-        if not capture and key in _SCRATCH:
-            _SCRATCH.move_to_end(key)
-            return _SCRATCH[key]
-        m = (t + 15) // 16 * 16
-        k = ng * O_LORA
-        rows = ng * m
-        specs = [
-            ((rows, 4096), torch.uint8),
-            ((rows, 128), torch.uint8),
-            ((m, k), torch.uint8),
-            ((m, k // 32), torch.uint8),
-        ]
-        buffers = tuple(
-            torch.empty(shape, dtype=dtype, device=device) for shape, dtype in specs
-        )
-        if not capture:
-            _SCRATCH[key] = buffers
-            if len(_SCRATCH) > _CACHE_LIMIT:
-                _SCRATCH.popitem(last=False)
-        return buffers
-
-
-def projection_shape(x, woa, wob):
-    """Read static dispatch metadata; callers supply tensors matching the documented contract."""
-    t, heads, dim = x.shape
-    if t < 1 or heads not in (8, 16, 64) or dim != HEAD_DIM:
-        raise ValueError("x must have shape (T>=1, H, 512), H in (8, 16, 64)")
-    return ProjectionShape(t, heads // 8, woa.shape[-1] == O_LORA, wob.shape[-1] == DIM)
-
-
-def core_budget(ref):
-    """Return (device, AIC blocks, AIV blocks) without caching stream quotas."""
-    device = ref.device.index
-    if device is None:
-        device = torch.npu.current_device()
-    info = dsl.get_platform_info(stream=torch.npu.current_stream(device))
+def core_budget():
+    """Return the MIX launch quota of the current stream without caching it."""
+    info = dsl.get_platform_info()
     cube, vector = int(info.cube_core_num), int(info.vector_core_num)
     if cube <= 0 or vector < 2:
         raise RuntimeError(f"Invalid MIX core quota: AIC={cube}, AIV={vector}")
     # A MIX block uses one AIC and two AIV on the supported architecture.
-    return device, min(cube, vector // 2), vector
+    return min(cube, vector // 2)
 
 
 def _tile_fits(base_m, base_n, k):
@@ -1122,8 +1084,34 @@ def _tile_fits(base_m, base_n, k):
     return (base_m + base_n) * (BASE_K * FP32_BYTES + k // QUANT_GROUP) <= L1_BYTES
 
 
+def _nz_resources(base_m, base_n1, base_n2, k_max, k_min):
+    """Pick the largest K window whose padded NZ slots still fit L1.
+
+    The private NZ B slots reserve two 32 KiB copy stripes.  Keep the M/N
+    tiles when possible by shrinking the K window before falling back to a
+    smaller M tile.
+    """
+    step_k, depth1, depth2 = _matmul_resources(base_m, base_n1, base_n2, k_max, k_min)
+    reuse_n = max(base_n1, base_n2)
+    stripes = 2 * _L1_NZ_STRIPE_BYTES if base_n1 != base_n2 else 0
+    scale_full = (k_max // 64) * 2
+    while step_k > 0:
+        k_l1 = BASE_K * step_k
+        total = (
+            2 * base_m * k_l1
+            + 2 * reuse_n * k_l1
+            + stripes
+            + base_m * scale_full
+            + reuse_n * scale_full
+        )
+        if total <= L1_BYTES:
+            return step_k, depth1, depth2
+        step_k //= 2
+    return None
+
+
 @lru_cache(maxsize=1024)
-def tiling_for_cores(block_num, t=72, m_pad=None, ng=NG):
+def tiling_for_cores(block_num, t=72, m_pad=None, ng=NG, nz=False):
     """Select M/N tiles from the stream core quota and Cube buffer limits."""
     block_num, t = int(block_num), int(t)
     if block_num <= 0 or t <= 0:
@@ -1164,11 +1152,19 @@ def tiling_for_cores(block_num, t=72, m_pad=None, ng=NG):
             best = min(stage)
             score += best[0]
             selected.append(best[2])
-        candidates.append((score, -base_m, selected[0], selected[1]))
+        step = 0
+        if nz:
+            resources = _nz_resources(
+                base_m, selected[0], selected[1], k_max, min(F // 2, ng * O_LORA)
+            )
+            if resources is None:
+                continue
+            step = resources[0]
+        candidates.append((score, -base_m, selected[0], selected[1], step))
     if not candidates:
         raise ValueError("no projection tile fits the configured Cube buffers")
-    _, negative_m, n1, n2 = min(candidates)
-    return -negative_m, n1, n2
+    _, negative_m, n1, n2, step = min(candidates)
+    return -negative_m, n1, n2, step
 
 
 def _matmul_resources(base_m, base_n1, base_n2, k=NG * O_LORA, k_min=None):
@@ -1223,6 +1219,8 @@ class AttnEpilogueKernel:
             self.max_k,
             k_min=min(self.f // 2, self.ng * self.o_lora),
         )
+        if tiling.step:
+            self.step_k = int(tiling.step)
         mm1_tiles = (
             self.ng
             * ((self.t + self.base_m - 1) // self.base_m)
@@ -1270,6 +1268,11 @@ class AttnEpilogueKernel:
         gm_out,
     ):
         """Fuse RoPE/QuantA, grouped MM1/QuantY, and MM2 with explicit producer barriers."""
+        saved_ctrl = get_ctrl()
+        fp8_saturation_mask = 1 << 48
+        set_ctrl(
+            saved_ctrl - (saved_ctrl // fp8_saturation_mask % 2) * fp8_saturation_mask
+        )
         t = self.t
         ng = self.ng
         m_pad = self.m_pad
@@ -1313,6 +1316,7 @@ class AttnEpilogueKernel:
             gm_out,
             MatmulShape(1, self.dim, k2, m_pad),
         )
+        set_ctrl(saved_ctrl)
 
     @jit
     def _first_matmul(self):
@@ -1511,90 +1515,51 @@ class AttnEpilogue:
         )
 
 
-_COMPILED = {}
-
-
-def _compiled(shape, m_pad, *, device, block_num):
-    """Reuse the compiled handle first; derive tiling and TensorSpecs only on a cache miss."""
-    t, ng = shape.t, shape.ng
-    f, o_lora, dim = F, O_LORA, DIM
-    key = (device, block_num, shape, m_pad)
-    if key not in _COMPILED:
-        base_m, base_n1, base_n2 = tiling_for_cores(block_num, t=t, ng=ng)
-        fp8_dtype = dtypes.float8_e4m3fn
-        k2 = ng * o_lora
-        _COMPILED[key] = dsl.compile(
-            AttnEpilogue(
-                shape,
-                m_pad,
-                ProjectionTiles(base_m, base_n1, base_n2),
-            ).run,
-            dsl.TensorSpec((t * ng, f), dtypes.bfloat16),
-            dsl.TensorSpec((t, ROPE_DIM), dtypes.float32),
-            dsl.TensorSpec((t, ROPE_DIM), dtypes.float32),
-            dsl.TensorSpec(
-                (ng, f, o_lora) if shape.first_nz else (ng * o_lora, f),
-                fp8_dtype,
-                storage_format="nz" if shape.first_nz else "nd",
-            ),
-            dsl.TensorSpec(
-                (ng, f // MX_DIVISOR, o_lora, 2)
-                if shape.first_nz
-                else (ng * o_lora, f // MX_DIVISOR, 2),
-                dtypes.uint8,
-            ),
-            dsl.TensorSpec(
-                (k2, dim) if shape.second_nz else (dim, k2),
-                fp8_dtype,
-                storage_format="nz" if shape.second_nz else "nd",
-            ),
-            dsl.TensorSpec(
-                (k2 // MX_DIVISOR, dim, 2)
-                if shape.second_nz
-                else (dim, k2 // MX_DIVISOR, 2),
-                dtypes.uint8,
-            ),
-            dsl.TensorSpec((ng * m_pad, f), dtypes.uint8),
-            dsl.TensorSpec((ng * m_pad, f // QUANT_GROUP), dtypes.uint8),
-            dsl.TensorSpec((m_pad, k2), dtypes.uint8),
-            dsl.TensorSpec((m_pad, k2 // QUANT_GROUP), dtypes.uint8),
-            dsl.TensorSpec((m_pad, dim), dtypes.bfloat16),
-            block_num,
-        )
-    return _COMPILED[key]
-
-
-def attn_epilogue(x, woa, wob, descale_woa, descale_wob, rope_sin, rope_cos):
-    """Project BF16 [T, NG*8, 512] to [T, 5120] using prequantized ND/NZ weights.
-
-    The caller supplies contiguous tensors on one NPU with the shapes/dtypes
-    documented in README. Only activation dimensions are checked here; tensor
-    metadata and private-format scans are intentionally absent from the hot path.
-    """
-    shape = projection_shape(x, woa, wob)
-    t, ng = shape.t, shape.ng
-    m = (t + 15) // 16 * 16
-    with torch.npu.device(x.device):
-        scratch = get_scratch(x.device, t, torch.npu.is_current_stream_capturing(), ng)
-        out = torch.empty((m, DIM), dtype=torch.bfloat16, device=x.device)
-        device, blocks, _ = core_budget(x)
-        _compiled(shape, m, device=device, block_num=blocks)(
-            x.view(t * ng, F),
-            rope_cos,
-            rope_sin,
-            woa if shape.first_nz else woa.view(ng * O_LORA, F),
-            descale_woa.view(torch.uint8)
-            if shape.first_nz
-            else descale_woa.view(torch.uint8).view(ng * O_LORA, F // MX_DIVISOR, 2),
-            wob,
-            descale_wob.view(torch.uint8),
-            scratch[0],
-            scratch[1],
-            scratch[2],
-            scratch[3],
-            out,
-        )
-        return out[:t]
+@compile_cache
+def _get_compiled(t, ng, first_nz, second_nz, m_pad, block_num):
+    """Share compilation, caching and AOT export with the Torch runtime entry."""
+    shape = ProjectionShape(t, ng, first_nz, second_nz)
+    base_m, base_n1, base_n2, step = tiling_for_cores(
+        block_num, t=t, ng=ng, nz=first_nz or second_nz
+    )
+    fp8_dtype = dtypes.float8_e4m3fn
+    k2 = ng * O_LORA
+    return dsl.compile(
+        AttnEpilogue(
+            shape,
+            m_pad,
+            ProjectionTiles(base_m, base_n1, base_n2, step),
+        ).run,
+        dsl.TensorSpec((t * ng, F), dtypes.bfloat16),
+        dsl.TensorSpec((t, ROPE_DIM), dtypes.float32),
+        dsl.TensorSpec((t, ROPE_DIM), dtypes.float32),
+        dsl.TensorSpec(
+            (ng, F, O_LORA) if first_nz else (ng * O_LORA, F),
+            fp8_dtype,
+            storage_format="nz" if first_nz else "nd",
+        ),
+        dsl.TensorSpec(
+            (ng, F // MX_DIVISOR, O_LORA, 2)
+            if first_nz
+            else (ng * O_LORA, F // MX_DIVISOR, 2),
+            dtypes.uint8,
+        ),
+        dsl.TensorSpec(
+            (k2, DIM) if second_nz else (DIM, k2),
+            fp8_dtype,
+            storage_format="nz" if second_nz else "nd",
+        ),
+        dsl.TensorSpec(
+            (k2 // MX_DIVISOR, DIM, 2) if second_nz else (DIM, k2 // MX_DIVISOR, 2),
+            dtypes.uint8,
+        ),
+        dsl.TensorSpec((ng * m_pad, F), dtypes.uint8),
+        dsl.TensorSpec((ng * m_pad, F // QUANT_GROUP), dtypes.uint8),
+        dsl.TensorSpec((m_pad, k2), dtypes.uint8),
+        dsl.TensorSpec((m_pad, k2 // QUANT_GROUP), dtypes.uint8),
+        dsl.TensorSpec((m_pad, DIM), dtypes.bfloat16),
+        block_num,
+    )
 
 
 @export("attn_epilogue")
@@ -1643,19 +1608,5 @@ def export_attn_epilogue():
                         bool(entry.get("second_nz", layout == "nz")),
                     )
                 )
-    handles = []
-    try:
-        for block_num, t, ng, first_nz, second_nz in dict.fromkeys(profiles):
-            shape = ProjectionShape(t, ng, first_nz, second_nz)
-            handles.append(
-                _compiled(
-                    shape,
-                    (t + 15) // 16 * 16,
-                    device=0,
-                    block_num=block_num,
-                )
-            )
-    finally:
-        for handle in handles:
-            handle.close()
-        _COMPILED.clear()
+    for block_num, t, ng, first_nz, second_nz in dict.fromkeys(profiles):
+        _get_compiled(t, ng, first_nz, second_nz, (t + 15) // 16 * 16, block_num)

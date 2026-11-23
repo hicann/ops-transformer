@@ -35,22 +35,20 @@ HIDDEN = 2048
 _OP_DIR = Path(__file__).resolve().parents[2]
 _OP_DSL = _OP_DIR / "op_dsl"
 _OP_MODULE = None
-_IMPORTED = None
 
 
 def _module():
-    global _OP_MODULE, _IMPORTED
+    global _OP_MODULE
     if _OP_MODULE is None:
-        if str(_OP_DSL) not in sys.path:
-            sys.path.insert(0, str(_OP_DSL))
-        _OP_MODULE = importlib.import_module("fused_qkv_proj_norm_rope_cache")
-        _IMPORTED = _OP_MODULE.fused_qkv_proj_norm_rope_cache
+        _torch_extension_module()
+        _OP_MODULE = sys.modules[
+            "fused_qkv_torch_extension_test.op_dsl.fused_qkv_proj_norm_rope_cache"
+        ]
     return _OP_MODULE
 
 
 def _implementation():
-    _module()
-    return _IMPORTED
+    return _torch_extension_module()._fused_qkv_proj_norm_rope_cache_impl
 
 
 def _device():
@@ -300,18 +298,27 @@ def test_stream_quota_change_recompiles():
     inputs = make_inputs(case)
     expected = golden(*inputs, 1e-6, True)
     stream = torch.npu.current_stream()
-    module = _module()
+    factory = _module()._get_compiled
+
+    def cached_quotas():
+        quotas = set()
+        for key in factory._cache:
+            config = {name: value for name, _kind, value in key[0]}
+            quotas.add(config["block_num"])
+        return quotas
+
     try:
         torch.npu.set_stream_limit(stream, 32, 64)
         wide = _run_operator(inputs, case)
-        keys = [key[3] for key in module._COMPILED]
-        assert 32 in keys, "32-AIC quota must be part of the compile cache key"
+        assert 32 in cached_quotas(), (
+            "32-AIC quota must be part of the compile cache key"
+        )
 
         torch.npu.set_stream_limit(stream, 8, 16)
         narrow = _run_operator(inputs, case)
-        keys = [key[3] for key in module._COMPILED]
-        assert 8 in keys, "8-AIC quota must compile a separate program"
-        assert 32 in keys, "the wider program must remain independently cached"
+        quotas = cached_quotas()
+        assert 8 in quotas, "8-AIC quota must compile a separate program"
+        assert 32 in quotas, "the wider program must remain independently cached"
 
         for got, ref in zip(wide, expected):
             torch.testing.assert_close(

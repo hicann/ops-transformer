@@ -26,9 +26,6 @@ torch_npu = pytest.importorskip("torch_npu")
 
 _OP_DIR = Path(__file__).resolve().parents[2]
 _OP_DSL = _OP_DIR / "op_dsl"
-if str(_OP_DSL) not in sys.path:
-    sys.path.insert(0, str(_OP_DSL))
-op = importlib.import_module("attn_epilogue")
 
 
 def _torch_extension_module():
@@ -79,10 +76,10 @@ def _torch_extension_module():
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
-    return module
+    return module.attn_epilogue
 
 
-_torch_extension_module()
+op = _torch_extension_module()
 
 
 def _graph_entry(*args):
@@ -188,14 +185,14 @@ def test_attn_epilogue(t, ng, nz):
     weights = _weights(ng)
     expected = _native(x, sin, cos, weights)
     args = (x.npu(), *(_as_nz(weights) if nz else weights), sin.npu(), cos.npu())
-    actual = op.attn_epilogue(*args)
+    actual = op(*args)
     torch.testing.assert_close(
         actual.view(torch.int16).cpu(), expected.view(torch.int16).cpu(), rtol=0, atol=0
     )
     if ng == 1 and nz:
         graph = torch.npu.NPUGraph()
         with torch.npu.graph(graph):
-            captured = op.attn_epilogue(*args)
+            captured = op(*args)
         graph.replay()
         torch.npu.synchronize()
         torch.testing.assert_close(
