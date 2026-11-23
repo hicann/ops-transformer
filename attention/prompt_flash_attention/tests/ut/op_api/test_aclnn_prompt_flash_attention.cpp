@@ -55,6 +55,24 @@ TEST_F(prompt_flash_attention_opapi_ut, prompt_flash_attention_aclnn_950_unsuppo
     op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
 }
 
+// dav5102 reject
+TEST_F(prompt_flash_attention_opapi_ut, prompt_flash_attention_aclnn_5102_unsupported)
+{
+    op::ScopedPlatformNpuArch guard(NpuArch::DAV_5102);
+    char inputLayout[] = "BNSD";
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+
+    aclnnStatus aclRet =
+        aclnnPromptFlashAttentionGetWorkspaceSize(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 8, 1.0,
+                                                  INT64_MAX, 0, inputLayout, 8, nullptr, &workspaceSize, &executor);
+    EXPECT_EQ(aclRet, ACLNN_ERR_RUNTIME_ERROR);
+    EXPECT_EQ(executor, nullptr);
+
+    aclRet = aclnnPromptFlashAttention(nullptr, 0, nullptr, nullptr);
+    EXPECT_EQ(aclRet, ACLNN_ERR_RUNTIME_ERROR);
+}
+
 // BNSD layout, FP16, no mask, standard MHA (N_q == N_kv)
 TEST_F(prompt_flash_attention_opapi_ut, prompt_flash_attention_aclnn_0)
 {

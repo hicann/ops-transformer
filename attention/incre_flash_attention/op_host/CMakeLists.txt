@@ -16,8 +16,6 @@ if (BUILD_OPEN_PROJECT)
     )
 endif()
 
-set(incre_flash_attention_mc62_arch_directory arch38 CACHE INTERNAL "incre_flash_attention mc62 arch")
-
 set(incre_flash_attention_compile_options
     --cce-auto-sync=off
     -Wno-deprecated-declarations

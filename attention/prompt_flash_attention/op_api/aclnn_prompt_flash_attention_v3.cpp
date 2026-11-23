@@ -19,6 +19,7 @@
 #include "opdev/fast_vector.h"
 #include "opdev/op_errno.h"
 #include "opdev/op_executor.h"
+#include "base/err_msg.h"
 
 using namespace op;
 
@@ -43,6 +44,14 @@ aclnnStatus aclnnPromptFlashAttentionV3GetWorkspaceSize(
                 "Interface aclnnPromptFlashAttention versions V1 to V3 are no longer supported on Ascend950.");
         return ACLNN_ERR_RUNTIME_ERROR;
     }
+    if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_5102) {
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1009", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{
+                "aclnnPromptFlashAttentionV3",
+                "Interface aclnnPromptFlashAttention versions V1 to V3 are no longer supported on Ascend5102."}));
+        return ACLNN_ERR_RUNTIME_ERROR;
+    }
     return InnerPromptFlashAttentionGetWorkspaceSize(
         query, key, value, pseShift, attenMask, actualSeqLengths, actualSeqLengthsKv, deqScale1, quantScale1, deqScale2,
         quantScale2, quantOffset2, numHeads, scaleValue, preTokens, nextTokens, inputLayout, numKeyValueHeads,
@@ -55,6 +64,14 @@ aclnnStatus aclnnPromptFlashAttentionV3(void* workspace, uint64_t workspaceSize,
     if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
         OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
                 "Interface aclnnPromptFlashAttention versions V1 to V3 are no longer supported on Ascend950.");
+        return ACLNN_ERR_RUNTIME_ERROR;
+    }
+    if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_5102) {
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1009", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{
+                "aclnnPromptFlashAttentionV3",
+                "Interface aclnnPromptFlashAttention versions V1 to V3 are no longer supported on Ascend5102."}));
         return ACLNN_ERR_RUNTIME_ERROR;
     }
     return InnerPromptFlashAttention(workspace, workspaceSize, executor, stream);

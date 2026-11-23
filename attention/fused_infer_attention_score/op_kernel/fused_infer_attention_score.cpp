@@ -28,13 +28,7 @@
 #if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3003 || __NPU_ARCH__ == 3113))
 #include "arch31/fused_infer_attention_score_arch31.cpp"
 #elif (__NPU_ARCH__ == 5102)
-#ifdef NOT_DYNAMIC_COMPILE
-#include "../../prompt_flash_attention/op_kernel/arch38/prompt_flash_attention_entry_regbase.h"
-#include "../../incre_flash_attention/op_kernel/incre_flash_attention.cpp"
-#else
-#include "../prompt_flash_attention/arch38/prompt_flash_attention_entry_regbase.h"
-#include "../incre_flash_attention/incre_flash_attention.cpp"
-#endif
+#include "arch38/fia_arch38_entry_regbase.h"
 
 #else
 #ifdef NOT_DYNAMIC_COMPILE
@@ -75,12 +69,12 @@ extern "C" __global__ __aicore__ void fused_infer_attention_score(
         keySharedPrefix, valueSharedPrefix, actualSharedPrefixLen, queryRope, keyRope, keyRopeAntiquantScale,
         dequantScaleQuery, learnableSink, qStartIdx, kvStartIdx, attentionOut, softmaxLse, workspace, tiling);
 #elif (__NPU_ARCH__ == 5102)
-    prompt_flash_attention_FIAS_regbase(
-        query, key, value, pse_shift, attenMask, actualSeqLengths, actualSeqLengthsKV, deq_scale1, quant_scale1,
-        deq_scale2, quant_scale2, quant_offset2, antiquantScale, antiquantOffset, blocktable, queryPaddingSize,
-        kvPaddingSize, keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset,
-        keySharedPrefix, valueSharedPrefix, actualSharedPrefixLen, queryRope, keyRope, dequantScaleQuery, attentionOut,
-        softmaxLse, workspace, tiling);
+    fia_arch38_regbase(query, key, value, pse_shift, attenMask, actualSeqLengths, actualSeqLengthsKV, deq_scale1,
+                       quant_scale1, deq_scale2, quant_scale2, quant_offset2, antiquantScale, antiquantOffset,
+                       blocktable, queryPaddingSize, kvPaddingSize, keyAntiquantScale, keyAntiquantOffset,
+                       valueAntiquantScale, valueAntiquantOffset, keySharedPrefix, valueSharedPrefix,
+                       actualSharedPrefixLen, queryRope, keyRope, dequantScaleQuery, attentionOut, softmaxLse,
+                       workspace, tiling);
 #else
     if (TILING_KEY_VAR >= FAI_FLAG_TILING) {
 #if ((ORIG_DTYPE_QUERY == DT_FLOAT16) && (ORIG_DTYPE_ATTENTION_OUT == DT_FLOAT16) && \

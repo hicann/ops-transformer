@@ -20,11 +20,7 @@
 #include "kernel_operator.h"
 #endif
 
-#if (__NPU_ARCH__ == 5102)
-#include "arch38/prompt_flash_attention_entry_regbase.h"
-#else
 #include "prompt_flash_attention_arch22.h"
-#endif
 
 extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
@@ -39,21 +35,12 @@ extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(
     __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling)
 {
     {
-#if (__NPU_ARCH__ == 5102)
-        prompt_flash_attention_FIAS_regbase(
-            query, key, value, pseShift, attenMask, actualSeqLengths, actualSeqLengthsKV, deq_scale1, quant_scale1,
-            deq_scale2, quant_scale2, quant_offset2, antiquant_scale, antiquant_offset, blocktable, queryPaddingSize,
-            kvPaddingSize, key_antiquant_scale, key_antiquant_offset, value_antiquant_scale, value_antiquant_offset,
-            keySharedPrefix, valueSharedPrefix, actualSharedPrefixLen, queryRope, keyRope, dequantScaleQuery,
-            attentionOut, softmaxLse, workspace, tiling);
-#else
         prompt_flash_attention_FIAS_arch22(
             query, key, value, pseShift, attenMask, actualSeqLengths, actualSeqLengthsKV, deq_scale1, quant_scale1,
             deq_scale2, quant_scale2, quant_offset2, antiquant_scale, antiquant_offset, blocktable, queryPaddingSize,
             kvPaddingSize, key_antiquant_scale, key_antiquant_offset, value_antiquant_scale, value_antiquant_offset,
             keySharedPrefix, valueSharedPrefix, actualSharedPrefixLen, queryRope, keyRope, dequantScaleQuery,
             learnableSink, attentionOut, softmaxLse, workspace, tiling);
-#endif
     }
 }
 

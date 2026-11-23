@@ -9,29 +9,26 @@
  */
 
 /*!
- * \file prompt_flash_attention_entry_regbase.h
+ * \file fia_arch38_entry_regbase.h
  * \brief
  */
 
-#ifndef PROMPT_FLASH_ATTENTION_ENTRY_ARCH38_H_
-#define PROMPT_FLASH_ATTENTION_ENTRY_ARCH38_H_
+#ifndef FIA_ARCH38_ENTRY_REGBASE_H_
+#define FIA_ARCH38_ENTRY_REGBASE_H_
 
-#include "../../../common/op_kernel/arch38/flash_attention_score_kernel_infer_regbase_v2.h"
-#include "prompt_flash_attention_dummy.h"
+#include "flash_attention_score_kernel_infer_regbase_v2.h"
+#include "fia_arch38_dummy.h"
 namespace optiling {};
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define PFA_REGBASE_COPY_TILING_DATA(tiling) \
-    GET_TILING_DATA_WITH_STRUCT(FlashAttentionScoreSimplifiedTilingData, tilingDataIn, tiling); \
-    const FlashAttentionScoreSimplifiedTilingData* __restrict tilingData = &tilingDataIn;
-
-#define INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(templateClass, ...) \
+#define INVOKE_FIA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(templateClass, ...) \
     do { \
         if (query == nullptr) { \
             return; \
         } \
-        PFA_REGBASE_COPY_TILING_DATA(tiling); \
+        GET_TILING_DATA_WITH_STRUCT(FlashAttentionScoreSimplifiedTilingData, tilingDataIn, tiling); \
+        const FlashAttentionScoreSimplifiedTilingData* __restrict tilingData = &tilingDataIn; \
         TPipe tPipe; \
         using CubeBlockType = BaseApi::FABlockCube<__VA_ARGS__>; \
         using VecBlockType = BaseApi::FABlockVecInfer<__VA_ARGS__>; \
@@ -44,17 +41,18 @@ namespace optiling {};
     } while (0)
 
 // kv is empty tensor, return zero output
-#define INVOKE_PFA_DUMMY(templateClass, ...) \
+#define INVOKE_FIA_DUMMY(templateClass, ...) \
     do { \
         TPipe tPipe; \
-        PFA_REGBASE_COPY_TILING_DATA(tiling); \
-        PromptFlashAttentionDummy<half> op; \
+        GET_TILING_DATA_WITH_STRUCT(FlashAttentionScoreSimplifiedTilingData, tilingDataIn, tiling); \
+        const FlashAttentionScoreSimplifiedTilingData* __restrict tilingData = &tilingDataIn; \
+        FiaArch38Dummy<half> op; \
         op.Init(attentionOut, tilingData); \
         op.Process(); \
         return \
     } while (0)
 
-inline __aicore__ void prompt_flash_attention_FIAS_regbase(
+inline __aicore__ void fia_arch38_regbase(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
     __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
     __gm__ uint8_t* deq_scale1, __gm__ uint8_t* quant_scale1, __gm__ uint8_t* deq_scale2,
@@ -91,98 +89,98 @@ inline __aicore__ void prompt_flash_attention_FIAS_regbase(
 
 #if TILING_KEY_VAR == 1002312000040001212
     // BNSD layout HighPerformance, No mask, No pse, 常量化, D128, useDn
-    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+    INVOKE_FIA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
         BaseApi::FlashAttentionScoreKernelInferRegbaseV2, int8_t, half, half, ImplModeEnum::AA_HIGH_PERFORMANCE,
         LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned128, S2TemplateType::Aligned128, DTemplateType::Aligned128,
         DTemplateType::Aligned128, PseTypeEnum::PSE_NONE_TYPE, false, false, false, true, false, false);
 #elif TILING_KEY_VAR == 1002312000040021212
     // BNSD layout HighPerformance, No mask, No pse, 常量化, D128, useDn
-    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+    INVOKE_FIA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
         BaseApi::FlashAttentionScoreKernelInferRegbaseV2, int8_t, half, int8_t, ImplModeEnum::AA_HIGH_PERFORMANCE,
         LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned128, S2TemplateType::Aligned128, DTemplateType::Aligned128,
         DTemplateType::Aligned128, PseTypeEnum::PSE_NONE_TYPE, false, false, false, true, false, false);
 #elif TILING_KEY_VAR == 1001311000000001212
     // BNSD layout HighPerformance, No mask, No pse, 常量化, D128
-    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+    INVOKE_FIA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
         BaseApi::FlashAttentionScoreKernelInferRegbaseV2, int8_t, half, half, ImplModeEnum::AA_HIGH_PERFORMANCE,
         LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned128, S2TemplateType::Aligned128, DTemplateType::Aligned64,
         DTemplateType::Aligned64, PseTypeEnum::PSE_NONE_TYPE, false, false, false, true, false, false);
 #elif TILING_KEY_VAR == 1001311000000021212
     // BNSD layout HighPerformance, No mask, No pse, 常量化, D64
-    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+    INVOKE_FIA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
         BaseApi::FlashAttentionScoreKernelInferRegbaseV2, int8_t, half, int8_t, ImplModeEnum::AA_HIGH_PERFORMANCE,
         LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned128, S2TemplateType::Aligned128, DTemplateType::Aligned64,
         DTemplateType::Aligned64, PseTypeEnum::PSE_NONE_TYPE, false, false, false, true, false, false);
 #elif TILING_KEY_VAR == 1002122000000021012
     // BNSD layout HighPerformance, No mask, No pse, 常量化, D128
-    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+    INVOKE_FIA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
         BaseApi::FlashAttentionScoreKernelInferRegbaseV2, half, half, int8_t, ImplModeEnum::AA_HIGH_PERFORMANCE,
         LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned64, S2TemplateType::Aligned256, DTemplateType::Aligned128,
         DTemplateType::Aligned128, PseTypeEnum::PSE_NONE_TYPE, false, false, false, true, false, false);
 #elif TILING_KEY_VAR == 1001121000000021012
     // BNSD layout HighPerformance, No mask, No pse, 常量化, D64, S1Base=64, S2Base=256, int8输出
-    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+    INVOKE_FIA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
         BaseApi::FlashAttentionScoreKernelInferRegbaseV2, half, half, int8_t, ImplModeEnum::AA_HIGH_PERFORMANCE,
         LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned64, S2TemplateType::Aligned256, DTemplateType::Aligned64,
         DTemplateType::Aligned64, PseTypeEnum::PSE_NONE_TYPE, false, false, false, true, false, false);
 #elif TILING_KEY_VAR == 1002312000100001212
     // BNSD layout HighPerformance, With mask, ND, No pse, 常量化, D128
-    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+    INVOKE_FIA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
         BaseApi::FlashAttentionScoreKernelInferRegbaseV2, int8_t, half, half, ImplModeEnum::AA_HIGH_PERFORMANCE,
         LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned128, S2TemplateType::Aligned128, DTemplateType::Aligned128,
         DTemplateType::Aligned128, PseTypeEnum::PSE_NONE_TYPE, true, false, false, true, false, false);
 #elif TILING_KEY_VAR == 1002312000100021212
     // BNSD layout HighPerformance, With mask, ND, No pse, 常量化, D128, out int8
-    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+    INVOKE_FIA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
         BaseApi::FlashAttentionScoreKernelInferRegbaseV2, int8_t, half, int8_t, ImplModeEnum::AA_HIGH_PERFORMANCE,
         LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned128, S2TemplateType::Aligned128, DTemplateType::Aligned128,
         DTemplateType::Aligned128, PseTypeEnum::PSE_NONE_TYPE, true, false, false, true, false, false);
 #elif TILING_KEY_VAR == 1001311000100001212
     // BNSD layout HighPerformance, With mask, ND, No pse, 常量化, D64
-    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+    INVOKE_FIA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
         BaseApi::FlashAttentionScoreKernelInferRegbaseV2, int8_t, half, half, ImplModeEnum::AA_HIGH_PERFORMANCE,
         LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned128, S2TemplateType::Aligned128, DTemplateType::Aligned64,
         DTemplateType::Aligned64, PseTypeEnum::PSE_NONE_TYPE, true, false, false, true, false, false);
 #elif TILING_KEY_VAR == 1001311000100021212
     // BNSD layout HighPerformance, With mask, ND, No pse, 常量化, D64, out int8
-    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+    INVOKE_FIA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
         BaseApi::FlashAttentionScoreKernelInferRegbaseV2, int8_t, half, int8_t, ImplModeEnum::AA_HIGH_PERFORMANCE,
         LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned128, S2TemplateType::Aligned128, DTemplateType::Aligned64,
         DTemplateType::Aligned64, PseTypeEnum::PSE_NONE_TYPE, true, false, false, true, false, false);
 #elif TILING_KEY_VAR == 1002122000100021012
     // BNSD layout HighPerformance, With mask, ND, No pse, 常量化, D128, S1=64/S2=256
-    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+    INVOKE_FIA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
         BaseApi::FlashAttentionScoreKernelInferRegbaseV2, half, half, int8_t, ImplModeEnum::AA_HIGH_PERFORMANCE,
         LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned64, S2TemplateType::Aligned256, DTemplateType::Aligned128,
         DTemplateType::Aligned128, PseTypeEnum::PSE_NONE_TYPE, true, false, false, true, false, false);
 #elif TILING_KEY_VAR == 1002312000040001012
     // BNSD layout HighPerformance, no mask, no pse, D128, FP16 noquant, FP16 out, S1=128/S2=128
-    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+    INVOKE_FIA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
         BaseApi::FlashAttentionScoreKernelInferRegbaseV2, half, half, half, ImplModeEnum::AA_HIGH_PERFORMANCE,
         LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned128, S2TemplateType::Aligned128, DTemplateType::Aligned128,
         DTemplateType::Aligned128, PseTypeEnum::PSE_NONE_TYPE, false, false, false, true, false, false);
 #elif TILING_KEY_VAR == 1002312000100001012
     // BNSD layout HighPerformance, with mask, no pse, D128, FP16 noquant, FP16 out, S1=128/S2=128
-    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+    INVOKE_FIA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
         BaseApi::FlashAttentionScoreKernelInferRegbaseV2, half, half, half, ImplModeEnum::AA_HIGH_PERFORMANCE,
         LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned128, S2TemplateType::Aligned128, DTemplateType::Aligned128,
         DTemplateType::Aligned128, PseTypeEnum::PSE_NONE_TYPE, true, false, false, true, false, false);
 #elif TILING_KEY_VAR == 1003113000100001012
     // BNSD layout HighPerformance, with mask, no pse, D256, FP16 noquant, FP16 out, S1=64/S2=128
-    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+    INVOKE_FIA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
         BaseApi::FlashAttentionScoreKernelInferRegbaseV2, half, half, half, ImplModeEnum::AA_HIGH_PERFORMANCE,
         LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned64, S2TemplateType::Aligned128, DTemplateType::Aligned256,
         DTemplateType::Aligned256, PseTypeEnum::PSE_NONE_TYPE, true, false, false, true, false, false);
 #elif TILING_KEY_VAR == 1001311000100001012
     // BNSD layout HighPerformance, with mask, no pse, D64, FP16 noquant, FP16 out, S1=128/S2=128
-    INVOKE_PFA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
+    INVOKE_FIA_GENERAL_OP_IMPL_REGBASE_V2_FA_BASEAPI(
         BaseApi::FlashAttentionScoreKernelInferRegbaseV2, half, half, half, ImplModeEnum::AA_HIGH_PERFORMANCE,
         LayOutTypeEnum::LAYOUT_BNSD, S1TemplateType::Aligned128, S2TemplateType::Aligned128, DTemplateType::Aligned64,
         DTemplateType::Aligned64, PseTypeEnum::PSE_NONE_TYPE, true, false, false, true, false, false);
 #elif TILING_KEY_VAR == 1000000000000000090
-    INVOKE_PFA_DUMMY();
+    INVOKE_FIA_DUMMY();
 #endif
 
 #endif
 }
-#endif // end of PROMPT_FLASH_ATTENTION_ENTRY_ARCH38_H_
+#endif // end of FIA_ARCH38_ENTRY_REGBASE_H_

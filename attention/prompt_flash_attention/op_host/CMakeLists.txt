@@ -16,8 +16,6 @@ if (BUILD_OPEN_PROJECT)
     )
 endif()
 
-set(prompt_flash_attention_mc62_arch_directory arch38 CACHE INTERNAL "prompt_flash_attention mc62 arch")
-
 add_ops_compile_options(
     OP_NAME PromptFlashAttention
     OPTIONS --cce-auto-sync=off

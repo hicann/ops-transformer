@@ -19,6 +19,7 @@
 #include "opdev/common_types.h"
 #include "opdev/fast_vector.h"
 #include "opdev/op_executor.h"
+#include "base/err_msg.h"
 #include "opdev/op_log.h"
 
 using namespace op;
@@ -40,6 +41,14 @@ aclnnStatus aclnnPromptFlashAttentionGetWorkspaceSize(const aclTensor* query, co
     if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
         OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
                 "Interface aclnnPromptFlashAttention versions V1 to V3 are no longer supported on Ascend950.");
+        return ACLNN_ERR_RUNTIME_ERROR;
+    }
+    if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_5102) {
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1009", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{
+                "aclnnPromptFlashAttention",
+                "Interface aclnnPromptFlashAttention versions V1 to V3 are no longer supported on Ascend5102."}));
         return ACLNN_ERR_RUNTIME_ERROR;
     }
     static bool isFirstCall = true;
@@ -70,6 +79,14 @@ aclnnStatus aclnnPromptFlashAttention(void* workspace, uint64_t workspaceSize, a
     if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_3510) {
         OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
                 "Interface aclnnPromptFlashAttention versions V1 to V3 are no longer supported on Ascend950.");
+        return ACLNN_ERR_RUNTIME_ERROR;
+    }
+    if (GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_5102) {
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1009", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{
+                "aclnnPromptFlashAttention",
+                "Interface aclnnPromptFlashAttention versions V1 to V3 are no longer supported on Ascend5102."}));
         return ACLNN_ERR_RUNTIME_ERROR;
     }
     static bool isFirstCall = true;

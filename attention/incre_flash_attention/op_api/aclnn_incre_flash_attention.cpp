@@ -33,6 +33,14 @@ aclnnStatus aclnnIncreFlashAttentionGetWorkspaceSize(const aclTensor* query, con
                                       "on Ascend950."}));
         return ACLNN_ERR_RUNTIME_ERROR;
     }
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_5102) {
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1009", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{"aclnnIncreFlashAttention",
+                                      "Interface aclnnIncreFlashAttention versions V1 to V4 are no longer supported "
+                                      "on Ascend5102."}));
+        return ACLNN_ERR_RUNTIME_ERROR;
+    }
     static bool isFirstCall = true;
     if (isFirstCall) {
         OP_LOGW("aclnnIncreFlashAttentionGetWorkspaceSize is scheduled to be deprecated in December 2026, "
@@ -58,6 +66,14 @@ aclnnStatus aclnnIncreFlashAttention(void* workspace, uint64_t workspaceSize, ac
             (std::vector<const char*>{"aclnnIncreFlashAttention",
                                       "Interface aclnnIncreFlashAttention versions V1 to V4 are no longer supported "
                                       "on Ascend950."}));
+        return ACLNN_ERR_RUNTIME_ERROR;
+    }
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_5102) {
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1009", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{"aclnnIncreFlashAttention",
+                                      "Interface aclnnIncreFlashAttention versions V1 to V4 are no longer supported "
+                                      "on Ascend5102."}));
         return ACLNN_ERR_RUNTIME_ERROR;
     }
     static bool isFirstCall = true;

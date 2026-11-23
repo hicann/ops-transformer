@@ -20,12 +20,12 @@
 #include "flash_attention_score_common_regbase_arch38.h"
 #include "kernel_operator.h"
 #include "attenmask_arch38.h"
-#include "const_def.h"
+#include "../../../common/op_kernel/const_def.h"
 
 // 线上编包
 #include "matmul_arch38.h"
-#include "../FixpipeOut.h"
-#include "../CopyInL1.h"
+#include "../../../common/op_kernel/FixpipeOut.h"
+#include "../../../common/op_kernel/CopyInL1.h"
 
 #include "pse_arch38.h"
 #include "infer_flash_attention_comm_arch38.h"

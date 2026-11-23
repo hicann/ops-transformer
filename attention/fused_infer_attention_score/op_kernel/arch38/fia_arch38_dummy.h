@@ -9,11 +9,11 @@
  */
 
 /*!
- * \file prompt_flash_attention_dummy.h
+ * \file fia_arch38_dummy.h
  * \brief
  */
-#ifndef PROMPT_FLASH_ATTENTION_DUMMY_H
-#define PROMPT_FLASH_ATTENTION_DUMMY_H
+#ifndef FIA_ARCH38_DUMMY_H_
+#define FIA_ARCH38_DUMMY_H_
 
 #include "kernel_tiling/kernel_tiling.h"
 #if ASC_DEVKIT_MAJOR >= 9
@@ -26,9 +26,9 @@
 using namespace AscendC;
 
 template <typename T>
-class PromptFlashAttentionDummy {
+class FiaArch38Dummy {
 public:
-    __aicore__ inline PromptFlashAttentionDummy(){};
+    __aicore__ inline FiaArch38Dummy(){};
     __aicore__ inline void Init(__gm__ uint8_t* attentionOut,
                                 const FlashAttentionScoreSimplifiedTilingData* __restrict tiling);
     __aicore__ inline void Process();
@@ -39,16 +39,16 @@ protected:
 };
 
 template <typename T>
-__aicore__ inline void PromptFlashAttentionDummy<T>::Init(
-    __gm__ uint8_t* attentionOut, const FlashAttentionScoreSimplifiedTilingData* __restrict tiling)
+__aicore__ inline void FiaArch38Dummy<T>::Init(__gm__ uint8_t* attentionOut,
+                                               const FlashAttentionScoreSimplifiedTilingData* __restrict tiling)
 {
     attentionOutGm.SetGlobalBuffer((__gm__ T*)attentionOut);
     tilingData = tiling;
 }
 
 template <typename T>
-__aicore__ inline void PromptFlashAttentionDummy<T>::Process()
+__aicore__ inline void FiaArch38Dummy<T>::Process()
 {
     uint32_t blockIdx = GetBlockIdx();
 }
-#endif // PROMPT_FLASH_ATTENTION_DUMMY_H
+#endif // FIA_ARCH38_DUMMY_H_

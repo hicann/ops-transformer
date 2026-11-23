@@ -17,7 +17,7 @@
 #include "util_regbase.h"
 #include "infer_flash_attention_comm_arch38.h"
 #include "flash_attention_score_common_regbase_arch38.h"
-#include "fa_arch38_policy.h"
+#include "fia_arch38_policy.h"
 #include "kernel_operator_list_tensor_intf.h"
 #include "vf/vf_mul_sel_softmaxflashv2_cast_nz_regbase_v2.h"
 #include "vf/vf_mul_sel_softmaxflashv2_cast_nz_dn_regbase_v2.h"
@@ -60,7 +60,7 @@ public:
     static constexpr bool containAllOptionalInput = hasPse && hasAtten && hasDrop;
     static constexpr bool splitD = (uint16_t)dVTemplateType > (uint16_t)DTemplateType::Aligned256;
     static constexpr bool forceBmm2UB =
-        ArchInfo::IsForceBmm2UB(hasAtten, static_cast<uint32_t>(dVTemplateType), s1BaseSize);
+        FiaPolicy::IsForceBmm2UB(hasAtten, static_cast<uint32_t>(dVTemplateType), s1BaseSize);
     static constexpr TPosition bmm2OutPos =
         forceBmm2UB ? TPosition::VECCALC :
                       GetC2Position(dVTemplateType,

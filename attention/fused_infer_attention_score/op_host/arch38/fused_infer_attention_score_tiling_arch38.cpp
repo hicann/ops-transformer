@@ -15,8 +15,8 @@
 
 #include "op_host/util/op_const_def.h"
 #include "fused_infer_attention_score_tiling_arch38.h"
-#include "../../../incre_flash_attention/op_host/incre_flash_attention_tiling_arch38.h"
-#include "../../../prompt_flash_attention/op_host/prompt_flash_attention_tiling_arch38.h"
+#include "fia_arch38_prompt_tiling.h"
+#include "../fused_infer_attention_score_tiling_index.h"
 #include "log/log.h"
 #include "log/error_code.h"
 #include "err/ops_err.h"
@@ -75,58 +75,6 @@ constexpr uint32_t V_D_PFA_MLA = 128;
 
 constexpr uint32_t SHAPE_INDEX_TWO = 2;
 
-constexpr uint32_t QUERY_INDEX = 0;
-constexpr uint32_t ATTENTION_OUT_INDEX = 0;
-constexpr uint32_t KEY_INDEX = 1;
-constexpr uint32_t VALUE_INDEX = 2;
-constexpr uint32_t PSE_SHIFT_INDEX = 3;
-constexpr uint32_t ATTEN_MASK_INDEX = 4;
-constexpr uint32_t FROM_FUSED_FLAG = 71;
-constexpr uint32_t ACTUAL_SEQ_Q_INDEX = 5;
-constexpr uint32_t ACTUAL_SEQ_KV_INDEX = 6;
-constexpr uint32_t ANTIQUANT_SCALE_INDEX = 12;
-constexpr uint32_t ANTIQUANT_OFFSET_INDEX = 13;
-constexpr uint32_t QUANT_SCALE1_INDEX = 8;
-constexpr uint32_t QUANT_SCALE2_INDEX = 10;
-constexpr uint32_t QUANT_OFFSET2_INDEX = 11;
-constexpr uint32_t ATTR_N_INDEX = 0;
-constexpr uint32_t ATTR_SCALE_INDEX = 1;
-constexpr uint32_t ATTR_PRE_TOKEN_INDEX = 2;
-constexpr uint32_t ATTR_NEXT_TOKEN_INDEX = 3;
-constexpr uint32_t ATTR_INPUT_LAYOUT_INDEX = 4;
-constexpr uint32_t ATTR_NUM_KV_HEADS_INDEX = 5;
-
-constexpr uint32_t DEQUANT_SCALE1_INDEX = 7;
-constexpr uint32_t DEQUANT_SCALE2_INDEX = 9;
-constexpr uint32_t BLOCK_TABLE_INDEX = 14;
-constexpr uint32_t QUERY_PADDING_SIZE_INDEX = 15;
-constexpr uint32_t KV_PADDING_SIZE_INDEX = 16;
-constexpr uint32_t KEY_ANTIQUANT_SCALE_INDEX = 17;
-constexpr uint32_t KEY_ANTIQUANT_OFFSET_INDEX = 18;
-constexpr uint32_t VALUE_ANTIQUANT_SCALE_INDEX = 19;
-constexpr uint32_t VALUE_ANTIQUANT_OFFSET_INDEX = 20;
-constexpr uint32_t KEY_SHARED_PREFIX_INDEX = 21;
-constexpr uint32_t VALUE_SHARED_PREFIX_INDEX = 22;
-constexpr uint32_t ACTUAL_SHARED_PREFIX_LEN_INDEX = 23;
-constexpr uint32_t QUERY_ROPE_INDEX = 24;
-constexpr uint32_t KEY_ROPE_INDEX = 25;
-constexpr uint32_t DEQUANT_SCALE_QUERY_INDEX = 27;
-constexpr uint32_t LEARNABLE_SINK_INDEX = 28;
-constexpr uint32_t Q_START_IDX_INDEX = 29;
-constexpr uint32_t KV_START_IDX_INDEX = 30;
-
-constexpr uint32_t ATTR_SPARSE_MODE_INDEX = 6;
-constexpr uint32_t ATTR_INNER_PRECISE_INDEX = 7;
-constexpr uint32_t ATTR_BLOCK_SIZE_INDEX = 8;
-constexpr uint32_t ANTIQUANT_MODE_INDEX = 9;
-constexpr uint32_t SOFTMAX_LSE_FLAG_INDEX = 10;
-constexpr uint32_t KEY_ANTIQUANT_MODE_INDEX = 11;
-constexpr uint32_t VALUE_ANTIQUANT_MODE_INDEX = 12;
-constexpr uint32_t QUERY_QUANT_MODE_INDEX = 13;
-constexpr uint32_t PSE_TYPE_INDEX = 14;
-
-constexpr uint32_t SOFTMAX_LSE_INDEX = 1;
-
 // 合法输入下 Tiling 失败时，按 EZ1008 正式错误码首报（Arglist: op_name, reason），并输出 PLOG 上下文
 inline void ReportTilingFailure(const gert::TilingContext* context, const char* reason)
 {
@@ -136,7 +84,7 @@ inline void ReportTilingFailure(const gert::TilingContext* context, const char* 
     REPORT_PREDEFINED_ERR_MSG("EZ1008", msgKey, msgvalue);
 }
 
-static bool CheckEmptyTensorList(ContextParamsForPFATiling& contextKeyParams, int64_t validBatchOfK)
+static bool CheckEmptyTensorList(FiaArch38ContextParams& contextKeyParams, int64_t validBatchOfK)
 {
     for (int64_t tmpIdx = 0; tmpIdx < validBatchOfK; ++tmpIdx) {
         if (contextKeyParams.kTensorList[tmpIdx]->GetStorageShape().GetShapeSize() != 0) {
@@ -150,7 +98,7 @@ static bool CheckEmptyTensorList(ContextParamsForPFATiling& contextKeyParams, in
     return true;
 }
 
-static bool GetKeyRopeSeqLenAndCheckBatch(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams,
+static bool GetKeyRopeSeqLenAndCheckBatch(gert::TilingContext* context, FiaArch38ContextParams& contextKeyParams,
                                           int64_t validBatchOfK, int64_t keyRopeSDimIdx, int64_t& keyRopeS)
 {
     keyRopeS = 0;
@@ -167,7 +115,7 @@ static bool GetKeyRopeSeqLenAndCheckBatch(gert::TilingContext* context, ContextP
     return true;
 }
 
-static bool CheckNormalTensorListBSH(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams,
+static bool CheckNormalTensorListBSH(gert::TilingContext* context, FiaArch38ContextParams& contextKeyParams,
                                      int64_t validBatchOfK)
 {
     auto standardKH = contextKeyParams.kTensorList[0]->GetStorageShape().GetDim(KV_DIM_2);
@@ -220,7 +168,7 @@ static bool CheckNormalTensorListBSH(gert::TilingContext* context, ContextParams
     return true;
 }
 
-static bool CheckNormalTensorListBNSD(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams,
+static bool CheckNormalTensorListBNSD(gert::TilingContext* context, FiaArch38ContextParams& contextKeyParams,
                                       int64_t validBatchOfK)
 {
     auto standardN = contextKeyParams.kTensorList[0]->GetStorageShape().GetDim(1);
@@ -294,7 +242,7 @@ static bool CheckNormalTensorListBNSD(gert::TilingContext* context, ContextParam
     return true;
 }
 
-static bool CheckNormalTensorListBSND(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams,
+static bool CheckNormalTensorListBSND(gert::TilingContext* context, FiaArch38ContextParams& contextKeyParams,
                                       int64_t validBatchOfK)
 {
     auto standardN = contextKeyParams.kTensorList[0]->GetStorageShape().GetDim(KV_DIM_2);
@@ -367,7 +315,7 @@ static bool CheckNormalTensorListBSND(gert::TilingContext* context, ContextParam
     return true;
 }
 
-static bool CheckNormalTensorList(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams,
+static bool CheckNormalTensorList(gert::TilingContext* context, FiaArch38ContextParams& contextKeyParams,
                                   const string layoutStr, int64_t validBatchOfK)
 {
     bool ret = false;
@@ -384,7 +332,7 @@ static bool CheckNormalTensorList(gert::TilingContext* context, ContextParamsFor
     return ret;
 }
 
-static bool CheckTensorList(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams,
+static bool CheckTensorList(gert::TilingContext* context, FiaArch38ContextParams& contextKeyParams,
                             const string layoutStr, int64_t batchOfQ)
 {
     int64_t validBatchOfK = 0;
@@ -443,7 +391,7 @@ static bool CheckTensorList(gert::TilingContext* context, ContextParamsForPFATil
     return true;
 }
 
-static bool CheckKVPaddingCrossover(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams)
+static bool CheckKVPaddingCrossover(gert::TilingContext* context, FiaArch38ContextParams& contextKeyParams)
 {
     OP_CHECK_IF(((contextKeyParams.queryPaddingSize != nullptr) &&
                  (contextKeyParams.queryPaddingSize->GetStorageShape().GetShapeSize() != 1 ||
@@ -491,7 +439,7 @@ static uint32_t GetTransposeLayout(const std::string& layout)
 }
 
 static ge::graphStatus ConvertQuantOptionalInputs(const gert::TilingContext* context,
-                                                  ContextParamsForPFATiling& contextKeyParams)
+                                                  FiaArch38ContextParams& contextKeyParams)
 {
     contextKeyParams.deqScale1Shape = context->GetOptionalInputShape(DEQUANT_SCALE1_INDEX);
     contextKeyParams.scale1Shape = context->GetOptionalInputShape(QUANT_SCALE1_INDEX);
@@ -508,8 +456,8 @@ static ge::graphStatus ConvertQuantOptionalInputs(const gert::TilingContext* con
                                             context->GetOptionalInputDesc(QUANT_OFFSET2_INDEX)->GetDataType() :
                                             ge::DT_FLOAT;
     contextKeyParams.dequantScaleQueryShape = context->GetOptionalInputShape(DEQUANT_SCALE_QUERY_INDEX);
-    contextKeyParams.KeyAntiquantScaleShape = context->GetOptionalInputShape(KEY_ANTIQUANT_SCALE_INDEX);
-    contextKeyParams.KeyAntiquantOffsetShape = context->GetOptionalInputShape(KEY_ANTIQUANT_OFFSET_INDEX);
+    contextKeyParams.keyAntiquantScaleShape = context->GetOptionalInputShape(KEY_ANTIQUANT_SCALE_INDEX);
+    contextKeyParams.keyAntiquantOffsetShape = context->GetOptionalInputShape(KEY_ANTIQUANT_OFFSET_INDEX);
     contextKeyParams.valueAntiquantScaleShape = context->GetOptionalInputShape(VALUE_ANTIQUANT_SCALE_INDEX);
     contextKeyParams.valueAntiquantOffsetShape = context->GetOptionalInputShape(VALUE_ANTIQUANT_OFFSET_INDEX);
 
@@ -517,7 +465,7 @@ static ge::graphStatus ConvertQuantOptionalInputs(const gert::TilingContext* con
         (context->GetOptionalInputDesc(DEQUANT_SCALE_QUERY_INDEX) != nullptr) ?
             context->GetOptionalInputDesc(DEQUANT_SCALE_QUERY_INDEX)->GetDataType() :
             ge::DT_FLOAT;
-    contextKeyParams.KeyAntiquantScaleType =
+    contextKeyParams.keyAntiquantScaleType =
         (context->GetOptionalInputDesc(KEY_ANTIQUANT_SCALE_INDEX) != nullptr) ?
             context->GetOptionalInputDesc(KEY_ANTIQUANT_SCALE_INDEX)->GetDataType() :
             ge::DT_FLOAT16;
@@ -532,8 +480,8 @@ static ge::graphStatus ConvertQuantOptionalInputs(const gert::TilingContext* con
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext* context,
-                                                 ContextParamsForPFATiling& contextKeyParams, bool isMaxWorkspace)
+static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext* context, FiaArch38ContextParams& contextKeyParams,
+                                                 bool isMaxWorkspace)
 {
     contextKeyParams.opName = context->GetNodeName();
 
@@ -612,9 +560,9 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext* context,
     auto attrs = context->GetAttrs();
     OP_CHECK_IF(attrs == nullptr, ReportTilingFailure(context, "Attributes returned from context is a nullptr"),
                 return ge::GRAPH_FAILED);
-    contextKeyParams.queryQuantMode = attrs->GetAttrPointer<int64_t>(QUERY_QUANT_MODE_INDEX);
-    contextKeyParams.keyAntiquantMode = attrs->GetAttrPointer<int64_t>(KEY_ANTIQUANT_MODE_INDEX);
-    contextKeyParams.valueAntiquantMode = attrs->GetAttrPointer<int64_t>(VALUE_ANTIQUANT_MODE_INDEX);
+    contextKeyParams.queryQuantMode = attrs->GetAttrPointer<int64_t>(ATTR_QUERY_QUANT_MODE_INDEX);
+    contextKeyParams.keyAntiquantMode = attrs->GetAttrPointer<int64_t>(ATTR_KEY_ANTIQUANT_MODE_INDEX);
+    contextKeyParams.valueAntiquantMode = attrs->GetAttrPointer<int64_t>(ATTR_VALUE_ANTIQUANT_MODE_INDEX);
     contextKeyParams.innerPrecisePtr = attrs->GetAttrPointer<int64_t>(ATTR_INNER_PRECISE_INDEX);
     contextKeyParams.headsNumber = attrs->GetAttrPointer<int64_t>(ATTR_N_INDEX);
     contextKeyParams.sparseMode = attrs->GetAttrPointer<int32_t>(ATTR_SPARSE_MODE_INDEX);
@@ -627,7 +575,7 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext* context,
     contextKeyParams.workspaceSize = context->GetWorkspaceSizes(1);
     contextKeyParams.isBSNDOut = (string(contextKeyParams.layout) == "BNSD_BSND") ? 1 : 0;
     contextKeyParams.transposeLayout = GetTransposeLayout(string(contextKeyParams.layout));
-    contextKeyParams.softmaxLseFlag = attrs->GetAttrPointer<bool>(SOFTMAX_LSE_FLAG_INDEX);
+    contextKeyParams.softmaxLseFlag = attrs->GetAttrPointer<bool>(ATTR_SOFTMAX_LSE_FLAG_INDEX);
     contextKeyParams.isSoftMaxLseEnable =
         (contextKeyParams.softmaxLseFlag == nullptr) ? false : *contextKeyParams.softmaxLseFlag;
     contextKeyParams.queryRopeInputShape = context->GetOptionalInputShape(QUERY_ROPE_INDEX);
@@ -640,7 +588,7 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext* context,
                                          contextKeyParams.kDataType;
     contextKeyParams.qStartIdx = context->GetOptionalInputTensor(Q_START_IDX_INDEX);
     contextKeyParams.kvStartIdx = context->GetOptionalInputTensor(KV_START_IDX_INDEX);
-    contextKeyParams.pseType = attrs->GetAttrPointer<int64_t>(PSE_TYPE_INDEX);
+    contextKeyParams.pseType = attrs->GetAttrPointer<int64_t>(ATTR_PSE_TYPE_INDEX);
 
     const string layoutStr = string(contextKeyParams.layout);
     int64_t batchOfQ = 1;
@@ -708,15 +656,12 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext* context,
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus ConvertContextToParamsIFA(gert::TilingContext& context, IncreFlashAttentionContext& ifaContext,
-                                                 bool isMaxWorkspace)
+static ge::graphStatus ConvertContextToParamsIFA(gert::TilingContext& context, FiaArch38IncreContext& ifaContext)
 {
     if (context.GetNodeName() == nullptr) {
         OP_LOGE_WITHOUT_REPORT("FusedInferAttentionScore", "opName got from TilingContext is nullptr");
         return ge::GRAPH_FAILED;
     }
-    ifaContext.opName = context.GetNodeName();
-    ifaContext.platformInfo = context.GetPlatformInfo();
     ifaContext.query.desc = context.GetInputDesc(QUERY_INDEX);
     ifaContext.query.shape = context.GetInputShape(QUERY_INDEX);
     ifaContext.key.desc = context.GetInputDesc(KEY_INDEX);
@@ -728,112 +673,19 @@ static ge::graphStatus ConvertContextToParamsIFA(gert::TilingContext& context, I
 
     ifaContext.value.desc = context.GetInputDesc(VALUE_INDEX);
     ifaContext.value.shape = context.GetInputShape(VALUE_INDEX);
-    ifaContext.pseShift.desc = context.GetOptionalInputDesc(PSE_SHIFT_INDEX);
-    ifaContext.pseShift.tensor = context.GetOptionalInputTensor(PSE_SHIFT_INDEX);
-
     ifaContext.attenMask.desc = context.GetOptionalInputDesc(ATTEN_MASK_INDEX);
     ifaContext.attenMask.tensor = context.GetOptionalInputTensor(ATTEN_MASK_INDEX);
     ifaContext.attenOut.desc = context.GetOutputDesc(ATTENTION_OUT_INDEX);
     ifaContext.attenOut.shape = context.GetOutputShape(ATTENTION_OUT_INDEX);
-    ifaContext.lseOut.desc = context.GetOutputDesc(SOFTMAX_LSE_INDEX);
-    ifaContext.lseOut.shape = context.GetOutputShape(SOFTMAX_LSE_INDEX);
-
-    ifaContext.actualSeqLengthsQ.tensor = context.GetOptionalInputTensor(ACTUAL_SEQ_Q_INDEX);
-    ifaContext.actualSeqLengths.tensor = context.GetOptionalInputTensor(ACTUAL_SEQ_KV_INDEX);
-    ifaContext.deqScale1.tensor = context.GetOptionalInputTensor(DEQUANT_SCALE1_INDEX);
-    ifaContext.quantScale1.tensor = context.GetOptionalInputTensor(QUANT_SCALE1_INDEX);
-    ifaContext.deqScale2.tensor = context.GetOptionalInputTensor(DEQUANT_SCALE2_INDEX);
-    ifaContext.quantScale2.tensor = context.GetOptionalInputTensor(QUANT_SCALE2_INDEX);
-    ifaContext.quantOffset2.tensor = context.GetOptionalInputTensor(QUANT_OFFSET2_INDEX);
-    ifaContext.quantScale2.desc = context.GetOptionalInputDesc(QUANT_SCALE2_INDEX);
-    ifaContext.quantOffset2.desc = context.GetOptionalInputDesc(QUANT_OFFSET2_INDEX);
-    ifaContext.antiquantScale.tensor = context.GetOptionalInputTensor(ANTIQUANT_SCALE_INDEX);
-    ifaContext.antiquantScale.desc = context.GetOptionalInputDesc(ANTIQUANT_SCALE_INDEX);
-    ifaContext.antiquantOffset.tensor = context.GetOptionalInputTensor(ANTIQUANT_OFFSET_INDEX);
-    ifaContext.antiquantOffset.desc = context.GetOptionalInputDesc(ANTIQUANT_OFFSET_INDEX);
     ifaContext.blockTable.tensor = context.GetOptionalInputTensor(BLOCK_TABLE_INDEX);
-    ifaContext.queryPaddingSize.tensor = context.GetOptionalInputTensor(QUERY_PADDING_SIZE_INDEX);
-    ifaContext.kvPaddingSize.tensor = context.GetOptionalInputTensor(KV_PADDING_SIZE_INDEX);
-    ifaContext.keyAntiquantScale.tensor = context.GetOptionalInputTensor(KEY_ANTIQUANT_SCALE_INDEX);
-    ifaContext.keyAntiquantScale.desc = context.GetOptionalInputDesc(KEY_ANTIQUANT_SCALE_INDEX);
-    ifaContext.keyAntiquantOffset.tensor = context.GetOptionalInputTensor(KEY_ANTIQUANT_OFFSET_INDEX);
-    ifaContext.keyAntiquantOffset.desc = context.GetOptionalInputDesc(KEY_ANTIQUANT_OFFSET_INDEX);
-    ifaContext.valueAntiquantScale.tensor = context.GetOptionalInputTensor(VALUE_ANTIQUANT_SCALE_INDEX);
-    ifaContext.valueAntiquantScale.desc = context.GetOptionalInputDesc(VALUE_ANTIQUANT_SCALE_INDEX);
-    ifaContext.valueAntiquantOffset.tensor = context.GetOptionalInputTensor(VALUE_ANTIQUANT_OFFSET_INDEX);
-    ifaContext.valueAntiquantOffset.desc = context.GetOptionalInputDesc(VALUE_ANTIQUANT_OFFSET_INDEX);
-    ifaContext.qStartIdx.tensor = context.GetOptionalInputTensor(Q_START_IDX_INDEX);
-    ifaContext.qStartIdx.desc = context.GetOptionalInputDesc(Q_START_IDX_INDEX);
-    ifaContext.kvStartIdx.tensor = context.GetOptionalInputTensor(KV_START_IDX_INDEX);
-    ifaContext.kvStartIdx.desc = context.GetOptionalInputDesc(KV_START_IDX_INDEX);
-    ifaContext.keySharedPrefix.tensor = context.GetOptionalInputTensor(KEY_SHARED_PREFIX_INDEX);
-    ifaContext.keySharedPrefix.desc = context.GetOptionalInputDesc(KEY_SHARED_PREFIX_INDEX);
-    ifaContext.valueSharedPrefix.tensor = context.GetOptionalInputTensor(VALUE_SHARED_PREFIX_INDEX);
-    ifaContext.valueSharedPrefix.desc = context.GetOptionalInputDesc(VALUE_SHARED_PREFIX_INDEX);
-    ifaContext.actualSharedPrefixLen.tensor = context.GetOptionalInputTensor(ACTUAL_SHARED_PREFIX_LEN_INDEX);
-    ifaContext.actualSharedPrefixLen.desc = context.GetOptionalInputDesc(ACTUAL_SHARED_PREFIX_LEN_INDEX);
 
     auto attrs = context.GetAttrs();
     OP_CHECK_IF(attrs == nullptr, ReportTilingFailure(&context, "attrs got from ge is nullptr"),
                 return ge::GRAPH_FAILED);
 
     ifaContext.numHeads = attrs->GetAttrPointer<uint32_t>(ATTR_N_INDEX);
-    ifaContext.sparseMode = attrs->GetAttrPointer<uint32_t>(ATTR_SPARSE_MODE_INDEX);
-    ifaContext.preToken = attrs->GetAttrPointer<int64_t>(ATTR_PRE_TOKEN_INDEX);
-    ifaContext.nextToken = attrs->GetAttrPointer<int64_t>(ATTR_NEXT_TOKEN_INDEX);
-    ifaContext.innerPrecise = attrs->GetAttrPointer<uint32_t>(ATTR_INNER_PRECISE_INDEX);
-    ifaContext.scaleValue = attrs->GetAttrPointer<float>(ATTR_SCALE_INDEX);
     ifaContext.layOut = attrs->GetStr(ATTR_INPUT_LAYOUT_INDEX);
     ifaContext.kvHeadNums = attrs->GetAttrPointer<uint32_t>(ATTR_NUM_KV_HEADS_INDEX);
-    ifaContext.blockSize = attrs->GetAttrPointer<uint32_t>(ATTR_BLOCK_SIZE_INDEX);
-    ifaContext.antiquantMode = attrs->GetAttrPointer<int64_t>(ANTIQUANT_MODE_INDEX);
-    ifaContext.softmaxLseFlag = attrs->GetAttrPointer<bool>(SOFTMAX_LSE_FLAG_INDEX);
-    ifaContext.keyAntiquantMode = attrs->GetAttrPointer<int64_t>(KEY_ANTIQUANT_MODE_INDEX);
-    ifaContext.valueAntiquantMode = attrs->GetAttrPointer<int64_t>(VALUE_ANTIQUANT_MODE_INDEX);
-    ifaContext.pseType = attrs->GetAttrPointer<int64_t>(PSE_TYPE_INDEX);
-
-    // Tiling下沉场景拿不到actualSeqLengths的个数，所以qk的batch数默认设置为1来规避后续校验
-    auto batchOfQuery = 1;
-    auto batchOfKey = 1;
-    std::string layoutStr(ifaContext.layOut);
-    if (layoutStr != "TND" && layoutStr != "NTD") {
-        batchOfQuery = ifaContext.query.shape->GetStorageShape().GetDim(QUERY_DIM_0);
-        batchOfKey = ifaContext.key.shape->GetStorageShape().GetDim(KV_DIM_0);
-    } else {
-        if (isMaxWorkspace) {
-            if (ifaContext.blockTable.tensor != nullptr) {
-                batchOfQuery = ifaContext.blockTable.tensor->GetStorageShape().GetDim(QUERY_DIM_0);
-                batchOfKey = ifaContext.blockTable.tensor->GetStorageShape().GetDim(KV_DIM_0);
-            }
-        } else {
-            OP_CHECK_IF(
-                (ifaContext.actualSeqLengthsQ.tensor == nullptr || ifaContext.actualSeqLengths.tensor == nullptr),
-                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context.GetNodeName(),
-                                                       "actual_seq_lengths,actual_seq_lengths_kv", "nullptr",
-                                                       "TND/NTD actualSeqLengths or actualSeqLengthsKv is null."),
-                return ge::GRAPH_FAILED);
-            batchOfQuery = ifaContext.actualSeqLengthsQ.tensor->GetSize();
-            batchOfKey = ifaContext.actualSeqLengths.tensor->GetSize();
-        }
-    }
-
-    if (batchOfQuery != batchOfKey) {
-        ifaContext.kCache.resize(batchOfQuery);
-        ifaContext.vCache.resize(batchOfQuery);
-        for (int64_t size = 0; size < batchOfQuery; ++size) {
-            ifaContext.kCache[size] = const_cast<gert::StorageShape*>(context.GetDynamicInputShape(KEY_INDEX, size));
-            ifaContext.vCache[size] = const_cast<gert::StorageShape*>(context.GetDynamicInputShape(VALUE_INDEX, size));
-        }
-    } else {
-        ifaContext.kCache.resize(1);
-        ifaContext.vCache.resize(1);
-        ifaContext.kCache[0] = const_cast<gert::StorageShape*>(context.GetDynamicInputShape(KEY_INDEX, 0));
-        ifaContext.vCache[0] = const_cast<gert::StorageShape*>(context.GetDynamicInputShape(VALUE_INDEX, 0));
-    }
-
-    OP_CHECK_IF(context.GetWorkspaceSizes(1) == nullptr,
-                ReportTilingFailure(&context, "workSpaceSize got from ge is nullptr"), return ge::GRAPH_FAILED);
-    ifaContext.workSpaces = context.GetWorkspaceSizes(1);
 
     // IFA（伪量化）模板当前不支持 learnable sink 输入特性
     OP_CHECK_IF(context.GetOptionalInputTensor(LEARNABLE_SINK_INDEX) != nullptr,
@@ -916,8 +768,7 @@ ge::graphStatus FusedInferAttentionScoreTilingArch38::DoOpTiling()
     int64_t s = 0;
     int64_t b = tempQ->GetStorageShape().GetDim(QUERY_DIM_0);
     int64_t t = 0;
-    bool lseFlag = *attrs->GetAttrPointer<bool>(SOFTMAX_LSE_FLAG_INDEX);
-    bool usingIFA = false;
+    bool lseFlag = *attrs->GetAttrPointer<bool>(ATTR_SOFTMAX_LSE_FLAG_INDEX);
     if (inputLayoutStr == "BNSD" || inputLayoutStr == "BNSD_BSND") {
         s = tempQ->GetStorageShape().GetDim(QUERY_DIM_2);
     } else if (inputLayoutStr == "TND" || inputLayoutStr == "TND_NTD") {
@@ -1204,174 +1055,151 @@ ge::graphStatus FusedInferAttentionScoreTilingArch38::DoOpTiling()
                 return ge::GRAPH_FAILED);
     auto qDType = context_->GetInputDesc(QUERY_INDEX)->GetDataType();
     auto kDType = context_->GetInputDesc(KEY_INDEX)->GetDataType();
-    // IFA非MLA或伪量化场景走IFA模板
-    // IFA的MLA或PFA非伪量化场景走PFA模板
+    // arch38 仅注册非伪量化模板（q == k），伪量化（q != k）无模板可分发，直接拒绝
+    OP_CHECK_IF(qDType != kDType,
+                OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+                    context_->GetNodeName(), "query, key",
+                    (std::string(GetPfaDataTypeStr(qDType)) + ", " + std::string(GetPfaDataTypeStr(kDType))).c_str(),
+                    "pseudo-quantization (query dtype != key dtype) is not supported on this platform."),
+                return ge::GRAPH_FAILED);
+    // IFA 非 MLA 场景（s=1/BNSD/无 rope）复用 PFA 模板，仅做 IFA 门禁
     const bool isIfaNonMlaScenario = (s == 1) && (inputLayoutStr == "BNSD") &&
                                      (context_->GetOptionalInputShape(QUERY_ROPE_INDEX) == nullptr) &&
                                      (context_->GetOptionalInputShape(KEY_ROPE_INDEX) == nullptr);
-    if ((qDType != kDType) || isIfaNonMlaScenario) {
-        auto platformInfoPtr = context_->GetPlatformInfo();
-        auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
-        if (qDType == kDType) {
-            usingIFA = false;
-        } else {
-            usingIFA = true;
-        }
+    // PFA tiling process
+    if (isIfaNonMlaScenario) {
+        FiaArch38IncreContext ifaCheckContext{};
+        OP_CHECK_IF(ConvertContextToParamsIFA(*context_, ifaCheckContext) != ge::GRAPH_SUCCESS,
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(),
+                                           "Error occurred while converting tilingContext to ifa context!"),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(!IsArch38IncreScenarioSupported(ifaCheckContext, context_),
+                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "unsupported IFA scenario on this platform."),
+                    return ge::GRAPH_FAILED);
     }
-    if (usingIFA) {
-        // IFA tiling path
-        IncreFlashAttentionContext ifaContext{};
-        auto ret = ConvertContextToParamsIFA(*context_, ifaContext, isMaxWorkspace);
-        if (ret != ge::GRAPH_SUCCESS) {
-            OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(),
-                                   "Error occurred while converting tilingContext to ifa context!");
-            return ret;
-        }
-        IFATilingArch38 ifaTilingArch38(context_);
-        ret = ifaTilingArch38.DoSubOpTiling(ifaContext);
-        OP_CHECK_IF(ret == ge::GRAPH_FAILED,
-                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "failed in FIA DoSubOpTiling"),
-                    return ge::GRAPH_FAILED);
-        return ret;
-    } else {
-        // PFA tiling process
-        // 非伪量化的 IFA 场景复用 PFA 模板，使用IFA门禁
-        if (isIfaNonMlaScenario) {
-            IncreFlashAttentionContext ifaCheckContext{};
-            OP_CHECK_IF(ConvertContextToParamsIFA(*context_, ifaCheckContext, isMaxWorkspace) != ge::GRAPH_SUCCESS,
-                        OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(),
-                                               "Error occurred while converting tilingContext to ifa context!"),
-                        return ge::GRAPH_FAILED);
-            IFATilingArch38 ifaTilingArch38(context_);
-            OP_CHECK_IF(!ifaTilingArch38.CheckArch38ScenarioSupported(ifaCheckContext),
-                        OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "unsupported IFA scenario on this platform."),
-                        return ge::GRAPH_FAILED);
-        }
 
-        constexpr int64_t D_ALIGN_32 = 32;
-        constexpr int64_t D_ALIGN_16 = 16;
+    constexpr int64_t D_ALIGN_32 = 32;
+    constexpr int64_t D_ALIGN_16 = 16;
 
-        PromptFlashAttentionTilingData pfaTilingData;
-        PromptFlashAttentionTilingArch38 pfa_tiling(context_);
-        ContextParamsForPFATiling contextParamsForPFATiling;
-        PromptFlashAttentionCompileInfo tempCompileInfoPtr;
+    FiaArch38FlashAttentionTilingData pfaTilingData;
+    FiaArch38PromptTiling pfa_tiling(context_);
+    FiaArch38ContextParams contextParamsForPFATiling;
+    FiaArch38CompileInfo tempCompileInfoPtr;
 
-        OP_CHECK_IF((attrs->GetAttrPointer<uint64_t>(ANTIQUANT_MODE_INDEX) != nullptr) &&
-                        (*attrs->GetAttrPointer<uint64_t>(ANTIQUANT_MODE_INDEX) != 0),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                        context_->GetNodeName(), "antiquant_mode",
-                        std::to_string(*attrs->GetAttrPointer<uint64_t>(ANTIQUANT_MODE_INDEX)),
-                        "antiquant_mode is not supported!"),
-                    return ge::GRAPH_FAILED);
-
-        auto platformInfoPtr = context_->GetPlatformInfo();
-        OP_CHECK_IF(platformInfoPtr == nullptr, ReportTilingFailure(context_, "platformInfoPtr is null!"),
-                    return ge::GRAPH_FAILED);
-        auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
-        tempCompileInfoPtr.aivNum = ascendcPlatform.GetCoreNumAiv();
-        tempCompileInfoPtr.aicNum = ascendcPlatform.GetCoreNumAic();
-        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, tempCompileInfoPtr.ubSize);
-        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, tempCompileInfoPtr.l1Size);
-        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, tempCompileInfoPtr.l0CSize);
-        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_A, tempCompileInfoPtr.l0ASize);
-        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_B, tempCompileInfoPtr.l0BSize);
-        tempCompileInfoPtr.socShortName = ascendcPlatform.GetSocVersion();
-        tempCompileInfoPtr.defaultSysWorkspaceSize = 0;
-
-        contextParamsForPFATiling.compileInfoPtr = &tempCompileInfoPtr;
-        auto ret = ConvertContextToParamsPFA(context_, contextParamsForPFATiling, isMaxWorkspace);
-        if (ret != ge::GRAPH_SUCCESS) {
-            OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(),
-                                   "Error occurred while converting tilingContext to PFA context!");
-            return ret;
-        }
-        if (lseFlag != false) {
-            if (!pfa_tiling.CheckNonEmptyShapeExceptions(contextParamsForPFATiling,
-                                                         contextParamsForPFATiling.lseoutputShape, "softmaxLse")) {
-                return ge::GRAPH_FAILED;
-            }
-            OP_CHECK_IF(((tempLse == nullptr)), OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "softmax_lse"),
-                        return ge::GRAPH_FAILED);
-
-            if (!qOutEmptyTensor) { // q、out为空时，lse为空则不输出，不为空则输出inf，不做拦截
-                if (inputLayoutStr == "TND" || inputLayoutStr == "TND_NTD") {
-                    OP_CHECK_IF(((tempLse->GetStorageShape().GetDimNum() != QUERY_DIM_3)), // 3：lse shape TN1
-                                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                                    context_->GetNodeName(), "softmax_lse",
-                                    std::to_string(tempLse->GetStorageShape().GetDimNum()),
-                                    "Layout is TND/TND_NTD SoftmaxLse shape dim should be 3"),
-                                return ge::GRAPH_FAILED);
-                    OP_CHECK_IF((((tempLse->GetStorageShape().GetDim(QUERY_DIM_0) != t) ||
-                                  (tempLse->GetStorageShape().GetDim(QUERY_DIM_1) !=
-                                   tempN) || // 0: the first dimension 1: the second dimension
-                                  (tempLse->GetStorageShape().GetDim(QUERY_DIM_2) != 1))), // 2: the third dimension
-                                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                                    context_->GetNodeName(), "softmax_lse",
-                                    GetShapeDebugStr(tempLse->GetStorageShape()) + " vs TN1[" + std::to_string(t) +
-                                        ", " + std::to_string(tempN) + ", 1]",
-                                    "Layout is TND SoftmaxLse shape does not match TN1"), // 2: the third dimension
-                                return ge::GRAPH_FAILED);
-                } else if (inputLayoutStr == "NTD" || inputLayoutStr == "NTD_TND") {
-                    OP_CHECK_IF(((tempLse->GetStorageShape().GetDimNum() != QUERY_DIM_3)), // 3：lse shape TN1
-                                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                                    context_->GetNodeName(), "softmax_lse",
-                                    std::to_string(tempLse->GetStorageShape().GetDimNum()),
-                                    "Layout is NTD/NTD_TND SoftmaxLse shape dim should be 3"),
-                                return ge::GRAPH_FAILED);
-                    OP_CHECK_IF((((tempLse->GetStorageShape().GetDim(QUERY_DIM_1) != tempN) ||
-                                  (tempLse->GetStorageShape().GetDim(QUERY_DIM_0) !=
-                                   t) || // 0: the first dimension 1: the second dimension
-                                  (tempLse->GetStorageShape().GetDim(QUERY_DIM_2) != 1))), // 2: the third dimension
-                                OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                                    context_->GetNodeName(), "softmax_lse",
-                                    GetShapeDebugStr(tempLse->GetStorageShape()) + " vs TN1[" + std::to_string(t) +
-                                        ", " + std::to_string(tempN) + ", 1]",
-                                    "Layout is NTD SoftmaxLse shape does not match TN1"), // 2: the third dimension
-                                return ge::GRAPH_FAILED);
-                } else {
-                    OP_CHECK_IF(((tempLse->GetStorageShape().GetDimNum() != QUERY_DIM_4)), // 4：lse shape BNS1
-                                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                                    context_->GetNodeName(), "softmax_lse",
-                                    std::to_string(tempLse->GetStorageShape().GetDimNum()) + " (layout is " +
-                                        inputLayoutStr + ")",
-                                    "Layout is " + inputLayoutStr + ", SoftmaxLse shape dim should be 4"),
-                                return ge::GRAPH_FAILED);
-                    OP_CHECK_IF(
-                        (((tempLse->GetStorageShape().GetDim(QUERY_DIM_0) != b) ||
-                          (tempLse->GetStorageShape().GetDim(QUERY_DIM_1) !=
-                           tempN) || // 0: the first dimension 1: the second dimension
-                          (tempLse->GetStorageShape().GetDim(QUERY_DIM_2) != s) ||
-                          (tempLse->GetStorageShape().GetDim(QUERY_DIM_3) !=
-                           1))), // 2: the third dimension 3: the fourth dimension
-                        OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
-                            context_->GetNodeName(), "softmax_lse",
-                            GetShapeDebugStr(tempLse->GetStorageShape()) + " vs BNS1[" + std::to_string(b) + ", " +
-                                std::to_string(tempN) + ", " + std::to_string(s) + ", 1]",
-                            "SoftmaxLse shape does not match BNS1"), // 2: the third dimension 3: the fourth dimension
-                        return ge::GRAPH_FAILED);
-                }
-            }
-        }
-        if (ascendcPlatform.GetCurNpuArch() != Ops::Base::DAV_5102) {
-            OP_CHECK_IF((((contextParamsForPFATiling.inputDataType == ge::DT_INT8) ||
-                          (contextParamsForPFATiling.kDataType == ge::DT_INT8) ||
-                          (contextParamsForPFATiling.outputDataType == ge::DT_INT8)) &&
-                         (queryD % D_ALIGN_32 != 0)),
-                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                            context_->GetNodeName(), "query", std::to_string(queryD),
-                            "D of query should be 32 elements aligned when int8 is involved!"),
-                        return ge::GRAPH_FAILED);
-            OP_CHECK_IF(
-                (queryD % D_ALIGN_16 != 0),
-                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "query", std::to_string(queryD),
-                                                      "D should be 16 elements aligned when FLOAT16/BFLOAT16 dtype!"),
+    OP_CHECK_IF((attrs->GetAttrPointer<uint64_t>(ATTR_ANTIQUANT_MODE_INDEX) != nullptr) &&
+                    (*attrs->GetAttrPointer<uint64_t>(ATTR_ANTIQUANT_MODE_INDEX) != 0),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context_->GetNodeName(), "antiquant_mode",
+                    std::to_string(*attrs->GetAttrPointer<uint64_t>(ATTR_ANTIQUANT_MODE_INDEX)),
+                    "antiquant_mode is not supported!"),
                 return ge::GRAPH_FAILED);
-        }
-        ret = pfa_tiling.DoSubOpTiling(pfaTilingData, contextParamsForPFATiling);
-        OP_CHECK_IF(ret == ge::GRAPH_FAILED,
-                    OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "failed in FIA DoSubOpTiling"),
-                    return ge::GRAPH_FAILED);
+
+    auto platformInfoPtr = context_->GetPlatformInfo();
+    OP_CHECK_IF(platformInfoPtr == nullptr, ReportTilingFailure(context_, "platformInfoPtr is null!"),
+                return ge::GRAPH_FAILED);
+    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
+    tempCompileInfoPtr.aivNum = ascendcPlatform.GetCoreNumAiv();
+    tempCompileInfoPtr.aicNum = ascendcPlatform.GetCoreNumAic();
+    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, tempCompileInfoPtr.ubSize);
+    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, tempCompileInfoPtr.l1Size);
+    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, tempCompileInfoPtr.l0CSize);
+    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_A, tempCompileInfoPtr.l0ASize);
+    ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_B, tempCompileInfoPtr.l0BSize);
+    tempCompileInfoPtr.socShortName = ascendcPlatform.GetSocVersion();
+    tempCompileInfoPtr.defaultSysWorkspaceSize = 0;
+
+    contextParamsForPFATiling.compileInfoPtr = &tempCompileInfoPtr;
+    auto ret = ConvertContextToParamsPFA(context_, contextParamsForPFATiling, isMaxWorkspace);
+    if (ret != ge::GRAPH_SUCCESS) {
+        OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(),
+                               "Error occurred while converting tilingContext to PFA context!");
         return ret;
     }
+    if (lseFlag != false) {
+        if (!pfa_tiling.CheckNonEmptyShapeExceptions(contextParamsForPFATiling,
+                                                     contextParamsForPFATiling.lseoutputShape, "softmaxLse")) {
+            return ge::GRAPH_FAILED;
+        }
+        OP_CHECK_IF(((tempLse == nullptr)), OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "softmax_lse"),
+                    return ge::GRAPH_FAILED);
+
+        if (!qOutEmptyTensor) { // q、out为空时，lse为空则不输出，不为空则输出inf，跳过lse形状校验
+            if (inputLayoutStr == "TND" || inputLayoutStr == "TND_NTD") {
+                OP_CHECK_IF(
+                    ((tempLse->GetStorageShape().GetDimNum() != QUERY_DIM_3)), // 3：lse shape TN1
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "softmax_lse",
+                                                             std::to_string(tempLse->GetStorageShape().GetDimNum()),
+                                                             "Layout is TND/TND_NTD SoftmaxLse shape dim should be 3"),
+                    return ge::GRAPH_FAILED);
+                OP_CHECK_IF((((tempLse->GetStorageShape().GetDim(QUERY_DIM_0) != t) ||
+                              (tempLse->GetStorageShape().GetDim(QUERY_DIM_1) !=
+                               tempN) || // 0: the first dimension 1: the second dimension
+                              (tempLse->GetStorageShape().GetDim(QUERY_DIM_2) != 1))), // 2: the third dimension
+                            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                                context_->GetNodeName(), "softmax_lse",
+                                GetShapeDebugStr(tempLse->GetStorageShape()) + " vs TN1[" + std::to_string(t) + ", " +
+                                    std::to_string(tempN) + ", 1]",
+                                "Layout is TND SoftmaxLse shape does not match TN1"), // 2: the third dimension
+                            return ge::GRAPH_FAILED);
+            } else if (inputLayoutStr == "NTD" || inputLayoutStr == "NTD_TND") {
+                OP_CHECK_IF(
+                    ((tempLse->GetStorageShape().GetDimNum() != QUERY_DIM_3)), // 3：lse shape TN1
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context_->GetNodeName(), "softmax_lse",
+                                                             std::to_string(tempLse->GetStorageShape().GetDimNum()),
+                                                             "Layout is NTD/NTD_TND SoftmaxLse shape dim should be 3"),
+                    return ge::GRAPH_FAILED);
+                OP_CHECK_IF((((tempLse->GetStorageShape().GetDim(QUERY_DIM_1) != tempN) ||
+                              (tempLse->GetStorageShape().GetDim(QUERY_DIM_0) !=
+                               t) || // 0: the first dimension 1: the second dimension
+                              (tempLse->GetStorageShape().GetDim(QUERY_DIM_2) != 1))), // 2: the third dimension
+                            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                                context_->GetNodeName(), "softmax_lse",
+                                GetShapeDebugStr(tempLse->GetStorageShape()) + " vs TN1[" + std::to_string(t) + ", " +
+                                    std::to_string(tempN) + ", 1]",
+                                "Layout is NTD SoftmaxLse shape does not match TN1"), // 2: the third dimension
+                            return ge::GRAPH_FAILED);
+            } else {
+                OP_CHECK_IF(
+                    ((tempLse->GetStorageShape().GetDimNum() != QUERY_DIM_4)), // 4：lse shape BNS1
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                        context_->GetNodeName(), "softmax_lse",
+                        std::to_string(tempLse->GetStorageShape().GetDimNum()) + " (layout is " + inputLayoutStr + ")",
+                        "Layout is " + inputLayoutStr + ", SoftmaxLse shape dim should be 4"),
+                    return ge::GRAPH_FAILED);
+                OP_CHECK_IF(
+                    (((tempLse->GetStorageShape().GetDim(QUERY_DIM_0) != b) ||
+                      (tempLse->GetStorageShape().GetDim(QUERY_DIM_1) !=
+                       tempN) || // 0: the first dimension 1: the second dimension
+                      (tempLse->GetStorageShape().GetDim(QUERY_DIM_2) != s) ||
+                      (tempLse->GetStorageShape().GetDim(QUERY_DIM_3) !=
+                       1))), // 2: the third dimension 3: the fourth dimension
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        context_->GetNodeName(), "softmax_lse",
+                        GetShapeDebugStr(tempLse->GetStorageShape()) + " vs BNS1[" + std::to_string(b) + ", " +
+                            std::to_string(tempN) + ", " + std::to_string(s) + ", 1]",
+                        "SoftmaxLse shape does not match BNS1"), // 2: the third dimension 3: the fourth dimension
+                    return ge::GRAPH_FAILED);
+            }
+        }
+    }
+    if (ascendcPlatform.GetCurNpuArch() != Ops::Base::DAV_5102) {
+        OP_CHECK_IF(
+            (((contextParamsForPFATiling.inputDataType == ge::DT_INT8) ||
+              (contextParamsForPFATiling.kDataType == ge::DT_INT8) ||
+              (contextParamsForPFATiling.outputDataType == ge::DT_INT8)) &&
+             (queryD % D_ALIGN_32 != 0)),
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "query", std::to_string(queryD),
+                                                  "D of query should be 32 elements aligned when int8 is involved!"),
+            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            (queryD % D_ALIGN_16 != 0),
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "query", std::to_string(queryD),
+                                                  "D should be 16 elements aligned when FLOAT16/BFLOAT16 dtype!"),
+            return ge::GRAPH_FAILED);
+    }
+    ret = pfa_tiling.DoSubOpTiling(pfaTilingData, contextParamsForPFATiling);
+    OP_CHECK_IF(ret == ge::GRAPH_FAILED, OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(), "failed in FIA DoSubOpTiling"),
+                return ge::GRAPH_FAILED);
+    return ret;
 }
 } // namespace optiling

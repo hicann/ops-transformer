@@ -89,6 +89,7 @@ if(NOT BUILD_OPS_RTY_KERNEL)
     ../op_host/arch35/fused_infer_attention_score_tiling_v4.cpp
     ../op_host/arch35/fused_infer_attention_score_tiling_impl.cpp
     ../op_host/arch38/fused_infer_attention_score_tiling_arch38.cpp
+    ../op_host/arch38/fia_arch38_prompt_tiling.cpp
     ../op_host/fused_infer_attention_score_tiling_info_parser.cpp
     ${ARCH35_CHECKER_SRC_FILES}
     ../op_host/arch22/fused_infer_attention_score_tiling_v3.cpp

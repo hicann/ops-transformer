@@ -36,6 +36,14 @@ aclnnStatus aclnnIncreFlashAttentionV4GetWorkspaceSize(
                                       "on Ascend950."}));
         return ACLNN_ERR_RUNTIME_ERROR;
     }
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_5102) {
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1009", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{"aclnnIncreFlashAttentionV4",
+                                      "Interface aclnnIncreFlashAttention versions V1 to V4 are no longer supported "
+                                      "on Ascend5102."}));
+        return ACLNN_ERR_RUNTIME_ERROR;
+    }
     aclnnStatus ret = aclnnInnerIncreFlashAttentionGetWorkspaceSize(
         query, key, value, pseShift, attenMask, actualSeqLengths, dequantScale1, quantScale1, dequantScale2,
         quantScale2, quantOffset2, antiquantScale, antiquantOffset, blocktable, kvPaddingSize, numHeads, scaleValue,
@@ -53,6 +61,14 @@ aclnnStatus aclnnIncreFlashAttentionV4(void* workspace, uint64_t workspaceSize, 
             (std::vector<const char*>{"aclnnIncreFlashAttentionV4",
                                       "Interface aclnnIncreFlashAttention versions V1 to V4 are no longer supported "
                                       "on Ascend950."}));
+        return ACLNN_ERR_RUNTIME_ERROR;
+    }
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_5102) {
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1009", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{"aclnnIncreFlashAttentionV4",
+                                      "Interface aclnnIncreFlashAttention versions V1 to V4 are no longer supported "
+                                      "on Ascend5102."}));
         return ACLNN_ERR_RUNTIME_ERROR;
     }
     aclnnStatus ret = aclnnInnerIncreFlashAttention(workspace, workspaceSize, executor, stream);

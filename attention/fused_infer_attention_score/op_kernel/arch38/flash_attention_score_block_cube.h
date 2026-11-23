@@ -15,14 +15,14 @@
 #ifndef FLASH_ATTENTION_SCORE_BLOCK_CUBE_H_
 #define FLASH_ATTENTION_SCORE_BLOCK_CUBE_H_
 #include "util_regbase.h"
-#include "../offset_calculator.h"
+#include "../../../common/op_kernel/offset_calculator.h"
 #include "matmul_arch38.h"
-#include "../FixpipeOut.h"
-#include "../CopyInL1.h"
+#include "../../../common/op_kernel/FixpipeOut.h"
+#include "../../../common/op_kernel/CopyInL1.h"
 
 #include "infer_flash_attention_comm_arch38.h"
 #include "flash_attention_score_common_regbase_arch38.h"
-#include "fa_arch38_policy.h"
+#include "fia_arch38_policy.h"
 #include "kernel_operator_list_tensor_intf.h"
 using namespace AscendC;
 using namespace AscendC::Impl::Detail;
@@ -125,7 +125,7 @@ public:
         IsDn(true, isInt8, pseMode, hasAtten, hasDrop, s1BaseSize == 128, dTemplateType, hasRope);
 
     static constexpr bool forceBmm2UB =
-        ArchInfo::IsForceBmm2UB(hasAtten, static_cast<uint32_t>(dVTemplateType), s1BaseSize);
+        FiaPolicy::IsForceBmm2UB(hasAtten, static_cast<uint32_t>(dVTemplateType), s1BaseSize);
     static constexpr TPosition bmm2OutPos =
         forceBmm2UB ? TPosition::VECCALC :
                       GetC2Position(dVTemplateType,

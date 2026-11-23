@@ -336,13 +336,6 @@ std::string GetPfaDataTypeStr(ge::DataType type) {
 }
 } // namespace v2
 
-namespace arch38 {
-std::string GetPfaDataTypeStr(ge::DataType type) {
-    ge::DataType findDype = (g_strDataTypePfa.find(type) == g_strDataTypePfa.end()) ? ge::DT_UNDEFINED : type;
-    return g_strDataTypePfa.at(findDype);
-}
-} // namespace arch38
-
 ge::graphStatus PromptFlashAttentionTiling::ConvertContextToPFAParams(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams) const
 {
     contextKeyParams.opName = context->GetNodeName();

@@ -14,7 +14,7 @@
  */
 #ifndef MATMUL_H
 #define MATMUL_H
-#include "../buffers_policy.h"
+#include "../../../common/op_kernel/buffers_policy.h"
 using namespace AscendC;
 
 namespace fa_base_matmul {

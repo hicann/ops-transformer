@@ -302,7 +302,6 @@ public:
             .ExtendCfgInfo("aclnnSupport.value", "support_aclnn");
         this->AICore().AddConfig("ascend910b", aicore_config);
         this->AICore().AddConfig("ascend910_93", aicore_config);
-        this->AICore().AddConfig("mc62", aicore_config);
 
         OpAICoreConfig config_310p;
         config_310p.Input("query")
