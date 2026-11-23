@@ -590,10 +590,9 @@ inline ge::graphStatus ValidateKeyInnerAxesContiguous(gert::TilingContext* conte
         if (dimSize > 1) {
             const uint64_t actualStride = static_cast<uint64_t>(stride->GetStride(static_cast<size_t>(dim)));
             OP_CHECK_IF(actualStride != expectedStride,
-                        OP_LOGE(context,
-                                "key dim%ld must be contiguous, actual stride is %lu, expected stride is %lu. "
-                                "Only dim0 may be non-contiguous.",
-                                dim, actualStride, expectedStride),
+                        OP_LOGE_FOR_INVALID_STRIDE(
+                            context->GetNodeName(), (std::string("key.dim") + std::to_string(dim)).c_str(),
+                            std::to_string(actualStride).c_str(), std::to_string(expectedStride).c_str()),
                         return ge::GRAPH_FAILED);
         }
         expectedStride *= static_cast<uint64_t>(dimSize);
@@ -627,19 +626,23 @@ inline ge::graphStatus ResolveStrideKvBlock(gert::TilingContext* context, const 
 
     const int64_t actualStride0 = stride->GetStride(MSA_DIM_0);
     if (MsaIsSeqKeyLayout(info.keyLayout)) {
-        OP_CHECK_IF(actualStride0 < 0 || static_cast<uint64_t>(actualStride0) != defaultStride0,
-                    OP_LOGE(context, "TND key dim0 must be contiguous, actual=%ld expected=%lu.", actualStride0,
-                            defaultStride0),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            actualStride0 < 0 || static_cast<uint64_t>(actualStride0) != defaultStride0,
+            OP_LOGE_FOR_INVALID_STRIDE(context->GetNodeName(), "key.dim0", std::to_string(actualStride0).c_str(),
+                                       std::to_string(defaultStride0).c_str()),
+            return ge::GRAPH_FAILED);
         strideKvBlock = 0;
         return ge::GRAPH_SUCCESS;
     }
 
     OP_CHECK_IF(actualStride0 < 0 || static_cast<uint64_t>(actualStride0) < defaultStride0,
-                OP_LOGE(context, "PA key dim0 stride must be >= %lu, got %ld.", defaultStride0, actualStride0),
+                OP_LOGE_FOR_INVALID_STRIDE(context->GetNodeName(), "key.dim0", std::to_string(actualStride0).c_str(),
+                                           (std::string(">= ") + std::to_string(defaultStride0)).c_str()),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(static_cast<uint64_t>(actualStride0) > static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()),
-                OP_LOGE(context, "PA key dim0 stride %ld exceeds uint32 strideKvBlock.", actualStride0),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "key.dim0 stride",
+                                                      std::to_string(actualStride0).c_str(),
+                                                      "the stride must not exceed UINT32_MAX"),
                 return ge::GRAPH_FAILED);
     strideKvBlock = static_cast<uint32_t>(actualStride0);
     OP_LOGI(context->GetNodeName(), "PA key strideKvBlock=%u (contiguous default=%lu).", strideKvBlock, defaultStride0);
@@ -660,7 +663,8 @@ ge::graphStatus ParseLayoutKeyAttr(gert::TilingContext* context, const std::stri
     } else if (s == "BNBD") {
         keyLayout = MSA_KEY_LAYOUT_BNBD;
     } else {
-        OP_LOGE(context, "layout_key must be TND, BSND, BNSD, BBND or BNBD, got %s.", s.c_str());
+        OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(context->GetNodeName(), "layout_key", s.c_str(),
+                                               "the supported values are TND, BSND, BNSD, BBND and BNBD");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -676,7 +680,8 @@ ge::graphStatus ParseLayoutQueryAttr(gert::TilingContext* context, const char* l
     } else if (std::strcmp(s, "BNSD") == 0) {
         queryLayout = MSA_QUERY_LAYOUT_BNSD;
     } else {
-        OP_LOGE(context, "layout_query must be TND, BSND or BNSD, got %s.", s);
+        OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(context->GetNodeName(), "layout_query", s,
+                                               "the supported values are TND, BSND and BNSD");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -758,7 +763,10 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                 OP_LOGE(context, "FRACTAL_NZ key is not supported."), return ge::GRAPH_FAILED);
 
     OP_CHECK_IF(qlen.GetDimNum() != MSA_RANK_1D || qlen.GetDim(MSA_DIM_0) < MSA_QLEN_MIN_DIM0,
-                OP_LOGE(context, "actual_seq_qlen must be 1D [B+1]."), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "actual_seq_qlen",
+                                                         (std::to_string(qlen.GetDimNum()) + "D").c_str(),
+                                                         "actual_seq_qlen must be 1D [B+1]"),
+                return ge::GRAPH_FAILED);
     info.batch = static_cast<uint32_t>(qlen.GetDim(MSA_DIM_0) - 1);
 
     const auto* attrs = context->GetAttrs();
@@ -820,11 +828,20 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
             const uint32_t queryOfKey = (info.keyLayout == MSA_KEY_LAYOUT_BSND) ? MSA_QUERY_LAYOUT_BSND :
                                         (info.keyLayout == MSA_KEY_LAYOUT_BNSD) ? MSA_QUERY_LAYOUT_BNSD :
                                                                                   MSA_QUERY_LAYOUT_TND;
-            OP_CHECK_IF(info.queryLayout != queryOfKey,
-                        OP_LOGE(context, "non-paged key layout must match layout_query."), return ge::GRAPH_FAILED);
+            OP_CHECK_IF(
+                info.queryLayout != queryOfKey,
+                OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(
+                    context->GetNodeName(), "layout_key", layoutKey.c_str(),
+                    (std::string("the non-paged key layout must match layout_query=") +
+                     (attrs->GetStr(MSA_ATTR_LAYOUT_QUERY) == nullptr ? "TND" : attrs->GetStr(MSA_ATTR_LAYOUT_QUERY)))
+                        .c_str()),
+                return ge::GRAPH_FAILED);
         }
     } else {
-        OP_CHECK_IF(info.queryLayout > MSA_QUERY_LAYOUT_BNSD, OP_LOGE(context, "layout_query is invalid."),
+        OP_CHECK_IF(info.queryLayout > MSA_QUERY_LAYOUT_BNSD,
+                    OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(context->GetNodeName(), "layout_query",
+                                                           std::to_string(info.queryLayout).c_str(),
+                                                           "the layout_query value is invalid"),
                     return ge::GRAPH_FAILED);
     }
     if (info.queryLayout == MSA_QUERY_LAYOUT_TND) {
@@ -863,7 +880,12 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                 for (uint32_t b = 0; b < info.batch; ++b) {
                     const int32_t qlenB = qlenData[b + 1] - qlenData[b];
                     OP_CHECK_IF(qlenB < 0 || static_cast<uint32_t>(qlenB) > info.qMaxSeq,
-                                OP_LOGE(context, "query length %d exceeds layout S=%u.", qlenB, info.qMaxSeq),
+                                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                                    context->GetNodeName(), "actual_seq_qlen", std::to_string(qlenB).c_str(),
+                                    (std::string("the query length must be non-negative and must not exceed the "
+                                                 "layout S=") +
+                                     std::to_string(info.qMaxSeq))
+                                        .c_str()),
                                 return ge::GRAPH_FAILED);
                 }
             }
@@ -876,12 +898,17 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
             OP_CHECK_NULL_WITH_CONTEXT(context, scoreShapeEarly);
             const gert::Shape& scoreEarly = scoreShapeEarly->GetStorageShape();
             OP_CHECK_IF(scoreEarly.GetDimNum() != MSA_QUERY_DIM_NUM,
-                        OP_LOGE(context, "score must be 3D [N1,T1,stride]."), return ge::GRAPH_FAILED);
+                        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "score",
+                                                                 (std::to_string(scoreEarly.GetDimNum()) + "D").c_str(),
+                                                                 "score must have 3 dims [N1, T1, stride]"),
+                        return ge::GRAPH_FAILED);
             // pool_block_size=16 的 head 间 max 把 score 收到 1 个 head；块长 128 仍是每个 query head 一份。
             const uint32_t expectScoreHeads = (poolBlockSizeAttr == MSA_BLOCK16_SIZE) ? 1U : info.numQHeads;
             OP_CHECK_IF(
                 static_cast<uint32_t>(scoreEarly.GetDim(MSA_DIM_0)) != expectScoreHeads,
-                OP_LOGE(context, "score head dim(%ld) must be %u.", scoreEarly.GetDim(MSA_DIM_0), expectScoreHeads),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context->GetNodeName(), "score.shape[0]", std::to_string(scoreEarly.GetDim(MSA_DIM_0)).c_str(),
+                    (std::string("the head dim must be ") + std::to_string(expectScoreHeads)).c_str()),
                 return ge::GRAPH_FAILED);
             const int64_t scoreTokens = scoreEarly.GetDim(MSA_DIM_1);
             OP_CHECK_IF(scoreTokens < 0, OP_LOGE(context, "score T1 must be concrete, got %ld.", scoreTokens),
@@ -921,7 +948,9 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                     OP_LOGE(context, "non-paged actual_seq_klen must be [B+1] prefix-sum."), return ge::GRAPH_FAILED);
         if (info.keyLayout == MSA_KEY_LAYOUT_TND) {
             OP_CHECK_IF(kc.GetDimNum() != MSA_KEY_TND_DIM_NUM,
-                        OP_LOGE(context, "layout_key=TND requires key rank 3 [T2,N2,D], got %zu.", kc.GetDimNum()),
+                        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "key",
+                                                                 (std::to_string(kc.GetDimNum()) + "D").c_str(),
+                                                                 "layout_key=TND requires key rank 3 [T2, N2, D]"),
                         return ge::GRAPH_FAILED);
             info.totalK = static_cast<uint32_t>(kc.GetDim(MSA_DIM_0));
             info.numKvHeads = static_cast<uint32_t>(kc.GetDim(MSA_DIM_1));
@@ -952,7 +981,12 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                     for (uint32_t b = 0; b < info.batch; ++b) {
                         const int32_t kvB = klenData[b + 1U] - klenData[b];
                         OP_CHECK_IF(kvB < 0 || static_cast<uint32_t>(kvB) > info.kMaxSeq,
-                                    OP_LOGE(context, "key length %d exceeds layout S=%u.", kvB, info.kMaxSeq),
+                                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                                        context->GetNodeName(), "actual_seq_klen", std::to_string(kvB).c_str(),
+                                        (std::string("the key length must be non-negative and must not exceed the "
+                                                     "layout S=") +
+                                         std::to_string(info.kMaxSeq))
+                                            .c_str()),
                                     return ge::GRAPH_FAILED);
                     }
                 }
@@ -967,7 +1001,9 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                     OP_LOGE(context, "PageAttention (BBND/BNBD) requires block_table."), return ge::GRAPH_FAILED);
         const gert::Shape& bt = blockTableShape->GetStorageShape();
         OP_CHECK_IF(bt.GetDimNum() != MSA_BLOCK_TABLE_DIM_NUM,
-                    OP_LOGE(context, "block_table must have 2 dims, got %zu.", bt.GetDimNum()),
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "block_table",
+                                                             (std::to_string(bt.GetDimNum()) + "D").c_str(),
+                                                             "block_table must have 2 dims"),
                     return ge::GRAPH_FAILED);
         OP_CHECK_IF(static_cast<uint32_t>(bt.GetDim(MSA_DIM_0)) != info.batch,
                     OP_LOGE(context, "block_table batch(%ld) must equal actual_seq_qlen batch(%u).",
@@ -976,8 +1012,11 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
         // 页表按存储页粒度：宽度 = 存储页数，与打分块数（pool_block_size attr）解耦。
         info.tableWidth = static_cast<uint32_t>(bt.GetDim(MSA_DIM_1));
         OP_CHECK_IF(kc.GetDimNum() != MSA_KEY_PA_DIM_NUM,
-                    OP_LOGE(context, "layout_key=%s requires key rank 4, got %zu.",
-                            info.keyLayout == MSA_KEY_LAYOUT_BNBD ? "BNBD" : "BBND", kc.GetDimNum()),
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                        context->GetNodeName(), "key", (std::to_string(kc.GetDimNum()) + "D").c_str(),
+                        (std::string("layout_key=") + (info.keyLayout == MSA_KEY_LAYOUT_BNBD ? "BNBD" : "BBND") +
+                         " requires key rank 4")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
         info.numPages = static_cast<uint32_t>(kc.GetDim(MSA_DIM_0));
         // 存储页长 = key 的页维度；打分块长 = pool_block_size attr。两者解耦：打分块必须放得进存储页。
@@ -1008,7 +1047,12 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
         info.poolBlockSize = poolBlockSizeAttr;
         info.pageSize = pageSize;
         OP_CHECK_IF(klen.GetDimNum() != MSA_RANK_1D || static_cast<uint32_t>(klen.GetDim(MSA_DIM_0)) != info.batch,
-                    OP_LOGE(context, "PA actual_seq_klen must be [B] visible S2."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        context->GetNodeName(), "actual_seq_klen", Ops::Base::ToString(klen).c_str(),
+                        (std::string("PA actual_seq_klen must be 1D [B] with leading dim equal to batch=") +
+                         std::to_string(info.batch))
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
     }
 
     // score 末维 = 打分块数（16 对齐）。return_choice=0 时取自用户 score；否则按输入推导，与 InferShape 一致。
@@ -1028,7 +1072,10 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                     OP_LOGE(context, "outputs do not match return_choice=%u.", info.returnChoice),
                     return ge::GRAPH_FAILED);
         const gert::Shape& scOut = scoreShape->GetStorageShape();
-        OP_CHECK_IF(scOut.GetDimNum() != MSA_QUERY_DIM_NUM, OP_LOGE(context, "score must be 3D [N1,T1,stride]."),
+        OP_CHECK_IF(scOut.GetDimNum() != MSA_QUERY_DIM_NUM,
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "score",
+                                                             (std::to_string(scOut.GetDimNum()) + "D").c_str(),
+                                                             "score must have 3 dims [N1, T1, stride]"),
                     return ge::GRAPH_FAILED);
         if (info.queryLayout == MSA_QUERY_LAYOUT_TND) {
             const int64_t expectHeads = poolBlockSizeAttr == MSA_BLOCK16_SIZE ? 1 : info.numQHeads;
@@ -1039,12 +1086,18 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                 return ge::GRAPH_FAILED);
         }
         info.maxBlocksPerBatch = static_cast<uint32_t>(scOut.GetDim(MSA_DIM_2));
-        OP_CHECK_IF(info.maxBlocksPerBatch == 0, OP_LOGE(context, "score last dim must be positive."),
+        OP_CHECK_IF(info.maxBlocksPerBatch == 0,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "score.shape[2]",
+                                                          std::to_string(info.maxBlocksPerBatch).c_str(),
+                                                          "the score last dim must be positive"),
                     return ge::GRAPH_FAILED);
-        OP_CHECK_IF((info.maxBlocksPerBatch % MSA_SCORE_STRIDE_ALIGN) != 0,
-                    OP_LOGE(context, "score last dim(%u) must be a multiple of %u.", info.maxBlocksPerBatch,
-                            MSA_SCORE_STRIDE_ALIGN),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            (info.maxBlocksPerBatch % MSA_SCORE_STRIDE_ALIGN) != 0,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                context->GetNodeName(), "score.shape[2]", std::to_string(info.maxBlocksPerBatch).c_str(),
+                (std::string("the score last dim must be a multiple of ") + std::to_string(MSA_SCORE_STRIDE_ALIGN))
+                    .c_str()),
+            return ge::GRAPH_FAILED);
         OP_CHECK_NULL_WITH_CONTEXT(context, scoreOutIr.desc);
         OP_CHECK_IF(scoreOutIr.desc->GetDataType() != ge::DT_FLOAT,
                     OP_LOGE(context, "fp16 score is reserved and not supported."), return ge::GRAPH_FAILED);
@@ -1104,7 +1157,10 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         info.headDim == 0 || (info.headDim % MSA_SCORE_STRIDE_ALIGN) != 0,
-        OP_LOGE(context, "headDim(%u) must be a positive multiple of %u.", info.headDim, MSA_SCORE_STRIDE_ALIGN),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context->GetNodeName(), "headDim", std::to_string(info.headDim).c_str(),
+            (std::string("the headDim must be a positive multiple of ") + std::to_string(MSA_SCORE_STRIDE_ALIGN))
+                .c_str()),
         return ge::GRAPH_FAILED);
     OP_CHECK_IF(info.headDim > MSA_K_TILE,
                 OP_LOGE(context, "headDim(%u) larger than %u is not supported yet.", info.headDim, MSA_K_TILE),
@@ -1118,29 +1174,44 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                 OP_LOGE(context, "maxBlocksPerBatch must be positive (empty kv uses aligned score stride)."),
                 return ge::GRAPH_FAILED);
     // 仅 PA 有 page 池；TND / BSND 直接按 token 寻址，numPages 恒为 0。
-    OP_CHECK_IF((info.keyLayout == MSA_KEY_LAYOUT_BBND || info.keyLayout == MSA_KEY_LAYOUT_BNBD) && info.numPages == 0,
-                OP_LOGE(context, "PA numPages must be positive."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        (info.keyLayout == MSA_KEY_LAYOUT_BBND || info.keyLayout == MSA_KEY_LAYOUT_BNBD) && info.numPages == 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "numPages", std::to_string(info.numPages).c_str(),
+                                              "PA numPages must be positive"),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(static_cast<uint32_t>(startLocShape->GetStorageShape().GetDim(MSA_DIM_0)) != info.batch,
-                OP_LOGE(context, "start_loc size must equal batch."), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context->GetNodeName(), "start_loc",
+                    std::to_string(startLocShape->GetStorageShape().GetDim(MSA_DIM_0)).c_str(),
+                    (std::string("the start_loc size must equal batch=") + std::to_string(info.batch)).c_str()),
+                return ge::GRAPH_FAILED);
 
     const auto* queryDesc = context->GetInputDesc(MSA_IDX_QUERY);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryDesc);
     info.queryDtype = queryDesc->GetDataType();
     info.isMxFp4 = info.isAscend950 && info.queryDtype == ge::DT_FLOAT4_E2M1 && info.keyDtype == ge::DT_FLOAT4_E2M1;
     OP_CHECK_IF(!info.isMxFp4 && !IsNonQuantQueryDtype(info.queryDtype, info.isAscend950),
-                OP_LOGE(context, "query dtype must be bf16 or fp16 on A2/A3; Ascend 950 also allows hifloat8 / "
-                                 "float8_e5m2 / float8_e4m3fn. int8 query and float4 are reserved."),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                    context->GetNodeName(), "query", Ops::Base::ToString(info.queryDtype).c_str(),
+                    "bf16 or fp16 is supported on A2/A3, and hifloat8, float8_e5m2 or float8_e4m3fn is also "
+                    "supported on Ascend 950; int8 query and float4 are reserved"),
                 return ge::GRAPH_FAILED);
 
     info.isQuant = (info.keyDtype == ge::DT_INT8);
     // 预留int8场景，当前拦截
     OP_CHECK_IF(info.queryDtype == ge::DT_FLOAT16 && info.keyDtype == ge::DT_INT8,
-                OP_LOGE(context, "float16 query with int8 key is not supported yet, got query %d key %d.",
-                        static_cast<int32_t>(info.queryDtype), static_cast<int32_t>(info.keyDtype)),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), "query/key",
+                                                      (std::string("query=") + Ops::Base::ToString(info.queryDtype) +
+                                                       ", key=" + Ops::Base::ToString(info.keyDtype))
+                                                          .c_str(),
+                                                      "float16 query with int8 key is not supported yet"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(info.isAscend950 && info.queryDtype == ge::DT_HIFLOAT8 && info.keyDtype == ge::DT_HIFLOAT8,
-                OP_LOGE(context, "hifloat8 query with hifloat8 key is not supported yet, got query %d key %d.",
-                        static_cast<int32_t>(info.queryDtype), static_cast<int32_t>(info.keyDtype)),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), "query/key",
+                                                      (std::string("query=") + Ops::Base::ToString(info.queryDtype) +
+                                                       ", key=" + Ops::Base::ToString(info.keyDtype))
+                                                          .c_str(),
+                                                      "hifloat8 query with hifloat8 key is not supported yet"),
                 return ge::GRAPH_FAILED);
     // 打分块长 16（TND 16、BSND/BNSD、页长 16 的两级 maxpool）仅 fp16 / bf16；int8 与 FP8 固定 128。
     OP_CHECK_IF(info.poolBlockSize == MSA_BLOCK16_SIZE && !info.isMxFp4 &&
@@ -1162,8 +1233,14 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
         OP_CHECK_IF(info.queryDtype != ge::DT_FLOAT16, OP_LOGE(context, "ND int8 key currently requires fp16 query."),
                     return ge::GRAPH_FAILED);
     } else {
-        OP_CHECK_IF(info.keyDtype != info.queryDtype, OP_LOGE(context, "non-quant key dtype must match query dtype."),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            info.keyDtype != info.queryDtype,
+            OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context->GetNodeName(), "query, key",
+                                                   (std::string("query=") + Ops::Base::ToString(info.queryDtype) +
+                                                    ", key=" + Ops::Base::ToString(info.keyDtype))
+                                                       .c_str(),
+                                                   "the non-quant key dtype must match the query dtype"),
+            return ge::GRAPH_FAILED);
         OP_CHECK_IF(IsFp8ComputeDtype(info.queryDtype) && !info.isAscend950,
                     OP_LOGE(context, "FP8 query/key is only supported on Ascend 950."), return ge::GRAPH_FAILED);
     }
@@ -1199,7 +1276,9 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
         OP_CHECK_IF(!kOk, OP_LOGE(context, "MXFP4 key_scale must mirror key layout with last dim D/32."),
                     return ge::GRAPH_FAILED);
     } else if (info.isQuant) {
-        OP_CHECK_IF(!IsOptionalProvided(scaleShape), OP_LOGE(context, "int8 key requires dequant scale."),
+        OP_CHECK_IF(!IsOptionalProvided(scaleShape),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "key_scale",
+                                                             "an int8 key requires the dequant scale input"),
                     return ge::GRAPH_FAILED);
         const gert::Shape& sc = scaleShape->GetStorageShape();
         if (info.keyLayout == MSA_KEY_LAYOUT_TND) {
@@ -1209,27 +1288,43 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
             const bool ok1d = (sc.GetDimNum() == MSA_RANK_1D && info.numKvHeads == 1 &&
                                static_cast<uint32_t>(sc.GetDim(MSA_DIM_0)) == info.totalK);
             OP_CHECK_IF(!ok2d && !ok1d,
-                        OP_LOGE(context, "TND dequant scale must be [%u, %u] or [%u] (N2=1).", info.totalK,
-                                info.numKvHeads, info.totalK),
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            context->GetNodeName(), "key_scale", Ops::Base::ToString(sc).c_str(),
+                            (std::string("the TND dequant scale must be [") + std::to_string(info.totalK) + ", " +
+                             std::to_string(info.numKvHeads) + "] or [" + std::to_string(info.totalK) + "] when N2=1")
+                                .c_str()),
                         return ge::GRAPH_FAILED);
         } else {
             OP_CHECK_IF(sc.GetDimNum() != MSA_SCALE_PA_DIM_NUM,
-                        OP_LOGE(context, "PA dequant scale must be 3D [NP, N_kv, P], got rank %zu.", sc.GetDimNum()),
+                        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "key_scale",
+                                                                 (std::to_string(sc.GetDimNum()) + "D").c_str(),
+                                                                 "PA dequant scale must have 3 dims [NP, N_kv, P]"),
                         return ge::GRAPH_FAILED);
             OP_CHECK_IF(static_cast<uint32_t>(sc.GetDim(MSA_DIM_0)) != info.numPages ||
                             static_cast<uint32_t>(sc.GetDim(MSA_DIM_1)) != info.numKvHeads ||
                             static_cast<uint32_t>(sc.GetDim(MSA_DIM_2)) != info.pageSize,
-                        OP_LOGE(context, "dequant scale shape must be [%u, %u, %u], got [%ld, %ld, %ld].",
-                                info.numPages, info.numKvHeads, info.pageSize, sc.GetDim(MSA_DIM_0),
-                                sc.GetDim(MSA_DIM_1), sc.GetDim(MSA_DIM_2)),
+                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                            context->GetNodeName(), "key_scale", Ops::Base::ToString(sc).c_str(),
+                            (std::string("the dequant scale shape must be [") + std::to_string(info.numPages) + ", " +
+                             std::to_string(info.numKvHeads) + ", " + std::to_string(info.pageSize) + "]")
+                                .c_str()),
                         return ge::GRAPH_FAILED);
         }
         const auto* scaleDesc = context->GetOptionalInputDesc(MSA_IDX_KEY_SCALE);
-        OP_CHECK_NULL_WITH_CONTEXT(context, scaleDesc);
-        OP_CHECK_IF(scaleDesc->GetDataType() != ge::DT_FLOAT, OP_LOGE(context, "dequant scale dtype must be float32."),
+        if (scaleDesc == nullptr) {
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "key_scale",
+                                                     "the dequant scale must be provided for an int8 key");
+            return ge::GRAPH_FAILED;
+        }
+        OP_CHECK_IF(scaleDesc->GetDataType() != ge::DT_FLOAT,
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), "key_scale",
+                                                          Ops::Base::ToString(scaleDesc->GetDataType()).c_str(),
+                                                          "the dequant scale dtype must be float32"),
                     return ge::GRAPH_FAILED);
     } else {
-        OP_CHECK_IF(IsOptionalProvided(scaleShape), OP_LOGE(context, "non-quant path must not pass key_scale."),
+        OP_CHECK_IF(IsOptionalProvided(scaleShape),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "key_scale", "provided",
+                                                          "the non-quant path must not pass key_scale"),
                     return ge::GRAPH_FAILED);
     }
     OP_CHECK_IF(!info.isMxFp4 && IsOptionalProvided(queryScaleShape),
@@ -1238,27 +1333,38 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
     const int64_t* sparseModeAttr = attrs->GetInt(MSA_ATTR_SPARSE_MODE);
     info.sparseMode = (sparseModeAttr == nullptr) ? MSA_SPARSE_MODE_RIGHT_DOWN : static_cast<uint32_t>(*sparseModeAttr);
     OP_CHECK_IF(info.sparseMode != MSA_SPARSE_MODE_DEFAULT && info.sparseMode != MSA_SPARSE_MODE_RIGHT_DOWN,
-                OP_LOGE(context, "sparse_mode must be %u or %u, got %u.", MSA_SPARSE_MODE_DEFAULT,
-                        MSA_SPARSE_MODE_RIGHT_DOWN, info.sparseMode),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    context->GetNodeName(), "sparse_mode", std::to_string(info.sparseMode).c_str(),
+                    (std::string("the supported values are ") + std::to_string(MSA_SPARSE_MODE_DEFAULT) + " and " +
+                     std::to_string(MSA_SPARSE_MODE_RIGHT_DOWN))
+                        .c_str()),
                 return ge::GRAPH_FAILED);
 
     const gert::StorageShape* attenMaskShape = context->GetOptionalInputShape(MSA_IDX_ATTEN_MASK);
     if (info.sparseMode == MSA_SPARSE_MODE_RIGHT_DOWN) {
         OP_CHECK_IF(!IsOptionalProvided(attenMaskShape),
-                    OP_LOGE(context, "sparse_mode=%u requires atten_mask of shape [%u, %u].",
-                            MSA_SPARSE_MODE_RIGHT_DOWN, MSA_ATTEN_MASK_SIZE, MSA_ATTEN_MASK_SIZE),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        context->GetNodeName(), "atten_mask",
+                        (std::string("sparse_mode=") + std::to_string(MSA_SPARSE_MODE_RIGHT_DOWN) +
+                         " requires atten_mask of shape [" + std::to_string(MSA_ATTEN_MASK_SIZE) + ", " +
+                         std::to_string(MSA_ATTEN_MASK_SIZE) + "]")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
         const gert::Shape& am = attenMaskShape->GetStorageShape();
         OP_CHECK_IF(am.GetDimNum() != MSA_ATTEN_MASK_DIM_NUM ||
                         static_cast<uint32_t>(am.GetDim(MSA_DIM_0)) != MSA_ATTEN_MASK_SIZE ||
                         static_cast<uint32_t>(am.GetDim(MSA_DIM_1)) != MSA_ATTEN_MASK_SIZE,
-                    OP_LOGE(context, "atten_mask must be [%u, %u], got rank=%zu dims=[%ld,%ld].", MSA_ATTEN_MASK_SIZE,
-                            MSA_ATTEN_MASK_SIZE, am.GetDimNum(), am.GetDimNum() > 0 ? am.GetDim(MSA_DIM_0) : -1,
-                            am.GetDimNum() > 1 ? am.GetDim(MSA_DIM_1) : -1),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        context->GetNodeName(), "atten_mask", Ops::Base::ToString(am).c_str(),
+                        (std::string("atten_mask must be [") + std::to_string(MSA_ATTEN_MASK_SIZE) + ", " +
+                         std::to_string(MSA_ATTEN_MASK_SIZE) + "]")
+                            .c_str()),
                     return ge::GRAPH_FAILED);
     } else {
         OP_CHECK_IF(IsOptionalProvided(attenMaskShape),
-                    OP_LOGE(context, "sparse_mode=%u must not pass atten_mask.", MSA_SPARSE_MODE_DEFAULT),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        context->GetNodeName(), "sparse_mode", std::to_string(MSA_SPARSE_MODE_DEFAULT).c_str(),
+                        "the atten_mask input must not be passed for this sparse_mode"),
                     return ge::GRAPH_FAILED);
     }
 
@@ -1279,7 +1385,10 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(info.platformInfo);
     const uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
     const uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
-    OP_CHECK_IF(aicNum == 0, OP_LOGE(context, "aic core num is 0."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(aicNum == 0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "aicNum", "0",
+                                                      "the platform must report at least one AI core"),
+                return ge::GRAPH_FAILED);
 
     const uint32_t scoreBlockStride = RoundUpU32(info.maxBlocksPerBatch, MSA_SCORE_STRIDE_ALIGN);
     // 950 C_to_UB：S 不进 GM；int8/TND 尾页仍要一页 K scratch。A2 与 950 回退（MSA_A5_USE_C2UB=0）走 8-stage S。

@@ -58,7 +58,9 @@ static uint32_t InferOutFeatures(const gert::Shape& weightShape, bool transWeigh
 ge::graphStatus CheckExpectDataType(ge::DataType actual, ge::DataType expect, const char* tensorName,
                                     const char* expectName, const char* opName)
 {
-    OP_CHECK_IF(actual != expect, OP_LOGE(opName, "%s dtype must be %s.", tensorName, expectName),
+    OP_CHECK_IF(actual != expect,
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName, tensorName, Ops::Base::ToString(actual).c_str(),
+                                                      (std::string("the dtype must be ") + expectName).c_str()),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -83,7 +85,11 @@ ge::graphStatus KdaInputProjInfoParser::GetNpuInfo()
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfo_);
     const uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
     const uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
-    OP_CHECK_IF(aicNum == 0U || aivNum == 0U, OP_LOGE(opName_, "num of core obtained is 0."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(aicNum == 0U || aivNum == 0U,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    opName_, "aicNum/aivNum", (std::to_string(aicNum) + "/" + std::to_string(aivNum)).c_str(),
+                    "the platform must report at least one AI core and one vector core"),
+                return ge::GRAPH_FAILED);
     aicNum_ = aicNum;
     aivNum_ = aivNum;
 
@@ -229,22 +235,49 @@ ge::graphStatus KdaInputProjInfoParser::GetAndCheckInOutDataType()
 ge::graphStatus KdaInputProjInfoParser::CheckShapeDim()
 {
     OP_CHECK_IF(opParamInfo_.x.shape->GetStorageShape().GetDimNum() != DIM_NUM_TWO,
-                OP_LOGE(opName_, "%s must be 2D.", kda_input_proj::X_NAME), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    opName_, kda_input_proj::X_NAME,
+                    (std::to_string(opParamInfo_.x.shape->GetStorageShape().GetDimNum()) + "D").c_str(),
+                    "the storage shape must be 2D"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.weightQkv.shape->GetStorageShape().GetDimNum() != DIM_NUM_TWO,
-                OP_LOGE(opName_, "%s must be 2D.", kda_input_proj::WEIGHT_QKV_NAME), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    opName_, kda_input_proj::WEIGHT_QKV_NAME,
+                    (std::to_string(opParamInfo_.weightQkv.shape->GetStorageShape().GetDimNum()) + "D").c_str(),
+                    "the storage shape must be 2D"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.weightBeta.shape->GetStorageShape().GetDimNum() != DIM_NUM_TWO,
-                OP_LOGE(opName_, "%s must be 2D.", kda_input_proj::WEIGHT_BETA_NAME), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    opName_, kda_input_proj::WEIGHT_BETA_NAME,
+                    (std::to_string(opParamInfo_.weightBeta.shape->GetStorageShape().GetDimNum()) + "D").c_str(),
+                    "the storage shape must be 2D"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.weightGate.shape->GetStorageShape().GetDimNum() != DIM_NUM_TWO,
-                OP_LOGE(opName_, "%s must be 2D.", kda_input_proj::WEIGHT_GATE_NAME), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    opName_, kda_input_proj::WEIGHT_GATE_NAME,
+                    (std::to_string(opParamInfo_.weightGate.shape->GetStorageShape().GetDimNum()) + "D").c_str(),
+                    "the storage shape must be 2D"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.weightG.shape->GetStorageShape().GetDimNum() != DIM_NUM_TWO,
-                OP_LOGE(opName_, "%s must be 2D.", kda_input_proj::WEIGHT_G_NAME), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    opName_, kda_input_proj::WEIGHT_G_NAME,
+                    (std::to_string(opParamInfo_.weightG.shape->GetStorageShape().GetDimNum()) + "D").c_str(),
+                    "the storage shape must be 2D"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.weightQkvScale.shape->GetStorageShape().GetDimNum() != DIM_NUM_THREE,
-                OP_LOGE(opName_, "%s must be 3D.", kda_input_proj::WEIGHT_QKV_SCALE_NAME), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    opName_, kda_input_proj::WEIGHT_QKV_SCALE_NAME,
+                    (std::to_string(opParamInfo_.weightQkvScale.shape->GetStorageShape().GetDimNum()) + "D").c_str(),
+                    "the storage shape must be 3D"),
+                return ge::GRAPH_FAILED);
 
     const int64_t tSize = opParamInfo_.x.shape->GetStorageShape().GetDim(0);
     const int64_t hiddenSize = opParamInfo_.x.shape->GetStorageShape().GetDim(1);
     OP_CHECK_IF(tSize <= 0L || hiddenSize <= 0L,
-                OP_LOGE(opName_, "%s shape [%ld, %ld] is invalid.", kda_input_proj::X_NAME, tSize, hiddenSize),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, kda_input_proj::X_NAME,
+                    (std::string("[") + std::to_string(tSize) + ", " + std::to_string(hiddenSize) + "]").c_str(),
+                    "the shape dims must be greater than 0"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -255,7 +288,11 @@ ge::graphStatus KdaInputProjInfoParser::GetBaseShapeInfo()
     baseParams_.tSize = static_cast<uint32_t>(xShape.GetDim(DIM_IDX_ZERO));
     baseParams_.hiddenSize = static_cast<uint32_t>(xShape.GetDim(DIM_IDX_ONE));
     OP_CHECK_IF(baseParams_.tSize == 0 || baseParams_.hiddenSize == 0,
-                OP_LOGE(opName_, "x shape [%u, %u] is invalid.", baseParams_.tSize, baseParams_.hiddenSize),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "x",
+                                                      (std::string("[") + std::to_string(baseParams_.tSize) + ", " +
+                                                       std::to_string(baseParams_.hiddenSize) + "]")
+                                                          .c_str(),
+                                                      "the shape dims must be greater than 0"),
                 return ge::GRAPH_FAILED);
 
     const bool transQkv = GetAttrOrDefault(opParamInfo_.transWeightQkv, true);

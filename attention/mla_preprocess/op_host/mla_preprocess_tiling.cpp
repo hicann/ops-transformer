@@ -182,11 +182,9 @@ inline bool ValidateCacheNonFirstAxisContiguous(gert::TilingContext* context, co
         auto dim = static_cast<size_t>(i);
         uint64_t actualStride = static_cast<uint64_t>(stride->GetStride(dim));
         if (actualStride != expectedStride) {
-            OP_LOGE(context,
-                    "Tensor %s (irIdx=%lu) dim%ld is non-contiguous: "
-                    "actual stride=%lu, expected contiguous stride=%lu. "
-                    "Only the first axis (dim0) may be non-contiguous.",
-                    tensorName, inputIndex, i, actualStride, expectedStride);
+            OP_LOGE_FOR_INVALID_STRIDE(context->GetNodeName(),
+                                       (std::string(tensorName) + ".dim" + std::to_string(i)).c_str(),
+                                       std::to_string(actualStride).c_str(), std::to_string(expectedStride).c_str());
             return false;
         }
         expectedStride *= static_cast<uint64_t>(shape.GetDim(dim));
@@ -970,7 +968,11 @@ ge::graphStatus MlaPreprocessTiling::Init(gert::TilingContext* context)
     const bool cosDisablesRope = cosStorageShape.GetDimNum() == 1 && cosStorageShape.GetDim(0) == 0;
     const bool sinDisablesRope = sinStorageShape.GetDimNum() == 1 && sinStorageShape.GetDim(0) == 0;
     OP_CHECK_IF(cosDisablesRope != sinDisablesRope,
-                OP_LOGE(context, "cos and sin must both have shape [0] or neither have shape [0]."),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), "cos/sin",
+                                                      (std::string("cos=") + Ops::Base::ToString(cosStorageShape) +
+                                                       ", sin=" + Ops::Base::ToString(sinStorageShape))
+                                                          .c_str(),
+                                                      "cos and sin must both have shape [0] or neither have shape [0]"),
                 return ge::GRAPH_FAILED);
     if (!cosDisablesRope) {
         const auto& inputStorageShape = context->GetRequiredInputShape(INDEX_INPUT)->GetStorageShape();
@@ -978,7 +980,13 @@ ge::graphStatus MlaPreprocessTiling::Init(gert::TilingContext* context)
         OP_CHECK_IF(cosStorageShape.GetDimNum() != 2 || sinStorageShape.GetDimNum() != 2 ||
                         cosStorageShape.GetDim(0) != tokenNum || sinStorageShape.GetDim(0) != tokenNum ||
                         cosStorageShape.GetDim(1) != HEADDIM || sinStorageShape.GetDim(1) != HEADDIM,
-                    OP_LOGE(context, "cos and sin must have shape [tokenNum, 64]."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        context->GetNodeName(), "cos/sin",
+                        (std::string("cos=") + Ops::Base::ToString(cosStorageShape) +
+                         ", sin=" + Ops::Base::ToString(sinStorageShape))
+                            .c_str(),
+                        (std::string("both must have shape [") + std::to_string(tokenNum) + ", 64]").c_str()),
+                    return ge::GRAPH_FAILED);
     }
     param.enableRope = !cosDisablesRope;
 

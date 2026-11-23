@@ -86,14 +86,19 @@ static ge::graphStatus CheckRank(const gert::Shape* shape, size_t expectRank, co
                                  const char* opName)
 {
     OP_CHECK_IF(shape->GetDimNum() != expectRank,
-                OP_LOGE(opName, "%s must be %zuD, but got %zuD.", tensorName, expectRank, shape->GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    opName, tensorName, (std::to_string(shape->GetDimNum()) + "D").c_str(),
+                    (std::string("the shape dim must be ") + std::to_string(expectRank) + "D").c_str()),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
 static ge::graphStatus CheckDimValue(int64_t dim, const char* tensorName, const char* dimName, const char* opName)
 {
-    OP_CHECK_IF(!IsValidDim(dim), OP_LOGE(opName, "%s.%s=%ld is invalid (expect >0 or -1).", tensorName, dimName, dim),
+    OP_CHECK_IF(!IsValidDim(dim),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName, (std::string(tensorName) + "." + dimName).c_str(),
+                                                      std::to_string(dim).c_str(),
+                                                      "the value must be greater than 0 or equal to -1"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

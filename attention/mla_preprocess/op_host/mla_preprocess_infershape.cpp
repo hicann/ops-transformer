@@ -260,15 +260,24 @@ static ge::graphStatus CheckRopeInputShapes(gert::InferShapeContext* context, in
 
     const bool cosDisablesRope = IsDisabledRopeShape(cosShape);
     const bool sinDisablesRope = IsDisabledRopeShape(sinShape);
-    OP_CHECK_IF(cosDisablesRope != sinDisablesRope,
-                OP_LOGE(context->GetNodeName(), "cos and sin must both have shape [0] or neither have shape [0]."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        cosDisablesRope != sinDisablesRope,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context->GetNodeName(), "cos/sin",
+            (std::string("cos=") + Ops::Base::ToString(*cosShape) + ", sin=" + Ops::Base::ToString(*sinShape)).c_str(),
+            "cos and sin must both have shape [0] or neither have shape [0]"),
+        return ge::GRAPH_FAILED);
     if (!cosDisablesRope) {
-        OP_CHECK_IF(cosShape->GetDimNum() != 2 || sinShape->GetDimNum() != 2 || cosShape->GetDim(0) != tokenNum ||
-                        sinShape->GetDim(0) != tokenNum || cosShape->GetDim(1) != ROPE_HEAD_DIM ||
-                        sinShape->GetDim(1) != ROPE_HEAD_DIM,
-                    OP_LOGE(context->GetNodeName(), "cos and sin must have shape [tokenNum, 64]."),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            cosShape->GetDimNum() != 2 || sinShape->GetDimNum() != 2 || cosShape->GetDim(0) != tokenNum ||
+                sinShape->GetDim(0) != tokenNum || cosShape->GetDim(1) != ROPE_HEAD_DIM ||
+                sinShape->GetDim(1) != ROPE_HEAD_DIM,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                context->GetNodeName(), "cos/sin",
+                (std::string("cos=") + Ops::Base::ToString(*cosShape) + ", sin=" + Ops::Base::ToString(*sinShape))
+                    .c_str(),
+                (std::string("both must have shape [") + std::to_string(tokenNum) + ", 64]").c_str()),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }

@@ -122,7 +122,11 @@ private:
     bool CalcBasicBlock(uint64_t& baseM, uint64_t& baseN, uint64_t& baseK) const
     {
         if (m_ == 0UL || n_ == 0UL || k_ == 0UL) {
-            OP_LOGE(opName_, "Invalid QMM shape: m=%lu n=%lu k=%lu", m_, n_, k_);
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "qmm",
+                                                  (std::string("[m=") + std::to_string(m_) +
+                                                   ", n=" + std::to_string(n_) + ", k=" + std::to_string(k_) + "]")
+                                                      .c_str(),
+                                                  "m, n and k must be greater than 0");
             return false;
         }
 

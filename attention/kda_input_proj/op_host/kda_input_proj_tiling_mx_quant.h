@@ -85,9 +85,12 @@ public:
         const int64_t totalCoreNum = static_cast<int64_t>(tilingInfo_.aivNum);
         const int64_t ubSize = static_cast<int64_t>(tilingInfo_.ubSize);
 
-        OP_CHECK_IF(rowNum <= 0L || colNum <= 0L,
-                    OP_LOGE(opName, "MxQuant got invalid x shape [%ld, %ld].", rowNum, colNum),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            rowNum <= 0L || colNum <= 0L,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                opName, "x", (std::string("[") + std::to_string(rowNum) + ", " + std::to_string(colNum) + "]").c_str(),
+                "the x shape dims must be greater than 0"),
+            return ge::GRAPH_FAILED);
         OP_CHECK_IF(totalCoreNum <= 0L, OP_LOGE(opName, "MxQuant got aivNum=%ld.", totalCoreNum),
                     return ge::GRAPH_FAILED);
 

@@ -112,7 +112,8 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
     } else if (std::strcmp(layoutKey, "BBND") == 0) {
         keyLayout = MSA_KEY_LAYOUT_BBND;
     } else {
-        OP_LOGE(context, "layout_key must be TND, BSND, BNSD, BBND or BNBD, got %s.", layoutKey);
+        OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(context->GetNodeName(), "layout_key", layoutKey,
+                                               "the supported values are TND, BSND, BNSD, BBND and BNBD");
         return ge::GRAPH_FAILED;
     }
     if (std::strcmp(layoutQuery, "BSND") == 0) {
@@ -120,7 +121,8 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
     } else if (std::strcmp(layoutQuery, "BNSD") == 0) {
         queryLayout = MSA_QUERY_LAYOUT_BNSD;
     } else if (std::strcmp(layoutQuery, "TND") != 0) {
-        OP_LOGE(context, "layout_query must be TND, BSND or BNSD, got %s.", layoutQuery);
+        OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(context->GetNodeName(), "layout_query", layoutQuery,
+                                               "the supported values are TND, BSND and BNSD");
         return ge::GRAPH_FAILED;
     }
     const bool batchKey128 = (keyLayout == MSA_KEY_LAYOUT_BSND || keyLayout == MSA_KEY_LAYOUT_BNSD) &&
@@ -134,7 +136,11 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
         const bool same = (keyLayout == MSA_KEY_LAYOUT_TND && queryLayout == MSA_QUERY_LAYOUT_TND) ||
                           (keyLayout == MSA_KEY_LAYOUT_BSND && queryLayout == MSA_QUERY_LAYOUT_BSND) ||
                           (keyLayout == MSA_KEY_LAYOUT_BNSD && queryLayout == MSA_QUERY_LAYOUT_BNSD);
-        OP_CHECK_IF(!same, OP_LOGE(context, "non-paged key layout must match layout_query."), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(!same,
+                    OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(
+                        context->GetNodeName(), "layout_key", layoutKey,
+                        (std::string("the non-paged key layout must match layout_query=") + layoutQuery).c_str()),
+                    return ge::GRAPH_FAILED);
     }
 
     int64_t totalQ = 0;
@@ -164,7 +170,12 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
                     for (int64_t i = 0; i + 1 < prefixN; ++i) {
                         const int64_t qlenB = static_cast<int64_t>(qlenData[i + 1]) - static_cast<int64_t>(qlenData[i]);
                         OP_CHECK_IF(qlenB < 0 || qlenB > seq,
-                                    OP_LOGE(context, "query length %ld exceeds layout S=%ld.", qlenB, seq),
+                                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                                        context->GetNodeName(), "actual_seq_qlen", std::to_string(qlenB).c_str(),
+                                        (std::string("the query length must be non-negative and must not exceed the "
+                                                     "layout S=") +
+                                         std::to_string(seq))
+                                            .c_str()),
                                     return ge::GRAPH_FAILED);
                     }
                     totalQ = static_cast<int64_t>(qlenData[prefixN - 1]);
@@ -179,7 +190,9 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
         OP_CHECK_IF(blockTableShape == nullptr || blockTableShape->GetDimNum() == 0,
                     OP_LOGE(context, "layout_key=BBND/BNBD requires block_table."), return ge::GRAPH_FAILED);
         OP_CHECK_IF(blockTableShape->GetDimNum() != MSA_BLOCK_TABLE_DIM_NUM,
-                    OP_LOGE(context, "block_table must have 2 dims, but got %zu.", blockTableShape->GetDimNum()),
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                        context->GetNodeName(), "block_table",
+                        (std::to_string(blockTableShape->GetDimNum()) + "D").c_str(), "block_table must have 2 dims"),
                     return ge::GRAPH_FAILED);
         // 页长仍须整除 pool_block_size：一个打分块从同一张物理页连续取出。
         const int64_t pageLen = (std::strcmp(layoutKey, "BBND") == 0) ? keyShape->GetDim(1) : keyShape->GetDim(2);
@@ -191,7 +204,9 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
     } else {
         const size_t expectRank = (keyLayout == MSA_KEY_LAYOUT_TND) ? MSA_KEY_TND_DIM_NUM : MSA_KEY_PA_DIM_NUM;
         OP_CHECK_IF(keyShape->GetDimNum() != expectRank,
-                    OP_LOGE(context, "non-paged key rank mismatch, got %zu.", keyShape->GetDimNum()),
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                        context->GetNodeName(), "key", (std::to_string(keyShape->GetDimNum()) + "D").c_str(),
+                        (std::string("the non-paged key rank must be ") + std::to_string(expectRank) + "D").c_str()),
                     return ge::GRAPH_FAILED);
         const gert::Shape* klenShape = context->GetOptionalInputShape(MSA_ACTUAL_SEQ_KLEN_INDEX);
         const gert::Tensor* klenTensor = context->GetOptionalInputTensor(MSA_ACTUAL_SEQ_KLEN_INDEX);
@@ -214,7 +229,11 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
             for (int64_t i = 0; i + 1 < prefixN; ++i) {
                 const int64_t kv = static_cast<int64_t>(klenData[i + 1]) - static_cast<int64_t>(klenData[i]);
                 OP_CHECK_IF(kv < 0 || (capSeq && kv > keySeqCap),
-                            OP_LOGE(context, "key length %ld exceeds layout S=%ld.", kv, keySeqCap),
+                            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                                context->GetNodeName(), "actual_seq_klen", std::to_string(kv).c_str(),
+                                (std::string("the key length must be non-negative and must not exceed the layout S=") +
+                                 std::to_string(keySeqCap))
+                                    .c_str()),
                             return ge::GRAPH_FAILED);
                 const int64_t blocks = (kv <= 0) ? 0 : ((kv + seqBlock - 1) / seqBlock);
                 if (blocks > maxBlocks) {
