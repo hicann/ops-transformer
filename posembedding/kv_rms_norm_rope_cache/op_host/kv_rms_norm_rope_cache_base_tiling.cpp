@@ -322,19 +322,25 @@ bool KvRmsNormRopeCacheTilingBase::CheckCacheValidPA(const gert::TilingContext* 
 
     if (cacheBlkSize < DIM_ONE) {
         // block size must be larger than 0 under all PageAttention modes.
-        OP_LOGE(context_->GetNodeName(), "Block size of [%s] must be positive integer, but got %ld.", cacheName,
-                cacheBlkSize);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), cacheName,
+                                              ToString(context->GetInputShape(cacheIndex)->GetStorageShape()).c_str(),
+                                              "The block_size dimension must be positive");
         return false;
     }
     if (cacheN != this->numHeadKv_) {
-        OP_LOGE(context_->GetNodeName(), "Numhead of [%s] must be consist with input kv(%ld), but got %ld.", cacheName,
-                this->numHeadKv_, cacheN);
+        const std::string reason =
+            "The num_heads dimension must equal kv num_heads (" + std::to_string(this->numHeadKv_) + ")";
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), cacheName,
+                                              ToString(context->GetInputShape(cacheIndex)->GetStorageShape()).c_str(),
+                                              reason.c_str());
         return false;
     }
     if (cacheD != headSize) {
         // Inconsist cache hDim size with the expected value headSize
-        OP_LOGE(context_->GetNodeName(), "Expected hDim size of [%s] is %ld, but got %ld.", cacheName, headSize,
-                cacheD);
+        const std::string reason = "The head_size dimension must equal " + std::to_string(headSize);
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context_->GetNodeName(), cacheName,
+                                              ToString(context->GetInputShape(cacheIndex)->GetStorageShape()).c_str(),
+                                              reason.c_str());
         return false;
     }
 

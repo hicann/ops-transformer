@@ -13,6 +13,7 @@
 #include <vector>
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
+#include "experiment/metadef/common/util/error_manager/error_manager.h"
 #include "../../../op_host/kv_rms_norm_rope_cache_tiling.h"
 
 using namespace std;
@@ -1761,3 +1762,80 @@ TEST_F(KvRmsNormRopeCacheTiling, kv_rms_norm_rope_cache_non_quant_cache_with_sca
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, 10000,
                     "* * * * * * * * * * * * * * * * * * * * * * * 256 * * * ");
 }
+
+namespace {
+// PA cache dim 0/1/2 must match before the DS stage is selected.
+struct PaErrorCase {
+    int cache;
+    int dim;
+};
+class KvRmsNormRopeCachePaError : public testing::TestWithParam<PaErrorCase> {};
+TEST_P(KvRmsNormRopeCachePaError, RegistryReportsOneFormalShapeError)
+{
+    optiling::KvRmsNormRopeCacheCompileInfo compileInfo;
+    compileInfo.coreNum = 48;
+    compileInfo.ubSize = 196608;
+    gert::TilingContextPara tilingContextPara(
+        "KvRmsNormRopeCache",
+        {{{{64, 1, 1, 576}, {64, 1, 1, 576}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{512}, {512}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{64, 1, 1, 64}, {64, 1, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{64, 1, 1, 64}, {64, 1, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{64}, {64}}, ge::DT_INT64, ge::FORMAT_ND},
+         {{{576, 128, 1, 64}, {576, 128, 1, 64}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{576, 128, 1, 512}, {576, 128, 1, 512}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{64}, {64}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         {{{512}, {512}}, ge::DT_FLOAT, ge::FORMAT_ND},
+         kOptionalInput,
+         kOptionalInput,
+         kOptionalInput},
+        {{{{576, 128, 1, 64}, {576, 128, 1, 64}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{576, 128, 1, 512}, {576, 128, 1, 512}}, ge::DT_INT8, ge::FORMAT_ND},
+         {{{64, 1, 1, 64}, {64, 1, 1, 64}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+         {{{64, 1, 1, 512}, {64, 1, 1, 512}}, ge::DT_FLOAT16, ge::FORMAT_ND}},
+        {
+            {"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-05)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>("PA_BNSD")},
+            {"is_output_kv", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+        },
+        &compileInfo, "Ascend910B", 48, 196608);
+
+    const auto param = GetParam();
+    if (param.dim == 2) {
+        // Both caches must remain consistent to reach shared num_heads validation.
+        for (int cache : {5, 6}) {
+            tilingContextPara.inputTensorDesc_[cache].shape_.MutableStorageShape().SetDim(2, 2);
+            tilingContextPara.inputTensorDesc_[cache].shape_.MutableOriginShape().SetDim(2, 2);
+        }
+    } else if (param.dim == 3) {
+        auto& shape = tilingContextPara.inputTensorDesc_[param.cache].shape_;
+        shape.MutableStorageShape().SetDim(3, param.cache == 5 ? 63 : 511);
+        shape.MutableOriginShape().SetDim(3, param.cache == 5 ? 63 : 511);
+    }
+    auto& manager = ErrorManager::GetInstance();
+    ASSERT_EQ(manager.Init(), 0);
+    (void)manager.GetRawErrorMessages();
+    ExecuteTestCase(tilingContextPara, param.dim == 0 ? ge::GRAPH_SUCCESS : ge::GRAPH_FAILED, param.dim == 0 ? 5011 : 0,
+                    "");
+    const auto errors = manager.GetRawErrorMessages();
+    if (param.dim == 0) {
+        EXPECT_TRUE(errors.empty());
+        return;
+    }
+    ASSERT_EQ(errors.size(), 1U);
+    EXPECT_EQ(errors[0].error_id, "EZ0009");
+    const auto& fields = errors[0].args_map;
+    ASSERT_EQ(fields.count("param_name"), 1U);
+    EXPECT_EQ(fields.at("param_name"), param.cache == 5 ? "k_cache" : "ckv_cache");
+    ASSERT_EQ(fields.count("op_name"), 1U);
+    EXPECT_FALSE(fields.at("op_name").empty());
+    ASSERT_EQ(fields.count("incorrect_shape"), 1U);
+    EXPECT_FALSE(fields.at("incorrect_shape").empty());
+    ASSERT_EQ(fields.count("reason"), 1U);
+    EXPECT_EQ(fields.at("reason"),
+              param.dim == 2 ? "The num_heads dimension must equal kv num_heads (1)" :
+                               std::string("The head_size dimension must equal ") + (param.cache == 5 ? "64" : "512"));
+}
+INSTANTIATE_TEST_SUITE_P(DsRegistry, KvRmsNormRopeCachePaError,
+                         testing::Values(PaErrorCase{5, 0}, PaErrorCase{5, 2}, PaErrorCase{5, 3}, PaErrorCase{6, 3}));
+} // namespace
