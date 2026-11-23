@@ -452,6 +452,8 @@ aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/co
 - `cosOptional`和`sinOptional`必须同时为空，当前不支持RoPE；
   `sequsedOptional`必须为空，当前不支持通过`attention_mask`选择token。
 - 支持BSH场景的`B=0`或`S=0`，以及TH场景的`T=0`。
+  当BSH场景的`B=0`或`S=0`，或TH场景的`T=0`，且输出为空Tensor时，接口可直接返回成功，
+  不会因`cosOptional`、`sinOptional`或`sequsedOptional`传入Tensor而返回`561002`。
 - `cmpRatio`的默认值为4，取值范围是`2/4/8/16/32/64/128`。
 - `normEps`的默认值为`1e-6`，取值范围是大于0。
 - `rotaryMode`的默认值为1，取值范围是`0/1`，当前不执行RoPE。
