@@ -54,6 +54,8 @@ struct EngramFetchGradTestParam {
     uint64_t expectTilingKey;
     std::string expectTilingData;
     std::vector<size_t> expectWorkspaces;
+    // UT 默认模拟 host 已透传感知 attr（真实 op 缺省 = 0 未感知）
+    int64_t ranksPerSupernode = 128;
 };
 
 inline std::ostream& operator<<(std::ostream& os, const EngramFetchGradTestParam& param)
@@ -444,7 +446,193 @@ static EngramFetchGradTestParam g_testCases[] = {
      ge::GRAPH_FAILED,
      0UL,
      "",
-     {}},
+     {},
+     0},
+
+    // 成功：B=128 + 平铺 rail ctx + world=2048 → rail tiling、key=1
+    {"success_rail_multi_supernode_bs128_8",
+     {12292},
+     ge::DT_INT32,
+     ge::FORMAT_ND,
+     {8, 512},
+     ge::DT_BF16,
+     ge::FORMAT_ND,
+     {8},
+     ge::DT_INT32,
+     {16384},
+     {2048},
+     {16},
+     {16, 512},
+     ge::DT_BF16,
+     {16},
+     {1},
+     4,
+     41943040,
+     "3510",
+     ge::GRAPH_SUCCESS,
+     1UL,
+     "",
+     {},
+     128},
+
+    // 成功：8 卡 = 4 超节点 × B=2（轨道 3 对端）→ rail tiling、key=1
+    {"success_rail_small_world_bs2_2",
+     {12292},
+     ge::DT_INT32,
+     ge::FORMAT_ND,
+     {8, 512},
+     ge::DT_BF16,
+     ge::FORMAT_ND,
+     {8},
+     ge::DT_INT32,
+     {64},
+     {8},
+     {16},
+     {16, 512},
+     ge::DT_BF16,
+     {16},
+     {1},
+     4,
+     4194304,
+     "3510",
+     ge::GRAPH_SUCCESS,
+     1UL,
+     "",
+     {},
+     2},
+
+    // 成功：world=4 = 2 超节点 × B=2（轨道 1 对端）→ rail tiling、key=1
+    {"success_rail_single_supernode_bs2_2",
+     {12292},
+     ge::DT_INT32,
+     ge::FORMAT_ND,
+     {8, 512},
+     ge::DT_BF16,
+     ge::FORMAT_ND,
+     {8},
+     ge::DT_INT32,
+     {32},
+     {4},
+     {16},
+     {16, 512},
+     ge::DT_BF16,
+     {16},
+     {1},
+     4,
+     4194304,
+     "3510",
+     ge::GRAPH_SUCCESS,
+     1UL,
+     "",
+     {},
+     2},
+
+    // 失败：world>1024 但 ctx 非平铺 rail 格式
+    {"fail_rail_ctx_not_flat",
+     {4100},
+     ge::DT_INT32,
+     ge::FORMAT_ND,
+     {8, 512},
+     ge::DT_BF16,
+     ge::FORMAT_ND,
+     {8},
+     ge::DT_INT32,
+     {16384},
+     {2048},
+     {16},
+     {16, 512},
+     ge::DT_BF16,
+     {16},
+     {1},
+     4,
+     4194304,
+     "3510",
+     ge::GRAPH_FAILED,
+     0UL,
+     "",
+     {},
+     1},
+
+    // 成功：存量兼容——world=256 > 缺省阈值 128 但 attr 未感知（老路径恒 0）且 ctx 为老布局
+    // （4100 int32 = 老 EngramCommContext 平铺）→ 老模板接手（allow_hybrid_mode=0 的
+    // world∈(128,1024] 存量训练零变化），key=0（老 grad 模板）
+    {"success_legacy_ctx_attr_unsensed_world256",
+     {4100},
+     ge::DT_INT32,
+     ge::FORMAT_ND,
+     {8, 512},
+     ge::DT_BF16,
+     ge::FORMAT_ND,
+     {8},
+     ge::DT_INT32,
+     {256 * 8},
+     {256},
+     {16},
+     {16, 512},
+     ge::DT_BF16,
+     {16},
+     {1},
+     4,
+     4194304,
+     "3510",
+     ge::GRAPH_SUCCESS,
+     0UL,
+     "",
+     {},
+     0},
+
+    // 失败：world 非 ranksPerSupernode 整倍
+    {"fail_rail_world_not_group_multiple",
+     {12292},
+     ge::DT_INT32,
+     ge::FORMAT_ND,
+     {8, 512},
+     ge::DT_BF16,
+     ge::FORMAT_ND,
+     {8},
+     ge::DT_INT32,
+     {1537 * 8},
+     {1537},
+     {16},
+     {16, 512},
+     ge::DT_BF16,
+     {16},
+     {1},
+     4,
+     4194304,
+     "3510",
+     ge::GRAPH_FAILED,
+     0UL,
+     "",
+     {},
+     128},
+
+    // 失败：world≤1024（老模板）但 ctx 是平铺 rail 格式
+    // 失败：world>128 且 rail ctx 进 rail 分支，但感知 attr 未透传（=0，感知链断裂）
+    {"fail_rail_attr_unsensed",
+     {12292},
+     ge::DT_INT32,
+     ge::FORMAT_ND,
+     {8, 512},
+     ge::DT_BF16,
+     ge::FORMAT_ND,
+     {8},
+     ge::DT_INT32,
+     {2048 * 8},
+     {2048},
+     {16},
+     {16, 512},
+     ge::DT_BF16,
+     {16},
+     {1},
+     4,
+     4194304,
+     "3510",
+     ge::GRAPH_FAILED,
+     0UL,
+     "",
+     {},
+     0},
 };
 
 class EngramFetchGradArch35TilingTest : public testing::TestWithParam<EngramFetchGradTestParam> {
@@ -476,7 +664,6 @@ static gert::TilingContextPara BuildTilingContextPara(const EngramFetchGradTestP
     gert::StorageShape uniqueLocalEntryShape = {param.uniqueLocalEntryShape, param.uniqueLocalEntryShape};
     gert::StorageShape numUniqueShape = {param.numUniqueShape, param.numUniqueShape};
 
-    // 7 inputs: commContext, gradFetched, perm, sendCounts, recvCounts, recvLocalEntry, numRecv
     std::vector<gert::TilingContextPara::TensorDescription> inputTensorDesc_(
         {{commContextShape, param.commContextDtype, param.commContextFormat},
          {gradFetchedShape, param.gradFetchedDtype, param.gradFetchedFormat},
@@ -486,7 +673,6 @@ static gert::TilingContextPara BuildTilingContextPara(const EngramFetchGradTestP
          {recvLocalEntryShape, ge::DT_INT32, ge::FORMAT_ND},
          {numUniqueShape, ge::DT_INT32, ge::FORMAT_ND}});
 
-    // 3 outputs: gradUniqueOut (same dtype as gradFetched), uniqueLocalEntryOut (int32), numUniqueOut (int32)
     std::vector<gert::TilingContextPara::TensorDescription> outputTensorDesc_(
         {{gradUniqueShape, param.gradUniqueDtype, ge::FORMAT_ND},
          {uniqueLocalEntryShape, ge::DT_INT32, ge::FORMAT_ND},
@@ -494,7 +680,8 @@ static gert::TilingContextPara BuildTilingContextPara(const EngramFetchGradTestP
 
     std::vector<gert::TilingContextPara::OpAttr> attrs_(
         {{"num_entries_per_rank", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.numEntriesPerRank)},
-         {"comm_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.commBufferSize)}});
+         {"comm_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.commBufferSize)},
+         {"ranks_per_supernode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(param.ranksPerSupernode)}});
 
     return gert::TilingContextPara(OP_NAME, inputTensorDesc_, outputTensorDesc_, attrs_, &compileInfo,
                                    param.socVersion);

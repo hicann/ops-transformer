@@ -17,6 +17,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/pybind11.h>
 #include <chrono>
+#include <cstddef>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -24,6 +25,7 @@
 #include <utility>
 #include <vector>
 #include <cstring>
+#include <cstdio>
 #include <atomic>
 #include <cstdint>
 #include <algorithm>
@@ -79,8 +81,6 @@ constexpr uint32_t MIX_CLOS_SLOT = 0U;
 constexpr uint32_t MIX_MESH_SLOT = 1U;
 constexpr uint32_t MIX_LAYERED_RANK_SIZE = 8U;
 constexpr uint64_t VMM_RESERVE_MEM_FLAG = 1U;
-constexpr int64_t HYBRID_MODE_DEFAULT = 0;
-constexpr int64_t RAIL_ALIGNED_TOPO = 1;
 
 // RAII guard for multi-step host buffer allocation
 struct HostBufferGuard {
@@ -212,6 +212,24 @@ struct EngramCommContext {
     uint64_t rankSlotStride = 0;
 };
 
+// 布局：[0,16) 头部标量 | nodeWinBase[] | nodeChannel[]（定长容量，建链只写有效前缀）
+struct EngramRailCtxHead {
+    uint32_t localId = 0;           // L = rank mod C
+    uint32_t supernodeId = 0;       // sn = rank / C
+    uint32_t supernodeCnt = 0;      // 超节点数 = world / C
+    uint32_t ranksPerSupernode = 0; // C = 每超节点卡数
+};
+static_assert(sizeof(EngramRailCtxHead) == 16, "rail ctx head must stay 16B");
+constexpr uint32_t RAIL_SN_DOMAIN_MAX = 2048U;
+constexpr uint32_t RAIL_NODE_MAX = HCCL_MAX_RANK_SIZE + RAIL_SN_DOMAIN_MAX; // node 表容量 = C 上限 + 超节点数上限
+constexpr uint64_t RAIL_CTX_WIN_OFF = sizeof(EngramRailCtxHead);            // nodeWinBase 偏移
+constexpr uint64_t RAIL_CTX_CH_OFF = RAIL_CTX_WIN_OFF + 8ULL * RAIL_NODE_MAX;     // nodeChannel 偏移
+constexpr uint64_t RAIL_CTX_TOTAL_BYTES = RAIL_CTX_CH_OFF + 8ULL * RAIL_NODE_MAX; // 49168B
+constexpr int64_t RAIL_CTX_ELEMS =
+    static_cast<int64_t>(RAIL_CTX_TOTAL_BYTES / sizeof(int32_t)); // 12292 = tiling CTX_RAIL_ELEMS
+static_assert(RAIL_CTX_TOTAL_BYTES % sizeof(int32_t) == 0, "rail ctx must be int32-flat");
+constexpr uint64_t RAIL_WIN_SLOT_BYTES = 32ULL; // 窗头写者槽/epoch 槽步长（与 kernel 侧 STATE_OFFSET 一致）
+
 struct MoeCommContext {
     uint32_t epRankId = 0;
     uint32_t rankSizePerServer = 0;
@@ -225,6 +243,21 @@ struct RankLinkInfo {
     uint32_t layer;
 };
 
+// 分轨拓扑感知结果：只感知一数 ranksPerSupernode，超节点数/轨道对端集全推导
+struct RailTopoInfo {
+    uint32_t world{0};
+    uint32_t ranksPerSupernode{0};        // 每超节点（直连域）卡数
+    uint32_t ranksPerMachine{0};          // 成对 env 声明时填充；训练不读
+    std::vector<uint32_t> supernodePeers; // 同超节点成员（全局 rank，不含我）
+    std::vector<uint32_t> railPeers;      // 轨道对端（各超节点的同 L 卡）
+};
+
+// 分轨建链规格：逐对端一条（cpr=1——每通道单生产者由 kernel 侧 S 核统一发送保证）
+struct RailPeerSpec {
+    uint32_t peerRank;
+    uint32_t tableIdx; // 平铺 node 表落表下标
+    bool inSupernode;  // true→期望 UB_CTP；false→期望 UB_RTP（探测内含二选一兜底）
+};
 struct LayerRanks {
     uint32_t layer;
     std::vector<uint32_t> ranks;
@@ -282,11 +315,8 @@ struct EngramContextResources : EngramCtxResBase {
     at::Tensor contextTensor;
 };
 
-// 进程级 Engram 通信 buffer 共享池：HCCL 引擎 ctx 以 tag 为单例缓存在通信域内，注册内存
-// (HcclCommMemReg)与 channel 均无反注册/销毁接口，ctx 的 virtualAddrList[] 指向注册的 host
-// 映射内存。因此注册内存生命周期与 tag 绑定并保留至进程级：同 tag 多实例共享，Destroy 仅
-// 解除本实例引用、不释放内存，同 group destroy 后重建 ElasticBuffer 时直接复用(自建 buffer
-// 重建容量不得超过首建值；外部零拷贝 buffer 重建时地址与大小必须与首建注册一致)。
+// 进程级 Engram 通信 buffer 共享池：注册内存与 channel 均无反注册接口，生命周期与 tag 绑定
+// 保留至进程级——Destroy 仅解除引用，同 group 重建直接复用（容量/地址须与首建一致）。
 struct EngramSharedBufferEntry : EngramCtxResBase {
     bool external = false;         // buffer 是否来自调用方零拷贝存储
     int64_t registeredBytes = 0;   // 实际已注册的字节数
@@ -366,6 +396,31 @@ static void RollbackExternalHostRegistration(EngramContextResources& resources, 
     }
 }
 
+struct ExternalHostRegGuard {
+    EngramContextResources* resources = nullptr;
+    void* externalHostPtr = nullptr;
+    void* sfHostPtr = nullptr;
+    bool released = false;
+
+    ExternalHostRegGuard(EngramContextResources& res, void* extHostPtr, void* sfTblHostPtr)
+        : resources(&res),
+          externalHostPtr(extHostPtr),
+          sfHostPtr(sfTblHostPtr)
+    {}
+
+    ~ExternalHostRegGuard()
+    {
+        if (!released && resources != nullptr) {
+            RollbackExternalHostRegistration(*resources, externalHostPtr, sfHostPtr);
+        }
+    }
+
+    void Release()
+    {
+        released = true;
+    }
+};
+
 template <typename ContextT>
 static at::Tensor CreateCommContextTensor(const ContextT& context)
 {
@@ -432,7 +487,46 @@ static void DumpRankPairLinks(const HcclComm& commHandle, uint32_t srcRankId, ui
     ASCEND_LOGI("[DumpTopo] done");
 }
 
+// env 值防御解析：空串/非数字/负号/溢出/零值走 err 失败路径，不得以 stoul 异常逃出探测契约
+static bool ParseEnvUint32(const char* name, const char* raw, uint32_t& value, std::string& err)
+{
+    const std::string rangeHint = "env " + std::string(name) + "='" + raw + "' must be a decimal integer in [1, " +
+                                  std::to_string(UINT32_MAX) + "]";
+    if (raw[0] == '\0' || raw[0] == '-') {
+        err = rangeHint;
+        return false;
+    }
+    errno = 0;
+    char* endPtr = nullptr;
+    const unsigned long long parsed = std::strtoull(raw, &endPtr, 10);
+    if (endPtr == raw || *endPtr != '\0' || errno == ERANGE || parsed == 0ULL || parsed > UINT32_MAX) {
+        err = rangeHint;
+        return false;
+    }
+    value = static_cast<uint32_t>(parsed);
+    return true;
+}
+
 class HcclContextBuilderBase {
+public:
+    // 按通信组名包装的拓扑探测入口（EnsureEngramContext 预探测用）
+    static bool ProbeRailTopoByGroup(const std::string& groupName, RailTopoInfo& topo, std::string& reason)
+    {
+        HcclComm comm = nullptr;
+        if (HcomGetCommHandleByGroupFunc(groupName.c_str(), &comm) != HCCL_SUCCESS || comm == nullptr) {
+            reason = "get comm handle failed";
+            return false;
+        }
+        uint32_t myRank = 0;
+        uint32_t world = 0;
+        if (HcclGetRankIdFunc(comm, &myRank) != HCCL_SUCCESS || HcclGetRankSizeFunc(comm, &world) != HCCL_SUCCESS ||
+            world == 0U) {
+            reason = "get rank info failed";
+            return false;
+        }
+        return ProbeRailTopo(comm, myRank, world, topo, reason);
+    }
+
 protected:
     static void AcquireHcclHandle(const std::string& groupName, HcclComm& hcclComm)
     {
@@ -481,6 +575,356 @@ protected:
     {
         auto hcclRet = HcclRankGraphGetLayersFunc(commHandle, &netLayerList, &netLayerNum);
         TORCH_CHECK(hcclRet == HCCL_SUCCESS, "Get HCCL layers failed, ret: ", hcclRet);
+    }
+
+    // 查询 src→dst 在 rank-graph 中是否有任意链路（不区分协议）
+    static bool HasAnyLink(const HcclComm& commHandle, const uint32_t* layerList, uint32_t layerNum, uint32_t srcRank,
+                           uint32_t dstRank)
+    {
+        for (uint32_t li = 0; li < layerNum; ++li) {
+            CommLink* links = nullptr;
+            uint32_t linkNum = 0;
+            if (HcclRankGraphGetLinksFunc(commHandle, layerList[li], srcRank, dstRank, &links, &linkNum) ==
+                    HCCL_SUCCESS &&
+                linkNum > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // 候选 B 实测校验：同号卡轨道对端逐个（超限时等距抽样，上限 64）实测有链路；按 B 降序，首个通过即最大有效 B
+    static bool RailCandidateValid(const HcclComm& commHandle, const uint32_t* layerList, uint32_t layerNum,
+                                   uint32_t myRank, uint32_t world, uint32_t candB)
+    {
+        constexpr uint32_t kRailProbeCap = 64;
+        const uint32_t snCnt = world / candB;
+        const uint32_t mySn = myRank / candB;
+        const uint32_t myL = myRank % candB;
+        const uint32_t total = snCnt - 1U;
+        const uint32_t step = (total > kRailProbeCap) ? (total / kRailProbeCap) : 1U;
+        uint32_t peerIdx = 0;
+        uint32_t probed = 0;
+        for (uint32_t sn = 0U; sn < snCnt && probed < kRailProbeCap; ++sn) {
+            if (sn == mySn) {
+                continue;
+            }
+            if (peerIdx % step == 0U) {
+                const uint32_t peer = sn * candB + myL;
+                ++probed;
+                if (!HasAnyLink(commHandle, layerList, layerNum, myRank, peer)) {
+                    return false;
+                }
+            }
+            ++peerIdx;
+        }
+        return probed > 0U;
+    }
+
+    // 共享拓扑探测：env（单设 RANKS_PER_SUPERNODE / 成对 RANK_SIZE_PER_*）→ 层形状候选 + 链路实测
+    static bool TryProbeHybridTopo(const HcclComm& shareComm, uint32_t rankId, uint32_t& ranksPerSupernode,
+                                   uint32_t* ranksPerMachine, std::string& err)
+    {
+        const char* envPerSupernode = std::getenv("RANKS_PER_SUPERNODE");
+        if (envPerSupernode != nullptr) {
+            if (!ParseEnvUint32("RANKS_PER_SUPERNODE", envPerSupernode, ranksPerSupernode, err)) {
+                return false;
+            }
+            // B 容量上界（ctx node 表超节点段容量）：超限 fail-fast 防 node 表越段写
+            if (ranksPerSupernode > HCCL_MAX_RANK_SIZE) {
+                err = "env RANKS_PER_SUPERNODE='" + std::string(envPerSupernode) +
+                      "' exceeds ctx grp table capacity (max " + std::to_string(HCCL_MAX_RANK_SIZE) + ")";
+                return false;
+            }
+            return true;
+        }
+        const char* envPerMachine = std::getenv("RANK_SIZE_PER_MACHINE");
+        const char* envSnSize = std::getenv("RANK_SIZE_PER_SUPERNODE");
+        if (envPerMachine != nullptr || envSnSize != nullptr) {
+            if (envPerMachine == nullptr || envSnSize == nullptr) {
+                err = "RANK_SIZE_PER_MACHINE and RANK_SIZE_PER_SUPERNODE must be set together";
+                return false;
+            }
+            uint32_t perMachine = 0;
+            uint32_t perSupernode = 0;
+            if (!ParseEnvUint32("RANK_SIZE_PER_MACHINE", envPerMachine, perMachine, err) ||
+                !ParseEnvUint32("RANK_SIZE_PER_SUPERNODE", envSnSize, perSupernode, err)) {
+                return false;
+            }
+            if (perSupernode > HCCL_MAX_RANK_SIZE) {
+                err = "env RANK_SIZE_PER_SUPERNODE='" + std::string(envSnSize) +
+                      "' exceeds ctx grp table capacity (max " + std::to_string(HCCL_MAX_RANK_SIZE) + ")";
+                return false;
+            }
+            uint32_t world = 0;
+            if (HcclGetRankSizeFunc(shareComm, &world) != HCCL_SUCCESS || world == 0U) {
+                err = "get rank size failed";
+                return false;
+            }
+            if (perMachine == 0U || perSupernode == 0U || perSupernode % perMachine != 0U ||
+                world % perSupernode != 0U) {
+                err = "env RANK_SIZE_PER_MACHINE=" + std::to_string(perMachine) +
+                      " / RANK_SIZE_PER_SUPERNODE=" + std::to_string(perSupernode) +
+                      " inconsistent with world=" + std::to_string(world);
+                return false;
+            }
+            ranksPerSupernode = perSupernode;
+            if (ranksPerMachine != nullptr) {
+                *ranksPerMachine = perMachine;
+            }
+            return true;
+        }
+        uint32_t world = 0;
+        if (HcclGetRankSizeFunc(shareComm, &world) != HCCL_SUCCESS || world == 0U) {
+            err = "get rank size failed";
+            return false;
+        }
+        uint32_t* layerList = nullptr;
+        uint32_t layerNum = 0;
+        GetNetLayers(shareComm, layerList, layerNum);
+        // 符号缺失 fail-fast：仅分轨探测消费，老版 libhccl_fwk 缺符号时经 err 上报；存量路径不经此
+        if (HcclRankGraphGetInstSizeListByLayerFunc == nullptr) {
+            err = "rail-aligned topo probe requires HCCL symbol HcclRankGraphGetInstSizeListByLayer "
+                  "(libhccl_fwk too old for this CANN pairing; update CANN/HCCL)";
+            return false;
+        }
+        // 每层形状（instCnt × instSize；instSize 全等且乘积覆盖全集群才参与候选）
+        struct LayerShape {
+            uint32_t layer;
+            uint32_t instCnt;
+            uint32_t instSize;
+        };
+        std::vector<LayerShape> shapes;
+        for (uint32_t li = 0; li < layerNum; ++li) {
+            uint32_t* instSizeList = nullptr;
+            uint32_t instListSize = 0;
+            (void)HcclRankGraphGetInstSizeListByLayerFunc(shareComm, layerList[li], &instSizeList, &instListSize);
+            if (instListSize == 0 || instSizeList == nullptr) {
+                continue;
+            }
+            bool uniform = true;
+            for (uint32_t i = 1; i < instListSize; ++i) {
+                if (instSizeList[i] != instSizeList[0]) {
+                    uniform = false;
+                    break;
+                }
+            }
+            if (!uniform || static_cast<uint64_t>(instListSize) * instSizeList[0] != world) {
+                continue;
+            }
+            shapes.push_back({layerList[li], instListSize, instSizeList[0]});
+        }
+        for (const auto& sh : shapes) {
+            if (sh.instCnt == 1U && sh.instSize == world) {
+                ranksPerSupernode = world;
+                return true;
+            }
+        }
+        std::vector<uint32_t> candidates;
+        for (const auto& sh : shapes) {
+            for (uint32_t v : {sh.instCnt, sh.instSize}) {
+                if (v >= 2U && v <= HCCL_MAX_RANK_SIZE && world % v == 0U && world / v >= 2U &&
+                    world / v <= RAIL_SN_DOMAIN_MAX) {
+                    candidates.push_back(v);
+                }
+            }
+        }
+        std::sort(candidates.begin(), candidates.end(), std::greater<uint32_t>());
+        candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
+        if (candidates.empty()) {
+            err = "structured layer selection failed: no valid B candidate from layer shapes (world=" +
+                  std::to_string(world) + ", shapes=" + std::to_string(shapes.size()) + ")";
+            return false;
+        }
+        for (uint32_t candB : candidates) {
+            if (RailCandidateValid(shareComm, layerList, layerNum, rankId, world, candB)) {
+                ranksPerSupernode = candB;
+                return true;
+            }
+        }
+        err = "structured layer selection failed: no candidate B passed rail-peer link validation (world=" +
+              std::to_string(world) + ")";
+        return false;
+    }
+
+    // 兜底拓扑探测：world 因子分解枚举候选 B + 轨道对端链路实测
+    static bool TryDiscoverRailTopology(const HcclComm& comm, uint32_t myRank, uint32_t world, RailTopoInfo& topo,
+                                        std::string& err)
+    {
+        uint32_t* layerList = nullptr;
+        uint32_t layerNum = 0;
+        if (HcclRankGraphGetLayersFunc(comm, &layerList, &layerNum) != HCCL_SUCCESS || layerNum == 0) {
+            err = "no net layers visible on comm (world=" + std::to_string(world) + ")";
+            return false;
+        }
+        const uint32_t bMax = std::min(HCCL_MAX_RANK_SIZE, world / 2U);
+        for (uint32_t candB = bMax; candB >= 2U; --candB) { // 降序：首个通过即最大有效 B
+            const uint32_t snCnt = world / candB;
+            if (world % candB != 0U || snCnt < 2U || snCnt > RAIL_SN_DOMAIN_MAX) {
+                continue;
+            }
+            if (!RailCandidateValid(comm, layerList, layerNum, myRank, world, candB)) {
+                continue;
+            }
+            const uint32_t mySn = myRank / candB;
+            const uint32_t myL = myRank % candB;
+            topo.ranksPerSupernode = candB;
+            for (uint32_t r = mySn * candB; r < mySn * candB + candB; ++r) {
+                if (r != myRank) {
+                    topo.supernodePeers.push_back(r);
+                }
+            }
+            for (uint32_t sn = 0; sn < snCnt; ++sn) { // 轨道集 = 纯推导（可达性由建链实测兜底）
+                if (sn != mySn) {
+                    topo.railPeers.push_back(sn * candB + myL);
+                }
+            }
+            return true;
+        }
+        err = "no divisor B of world passed rail-peer link validation (world=" + std::to_string(world) + ")";
+        return false;
+    }
+
+    // 拓扑探测核心（comm 级）：优先共享探测，失败回退因子分解兜底；成功后按轨道公式展开 peer 集
+    static bool ProbeRailTopo(const HcclComm& comm, uint32_t myRank, uint32_t world, RailTopoInfo& topo,
+                              std::string& reason)
+    {
+        RailTopoInfo probe;
+        uint32_t sharedRanksPerSupernode = 0;
+        uint32_t sharedRanksPerMachine = 0;
+        std::string sharedErr;
+        if (TryProbeHybridTopo(comm, myRank, sharedRanksPerSupernode, &sharedRanksPerMachine, sharedErr)) {
+            const uint32_t ranksPerSupernode = sharedRanksPerSupernode;
+            if (ranksPerSupernode == 0U || ranksPerSupernode > HCCL_MAX_RANK_SIZE) { // rail ctx node 表超节点段容量上限
+                reason = "ranksPerSupernode=" + std::to_string(ranksPerSupernode) +
+                         " exceeds rail ctx node table supernode-segment limit 1024";
+                return false;
+            }
+            if (world < ranksPerSupernode || world % ranksPerSupernode != 0U) {
+                reason = "world(" + std::to_string(world) +
+                         ") is not a multiple of ranksPerSupernode=" + std::to_string(ranksPerSupernode) +
+                         " — rail-aligned requires uniform supernodes";
+                return false;
+            }
+            const uint32_t snCnt = world / ranksPerSupernode;
+            if (snCnt > RAIL_SN_DOMAIN_MAX) { // rail ctx node 表轨道段容量上限
+                reason = "supernode count(world/ranksPerSupernode=" + std::to_string(snCnt) +
+                         ") exceeds rail ctx node table rail-segment limit 2048";
+                return false;
+            }
+            probe.ranksPerSupernode = ranksPerSupernode;
+            probe.ranksPerMachine = sharedRanksPerMachine;
+            // peer 集按轨道公式展开
+            const uint32_t mySn = myRank / ranksPerSupernode;
+            const uint32_t myL = myRank % ranksPerSupernode;
+            for (uint32_t l = 0U; l < ranksPerSupernode; ++l) {
+                const uint32_t r = mySn * ranksPerSupernode + l;
+                if (r != myRank) {
+                    probe.supernodePeers.push_back(r);
+                }
+            }
+            for (uint32_t sn = 0U; sn < snCnt; ++sn) {
+                if (sn != mySn) {
+                    probe.railPeers.push_back(sn * ranksPerSupernode + myL);
+                }
+            }
+            ASCEND_LOGI("[RailTopo] shared topo: ranksPerSupernode=%u snCnt=%u (world=%u)", ranksPerSupernode, snCnt,
+                        world);
+        } else {
+            // 因子分解兜底
+            std::string err;
+            if (!TryDiscoverRailTopology(comm, myRank, world, probe, err)) {
+                reason = "not a rail topology (world=" + std::to_string(world) + "): shared probe [" + sharedErr +
+                         "]; divisor probe [" + err + "]";
+                return false;
+            }
+            ASCEND_LOGI("[RailTopo] divisor topo fallback: ranksPerSupernode=%u", probe.ranksPerSupernode);
+        }
+        probe.world = world;
+        topo = probe;
+        return true;
+    }
+
+    // 逐层探测（不抛异常版）
+    static bool ProbeLink(const HcclComm& commHandle, const uint32_t* layerList, uint32_t layerNum, uint32_t srcRank,
+                          uint32_t dstRank, CommProtocol protocol, RankLinkInfo& out)
+    {
+        for (uint32_t li = 0; li < layerNum; ++li) {
+            CommLink* links = nullptr;
+            uint32_t linkNum = 0;
+            auto hcclRet = HcclRankGraphGetLinksFunc(commHandle, layerList[li], srcRank, dstRank, &links, &linkNum);
+            for (uint32_t i = 0; hcclRet == HCCL_SUCCESS && links != nullptr && i < linkNum; ++i) {
+                if (links[i].linkAttr.linkProtocol == protocol) {
+                    out = {links[i].linkAttr.linkProtocol, layerList[li]};
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // 按对端规格批量建链（探测 + desc + Acquire），返回与 peers 等长等序的句柄集
+    static std::vector<ChannelHandle> AcquireRailChannels(const HcclComm& commHandle, const uint32_t* layerList,
+                                                          uint32_t layerNum, uint32_t myRank,
+                                                          const std::vector<RailPeerSpec>& peers,
+                                                          HcclMemHandle& memHandle)
+    {
+        std::vector<ChannelHandle> handles(peers.size(), 0);
+        if (peers.empty()) {
+            return handles;
+        }
+        std::vector<HcclChannelDesc> descs;
+        descs.reserve(peers.size());
+        for (const RailPeerSpec& spec : peers) {
+            // 协议期望：超节点内 UB_CTP 直连；出超节点（轨道腿）UB_RTP
+            CommProtocol expected =
+                spec.inSupernode ? CommProtocol::COMM_PROTOCOL_UB_CTP : CommProtocol::COMM_PROTOCOL_UB_RTP;
+            RankLinkInfo linkInfo{};
+            bool linkFound = ProbeLink(commHandle, layerList, layerNum, myRank, spec.peerRank, expected, linkInfo);
+            if (!linkFound) {
+                // 协议二选一兜底：env 覆盖形态与物理链路错位时换另一协议再试
+                expected = (expected == CommProtocol::COMM_PROTOCOL_UB_CTP) ? CommProtocol::COMM_PROTOCOL_UB_RTP :
+                                                                              CommProtocol::COMM_PROTOCOL_UB_CTP;
+                linkFound = ProbeLink(commHandle, layerList, layerNum, myRank, spec.peerRank, expected, linkInfo);
+            }
+            if (!linkFound) {
+                // 诊断：dump 该对端在全部层的全部链路协议
+                std::string linksDesc;
+                for (uint32_t li = 0; li < layerNum; ++li) {
+                    CommLink* dbgLinks = nullptr;
+                    uint32_t dbgLinkNum = 0;
+                    if (HcclRankGraphGetLinksFunc(commHandle, layerList[li], myRank, spec.peerRank, &dbgLinks,
+                                                  &dbgLinkNum) == HCCL_SUCCESS &&
+                        dbgLinks != nullptr) {
+                        for (uint32_t i = 0; i < dbgLinkNum; ++i) {
+                            linksDesc += " [layer=" + std::to_string(layerList[li]) + " proto=" +
+                                         std::to_string(static_cast<uint32_t>(dbgLinks[i].linkAttr.linkProtocol)) + "]";
+                        }
+                    }
+                }
+                TORCH_CHECK(false, "rail topo probe: no ",
+                            (expected == CommProtocol::COMM_PROTOCOL_UB_CTP ? "UB_CTP" : "UB_RTP"), " link to peer ",
+                            spec.peerRank, " [", (spec.inSupernode ? "supernode-peer" : "rail-peer"),
+                            ", myRank=", myRank,
+                            "] (probe result inconsistent with layer members, check cluster wiring); visible links:",
+                            linksDesc.empty() ? " <none in any layer>" : linksDesc);
+            }
+            CommLink* links = nullptr;
+            GetHcclCommLink(commHandle, linkInfo.layer, myRank, spec.peerRank, expected, links);
+            HcclChannelDesc desc;
+            HcclResult initRet = HcclChannelDescInit(&desc, 1);
+            TORCH_CHECK(initRet == HCCL_SUCCESS, "HcclChannelDescInit failed, ret=", initRet);
+            desc.remoteRank = spec.peerRank;
+            desc.channelProtocol = linkInfo.protocol;
+            desc.localEndpoint = links->srcEndpointDesc;
+            desc.remoteEndpoint = links->dstEndpointDesc;
+            desc.notifyNum = MOE_CHANNEL_NOTIFY_NUM;
+            desc.memHandles = &memHandle; // V1 同款：channel 绑定存储注册内存
+            desc.memHandleNum = 1;
+            descs.push_back(desc);
+        }
+        AcquireChannels(commHandle, CommEngine::COMM_ENGINE_AIV, descs, handles.data());
+        return handles;
     }
 
     bool SupportsProtocol(const HcclComm& commHandle, uint32_t layerId, uint32_t srcRankId, uint32_t dstRankId,
@@ -967,7 +1411,7 @@ public:
             desc.channelProtocol = linkIter->second.protocol;
             desc.localEndpoint = link->srcEndpointDesc;
             desc.remoteEndpoint = link->dstEndpointDesc;
-            desc.notifyNum = 3;
+            desc.notifyNum = MOE_CHANNEL_NOTIFY_NUM;
             desc.memHandles = &resources.memHandle;
             desc.memHandleNum = 1;
             std::vector<HcclChannelDesc> descs{desc};
@@ -1061,7 +1505,7 @@ public:
         EngramContextResources resources;
         AcquireHcclHandle(groupName, resources.hcclComm);
         std::string contextTag =
-            groupName + (hybridMode_ == RAIL_ALIGNED_TOPO ? "engram_embedding_rail_aligned" : "engram_embedding");
+            groupName + (hybridMode_ == NETWORK_HYBRID ? "engram_embedding_rail_aligned" : "engram_embedding");
         CheckContextTag(contextTag);
 
         std::lock_guard<std::mutex> lock(gEngramSharedBufferMutex);
@@ -1111,6 +1555,167 @@ public:
         resources.CopyBase(entry);
         resources.contextTensor = CreateCommContextTensor(resources.context);
         return resources;
+    }
+
+    // 训练分轨建链：感知拓扑、取协议 WIN、注册存储、建 channel、组装平铺 rail ctx。
+    // ctx tag 与推理 rail（engram_embedding_rail_aligned）/老路径（engram_embedding）隔离——
+    // 平铺 rail ctx 布局，kernel/tiling 按 CTX_RAIL_ELEMS 识别。
+    EngramContextResources BuildRailContext(const std::string& groupName, int64_t numCpuBytes, void* externalHostPtr,
+                                            int64_t externalBytes, void* sfHostPtr, int64_t sfBytes)
+    {
+        constexpr uint32_t kRailChannelsPerRank = 1U; // 每通道单生产者：kernel 侧 S 核统一发送，S/F/barrier 共用
+        EngramContextResources resources;
+        AcquireHcclHandle(groupName, resources.hcclComm);
+        uint32_t myRank = 0;
+        uint32_t world = 0;
+        GetRankInfo(resources.hcclComm, myRank, world);
+        const std::string contextTag = groupName + "engram_embedding_rail";
+        CheckContextTag(contextTag);
+
+        std::lock_guard<std::mutex> lock(gEngramSharedBufferMutex);
+        if (HasEngramCommCtx(resources.hcclComm, contextTag)) {
+            // 复用：channel 与内存注册均无反注册接口，按 tag 复用首建资源
+            auto iter = gEngramSharedBuffers.find(contextTag);
+            TORCH_CHECK(iter != gEngramSharedBuffers.end(), "rail comm context of group '", contextTag,
+                        "' exists but its buffer is missing from the shared pool; an earlier build on this "
+                        "group may have failed midway, please use a new comm group");
+            const EngramSharedBufferEntry& entry = iter->second;
+            TORCH_CHECK(entry.context.ranksPerSupernode > 0U, "comm context of group '", contextTag,
+                        "' was built by the legacy path; "
+                        "rail and legacy builders cannot share one comm group, please use a new comm group");
+            TORCH_CHECK(entry.external == (externalHostPtr != nullptr) &&
+                            (externalHostPtr == nullptr ||
+                             (externalHostPtr == entry.hostBufPtr && externalBytes == entry.registeredBytes)),
+                        "rail rebuild requires the same engram storage presence/address/size as the first "
+                        "build (zero-copy storage must be the same pinned buffer; got ptr=",
+                        externalHostPtr, ", bytes=", externalBytes, ", registered ptr=", entry.hostBufPtr,
+                        ", bytes=", entry.registeredBytes, ")");
+            TORCH_CHECK(externalHostPtr != nullptr || numCpuBytes <= entry.registeredBytes, "rail storage budget (",
+                        numCpuBytes, ") exceeds the first-built buffer (", entry.registeredBytes,
+                        "); destroy and recreate with a larger size is not supported, "
+                        "please use a new comm group");
+            TORCH_CHECK(
+                entry.sfExternal == (sfHostPtr != nullptr) &&
+                    (sfHostPtr == nullptr || (sfHostPtr == entry.sfHostBufPtr && sfBytes == entry.sfRegisteredBytes)),
+                "rail rebuild requires the same SF table presence/address/size as the first build "
+                "(zero-copy SF must be the same pinned buffer)");
+            resources.CopyBase(entry);
+            resources.contextTensor = GetRailCtxTensor(resources.hcclComm, contextTag);
+            return resources;
+        }
+
+        RailTopoInfo topo;
+        {
+            std::string probeErr;
+            TORCH_CHECK(ProbeRailTopo(resources.hcclComm, myRank, world, topo, probeErr),
+                        "rail-aligned topo probe failed in Build: ", probeErr);
+        }
+
+        // 协议 WIN = HCCL 默认 buffer；集合通信共享 scratch 可能覆写窗头，ReZeroRailWindowHead 兜底
+        void* localWinBuf = nullptr;
+        uint64_t localWinSize = 0;
+        auto winRet = HcclGetHcclBufferFunc(resources.hcclComm, &localWinBuf, &localWinSize);
+        TORCH_CHECK(winRet == HCCL_SUCCESS, "rail HcclGetHcclBuffer failed, ret=", winRet);
+        TORCH_CHECK(localWinBuf != nullptr && localWinSize > 0, "rail got empty HCCL default buffer");
+        const int64_t winBytes = static_cast<int64_t>(localWinSize);
+
+        // engine ctx = 平铺 rail ctx（头部标量 + node 表两张，定长 RAIL_CTX_TOTAL_BYTES）
+        void* railEngineCtx = nullptr;
+        CreateEngineContext(resources.hcclComm, contextTag, CommEngine::COMM_ENGINE_AIV, RAIL_CTX_TOTAL_BYTES,
+                            railEngineCtx);
+        HostBufferGuard guard;
+        const std::string memTag = contextTag + "_buffer";
+        TORCH_CHECK(externalHostPtr != nullptr || numCpuBytes > 0,
+                    "rail build requires external storage or a positive num_cpu_bytes budget");
+        // 自建表拷贝 buffer 按 2MB 对齐开（HcclCommMemReg 注册尺寸对齐惯例）
+        const int64_t storageAllocBytes =
+            (externalHostPtr != nullptr) ? externalBytes :
+                                           (numCpuBytes + BUFFER_ALIGNMENT - 1) / BUFFER_ALIGNMENT * BUFFER_ALIGNMENT;
+        ExternalHostRegGuard extRegGuard(resources, externalHostPtr, sfHostPtr);
+        AllocateAndRegisterBuffer(resources.hcclComm, memTag, storageAllocBytes, resources, guard, externalHostPtr,
+                                  externalBytes);
+        if (sfHostPtr != nullptr && sfBytes > 0) {
+            MapSfTableBuffer(resources, sfHostPtr, sfBytes);
+        }
+        resources.commBufferSize = winBytes; // WIN 大小即 commBufferSize（tiling 按 N 分满）
+
+        // host 侧元信息：本结构不拷贝落设备（设备侧 ctx = 平铺 rail ctx），供 getter/共享池校验/窗头复位用
+        const uint32_t ranksPerSupernode = topo.ranksPerSupernode;
+        const uint32_t snCnt = world / ranksPerSupernode;
+        resources.context.rankId = myRank % ranksPerSupernode;
+        resources.context.rankSize = ranksPerSupernode;
+        resources.context.channelsPerRank = kRailChannelsPerRank;
+        resources.context.virtualAddrList[resources.context.rankId] = reinterpret_cast<uint64_t>(localWinBuf);
+        resources.context.ranksPerSupernode = topo.ranksPerSupernode;
+
+        // 平铺 rail ctx 组装（布局与 kernel route.h / tiling_data.h 一致）
+        std::vector<uint8_t> railCtx(RAIL_CTX_TOTAL_BYTES, 0);
+        auto railHead = reinterpret_cast<EngramRailCtxHead*>(railCtx.data());
+        railHead->localId = myRank % ranksPerSupernode;
+        railHead->supernodeId = myRank / ranksPerSupernode;
+        railHead->supernodeCnt = snCnt;
+        railHead->ranksPerSupernode = ranksPerSupernode;
+        auto nodeWinBaseAt = [&](uint32_t p) -> uint64_t& {
+            return *reinterpret_cast<uint64_t*>(railCtx.data() + RAIL_CTX_WIN_OFF + 8ULL * p);
+        };
+        auto nodeChannelAt = [&](uint32_t p) -> uint64_t& {
+            return *reinterpret_cast<uint64_t*>(railCtx.data() + RAIL_CTX_CH_OFF + 8ULL * p);
+        };
+        nodeWinBaseAt(railHead->localId) = reinterpret_cast<uint64_t>(localWinBuf); // 自槽无通道
+
+        uint32_t* layerList = nullptr;
+        uint32_t layerNum = 0;
+        GetNetLayers(resources.hcclComm, layerList, layerNum);
+        TORCH_CHECK(layerNum > 0, "rail link setup: no net layers visible (world=", world, ")");
+        std::vector<RailPeerSpec> supernodeSpecs; // 超节点同伴：期望 UB_CTP 直连
+        supernodeSpecs.reserve(topo.supernodePeers.size());
+        for (uint32_t r : topo.supernodePeers) {
+            supernodeSpecs.push_back({r, r % ranksPerSupernode, true});
+        }
+        std::vector<RailPeerSpec> railSpecs; // 轨道对端：期望 UB_RTP，tableIdx 落 node 表轨道段
+        railSpecs.reserve(topo.railPeers.size());
+        for (uint32_t r : topo.railPeers) {
+            railSpecs.push_back({r, ranksPerSupernode + r / ranksPerSupernode, false});
+        }
+        std::vector<ChannelHandle> supernodeHandles =
+            AcquireRailChannels(resources.hcclComm, layerList, layerNum, myRank, supernodeSpecs, resources.memHandle);
+        std::vector<ChannelHandle> railHandles =
+            AcquireRailChannels(resources.hcclComm, layerList, layerNum, myRank, railSpecs, resources.memHandle);
+        // spec 顺序 = 句柄顺序落表；filledIdx 显式记录已落槽下标（句柄值不做 0 哨兵假设）
+        std::vector<uint32_t> supernodeIdx;
+        supernodeIdx.reserve(supernodeSpecs.size());
+        for (size_t i = 0; i < supernodeSpecs.size(); ++i) {
+            nodeChannelAt(supernodeSpecs[i].tableIdx) = supernodeHandles[i];
+            supernodeIdx.push_back(supernodeSpecs[i].tableIdx);
+        }
+        std::vector<uint32_t> railIdx;
+        railIdx.reserve(railSpecs.size());
+        for (size_t i = 0; i < railSpecs.size(); ++i) {
+            TORCH_CHECK(railSpecs[i].tableIdx < RAIL_NODE_MAX, "rail node idx ", railSpecs[i].tableIdx,
+                        " exceeds node table capacity ", RAIL_NODE_MAX);
+            nodeChannelAt(railSpecs[i].tableIdx) = railHandles[i];
+            railIdx.push_back(railSpecs[i].tableIdx);
+        }
+        PullRailPeerWins(resources.hcclComm, railCtx, supernodeIdx, winBytes);
+        PullRailPeerWins(resources.hcclComm, railCtx, railIdx, winBytes);
+
+        // 窗头清零：单调编码协议要求首调 epoch=0 直通，建链时一次性清零并同步全设备
+        InitWindowHeadOnDevice(localWinBuf, winBytes, ranksPerSupernode, world);
+        CopyContextToDevice(resources.hcclComm, contextTag, CommEngine::COMM_ENGINE_AIV, railCtx.data(),
+                            railCtx.size());
+        resources.contextTensor = GetRailCtxTensor(resources.hcclComm, contextTag);
+        RegisterBufferPoolEntry(contextTag, resources, externalHostPtr, externalBytes, sfHostPtr, sfBytes,
+                                storageAllocBytes);
+        extRegGuard.Release();
+        guard.Release();
+        return resources;
+    }
+
+    // 窗头字节数 = (W+1)×32，W = ranksPerSupernode + 超节点数（kernel RAIL_WIN_SLOT_BYTES 同口径）
+    static uint64_t WinHeadBytes(uint32_t ranksPerSupernode, uint32_t world)
+    {
+        const uint64_t snCnt = (ranksPerSupernode > 0U) ? world / ranksPerSupernode : 0U;
+        return (static_cast<uint64_t>(ranksPerSupernode) + snCnt + 1ULL) * RAIL_WIN_SLOT_BYTES;
     }
 
 private:
@@ -1192,13 +1797,15 @@ private:
         const char* envPerSupernode = std::getenv("RANK_SIZE_PER_SUPERNODE");
         TORCH_CHECK((envPerMachine == nullptr) == (envPerSupernode == nullptr),
                     "RANK_SIZE_PER_MACHINE and RANK_SIZE_PER_SUPERNODE must be set together");
+        TORCH_CHECK(HcclRankGraphGetInstSizeListByLayerFunc != nullptr,
+                    "rail_aligned inference topo probe requires HcclRankGraphGetInstSizeListByLayer, "
+                    "which is missing from the loaded libhccl; upgrade CANN/HCCL or set "
+                    "RANK_SIZE_PER_MACHINE + RANK_SIZE_PER_SUPERNODE explicitly");
         if (envPerMachine != nullptr && envPerSupernode != nullptr) {
-            try {
-                ranksPerMachine = static_cast<uint32_t>(std::stoul(envPerMachine));
-                ranksPerSupernode = static_cast<uint32_t>(std::stoul(envPerSupernode));
-            } catch (const std::exception& e) {
-                TORCH_CHECK(false, "RANK_SIZE_PER_MACHINE/RANK_SIZE_PER_SUPERNODE invalid: ", e.what());
-            }
+            std::string envErr;
+            TORCH_CHECK(ParseEnvUint32("RANK_SIZE_PER_MACHINE", envPerMachine, ranksPerMachine, envErr) &&
+                            ParseEnvUint32("RANK_SIZE_PER_SUPERNODE", envPerSupernode, ranksPerSupernode, envErr),
+                        "RANK_SIZE_PER_MACHINE/RANK_SIZE_PER_SUPERNODE invalid: ", envErr);
             ASCEND_LOGI("rail_aligned topo: rank=%u env set ranksPerMachine=%u ranksPerSupernode=%u", srcRankId,
                         ranksPerMachine, ranksPerSupernode);
         } else {
@@ -1285,7 +1892,7 @@ private:
             }
             return found;
         };
-        if (hybridMode_ == RAIL_ALIGNED_TOPO) {
+        if (hybridMode_ == NETWORK_HYBRID) {
             ProbeRailTopology(commHandle, srcRankId, rankSize, layerList, layerNum);
             const uint32_t ranksPerMachine = railStorage_.ranksPerMachine;
             const uint32_t machineCount = railStorage_.machineCount;
@@ -1386,6 +1993,57 @@ private:
         resources.sfDeviceBufPtr = devPtr;
     }
 
+    // 逐节点查其 HCCL 默认 buffer 基址，按节点索引落平铺 node 表（filledIdx = 已落 channel 的节点索引集）。
+    // remoteBase == localBase 为预期形态（对称 VA），非"返回了本端 buffer"：各卡默认 buffer 映射在同一
+    // VA，通道远程写/信用读目的地址按对端设备 VA 空间解析。
+    static void PullRailPeerWins(const HcclComm& comm, std::vector<uint8_t>& railCtx,
+                                 const std::vector<uint32_t>& filledIdx, int64_t localWinBytes)
+    {
+        for (uint32_t idx : filledIdx) {
+            void* remoteBuffer = nullptr;
+            uint64_t remoteBufSize = 0;
+            const uint64_t chHandle = *reinterpret_cast<const uint64_t*>(railCtx.data() + RAIL_CTX_CH_OFF + 8ULL * idx);
+            auto hcclRet = HcclChannelGetHcclBufferFunc(comm, chHandle, &remoteBuffer, &remoteBufSize);
+            TORCH_CHECK(hcclRet == HCCL_SUCCESS, "rail HcclChannelGetHcclBuffer(idx=", idx, ") failed, ret=", hcclRet);
+            TORCH_CHECK(remoteBuffer != nullptr, "rail remote HCCL default buffer is null for node idx ", idx);
+            if (localWinBytes > 0) {
+                TORCH_CHECK(static_cast<int64_t>(remoteBufSize) >= localWinBytes, "rail remote win size(",
+                            remoteBufSize, ") < local(", localWinBytes, ") for node idx ", idx,
+                            " — cross-rank default buffer size mismatch");
+            }
+            *reinterpret_cast<uint64_t*>(railCtx.data() + RAIL_CTX_WIN_OFF + 8ULL * idx) =
+                reinterpret_cast<uint64_t>(remoteBuffer);
+        }
+    }
+
+    // 取平铺 rail ctx tensor：from_blob 非持有视图，内存归 HCCL 所有（生命周期与 comm 一致）
+    static at::Tensor GetRailCtxTensor(const HcclComm& commHandle, const std::string& contextTag)
+    {
+        void* ctx = nullptr;
+        uint64_t ctxSize = 0;
+        auto hcclRet =
+            HcclEngineCtxGetFunc(commHandle, contextTag.c_str(), CommEngine::COMM_ENGINE_AIV, &ctx, &ctxSize);
+        TORCH_CHECK(hcclRet == HCCL_SUCCESS && ctx != nullptr && ctxSize > 0, "get flat rail ctx of tag '", contextTag,
+                    "' failed, ret=", hcclRet);
+        TORCH_CHECK(ctxSize >= RAIL_CTX_TOTAL_BYTES, "flat rail ctx size ", ctxSize, " < expected ",
+                    RAIL_CTX_TOTAL_BYTES);
+        auto options = at::TensorOptions().dtype(at::kInt).device(c10::DeviceType::PrivateUse1);
+        return at_npu::native::from_blob(ctx, {RAIL_CTX_ELEMS}, options);
+    }
+
+    // 建链时把协议 WIN 窗头一次性 device 清零并同步全设备（默认 buffer 初始内容非零，
+    // 单调编码协议要求首调 epoch=0 直通）
+    static void InitWindowHeadOnDevice(void* winBase, int64_t winBytes, uint32_t ranksPerSupernode, uint32_t world)
+    {
+        uint64_t headBytes = WinHeadBytes(ranksPerSupernode, world);
+        TORCH_CHECK(winBase != nullptr && winBytes >= static_cast<int64_t>(headBytes), "rail win too small: ", winBytes,
+                    " < head ", headBytes);
+        aclError ar = aclrtMemset(winBase, static_cast<size_t>(winBytes), 0, static_cast<size_t>(headBytes));
+        TORCH_CHECK(ar == ACL_SUCCESS, "aclrtMemset(win head ", headBytes, "B) failed, ret=", ar);
+        ar = aclrtSynchronizeDevice();
+        TORCH_CHECK(ar == ACL_SUCCESS, "aclrtSynchronizeDevice after win head memset failed, ret=", ar);
+    }
+
     void BuildChannelDescs(const HcclComm& commHandle, uint32_t srcRankId, uint32_t rankDim, uint32_t channelsPerRank,
                            HcclMemHandle& memHandle, std::vector<HcclChannelDesc>& channelDesc)
     {
@@ -1411,7 +2069,7 @@ private:
                 desc.channelProtocol = linkInfo.protocol;
                 desc.localEndpoint = links->srcEndpointDesc;
                 desc.remoteEndpoint = links->dstEndpointDesc;
-                desc.notifyNum = 3;
+                desc.notifyNum = MOE_CHANNEL_NOTIFY_NUM;
                 desc.memHandles = &memHandle;
                 desc.memHandleNum = 1;
                 channelDesc.push_back(desc);
@@ -1600,7 +2258,7 @@ private:
         ResolveRankLinks(resources.hcclComm, resources.context.rankId, resources.context.rankSize, netLayerList,
                          netLayerNum);
 
-        if (hybridMode_ == RAIL_ALIGNED_TOPO) {
+        if (hybridMode_ == NETWORK_HYBRID) {
             TORCH_CHECK(externalHostPtr == nullptr,
                         "rail_aligned does not support zero-copy external storage, use self-allocated buffer");
             AllocRailMemory(memBufferTag, numCpuBytes, resources);
@@ -1613,7 +2271,7 @@ private:
             MapSfTableBuffer(resources, sfHostPtr, sfBytes);
         }
 
-        if (hybridMode_ == RAIL_ALIGNED_TOPO) {
+        if (hybridMode_ == NETWORK_HYBRID) {
             GetRailCommResource(resources.hcclComm, resources, memBufferTag);
         } else if (withGrad_) {
             QueryHcclBufferResource(resources.hcclComm, resources);
@@ -2272,9 +2930,12 @@ private:
 // ElasticBuffer class - unified interface for Engram storage and MoE EP kernels
 class ElasticBuffer {
 public:
+    // 同轨道通信开关（对标 DeepEP allow_hybrid_mode）：0=关闭；1=分轨——训练走分轨模型，
+    // 拓扑自动探测（env 覆盖 → 链路实测 → 因子分解兜底）。worldSize 由 python 传入（dist world）。
     ElasticBuffer(const std::optional<std::string>& groupName, int64_t numCpuBytes, int64_t numMaxTokensPerRank = 0,
                   bool withGrad = false, bool explicitlyDestroy = false, const std::string& netLayer = "auto",
-                  const std::string& moeCommAlg = MOE_COMM_ALG_DEFAULT, int64_t allowHybridMode = 0);
+                  const std::string& moeCommAlg = MOE_COMM_ALG_DEFAULT, int64_t allowHybridMode = NETWORK_DIRECT,
+                  int64_t worldSize = 0);
     ~ElasticBuffer();
 
     void EngramWrite(const at::Tensor& storage, const c10::optional<at::Tensor>& sf, bool zeroCopy);
@@ -2285,6 +2946,19 @@ public:
     {
         return engramContextTensor_;
     }
+
+    // ctx 是否已建链（python attr getter 防御：未建链时不缓存缺省拓扑）
+    bool IsEngramContextInitialized() const
+    {
+        return engramContextInitialized_;
+    }
+
+    // 读取感知数每超节点卡数（python getter → attr 透传给 tiling；未建链/老路径返回 0）
+    uint32_t GetRanksPerSupernode() const
+    {
+        return engramCommContext_.ranksPerSupernode;
+    }
+
     const at::Tensor& GetLocalStorageAddrTensor() const
     {
         return localStorageAddrTensor_;
@@ -2299,6 +2973,12 @@ public:
     }
     uint32_t GetRankSize() const
     {
+        // 分轨（探测命中轨道即建链，含 ≤1024 缩比床）：ctx group 实例的 rankSize 只是编号空间
+        // 大小，不是通信域尺寸——python 校验（send_counts=world×8）与 maxR 需要 world；
+        // 老路径/本地全词表维持原语义（通信域 rank 数）。
+        if (engramRailContext_) {
+            return static_cast<uint32_t>(engramWorldSize_);
+        }
         return engramCommContext_.rankSize;
     }
 
@@ -2313,18 +2993,20 @@ public:
                                                    const at::Tensor& localStorageAddr, at::ScalarType sfDtype,
                                                    int64_t sfPacks, const at::Tensor& sfTableAddr,
                                                    int64_t numMaxTokensPerRank, int64_t commBufferSize,
-                                                   int64_t rankSize);
+                                                   int64_t rankSize, int64_t ranksPerSupernode = 0);
     static at::Tensor EngramFetchWait(const at::Tensor& context, const at::Tensor& fetched);
 
     // Stateless static method for training backward (graph-mode compatible).
     // Outputs: gradUnique [maxR, H], uniqueLocalEntry [maxR], numUnique [1] (NOT narrowed).
     // Caller is responsible for narrowing by numUnique.item() outside the graph.
     using EngramFetchGradOutput = std::tuple<at::Tensor, at::Tensor, at::Tensor>;
+    // 感知数（HCCL 感知 → python get_ranks_per_supernode → 透传）：缺省 0 = 未感知
     static EngramFetchGradOutput EngramFetchGrad(const at::Tensor& context, const at::Tensor& gradFetched,
                                                  const at::Tensor& perm, const at::Tensor& sendCounts,
                                                  const at::Tensor& recvCounts, const at::Tensor& recvLocalEntry,
                                                  const at::Tensor& numRecv, int64_t numEntries, int64_t commBufferSize,
-                                                 int64_t numMaxTokensPerRank, int64_t rankSize);
+                                                 int64_t numMaxTokensPerRank, int64_t rankSize,
+                                                 int64_t ranksPerSupernode = 0);
 
     static int64_t GetEngramStorageSizeHint(int64_t numEntries, int64_t hiddenSize,
                                             at::ScalarType dtype = at::kBFloat16);
@@ -2365,6 +3047,7 @@ private:
     int64_t ResolveRankNumPerServer(int64_t epWorldSize) const;
     int64_t ResolveTopoType(int64_t epWorldSize, int64_t rankNumPerServer) const;
     void CheckExternalStorageUnchanged(const at::Tensor& storage, bool zeroCopy, bool localMode) const;
+    void ReZeroRailWindowHead(aclrtStream stream);
 
     std::optional<std::string> groupName_;
     bool localFullVocab_ = false;
@@ -2374,9 +3057,11 @@ private:
     bool withGrad_ = false;
     std::string netLayer_ = "auto";
     std::string moeCommAlg_ = MOE_COMM_ALG_DEFAULT;
-    int64_t hybridMode_ = 0;
+    int64_t hybridMode_ = NETWORK_DIRECT;
     uint32_t rankId_ = 0;
     uint32_t rankSize_ = 0;
+    int64_t engramWorldSize_ = 0;
+    bool engramRailContext_ = false;
 
     void* engramHostBufPtr_ = nullptr;
     void* engramDeviceBufPtr_ = nullptr;
@@ -2419,7 +3104,8 @@ private:
 
 ElasticBuffer::ElasticBuffer(const std::optional<std::string>& groupName, int64_t numCpuBytes,
                              int64_t numMaxTokensPerRank, bool withGrad, bool explicitlyDestroy,
-                             const std::string& netLayer, const std::string& moeCommAlg, int64_t allowHybridMode)
+                             const std::string& netLayer, const std::string& moeCommAlg, int64_t allowHybridMode,
+                             int64_t worldSize)
     : groupName_(groupName),
       localFullVocab_(!groupName.has_value()),
       engramNumCpuBytes_(numCpuBytes),
@@ -2430,20 +3116,24 @@ ElasticBuffer::ElasticBuffer(const std::optional<std::string>& groupName, int64_
       withGrad_(withGrad),
       netLayer_(netLayer),
       moeCommAlg_(moeCommAlg),
-      hybridMode_(allowHybridMode)
+      hybridMode_(allowHybridMode),
+      engramWorldSize_(worldSize)
 {
     TORCH_CHECK(moeCommAlg_ == MOE_COMM_ALG_AUTO || moeCommAlg_ == MOE_COMM_ALG_CLOS_ONLY,
                 "MoE comm_alg must be 'auto' or 'clos_only', but got '", moeCommAlg_, "'.");
-    TORCH_CHECK(allowHybridMode == HYBRID_MODE_DEFAULT || allowHybridMode == RAIL_ALIGNED_TOPO,
-                "hybrid_mode must be 0 (off) or 1 (rail_aligned), but got ", allowHybridMode, ".");
+    TORCH_CHECK(hybridMode_ == NETWORK_DIRECT || hybridMode_ == NETWORK_HYBRID,
+                "allow_hybrid_mode must be 0 (off) or 1 (rail-aligned), got ", hybridMode_, ".");
     if (!localFullVocab_) {
         InitHcclEngineCtxFunctions();
         InitHcclFunctions();
     }
-    if (hybridMode_ == RAIL_ALIGNED_TOPO) {
-        TORCH_CHECK(!localFullVocab_, "rail_aligned only supports grouped mode (group != None)");
-        TORCH_CHECK(withGrad_ || (engramNumCpuBytes_ > 0 && engramNumCpuBytes_ % BUFFER_ALIGNMENT == 0),
-                    "rail_aligned inference requires explicit 2MB-aligned num_cpu_bytes, got ", engramNumCpuBytes_);
+    if (hybridMode_ == NETWORK_HYBRID) {
+        TORCH_CHECK(!localFullVocab_, "allow_hybrid_mode only supports grouped mode (group != None)");
+        if (!withGrad_) {
+            // 推理分轨依赖 host 锁页共享槽直读，须显式 2MB 对齐 num_cpu_bytes；训练分轨自建对齐缓冲
+            TORCH_CHECK(engramNumCpuBytes_ > 0 && engramNumCpuBytes_ % BUFFER_ALIGNMENT == 0,
+                        "rail_aligned inference requires explicit 2MB-aligned num_cpu_bytes, got ", engramNumCpuBytes_);
+        }
     }
 }
 
@@ -2476,9 +3166,57 @@ void ElasticBuffer::EnsureEngramContext(void* externalHostPtr, int64_t externalB
     } else {
         commStream_ = c10_npu::getNPUStreamFromPool().stream(false);
         TORCH_CHECK(commStream_ != nullptr, "Failed to get NPU stream from pool for comm stream");
-        EngramContextBuilder builder(hybridMode_, commStream_);
-        resources = builder.Build(*groupName_, withGrad_ ? 0 : engramNumCpuBytes_, withGrad_, externalHostPtr,
-                                  externalBytes, sfHostPtr, sfBytes, netLayer_);
+        if (hybridMode_ == NETWORK_HYBRID && withGrad_) {
+            RailTopoInfo probeTopo;
+            std::string probeReason;
+            TORCH_CHECK(EngramContextBuilder::ProbeRailTopoByGroup(*groupName_, probeTopo, probeReason),
+                        "allow_hybrid_mode (training rail-aligned) topo probe failed: ", probeReason,
+                        "; set RANKS_PER_SUPERNODE for test clusters (ranks per supernode), "
+                        "or check supernode wiring and HCCL topo");
+            if (engramWorldSize_ > probeTopo.ranksPerSupernode) {
+                EngramContextBuilder builder(hybridMode_, commStream_);
+                resources = builder.BuildRailContext(*groupName_, withGrad_ ? 0 : engramNumCpuBytes_, externalHostPtr,
+                                                     externalBytes, sfHostPtr, sfBytes);
+                engramRailContext_ = true; // GetRankSize 语义开关：分轨下返回 world
+            } else {
+                TORCH_CHECK(engramWorldSize_ <= HCCL_MAX_RANK_SIZE, "single supernode world=", engramWorldSize_,
+                            " exceeds legacy builder rank limit 1024 (all-direct domain too large); "
+                            "rail-aligned requires a multi-supernode rail topology");
+                EngramContextBuilder builder;
+                resources = builder.Build(*groupName_, withGrad_ ? 0 : engramNumCpuBytes_, withGrad_, externalHostPtr,
+                                          externalBytes, sfHostPtr, sfBytes, netLayer_);
+            }
+        } else if (hybridMode_ == NETWORK_HYBRID) {
+            EngramContextBuilder builder(hybridMode_, commStream_);
+            resources = builder.Build(*groupName_, withGrad_ ? 0 : engramNumCpuBytes_, withGrad_, externalHostPtr,
+                                      externalBytes, sfHostPtr, sfBytes, netLayer_);
+        } else {
+            TORCH_CHECK(engramWorldSize_ <= HCCL_MAX_RANK_SIZE, "world=", engramWorldSize_,
+                        " > 1024 requires rail-aligned link setup: pass "
+                        "allow_hybrid_mode=1 to ElasticBuffer (training rail-aligned); "
+                        "legacy builder cannot host world > 1024");
+            try {
+                EngramContextBuilder builder;
+                resources = builder.Build(*groupName_, withGrad_ ? 0 : engramNumCpuBytes_, withGrad_, externalHostPtr,
+                                          externalBytes, sfHostPtr, sfBytes, netLayer_);
+            } catch (const std::exception& e) {
+                const std::string errMsg = e.what();
+                if (errMsg.find("No UBC/UBG link found") == std::string::npos) {
+                    throw;
+                }
+                RailTopoInfo probeTopo;
+                std::string probeReason;
+                if (EngramContextBuilder::ProbeRailTopoByGroup(*groupName_, probeTopo, probeReason) &&
+                    probeTopo.world > probeTopo.ranksPerSupernode && probeTopo.ranksPerSupernode > 0U) {
+                    TORCH_CHECK(false, "direct link setup failed on a rail topology: world=", probeTopo.world,
+                                ", ranksPerSupernode=", probeTopo.ranksPerSupernode,
+                                " (cross-supernode peers are "
+                                "only reachable via same-L rail links); original error: ",
+                                errMsg, "; pass allow_hybrid_mode=1 to ElasticBuffer for rail-aligned link setup");
+                }
+                throw;
+            }
+        }
     }
     rankId_ = resources.context.rankId;
     rankSize_ = resources.context.rankSize;
@@ -2650,10 +3388,10 @@ void ElasticBuffer::EngramWrite(const at::Tensor& storage, const c10::optional<a
         TORCH_CHECK(storage.size(0) <= int32Max,
                     "num_entries must not exceed INT32_MAX in full-vocab mode, got num_entries=", storage.size(0));
     } else {
-        TORCH_CHECK(storage.size(0) * static_cast<int64_t>(engramCommContext_.rankSize) <= int32Max,
+        const int64_t rankSizeForBound = static_cast<int64_t>(GetRankSize());
+        TORCH_CHECK(storage.size(0) * rankSizeForBound <= int32Max,
                     "num_entries * rank_size must not exceed INT32_MAX, got num_entries=", storage.size(0),
-                    ", rank_size=", engramCommContext_.rankSize,
-                    ", product=", storage.size(0) * static_cast<int64_t>(engramCommContext_.rankSize));
+                    ", rank_size=", rankSizeForBound, ", product=", storage.size(0) * rankSizeForBound);
     }
 
     if (!localFullVocab_) {
@@ -2672,7 +3410,7 @@ void ElasticBuffer::EngramWrite(const at::Tensor& storage, const c10::optional<a
         const uint8_t* src = static_cast<const uint8_t*>(storage.data_ptr());
         while (remaining > 0) {
             size_t chunkSize = std::min(remaining, MEMCPY_MAX_BYTES);
-            if (hybridMode_ == RAIL_ALIGNED_TOPO) {
+            if (hybridMode_ == NETWORK_HYBRID) {
                 aclError copyRet = aclrtMemcpy(dst, chunkSize, src, chunkSize, ACL_MEMCPY_HOST_TO_HOST);
                 TORCH_CHECK(copyRet == ACL_SUCCESS, "aclrtMemcpy(rail write) failed, ret=", static_cast<int>(copyRet),
                             ", chunkSize=", chunkSize);
@@ -2690,6 +3428,7 @@ void ElasticBuffer::EngramWrite(const at::Tensor& storage, const c10::optional<a
     if (!localFullVocab_) {
         EngramBarrier(false, true);
     }
+
     engramWriteCalled_ = true;
 }
 
@@ -2710,7 +3449,7 @@ ElasticBuffer::EngramFetchOutput ElasticBuffer::EngramFetch(const at::Tensor& co
     aclTensor* nullTensor = nullptr;
     int64_t zero = 0;
     ACLNN_CMD(aclnnEngramFetch, context, indices, nullTensor, sfTable, fetched, nullTensor, nullTensor, nullTensor,
-              nullTensor, nullTensor, fetchedSf, hiddenSize, numEntries, zero, zero, zero, hybridMode);
+              nullTensor, nullTensor, fetchedSf, hiddenSize, numEntries, zero, zero, zero, hybridMode, zero);
     return {fetched, fetchedSf};
 }
 
@@ -2721,7 +3460,7 @@ ElasticBuffer::EngramFetchOutput ElasticBuffer::EngramFetch(const at::Tensor& co
 ElasticBuffer::EngramFetchTrainOutput ElasticBuffer::EngramFetchTrain(
     const at::Tensor& context, const at::Tensor& indices, int64_t hiddenSize, int64_t numEntries, int64_t dtypeEnum,
     const at::Tensor& localStorageAddr, at::ScalarType sfDtype, int64_t sfPacks, const at::Tensor& sfTableAddr,
-    int64_t numMaxTokensPerRank, int64_t commBufferSize, int64_t rankSize)
+    int64_t numMaxTokensPerRank, int64_t commBufferSize, int64_t rankSize, int64_t ranksPerSupernode)
 {
     auto dtype = static_cast<at::ScalarType>(dtypeEnum);
     TORCH_CHECK(rankSize > 0 && numMaxTokensPerRank <= INT64_MAX / rankSize,
@@ -2744,10 +3483,10 @@ ElasticBuffer::EngramFetchTrainOutput ElasticBuffer::EngramFetchTrain(
 
     if (numTokens > 0) {
         constexpr int64_t withGrad = 1;
-        int64_t zero = 0;
+        int64_t zeroHybridMode = 0; // 训练不走推理分轨（hybrid_mode=0）
         ACLNN_CMD(aclnnEngramFetch, context, indices, localStorageAddr, sfTableAddr, fetched, perm, sendCounts,
                   recvCounts, recvLocalEntry, numRecv, fetchedSf, hiddenSize, numEntries, numMaxTokensPerRank,
-                  commBufferSize, withGrad, zero);
+                  commBufferSize, withGrad, zeroHybridMode, ranksPerSupernode);
     }
     return std::make_tuple(fetched, fetchedSf, perm, sendCounts, recvCounts, recvLocalEntry, numRecv);
 }
@@ -2766,7 +3505,7 @@ at::Tensor ElasticBuffer::EngramFetchWait(const at::Tensor& context, const at::T
 ElasticBuffer::EngramFetchGradOutput ElasticBuffer::EngramFetchGrad(
     const at::Tensor& context, const at::Tensor& gradFetched, const at::Tensor& perm, const at::Tensor& sendCounts,
     const at::Tensor& recvCounts, const at::Tensor& recvLocalEntry, const at::Tensor& numRecv, int64_t numEntries,
-    int64_t commBufferSize, int64_t numMaxTokensPerRank, int64_t rankSize)
+    int64_t commBufferSize, int64_t numMaxTokensPerRank, int64_t rankSize, int64_t ranksPerSupernode)
 {
     int64_t hidden = gradFetched.size(1);
     TORCH_CHECK(rankSize > 0 && numMaxTokensPerRank <= INT64_MAX / rankSize,
@@ -2780,7 +3519,7 @@ ElasticBuffer::EngramFetchGradOutput ElasticBuffer::EngramFetchGrad(
     auto numUnique = at::empty({1}, at::TensorOptions().dtype(at::kInt).device(gradFetched.device()));
 
     ACLNN_CMD(aclnnEngramFetchGrad, context, gradFetched, perm, sendCounts, recvCounts, recvLocalEntry, numRecv,
-              gradUnique, uniqueLocalEntry, numUnique, numEntries, commBufferSize);
+              gradUnique, uniqueLocalEntry, numUnique, numEntries, commBufferSize, ranksPerSupernode);
 
     return std::make_tuple(gradUnique, uniqueLocalEntry, numUnique);
 }
@@ -2809,6 +3548,10 @@ void ElasticBuffer::EngramBarrier(bool useCommStream, bool withCpuSync)
     HcclResult ret = HcclBarrierFunc(engramHcclComm_, stream);
     TORCH_CHECK(ret == HCCL_SUCCESS, "HcclBarrier failed, ret: ", ret);
 
+    if (engramRailContext_) {
+        ReZeroRailWindowHead(stream);
+    }
+
     if (withCpuSync) {
         aclError aclRet = aclrtSynchronizeDevice();
         TORCH_CHECK(aclRet == ACL_SUCCESS, "aclrtSynchronizeDevice failed, ret: ", aclRet);
@@ -2817,6 +3560,26 @@ void ElasticBuffer::EngramBarrier(bool useCommStream, bool withCpuSync)
     if (useCommStream) {
         NpuStreamWait(computeStream, commStream_);
     }
+}
+
+void ElasticBuffer::ReZeroRailWindowHead(aclrtStream stream)
+{
+    if (!engramRailContext_) {
+        return;
+    }
+    void* winBase = reinterpret_cast<void*>(engramCommContext_.virtualAddrList[engramCommContext_.rankId]);
+    TORCH_CHECK(winBase != nullptr, "rail window head reset: null protocol win base");
+    const uint32_t ranksPerSupernode = GetRanksPerSupernode();
+    TORCH_CHECK(ranksPerSupernode > 0U && static_cast<uint64_t>(engramWorldSize_) % ranksPerSupernode == 0,
+                "rail window head reset: invalid topology ranksPerSupernode=", ranksPerSupernode,
+                ", world=", engramWorldSize_);
+    const uint64_t headBytes =
+        EngramContextBuilder::WinHeadBytes(ranksPerSupernode, static_cast<uint32_t>(engramWorldSize_));
+    TORCH_CHECK(commBufferSize_ >= static_cast<int64_t>(headBytes), "rail window head reset: commBufferSize(",
+                commBufferSize_, ") < win head(", headBytes, ")");
+    aclError ar =
+        aclrtMemsetAsync(winBase, static_cast<size_t>(commBufferSize_), 0, static_cast<size_t>(headBytes), stream);
+    TORCH_CHECK(ar == ACL_SUCCESS, "aclrtMemsetAsync(rail win head ", headBytes, "B) failed, ret=", ar);
 }
 
 // Destroy - explicit resource cleanup
@@ -2829,7 +3592,7 @@ void ElasticBuffer::Destroy()
     if (localFullVocab_) {
         aclError syncRet = aclrtSynchronizeDevice();
         TORCH_CHECK(syncRet == ACL_SUCCESS, "aclrtSynchronizeDevice failed during local destroy, ret: ", syncRet);
-    } else if (hybridMode_ == RAIL_ALIGNED_TOPO) {
+    } else if (hybridMode_ == NETWORK_HYBRID) {
         // rail_aligned 模式：注册内存/物理内存/导入句柄均无与正常路径一致的释放通道，按约定不释放
         ASCEND_LOGI("rail_aligned destroy: leak rail resources by design");
     } else {
@@ -3152,11 +3915,15 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
 
     pybind11::class_<Mc2Api::ElasticBuffer>(m, "ElasticBuffer")
         .def(pybind11::init<const std::optional<std::string>&, int64_t, int64_t, bool, bool, const std::string&,
-                            const std::string&, bool>(),
+                            const std::string&, int64_t, int64_t>(),
              pybind11::arg("groupName"), pybind11::arg("numCpuBytes"), pybind11::arg("numMaxTokensPerRank") = 0,
              pybind11::arg("withGrad") = false, pybind11::arg("explicitlyDestroy") = false,
              pybind11::arg("netLayer") = "auto", pybind11::arg("moeCommAlg") = Mc2Api::MOE_COMM_ALG_DEFAULT,
-             pybind11::arg("allowHybridMode") = 0)
+             pybind11::arg("allowHybridMode") = 0, pybind11::arg("worldSize") = 0)
+        .def("get_ranks_per_supernode",
+             [](const Mc2Api::ElasticBuffer& self) -> int64_t {
+                 return static_cast<int64_t>(self.GetRanksPerSupernode());
+             })
         .def("engram_write", &Mc2Api::ElasticBuffer::EngramWrite, pybind11::arg("storage").noconvert(),
              pybind11::arg("sf") = pybind11::none(), pybind11::arg("zeroCopy"))
         .def_static("engram_fetch",
@@ -3166,27 +3933,34 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m)
                     pybind11::arg("context"), pybind11::arg("indices"), pybind11::arg("hidden_size"),
                     pybind11::arg("num_entries"), pybind11::arg("dtype"), pybind11::arg("sf_table"),
                     pybind11::arg("hybrid_mode"))
-        .def_static("engram_fetch_train", &Mc2Api::ElasticBuffer::EngramFetchTrain, pybind11::arg("context"),
-                    pybind11::arg("indices"), pybind11::arg("hidden_size"), pybind11::arg("num_entries"),
-                    pybind11::arg("dtype"), pybind11::arg("local_storage_addr"), pybind11::arg("sf_dtype"),
-                    pybind11::arg("sf_packs"), pybind11::arg("sf_table_addr"), pybind11::arg("num_max_tokens_per_rank"),
-                    pybind11::arg("comm_buffer_size"), pybind11::arg("rank_size"))
+        .def_static("engram_fetch_train",
+                    static_cast<Mc2Api::ElasticBuffer::EngramFetchTrainOutput (*)(
+                        const at::Tensor&, const at::Tensor&, int64_t, int64_t, int64_t, const at::Tensor&,
+                        at::ScalarType, int64_t, const at::Tensor&, int64_t, int64_t, int64_t, int64_t)>(
+                        &Mc2Api::ElasticBuffer::EngramFetchTrain),
+                    pybind11::arg("context"), pybind11::arg("indices"), pybind11::arg("hidden_size"),
+                    pybind11::arg("num_entries"), pybind11::arg("dtype"), pybind11::arg("local_storage_addr"),
+                    pybind11::arg("sf_dtype"), pybind11::arg("sf_packs"), pybind11::arg("sf_table_addr"),
+                    pybind11::arg("num_max_tokens_per_rank"), pybind11::arg("comm_buffer_size"),
+                    pybind11::arg("rank_size"), pybind11::arg("ranks_per_supernode") = 0)
         .def_static("engram_fetch_wait", &Mc2Api::ElasticBuffer::EngramFetchWait, pybind11::arg("context"),
                     pybind11::arg("fetched"))
         .def_static("engram_fetch_grad_op",
                     static_cast<Mc2Api::ElasticBuffer::EngramFetchGradOutput (*)(
                         const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&, const at::Tensor&,
-                        const at::Tensor&, const at::Tensor&, int64_t, int64_t, int64_t, int64_t)>(
+                        const at::Tensor&, const at::Tensor&, int64_t, int64_t, int64_t, int64_t, int64_t)>(
                         &Mc2Api::ElasticBuffer::EngramFetchGrad),
                     pybind11::arg("context"), pybind11::arg("gradFetched").noconvert(),
                     pybind11::arg("perm").noconvert(), pybind11::arg("sendCounts").noconvert(),
                     pybind11::arg("recvCounts").noconvert(), pybind11::arg("recvLocalEntry").noconvert(),
                     pybind11::arg("numRecv").noconvert(), pybind11::arg("numEntries"), pybind11::arg("commBufferSize"),
-                    pybind11::arg("numMaxTokensPerRank"), pybind11::arg("rankSize"))
+                    pybind11::arg("numMaxTokensPerRank"), pybind11::arg("rankSize"),
+                    pybind11::arg("ranksPerSupernode") = 0)
         .def("engram_barrier", &Mc2Api::ElasticBuffer::EngramBarrier, pybind11::arg("useCommStream") = true,
              pybind11::arg("withCpuSync") = false)
         .def("destroy", &Mc2Api::ElasticBuffer::Destroy)
         .def("get_context_tensor", &Mc2Api::ElasticBuffer::GetContextTensor)
+        .def("engram_context_initialized", &Mc2Api::ElasticBuffer::IsEngramContextInitialized)
         .def("get_local_storage_addr", &Mc2Api::ElasticBuffer::GetLocalStorageAddrTensor)
         .def("get_local_sf_table_addr", &Mc2Api::ElasticBuffer::GetLocalSfTableAddrTensor)
         .def("get_comm_buffer_size", &Mc2Api::ElasticBuffer::GetCommBufferSize)

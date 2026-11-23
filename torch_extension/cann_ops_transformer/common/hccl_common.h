@@ -239,7 +239,6 @@ static inline void InitHcclRankGraphFunctions()
     TORCH_CHECK(HcclRankGraphGetRanksByLayerFunc != nullptr, "getHcclRankGraphGetRanksByLayer failed.");
     HcclRankGraphGetInstSizeListByLayerFunc =
         GetHcclFwkFuncAddr<_HcclRankGraphGetInstSizeListByLayer>("HcclRankGraphGetInstSizeListByLayer");
-    TORCH_CHECK(HcclRankGraphGetInstSizeListByLayerFunc != nullptr, "getHcclRankGraphGetInstSizeListByLayer failed.");
 }
 
 // 初始化新的EngineCtx API (从libhccl_fwk.so加载)

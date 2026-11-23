@@ -33,6 +33,7 @@
 #include "engram_fetch_arch35.h"
 #include "engram_fetch_rail_arch35.h"
 #include "engram_fetch_train_arch35.h"
+#include "railaligned/engram_fetch_train_railaligned_arch35.h"
 
 using namespace Mc2Kernel;
 
@@ -56,6 +57,13 @@ __global__ __aicore__ void engram_fetch(GM_ADDR commContext, GM_ADDR indices, GM
         EngramFetchArch35 op;
         op.Init(commContext, indices, fetched, sfTable, fetchedSf, workspaceGM, &pipe, &tilingData);
         op.Process<EngramHasSf>();
+    } else if constexpr (EngramFetchMode == ENGRAM_FETCH_TRAIN_RAIL_MODE) {
+        AscendC::TPipe pipe;
+        EngramFetchTrainRailAlignedArch35 opRail;
+        opRail.Init<EngramHasSf>(commContext, indices, fetched, fetchedSf, permOut, sendCountsOut, recvCountsOut,
+                                 recvLocalEntryOut, numRecvOut, workspaceGM, localStorageAddr, sfTable, &pipe,
+                                 &tilingData);
+        opRail.Process<EngramHasSf>();
     } else if constexpr (EngramFetchMode == ENGRAM_FETCH_TRAIN_MODE) {
         AscendC::TPipe pipe;
         EngramFetchTrainArch35 op;

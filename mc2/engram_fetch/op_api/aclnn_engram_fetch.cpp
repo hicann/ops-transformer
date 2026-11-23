@@ -42,21 +42,19 @@ static aclnnStatus CheckParams(const aclTensor* commContext, const aclTensor* in
 extern "C" {
 #endif
 
-aclnnStatus aclnnEngramFetchGetWorkspaceSize(const aclTensor* commContext, const aclTensor* indices,
-                                             const aclTensor* localStorageAddr, const aclTensor* sfTable,
-                                             aclTensor* fetched, aclTensor* permOut, aclTensor* sendCountsOut,
-                                             aclTensor* recvCountsOut, aclTensor* recvLocalEntryOut,
-                                             aclTensor* numRecvOut, aclTensor* fetchedSf, int32_t hiddenSize,
-                                             int64_t numEntriesPerRank, int64_t numMaxTokensPerRank,
-                                             int64_t commBufferSize, int64_t withGrad, int64_t hybridMode,
-                                             uint64_t* workspaceSize, aclOpExecutor** executor)
+aclnnStatus aclnnEngramFetchGetWorkspaceSize(
+    const aclTensor* commContext, const aclTensor* indices, const aclTensor* localStorageAddr, const aclTensor* sfTable,
+    aclTensor* fetched, aclTensor* permOut, aclTensor* sendCountsOut, aclTensor* recvCountsOut,
+    aclTensor* recvLocalEntryOut, aclTensor* numRecvOut, aclTensor* fetchedSf, int32_t hiddenSize,
+    int64_t numEntriesPerRank, int64_t numMaxTokensPerRank, int64_t commBufferSize, int64_t withGrad,
+    int64_t hybridMode, int64_t ranksPerSupernode, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
     auto retParam = CheckParams(commContext, indices, fetched);
     CHECK_RET(retParam == ACLNN_SUCCESS, retParam);
     aclnnStatus ret = aclnnInnerEngramFetchGetWorkspaceSize(
         commContext, indices, localStorageAddr, sfTable, hiddenSize, numEntriesPerRank, numMaxTokensPerRank,
-        commBufferSize, withGrad, hybridMode, fetched, permOut, sendCountsOut, recvCountsOut, recvLocalEntryOut,
-        numRecvOut, fetchedSf, workspaceSize, executor);
+        commBufferSize, withGrad, hybridMode, ranksPerSupernode, fetched, permOut, sendCountsOut, recvCountsOut,
+        recvLocalEntryOut, numRecvOut, fetchedSf, workspaceSize, executor);
     return ret;
 }
 

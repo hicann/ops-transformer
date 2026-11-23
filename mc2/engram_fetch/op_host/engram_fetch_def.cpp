@@ -44,6 +44,7 @@ public:
         this->Attr("comm_buffer_size").AttrType(OPTIONAL).Int();
         this->Attr("with_grad").AttrType(OPTIONAL).Int();
         this->Attr("hybrid_mode").AttrType(OPTIONAL).Int();
+        this->Attr("ranks_per_supernode").AttrType(OPTIONAL).Int(0);
 
         OpAICoreConfig aicore_config_a5;
         aicore_config_a5.DynamicCompileStaticFlag(true)

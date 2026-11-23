@@ -17,19 +17,16 @@
 #define ASCENDC_ENGRAM_FETCH_GRAD_TILING_H
 
 #include <cstdint>
+#include "arch35/railaligned/engram_fetch_grad_route.h"
 
 namespace Mc2Kernel {
-constexpr uint32_t MAX_QP_SIZE = 1024U;           // 通信域 rank 上界（EngramCommContext.commBuffer 容量）
-constexpr uint32_t UB_ALIGN = 32U;                // UB 32B 对齐
-constexpr uint32_t TILE_BYTES = 64U * 1024U;      // grad 单 tile 整缓冲容量
-constexpr uint32_t GRAD_PING_BYTES = 32U * 1024U; // grad ping/pong 半缓冲容量
-constexpr uint32_t ENTRY_BUF_BYTES = 64U * 1024U;
-constexpr uint32_t GRAD_BUF_BYTES = 64U * 1024U;
-constexpr uint32_t IDX_BUF_BYTES = 4U * 1024U;
+
+constexpr uint32_t UB_ALIGN = 32U;                   // UB 32B 对齐
+constexpr uint32_t TILE_BYTES = 64U * 1024U;         // grad 单 tile 整缓冲容量
+constexpr uint32_t GRAD_PING_BYTES = 32U * 1024U;    // grad ping/pong 半缓冲容量
 constexpr uint32_t COMM_BUF_BYTES = 2U * TILE_BYTES; // entryBuf + gradBuf
 constexpr uint32_t HCOMM_INIT_SIZE = 512U;
 constexpr uint32_t STATE_OFFSET = 32U;         // 通信窗口状态槽步长
-constexpr uint32_t ENTRY_BATCH_CAP = 1024U;    // entry 批容量（int32 个数）
 constexpr uint32_t ENTRY_BUF_INT32_SLOTS = 5U; // entryBuf 头部被 int32 槽位占用的批数
 constexpr uint32_t ACCUM_BUF_COPIES = 2U;      // fp32 累加行双缓冲份数（AccumBufBytes）
 constexpr uint32_t FLUSH_CAST_HEAD_BYTES =
@@ -56,5 +53,18 @@ struct EngramFetchGradTilingData {
     uint32_t sortTmpUbSize;    // SortLib: AscendC::Sort 临时 UB 字节
     uint32_t sortCoreCnt;      // sort 参与核数
     uint32_t chunkElems;
+    uint32_t ranksPerSupernode; // 每超节点卡数（感知透传）
+    uint32_t numRows;           // N：收件区行格数（按 commBufferSize 分满反解，非 2 的幂）
+    uint32_t batchRows;         // 发送批行数 ≈ 64KB / P
+    uint32_t sendCoreCnt;       // S 发送组核数
+    uint32_t fwdCoreCnt;        // F 转发组核数（M/R 合并后的统一转发循环）
+    uint32_t ownerCoreCnt;      // O 收集组核数
 };
+
+namespace Mc2Kernel {
+
+constexpr uint32_t CTX_RAIL_ELEMS = RAIL_CTX_TOTAL_BYTES / 4U; // 平铺 rail ctx int32 数（头部 + node 表两张）
+constexpr uint32_t CTX_LEGACY_ELEMS = 16400U / 4U;             // 4100
+
+} // namespace Mc2Kernel
 #endif

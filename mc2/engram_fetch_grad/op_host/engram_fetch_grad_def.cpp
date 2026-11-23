@@ -51,6 +51,12 @@ public:
 
         this->Attr("num_entries_per_rank").AttrType(REQUIRED).Int();
         this->Attr("comm_buffer_size").AttrType(REQUIRED).Int();
+        // 轨道模型（rail-aligned，204800 适配）——感知 attr：torch 侧经 HCCL topo 感知
+        // （超节点直连层）自动填入（用户零参数）。ranksPerSupernode=每超节点卡数是唯一
+        // 拓扑事实，超节点数=world÷ranksPerSupernode、轨道对端数=world÷ranksPerSupernode−1
+        // 全推导。缺省 0 = 未感知（tiling 分发按 128 兼容边界处理，rail tiling 校验要求 >0）。
+        // 与 ctx 尾部字段 ranksPerSupernode 同源。
+        this->Attr("ranks_per_supernode").AttrType(OPTIONAL).Int(0);
 
         OpAICoreConfig aicore_config_a5;
         aicore_config_a5.DynamicCompileStaticFlag(true)

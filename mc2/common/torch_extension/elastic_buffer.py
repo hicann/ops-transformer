@@ -168,12 +168,14 @@ class ElasticBufferOpBuilder(OpBuilder):
             "engram_fetch_train(Tensor context, Tensor indices, int hidden_size, "
             "int num_entries, int dtype, Tensor local_storage_addr, "
             "ScalarType sf_dtype, int sf_packs, Tensor sf_table_addr, "
-            "int num_max_tokens_per_rank, int comm_buffer_size, int rank_size) "
+            "int num_max_tokens_per_rank, int comm_buffer_size, int rank_size, "
+            "int ranks_per_supernode=0) "
             "-> (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)",
             "engram_fetch_wait(Tensor context, Tensor fetched) -> Tensor",
             "engram_fetch_grad(Tensor context, Tensor grad_fetched, Tensor perm, Tensor send_counts, "
             "Tensor recv_counts, Tensor recv_local_entry, Tensor num_recv, int num_entries, "
-            "int comm_buffer_size, int num_max_tokens_per_rank, int rank_size) "
+            "int comm_buffer_size, int num_max_tokens_per_rank, int rank_size, "
+            "int ranks_per_supernode=0) "
             "-> (Tensor, Tensor, Tensor)",
         ]
 
@@ -221,6 +223,7 @@ class ElasticBufferOpBuilder(OpBuilder):
             num_max_tokens_per_rank,
             comm_buffer_size,
             rank_size,
+            ranks_per_supernode=0,
         ):
             torch._check(
                 sf_packs >= 0,
@@ -229,6 +232,14 @@ class ElasticBufferOpBuilder(OpBuilder):
             torch._check(
                 sf_dtype in _ENGRAM_SF_DTYPES,
                 lambda: (f"sf_dtype must be float32 or float8_e8m0fnu, got {sf_dtype}"),
+            )
+            _ = (
+                context,
+                num_entries,
+                local_storage_addr,
+                sf_table_addr,
+                comm_buffer_size,
+                ranks_per_supernode,
             )
             num_tokens = indices.size(0)
             max_r = num_max_tokens_per_rank * rank_size
@@ -276,8 +287,10 @@ class ElasticBufferOpBuilder(OpBuilder):
             comm_buffer_size,
             num_max_tokens_per_rank,
             rank_size,
+            ranks_per_supernode=0,
         ):
             # Outputs are NOT narrowed; full maxR rows. Caller narrows by num_unique.
+            _ = (ranks_per_supernode,)
             num_max_tokens_per_rank = (
                 1 if num_max_tokens_per_rank <= 0 else num_max_tokens_per_rank
             )
@@ -359,6 +372,7 @@ def engram_fetch_train(
     num_max_tokens_per_rank,
     comm_buffer_size,
     rank_size,
+    ranks_per_supernode=0,
 ):
     op_module = _elastic_buffer_op_builder.load()
     return op_module.ElasticBuffer.engram_fetch_train(
@@ -374,6 +388,7 @@ def engram_fetch_train(
         num_max_tokens_per_rank,
         comm_buffer_size,
         rank_size,
+        ranks_per_supernode,
     )
 
 
@@ -396,6 +411,7 @@ def engram_fetch_grad(
     comm_buffer_size,
     num_max_tokens_per_rank,
     rank_size,
+    ranks_per_supernode=0,
 ):
     op_module = _elastic_buffer_op_builder.load()
     return op_module.ElasticBuffer.engram_fetch_grad_op(
@@ -410,6 +426,7 @@ def engram_fetch_grad(
         comm_buffer_size,
         num_max_tokens_per_rank,
         rank_size,
+        ranks_per_supernode,
     )
 
 
@@ -739,9 +756,9 @@ class ElasticBuffer:
                 and freed when the process exits (see ``destroy``).
             netlayer: HCCL netlayer selection. ``"auto"`` (default) probes
                 every peer starting from the first netlayer onward; a
-                non-negative integer string (e.g. ``"1"``, ``"2"``) builds
-                links within the specified netlayer only (every peer must
-                be reachable in that layer, otherwise the build fails). A
+                non-negative integer string (e.g. "1", "2") builds
+                links within the specified netlayer only (every peer must be
+                reachable in that layer, otherwise the build fails). A
                 specified netlayer that does not exist fails the build
                 directly.
             comm_alg: MoE communication port mode. ``"auto"`` (default) uses
@@ -751,17 +768,20 @@ class ElasticBuffer:
                 with 64 Jettys for both dispatch and combine.
                 Empty strings are not supported. Clos-only mode requires
                 direct topology and rejects UBG (UB_RTP) links.
-            allow_hybrid_mode: engram rail-aligned communication switch,
-                When enabled, engram communication
-                builds links along the rail-aligned topology: direct connections within
-                a supernode, and same-rank-number channels across supernodes; topology
-                is auto-detected.
+            allow_hybrid_mode: engram 同轨道通信开关（int，对标 DeepEP）：
+                0 = 关闭（默认），1 = 分轨——超节点内直连、跨超节点同号卡轨道两跳，
+                拓扑自动探测；测试环境可经 env 覆盖（RANKS_PER_SUPERNODE，或成对
+                RANK_SIZE_PER_MACHINE + RANK_SIZE_PER_SUPERNODE）。训练 world>1024 必须开启。
         """
         if allow_hybrid_mode:
             _torch_check(
                 group is not None,
-                lambda: "rail_aligned only supports grouped mode (group != None).",
+                lambda: "allow_hybrid_mode only supports grouped mode (group != None).",
             )
+        torch._check(
+            allow_hybrid_mode in (0, 1),
+            lambda: f"allow_hybrid_mode must be 0 (off) or 1 (rail-aligned), got {allow_hybrid_mode!r}.",
+        )
         moe_args = (num_max_tokens_per_rank, hidden, num_topk)
         self._validate_init_args(group, num_cpu_bytes, moe_args, with_grad)
 
@@ -806,6 +826,8 @@ class ElasticBuffer:
         )
         self._comm_alg = comm_alg
         self._allow_hybrid_mode = allow_hybrid_mode
+
+        # 感知数经 get_ranks_per_supernode 读出后随算子调用透传
         _elastic_buffer_ops = _elastic_buffer_op_builder.load()
         self._runtime = _elastic_buffer_ops.ElasticBuffer(
             self._group_name,
@@ -816,7 +838,9 @@ class ElasticBuffer:
             self._netlayer,
             self._comm_alg,
             self._allow_hybrid_mode,
+            self._ep_world_size if self._group is not None else 0,
         )
+        self._ranks_per_supernode = None
 
         self._num_max_tokens_per_rank = num_max_tokens_per_rank
         self._hidden = hidden
@@ -1100,6 +1124,9 @@ class ElasticBuffer:
             self._local_sf_table_addr = self._runtime.get_local_sf_table_addr()
         self._comm_buffer_size = self._runtime.get_comm_buffer_size()
         self._rank_size = self._runtime.get_rank_size()
+        if self._group is not None:
+            # 建链后缓存为纯属性：图捕获下 forward 不触 pybind（dynamo 无法 trace，会断图）
+            self._ranks_per_supernode = self._runtime.get_ranks_per_supernode()
 
     def engram_fetch(self, indices: torch.Tensor) -> Callable:
         """
@@ -1148,6 +1175,7 @@ class ElasticBuffer:
                 self._num_max_tokens_per_rank,
                 self._comm_buffer_size,
                 self._rank_size,
+                self._get_ranks_per_supernode_attr(),
             )
             ctx = EngramFetchCtx(
                 perm=perm,
@@ -1227,6 +1255,7 @@ class ElasticBuffer:
                 self._comm_buffer_size,
                 self._num_max_tokens_per_rank,
                 self._rank_size,
+                self._get_ranks_per_supernode_attr(),
             )
         )
         # Narrow to actualK rows outside the graph (.item() syncs; not graph-safe).
@@ -1239,6 +1268,14 @@ class ElasticBuffer:
             grad_unique = grad_unique_full
             unique_local_entry = unique_local_entry_full
         return grad_unique, unique_local_entry
+
+    def _get_ranks_per_supernode_attr(self) -> int:
+        """0 = 未感知（tiling 按 128 兼容）；未建链不缓存，等建链后再取。"""
+        if self._ranks_per_supernode is None:
+            if self._group is None or not self._runtime.engram_context_initialized():
+                return 0
+            self._ranks_per_supernode = self._runtime.get_ranks_per_supernode()
+        return self._ranks_per_supernode
 
     def dispatch(
         self,
@@ -1576,6 +1613,7 @@ class ElasticBuffer:
         self._local_sf_table_addr = None
         self._comm_buffer_size = 0
         self._rank_size = 0
+        self._ranks_per_supernode = None
         self._engram_sf = None
 
     def _check_engram_fetch_grad(
@@ -1656,16 +1694,26 @@ class ElasticBuffer:
                 f"fetch_ctx.recv_counts length ({fetch_ctx.recv_counts.size(0)}) must equal "
                 f"rank_size ({self._rank_size})"
             )
-        expected_recv_local_entry_len = self._num_max_tokens_per_rank * self._rank_size
-        if fetch_ctx.recv_local_entry.size(0) != expected_recv_local_entry_len:
-            raise RuntimeError(
-                f"fetch_ctx.recv_local_entry length ({fetch_ctx.recv_local_entry.size(0)}) must equal "
-                f"num_max_tokens_per_rank * rank_size = {expected_recv_local_entry_len}"
-            )
+        # 形状校验先行：num_recv 非 (1,) 时先于 .item() 报定制错误（否则 .item() 的 torch 通用
+        # 异常先触发，掩没本处语义）。
         if fetch_ctx.num_recv.size(0) != 1:
             raise RuntimeError(
                 f"fetch_ctx.num_recv length ({fetch_ctx.num_recv.size(0)}) must be 1"
             )
+        max_recv_len = self._num_max_tokens_per_rank * self._rank_size
+        if fetch_ctx.recv_local_entry.size(0) >= max_recv_len:
+            if fetch_ctx.recv_local_entry.size(0) != max_recv_len:
+                raise RuntimeError(
+                    f"fetch_ctx.recv_local_entry length ({fetch_ctx.recv_local_entry.size(0)}) must equal "
+                    f"num_max_tokens_per_rank * rank_size = {max_recv_len}"
+                )
+        else:
+            actual_recv = int(fetch_ctx.num_recv.item())
+            if fetch_ctx.recv_local_entry.size(0) < actual_recv:
+                raise RuntimeError(
+                    f"fetch_ctx.recv_local_entry length ({fetch_ctx.recv_local_entry.size(0)}) must cover "
+                    f"num_recv ({actual_recv}); rail cap = dim0 (调试构造实际 totalRecv 需覆盖有效前缀)"
+                )
 
     def _check_engram_fetch_ready(self, indices: torch.Tensor) -> None:
         if indices.device.type != torch.device("npu").type:

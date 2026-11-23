@@ -67,14 +67,21 @@ constexpr AscendC::UrmaWqeEntry URMA_CQE_CFG = {
 };
 #endif
 
+// 老 ctx 布局（定长 16400B = 4100 int32）：rankId..rankSlotStride 及 [1024] 两表是老模板/老
+// builder 与推理 rail（PR #15511）的既定布局，勿扩 commBuffer/hcommHandle（会漂移全部存量偏移）。
+// ranksPerMachine/ranksPerSupernode/rankSlotStride 为推理 rail kernel 的拓扑三要素（老路径恒 0）；
+// 训练分轨建链不再经本结构落设备——平铺 rail ctx（EngramRailCtxHead + node 表，见
+// engram_fetch_grad_tiling_data.h）独立布局；ranksPerSupernode 同时是 host 侧感知事实源
+// （getter 读出透传 attr）。
 struct EngramCommContext {
     uint32_t rankId;
     uint32_t rankSize;
-    uint64_t commBuffer[HCCL_MAX_RANK_SIZE];
+    uint64_t commBuffer[HCCL_MAX_RANK_SIZE]; // 组内(local): 各rank device VA
     uint64_t hcommHandle[HCCL_MAX_RANK_SIZE];
     uint32_t channelsPerRank;
+    // rail布局：超外按machine粒度，超内按rank粒度依次排布
     uint32_t ranksPerMachine;
-    uint32_t ranksPerSupernode;
+    uint32_t ranksPerSupernode; // 每超节点卡数（分轨感知事实源；老路径恒 0）
     uint64_t rankSlotStride;
 };
 
