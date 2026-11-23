@@ -48,7 +48,8 @@ def _attend(q, k, v, atten_mask, scale, need_fix_invalid, sink=None):
 
     qk = torch.matmul(q, k.permute(0, 1, 3, 2)).mul(scale)
     if atten_mask is not None:
-        qk = qk.masked_fill_(atten_mask.cpu().bool(), value=torch.tensor(-1.7e38))
+        mask_value = float("-inf") if sink is not None else -1.7e38
+        qk = qk.masked_fill_(atten_mask.cpu().bool(), mask_value)
 
     if qk.shape[-1] == 0:
         b, n, sq, _ = qk.shape
@@ -60,7 +61,7 @@ def _attend(q, k, v, atten_mask, scale, need_fix_invalid, sink=None):
 
     # softmax_res, x_max, x_sum = tsoftmax(qk)
 
-    if need_fix_invalid:
+    if need_fix_invalid and sink is None:
         softmax_res, x_max, x_sum = _fix_invalid_rows(softmax_res, x_max, x_sum)
 
     out = torch.matmul(softmax_res, v)
@@ -140,6 +141,10 @@ def tforward_tnd(q, k, v, **kwargs):
     out_golden = torch.zeros([1, n1, s1_total, d_v], dtype=q.dtype)
     x_max = torch.zeros([n1, s1_total], dtype=torch.float32)
     x_sum = torch.zeros([n1, s1_total], dtype=torch.float32)
+    if sink is not None:
+        # LSE = log(x_sum) + x_max for rows skipped below.
+        x_max.copy_(sink.reshape(n1, 1))
+        x_sum.fill_(1.0)
     for i in range(b):
         act_q_len = seqused_q[i]
         act_kv_len = seqused_kv[i]

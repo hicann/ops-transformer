@@ -328,15 +328,8 @@ class FlashAttnGolden:
         is_tnd_out = layout_q == "TND"
         if is_tnd_out:
             total_q = q.shape[0]
-            out_tnd = torch.zeros(
-                total_q, N_q, dv, dtype=torch.float32, device=q.device
-            )
-            # 算子 lse 输出为 (N, T), 与算子对齐
-            lse_tnd = torch.full(
-                (N_q, total_q), float("inf"), dtype=torch.float32, device=q.device
-            )
-            out = None
-            lse = None
+            out_shape = (total_q, N_q, dv)
+            lse_shape = (N_q, total_q)
         else:
             # out/lse 的 S 维度用张量全量(算子按 q 张量形状输出),
             # 不能取 max(seqused_q) — 否则 seqused < S1 时 shape mismatch
@@ -344,12 +337,16 @@ class FlashAttnGolden:
                 max_sq = q.shape[1]
             else:
                 max_sq = q.shape[2]
-            out = torch.zeros(B, N_q, max_sq, dv, dtype=torch.float32, device=q.device)
-            lse = torch.full(
-                (B, N_q, max_sq), float("inf"), dtype=torch.float32, device=q.device
-            )
-            out_tnd = None
-            lse_tnd = None
+            out_shape = (B, N_q, max_sq, dv)
+            lse_shape = (B, N_q, max_sq)
+
+        out = torch.zeros(out_shape, dtype=torch.float32, device=q.device)
+        lse = torch.empty(lse_shape, dtype=torch.float32, device=q.device)
+        # Skipped batches and Q padding keep the per-head initial value.
+        if sinks is None:
+            lse.fill_(float("inf"))
+        else:
+            lse.copy_(sinks[:, None])
 
         for b in range(B):
             sq = q_lens[b]
@@ -419,32 +416,14 @@ class FlashAttnGolden:
                     else:
                         o, l = compute_fn(q_bh, k_bh, v_bh, mask_b, scale, sink, drop)
                     if is_tnd_out:
-                        out_tnd[q_start : q_start + sq, qh, :] = o
-                        lse_tnd[qh, q_start : q_start + sq] = l
+                        out[q_start : q_start + sq, qh, :] = o
+                        lse[qh, q_start : q_start + sq] = l
                     else:
                         out[b, qh, :sq, :] = o
                         lse[b, qh, :sq] = l
 
             del q_b, k_b, v_b
 
-        # 无效行对齐算子: 有效行之后未计算的行(/空序列) LSE 刷 +inf
-        # (整行被 mask 的行已在 _compute_*_single 中置 +inf; 此处只覆盖
-        #  seqused_q < S1 的 padding 行与 sq<=0 的空序列行)
-        if is_tnd_out:
-            for b in range(B):
-                sq = q_lens[b]
-                seg_start = cu_q[b]
-                seg_end = cu_q[b + 1]
-                if sq < seg_end - seg_start:
-                    lse_tnd[:, seg_start + sq : seg_end] = float("inf")
-        else:
-            for b in range(B):
-                sq = q_lens[b]
-                if sq < max_sq:
-                    lse[b, :, sq:] = float("inf")
-
-        if is_tnd_out:
-            return out_tnd, lse_tnd
         return out, lse
 
     def _extract_batch_bnsd_f32(

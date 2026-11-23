@@ -48,7 +48,8 @@ class CPUBackend(Backend):
 
         out_cpu, x_max, x_sum = tforward(q_cpu, k_cpu, v_cpu, **tforward_kwargs)
         lse = torch.log(x_sum) + x_max
-        lse[x_max <= torch.finfo(torch.float32).min + 1.0] = float("inf")
+        if tforward_kwargs.get("sinks") is None:
+            lse[x_max <= torch.finfo(torch.float32).min + 1.0] = float("inf")
         return {"out": out_cpu, "lse": lse}
 
 
