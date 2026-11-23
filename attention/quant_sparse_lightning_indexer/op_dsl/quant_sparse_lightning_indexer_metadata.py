@@ -39,12 +39,14 @@ LI_WORKSPACE_OFFSET_FIELD = 7  # LI 记录第 7 字段：本行首个 LD 工作�
 SCHEDULER_FIELDS = 8
 SCHEDULER_QUERY_OFFSET_FIELD = 7  # 临时调度记录第 7 字段：组内 query 偏移。
 MAX_MERGE_PARTS = 8
+CANDIDATE_CAPACITY = 2048
 TOPK_TRUNK_LEN = 16384
 S2_TILE_TOKENS = 512  # 与主算子的 TILE_N 一致，metadata 边界以此为单位。
 
 
 class Args:
     cu: GmIn(I32)
+    cu_k: GmIn(I32)
     used_q: GmIn(I32)
     used_k: GmIn(I32)
     residual: GmIn(I32)
@@ -53,6 +55,7 @@ class Args:
     output: GmOut(I32)
     scratch: GmOut(I64)
     has_cu: U32
+    has_cu_k: U32
     has_q: U32
     has_k: U32
     has_residual: U32
@@ -72,18 +75,51 @@ class Args:
     has_offset: U32
 
 
+def _check_sequence(cu, used, has_cu, has_used, batch):
+    if has_cu != 0 and cu[0] != 0:
+        return 0
+    for i in range(batch):
+        if has_cu != 0 and cu[i] > cu[i + 1]:
+            return 0
+        if has_used != 0:
+            if used[i] < 0:
+                return 0
+            if has_cu != 0 and used[i] > cu[i + 1] - cu[i]:
+                return 0
+    return 1
+
+
 @aicpu_kernel
 def metadata_kernel(args: Args):
+    for i in range(METADATA_ELEMENTS):
+        args.output[i] = 0
+    if _check_sequence(args.cu, args.used_q, args.has_cu, args.has_q, args.batch) == 0:
+        return 1
+    if (
+        _check_sequence(args.cu_k, args.used_k, args.has_cu_k, args.has_k, args.batch)
+        == 0
+    ):
+        return 1
+    if args.has_residual != 0:
+        for i in range(args.batch):
+            if args.residual[i] < 0 or args.residual[i] >= args.ratio:
+                return 1
     total_q = args.total_q
     if args.has_cu != 0:
         total_q = args.cu[args.batch]
     groups = args.groups
     if args.sparse != 0:
+        if total_q != args.total_q:
+            return 1
+        for i in range(total_q):
+            if (
+                args.candidate_length[i] < 0
+                or args.candidate_length[i] > CANDIDATE_CAPACITY
+            ):
+                return 1
         groups = total_q
     workers = args.workers
     # 调度开销按有效 M 轴长度计算，尾组只计入实际 query 行。
-    for i in range(METADATA_ELEMENTS):
-        args.output[i] = 0
     # Variable-size scheduler state belongs in GM, not the AICPU local arena.
     for i in range(0, groups * (12 + 3 * args.splits)):
         args.scratch[i] = 0
@@ -116,8 +152,10 @@ def metadata_kernel(args: Args):
         actual = args.capacity
         if args.has_k != 0:
             actual = args.used_k[batch_idx]
+        elif args.has_cu_k != 0:
+            actual = args.cu_k[batch_idx + 1] - args.cu_k[batch_idx]
         rem = 0
-        if args.has_residual != 0:
+        if args.mask == 3 and args.ratio != 1 and args.has_residual != 0:
             rem = args.residual[batch_idx]
         visible = actual
         if args.mask == 3:
@@ -411,6 +449,7 @@ def build_metadata(
     query_rows=6,
     ld=True,
     output_idx_offset=None,
+    cu_k=None,
 ):
     groups = q.shape[0] if sparse else batch * max_tasks
     device_index = q.device.index
@@ -427,6 +466,7 @@ def build_metadata(
     _, compiled = compiled_metadata()
     tensors = dict(
         cu=cu,
+        cu_k=cu_k,
         used_q=used_q,
         used_k=used_k,
         residual=residual,
@@ -439,9 +479,10 @@ def build_metadata(
         output=output.data_ptr(),
         scratch=scratch.data_ptr(),
         has_cu=int(cu is not None),
+        has_cu_k=int(cu_k is not None),
         has_q=int(used_q is not None),
         has_k=int(used_k is not None),
-        has_residual=int(mask == 3 and ratio != 1 and residual is not None),
+        has_residual=int(residual is not None),
         sparse=int(sparse),
         mask=mask,
         ratio=ratio,
@@ -538,8 +579,6 @@ def metadata_geometry(
     max_k = int(max_seqlen_k)
     if max_q == 0 or max_q < -1 or max_k < -1:
         raise ValueError("Invalid maximum sequence length")
-    if max_k == -1 and seqused_k is None:
-        raise ValueError("PA metadata requires max_seqlen_k or seqused_k")
     geometry = SimpleNamespace(shape=(total_query_rows, num_heads_q), device=device)
     return geometry, batch, max_q, max_k
 
@@ -566,6 +605,13 @@ def quant_sparse_lightning_indexer_metadata(
     layout_q="TND",
     layout_k="TND",
 ):
+    if layout_k == "PA_BBND":
+        if seqused_k is None:
+            raise ValueError("PA_BBND metadata requires seqused_k")
+        if cu_seqlens_k is not None:
+            raise ValueError("PA_BBND must not supply cu_seqlens_k")
+        if mask_mode == 3 and cmp_ratio != 1 and cmp_residual_k is None:
+            raise ValueError("Cmp_residual_k is required for causal compressed K")
     if layout_q == "TND" and cu_seqlens_q is None:
         raise ValueError("When layout_q is TND, cu_seqlens_q must be provided.")
     if layout_k == "TND" and cu_seqlens_k is None:
@@ -619,7 +665,7 @@ def quant_sparse_lightning_indexer_metadata(
             )
         if layout_q != "TND" or int(max_seqlen_q) < -1 or int(max_seqlen_k) < -1:
             raise ValueError("Invalid TND layout or maximum sequence length")
-        batch, effective_k = _tnd_geometry(
+        batch = _tnd_geometry(
             candidate_block_length,
             cu_seqlens_q,
             cu_seqlens_k,
@@ -633,8 +679,9 @@ def quant_sparse_lightning_indexer_metadata(
         return _build_tnd_metadata(
             candidate_block_length,
             cu_seqlens_q,
+            cu_seqlens_k,
             seqused_q,
-            effective_k,
+            seqused_k,
             cmp_residual_k,
             batch=batch,
             topk=topk,
@@ -665,8 +712,12 @@ def quant_sparse_lightning_indexer_metadata(
     if (
         candidate_block_length.dtype != torch.int32
         or candidate_block_length.ndim not in (1, 2)
+        or candidate_block_length.numel() == 0
+        or not candidate_block_length.is_contiguous()
     ):
-        raise ValueError("Candidate_block_length must be int32 [T] or [T,1]")
+        raise ValueError(
+            "Candidate_block_length must be contiguous int32 [T] or [T,1], T>0"
+        )
     if candidate_block_length.ndim == 2 and candidate_block_length.shape[1] != 1:
         raise ValueError("Candidate_block_length must have one KV head")
     if candidate_block_length.device != q.device:
@@ -727,16 +778,15 @@ def _tnd_geometry(
         _sequence(residual, "cmp_residual_k", device, batch)
     elif residual is not None:
         raise ValueError("Cmp_residual_k requires mask_mode=3 and cmp_ratio!=1")
-    # Boundary values remain a device-side input contract; no CPU read/sync.
-    effective_k = used_k if used_k is not None else cu_k[1:] - cu_k[:-1]
-    return batch, effective_k
+    return batch
 
 
 def _build_tnd_metadata(
     lengths,
     cu_q,
+    cu_k,
     used_q,
-    effective_k,
+    used_k,
     residual,
     *,
     batch,
@@ -752,7 +802,7 @@ def _build_tnd_metadata(
         geometry,
         cu_q,
         used_q,
-        effective_k,
+        used_k,
         residual,
         lengths,
         batch=batch,
@@ -763,4 +813,5 @@ def _build_tnd_metadata(
         ratio=int(cmp_ratio),
         sparse=True,
         output_idx_offset=output_idx_offset,
+        cu_k=cu_k,
     )

@@ -88,8 +88,8 @@
   - 当`layout_k`为PA_BBND时，`k`使用`uint8`存储，shape为`(block_num,block_size/8,544)`；`block_size`支持[16,1024]且必须为16的倍数。每8个token的512字节Key数据和32字节反量化系数合并存储，`k_descale`必须传入空`uint8` Tensor。
   - 当`layout_q`为TND时，必须传入`cu_seqlens_q`；当`layout_k`为TND时，必须传入`cu_seqlens_k`，且不支持传入`block_table`。
   - BSND布局不支持传入`cu_seqlens_q`和`cu_seqlens_k`；当`layout_k`为PA_BBND时，不支持传入`cu_seqlens_k`。
-  - 当`layout_k`为PA_BBND且batch数大于1时，必须传入`block_table`；batch数为1时可不传入，按物理页顺序寻址。未传入`seqused_k`时，生成metadata所用的`max_seqlen_k`必须与计算接口的逻辑Key容量一致。
-  - `q`、`w`、`q_descale`、`candidate_block_indices`和`candidate_block_length`必须连续。TND布局的`k`、`k_descale`及PA_BBND布局的`k`支持0轴非连续，其余轴必须连续，0轴stride不得小于单行或单页容量；BSND布局的`k`和`k_descale`必须连续。
+  - 当`layout_k`为PA_BBND时，必须传入`seqused_k`和非空的`block_table`。
+  - `q`、`w`、`q_descale`、`candidate_block_indices`和`candidate_block_length`必须连续。当`layout_k`为TND或BSND时，`k`和`k_descale`必须连续。当`layout_k`为PA_BBND时，`k`仅支持0轴非连续，0轴stride不得小于单页容量。
   - `candidate_block_size`仅支持8。`candidate_block_indices`的shape为`(T,1,2048)`或`(B,S1,1,2048)`。
   - `candidate_block_length`必须传入，shape为`(T,1)`或`(B,S1,1)`，每个元素表示对应行的实际有效候选数，取值范围为[0,2048]。对应行前`candidate_block_length`个候选块索引必须合法且互不重复，不能以候选容量代替实际有效候选数。
   - `return_value`支持0、1。为0时，`sparse_values`为空Tensor；为1时，`sparse_values`的数据类型为BFLOAT16，shape与`sparse_indices`相同，分数与索引逐项对应，输出索引不保证有序。

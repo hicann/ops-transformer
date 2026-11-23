@@ -207,7 +207,8 @@
   - The generated metadata is used only by QuantSparseLightningIndexer and must not be substituted with QuantLightningIndexerV2 metadata.
   - layout_q supports BSND and TND; layout_k supports BSND, TND and PA_BBND. Non-paged layouts must match.
   - TND Query or Key requires the corresponding cu_seqlens_q or cu_seqlens_k. BSND layouts do not accept prefix sums.
-  - For BSND Key, max_seqlen_k must equal the physical Key sequence length. For PA_BBND, at least one of seqused_k and max_seqlen_k is required; if seqused_k is omitted, max_seqlen_k must match the logical Key capacity used by the compute interface.
+  - When layout_k is BSND, max_seqlen_k must equal the physical Key sequence length.
+  - When layout_k is PA_BBND, seqused_k must be passed and cu_seqlens_k must be omitted.
 <!-- end id7 -->
 
 <!-- npu="A3,910b" id8 -->

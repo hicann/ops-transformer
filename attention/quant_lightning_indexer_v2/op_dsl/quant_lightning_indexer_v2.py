@@ -41,7 +41,7 @@ from cannbotdsl import ProfileSpec, TensorSpec
 from cannbotdsl.lang.vf import vf
 from cannbotdsl.lang.control_flow import range as dsl_range
 from cannbotdsl.lang.constexpr import range_constexpr
-from cannbotdsl.ops.arch import get_block_idx, get_subblock_id
+from cannbotdsl.ops.arch import get_block_idx, get_block_num, get_subblock_id
 from cannbotdsl.ops.matmul import matmul as dsl_matmul
 from cannbotdsl.ops.memcpy import mem_copy
 from cannbotdsl.ops.sync import (
@@ -62,6 +62,8 @@ from cannbotdsl.tensor import (
     make_layout,
     tile_slice,
 )
+from inspect import signature
+
 from cannbotdsl.ops import reg as rr
 
 from cannbotdsl.ops.sync import cube_sync_all
@@ -92,6 +94,7 @@ LD_RECORD_START = 36
 METADATA_ELEMENTS = 1024
 METADATA_FIELDS = 8
 METADATA_ROWS = METADATA_ELEMENTS // METADATA_FIELDS
+OWNER_PACK_ROWS = 8
 # 该 TopK 容量采用缓存分数路径，其余容量使用通用流式路径。
 CACHED_TOPK_COUNT = 512
 BF16_NEG_INF_BITS = 0xFF80
@@ -126,6 +129,18 @@ HISTOGRAM_AFTER_QK_BYTES = 18432
 CACHED_TOPK_INDEX_OFFSET = CACHE_TOKENS * 2 + 1024
 KEY_STORAGE_ROW_ELEMENTS = N2 * PACKED_D
 KEY_SCALE_STORAGE_ROW_ELEMENTS = N2 * 2 * 2
+
+
+# DSL 0.8.3 and the PR API emit the same compacting store, with different Python signatures.
+if "mask" in signature(rr.vsqueeze_and_storeunalign).parameters:
+    _squeeze_begin = rr.vsqueeze_and_storeunalign_init
+    _squeeze_store = rr.vsqueeze_and_storeunalign
+else:
+    _squeeze_begin = rr.vstore_unalign_begin
+
+    def _squeeze_store(dst, offset, value, cursor, *, mask):
+        selected = rr.vsqueeze_and_storeunalign_init(value, mask=mask)
+        rr.vsqueeze_and_storeunalign(dst, offset, selected, cursor)
 
 
 @jit
@@ -381,18 +396,24 @@ def _pa_axis0_storage_rows(
     return stride0, storage_rows
 
 
+@jit
+def _packed_query_rows(length, cap):
+    groups = max(1, (length + cap - 1) // cap)
+    return 2 * max(1, (length + 2 * groups - 1) // (2 * groups))
+
+
 class Owner64Vector:
     # 初始化M64/N512 单 Vector 评分的配置与缓冲区。
     def __init__(self, n1):
         self.n1 = int(n1)
-        self.vec_rows = 6
+        self.vec_rows = OWNER_PACK_ROWS
         self.subblock_idx = 0
         self.ub_pool = _UbPool(196608)
         self.weight_ub = _ub_ring_buffer(
-            self.ub_pool, MemLoc.UB, (6, self.n1), dtypes.float32, depth=1
+            self.ub_pool, MemLoc.UB, (self.vec_rows, self.n1), dtypes.float32, depth=1
         )
         self.packed_weight = _ub_buffer(
-            self.ub_pool, MemLoc.UB, (6, 128), dtypes.bfloat16
+            self.ub_pool, MemLoc.UB, (self.vec_rows, 128), dtypes.bfloat16
         )
         self.key_ub = _ub_ring_buffer(
             self.ub_pool, MemLoc.UB, (2, 512), dtypes.uint16, depth=2
@@ -408,8 +429,8 @@ class Owner64Vector:
         if dtypes.int32(self.subblock_idx) * self.vec_rows >= task_span_count:
             weight_row = dtypes.int64(public_row_base)
         mem_copy(
-            self.weight_ub.next_write(),
-            tile_slice(weights[weight_row:, 0:], (self.vec_rows, self.n1), (0, 0)),
+            self.weight_ub.next_write()[:task_span_count, None],
+            weights[weight_row : weight_row + task_span_count, None],
         )
         weight_read = self.weight_ub.next_read()
         with vf(mode="simd"):
@@ -598,6 +619,19 @@ class _VectorCache(NamedTuple):
     stream_total: object
 
 
+class _SixRowTile(NamedTuple):
+    token_tile: object
+    qk_slot: object
+    hist_slot: object
+    stream_hist: object
+    cache_task: object
+    stream_task: object
+    tokens: object
+    c0: object
+    c1: object
+    c2: object
+
+
 class _MergeBuffers(NamedTuple):
     partial_indices: object
     partial_bits: object
@@ -611,6 +645,7 @@ class _MergeRows(NamedTuple):
     workers: object
     cu_seqlens_q: object
     query_tile_rows: object
+    workspace_stride: object
     has_cu: object
 
 
@@ -670,17 +705,10 @@ class _OwnerTile(NamedTuple):
     tokens: object
 
 
-class _PaddingSequences(NamedTuple):
-    cu_seqlens_q: object
-    seqused_q: object
-    candidate_length: object
-
-
-class _PaddingSchedule(NamedTuple):
-    worker: object
-    worker_count: object
+class _EmptyGroupSchedule(NamedTuple):
     total_q: object
     batch_count: object
+    tokens: object
 
 
 class _QliSequences(NamedTuple):
@@ -691,7 +719,6 @@ class _QliSequences(NamedTuple):
 
 
 class _KernelSchedule(NamedTuple):
-    worker_count: object
     total_q: object
     batch_count: object
     tokens: object
@@ -893,27 +920,21 @@ class QliRawTopKSelector:
 
     @jit
     def _collect_threshold_indices_vf(self, sort_key, valid_len, tmp_idx, kth):
-        ureg = rr.vstore_unalign_begin(tmp_idx)
+        ureg = _squeeze_begin(tmp_idx)
         valid_chunk_count = (valid_len + 127) // 128
         for chunk in dsl_range(valid_chunk_count, unroll=1):
             valid_count = valid_len - chunk * 128
             mask16 = rr.update_mask(valid_count, elem_bits=16)[0]
             keys = rr.vload(sort_key, chunk * 128)
             idx = rr.varange(chunk * 128, dtypes.uint16)
-            sq = rr.vsqueeze_and_storeunalign_init(
-                idx, mask=rr.vgt(keys, kth, mask=mask16)
-            )
-            rr.vsqueeze_and_storeunalign(tmp_idx, 0, sq, ureg)
+            _squeeze_store(tmp_idx, 0, idx, ureg, mask=rr.vgt(keys, kth, mask=mask16))
         for chunk in dsl_range(valid_chunk_count, unroll=1):
             valid_count = valid_len - chunk * 128
             mask16 = rr.update_mask(valid_count, elem_bits=16)[0]
             keys = rr.vload(sort_key, chunk * 128)
             idx = rr.varange(chunk * 128, dtypes.uint16)
-            sq = rr.vsqueeze_and_storeunalign_init(
-                idx, mask=rr.veq(keys, kth, mask=mask16)
-            )
-            rr.vsqueeze_and_storeunalign(tmp_idx, 0, sq, ureg)
-        rr.vstore_unalign_post(tmp_idx, 0, ureg)
+            _squeeze_store(tmp_idx, 0, idx, ureg, mask=rr.veq(keys, kth, mask=mask16))
+        rr.vsqueeze_and_storeunalign_finalize(tmp_idx, 0, ureg)
 
     @jit
     def _emit_indices_only_vf(self, tmp, out, output_valid_count, index_base):
@@ -1544,6 +1565,22 @@ class QliRawTopKSelector:
             rr.vmem_bar("vst_vld")
 
     @jit
+    def store_empty_indices(self, gm_indices: Tensor):
+        """Fill the entire public index row with the invalid index."""
+        idx_write = self.output_idx_stage.next_write()
+        with vf(mode="simd"):
+            for chunk in dsl_range(ceil_div(self.topk, 64), unroll=1):
+                mask32 = rr.update_mask(self.topk - chunk * 64, elem_bits=32)[0]
+                rr.vstore(
+                    idx_write,
+                    chunk * 64,
+                    rr.vdups(-1, dtypes.int32, mask=mask32),
+                    mask32,
+                )
+            rr.vmem_bar("vst_vld")
+        mem_copy(gm_indices, self.output_idx_stage.next_read())
+
+    @jit
     def store_empty_row(
         self,
         gm_sparse_indices: Tensor,
@@ -2047,16 +2084,13 @@ class QliRawTopKSelector:
     @jit
     def _byte_compact(self, sort_key, valid_len, output, kth):
         with vf(mode="simd"):
-            cursor = rr.vstore_unalign_begin(output)
+            cursor = _squeeze_begin(output)
             for chunk in dsl_range((valid_len + 127) // 128):
                 m = rr.update_mask(valid_len - chunk * 128, elem_bits=16)[0]
                 idx = rr.varange(chunk * 128, dtypes.uint16)
                 keys = rr.vload_unpack(sort_key, chunk * 128, unpack_mode="unpack2")
-                selected = rr.vsqueeze_and_storeunalign_init(
-                    idx, mask=rr.vges(keys, kth, mask=m)
-                )
-                rr.vsqueeze_and_storeunalign(output, 0, selected, cursor)
-            rr.vstore_unalign_post(output, 0, cursor)
+                _squeeze_store(output, 0, idx, cursor, mask=rr.vges(keys, kth, mask=m))
+            rr.vsqueeze_and_storeunalign_finalize(output, 0, cursor)
             rr.vmem_bar("vst_vld")
 
     @jit
@@ -2071,28 +2105,26 @@ class QliRawTopKSelector:
         else:
             self._byte_compact(sort_key, valid_len, candidates, kth)
             with vf(mode="simd"):
-                cursor = rr.vstore_unalign_begin(tmp_idx)
+                cursor = _squeeze_begin(tmp_idx)
                 for chunk in dsl_range((retained + 127) // 128):
                     m = rr.update_mask(retained - chunk * 128, elem_bits=16)[0]
                     idx = rr.vload(candidates, chunk * 128)
                     keys = rr.vreinterpret_lanes(
                         rr.vgather(sort_key, idx, mask=m), dtypes.uint16
                     )
-                    selected = rr.vsqueeze_and_storeunalign_init(
-                        idx, mask=rr.vgts(keys, kth, mask=m)
+                    _squeeze_store(
+                        tmp_idx, 0, idx, cursor, mask=rr.vgts(keys, kth, mask=m)
                     )
-                    rr.vsqueeze_and_storeunalign(tmp_idx, 0, selected, cursor)
                 for chunk in dsl_range((retained + 127) // 128):
                     m = rr.update_mask(retained - chunk * 128, elem_bits=16)[0]
                     idx = rr.vload(candidates, chunk * 128)
                     keys = rr.vreinterpret_lanes(
                         rr.vgather(sort_key, idx, mask=m), dtypes.uint16
                     )
-                    selected = rr.vsqueeze_and_storeunalign_init(
-                        idx, mask=rr.veqs(keys, kth, mask=m)
+                    _squeeze_store(
+                        tmp_idx, 0, idx, cursor, mask=rr.veqs(keys, kth, mask=m)
                     )
-                    rr.vsqueeze_and_storeunalign(tmp_idx, 0, selected, cursor)
-                rr.vstore_unalign_post(tmp_idx, 0, cursor)
+                rr.vsqueeze_and_storeunalign_finalize(tmp_idx, 0, cursor)
                 rr.vmem_bar("vst_vld")
 
     @jit
@@ -2380,7 +2412,9 @@ class LdMergeStage:
         self, buffers: _MergeBuffers, rows_config: _MergeRows, options: _MergeOptions
     ):
         partial_indices, partial_bits, indices, bits, metadata = buffers
-        rows, workers, cu_seqlens_q, query_tile_rows, has_cu = rows_config
+        rows, workers, cu_seqlens_q, query_tile_rows, workspace_stride, has_cu = (
+            rows_config
+        )
         output_offset_address, need_values = options
         fd = dtypes.int64(LD_RECORD_START + get_block_idx() * 2 + get_subblock_id())
         if metadata[fd, 0] != 0:
@@ -2388,7 +2422,14 @@ class LdMergeStage:
             begin = dtypes.int64(0)
             if has_cu:
                 begin = dtypes.int64(cu_seqlens_q[batch_idx])
-            row_base = begin + dtypes.int64(metadata[fd, 2]) * query_tile_rows
+            marker = metadata[METADATA_ROWS - 1, METADATA_FIELDS - 1]
+            offset = dtypes.int64(metadata[fd, 2])
+            if marker >= 0:
+                width = dtypes.int64(query_tile_rows)
+                if marker > 0:
+                    width = dtypes.int64(marker)
+                offset = offset * width
+            row_base = begin + offset
             workspace_begin = dtypes.int64(metadata[fd, 3])
             part_count = dtypes.int64(metadata[fd, 4])
             m_begin = dtypes.int64(metadata[fd, 5])
@@ -2429,7 +2470,7 @@ class LdMergeStage:
                     for part in dsl_range(0, count, unroll=1):
                         source_row = (
                             workspace_begin + first + part
-                        ) * query_tile_rows + m
+                        ) * workspace_stride + m
                         if const_expr(self.topk % 16 != 0):
                             # Packed row offsets are not DMA aligned; keep these copies on the scalar unit.
                             for element in dsl_range(self.topk, unroll=1):
@@ -3040,11 +3081,11 @@ class QliCube:
         self.scale_b = None
 
     @jit
-    def _load_query_l1(self, query, query_scale, query_token_start):
+    def _load_query_l1(self, query, query_scale, query_token_start, max_rows):
         source_row = dtypes.int64(query_token_start) * self.n1
         avail = dtypes.int64(query.shape[0]) - source_row
         avail = avail if avail > 0 else dtypes.int64(0)
-        rows_to_copy = avail if avail < self.tile_m else dtypes.int64(self.tile_m)
+        rows_to_copy = min(avail, dtypes.int64(max_rows))
         mem_copy(
             from_tensor(
                 self.q_l1.next_write(),
@@ -3055,12 +3096,10 @@ class QliCube:
             query[source_row : source_row + rows_to_copy, None],
         )
         mem_copy(
-            self.q_scale_l1.next_write().permute(1, 0),
-            tile_slice(
-                query_scale[source_row:, 0:, 0:],
-                (self.tile_m, 2, 2),
-                (0, 0, 0),
-            ).flatten(1, 2),
+            self.q_scale_l1.next_write().permute(1, 0)[:rows_to_copy, None],
+            query_scale[source_row : source_row + rows_to_copy, None, None].flatten(
+                1, 2
+            ),
             options=self.scale_a,
         )
         query_read = self.q_l1.next_read()
@@ -3125,7 +3164,7 @@ class QliCube:
             )
         else:
             query_read, scale_read = self._load_query_l1(
-                query, query_scale, query_token_start
+                query, query_scale, query_token_start, self.tile_m
             )
             mem_copy(
                 self.l0a0.next_write(),
@@ -3311,7 +3350,14 @@ class OwnerCube512(QliCube):
         super().__init__(pa_block_size, n1, query_rows, key_tile_columns=512)
 
     def _allocate_buffers(self):
-        self.q_l1 = self.shared_cube.q_l1
+        self.tile_m = OWNER_PACK_ROWS * self.n1
+        self.q_l1 = RingBuffer(
+            MemLoc.L1,
+            dtypes.fp4x2_e2m1,
+            make_layout((self.tile_m, LOGICAL_D)),
+            depth=1,
+            data_format="nz",
+        )
         self.k_l1 = RingBuffer(
             MemLoc.L1,
             dtypes.fp4x2_e2m1,
@@ -3319,7 +3365,13 @@ class OwnerCube512(QliCube):
             depth=4,
             data_format="nz",
         )
-        self.q_scale_l1 = self.shared_cube.q_scale_l1
+        self.q_scale_l1 = RingBuffer(
+            MemLoc.L1,
+            dtypes.float8_e8m0,
+            make_layout((4, self.tile_m)),
+            depth=1,
+            data_format="nz",
+        )
         self.k_scale_l1 = RingBuffer(
             MemLoc.L1,
             dtypes.float8_e8m0,
@@ -3360,37 +3412,28 @@ class OwnerCube512(QliCube):
         )
         self.scale_a = None
         self.scale_b = None
-        self.micro_a0 = RingBuffer(
-            MemLoc.L0A, dtypes.fp4x2_e2m1, make_layout((64, LOGICAL_D)), depth=1
-        )
-        self.micro_a1 = RingBuffer(
-            MemLoc.L0A, dtypes.fp4x2_e2m1, make_layout((64, LOGICAL_D)), depth=1
-        )
-        self.micro_a2 = RingBuffer(
-            MemLoc.L0A, dtypes.fp4x2_e2m1, make_layout((64, LOGICAL_D)), depth=1
+        self.micro_queries = tuple(
+            RingBuffer(
+                MemLoc.L0A, dtypes.fp4x2_e2m1, make_layout((64, LOGICAL_D)), depth=1
+            )
+            for _ in range(OWNER_PACK_ROWS // 2)
         )
 
-    # 将六个 query 分成三组，准备每组 M64 的 Cube 输入。
+    # 每两行 Q 常驻一块 L0A，最多四块共用当前 L0B 中的 K。
     @jit
-    def load_micro_query(self, query, query_scale, query_token_start):
+    def load_micro_query(self, query, query_scale, query_token_start, span):
         query_read, scale_read = self._load_query_l1(
-            query, query_scale, query_token_start
+            query, query_scale, query_token_start, span * self.n1
         )
-        mem_copy(
-            self.micro_a0.next_write(),
-            tile_slice(query_read, (64, LOGICAL_D), (0, 0)),
-            options=copy_options(mx_scale=tile_slice(scale_read, (64, 4), (0, 0))),
-        )
-        mem_copy(
-            self.micro_a1.next_write(),
-            tile_slice(query_read, (64, LOGICAL_D), (1, 0)),
-            options=copy_options(mx_scale=tile_slice(scale_read, (64, 4), (1, 0))),
-        )
-        mem_copy(
-            self.micro_a2.next_write(),
-            tile_slice(query_read, (64, LOGICAL_D), (2, 0)),
-            options=copy_options(mx_scale=tile_slice(scale_read, (64, 4), (2, 0))),
-        )
+        for pair in range_constexpr(OWNER_PACK_ROWS // 2):
+            if span > 2 * pair:
+                mem_copy(
+                    self.micro_queries[pair].next_write(),
+                    tile_slice(query_read, (64, LOGICAL_D), (pair, 0)),
+                    options=copy_options(
+                        mx_scale=tile_slice(scale_read, (64, 4), (pair, 0))
+                    ),
+                )
 
 
 class QliVector:
@@ -4060,6 +4103,7 @@ class QliVector:
         s2_len_v2 = max(
             0, min(dtypes.int32(tile_tokens), s2_len_v2 - dtypes.int32(token_offset))
         )
+        collect_candidate_scores = dtypes.int32(0)
         if self.cache_enabled and cache_task == 1:
             self._score_rows(
                 qk_handoff,
@@ -4098,17 +4142,16 @@ class QliVector:
                     s2_len_v2,
                 )
             if self.candidate_enabled:
+                collect_candidate_scores = dtypes.int32(
+                    actual_s2 > self.candidate_topk_count * CANDIDATE_BLOCK_SIZE
+                    or self.metadata[LD_RECORD_START, 0] != 0
+                )
                 cand_key_write = self.candidate_key_ub.next_write()
                 for row_in_subblock in range_constexpr(self.vec_rows):
                     local_row = dtypes.int32(
                         self.subblock_idx * self.vec_rows + row_in_subblock
                     )
                     public_row = dtypes.int64(public_row_base) + dtypes.int64(local_row)
-                    (
-                        workspace_task_idx * self.query_rows
-                        + self.subblock_idx * self.vec_rows
-                        + row_in_subblock
-                    )
                     valid_s2 = actual_s2
                     if self.mask_mode == 3:
                         query_in_batch = (
@@ -4129,25 +4172,27 @@ class QliVector:
                             valid_s2 = actual_s2
                     if local_row >= task_active_count:
                         valid_s2 = 0
-                    valid_candidate_count = (
-                        valid_s2 + CANDIDATE_BLOCK_SIZE - 1
-                    ) // CANDIDATE_BLOCK_SIZE
-                    local_candidate_count = (
-                        valid_candidate_count
-                        - dtypes.int32(token_offset) // CANDIDATE_BLOCK_SIZE
-                    )
-                    if local_candidate_count < 0:
-                        local_candidate_count = 0
-                    if local_candidate_count > QK_COLUMNS // CANDIDATE_BLOCK_SIZE:
-                        local_candidate_count = QK_COLUMNS // CANDIDATE_BLOCK_SIZE
-                    partial_target = dtypes.int32(QK_COLUMNS // CANDIDATE_BLOCK_SIZE)
-                    if valid_s2 % CANDIDATE_BLOCK_SIZE != 0:
-                        if valid_s2 > dtypes.int32(token_offset):
-                            if valid_s2 < dtypes.int32(token_offset) + QK_COLUMNS:
-                                partial_target = (
-                                    valid_s2 - dtypes.int32(token_offset)
-                                ) // CANDIDATE_BLOCK_SIZE
-                    if self.candidate_enabled:
+                    if collect_candidate_scores:
+                        valid_candidate_count = (
+                            valid_s2 + CANDIDATE_BLOCK_SIZE - 1
+                        ) // CANDIDATE_BLOCK_SIZE
+                        local_candidate_count = (
+                            valid_candidate_count
+                            - dtypes.int32(token_offset) // CANDIDATE_BLOCK_SIZE
+                        )
+                        if local_candidate_count < 0:
+                            local_candidate_count = 0
+                        if local_candidate_count > QK_COLUMNS // CANDIDATE_BLOCK_SIZE:
+                            local_candidate_count = QK_COLUMNS // CANDIDATE_BLOCK_SIZE
+                        partial_target = dtypes.int32(
+                            QK_COLUMNS // CANDIDATE_BLOCK_SIZE
+                        )
+                        if valid_s2 % CANDIDATE_BLOCK_SIZE != 0:
+                            if valid_s2 > dtypes.int32(token_offset):
+                                if valid_s2 < dtypes.int32(token_offset) + QK_COLUMNS:
+                                    partial_target = (
+                                        valid_s2 - dtypes.int32(token_offset)
+                                    ) // CANDIDATE_BLOCK_SIZE
                         with vf(mode="simd"):
                             candidate_count = QK_COLUMNS // CANDIDATE_BLOCK_SIZE
                             candidate_mask16 = rr.update_mask(
@@ -4260,29 +4305,26 @@ class QliVector:
                                 candidate_mask16,
                             )
                             rr.vmem_bar("vst_vld")
-                    if self.candidate_enabled:
-                        if local_row < task_span_count:
-                            if token_offset == 0:
-                                length = (
-                                    valid_s2 + CANDIDATE_BLOCK_SIZE - 1
-                                ) // CANDIDATE_BLOCK_SIZE
-                                if length > self.candidate_topk_count:
-                                    length = dtypes.int32(self.candidate_topk_count)
-                                length_write = self.candidate_length_ub.next_write()
-                                with vf(mode="simd"):
-                                    mask = rr.update_mask(1, elem_bits=32)[0]
-                                    rr.vstore(
-                                        length_write,
-                                        0,
-                                        rr.vdups(length, dtypes.int32, mask=mask),
-                                        mask,
-                                    )
-                                mem_copy(
-                                    tile_slice(
-                                        candidate_length_out, (1,), (public_row,)
-                                    ),
-                                    self.candidate_length_ub.next_read(),
+                    if local_row < task_span_count:
+                        if token_offset == 0:
+                            length = (
+                                valid_s2 + CANDIDATE_BLOCK_SIZE - 1
+                            ) // CANDIDATE_BLOCK_SIZE
+                            if length > self.candidate_topk_count:
+                                length = dtypes.int32(self.candidate_topk_count)
+                            length_write = self.candidate_length_ub.next_write()
+                            with vf(mode="simd"):
+                                mask = rr.update_mask(1, elem_bits=32)[0]
+                                rr.vstore(
+                                    length_write,
+                                    0,
+                                    rr.vdups(length, dtypes.int32, mask=mask),
+                                    mask,
                                 )
+                            mem_copy(
+                                tile_slice(candidate_length_out, (1,), (public_row,)),
+                                self.candidate_length_ub.next_read(),
+                            )
             rows_to_store = (
                 task_span_count - dtypes.int32(self.subblock_idx) * self.vec_rows
             )
@@ -4291,7 +4333,7 @@ class QliVector:
             if rows_to_store > self.vec_rows:
                 rows_to_store = self.vec_rows
             first_workspace_row = (
-                workspace_task_idx * self.query_rows + self.subblock_idx * self.vec_rows
+                workspace_task_idx * self.work_rows + self.subblock_idx * self.vec_rows
             )
             key_read = self.key_ub.next_read()
             if stream_task:
@@ -4309,25 +4351,27 @@ class QliVector:
                     ),
                 )
             if self.candidate_enabled:
-                mem_copy(
-                    tile_slice(
-                        candidate_key_out[
-                            first_workspace_row:,
-                            workspace_token_offset // CANDIDATE_BLOCK_SIZE :,
-                        ],
-                        (self.vec_rows, QK_COLUMNS // CANDIDATE_BLOCK_SIZE),
-                        (0, 0),
-                    ),
-                    from_tensor(
-                        self.candidate_key_ub.next_read(),
-                        layout=make_layout(
-                            (
-                                dtypes.int64(rows_to_store),
-                                QK_COLUMNS // CANDIDATE_BLOCK_SIZE,
-                            )
+                cand_key_read = self.candidate_key_ub.next_read()
+                if collect_candidate_scores:
+                    mem_copy(
+                        tile_slice(
+                            candidate_key_out[
+                                first_workspace_row:,
+                                workspace_token_offset // CANDIDATE_BLOCK_SIZE :,
+                            ],
+                            (self.vec_rows, QK_COLUMNS // CANDIDATE_BLOCK_SIZE),
+                            (0, 0),
                         ),
-                    ),
-                )
+                        from_tensor(
+                            cand_key_read,
+                            layout=make_layout(
+                                (
+                                    dtypes.int64(rows_to_store),
+                                    QK_COLUMNS // CANDIDATE_BLOCK_SIZE,
+                                )
+                            ),
+                        ),
+                    )
 
     @jit
     def _store_scored_row(
@@ -4679,16 +4723,17 @@ class DmaTopKSelectPreprocessor:
     # 在当前 VF 内过滤一组输入并压缩相对位置；调用方保留分组和同步边界。
     @jit
     def _filter_group_vf(self, source, start, count, threshold, position_base):
-        cursor = rr.vstore_unalign_begin(self.hits_positions)
+        cursor = _squeeze_begin(self.hits_positions)
         for chunk in dsl_range((count + 127) // 128, unroll=1):
             mask = rr.update_mask(count - chunk * 128, elem_bits=16)[0]
             keep = rr.vgt(rr.vload(source, start + chunk * 128), threshold, mask=mask)
             positions = rr.varange(chunk * 128, dtypes.uint16)
-            packed = rr.vsqueeze_and_storeunalign_init(positions, mask=keep)
-            rr.vsqueeze_and_storeunalign(
-                self.hits_positions, position_base, packed, cursor
+            _squeeze_store(
+                self.hits_positions, position_base, positions, cursor, mask=keep
             )
-        rr.vstore_unalign_post(self.hits_positions, position_base, cursor)
+        rr.vsqueeze_and_storeunalign_finalize(
+            self.hits_positions, position_base, cursor
+        )
 
     # 将筛选命中值及其原始位置追加到候选池。
     @jit
@@ -5401,18 +5446,21 @@ class StreamingLdTopK:
                 with vf(mode="simd"):
                     mask = rr.update_mask(128, elem_bits=16)[0]
                     threshold = rr.vdup(rr.vload(self.thresholds, row * 16), mask=mask)
-                    cursor = rr.vstore_unalign_begin(self.packed)
+                    cursor = _squeeze_begin(self.packed)
                     for c in dsl_range(32, unroll=1):
                         keep = rr.vgt(
                             rr.vload(source, row * STREAM_PAGE_TOKENS + c * 128),
                             threshold,
                             mask=mask,
                         )
-                        packed = rr.vsqueeze_and_storeunalign_init(
-                            rr.varange(c * 128, dtypes.uint16), mask=keep
+                        _squeeze_store(
+                            self.packed,
+                            0,
+                            rr.varange(c * 128, dtypes.uint16),
+                            cursor,
+                            mask=keep,
                         )
-                        rr.vsqueeze_and_storeunalign(self.packed, 0, packed, cursor)
-                    rr.vstore_unalign_post(self.packed, 0, cursor)
+                    rr.vsqueeze_and_storeunalign_finalize(self.packed, 0, cursor)
                     rr.vmem_bar("vst_vld")
                 vec_sync_notify(PIPE.V, PIPE.S, 6)
                 vec_sync_wait(PIPE.V, PIPE.S, 6)
@@ -5641,13 +5689,12 @@ class QliFusedKernel:
             else self.tile_m * QK_ROW_BYTES + VECTOR_AFTER_QK_BYTES,
             self.cache_enabled,
         )
+        self.vector.metadata = metadata
         self.stream_supported = (
-            not candidate_enabled
-            and int(n1) == 32
-            and int(query_rows) == 6
-            and int(topk) == 512
+            int(n1) == 32 and int(query_rows) == 6 and int(topk) == 512
         )
         self.streaming = StreamingLdTopK(self.topk)
+        self.vector.work_rows = OWNER_PACK_ROWS if self.n1 == 32 else self.query_rows
         self.vector.streaming = self.streaming
         # Dedicated 512B-strided bank-separated histogram slots, main phase only.
         self.hist_slot0 = _ub_buffer(
@@ -5714,15 +5761,23 @@ class QliFusedKernel:
                 depth=1,
                 addr=258048,
             )
-        self.owner_supported = (
-            not self.tnd_layout
-            and not candidate_enabled
-            and int(n1) == 32
-            and int(query_rows) == 6
-        )
+        self.work_rows = OWNER_PACK_ROWS if self.n1 == 32 else self.query_rows
+        self.owner_supported = int(n1) == 32 and int(query_rows) == 6
         if self.owner_supported:
-            self.owner_cube = OwnerCube512(pa_block_size, n1, query_rows, self.cube)
+            owner_type = OwnerTndCube512 if self.tnd_layout else OwnerCube512
+            self.owner_cube = owner_type(pa_block_size, n1, query_rows, self.cube)
             self.owner64_vector = Owner64Vector(n1)
+            if self.candidate_enabled:
+                self.owner_candidate_ub = _ub_ring_buffer(
+                    self.owner64_vector.ub_pool,
+                    MemLoc.UB,
+                    (64,),
+                    dtypes.uint16,
+                    depth=1,
+                )
+                self.owner_length_ub = _ub_ring_buffer(
+                    self.owner64_vector.ub_pool, MemLoc.UB, (1,), dtypes.int32, depth=1
+                )
             self.owner64_slot0 = _ub_buffer(
                 self.ub_pool, MemLoc.UB, (64, 512), dtypes.bfloat16, addr=0
             )
@@ -5731,6 +5786,13 @@ class QliFusedKernel:
             )
             self.owner64_slot2 = _ub_buffer(
                 self.ub_pool, MemLoc.UB, (64, 512), dtypes.bfloat16, addr=131072
+            )
+
+            self.owner_slots = (
+                self.owner64_slot0,
+                self.owner64_slot1,
+                self.owner64_slot2,
+                self.owner64_slot1,
             )
 
         # Byte-cache and streaming pools alias UB and execute exclusively.
@@ -5815,12 +5877,109 @@ class QliFusedKernel:
             rr.vmem_bar("vst_vld")
 
     @jit
+    def _use_owner(self, group_rows, row_ld, span, used_k):
+        return group_rows != 0 or (
+            group_rows == 0
+            and not self.candidate_enabled
+            and not self.tnd_layout
+            and row_ld == 0
+            and span == 6
+            and used_k >= OWNER_MIN_TOKENS
+            and used_k <= OWNER_MAX_TOKENS
+        )
+
+    @jit
+    def _compute_six_row_tile(
+        self,
+        inputs: _QliInputs,
+        outputs: _TaskOutputs,
+        schedule: _TaskSchedule,
+        tile: _SixRowTile,
+        event: Constexpr,
+    ):
+        (
+            token_tile,
+            qk_slot,
+            hist_slot,
+            stream_hist,
+            cache_task,
+            stream_task,
+            tokens,
+            c0,
+            c1,
+            c2,
+        ) = tile
+        logical_start = token_tile * TILE_N
+        cube_sync_intra_wait(PIPE.FIXPIPE, event)
+        cube_sync_intra_wait(PIPE.FIXPIPE, event + 16)
+        self.cube.compute_qk(
+            inputs.key,
+            inputs.key_scale,
+            inputs.block_table,
+            schedule.batch_idx,
+            schedule.actual_s2,
+            inputs.key_stride0,
+            inputs.key_dequant_scale_stride0,
+            self.has_block_table,
+            token_tile,
+            qk_slot,
+        )
+        cube_sync_intra_arrive(PIPE.FIXPIPE, event)
+        cube_sync_intra_arrive(PIPE.FIXPIPE, event + 16)
+        vec_sync_intra_wait(PIPE.V, event)
+        buffers = _VectorBuffers(
+            qk_slot,
+            inputs.weights,
+            outputs.key_out,
+            outputs.candidate_key_out,
+            outputs.candidate_length,
+        )
+        rows = _VectorRows(
+            schedule.public_row_base,
+            schedule.task_span_count,
+            schedule.task_active_count,
+            schedule.workspace_task_idx,
+            schedule.query_offset,
+            schedule.used_q,
+        )
+        tile = _VectorTile(
+            logical_start,
+            schedule.actual_s2,
+            schedule.cmp_residual,
+            tokens // CANDIDATE_BLOCK_SIZE,
+            logical_start - schedule.tile_begin * TILE_N,
+            min(QK_COLUMNS, (schedule.tile_end - token_tile) * TILE_N),
+        )
+        if self.streaming_mode:
+            self.vector.compute_vector1(
+                buffers,
+                rows,
+                tile,
+                _VectorCache(stream_hist, hist_slot, cache_task, stream_task, tokens),
+            )
+        else:
+            self.vector._compute_vector1_fallback(
+                buffers,
+                rows,
+                tile,
+                _VectorCache(stream_hist, hist_slot, cache_task, 0, 0),
+            )
+        vec_sync_intra_arrive(PIPE.V, event)
+        if self.streaming_mode:
+            if stream_task:
+                c0, c1, c2 = self.streaming.process(
+                    logical_start - schedule.tile_begin * TILE_N, tokens, c0, c1, c2
+                )
+        return c0, c1, c2
+
+    @jit
     def _compute_nonempty_task(
         self,
         inputs: _QliInputs,
         outputs: _TaskOutputs,
         schedule: _TaskSchedule,
         previous_owner,
+        owner_cv,
     ):
         # 完整任务只按公开返回值需求保留分数；LD 分片仍保留归并值。
         (
@@ -5866,14 +6025,6 @@ class QliFusedKernel:
         c1 = dtypes.int64(0)
         c2 = dtypes.int64(0)
         stream_task = dtypes.int32(0)
-        owner_cv = dtypes.int32(0)
-        if self.owner_supported:
-            owner_cv = dtypes.int32(
-                row_ld == 0
-                and task_span_count == 6
-                and (actual_s2 >= OWNER_MIN_TOKENS)
-                and (actual_s2 <= OWNER_MAX_TOKENS)
-            )
         if previous_owner >= 0 and (previous_owner != 0 or owner_cv != 0):
             cube_sync_all()
             cube_sync_intra_arrive(PIPE.FIXPIPE, 14)
@@ -5886,25 +6037,8 @@ class QliFusedKernel:
         if owner_cv:
             if self.owner_supported:
                 self._compute_cv_owner64(
-                    _QliInputs(
-                        query=query,
-                        key=key,
-                        weights=weights,
-                        query_scale=query_scale,
-                        key_scale=key_scale,
-                        key_stride0=key_stride0,
-                        key_dequant_scale_stride0=key_dequant_scale_stride0,
-                        block_table=block_table,
-                    ),
-                    _TaskOutputs(
-                        key_out=key_out,
-                        candidate_key_out=candidate_key_out,
-                        sparse_indices=sparse_indices,
-                        sparse_value_bits=sparse_value_bits,
-                        candidate_indices=candidate_indices,
-                        candidate_value_bits=candidate_value_bits,
-                        candidate_length=candidate_length,
-                    ),
+                    inputs,
+                    outputs,
                     _TaskSchedule(
                         batch_idx=batch_idx,
                         public_row_base=public_row_base,
@@ -6029,7 +6163,6 @@ class QliFusedKernel:
                         stream_hist = dtypes.int32(0)
                         cache_task = dtypes.int32(0)
                         self.streaming.reset()
-            tokens // TILE_N
             candidate_tokens = tokens // CANDIDATE_BLOCK_SIZE
             vec_sync_intra_arrive(PIPE.V, 8)
             vec_sync_intra_arrive(PIPE.V, 9)
@@ -6063,203 +6196,43 @@ class QliFusedKernel:
                         self.qk_slot0,
                     )
                 if (token_tile - tile_begin) % 2 == 0:
-                    logical_start = token_tile * TILE_N
-                    cube_sync_intra_wait(PIPE.FIXPIPE, 8)
-                    cube_sync_intra_wait(PIPE.FIXPIPE, 24)
-                    qk_write = self.qk_slot0
-                    self.cube.compute_qk(
-                        key,
-                        key_scale,
-                        block_table,
-                        batch_idx,
-                        actual_s2,
-                        key_stride0,
-                        key_dequant_scale_stride0,
-                        self.has_block_table,
-                        token_tile,
-                        qk_write,
+                    c0, c1, c2 = self._compute_six_row_tile(
+                        inputs,
+                        outputs,
+                        schedule,
+                        _SixRowTile(
+                            token_tile,
+                            self.qk_slot0,
+                            self.hist_slot0,
+                            stream_hist,
+                            cache_task,
+                            stream_task,
+                            tokens,
+                            c0,
+                            c1,
+                            c2,
+                        ),
+                        8,
                     )
-                    cube_sync_intra_arrive(PIPE.FIXPIPE, 8)
-                    cube_sync_intra_arrive(PIPE.FIXPIPE, 24)
-                    vec_sync_intra_wait(PIPE.V, 8)
-                    qk_read = self.qk_slot0
-                    if self.streaming_mode:
-                        self.vector.compute_vector1(
-                            _VectorBuffers(
-                                qk_handoff=qk_read,
-                                weights=weights,
-                                key_out=key_out,
-                                candidate_key_out=candidate_key_out,
-                                candidate_length_out=candidate_length,
-                            ),
-                            _VectorRows(
-                                public_row_base=public_row_base,
-                                task_span_count=task_span_count,
-                                task_active_count=task_active_count,
-                                workspace_task_idx=workspace_task_idx,
-                                task_q_offset=query_offset,
-                                task_used_q=used_q,
-                            ),
-                            _VectorTile(
-                                token_offset=logical_start,
-                                actual_s2=actual_s2,
-                                cmp_residual=cmp_residual,
-                                total_candidate_tokens=candidate_tokens,
-                                workspace_token_offset=logical_start
-                                - tile_begin * TILE_N,
-                                tile_tokens=min(
-                                    QK_COLUMNS, (tile_end - token_tile) * TILE_N
-                                ),
-                            ),
-                            _VectorCache(
-                                stream_hist=stream_hist,
-                                hist=self.hist_slot0,
-                                cache_task=cache_task,
-                                stream_task=stream_task,
-                                stream_total=tokens,
-                            ),
-                        )
-                    else:
-                        self.vector._compute_vector1_fallback(
-                            _VectorBuffers(
-                                qk_handoff=qk_read,
-                                weights=weights,
-                                key_out=key_out,
-                                candidate_key_out=candidate_key_out,
-                                candidate_length_out=candidate_length,
-                            ),
-                            _VectorRows(
-                                public_row_base=public_row_base,
-                                task_span_count=task_span_count,
-                                task_active_count=task_active_count,
-                                workspace_task_idx=workspace_task_idx,
-                                task_q_offset=query_offset,
-                                task_used_q=used_q,
-                            ),
-                            _VectorTile(
-                                token_offset=logical_start,
-                                actual_s2=actual_s2,
-                                cmp_residual=cmp_residual,
-                                total_candidate_tokens=candidate_tokens,
-                                workspace_token_offset=logical_start
-                                - tile_begin * TILE_N,
-                                tile_tokens=min(
-                                    QK_COLUMNS, (tile_end - token_tile) * TILE_N
-                                ),
-                            ),
-                            _VectorCache(
-                                stream_hist=stream_hist,
-                                hist=self.hist_slot0,
-                                cache_task=cache_task,
-                                stream_task=0,
-                                stream_total=0,
-                            ),
-                        )
-                    vec_sync_intra_arrive(PIPE.V, 8)
-                    if self.streaming_mode:
-                        if stream_task:
-                            c0, c1, c2 = self.streaming.process(
-                                logical_start - tile_begin * TILE_N, tokens, c0, c1, c2
-                            )
                 else:
-                    logical_start = token_tile * TILE_N
-                    cube_sync_intra_wait(PIPE.FIXPIPE, 9)
-                    cube_sync_intra_wait(PIPE.FIXPIPE, 25)
-                    qk_write = self.qk_slot1
-                    self.cube.compute_qk(
-                        key,
-                        key_scale,
-                        block_table,
-                        batch_idx,
-                        actual_s2,
-                        key_stride0,
-                        key_dequant_scale_stride0,
-                        self.has_block_table,
-                        token_tile,
-                        qk_write,
+                    c0, c1, c2 = self._compute_six_row_tile(
+                        inputs,
+                        outputs,
+                        schedule,
+                        _SixRowTile(
+                            token_tile,
+                            self.qk_slot1,
+                            self.hist_slot1,
+                            stream_hist,
+                            cache_task,
+                            stream_task,
+                            tokens,
+                            c0,
+                            c1,
+                            c2,
+                        ),
+                        9,
                     )
-                    cube_sync_intra_arrive(PIPE.FIXPIPE, 9)
-                    cube_sync_intra_arrive(PIPE.FIXPIPE, 25)
-                    vec_sync_intra_wait(PIPE.V, 9)
-                    qk_read = self.qk_slot1
-                    if self.streaming_mode:
-                        self.vector.compute_vector1(
-                            _VectorBuffers(
-                                qk_handoff=qk_read,
-                                weights=weights,
-                                key_out=key_out,
-                                candidate_key_out=candidate_key_out,
-                                candidate_length_out=candidate_length,
-                            ),
-                            _VectorRows(
-                                public_row_base=public_row_base,
-                                task_span_count=task_span_count,
-                                task_active_count=task_active_count,
-                                workspace_task_idx=workspace_task_idx,
-                                task_q_offset=query_offset,
-                                task_used_q=used_q,
-                            ),
-                            _VectorTile(
-                                token_offset=logical_start,
-                                actual_s2=actual_s2,
-                                cmp_residual=cmp_residual,
-                                total_candidate_tokens=candidate_tokens,
-                                workspace_token_offset=logical_start
-                                - tile_begin * TILE_N,
-                                tile_tokens=min(
-                                    QK_COLUMNS, (tile_end - token_tile) * TILE_N
-                                ),
-                            ),
-                            _VectorCache(
-                                stream_hist=stream_hist,
-                                hist=self.hist_slot1,
-                                cache_task=cache_task,
-                                stream_task=stream_task,
-                                stream_total=tokens,
-                            ),
-                        )
-                    else:
-                        self.vector._compute_vector1_fallback(
-                            _VectorBuffers(
-                                qk_handoff=qk_read,
-                                weights=weights,
-                                key_out=key_out,
-                                candidate_key_out=candidate_key_out,
-                                candidate_length_out=candidate_length,
-                            ),
-                            _VectorRows(
-                                public_row_base=public_row_base,
-                                task_span_count=task_span_count,
-                                task_active_count=task_active_count,
-                                workspace_task_idx=workspace_task_idx,
-                                task_q_offset=query_offset,
-                                task_used_q=used_q,
-                            ),
-                            _VectorTile(
-                                token_offset=logical_start,
-                                actual_s2=actual_s2,
-                                cmp_residual=cmp_residual,
-                                total_candidate_tokens=candidate_tokens,
-                                workspace_token_offset=logical_start
-                                - tile_begin * TILE_N,
-                                tile_tokens=min(
-                                    QK_COLUMNS, (tile_end - token_tile) * TILE_N
-                                ),
-                            ),
-                            _VectorCache(
-                                stream_hist=stream_hist,
-                                hist=self.hist_slot1,
-                                cache_task=cache_task,
-                                stream_task=0,
-                                stream_total=0,
-                            ),
-                        )
-                    vec_sync_intra_arrive(PIPE.V, 9)
-                    if self.streaming_mode:
-                        if stream_task:
-                            c0, c1, c2 = self.streaming.process(
-                                logical_start - tile_begin * TILE_N, tokens, c0, c1, c2
-                            )
             cube_sync_intra_wait(PIPE.FIXPIPE, 8)
             cube_sync_intra_wait(PIPE.FIXPIPE, 24)
             cube_sync_intra_wait(PIPE.FIXPIPE, 9)
@@ -6291,10 +6264,10 @@ class QliFusedKernel:
                         )
                     rr.vmem_bar("vst_vld")
         topk_rows = dtypes.int32(self.query_rows // 2)
+        if owner_cv and self.metadata[METADATA_ROWS - 1, METADATA_FIELDS - 1] != 0:
+            topk_rows = dtypes.int32((task_span_count + 1) // 2)
         for row_in_subblock in dsl_range(topk_rows, unroll=1):
-            local_row = dtypes.int32(
-                get_subblock_id() * (self.query_rows // 2) + row_in_subblock
-            )
+            local_row = dtypes.int32(get_subblock_id() * topk_rows + row_in_subblock)
             owner_tail_sync = (
                 local_row == task_active_count
                 and row_in_subblock != 0
@@ -6304,7 +6277,7 @@ class QliFusedKernel:
                 vec_sync_all()
             uncached_li = row_ld == 0 and cache_task == 0
             public_row = dtypes.int64(local_row)
-            workspace_row = workspace_task_idx * self.query_rows + local_row
+            workspace_row = workspace_task_idx * self.work_rows + local_row
             valid_s2 = actual_s2
             if self.mask_mode == 3:
                 query_in_batch = query_offset + local_row
@@ -6509,7 +6482,13 @@ class QliFusedKernel:
             vec_sync_block_wait(PIPE.MTE3, 11, mode=1)
 
     @jit
-    def _compute_cv_owner_group(self, buffers: _OwnerBuffers, tile: _OwnerTile):
+    def _compute_cv_owner_group(
+        self,
+        buffers: _OwnerBuffers,
+        tile: _OwnerTile,
+        outputs: _TaskOutputs,
+        schedule: _TaskSchedule,
+    ):
         query_ring, qk_slot, key_read, key_out = buffers
         (
             query_start,
@@ -6540,14 +6519,118 @@ class QliFusedKernel:
         if dtypes.int32(get_subblock_id()) == owner:
             self.owner64_vector.score(qk_slot, dtypes.int32(self.n1), query_start)
             rows_to_store = min(2, task_span_count - query_start)
-            row_base = workspace_task_idx * self.query_rows + query_start
+            row_base = workspace_task_idx * self.work_rows + query_start
             col = (token_tile - tile_begin) * TILE_N
+            keys = self.owner64_vector.key_ub.next_read()
             mem_copy(
                 key_out[
                     row_base : row_base + rows_to_store, col : min(col + 512, tokens)
                 ],
-                self.owner64_vector.key_ub.next_read()[None, : min(512, tokens - col)],
+                keys[None, : min(512, tokens - col)],
             )
+
+            if self.candidate_enabled:
+                for local in dsl_range(rows_to_store, unroll=1):
+                    row = query_start + local
+                    visible = schedule.actual_s2
+                    if self.mask_mode == 3:
+                        visible = min(
+                            visible,
+                            max(
+                                dtypes.int32(0),
+                                (
+                                    schedule.actual_s2 * self.cmp_ratio
+                                    + schedule.cmp_residual
+                                    - schedule.used_q
+                                    + schedule.query_offset
+                                    + row
+                                    + 1
+                                )
+                                // self.cmp_ratio,
+                            ),
+                        )
+                    if row >= schedule.task_active_count:
+                        visible = dtypes.int32(0)
+                    blocks = (
+                        visible + CANDIDATE_BLOCK_SIZE - 1
+                    ) // CANDIDATE_BLOCK_SIZE
+                    if (
+                        schedule.row_ld
+                        or schedule.actual_s2
+                        > self.candidate_topk_count * CANDIDATE_BLOCK_SIZE
+                    ):
+                        start_block = dtypes.int32(
+                            token_tile * TILE_N // CANDIDATE_BLOCK_SIZE
+                        )
+                        count = max(
+                            dtypes.int32(0), min(dtypes.int32(64), blocks - start_block)
+                        )
+                        partial = dtypes.int32(-1)
+                        if (
+                            visible % CANDIDATE_BLOCK_SIZE
+                            and start_block < blocks
+                            and blocks <= start_block + 512 // CANDIDATE_BLOCK_SIZE
+                        ):
+                            # The lane compare is uint16; only the owning tile may promote its tail.
+                            partial = dtypes.int32(blocks - 1 - start_block)
+                        dst = self.owner_candidate_ub.next_write()
+                        with vf(mode="simd"):
+                            mask = rr.update_mask(64, elem_bits=16)[0]
+                            lanes = rr.varange(0, dtypes.uint16)
+                            offsets = rr.vadds(
+                                rr.vmuls(lanes, CANDIDATE_BLOCK_SIZE, mask=mask),
+                                local * 512,
+                                mask=mask,
+                            )
+                            maximum = rr.vgather(keys, offsets, mask=mask)
+                            for lane in range_constexpr(1, CANDIDATE_BLOCK_SIZE):
+                                maximum = rr.vmax(
+                                    maximum,
+                                    rr.vgather(
+                                        keys,
+                                        rr.vadds(offsets, lane, mask=mask),
+                                        mask=mask,
+                                    ),
+                                    mask=mask,
+                                )
+                            maximum = rr.vselect(
+                                rr.vdups(65408, dtypes.uint16, mask=mask),
+                                maximum,
+                                cond_mask=rr.veqs(lanes, partial, mask=mask),
+                            )
+                            maximum = rr.vselect(
+                                maximum,
+                                rr.vdups(0, dtypes.uint16, mask=mask),
+                                cond_mask=rr.vlts(lanes, count, mask=mask),
+                            )
+                            rr.vstore(dst, 0, maximum, mask)
+                        offset = col // CANDIDATE_BLOCK_SIZE
+                        store_count = min(64, (tokens - col) // CANDIDATE_BLOCK_SIZE)
+                        mem_copy(
+                            outputs.candidate_key_out[
+                                row_base + local, offset : offset + store_count
+                            ].flatten(),
+                            self.owner_candidate_ub.next_read()[:store_count],
+                        )
+                    if token_tile == 0:
+                        length = min(dtypes.int32(self.candidate_topk_count), blocks)
+                        length_ub = self.owner_length_ub.next_write()
+                        with vf(mode="simd"):
+                            mask = rr.update_mask(1, elem_bits=32)[0]
+                            rr.vstore(
+                                length_ub,
+                                0,
+                                rr.vdups(length, dtypes.int32, mask=mask),
+                                mask,
+                            )
+                        mem_copy(
+                            tile_slice(
+                                outputs.candidate_length,
+                                (1,),
+                                (schedule.public_row_base + row,),
+                            ),
+                            self.owner_length_ub.next_read(),
+                        )
 
     @jit
     def _compute_cv_owner64(
@@ -6588,7 +6671,9 @@ class QliFusedKernel:
             row_ld,
         ) = schedule
         vec_sync_all()
-        self.owner_cube.load_micro_query(query, query_scale, public_row_base)
+        self.owner_cube.load_micro_query(
+            query, query_scale, public_row_base, task_span_count
+        )
         self.owner64_vector.load_weights(weights, public_row_base, task_span_count)
         for preload in dsl_range(
             tile_begin, min(tile_end, tile_begin + 6), 2, unroll=1
@@ -6625,63 +6710,30 @@ class QliFusedKernel:
                 options=copy_options(mx_scale=self.owner_cube.k_scale_l1.next_read()),
             )
             key_read = self.owner_cube.l0b.next_read()
-            if task_span_count > 0:
-                owner = dtypes.int32((0 + (token_tile - tile_begin) // 2) % 2)
-                self._compute_cv_owner_group(
-                    _OwnerBuffers(
-                        query_ring=self.owner_cube.micro_a0,
-                        qk_slot=self.owner64_slot0,
-                        key_read=key_read,
-                        key_out=key_out,
-                    ),
-                    _OwnerTile(
-                        query_start=0,
-                        owner=owner,
-                        task_span_count=task_span_count,
-                        workspace_task_idx=workspace_task_idx,
-                        token_tile=token_tile,
-                        tile_begin=tile_begin,
-                        tokens=tokens,
-                    ),
-                )
-            if task_span_count > 2:
-                owner = dtypes.int32((1 + (token_tile - tile_begin) // 2) % 2)
-                self._compute_cv_owner_group(
-                    _OwnerBuffers(
-                        query_ring=self.owner_cube.micro_a1,
-                        qk_slot=self.owner64_slot1,
-                        key_read=key_read,
-                        key_out=key_out,
-                    ),
-                    _OwnerTile(
-                        query_start=2,
-                        owner=owner,
-                        task_span_count=task_span_count,
-                        workspace_task_idx=workspace_task_idx,
-                        token_tile=token_tile,
-                        tile_begin=tile_begin,
-                        tokens=tokens,
-                    ),
-                )
-            if task_span_count > 4:
-                owner = dtypes.int32((0 + (token_tile - tile_begin) // 2) % 2)
-                self._compute_cv_owner_group(
-                    _OwnerBuffers(
-                        query_ring=self.owner_cube.micro_a2,
-                        qk_slot=self.owner64_slot2,
-                        key_read=key_read,
-                        key_out=key_out,
-                    ),
-                    _OwnerTile(
-                        query_start=4,
-                        owner=owner,
-                        task_span_count=task_span_count,
-                        workspace_task_idx=workspace_task_idx,
-                        token_tile=token_tile,
-                        tile_begin=tile_begin,
-                        tokens=tokens,
-                    ),
-                )
+            num_pairs = (task_span_count + 1) // 2
+            # 两个 Vector 均分成对的微块；奇数组交替承担多出的一个。
+            rotate = (num_pairs % 2) * (((token_tile - tile_begin) // 2) % 2)
+            for pair in range_constexpr(OWNER_PACK_ROWS // 2):
+                if task_span_count > 2 * pair:
+                    self._compute_cv_owner_group(
+                        _OwnerBuffers(
+                            query_ring=self.owner_cube.micro_queries[pair],
+                            qk_slot=self.owner_slots[pair],
+                            key_read=key_read,
+                            key_out=key_out,
+                        ),
+                        _OwnerTile(
+                            query_start=2 * pair,
+                            owner=dtypes.int32((pair + rotate) % 2),
+                            task_span_count=task_span_count,
+                            workspace_task_idx=workspace_task_idx,
+                            token_tile=token_tile,
+                            tile_begin=tile_begin,
+                            tokens=tokens,
+                        ),
+                        outputs,
+                        schedule,
+                    )
 
     @jit
     def _compute_task(
@@ -6691,89 +6743,38 @@ class QliFusedKernel:
         schedule: _TaskSchedule,
         task_valid_s2,
         previous_owner,
+        marker,
     ):
-        (
-            query,
-            key,
-            weights,
-            query_scale,
-            key_scale,
-            key_stride0,
-            key_dequant_scale_stride0,
-            block_table,
-        ) = inputs
-        (
-            key_out,
-            candidate_key_out,
-            sparse_indices,
-            sparse_value_bits,
-            candidate_indices,
-            candidate_value_bits,
-            candidate_length,
-        ) = outputs
-        (
-            batch_idx,
-            public_row_base,
-            query_offset,
-            task_span_count,
-            task_active_count,
-            used_q,
-            actual_s2,
-            cmp_residual,
-            workspace_task_idx,
-            tokens,
-            tile_begin,
-            tile_end,
-            row_ld,
-        ) = schedule
-        if task_valid_s2 > dtypes.int32(tile_begin * TILE_N) and tile_end > tile_begin:
+        if (
+            task_valid_s2 > dtypes.int32(schedule.tile_begin * TILE_N)
+            and schedule.tile_end > schedule.tile_begin
+        ):
+            owner_cv = dtypes.int32(0)
+            if self.owner_supported:
+                owner_cv = dtypes.int32(
+                    self._use_owner(
+                        marker,
+                        schedule.row_ld,
+                        schedule.task_span_count,
+                        schedule.actual_s2,
+                    )
+                )
             self._compute_nonempty_task(
-                _QliInputs(
-                    query=query,
-                    key=key,
-                    weights=weights,
-                    query_scale=query_scale,
-                    key_scale=key_scale,
-                    key_stride0=key_stride0,
-                    key_dequant_scale_stride0=key_dequant_scale_stride0,
-                    block_table=block_table,
-                ),
-                _TaskOutputs(
-                    key_out=key_out,
-                    candidate_key_out=candidate_key_out,
-                    sparse_indices=sparse_indices,
-                    sparse_value_bits=sparse_value_bits,
-                    candidate_indices=candidate_indices,
-                    candidate_value_bits=candidate_value_bits,
-                    candidate_length=candidate_length,
-                ),
-                _TaskSchedule(
-                    batch_idx=batch_idx,
-                    public_row_base=public_row_base,
-                    query_offset=query_offset,
-                    task_span_count=task_span_count,
-                    task_active_count=task_active_count,
-                    used_q=used_q,
-                    actual_s2=actual_s2,
-                    cmp_residual=cmp_residual,
-                    workspace_task_idx=workspace_task_idx,
-                    tokens=tokens,
-                    tile_begin=tile_begin,
-                    tile_end=tile_end,
-                    row_ld=row_ld,
-                ),
-                previous_owner,
+                inputs, outputs, schedule, previous_owner, owner_cv
             )
+            previous_owner = owner_cv
         else:
             self._store_empty_rows(
-                sparse_indices,
-                sparse_value_bits,
-                candidate_indices,
-                candidate_value_bits,
-                candidate_length,
-                public_row_base,
-                task_span_count,
+                outputs.sparse_indices,
+                outputs.sparse_value_bits,
+                outputs.candidate_indices,
+                outputs.candidate_value_bits,
+                outputs.candidate_length,
+                schedule.public_row_base,
+                schedule.task_span_count,
+                schedule.row_ld,
             )
+        return previous_owner
 
     @jit
     def _store_empty_rows(
@@ -6785,10 +6786,11 @@ class QliFusedKernel:
         candidate_length,
         public_row_base,
         task_span_count,
+        initialize_candidate_values,
     ):
-        for row_in_subblock in range_constexpr(self.query_rows // 2):
+        for row_in_subblock in range_constexpr(self.work_rows // 2):
             local_row = dtypes.int32(
-                get_subblock_id() * (self.query_rows // 2) + row_in_subblock
+                get_subblock_id() * (self.work_rows // 2) + row_in_subblock
             )
             public_row = dtypes.int64(local_row)
             if local_row < task_span_count:
@@ -6805,52 +6807,132 @@ class QliFusedKernel:
                     ),
                 )
                 if self.candidate_enabled:
-                    self.candidate_topk.store_empty_row(
-                        tile_slice(
-                            candidate_indices,
-                            (1, self.candidate_topk_count),
-                            (public_row, 0),
-                        ),
-                        tile_slice(
-                            candidate_value_bits,
-                            (1, self.candidate_topk_count),
-                            (public_row, 0),
-                        ),
+                    candidate_row = tile_slice(
+                        candidate_indices,
+                        (1, self.candidate_topk_count),
+                        (public_row, 0),
                     )
+                    if initialize_candidate_values:
+                        self.candidate_topk.store_empty_row(
+                            candidate_row,
+                            tile_slice(
+                                candidate_value_bits,
+                                (1, self.candidate_topk_count),
+                                (public_row, 0),
+                            ),
+                        )
+                    else:
+                        self.candidate_topk.store_empty_indices(candidate_row)
         if self.candidate_enabled:
             vec_sync_all()
             self.vector.store_empty_candidate_lengths(
                 candidate_length, public_row_base, task_span_count
             )
+            if task_span_count > self.query_rows:
+                self.vector.store_empty_candidate_lengths(
+                    candidate_length,
+                    public_row_base + self.query_rows,
+                    task_span_count - self.query_rows,
+                )
             vec_sync_all()
 
     @jit
-    def _initialize_unscheduled_padding(
+    def _batch_geometry(self, sequences, block_table, batch_idx, total_q, tokens):
+        cu_seqlens_q, seqused_q, seqused_k, cmp_residual_k = sequences
+        begin = dtypes.int64(0)
+        end = dtypes.int64(total_q)
+        if self.has_cu_seqlens_q:
+            begin = dtypes.int64(cu_seqlens_q[batch_idx])
+            end = dtypes.int64(cu_seqlens_q[batch_idx + 1])
+        used_q = dtypes.int32(end - begin)
+        if self.has_seqused_q:
+            used_q = seqused_q[batch_idx]
+        actual_s2 = dtypes.int32(tokens)
+        if self.has_seqused_k:
+            actual_s2 = seqused_k[batch_idx]
+        elif self.tnd_layout and self.has_block_table:
+            actual_s2 = block_table[batch_idx + 1] - block_table[batch_idx]
+        remainder = dtypes.int32(0)
+        if self.has_cmp_residual_k:
+            remainder = cmp_residual_k[batch_idx]
+        return (begin, end, used_q, actual_s2, remainder)
+
+    @jit
+    def _scheduled_rows(self, used_q, marker):
+        width = dtypes.int32(self.query_rows)
+        if marker < 0:
+            width = _packed_query_rows(used_q, -dtypes.int32(marker))
+        elif marker > 0:
+            width = dtypes.int32(marker)
+        return width
+
+    @jit
+    def _empty_query_groups(self, used_q, actual_s2, remainder, active_groups, width):
+        empty_groups = dtypes.int64(0)
+        if actual_s2 == 0:
+            empty_groups = active_groups
+        elif self.mask_mode == 3:
+            empty_rows = max(
+                dtypes.int64(0),
+                dtypes.int64(used_q)
+                - dtypes.int64(actual_s2) * self.cmp_ratio
+                - remainder
+                + self.cmp_ratio
+                - 1,
+            )
+            empty_groups = min(active_groups, empty_rows // width)
+        return empty_groups
+
+    @jit
+    def _initialize_empty_groups(
         self,
-        sequences: _PaddingSequences,
-        schedule: _PaddingSchedule,
+        sequences: _QliSequences,
+        schedule: _EmptyGroupSchedule,
         final_outputs: _FinalOutputs,
+        block_table,
+        candidate_length,
     ):
-        # Only whole query tiles beyond effective Q are omitted from ASC-style
-        # compute groups. The last active tile already initializes its own tail.
-        cu_seqlens_q, seqused_q, candidate_length = sequences
-        worker, worker_count, total_q, batch_count = schedule
-        final_indices, final_bits, final_candidates, final_candidate_bits = (
-            final_outputs
-        )
-        indices, bits = final_indices, final_bits
-        candidates, candidate_bits = final_candidates, final_candidate_bits
-        for batch_idx in dsl_range(batch_count, unroll=1):
-            begin = dtypes.int64(0)
-            end = dtypes.int64(total_q)
-            if self.has_cu_seqlens_q:
-                begin = dtypes.int64(cu_seqlens_q[batch_idx])
-                end = dtypes.int64(cu_seqlens_q[batch_idx + 1])
-            used = dtypes.int64(seqused_q[batch_idx])
-            first_padding = (
-                (used + self.query_rows - 1) // self.query_rows
-            ) * self.query_rows
-            offset = first_padding + worker * self.query_rows
+        total_q, batch_count, tokens = schedule
+        indices, bits, candidates, candidate_bits = final_outputs
+        worker = dtypes.int64(get_block_idx())
+        worker_count = dtypes.int64(get_block_num())
+        batch_workers = min(dtypes.int64(batch_count), worker_count)
+        batch_lane = worker % batch_workers
+        row_worker = worker // batch_workers
+        row_workers = (worker_count - 1 - batch_lane) // batch_workers + 1
+        row_offset = row_worker * self.query_rows
+        row_step = row_workers * self.query_rows
+        marker = self.metadata[METADATA_ROWS - 1, METADATA_FIELDS - 1]
+        batch_idx = batch_lane
+        while batch_idx < batch_count:
+            begin, end, used_q, actual_s2, remainder = self._batch_geometry(
+                sequences, block_table, batch_idx, total_q, tokens
+            )
+            width = self._scheduled_rows(used_q, marker)
+            active_groups = (dtypes.int64(used_q) + width - 1) // width
+            empty_groups = self._empty_query_groups(
+                used_q, actual_s2, remainder, active_groups, width
+            )
+            # These two spans exclude the mixed group handled by the compute path.
+            offset = row_offset
+            while offset < min(empty_groups * width, end - begin):
+                self._store_empty_rows(
+                    indices[begin + offset :, 0:],
+                    bits[begin + offset :, 0:],
+                    candidates[begin + offset :, 0:],
+                    candidate_bits[begin + offset :, 0:],
+                    candidate_length,
+                    begin + offset,
+                    dtypes.int32(
+                        min(
+                            self.query_rows,
+                            min(empty_groups * width, end - begin) - offset,
+                        )
+                    ),
+                    False,
+                )
+                offset += row_step
+            offset = active_groups * width + row_offset
             while offset < end - begin:
                 self._store_empty_rows(
                     indices[begin + offset :, 0:],
@@ -6860,8 +6942,10 @@ class QliFusedKernel:
                     candidate_length,
                     begin + offset,
                     dtypes.int32(min(self.query_rows, end - begin - offset)),
+                    False,
                 )
-                offset += dtypes.int64(worker_count) * self.query_rows
+                offset += row_step
+            batch_idx += batch_workers
 
     @jit
     def __call__(
@@ -6891,9 +6975,7 @@ class QliFusedKernel:
             candidate_value_bits,
             candidate_length,
         ) = outputs
-        cu_seqlens_q, seqused_q, seqused_k, cmp_residual_k = sequences
         (
-            worker_count,
             total_q,
             batch_count,
             tokens,
@@ -6912,6 +6994,9 @@ class QliFusedKernel:
             final_candidates,
             final_candidate_bits,
         ) = merge_outputs
+        marker = self.metadata[METADATA_ROWS - 1, METADATA_FIELDS - 1]
+        # A zero in the reserved word also supports metadata from earlier producers.
+        scan_empty_groups = metadata[METADATA_ROWS - 1, METADATA_FIELDS - 2] == 0
         previous_owner = dtypes.int32(-1)
         worker = dtypes.int64(get_block_idx())
         workspace_cursor = dtypes.int64(metadata[worker, 7])
@@ -6919,37 +7004,44 @@ class QliFusedKernel:
             first_b = dtypes.int64(metadata[worker, 1])
             last_b = dtypes.int64(metadata[worker, 4])
             for batch_idx in dsl_range(first_b, min(last_b + 1, batch_count), unroll=1):
-                query_begin = dtypes.int64(0)
-                query_end = dtypes.int64(total_q)
-                if self.has_cu_seqlens_q:
-                    query_begin = dtypes.int64(cu_seqlens_q[batch_idx])
-                    query_end = dtypes.int64(cu_seqlens_q[batch_idx + 1])
-                used_q = dtypes.int32(query_end - query_begin)
-                if self.has_seqused_q:
-                    used_q = seqused_q[batch_idx]
-                actual_s2 = dtypes.int32(tokens)
-                if self.has_seqused_k:
-                    actual_s2 = seqused_k[batch_idx]
-                elif self.tnd_layout and self.has_block_table:
-                    actual_s2 = block_table[batch_idx + 1] - block_table[batch_idx]
-                remainder = dtypes.int32(0)
-                if self.has_cmp_residual_k:
-                    remainder = cmp_residual_k[batch_idx]
+                (
+                    query_begin,
+                    query_end,
+                    used_q,
+                    actual_s2,
+                    remainder,
+                ) = self._batch_geometry(
+                    sequences, block_table, batch_idx, total_q, tokens
+                )
+                public_tile_rows = self._scheduled_rows(used_q, marker)
+                active_groups = (
+                    dtypes.int64(used_q) + public_tile_rows - 1
+                ) // public_tile_rows
+                empty_groups = dtypes.int64(0)
+                if scan_empty_groups:
+                    empty_groups = self._empty_query_groups(
+                        used_q, actual_s2, remainder, active_groups, public_tile_rows
+                    )
                 first_m = dtypes.int64(0)
-                last_m = (
-                    query_end - query_begin + self.query_rows - 1
-                ) // self.query_rows
+                last_m = active_groups
+                last_boundary = dtypes.int64(metadata[worker, 5])
                 if batch_idx == first_b:
                     first_m = dtypes.int64(metadata[worker, 2])
+                    if marker < 0:
+                        first_m = first_m // public_tile_rows
                 if batch_idx == last_b:
-                    last_m = dtypes.int64(metadata[worker, 5]) + dtypes.int64(
-                        (1 if metadata[worker, 6] > 0 else 0)
+                    if marker < 0:
+                        last_boundary = last_boundary // public_tile_rows
+                    last_m = min(
+                        active_groups,
+                        last_boundary
+                        + dtypes.int64((1 if metadata[worker, 6] > 0 else 0)),
                     )
-                for m_idx in dsl_range(first_m, last_m, unroll=1):
-                    query_offset = dtypes.int32(m_idx * self.query_rows)
+                for m_idx in dsl_range(max(first_m, empty_groups), last_m, unroll=1):
+                    query_offset = dtypes.int32(m_idx * public_tile_rows)
                     public_row = dtypes.int32(query_begin + dtypes.int64(query_offset))
                     span = dtypes.int32(
-                        min(self.query_rows, query_end - dtypes.int64(public_row))
+                        min(public_tile_rows, query_end - dtypes.int64(public_row))
                     )
                     active = min(span, max(dtypes.int32(0), used_q - query_offset))
                     visible = actual_s2
@@ -6974,9 +7066,7 @@ class QliFusedKernel:
                     tile_end = (dtypes.int64(visible) + TILE_N - 1) // TILE_N
                     if batch_idx == first_b and m_idx == first_m:
                         tile_begin = dtypes.int64(metadata[worker, 3])
-                    if batch_idx == last_b and m_idx == dtypes.int64(
-                        metadata[worker, 5]
-                    ):
+                    if batch_idx == last_b and m_idx == last_boundary:
                         tile_end = min(tile_end, dtypes.int64(metadata[worker, 6]))
                     row_ld = (
                         tile_begin > 0
@@ -6984,48 +7074,48 @@ class QliFusedKernel:
                     )
                     row_indices = tile_slice(
                         final_indices[public_row:, 0:],
-                        (self.query_rows, self.topk_count),
+                        (self.work_rows, self.topk_count),
                         (0, 0),
                     )
                     row_bits = tile_slice(
                         final_bits[public_row:, 0:],
-                        (self.query_rows, self.topk_count),
+                        (self.work_rows, self.topk_count),
                         (0, 0),
                     )
                     row_candidates = tile_slice(
                         final_candidates[public_row:, 0:],
-                        (self.query_rows, self.candidate_topk_count),
+                        (self.work_rows, self.candidate_topk_count),
                         (0, 0),
                     )
                     row_candidate_bits = tile_slice(
                         final_candidate_bits[public_row:, 0:],
-                        (self.query_rows, self.candidate_topk_count),
+                        (self.work_rows, self.candidate_topk_count),
                         (0, 0),
                     )
                     if row_ld:
                         row_indices = tile_slice(
-                            sparse_indices[workspace_cursor * self.query_rows :, 0:],
-                            (self.query_rows, self.topk_count),
+                            sparse_indices[workspace_cursor * self.work_rows :, 0:],
+                            (self.work_rows, self.topk_count),
                             (0, 0),
                         )
                         row_bits = tile_slice(
-                            sparse_value_bits[workspace_cursor * self.query_rows :, 0:],
-                            (self.query_rows, self.topk_count),
+                            sparse_value_bits[workspace_cursor * self.work_rows :, 0:],
+                            (self.work_rows, self.topk_count),
                             (0, 0),
                         )
                         row_candidates = tile_slice(
-                            candidate_indices[workspace_cursor * self.query_rows :, 0:],
-                            (self.query_rows, self.candidate_topk_count),
+                            candidate_indices[workspace_cursor * self.work_rows :, 0:],
+                            (self.work_rows, self.candidate_topk_count),
                             (0, 0),
                         )
                         row_candidate_bits = tile_slice(
                             candidate_value_bits[
-                                workspace_cursor * self.query_rows :, 0:
+                                workspace_cursor * self.work_rows :, 0:
                             ],
-                            (self.query_rows, self.candidate_topk_count),
+                            (self.work_rows, self.candidate_topk_count),
                             (0, 0),
                         )
-                    self._compute_task(
+                    previous_owner = self._compute_task(
                         _QliInputs(
                             query=query,
                             key=key,
@@ -7062,22 +7152,14 @@ class QliFusedKernel:
                         ),
                         visible,
                         previous_owner,
+                        marker,
                     )
-                    if visible > tile_begin * TILE_N and tile_end > tile_begin:
-                        previous_owner = dtypes.int32(0)
-                        if self.owner_supported:
-                            previous_owner = dtypes.int32(
-                                row_ld == 0
-                                and span == 6
-                                and actual_s2 >= 32768
-                                and actual_s2 <= 131072
-                            )
                     # FD tasks cover active rows only. The first partial owner
                     # initializes inactive public rows directly in the final output.
                     if row_ld and tile_begin == 0:
-                        for local in range_constexpr(self.query_rows // 2):
+                        for local in range_constexpr(self.work_rows // 2):
                             r = dtypes.int32(
-                                get_subblock_id() * (self.query_rows // 2) + local
+                                get_subblock_id() * (self.work_rows // 2) + local
                             )
                             if r >= active and r < span:
                                 self.topk.store_empty_row(
@@ -7116,18 +7198,13 @@ class QliFusedKernel:
                     if row_ld:
                         workspace_cursor += 1
 
-        if self.has_seqused_q:
-            self._initialize_unscheduled_padding(
-                _PaddingSequences(
-                    cu_seqlens_q=cu_seqlens_q,
-                    seqused_q=seqused_q,
-                    candidate_length=candidate_length,
-                ),
-                _PaddingSchedule(
-                    worker=worker,
-                    worker_count=worker_count,
+        if scan_empty_groups:
+            self._initialize_empty_groups(
+                sequences,
+                _EmptyGroupSchedule(
                     total_q=total_q,
                     batch_count=batch_count,
+                    tokens=tokens,
                 ),
                 _FinalOutputs(
                     final_indices=final_indices,
@@ -7135,6 +7212,8 @@ class QliFusedKernel:
                     final_candidates=final_candidates,
                     final_candidate_bits=final_candidate_bits,
                 ),
+                block_table,
+                candidate_length,
             )
 
 
@@ -7158,6 +7237,7 @@ def _build_compiled_fused_runner(config: _RunnerConfig):
         tnd_layout,
     ) = config
     query_head_count = int(n1)
+    work_rows = OWNER_PACK_ROWS if query_head_count == 32 else int(query_tile_rows)
     tile_m = query_head_count * int(query_tile_rows)
     has_cmp_residual_k = int(mask_mode) == 3 and int(cmp_ratio) != 1
     topk = int(topk)
@@ -7236,13 +7316,13 @@ def _build_compiled_fused_runner(config: _RunnerConfig):
         final_sparse_indices = final_sparse_indices_data.view(total_q, topk)
         sparse_indices = make_tensor(
             make_pointer(dtypes.int32, dtypes.int64(sparse_indices_address), MemLoc.GM),
-            make_layout((worker_count * 2 * query_tile_rows, topk), stride=(topk, 1)),
+            make_layout((worker_count * 2 * work_rows, topk), stride=(topk, 1)),
         )
         sparse_value_bits = make_tensor(
             make_pointer(
                 dtypes.uint16, dtypes.int64(sparse_value_bits_address), MemLoc.GM
             ),
-            make_layout((worker_count * 2 * query_tile_rows, topk), stride=(topk, 1)),
+            make_layout((worker_count * 2 * work_rows, topk), stride=(topk, 1)),
         )
         final_sparse_bits = final_sparse_values_data.view(total_q, topk).view(
             dtype=dtypes.uint16
@@ -7256,7 +7336,7 @@ def _build_compiled_fused_runner(config: _RunnerConfig):
                 dtypes.int32, dtypes.int64(candidate_indices_address), MemLoc.GM
             ),
             make_layout(
-                (worker_count * 2 * query_tile_rows, candidate_topk),
+                (worker_count * 2 * work_rows, candidate_topk),
                 stride=(candidate_topk, 1),
             ),
         )
@@ -7265,7 +7345,7 @@ def _build_compiled_fused_runner(config: _RunnerConfig):
                 dtypes.uint16, dtypes.int64(candidate_value_bits_address), MemLoc.GM
             ),
             make_layout(
-                (worker_count * 2 * query_tile_rows, candidate_topk),
+                (worker_count * 2 * work_rows, candidate_topk),
                 stride=(candidate_topk, 1),
             ),
         )
@@ -7318,7 +7398,6 @@ def _build_compiled_fused_runner(config: _RunnerConfig):
                 cmp_residual_k=cmp_residual_k,
             ),
             _KernelSchedule(
-                worker_count=worker_count,
                 total_q=total_q,
                 batch_count=batch_count,
                 tokens=tokens,
@@ -7355,6 +7434,7 @@ def _build_compiled_fused_runner(config: _RunnerConfig):
                         workers=worker_count * 2,
                         cu_seqlens_q=cu_seqlens_q,
                         query_tile_rows=query_tile_rows,
+                        workspace_stride=work_rows,
                         has_cu=cu_seqlens_q.shape[0] > 0,
                     ),
                     _MergeOptions(
@@ -7375,6 +7455,7 @@ def _build_compiled_fused_runner(config: _RunnerConfig):
                         workers=worker_count * 2,
                         cu_seqlens_q=cu_seqlens_q,
                         query_tile_rows=query_tile_rows,
+                        workspace_stride=work_rows,
                         has_cu=cu_seqlens_q.shape[0] > 0,
                     ),
                     _MergeOptions(
@@ -7401,6 +7482,7 @@ def _build_compiled_fused_runner(config: _RunnerConfig):
                         workers=worker_count * 2,
                         cu_seqlens_q=cu_seqlens_q,
                         query_tile_rows=query_tile_rows,
+                        workspace_stride=work_rows,
                         has_cu=cu_seqlens_q.shape[0] > 0,
                     ),
                     _MergeOptions(output_offset_address=0, need_values=1),
@@ -7502,7 +7584,7 @@ def _build_compiled_fused_runner(config: _RunnerConfig):
     partial_rows = cannbotdsl.Dim("PARTIAL_ROWS")
     _metadata_tasks = cannbotdsl.Dim("METADATA_TASKS")
     workspace_rows = cannbotdsl.Dim(
-        "WORKSPACE_ROWS", min=1, max=MAX_CUBE_WORKERS * (tile_m // query_head_count)
+        "WORKSPACE_ROWS", min=1, max=MAX_CUBE_WORKERS * work_rows
     )
     fake = TensorSpec
     dummy_i32_spec = fake((1,), dtypes.int32)
@@ -7877,6 +7959,11 @@ def quant_lightning_indexer(
         raise ValueError("When layout_q is TND, cu_seqlens_q must be provided.")
     if layout_k == "TND" and cu_seqlens_k is None:
         raise ValueError("When layout_k is TND, cu_seqlens_k must be provided.")
+    if layout_k == "PA_BBND":
+        if block_table is None or seqused_k is None:
+            raise ValueError("PA_BBND requires block_table and seqused_k")
+        if cu_seqlens_k is not None:
+            raise ValueError("PA_BBND must not supply cu_seqlens_k")
     query_heads = _validate_query_heads(q, w, descale_q)
     output_prefix = tuple(q.shape[:-2])
     if layout_q == "BSND":
@@ -7942,8 +8029,8 @@ def quant_lightning_indexer(
     if q.ndim != 3 or tuple(q.shape[1:]) != (query_heads, PACKED_D):
         raise ValueError("QLI requires N1=1..32 and logical D=128")
     tnd_layout = layout_k == "TND"
-    if int(max_seqlen_q) < -1:
-        raise ValueError("Max_seqlen_q must be -1 or non-negative")
+    if not -1 <= int(max_seqlen_q) < 2**31:
+        raise ValueError("Max_seqlen_q must be in [-1, 2147483647]")
     if metadata is None:
         raise ValueError(
             "Metadata is required; call quant_lightning_indexer_metadata before this operator"
@@ -7951,6 +8038,7 @@ def quant_lightning_indexer(
     query_heads = int(q.shape[1])
     query_tile_rows = min(QUERY_TILE_ROWS, 256 // query_heads)
     tile_m = query_heads * query_tile_rows
+    work_rows = OWNER_PACK_ROWS if query_heads == 32 else query_tile_rows
     query, key, weights = q, k, w
     query_dequant_scale, key_dequant_scale = descale_q, descale_k
     _validate_public_tensor_contract(
@@ -8069,23 +8157,23 @@ def quant_lightning_indexer(
         raise RuntimeError(
             f"Unsupported Cube core count {worker_count}; LI metadata supports 1..{LD_RECORD_START}"
         )
-    workspace_row_count = worker_count * (tile_m // query_heads)
+    workspace_row_count = worker_count * work_rows
     shard_pad = tokens_pad
     # Public outputs and GM scratch are allocation-only Torch calls.  The
     # fused kernel writes every public row, including invalid/padded rows.
     sparse_indices_2d = torch.empty(
-        (worker_count * 2 * query_tile_rows, int(topk)),
+        (worker_count * 2 * work_rows, int(topk)),
         dtype=torch.int32,
         device=query.device,
     )
     sparse_values_2d = torch.empty(
-        (worker_count * 2 * query_tile_rows, int(topk)),
+        (worker_count * 2 * work_rows, int(topk)),
         dtype=torch.bfloat16,
         device=weights.device,
     )
     candidate_count = max(0, int(candidate_topk_blocks))
     candidate_indices_2d = torch.empty(
-        (worker_count * 2 * query_tile_rows, candidate_count),
+        (worker_count * 2 * work_rows, candidate_count),
         dtype=torch.int32,
         device=query.device,
     )
@@ -8113,7 +8201,7 @@ def quant_lightning_indexer(
         else torch.empty((1, split_count), dtype=torch.int32, device=query.device)
     )
     candidate_value_workspace = torch.empty(
-        (worker_count * 2 * query_tile_rows, kernel_candidate_count),
+        (worker_count * 2 * work_rows, kernel_candidate_count),
         dtype=torch.uint16,
         device=query.device,
     )
@@ -8364,7 +8452,9 @@ class QliTndCube(QliCube):
         if has_block_table:
             base = dtypes.int64(block_table[batch_idx])
         logical_row = token_tile * TILE_N
-        count = min(dtypes.int64(QK_COLUMNS), dtypes.int64(actual_s2) - logical_row)
+        count = min(
+            dtypes.int64(self.key_tile_columns), dtypes.int64(actual_s2) - logical_row
+        )
         source_row = base + logical_row
         # Tile windows pin the full NZ frame while the dynamic source slice
         # keeps the copy height clamped to the available key rows.
@@ -8372,18 +8462,22 @@ class QliTndCube(QliCube):
             from_tensor(
                 key_write,
                 dtype=dtypes.uint8,
-                layout=make_layout((QK_COLUMNS, PACKED_D)),
+                layout=make_layout((self.key_tile_columns, PACKED_D)),
                 data_format="nz",
             ),
             key[source_row : source_row + count, None],
         )
         mem_copy(
-            tile_slice(scale_write, (4, QK_COLUMNS), (0, 0)),
+            tile_slice(scale_write, (4, self.key_tile_columns), (0, 0)),
             key_scale[source_row : source_row + count, None, None]
             .flatten(1, 2)
             .permute(1, 0),
             options=self.scale_b,
         )
+
+
+class OwnerTndCube512(OwnerCube512):
+    prefetch_key = QliTndCube.prefetch_key
 
 
 def _tnd_axis0_stride(tensor, name, inner_strides, row_bytes):

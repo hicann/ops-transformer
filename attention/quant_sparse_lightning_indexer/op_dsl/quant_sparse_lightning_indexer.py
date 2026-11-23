@@ -37,6 +37,8 @@ from cannbotdsl.lang.jit import jit
 from cannbotdsl.lang.host import host
 from cannbotdsl.lang.kernel import kernel
 from cannbotdsl.lang.vf import vf
+from inspect import signature
+
 from cannbotdsl.ops import reg as rr
 from cannbotdsl.ops.arch import get_block_idx, get_subblock_id
 from cannbotdsl.ops.matmul import matmul as dsl_matmul
@@ -103,6 +105,18 @@ METADATA_ELEMENTS = 1024
 METADATA_FIELDS = 8
 METADATA_ROWS = METADATA_ELEMENTS // METADATA_FIELDS
 LD_RECORD_START = 36
+
+
+# DSL 0.8.3 and the PR API emit the same compacting store, with different Python signatures.
+if "mask" in signature(rr.vsqueeze_and_storeunalign).parameters:
+    _squeeze_begin = rr.vsqueeze_and_storeunalign_init
+    _squeeze_store = rr.vsqueeze_and_storeunalign
+else:
+    _squeeze_begin = rr.vstore_unalign_begin
+
+    def _squeeze_store(dst, offset, value, cursor, *, mask):
+        selected = rr.vsqueeze_and_storeunalign_init(value, mask=mask)
+        rr.vsqueeze_and_storeunalign(dst, offset, selected, cursor)
 
 
 class _LdMergeStageCallBuffers(NamedTuple):
@@ -221,7 +235,6 @@ class _ValidatePaSequencesSequences(NamedTuple):
 
 class _ValidatePaSequencesGeometry(NamedTuple):
     query_rows: object
-    physical_k_blocks: object
     pa_block_size: object
 
 
@@ -588,27 +601,25 @@ class QsliRawTopKSelector:
                 low_target,
                 mask=full16,
             )
-            ureg = rr.vstore_unalign_begin(tmp_idx)
+            ureg = _squeeze_begin(tmp_idx)
             valid_chunk_count = (valid_len + 127) // 128
             for chunk in dsl_range(valid_chunk_count, unroll=1):
                 valid_count = valid_len - chunk * 128
                 mask16 = rr.update_mask(valid_count, elem_bits=16)[0]
                 keys = rr.vload(sort_key, chunk * 128)
                 idx = rr.varange(chunk * 128, dtypes.uint16)
-                sq = rr.vsqueeze_and_storeunalign_init(
-                    idx, mask=rr.vgt(keys, kth, mask=mask16)
+                _squeeze_store(
+                    tmp_idx, 0, idx, ureg, mask=rr.vgt(keys, kth, mask=mask16)
                 )
-                rr.vsqueeze_and_storeunalign(tmp_idx, 0, sq, ureg)
             for chunk in dsl_range(valid_chunk_count, unroll=1):
                 valid_count = valid_len - chunk * 128
                 mask16 = rr.update_mask(valid_count, elem_bits=16)[0]
                 keys = rr.vload(sort_key, chunk * 128)
                 idx = rr.varange(chunk * 128, dtypes.uint16)
-                sq = rr.vsqueeze_and_storeunalign_init(
-                    idx, mask=rr.veq(keys, kth, mask=mask16)
+                _squeeze_store(
+                    tmp_idx, 0, idx, ureg, mask=rr.veq(keys, kth, mask=mask16)
                 )
-                rr.vsqueeze_and_storeunalign(tmp_idx, 0, sq, ureg)
-            rr.vstore_unalign_post(tmp_idx, 0, ureg)
+            rr.vsqueeze_and_storeunalign_finalize(tmp_idx, 0, ureg)
             rr.vmem_bar("vst_vld")
 
 
@@ -3080,8 +3091,8 @@ def _validate_compute_attributes(
         raise ValueError("Mask_mode must be 0 or 3")
     if int(cmp_ratio) < 1 or int(cmp_ratio) > 128:
         raise ValueError("Cmp_ratio must be in [1,128]")
-    if int(max_seqlen_q) < -1:
-        raise ValueError("Max_seqlen_q must be -1 or nonnegative")
+    if not -1 <= int(max_seqlen_q) < 2**31:
+        raise ValueError("Max_seqlen_q must be in [-1, 2147483647]")
 
 
 def _validate_candidate_inputs(
@@ -3101,9 +3112,10 @@ def _validate_candidate_inputs(
     if (
         candidate_block_length.dtype != torch.int32
         or candidate_block_length.device.type != "npu"
-        or int(candidate_block_length.numel()) != query_rows * N2
+        or tuple(candidate_block_length.shape) != (query_rows, N2)
+        or not candidate_block_length.is_contiguous()
     ):
-        raise ValueError("Candidate_block_length must be NPU int32 with T1*N2 entries")
+        raise ValueError("Candidate_block_length must be contiguous NPU int32 (T1,1)")
 
 
 def _validate_pa_sequences(sequences, geometry, options):
@@ -3116,7 +3128,7 @@ def _validate_pa_sequences(sequences, geometry, options):
         block_table,
         output_idx_offset,
     ) = sequences
-    query_rows, physical_k_blocks, pa_block_size = geometry
+    query_rows, pa_block_size = geometry
     mask_mode, cmp_ratio = options
     if cu_seqlens_q is None:
         batch = 1
@@ -3137,26 +3149,24 @@ def _validate_pa_sequences(sequences, geometry, options):
         ):
             raise ValueError("Seqused_q must be NPU int32 with shape (B,)")
 
-    if block_table is None:
-        if batch != 1:
-            raise ValueError("Block_table is required when batch is greater than one")
-        logical_k_capacity = physical_k_blocks * pa_block_size
-    else:
-        invalid_input = (
-            block_table.ndim != 2
-            or int(block_table.shape[0]) != batch
-            or block_table.dtype != torch.int32
-        )
-        if invalid_input or block_table.device.type != "npu":
-            raise ValueError("Block_table must be NPU int32 with shape (B,max_blocks)")
-        logical_k_capacity = int(block_table.shape[1]) * pa_block_size
-    if seqused_k is not None:
-        if (
-            tuple(seqused_k.shape) != (batch,)
-            or seqused_k.dtype != torch.int32
-            or seqused_k.device.type != "npu"
-        ):
-            raise ValueError("Seqused_k must be NPU int32 with shape (B,)")
+    invalid_shape = (
+        block_table.ndim != 2
+        or int(block_table.shape[0]) != batch
+        or int(block_table.shape[1]) <= 0
+    )
+    if (
+        invalid_shape
+        or block_table.dtype != torch.int32
+        or block_table.device.type != "npu"
+    ):
+        raise ValueError("Block_table must be nonempty NPU int32 (B,max_blocks)")
+    logical_k_capacity = int(block_table.shape[1]) * pa_block_size
+    if (
+        tuple(seqused_k.shape) != (batch,)
+        or seqused_k.dtype != torch.int32
+        or seqused_k.device.type != "npu"
+    ):
+        raise ValueError("Seqused_k must be NPU int32 with shape (B,)")
 
     needs_residual = int(mask_mode) == 3 and int(cmp_ratio) != 1
     if needs_residual:
@@ -3243,6 +3253,15 @@ def quant_sparse_lightning_indexer(
         raise ValueError("When layout_q is TND, cu_seqlens_q must be provided.")
     if layout_k == "TND" and cu_seqlens_k is None:
         raise ValueError("When layout_k is TND, cu_seqlens_k must be provided.")
+    if layout_k == "PA_BBND":
+        if block_table is None or seqused_k is None:
+            raise ValueError("PA_BBND requires block_table and seqused_k")
+        if cu_seqlens_k is not None:
+            raise ValueError("PA_BBND must not supply cu_seqlens_k")
+    if metadata is None:
+        raise ValueError(
+            "Metadata is required; call quant_sparse_lightning_indexer_metadata before this operator"
+        )
     query_heads = _validate_query_heads(q, w, descale_q)
     output_prefix = tuple(q.shape[:-2])
     if layout_q == "BSND":
@@ -3465,7 +3484,6 @@ def quant_sparse_lightning_indexer(
         ),
         _ValidatePaSequencesGeometry(
             query_rows=query_rows,
-            physical_k_blocks=physical_k_blocks,
             pa_block_size=pa_block_size,
         ),
         _ValidatePaSequencesOptions(mask_mode=mask_mode, cmp_ratio=cmp_ratio),
@@ -4771,12 +4789,12 @@ def _run_tnd(inputs, sequences, options) -> tuple[torch.Tensor, ...]:
     )
     if invalid_input or k.shape[0] <= 0:
         raise ValueError("TND k must have shape (T2,1,64), T1/T2>0")
-    _validate_pa_dim0_stride(k, "k")
     if descale_k is None or tuple(descale_k.shape) != (k.shape[0], 1, 2, 2):
         raise ValueError("Descale_k is required with shape (T2,1,2,2)")
     if descale_k.dtype not in (torch.uint8, torch.float8_e8m0fnu):
         raise TypeError("Descale_k must contain E8M0 or uint8 bits")
-    _validate_pa_dim0_stride(descale_k, "descale_k")
+    if not k.is_contiguous() or not descale_k.is_contiguous():
+        raise ValueError("TND K and descale_k must be contiguous")
     logical_k_capacity = int(k.shape[0])
     pa_block_size = 0  # unused by TND; preserved runner configuration position
     for name, tensor in (

@@ -135,9 +135,9 @@ b表示batch数量，q_s、k_s分别表示Query和Key的序列长度，q_t、k_t
   - `weights`仅支持float32；`query_dequant_scale`和非分页`key_dequant_scale`支持float8_e8m0。
   - Query的head数仅支持[1,32]。
   - `layout_k`为PA_BBND时，`key`使用uint8存储，shape为(block_num,block_size/8,544)。`block_size`为[16,1024]内16的倍数；每8个token的512字节Key数据和32字节反量化系数合并存储，`key_dequant_scale`必须传入空uint8 Tensor。
-  - `layout_k`为PA_BBND且batch数大于1时，必须传入`block_table`；batch数为1时可不传入，按物理页顺序寻址。未传入`seqused_k`时，生成metadata所用的`max_seqlen_k`必须与计算接口的逻辑Key容量一致。
+  - 当`layout_k`为PA_BBND时，必须传入`seqused_k`和非空的`block_table`，不支持传入`cu_seqlens_k`。
   - 非分页布局不支持传入`block_table`。
-  - TND布局的`key`、`key_dequant_scale`及PA_BBND布局的`key`支持第0轴非连续，其余轴必须连续，第0轴stride不得小于单行或单页容量；BSND布局的`key`和`key_dequant_scale`必须连续。
+  - 当`layout_k`为TND或BSND时，`key`和`key_dequant_scale`必须连续。当`layout_k`为PA_BBND时，`key`仅支持0轴非连续，0轴stride不得小于单页容量。
   - `candidate_block_length`必须传入且连续，每个元素表示对应行的实际有效候选数。对应行前`candidate_block_length`个候选块索引必须合法且互不重复，不能以候选容量代替实际有效候选数。
   - `return_value`支持0、1；输出索引不保证按分数排序，返回分数与索引逐项对应。
   - 仅在`mask_mode`为3且`cmp_ratio`不为1时传入`cmp_residual_k`，其余情况不传入。

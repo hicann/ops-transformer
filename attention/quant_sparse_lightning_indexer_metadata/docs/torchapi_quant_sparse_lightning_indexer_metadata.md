@@ -99,7 +99,7 @@ b表示batch数量，q_s表示BSND布局下Query的物理序列长度，q_t表�
   - 所有输入Tensor必须位于同一NPU设备并连续，输出metadata与输入位于同一设备。
   - TND/TND布局下，`batch_size`必须保持None，由Query和Key的前缀和推导batch数量；BSND布局下由`candidate_block_length`的shape推导，显式传入时须与其一致；TND/PA_BBND布局下由Query的前缀和推导。
   - `layout_k`为BSND时，`max_seqlen_k`必须与Key的物理序列长度一致。
-  - `layout_k`为PA_BBND时，`seqused_k`与`max_seqlen_k`至少传入一个；未传入`seqused_k`时，`max_seqlen_k`必须与计算接口的逻辑Key容量一致。
+  - 当`layout_k`为PA_BBND时，必须传入`seqused_k`，不支持传入`cu_seqlens_k`。
   - 仅在`mask_mode`为3且`cmp_ratio`不为1时传入`cmp_residual_k`，其余情况不传入。
   - 支持aclgraph图模式调用及Meta/Fake模式下的输出shape和数据类型推导。
 <!-- end id7 -->

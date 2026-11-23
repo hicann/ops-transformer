@@ -209,7 +209,8 @@
   - 本接口生成的metadata仅供QuantSparseLightningIndexer使用，不能与QuantLightningIndexerV2的metadata混用。
   - layout_q支持BSND、TND，layout_k支持BSND、TND、PA_BBND；非分页布局必须相同。
   - Query或Key为TND布局时，必须传入对应的cu_seqlens_q或cu_seqlens_k；BSND布局不传入前缀和。
-  - Key为BSND布局时，max_seqlen_k必须等于Key的物理序列长度；为PA_BBND布局时，seqused_k与max_seqlen_k至少传入一个，未传入seqused_k时，max_seqlen_k必须与计算接口的逻辑Key容量一致。
+  - 当layout_k为BSND时，max_seqlen_k必须等于Key的物理序列长度。
+  - 当layout_k为PA_BBND时，必须传入seqused_k，不支持传入cu_seqlens_k。
 <!-- end id7 -->
 
 <!-- npu="A3,910b" id8 -->

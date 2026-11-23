@@ -10,10 +10,12 @@
 
 LI: 36 records x 8 fields: enable, start B/M/S2, end B/M/S2,
 first LD workspace index. LD: 72 records x 8 fields: enable, B/M,
-workspace index/count, M start/count, reserved. Remaining words are zero.
-M is the operator's query tile index; S2 is a 256-token tile index.
-All query groups schedule indivisible 256-token blocks and write those
-indices directly. Odd lengths use a final tail.
+workspace index/count, M start/count, reserved. A negative last word gives
+the per-request group cap; native LI and LD M fields are then row offsets
+within a batch. Zero selects the legacy schedule.
+S2 boundaries are always expressed in 256-token units, including when the
+metadata scheduler assigns pairs of these units for M64/N512.
+
 """
 
 __all__ = ["quant_lightning_indexer_metadata"]
@@ -40,6 +42,9 @@ LD_RECORD_START = 36
 LI_WORKSPACE_OFFSET_FIELD = 7
 GROUP_QUERY_OFFSET_FIELD = 7
 S2_TILE_TOKENS = 256
+OWNER_QUERY_ROWS = 8
+# Bit zero enables LD. Older metadata binaries treat any nonzero value as enabled.
+LD_WITH_OWNER_TILES = 3
 
 
 GROUP_CACHE_FIELDS = 6
@@ -96,6 +101,12 @@ class Args:
     heads: I64
     ld: U32
     has_offset: U32
+    min_shard_tokens: I64
+
+
+def _packed_query_rows(length, cap):
+    groups = max(1, (length + cap - 1) // cap)
+    return 2 * max(1, (length + 2 * groups - 1) // (2 * groups))
 
 
 def _group_field(args, g, total_q, field):
@@ -104,6 +115,7 @@ def _group_field(args, g, total_q, field):
             return args.batch
         return 0
     cache = args.batch + 1
+    row_width = args.scratch[cache + GROUP_CACHE_FIELDS]
     if args.scratch[cache + GROUP_CACHE_ID] != g:
         batch_idx = args.scratch[cache + GROUP_CACHE_BATCH]
         # 连续访问同一 batch 的分组时复用前缀区间，否则才做二分查找。
@@ -117,7 +129,6 @@ def _group_field(args, g, total_q, field):
                 else:
                     hi = mid
             batch_idx = lo
-        qoff = (g - args.scratch[batch_idx]) * args.query_rows
         begin = 0
         end = total_q
         if args.has_cu != 0:
@@ -126,7 +137,10 @@ def _group_field(args, g, total_q, field):
         used = end - begin
         if args.has_q != 0:
             used = args.used_q[batch_idx]
-        span = min(args.query_rows, max(0, end - begin - qoff))
+        if args.output[METADATA_ELEMENTS - 1] < 0:
+            row_width = _packed_query_rows(used, row_width)
+        qoff = (g - args.scratch[batch_idx]) * row_width
+        span = min(row_width, max(0, end - begin - qoff))
         active = min(span, max(0, used - qoff))
         actual = args.capacity
         if args.has_k != 0:
@@ -134,7 +148,7 @@ def _group_field(args, g, total_q, field):
         elif args.has_cu_k != 0:
             actual = args.cu_k[batch_idx + 1] - args.cu_k[batch_idx]
         rem = 0
-        if args.has_residual != 0:
+        if args.mask == 3 and args.ratio != 1 and args.has_residual != 0:
             rem = args.residual[batch_idx]
         visible = actual
         if args.mask == 3:
@@ -151,9 +165,12 @@ def _group_field(args, g, total_q, field):
         args.scratch[cache + GROUP_CACHE_BATCH] = batch_idx
         args.scratch[cache + GROUP_CACHE_OFFSET] = qoff
         args.scratch[cache + GROUP_CACHE_ACTIVE] = active
+        tile_width = S2_TILE_TOKENS
+        if args.output[METADATA_ELEMENTS - 1] != 0:
+            tile_width = 512
         args.scratch[cache + GROUP_CACHE_TILES] = (
-            visible + S2_TILE_TOKENS - 1
-        ) // S2_TILE_TOKENS
+            visible + tile_width - 1
+        ) // tile_width
         args.scratch[cache + GROUP_CACHE_COST] = (
             6 * ((active * args.heads + 15) // 16) + 20
         )
@@ -168,34 +185,106 @@ def _group_field(args, g, total_q, field):
     return args.scratch[cache + GROUP_CACHE_TILES]
 
 
+def _check_sequence(cu, used, has_cu, has_used, batch):
+    if has_cu != 0 and cu[0] != 0:
+        return 0
+    for i in range(batch):
+        if has_cu != 0 and cu[i] > cu[i + 1]:
+            return 0
+        if has_used != 0:
+            if used[i] < 0:
+                return 0
+            if has_cu != 0 and used[i] > cu[i + 1] - cu[i]:
+                return 0
+    return 1
+
+
 @aicpu_kernel
 def metadata_kernel(args: Args):
+    for i in range(METADATA_ELEMENTS):
+        args.output[i] = 0
+    if _check_sequence(args.cu, args.used_q, args.has_cu, args.has_q, args.batch) == 0:
+        return 1
+    if (
+        _check_sequence(args.cu_k, args.used_k, args.has_cu_k, args.has_k, args.batch)
+        == 0
+    ):
+        return 1
+    if args.has_residual != 0:
+        for i in range(args.batch):
+            if args.residual[i] < 0 or args.residual[i] >= args.ratio:
+                return 1
     total_q = args.total_q
     if args.has_cu != 0:
         total_q = args.cu[args.batch]
     elif total_q < 0 and args.has_q != 0:
         total_q = args.used_q[0]
+    row_width = args.query_rows
+    native_tiles = args.ld == LD_WITH_OWNER_TILES
+    if native_tiles:
+        # Up to four pairs of Q reuse each K load. Test alignment per request.
+        row_width = OWNER_QUERY_ROWS
+        group_tokens = 0
+        six_aligned = True
+        has_work = False
+        for bi in range(args.batch):
+            active = total_q
+            if args.has_cu != 0:
+                active = args.cu[bi + 1] - args.cu[bi]
+            if args.has_q != 0:
+                active = args.used_q[bi]
+            if active > 0:
+                has_work = True
+                groups_for_request = (active + OWNER_QUERY_ROWS - 1) // OWNER_QUERY_ROWS
+                k_length = args.capacity
+                if args.has_k:
+                    k_length = args.used_k[bi]
+                elif args.has_cu_k:
+                    k_length = args.cu_k[bi + 1] - args.cu_k[bi]
+                group_tokens += k_length * groups_for_request
+                if active % args.query_rows != 0:
+                    six_aligned = False
+        # Very short local shards leave too little work per emitted TopK list.
+        if group_tokens < args.workers * args.min_shard_tokens:
+            row_width = 2
+        # Preserve the fused six-row CV / local TopK schedule for aligned requests.
+        if has_work and six_aligned:
+            native_tiles = False
+            row_width = args.query_rows
+    args.scratch[args.batch + 1 + GROUP_CACHE_FIELDS] = row_width
     # ASC GetS1SeqSize: seqused_q takes precedence over the TND span.
-    # B+1 prefix entries plus six cached fields; workspace is independent of Q/K length.
+    # B+1 prefix entries, group cache and one word for the selected width.
     groups = 0
+    all_groups_scheduled = True
     args.scratch[0] = 0
     for batch_idx in range(args.batch):
         length = total_q
         if args.has_cu != 0:
             length = args.cu[batch_idx + 1] - args.cu[batch_idx]
+        physical = length
         if args.has_q != 0:
             length = args.used_q[batch_idx]
-        groups += (length + args.query_rows - 1) // args.query_rows
+        width = row_width
+        if native_tiles:
+            width = _packed_query_rows(length, row_width)
+        count = (length + width - 1) // width
+        if count * width < physical:
+            all_groups_scheduled = False
+        groups += count
         args.scratch[batch_idx + 1] = groups
     args.scratch[args.batch + 1 + GROUP_CACHE_ID] = -1
     args.scratch[args.batch + 1 + GROUP_CACHE_BATCH] = 0
     workers = args.workers
-    for i in range(METADATA_ELEMENTS):
-        args.output[i] = 0
+    if native_tiles:
+        args.output[METADATA_ELEMENTS - 1] = -row_width
     total_cost = 0
     for g in range(groups):
         n = _group_field(args, g, total_q, 8)
+        if n == 0:
+            all_groups_scheduled = False
         total_cost += n * _group_field(args, g, total_q, 9)
+    if all_groups_scheduled:
+        args.output[METADATA_ELEMENTS - 2] = 1
     # ASC AssignByBatch -> AssignByRow -> AssignByBlock -> ForceAssign.
     # The cursor is a lexicographic (B, M, S2) boundary. No per-query split cap.
     first_group = zeros(I64, workers)
@@ -208,8 +297,7 @@ def metadata_kernel(args: Args):
         if n > 0:
             max_row_cost = max(
                 max_row_cost,
-                (n - 1) * _group_field(args, g, total_q, 9)
-                + _group_field(args, g, total_q, 9),
+                n * _group_field(args, g, total_q, 9),
             )
     g = 0
     at = 0
@@ -238,9 +326,7 @@ def metadata_kernel(args: Args):
                 if end == g:
                     start = at
                 if n > start:
-                    batch_cost += (n - start - 1) * _group_field(
-                        args, end, total_q, 9
-                    ) + _group_field(args, end, total_q, 9)
+                    batch_cost += (n - start) * _group_field(args, end, total_q, 9)
                     batch_blocks += n - start
                     batch_last = _group_field(args, end, total_q, 9)
                 end += 1
@@ -255,9 +341,7 @@ def metadata_kernel(args: Args):
             n = _group_field(args, g, total_q, 8)
             row_cost = 0
             if n > at:
-                row_cost = (n - at - 1) * _group_field(
-                    args, g, total_q, 9
-                ) + _group_field(args, g, total_q, 9)
+                row_cost = (n - at) * _group_field(args, g, total_q, 9)
             if used + row_cost > limit + _group_field(args, g, total_q, 9) // 2:
                 break
             used += row_cost
@@ -276,8 +360,6 @@ def metadata_kernel(args: Args):
             at += take
             if blocks == 0 and at < n:
                 cost = _group_field(args, g, total_q, 9)
-                if at == n - 1:
-                    cost = _group_field(args, g, total_q, 9)
                 used += cost
                 at += 1
             if at >= n:
@@ -394,6 +476,9 @@ def metadata_kernel(args: Args):
         used_cores = 1
         first_group[0] = 0
         last_group[0] = groups
+    abi_stride = 1
+    if native_tiles:
+        abi_stride = 2
     for c in range(used_cores):
         args.output[c * 8] = 1
         start = first_group[c]
@@ -401,17 +486,17 @@ def metadata_kernel(args: Args):
         if start < groups:
             args.output[c * 8 + 1] = _group_field(args, start, total_q, 6)
             m = _group_field(args, start, total_q, GROUP_QUERY_OFFSET_FIELD)
-            if args.sparse == 0:
-                m = m // args.query_rows
+            if args.sparse == 0 and not native_tiles:
+                m = m // row_width
             args.output[c * 8 + 2] = m
-            args.output[c * 8 + 3] = first_tile[c]
+            args.output[c * 8 + 3] = first_tile[c] * abi_stride
         if end < groups:
             args.output[c * 8 + 4] = _group_field(args, end, total_q, 6)
             m = _group_field(args, end, total_q, GROUP_QUERY_OFFSET_FIELD)
-            if args.sparse == 0:
-                m = m // args.query_rows
+            if args.sparse == 0 and not native_tiles:
+                m = m // row_width
             args.output[c * 8 + 5] = m
-            args.output[c * 8 + 6] = last_tile[c]
+            args.output[c * 8 + 6] = last_tile[c] * abi_stride
         else:
             args.output[c * 8 + 4] = args.batch
     # Record only cross-core rows. Compact workspace slots follow ASC FD order.
@@ -474,8 +559,8 @@ def metadata_kernel(args: Args):
             count = min(count, spare + 1)
         group = fd_group[f]
         m = _group_field(args, group, total_q, GROUP_QUERY_OFFSET_FIELD)
-        if args.sparse == 0:
-            m = m // args.query_rows
+        if args.sparse == 0 and not native_tiles:
+            m = m // row_width
         for v in range(count):
             dst = LD_RECORD_START * METADATA_FIELDS + vector * METADATA_FIELDS
             args.output[dst] = 1
@@ -536,6 +621,8 @@ def build_metadata(
     sparse=False,
     query_rows=6,
     ld=True,
+    allow_owner_tiles=False,
+    min_shard_tokens=0,
     output_idx_offset=None,
     cu_k=None,
 ):
@@ -549,7 +636,7 @@ def build_metadata(
         )
     output = torch.empty((METADATA_ELEMENTS,), dtype=torch.int32, device=q.device)
     scratch = torch.empty(
-        (batch + 1 + GROUP_CACHE_FIELDS,), dtype=torch.int64, device=q.device
+        (batch + 2 + GROUP_CACHE_FIELDS,), dtype=torch.int64, device=q.device
     )
     _, compiled = compiled_metadata()
     tensors = dict(
@@ -570,7 +657,7 @@ def build_metadata(
         has_q=int(used_q is not None),
         has_k=int(used_k is not None),
         has_cu_k=int(cu_k is not None),
-        has_residual=int(mask == 3 and ratio != 1 and residual is not None),
+        has_residual=int(residual is not None),
         sparse=int(sparse),
         mask=mask,
         ratio=ratio,
@@ -583,8 +670,9 @@ def build_metadata(
         groups=groups,
         query_rows=query_rows,
         heads=q.shape[1],
-        ld=int(ld),
+        ld=LD_WITH_OWNER_TILES if ld and allow_owner_tiles else int(ld),
         has_offset=int(output_idx_offset is not None),
+        min_shard_tokens=int(min_shard_tokens),
     )
     stream = torch.npu.current_stream(q.device)
     scratch.record_stream(stream)
@@ -698,6 +786,13 @@ def quant_lightning_indexer_metadata(
     candidate_block_size=-1,
 ):
     """Build flat AICPU metadata without requiring Q/K data tensors."""
+    if layout_k == "PA_BBND":
+        if seqused_k is None:
+            raise ValueError("PA_BBND metadata requires seqused_k")
+        if cu_seqlens_k is not None:
+            raise ValueError("PA_BBND must not supply cu_seqlens_k")
+        if mask_mode == 3 and cmp_ratio != 1 and cmp_residual_k is None:
+            raise ValueError("Cmp_residual_k is required for causal compressed K")
     if layout_q == "TND" and cu_seqlens_q is None:
         raise ValueError("When layout_q is TND, cu_seqlens_q must be provided.")
     if layout_k == "TND" and cu_seqlens_k is None:
@@ -798,6 +893,8 @@ def quant_lightning_indexer_metadata(
         mask=mask_mode,
         ratio=cmp_ratio,
         query_rows=rows,
+        allow_owner_tiles=(num_heads_q == 32),
+        min_shard_tokens=max(topk, candidate_topk_blocks * candidate_block_size),
     )
 
 
@@ -884,7 +981,8 @@ def _tnd_metadata(
         layout_q=layout_q,
         layout_k="PA_BBND",
     )
-    tasks = (max_query + 5) // 6 if max_query >= 0 else -1
+    rows = 6
+    tasks = (max_query + rows - 1) // rows if max_query >= 0 else -1
     return build_metadata(
         query,
         cu_q,
@@ -898,6 +996,8 @@ def _tnd_metadata(
         splits=choose_splits(topk),
         mask=mask_mode,
         ratio=cmp_ratio,
-        query_rows=6,
+        query_rows=rows,
+        allow_owner_tiles=(num_heads_q == 32),
+        min_shard_tokens=max(topk, candidate_topk_blocks * candidate_block_size),
         cu_k=cu_k,
     )

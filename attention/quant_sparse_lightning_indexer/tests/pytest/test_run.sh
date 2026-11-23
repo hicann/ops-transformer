@@ -12,7 +12,6 @@
 # QuantSparseLightningIndexer（两级 TopK 第二级 consumer）pytest 驱动脚本。
 # 用例全部集中在 test_quant_sparse_lightning_indexer_consumer.py：
 #   - 默认执行 38 条「吃 golden 候选」的算子级精度用例；
-#   - E2E_IDS 内的用例额外执行「吃第一级 NPU 候选」的链路一致性检查。
 # 运行前需 source CANN 的 set_env.sh（否则拿不到含本算子的 cann_ops_transformer 包），
 # 并用 ASCEND_RT_VISIBLE_DEVICES 指定空闲卡。
 
@@ -20,7 +19,7 @@ TEST_FILE="test_quant_sparse_lightning_indexer_consumer.py"
 
 # 全量用例
 run_all() {
-    echo "===== 执行全量用例（golden 候选 + E2E 链路） ====="
+    echo "===== 执行全量用例（golden 候选） ====="
     python3 -m pytest -rA -s "${TEST_FILE}" -v -m ci \
         -W ignore::UserWarning -W ignore::DeprecationWarning
 }
@@ -41,7 +40,7 @@ run_single() {
 show_help() {
     echo "用法: $0 <command> [options]"
     echo "命令说明："
-    echo "  all                          执行全量用例（38 条 golden 候选 + E2E 链路）"
+    echo "  all                          执行全量用例（38 条 golden 候选）"
     echo "  single -k <id>               执行指定用例（-k 支持 pytest 的匹配表达式）"
     echo "示例："
     echo "  $0 all"

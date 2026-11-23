@@ -14,16 +14,14 @@
 # 来源与本分支改造:
 #   由主算子测试 tests/pytest/qli_cand_orig.py（其上溯 /opt/tjj/qli_cand_test/test_qli_cand.py）按
 #   cand_mode 切片迁移而来，承载全部 cand_mode=2（第二级 consumer）用例；2026-10-08 并入原
-#   qli_consumer_two_level.py（算子级精度矩阵）中形状不重复的 13 个用例与其端到端检查。
+#   qli_consumer_two_level.py（算子级精度矩阵）中形状不重复的 13 个用例。
 #   - 本算子无 candidate_mode 属性：固定消费第一级输出的块级候选索引，候选尺寸约定与第一级一致
 #     （候选块个数由 candidate_block_indices 末维推导；候选块大小 candidate_block_size=8）
-#   - 每条用例默认「吃 golden 候选」比对（隔离 consumer 自身精度）；E2E_IDS 中的用例额外跑一遍
-#     「吃第一级 NPU 候选」的端到端比对（_e2e_check：以第一级真实输出为输入，与同一候选下的
-#     golden 比对，属链路一致性验证；第一级自身精度由主算子测试 qli_cand_orig.py 覆盖）
+#   - 每条用例使用本算子参考实现生成候选，仅比对 consumer 自身精度
 #   - 用例返回统一补成 3 元组（第三元恒空，与该 mode 语义一致），下游比对代码无需改动
 #   - 删除「新接口规范适配层」相关用例（该 py 适配层已在本分支删除）；
 #     1M 组与 cand_blocks=64（超出本分支 2048-only 契约）的用例 2026-10-08 按约定删除
-#   - 官方比对规则 result_compare_method 取自主算子测试目录（仓库内）
+#   - 官方比对规则 result_compare_method 位于本算子测试目录，与 QLI v2 标准一致
 # 自包含 harness: 输入生成(910b int8/PA) + torch 参考实现 + NPU 调用 + 集合比较
 # 用例矩阵: 设计文档 §6.5 + 算子级精度矩阵（pin 边界、单行长上下文等锚点）
 #
@@ -31,44 +29,37 @@
 #   source <CANN>/set_env.sh
 #   ASCEND_RT_VISIBLE_DEVICES=<空闲卡> pytest test_quant_sparse_lightning_indexer_consumer.py [-k <用例 id>]
 #   注: 文件名以 test_ 开头，pytest 默认即可收集；也可用同目录 test_run.sh 按用例集/单用例驱动
+import importlib.util
 import math
 import os
 import sys
 import time
+from pathlib import Path
 
 import numpy as np
 import torch
 import pytest
 import torch_npu
 
-# 比对规则与部分 helper 与主算子测试目录共用（仓库内相对定位）
-_MAIN_TESTS_DIR = os.path.normpath(
-    os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "..",
-        "..",
-        "quant_lightning_indexer_v2",
-        "tests",
-        "pytest",
-    )
+from quant_sparse_lightning_indexer_golden import (
+    golden_run,
+    golden_run_ext,
+    select_candidate_blocks_ref,
+    topk_golden,
 )
-if _MAIN_TESTS_DIR not in sys.path:
-    sys.path.insert(0, _MAIN_TESTS_DIR)
+
 from cann_ops_transformer.ops.attention.quant_sparse_lightning_indexer import (  # noqa: E402
     quant_sparse_lightning_indexer,
     quant_sparse_lightning_indexer_metadata,
 )
 
-# 第一级（source）算子仅用于 E2E_IDS 内的链路一致性用例；单独跑 consumer 时不需要它，
-# 因此这里允许导入失败，相关用例会 skip。
-try:
-    from cann_ops_transformer.ops.attention.quant_lightning_indexer_v2 import (  # noqa: E402
-        quant_lightning_indexer,
-    )
-except Exception:  # pylint: disable=broad-except
-    quant_lightning_indexer = None
-from result_compare_method import compare_topk_valid  # noqa: E402
+compare_spec = importlib.util.spec_from_file_location(
+    "qsli_pytest_compare", Path(__file__).with_name("result_compare_method.py")
+)
+compare_module = importlib.util.module_from_spec(compare_spec)
+compare_spec.loader.exec_module(compare_module)
+compare_topk_valid = compare_module.compare_topk_valid
+TopKCompareContext = compare_module.TopKCompareContext
 
 torch.npu.set_device(0)
 
@@ -76,42 +67,6 @@ NEG_INF = float("-inf")
 CAND_BLOCKS = 2048
 CAND_BS = 8
 HEAD_DIM = 128
-
-
-def select_candidate_blocks_ref(score_row, compress_len, topk_blocks, bs):
-    """参考实现: pad -> 块内 amax -> pin 尾块 -> topk -> -1 槽 (numpy/torch 交叉验证过)"""
-    width = score_row.shape[-1]
-    pad = (-width) % bs
-    padded = torch.nn.functional.pad(score_row, (0, pad), value=NEG_INF)
-    nb = padded.shape[-1] // bs
-    blocks = padded.unflatten(-1, (-1, bs)).amax(dim=-1)
-    last = (compress_len - 1) // bs
-    blocks[last] = float("inf")
-    k = min(topk_blocks, nb)
-    topv, topi = blocks.topk(k)
-    out = torch.full((topk_blocks,), -1, dtype=torch.int32)
-    keep = topv > NEG_INF
-    out[:k][keep] = topi[keep].to(torch.int32)
-    return out, blocks
-
-
-def topk_golden(score_row, topk):
-    """参与池 = 可达位置 (score != -inf); 候选外位置在调用方已置 -inf, 与不可达位置同样排除。
-    有效数 < topk 时输出 -1 补齐 (对齐模型 masked_fill(~candidates, -inf) + where(..., -1))。
-    排序键 (-score, index) 稳定排序: 按真实分降序, tie 取小索引。"""
-    n = score_row.shape[-1]
-    indices = torch.arange(n)
-    valid = score_row != NEG_INF
-    v_idx = indices[valid]
-    if v_idx.numel() == 0:
-        return torch.full((topk,), -1, dtype=torch.int32)
-    stacked = torch.stack([-score_row[v_idx], v_idx.to(torch.float32)], dim=1)
-    _, sorted_idx = torch.sort(stacked, dim=0, stable=True)
-    order = sorted_idx[:, 0]  # 有效位置降序 (tie 取小索引)
-    out = torch.full((topk,), -1, dtype=torch.int32)
-    actual = min(order.numel(), topk)
-    out[:actual] = v_idx[order[:actual]].to(torch.int32)
-    return out
 
 
 def gen_case_inputs(case):
@@ -446,253 +401,6 @@ def npu_run(inputs, case, cand_in_npu=None):
         **common,
     )
     return idx, vals, torch.empty(0, dtype=torch.int32, device=inputs["q"].device)
-
-
-def npu_run_source(inputs, case):
-    """第一级（source）入口: 仅为端到端路径生成候选输入。
-
-    走 QLI v2 的统一入口并显式传两个 candidate 参数（即 candidate 重载，candidate_topk_blocks=2048）。
-    返回块级候选索引张量 [.., candidate_topk_blocks]，直接作为第二级的 candidate_block_indices 传入。
-    """
-    ret = quant_lightning_indexer(
-        inputs["q"],
-        inputs["k_phys"],
-        inputs["w"],
-        inputs["q_scale"],
-        inputs["k_scale_phys"],
-        topk=case["topk"],
-        quant_mode=2,
-        cu_seqlens_q=inputs.get("cu_q_t"),
-        cu_seqlens_k=inputs.get("cu_k_t"),
-        seqused_k=inputs["seqused_k_t"],
-        cmp_residual_k=inputs.get("cmp_res_t"),
-        block_table=inputs["block_table"],
-        output_idx_offset=inputs.get("output_idx_offset_t"),
-        metadata=inputs["metadata"],
-        max_seqlen_q=max(case.get("seqs_q", [case["q_seq"]])),
-        layout_q=case.get("layout", "BSND"),
-        layout_k="PA_BBND",
-        mask_mode=case["mask_mode"],
-        cmp_ratio=case["cmp_ratio"],
-        candidate_topk_blocks=CAND_BLOCKS,
-        candidate_block_size=CAND_BS,
-    )
-    return ret[2]
-
-
-def _e2e_check(inputs, case, seqs_q, s2max, topk):
-    """端到端检查: 第一级 NPU 候选 -> 第二级 -> 与「同一候选下」的 golden 比对。
-
-    迁移自原 qli_consumer_two_level.py 的路径②（生产链路形态）。属一致性验证: 候选来自第一级
-    真实输出而非 golden，因此校验的是"consumer 在真实候选下行为正确"，不校验第一级精度。
-    """
-    if quant_lightning_indexer is None:
-        pytest.skip("第一级算子 quant_lightning_indexer 不可用，跳过 E2E 链路检查")
-    cand_src = npu_run_source(inputs, case)
-    idx_e2e, _, cand_dummy = npu_run(inputs, case, cand_src)
-    torch.npu.synchronize()
-    assert cand_dummy.numel() == 0, "consumer 输出第三元应为空"
-    idx_gold, _, score_rows, _ = golden_run_ext(inputs, case, cand_src.cpu())
-    if case.get("layout") == "TND":
-        fails = []
-        for r in range(sum(seqs_q)):
-            v4 = score_rows[r].reshape(1, 1, 1, -1).numpy()
-            ok_r, msg_r = cmp_indices(
-                idx_e2e.reshape(-1, topk)[r].cpu().unsqueeze(0),
-                idx_gold.reshape(-1, topk)[r].unsqueeze(0),
-                f"e2e@r{r}",
-                v4,
-                1,
-            )
-            if not ok_r:
-                fails.append(msg_r)
-        assert not fails, (
-            f"[{case['name']}] 端到端(第一级NPU候选) TND 逐行比对失败: {fails[:3]}"
-        )
-    else:
-        v4 = (
-            torch.stack(score_rows)
-            .reshape(case["batch"], case["q_seq"], s2max)
-            .unsqueeze(1)
-            .numpy()
-        )
-        ok, msg = cmp_indices(
-            idx_e2e.reshape(-1, topk),
-            idx_gold.reshape(-1, topk),
-            "sparse_indices(端到端)",
-            v4,
-            case["q_seq"],
-        )
-        assert ok, f"[{case['name']}] 端到端(第一级NPU候选) {msg}"
-    print(f"[{case['name']}] 端到端(第一级 NPU 候选) 一致")
-
-
-def golden_run(inputs, case, cand_blocks_in=None):
-    return golden_run_ext(inputs, case, cand_blocks_in)[:2]
-
-
-def _golden_row_score(q_b, i, w_b, qs_b, k_b, ks_b):
-    """单行 golden score: q 行 [G,D] x k [S2,D], 与全量 einsum 同数学 (逐行, 大 shape 抽样用)"""
-    q_row = q_b[i].to(torch.float32)  # [G, D]
-    qk = torch.matmul(q_row, k_b.to(torch.float32).t())  # [G, S2] (int8 值域内精确整数)
-    qk_relu = (qk / 1024.0).clamp_min(0.0).to(torch.float16)
-    cur_w = (w_b[i] * qs_b[i]).to(torch.float16)  # [G]
-    score = torch.matmul(
-        cur_w.to(torch.float32).unsqueeze(0), qk_relu.to(torch.float32)
-    ).reshape(-1)
-    return score * ks_b.to(torch.float32)
-
-
-def golden_run_ext(inputs, case, cand_blocks_in=None, need_rows=None):
-    """torch 参考: score (对齐 golden cal_atten_per_batch_int8) + candidate/masked topk;
-    额外返回 score_rows (mask 后位置分) 与 blk_rows (amax+pin 后块分) 供官方边界容忍比较。
-    TND 输入重整为 per-batch 列表后统一处理; output_idx_offset 逐元素加到 sparse_indices (对齐 arch35 全加语义)。
-    need_rows: 行号集合 (全行拼接序) — 大 shape 抽样模式, 仅计算/返回该批行 (逐行 matmul, 避免整 batch 大矩阵)"""
-    b = case["batch"]
-    g = case["g"]
-    ratio = case["cmp_ratio"]
-    res = case.get("cmp_res") or [0] * b
-    mask_mode = case["mask_mode"]
-    cand_mode = case["cand_mode"]
-    seqs_q = case.get("seqs_q") or [case["q_seq"]] * b
-    q_all = inputs["q"].cpu().to(torch.int32)
-    w_all = inputs["w"].cpu()
-    qs_all = inputs["q_scale"].cpu()
-    k_all = inputs["k_dense"].cpu().to(torch.int32)
-    ks_all = inputs["k_scale_dense"].cpu()
-    seqused_k = case["seqused_k"]
-    if case.get("layout") == "TND":
-        # TND: 仅 Q 侧拼接 (cu_q 前缀切分); K 为 PA 的 [B,1,S2max,D] 稠密表示, 与 BSND 同构索引
-        cu_q = inputs["cu_q"]
-        q_l = [q_all[cu_q[bi] : cu_q[bi + 1]] for bi in range(b)]
-        w_l = [w_all[cu_q[bi] : cu_q[bi + 1]] for bi in range(b)]
-        qs_l = [qs_all[cu_q[bi] : cu_q[bi + 1]] for bi in range(b)]
-        k_l = [k_all[bi, 0, : seqused_k[bi], :] for bi in range(b)]
-        ks_l = [ks_all[bi, 0, : seqused_k[bi]] for bi in range(b)]
-    else:
-        q_l = [q_all[bi] for bi in range(b)]
-        w_l = [w_all[bi] for bi in range(b)]
-        qs_l = [qs_all[bi] for bi in range(b)]
-        k_l = [k_all[bi, 0, : seqused_k[bi], :] for bi in range(b)]
-        ks_l = [ks_all[bi, 0, : seqused_k[bi]] for bi in range(b)]
-    offsets = inputs.get("output_idx_offsets") or [0] * (
-        sum(seqs_q) if case.get("layout") == "TND" else b * case["q_seq"]
-    )
-    if cand_blocks_in is not None:
-        cand_blocks_in = cand_blocks_in.reshape(
-            -1, cand_blocks_in.shape[-1]
-        )  # [B,S1,1,cb] -> [总行, cb]
-
-    idx_out_rows = []
-    cand_out_rows = []
-    score_rows = []  # [总行, s2max] mask 后位置分 (mode=2 为候选掩蔽后)
-    blk_rows = []  # [总行, nbMax] amax+pin 后块分 (仅 cand_mode==1)
-    s2max = max(seqused_k)
-    nb_max = (s2max + CAND_BS - 1) // CAND_BS
-    row_global = 0
-    for bi in range(b):
-        s1 = seqs_q[bi]
-        s2 = seqused_k[bi]
-        act_k = seqused_k[bi] * ratio + res[bi]  # 未压缩长度
-        k_b = k_l[bi]  # [S2, D]
-        # 抽样模式: 本 batch 需要的行 (全行拼接序)
-        batch_need = None
-        if need_rows is not None:
-            batch_need = [i for i in range(s1) if (row_global + i) in need_rows]
-        rows_to_calc = batch_need if batch_need is not None else list(range(s1))
-        if not rows_to_calc:
-            row_global += s1
-            continue
-        # 行级有效压缩长度 (vl, valid length: mask_mode=3 下该行可见的压缩后 key 长度)
-        valid_lens = []
-        for i in range(s1):
-            if mask_mode == 3:
-                base = act_k - s1 + i + 1
-                if base < 0:
-                    valid_lens.append(-1)
-                else:
-                    vl = int(base // ratio)
-                    valid_lens.append(vl)
-            else:
-                valid_lens.append(s2)
-        if need_rows is None:
-            # 全量模式: 整 batch matmul (小 shape)
-            q_b = q_l[bi].permute(1, 0, 2)  # [G, S1, D]
-            qk = torch.matmul(q_b, k_b.t())  # [G, S1, S2] int32
-            qk_relu = (qk.to(torch.float32) / 1024.0).clamp_min(0.0).to(torch.float16)
-            cur_w = (w_l[bi] * qs_l[bi]).to(torch.float16)  # [S1, G]
-            score = torch.einsum(
-                "in,nij->ij", cur_w.to(torch.float32), qk_relu.to(torch.float32)
-            )
-            score = score * ks_l[bi].to(torch.float32)  # [S1, S2]
-            # 行级 mask 原位写回 (mask_mode=3: vl 之后置 -inf; 全无效行整行 -inf)
-            for i in range(s1):
-                if mask_mode == 3:
-                    if valid_lens[i] < 0:
-                        score[i, :] = NEG_INF
-                    elif valid_lens[i] < s2:
-                        score[i, valid_lens[i] :] = NEG_INF
-        for i in rows_to_calc:
-            if need_rows is None:
-                row = score[i]
-            else:
-                # 抽样模式: 逐行 matmul, 避免大 batch 矩阵
-                row = _golden_row_score(q_l[bi], i, w_l[bi], qs_l[bi], k_b, ks_l[bi])
-                if mask_mode == 3:
-                    vl_r = valid_lens[i]
-                    if vl_r < 0:
-                        row = torch.full_like(row, NEG_INF)
-                    elif vl_r < s2:
-                        row[vl_r:] = NEG_INF
-            row_off = offsets[row_global + i] if (row_global + i) < len(offsets) else 0
-            # sparse_indices golden (output_idx_offset: R13 语义 — 仅有效槽加偏移, -1 槽保持 -1,
-            # 对齐模型 where(idxs < compress_lens, idxs + offset, -1) 与官方比对器 offset 处理)
-            idx_row = topk_golden(row, case["topk"])
-            if row_off:
-                idx_row = torch.where(idx_row >= 0, idx_row + row_off, idx_row).to(
-                    torch.int32
-                )
-            idx_out_rows.append(idx_row)
-            row_eff = row
-            # candidate golden (相对块号, 不加 offset — §11.6 契约)
-            if cand_mode == 1:
-                cand_row, blk_score_row = select_candidate_blocks_ref(
-                    row, valid_lens[i], case.get("cand_blocks", CAND_BLOCKS), CAND_BS
-                )
-                cand_out_rows.append(cand_row)
-                blk_pad = torch.full((nb_max,), NEG_INF)
-                blk_pad[: blk_score_row.numel()] = blk_score_row
-                blk_rows.append(blk_pad)
-            elif cand_mode == 2:
-                assert cand_blocks_in is not None
-                blk_list = cand_blocks_in[row_global + i]
-                nb = math.ceil(s2 / CAND_BS)
-                blk_mask = torch.zeros(nb, dtype=torch.bool)
-                valid_blk = blk_list[(blk_list >= 0) & (blk_list < nb)]
-                blk_mask[valid_blk.to(torch.long)] = True
-                pos_mask = blk_mask.repeat_interleave(CAND_BS)[:s2]
-                # 候选外（含不可达位置）→ -inf: 对齐模型 masked_fill(~candidates, -inf);
-                # 有效数 < topk 时不足槽位输出 -1（不再有候选外填充泄漏）
-                masked = torch.where(pos_mask, row, torch.full_like(row, NEG_INF))
-                m_idx = topk_golden(masked, case["topk"])
-                if row_off:
-                    # R13: 仅有效槽加偏移, -1 槽保持 -1 (对齐模型 where 语义)
-                    m_idx = torch.where(m_idx >= 0, m_idx + row_off, m_idx).to(
-                        torch.int32
-                    )
-                idx_out_rows[-1] = m_idx
-                row_eff = masked
-            # 有效位置分 (mode=2 为候选掩蔽后) 填充到 s2max, 供官方边界容忍比较
-            row_pad = torch.full((s2max,), NEG_INF)
-            if valid_lens[i] >= 0:
-                row_pad[:s2] = row_eff
-            score_rows.append(row_pad)
-        row_global += s1
-    idx_golden = torch.stack(idx_out_rows).reshape(-1, 1, case["topk"])
-    if need_rows is not None:
-        # 抽样模式: 额外返回行号列表 (调用方按行对位)
-        return idx_golden, cand_out_rows, score_rows, blk_rows, sorted(need_rows)
-    return idx_golden, cand_out_rows, score_rows, blk_rows
 
 
 def gen_cand_input(case, kind, inputs):
@@ -1531,14 +1239,14 @@ def cmp_indices(npu_rows, gold_rows, name, values4d=None, s1=1):
         ok_row, max_re = compare_topk_valid(
             g[:valid_len],
             n[:valid_len],
-            values4d,
-            (b_idx, i_idx, 0),
-            diff_npu,
-            diff_cpu,
-            None,
-            None,
-            thres=0.001,
-            return_value_flag=False,
+            TopKCompareContext(
+                topk_value=values4d,
+                bsn=(b_idx, i_idx, 0),
+                diff_npu=diff_npu,
+                diff_cpu=diff_cpu,
+                thres=0.001,
+                return_value_flag=False,
+            ),
         )
         if ok_row:
             n_boundary += 1
@@ -2233,20 +1941,6 @@ ARGVALUES = [tuple(c) for c in CASES] + [
 ALL_IDS = [c[0] for c in CASES] + [nid for nid, _, _ in NEW_CASES]
 
 
-# 端到端（吃第一级 NPU 候选）额外跑一遍的用例: 覆盖 decode/prefill/TND/0 轴非连续/offset
-# 与两个锚点（pin_overflow: 位置块数 2049=容量+1；decode_long_m1: s1=1 x s2=131072）
-E2E_IDS = {
-    "r1_m2_self",
-    "r1_m2_prefill",
-    "r2_m2_self",
-    "tnd_m2_rand",
-    "pa_gap_m2",
-    "off_m2",
-    "pin_overflow",
-    "decode_long_m1",
-}
-
-
 def _sample_rows(case):
     """抽样行集合: 固定行 (首/等分/尾, 覆盖 vl 极小到极大) + 固定 seed 随机行"""
     seqs_q = case.get("seqs_q") or [case["q_seq"]] * case["batch"]
@@ -2336,8 +2030,6 @@ def test_qli_cand(t):
             ]
             if case["cand_mode"] == 2:
                 assert cand_npu.numel() == 0
-            if case["cand_mode"] == 2 and case["name"] in E2E_IDS:
-                _e2e_check(inputs, case, seqs_q, s2max, topk)
             print(f"[{case['name']}] PASS")
             return
         # BSND 统一矩阵路径: values4d [B,1,S1,s2max] (每批行数统一 q_seq; TND 已走上方逐行分支)
@@ -2423,6 +2115,4 @@ def test_qli_cand(t):
     if case["cand_mode"] == 2:
         # 消费不改变候选输入, 校验透传无关性: 输出第三元为空
         assert cand_npu.numel() == 0
-    if case["cand_mode"] == 2 and case["name"] in E2E_IDS:
-        _e2e_check(inputs, case, seqs_q, s2max, topk)
     print(f"[{case['name']}] PASS")
