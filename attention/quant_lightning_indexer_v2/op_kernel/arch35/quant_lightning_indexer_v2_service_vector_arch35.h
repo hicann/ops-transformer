@@ -30,7 +30,11 @@ namespace QLIV2Kernel {
 using namespace QLIV2Common;
 constexpr uint32_t TRUNK_LEN_16K = 16384;
 // LD阶段UB目标占用（248KB = 256KB UB - 8KB 系统保留）
+#if CVRATIO > 1
 constexpr uint32_t LD_UB_TARGET_BYTES = 248 * 1024;
+#else
+constexpr uint32_t LD_UB_TARGET_BYTES = 376 * 1024;
+#endif
 constexpr uint32_t TRUNK_LEN_12K = 12288;
 constexpr uint32_t TRUNK_LEN_8K = 8192;
 constexpr uint32_t TRUNK_LEN_4K = 4096;
@@ -544,24 +548,35 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::ProcessVec1(const QLIV2Common::RunIn
     static_assert(std::is_same_v<SCORE_T, uint16_t>);
     auto outBase = vec1OutUB_[pingpong * (UB_BANK_STRIDE / sizeof(SCORE_T))];
     auto weightBase = weightUB_[qScalepingpong * (UB_BANK_STRIDE / sizeof(WEIGHT_T))];
-    auto weightTempBase = weightTempUB_[qScalepingpong * (UB_BANK_STRIDE / sizeof(float))];
 
-    auto qkBase = resMm1UB_[pingpong * (UB_BANK_STRIDE / sizeof(QK_T))];
-    auto qkVLstride = (UB_BANK_DEPTH_STRIDE / sizeof(QK_T)) / CVRATIO * constInfo_.mBaseSizeMax;
+    LocalTensor<float> weightTempBase;
+    LocalTensor<QK_T> qkBase;
+    uint32_t qkVLstride, qkStride;
+
+    if constexpr (CVRATIO > 1 || std::is_same_v<QK_T, bfloat16_t>) {
+        weightTempBase = weightTempUB_[pingpong * (UB_BANK_STRIDE / sizeof(float))];
+        qkBase = resMm1UB_[pingpong * (UB_BANK_STRIDE / sizeof(QK_T))];
+        qkVLstride = (UB_BANK_DEPTH_STRIDE / sizeof(QK_T)) / CVRATIO * constInfo_.mBaseSizeMax;
+        qkStride = gSize_ * UB_BANK_DEPTH_STRIDE / sizeof(QK_T);
+    } else {
+        weightTempBase = weightTempUB_[pingpong * (UB_BANK_DEPTH_STRIDE_1K / 2 / sizeof(float))];
+        qkBase = resMm1UB_[pingpong * (UB_BANK_DEPTH_STRIDE_1K / 2 / sizeof(QK_T))];
+        qkVLstride = 64;
+        qkStride = gSize_ * UB_BANK_DEPTH_STRIDE_1K / sizeof(QK_T);
+    }
 
     if constexpr (IS_HIFLOAT4) {
         vector1::BatchMulWeightAndReduceSumFP4(outBase, UB_BANK_DEPTH_STRIDE / sizeof(SCORE_T), qkBase, qkVLstride,
-                                               (uint32_t)(gSize_ * UB_BANK_DEPTH_STRIDE / sizeof(QK_T)), weightBase,
-                                               UB_BANK_DEPTH_STRIDE / sizeof(WEIGHT_T), gSize_, curAivS1ProcNum);
+                                               (uint32_t)qkStride, weightBase, UB_BANK_DEPTH_STRIDE / sizeof(WEIGHT_T),
+                                               gSize_, curAivS1ProcNum);
     } else if constexpr (IS_MXFP4) {
         vector1::BatchMulWeightAndReduceSumMXFP4(outBase, UB_BANK_DEPTH_STRIDE / sizeof(SCORE_T), qkBase, qkVLstride,
-                                                 (uint32_t)(gSize_ * UB_BANK_DEPTH_STRIDE / sizeof(QK_T)), weightBase,
+                                                 (uint32_t)qkStride, weightBase,
                                                  UB_BANK_DEPTH_STRIDE / sizeof(WEIGHT_T), gSize_, curAivS1ProcNum);
     } else if constexpr (IS_MX) {
         vector1::BatchMulWeightAndReduceSumMX(outBase, UB_BANK_DEPTH_STRIDE / sizeof(SCORE_T), qkBase, qkVLstride,
-                                              (uint32_t)(gSize_ * UB_BANK_DEPTH_STRIDE / sizeof(QK_T)), weightBase,
-                                              UB_BANK_DEPTH_STRIDE / sizeof(WEIGHT_T), weightTempBase, gSize_,
-                                              curAivS1ProcNum);
+                                              (uint32_t)qkStride, weightBase, UB_BANK_DEPTH_STRIDE / sizeof(WEIGHT_T),
+                                              weightTempBase, gSize_, curAivS1ProcNum);
     } else if constexpr (IS_WEIGHT_FP16) {
         auto qScaleBase = qScaleUB_[qScalepingpong * (UB_BANK_STRIDE / sizeof(WEIGHT_T))];
         auto kScaleBase =
@@ -571,7 +586,7 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::ProcessVec1(const QLIV2Common::RunIn
                                             UB_BANK_DEPTH_STRIDE / sizeof(WEIGHT_T), weightTempBase, kScaleBase,
                                             (uint32_t)0, qScaleBase, UB_BANK_DEPTH_STRIDE / sizeof(SCALE_T), gSize_,
                                             curAivS1ProcNum);
-    } else if (constInfo_.quantMode == 4) { // 4: per_tensor量化
+    } else if constexpr (QLIV2T::quantMode == QUANT_MODE_HIFLOAT8) { // 4: per_tensor量化
         // quantMode为4时不适用sacle的UB
         float kScaleValue = globalKScale_;
         float qScaleValue = globalQScale_;
@@ -579,15 +594,14 @@ __aicore__ inline void QLIV2Vector<QLIV2T>::ProcessVec1(const QLIV2Common::RunIn
             outBase, UB_BANK_DEPTH_STRIDE / sizeof(SCORE_T), qkBase, qkVLstride,
             (uint32_t)(gSize_ * UB_BANK_DEPTH_STRIDE / sizeof(QK_T)), weightBase,
             UB_BANK_DEPTH_STRIDE / sizeof(WEIGHT_T), weightTempBase, kScaleValue, qScaleValue, gSize_, curAivS1ProcNum);
-    } else if (constInfo_.quantMode == 1) {
+    } else if constexpr (QLIV2T::quantMode == QUANT_MODE_FP8) {
         auto qScaleBase = qScaleUB_[qScalepingpong * (UB_BANK_STRIDE / sizeof(float))];
         auto kScaleBase =
             kScaleUB_[kScalepingpong * 16 * s2BaseSize_ + ((info.s2Idx - info.s2Start) % 16) * s2BaseSize_];
         vector1::BatchMulWeightAndReduceSum(outBase, UB_BANK_DEPTH_STRIDE / sizeof(SCORE_T), qkBase, qkVLstride,
-                                            (uint32_t)(gSize_ * UB_BANK_DEPTH_STRIDE / sizeof(QK_T)), weightBase,
-                                            UB_BANK_DEPTH_STRIDE / sizeof(WEIGHT_T), weightTempBase, kScaleBase,
-                                            (uint32_t)0, qScaleBase, UB_BANK_DEPTH_STRIDE / sizeof(float), gSize_,
-                                            curAivS1ProcNum);
+                                            (uint32_t)qkStride, weightBase, UB_BANK_DEPTH_STRIDE / sizeof(WEIGHT_T),
+                                            weightTempBase, kScaleBase, (uint32_t)0, qScaleBase,
+                                            UB_BANK_DEPTH_STRIDE / sizeof(float), gSize_, curAivS1ProcNum);
     }
 
     if (info.isFirstS2InnerLoop) {

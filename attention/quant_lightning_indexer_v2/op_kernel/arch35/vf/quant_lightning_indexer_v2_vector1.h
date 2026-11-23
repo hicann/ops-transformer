@@ -18,6 +18,12 @@
 #include "kernel_operator.h"
 #include "../../../../lightning_indexer_v2/op_kernel/arch35/common/vf/lightning_indexer_v2_vector1_base.h"
 
+#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+constexpr uint32_t FP32_QK_ROW_STRIDE = UB_BANK_DEPTH_STRIDE_1K / sizeof(float);
+#else
+constexpr uint32_t FP32_QK_ROW_STRIDE = UB_BANK_DEPTH_STRIDE / sizeof(float);
+#endif
+
 namespace vector1 {
 __simd_vf__ void UIntToFloatReturnValueVF(__ubuf__ bfloat16_t* outBuf, __ubuf__ uint16_t* inBuf, uint16_t vfLoop)
 {
@@ -267,20 +273,24 @@ __simd_vf__ void MulWeightAndReduceSumF32GSizeOddVF(__ubuf__ uint16_t* qliF32Odd
 
     // unroll2
     for (uint16_t qliF32OddI = (uint16_t)(0); (uint16_t)(qliF32OddI + 1) < qliF32OddGSize; qliF32OddI += 2) {
-        Reg::LoadAlign<float>(qliF32OddRegQK[0], qliF32OddQk + 128 * qliF32OddI); // RowStride是128, 行都落在一个bank上
-        Reg::LoadAlign<float>(qliF32OddRegQK[1], qliF32OddQk + 128 * qliF32OddI + qliF32OddQkVLStride);
+        Reg::LoadAlign<float>(qliF32OddRegQK[0],
+                              qliF32OddQk + FP32_QK_ROW_STRIDE * qliF32OddI); // RowStride是128, 行都落在一个bank上
+        Reg::LoadAlign<float>(qliF32OddRegQK[1], qliF32OddQk + FP32_QK_ROW_STRIDE * qliF32OddI + qliF32OddQkVLStride);
         liV2Vector1::BroadcastLane(qliF32OddRegwBrc, qliF32OddRegW, qliF32OddI);
         liV2Vector1::WeightedAccum(qliF32OddRegSum0, qliF32OddRegQK, qliF32OddRegwBrc, qliF32OddMaskAllB32);
 
-        Reg::LoadAlign<float>(qliF32OddRegQK[0], qliF32OddQk + 128 * qliF32OddI + 128);
-        Reg::LoadAlign<float>(qliF32OddRegQK[1], qliF32OddQk + 128 * qliF32OddI + 128 + qliF32OddQkVLStride);
+        Reg::LoadAlign<float>(qliF32OddRegQK[0], qliF32OddQk + FP32_QK_ROW_STRIDE * qliF32OddI + FP32_QK_ROW_STRIDE);
+        Reg::LoadAlign<float>(qliF32OddRegQK[1],
+                              qliF32OddQk + FP32_QK_ROW_STRIDE * qliF32OddI + FP32_QK_ROW_STRIDE + qliF32OddQkVLStride);
         liV2Vector1::BroadcastLane(qliF32OddRegwBrc, qliF32OddRegW, qliF32OddI + 1);
         liV2Vector1::WeightedAccum(qliF32OddRegSum1, qliF32OddRegQK, qliF32OddRegwBrc, qliF32OddMaskAllB32);
     }
 
-    Reg::LoadAlign<float>(qliF32OddRegQK[0],
-                          qliF32OddQk + 128 * (qliF32OddGSize - 1)); // RowStride是128, 行都落在一个bank上
-    Reg::LoadAlign<float>(qliF32OddRegQK[1], qliF32OddQk + 128 * (qliF32OddGSize - 1) + qliF32OddQkVLStride);
+    Reg::LoadAlign<float>(
+        qliF32OddRegQK[0],
+        qliF32OddQk + FP32_QK_ROW_STRIDE * (qliF32OddGSize - 1)); // RowStride是128, 行都落在一个bank上
+    Reg::LoadAlign<float>(qliF32OddRegQK[1],
+                          qliF32OddQk + FP32_QK_ROW_STRIDE * (qliF32OddGSize - 1) + qliF32OddQkVLStride);
     liV2Vector1::BroadcastLane(qliF32OddRegwBrc, qliF32OddRegW, (qliF32OddGSize - 1));
     liV2Vector1::WeightedAccum(qliF32OddRegSum0, qliF32OddRegQK, qliF32OddRegwBrc, qliF32OddMaskAllB32);
 
@@ -437,13 +447,15 @@ __simd_vf__ void MulWeightAndReduceSumF32GSizeEvenVF(__ubuf__ uint16_t* qliF32Ev
     // unroll2
     for (uint16_t qliF32EvenI = (uint16_t)(0); qliF32EvenI < qliF32EvenGSize; qliF32EvenI += 2) {
         Reg::LoadAlign<float>(qliF32EvenRegQK[0],
-                              qliF32EvenQk + 128 * qliF32EvenI); // RowStride是128, 行都落在一个bank上
-        Reg::LoadAlign<float>(qliF32EvenRegQK[1], qliF32EvenQk + 128 * qliF32EvenI + qliF32EvenQkVLStride);
+                              qliF32EvenQk + FP32_QK_ROW_STRIDE * qliF32EvenI); // RowStride是128, 行都落在一个bank上
+        Reg::LoadAlign<float>(qliF32EvenRegQK[1],
+                              qliF32EvenQk + FP32_QK_ROW_STRIDE * qliF32EvenI + qliF32EvenQkVLStride);
         liV2Vector1::BroadcastLane(qliF32EvenRegwBrc, qliF32EvenRegW, qliF32EvenI);
         liV2Vector1::WeightedAccum(qliF32EvenRegSum0, qliF32EvenRegQK, qliF32EvenRegwBrc, qliF32EvenMaskAllB32);
 
-        Reg::LoadAlign<float>(qliF32EvenRegQK[0], qliF32EvenQk + 128 * qliF32EvenI + 128);
-        Reg::LoadAlign<float>(qliF32EvenRegQK[1], qliF32EvenQk + 128 * qliF32EvenI + 128 + qliF32EvenQkVLStride);
+        Reg::LoadAlign<float>(qliF32EvenRegQK[0], qliF32EvenQk + FP32_QK_ROW_STRIDE * qliF32EvenI + FP32_QK_ROW_STRIDE);
+        Reg::LoadAlign<float>(qliF32EvenRegQK[1], qliF32EvenQk + FP32_QK_ROW_STRIDE * qliF32EvenI + FP32_QK_ROW_STRIDE +
+                                                      qliF32EvenQkVLStride);
         liV2Vector1::BroadcastLane(qliF32EvenRegwBrc, qliF32EvenRegW, qliF32EvenI + 1);
         liV2Vector1::WeightedAccum(qliF32EvenRegSum1, qliF32EvenRegQK, qliF32EvenRegwBrc, qliF32EvenMaskAllB32);
     }
@@ -599,8 +611,9 @@ __simd_vf__ void MulWeightAndReduceSum2F32VF(__ubuf__ uint16_t* qliTwoF32Out0, _
                                              __ubuf__ float* qliTwoF32Qk0, __ubuf__ float* qliTwoF32Qk1,
                                              uint32_t qliTwoF32QkVLStride, __ubuf__ float* qliTwoF32Weight0,
                                              __ubuf__ float* qliTwoF32Weight1, __ubuf__ float* weightTemp,
-                                             __ubuf__ float* qliTwoF32QScale0, __ubuf__ float* qliTwoF32QScale1,
-                                             __ubuf__ float* qliTwoF32KScale0, uint16_t qliTwoF32GSize)
+                                             __ubuf__ float* weightTemp1, __ubuf__ float* qliTwoF32QScale0,
+                                             __ubuf__ float* qliTwoF32QScale1, __ubuf__ float* qliTwoF32KScale0,
+                                             uint16_t qliTwoF32GSize)
 {
     Reg::RegTensor<float> qliTwoF32RegwBrc[2];
     Reg::RegTensor<float> qliTwoF32RegQK0[2];
@@ -629,7 +642,12 @@ __simd_vf__ void MulWeightAndReduceSum2F32VF(__ubuf__ uint16_t* qliTwoF32Out0, _
     Reg::LoadAlign<float>(qliTwoF32RegQScale[1], qliTwoF32QScale1);
     Reg::Mul(qliTwoF32RegW[0], qliTwoF32RegW[0], qliTwoF32RegQScale[0], qliTwoF32MaskAllB32);
     Reg::Mul(qliTwoF32RegW[1], qliTwoF32RegW[1], qliTwoF32RegQScale[1], qliTwoF32MaskAllB32);
+#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
     Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(weightTemp, qliTwoF32RegW[1], qliTwoF32MaskAllB32);
+#else
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(weightTemp, qliTwoF32RegW[0], qliTwoF32MaskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(weightTemp1, qliTwoF32RegW[1], qliTwoF32MaskAllB32);
+#endif
     Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
     liV2Vector1::DuplicateZero(qliTwoF32RegSum0, qliTwoF32MaskAllB32);
     liV2Vector1::DuplicateZero(qliTwoF32RegSum1, qliTwoF32MaskAllB32);
@@ -638,26 +656,37 @@ __simd_vf__ void MulWeightAndReduceSum2F32VF(__ubuf__ uint16_t* qliTwoF32Out0, _
     Reg::LoadAlign<float>(qliTwoF32RegKScale[1], qliTwoF32KScale0 + 64);
 
     for (uint16_t qliTwoF32I = (uint16_t)(0); qliTwoF32I < qliTwoF32GSize; qliTwoF32I++) {
-        Reg::LoadAlign<float>(qliTwoF32RegQK0[0], qliTwoF32Qk0 + 128 * qliTwoF32I);
-        Reg::LoadAlign<float>(qliTwoF32RegQK0[1], qliTwoF32Qk0 + 128 * qliTwoF32I + qliTwoF32QkVLStride);
-        Reg::LoadAlign<float>(qliTwoF32RegQK1[0], qliTwoF32Qk1 + 128 * qliTwoF32I);
-        Reg::LoadAlign<float>(qliTwoF32RegQK1[1], qliTwoF32Qk1 + 128 * qliTwoF32I + qliTwoF32QkVLStride);
+#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+        Reg::LoadAlign<float>(qliTwoF32RegQK0[0], qliTwoF32Qk0 + FP32_QK_ROW_STRIDE * qliTwoF32I);
+        Reg::LoadAlign<float>(qliTwoF32RegQK0[1], qliTwoF32Qk0 + FP32_QK_ROW_STRIDE * qliTwoF32I + qliTwoF32QkVLStride);
+        Reg::LoadAlign<float>(qliTwoF32RegQK1[0], qliTwoF32Qk1 + FP32_QK_ROW_STRIDE * qliTwoF32I);
+        Reg::LoadAlign<float>(qliTwoF32RegQK1[1], qliTwoF32Qk1 + FP32_QK_ROW_STRIDE * qliTwoF32I + qliTwoF32QkVLStride);
         // 混合使用对整体性能更好
         liV2Vector1::BroadcastLane(qliTwoF32RegwBrc[0], qliTwoF32RegW[0], qliTwoF32I);
         // Weight无bank冲突，用LoadAlign来提取weight标量
         // 地址空间处理：原 BroadcastLane(ptr) 内联为 LoadAlign BRC，避免 __ubuf__ 传给 __local_mem__ 参数
         Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliTwoF32RegwBrc[1], weightTemp + qliTwoF32I);
-// A6 (9201/9202): relu在fixpipe随路做，vec1不做
-#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+
         Reg::Relu(qliTwoF32RegQK0[0], qliTwoF32RegQK0[0], qliTwoF32MaskAllB32);
         Reg::Relu(qliTwoF32RegQK0[1], qliTwoF32RegQK0[1], qliTwoF32MaskAllB32);
         Reg::Relu(qliTwoF32RegQK1[0], qliTwoF32RegQK1[0], qliTwoF32MaskAllB32);
         Reg::Relu(qliTwoF32RegQK1[1], qliTwoF32RegQK1[1], qliTwoF32MaskAllB32);
-#endif
         Reg::MulAddDst(qliTwoF32RegSum0[0], qliTwoF32RegQK0[0], qliTwoF32RegwBrc[0], qliTwoF32MaskAllB32);
         Reg::MulAddDst(qliTwoF32RegSum0[1], qliTwoF32RegQK0[1], qliTwoF32RegwBrc[0], qliTwoF32MaskAllB32);
         Reg::MulAddDst(qliTwoF32RegSum1[0], qliTwoF32RegQK1[0], qliTwoF32RegwBrc[1], qliTwoF32MaskAllB32);
         Reg::MulAddDst(qliTwoF32RegSum1[1], qliTwoF32RegQK1[1], qliTwoF32RegwBrc[1], qliTwoF32MaskAllB32);
+#else
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliTwoF32RegwBrc[0], weightTemp + qliTwoF32I);
+        Reg::LoadAlign<float>(qliTwoF32RegQK0[1], qliTwoF32Qk0 + FP32_QK_ROW_STRIDE * qliTwoF32I + qliTwoF32QkVLStride);
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliTwoF32RegwBrc[1], weightTemp1 + qliTwoF32I);
+        Reg::LoadAlign<float>(qliTwoF32RegQK0[0], qliTwoF32Qk0 + FP32_QK_ROW_STRIDE * qliTwoF32I);
+        Reg::MulAddDst(qliTwoF32RegSum0[0], qliTwoF32RegQK0[0], qliTwoF32RegwBrc[0], qliTwoF32MaskAllB32);
+        Reg::MulAddDst(qliTwoF32RegSum0[1], qliTwoF32RegQK0[1], qliTwoF32RegwBrc[0], qliTwoF32MaskAllB32);
+        Reg::LoadAlign<float>(qliTwoF32RegQK1[0], qliTwoF32Qk1 + FP32_QK_ROW_STRIDE * qliTwoF32I);
+        Reg::LoadAlign<float>(qliTwoF32RegQK1[1], qliTwoF32Qk1 + FP32_QK_ROW_STRIDE * qliTwoF32I + qliTwoF32QkVLStride);
+        Reg::MulAddDst(qliTwoF32RegSum1[0], qliTwoF32RegQK1[0], qliTwoF32RegwBrc[1], qliTwoF32MaskAllB32);
+        Reg::MulAddDst(qliTwoF32RegSum1[1], qliTwoF32RegQK1[1], qliTwoF32RegwBrc[1], qliTwoF32MaskAllB32);
+#endif
     }
 
     // Apply kScale scaling
@@ -821,8 +850,9 @@ __simd_vf__ void MulWeightAndReduceSum4F32VF(
     __ubuf__ float* qliTwoF32Qk2, __ubuf__ float* qliTwoF32Qk3, uint32_t qliTwoF32QkVLStride,
     __ubuf__ float* qliTwoF32Weight0, __ubuf__ float* qliTwoF32Weight1, __ubuf__ float* qliTwoF32Weight2,
     __ubuf__ float* qliTwoF32Weight3, __ubuf__ float* weightTemp, __ubuf__ float* weightTemp1,
-    __ubuf__ float* qliTwoF32QScale0, __ubuf__ float* qliTwoF32QScale1, __ubuf__ float* qliTwoF32QScale2,
-    __ubuf__ float* qliTwoF32QScale3, __ubuf__ float* qliTwoF32KScale0, uint16_t qliTwoF32GSize)
+    __ubuf__ float* weightTemp2, __ubuf__ float* weightTemp3, __ubuf__ float* qliTwoF32QScale0,
+    __ubuf__ float* qliTwoF32QScale1, __ubuf__ float* qliTwoF32QScale2, __ubuf__ float* qliTwoF32QScale3,
+    __ubuf__ float* qliTwoF32KScale0, uint16_t qliTwoF32GSize)
 {
     Reg::RegTensor<float> qliTwoF32RegwBrc[4];
     Reg::RegTensor<float> qliTwoF32RegQK0[2];
@@ -864,8 +894,10 @@ __simd_vf__ void MulWeightAndReduceSum4F32VF(
     Reg::Mul(qliTwoF32RegW[2], qliTwoF32RegW[2], qliTwoF32RegQScale[2], qliTwoF32MaskAllB32);
     Reg::Mul(qliTwoF32RegW[3], qliTwoF32RegW[3], qliTwoF32RegQScale[3], qliTwoF32MaskAllB32);
 
-    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(weightTemp, qliTwoF32RegW[1], qliTwoF32MaskAllB32);
-    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(weightTemp1, qliTwoF32RegW[3], qliTwoF32MaskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(weightTemp, qliTwoF32RegW[0], qliTwoF32MaskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(weightTemp1, qliTwoF32RegW[1], qliTwoF32MaskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(weightTemp2, qliTwoF32RegW[2], qliTwoF32MaskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(weightTemp3, qliTwoF32RegW[3], qliTwoF32MaskAllB32);
     Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
     liV2Vector1::DuplicateZero(qliTwoF32RegSum0, qliTwoF32MaskAllB32);
     liV2Vector1::DuplicateZero(qliTwoF32RegSum1, qliTwoF32MaskAllB32);
@@ -876,31 +908,32 @@ __simd_vf__ void MulWeightAndReduceSum4F32VF(
     Reg::LoadAlign<float>(qliTwoF32RegKScale[1], qliTwoF32KScale0 + 64);
 
     for (uint16_t qliTwoF32I = (uint16_t)(0); qliTwoF32I < qliTwoF32GSize; qliTwoF32I++) {
-        // 混合使用对整体性能更好
-        liV2Vector1::BroadcastLane(qliTwoF32RegwBrc[0], qliTwoF32RegW[0], qliTwoF32I);
-        Reg::LoadAlign<float>(qliTwoF32RegQK0[0], qliTwoF32Qk0 + 128 * qliTwoF32I);
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliTwoF32RegwBrc[0], weightTemp + qliTwoF32I);
+        Reg::LoadAlign<float>(qliTwoF32RegQK0[1], qliTwoF32Qk0 + FP32_QK_ROW_STRIDE * qliTwoF32I + qliTwoF32QkVLStride);
+
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliTwoF32RegwBrc[1], weightTemp1 + qliTwoF32I);
+        Reg::LoadAlign<float>(qliTwoF32RegQK0[0], qliTwoF32Qk0 + FP32_QK_ROW_STRIDE * qliTwoF32I);
+
         Reg::MulAddDst(qliTwoF32RegSum0[0], qliTwoF32RegQK0[0], qliTwoF32RegwBrc[0], qliTwoF32MaskAllB32);
-        Reg::LoadAlign<float>(qliTwoF32RegQK0[1], qliTwoF32Qk0 + 128 * qliTwoF32I + qliTwoF32QkVLStride);
         Reg::MulAddDst(qliTwoF32RegSum0[1], qliTwoF32RegQK0[1], qliTwoF32RegwBrc[0], qliTwoF32MaskAllB32);
 
-        // Weight无bank冲突，用LoadAlign来提取weight标量
-        // 地址空间处理：原 BroadcastLane(ptr) 内联为 LoadAlign BRC，避免 __ubuf__ 传给 __local_mem__ 参数
-        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliTwoF32RegwBrc[1], weightTemp + qliTwoF32I);
-        Reg::LoadAlign<float>(qliTwoF32RegQK1[0], qliTwoF32Qk1 + 128 * qliTwoF32I);
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliTwoF32RegwBrc[2], weightTemp2 + qliTwoF32I);
+        Reg::LoadAlign<float>(qliTwoF32RegQK1[1], qliTwoF32Qk1 + FP32_QK_ROW_STRIDE * qliTwoF32I + qliTwoF32QkVLStride);
+
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliTwoF32RegwBrc[3], weightTemp3 + qliTwoF32I);
+        Reg::LoadAlign<float>(qliTwoF32RegQK1[0], qliTwoF32Qk1 + FP32_QK_ROW_STRIDE * qliTwoF32I);
+
         Reg::MulAddDst(qliTwoF32RegSum1[0], qliTwoF32RegQK1[0], qliTwoF32RegwBrc[1], qliTwoF32MaskAllB32);
-        Reg::LoadAlign<float>(qliTwoF32RegQK1[1], qliTwoF32Qk1 + 128 * qliTwoF32I + qliTwoF32QkVLStride);
         Reg::MulAddDst(qliTwoF32RegSum1[1], qliTwoF32RegQK1[1], qliTwoF32RegwBrc[1], qliTwoF32MaskAllB32);
 
-        liV2Vector1::BroadcastLane(qliTwoF32RegwBrc[2], qliTwoF32RegW[2], qliTwoF32I);
-        Reg::LoadAlign<float>(qliTwoF32RegQK2[0], qliTwoF32Qk2 + 128 * qliTwoF32I);
+        Reg::LoadAlign<float>(qliTwoF32RegQK2[0], qliTwoF32Qk2 + FP32_QK_ROW_STRIDE * qliTwoF32I);
         Reg::MulAddDst(qliTwoF32RegSum2[0], qliTwoF32RegQK2[0], qliTwoF32RegwBrc[2], qliTwoF32MaskAllB32);
-        Reg::LoadAlign<float>(qliTwoF32RegQK2[1], qliTwoF32Qk2 + 128 * qliTwoF32I + qliTwoF32QkVLStride);
+        Reg::LoadAlign<float>(qliTwoF32RegQK2[1], qliTwoF32Qk2 + FP32_QK_ROW_STRIDE * qliTwoF32I + qliTwoF32QkVLStride);
         Reg::MulAddDst(qliTwoF32RegSum2[1], qliTwoF32RegQK2[1], qliTwoF32RegwBrc[2], qliTwoF32MaskAllB32);
 
-        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliTwoF32RegwBrc[3], weightTemp1 + qliTwoF32I);
-        Reg::LoadAlign<float>(qliTwoF32RegQK3[0], qliTwoF32Qk3 + 128 * qliTwoF32I);
+        Reg::LoadAlign<float>(qliTwoF32RegQK3[0], qliTwoF32Qk3 + FP32_QK_ROW_STRIDE * qliTwoF32I);
         Reg::MulAddDst(qliTwoF32RegSum3[0], qliTwoF32RegQK3[0], qliTwoF32RegwBrc[3], qliTwoF32MaskAllB32);
-        Reg::LoadAlign<float>(qliTwoF32RegQK3[1], qliTwoF32Qk3 + 128 * qliTwoF32I + qliTwoF32QkVLStride);
+        Reg::LoadAlign<float>(qliTwoF32RegQK3[1], qliTwoF32Qk3 + FP32_QK_ROW_STRIDE * qliTwoF32I + qliTwoF32QkVLStride);
         Reg::MulAddDst(qliTwoF32RegSum3[1], qliTwoF32RegQK3[1], qliTwoF32RegwBrc[3], qliTwoF32MaskAllB32);
     }
 
@@ -982,11 +1015,13 @@ __aicore__ inline void MulWeightAndReduceSum4(const LocalTensor<uint16_t>& out_,
     __ubuf__ uint16_t* out1 = out0 + outStride;
     __ubuf__ uint16_t* out2 = out1 + outStride;
     __ubuf__ uint16_t* out3 = out2 + outStride;
-    __ubuf__ float* weightTemp1 = weightTemp + 256;
+    __ubuf__ float* weightTemp1 = weightTemp + 64;
+    __ubuf__ float* weightTemp2 = weightTemp + 256;
+    __ubuf__ float* weightTemp3 = weightTemp + 320;
 
     MulWeightAndReduceSum4F32VF(out0, out1, out2, out3, qk0, qk1, qk2, qk3, qkVLStride, weight0, weight1, weight2,
-                                weight3, weightTemp, weightTemp1, qScale0, qScale1, qScale2, qScale3, kScale0,
-                                (uint16_t)gSize);
+                                weight3, weightTemp, weightTemp1, weightTemp2, weightTemp3, qScale0, qScale1, qScale2,
+                                qScale3, kScale0, (uint16_t)gSize);
 }
 
 // 计算S1=3
@@ -996,7 +1031,8 @@ __simd_vf__ void MulWeightAndReduceSum3F32VF(__ubuf__ uint16_t* qliTwoF32Out0, _
                                              __ubuf__ float* qliTwoF32Qk1, __ubuf__ float* qliTwoF32Qk2,
                                              uint32_t qliTwoF32QkVLStride, __ubuf__ float* qliTwoF32Weight0,
                                              __ubuf__ float* qliTwoF32Weight1, __ubuf__ float* qliTwoF32Weight2,
-                                             __ubuf__ float* weightTemp, __ubuf__ float* qliTwoF32QScale0,
+                                             __ubuf__ float* weightTemp, __ubuf__ float* weightTemp1,
+                                             __ubuf__ float* weightTemp2, __ubuf__ float* qliTwoF32QScale0,
                                              __ubuf__ float* qliTwoF32QScale1, __ubuf__ float* qliTwoF32QScale2,
                                              __ubuf__ float* qliTwoF32KScale0, uint16_t qliTwoF32GSize)
 {
@@ -1035,7 +1071,10 @@ __simd_vf__ void MulWeightAndReduceSum3F32VF(__ubuf__ uint16_t* qliTwoF32Out0, _
     Reg::Mul(qliTwoF32RegW[1], qliTwoF32RegW[1], qliTwoF32RegQScale[1], qliTwoF32MaskAllB32);
     Reg::Mul(qliTwoF32RegW[2], qliTwoF32RegW[2], qliTwoF32RegQScale[2], qliTwoF32MaskAllB32);
 
-    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(weightTemp, qliTwoF32RegW[1], qliTwoF32MaskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(weightTemp, qliTwoF32RegW[0], qliTwoF32MaskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(weightTemp1, qliTwoF32RegW[1], qliTwoF32MaskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(weightTemp2, qliTwoF32RegW[2], qliTwoF32MaskAllB32);
+
     Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
     liV2Vector1::DuplicateZero(qliTwoF32RegSum0, qliTwoF32MaskAllB32);
     liV2Vector1::DuplicateZero(qliTwoF32RegSum1, qliTwoF32MaskAllB32);
@@ -1045,25 +1084,26 @@ __simd_vf__ void MulWeightAndReduceSum3F32VF(__ubuf__ uint16_t* qliTwoF32Out0, _
     Reg::LoadAlign<float>(qliTwoF32RegKScale[1], qliTwoF32KScale0 + 64);
 
     for (uint16_t qliTwoF32I = (uint16_t)(0); qliTwoF32I < qliTwoF32GSize; qliTwoF32I++) {
-        // 混合使用对整体性能更好
-        liV2Vector1::BroadcastLane(qliTwoF32RegwBrc[0], qliTwoF32RegW[0], qliTwoF32I);
-        Reg::LoadAlign<float>(qliTwoF32RegQK0[0], qliTwoF32Qk0 + 128 * qliTwoF32I);
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliTwoF32RegwBrc[0], weightTemp + qliTwoF32I);
+        Reg::LoadAlign<float>(qliTwoF32RegQK0[1], qliTwoF32Qk0 + FP32_QK_ROW_STRIDE * qliTwoF32I + qliTwoF32QkVLStride);
+
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliTwoF32RegwBrc[1], weightTemp1 + qliTwoF32I);
+        Reg::LoadAlign<float>(qliTwoF32RegQK0[0], qliTwoF32Qk0 + FP32_QK_ROW_STRIDE * qliTwoF32I);
+
         Reg::MulAddDst(qliTwoF32RegSum0[0], qliTwoF32RegQK0[0], qliTwoF32RegwBrc[0], qliTwoF32MaskAllB32);
-        Reg::LoadAlign<float>(qliTwoF32RegQK0[1], qliTwoF32Qk0 + 128 * qliTwoF32I + qliTwoF32QkVLStride);
         Reg::MulAddDst(qliTwoF32RegSum0[1], qliTwoF32RegQK0[1], qliTwoF32RegwBrc[0], qliTwoF32MaskAllB32);
 
-        // Weight无bank冲突，用LoadAlign来提取weight标量
-        // 地址空间处理：原 BroadcastLane(ptr) 内联为 LoadAlign BRC，避免 __ubuf__ 传给 __local_mem__ 参数
-        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliTwoF32RegwBrc[1], weightTemp + qliTwoF32I);
-        Reg::LoadAlign<float>(qliTwoF32RegQK1[0], qliTwoF32Qk1 + 128 * qliTwoF32I);
-        Reg::MulAddDst(qliTwoF32RegSum1[0], qliTwoF32RegQK1[0], qliTwoF32RegwBrc[1], qliTwoF32MaskAllB32);
-        Reg::LoadAlign<float>(qliTwoF32RegQK1[1], qliTwoF32Qk1 + 128 * qliTwoF32I + qliTwoF32QkVLStride);
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliTwoF32RegwBrc[2], weightTemp2 + qliTwoF32I);
+        Reg::LoadAlign<float>(qliTwoF32RegQK1[1], qliTwoF32Qk1 + FP32_QK_ROW_STRIDE * qliTwoF32I + qliTwoF32QkVLStride);
+
         Reg::MulAddDst(qliTwoF32RegSum1[1], qliTwoF32RegQK1[1], qliTwoF32RegwBrc[1], qliTwoF32MaskAllB32);
 
-        liV2Vector1::BroadcastLane(qliTwoF32RegwBrc[2], qliTwoF32RegW[2], qliTwoF32I);
-        Reg::LoadAlign<float>(qliTwoF32RegQK2[0], qliTwoF32Qk2 + 128 * qliTwoF32I);
+        Reg::LoadAlign<float>(qliTwoF32RegQK1[0], qliTwoF32Qk1 + FP32_QK_ROW_STRIDE * qliTwoF32I);
+        Reg::MulAddDst(qliTwoF32RegSum1[0], qliTwoF32RegQK1[0], qliTwoF32RegwBrc[1], qliTwoF32MaskAllB32);
+
+        Reg::LoadAlign<float>(qliTwoF32RegQK2[0], qliTwoF32Qk2 + FP32_QK_ROW_STRIDE * qliTwoF32I);
         Reg::MulAddDst(qliTwoF32RegSum2[0], qliTwoF32RegQK2[0], qliTwoF32RegwBrc[2], qliTwoF32MaskAllB32);
-        Reg::LoadAlign<float>(qliTwoF32RegQK2[1], qliTwoF32Qk2 + 128 * qliTwoF32I + qliTwoF32QkVLStride);
+        Reg::LoadAlign<float>(qliTwoF32RegQK2[1], qliTwoF32Qk2 + FP32_QK_ROW_STRIDE * qliTwoF32I + qliTwoF32QkVLStride);
         Reg::MulAddDst(qliTwoF32RegSum2[1], qliTwoF32RegQK2[1], qliTwoF32RegwBrc[2], qliTwoF32MaskAllB32);
     }
 
@@ -1076,8 +1116,8 @@ __simd_vf__ void MulWeightAndReduceSum3F32VF(__ubuf__ uint16_t* qliTwoF32Out0, _
     Reg::Mul(qliTwoF32RegSum2[1], qliTwoF32RegSum2[1], qliTwoF32RegKScale[1], qliTwoF32MaskAllB32);
 
     // Convert to bfloat16 and store output channel
-    Reg::RegTensor<bfloat16_t> qliTwoF32RegSumBF16[4];
-    Reg::RegTensor<uint16_t> qliTwoF32RegOut[4];
+    Reg::RegTensor<bfloat16_t> qliTwoF32RegSumBF16[3];
+    Reg::RegTensor<uint16_t> qliTwoF32RegOut[3];
     Reg::DeInterleave(qliTwoF32RegSum0[0], qliTwoF32RegSum0[1], qliTwoF32RegSum0[0], qliTwoF32RegSum0[1]);
     Reg::DeInterleave(qliTwoF32RegSum1[0], qliTwoF32RegSum1[1], qliTwoF32RegSum1[0], qliTwoF32RegSum1[1]);
     Reg::DeInterleave(qliTwoF32RegSum2[0], qliTwoF32RegSum2[1], qliTwoF32RegSum2[0], qliTwoF32RegSum2[1]);
@@ -1134,8 +1174,11 @@ __aicore__ inline void MulWeightAndReduceSum3(const LocalTensor<uint16_t>& out_,
     __ubuf__ uint16_t* out1 = out0 + outStride;
     __ubuf__ uint16_t* out2 = out1 + outStride;
 
+    __ubuf__ float* weightTemp1 = weightTemp + 64;
+    __ubuf__ float* weightTemp2 = weightTemp + 256;
+
     MulWeightAndReduceSum3F32VF(out0, out1, out2, qk0, qk1, qk2, qkVLStride, weight0, weight1, weight2, weightTemp,
-                                qScale0, qScale1, qScale2, kScale0, (uint16_t)gSize);
+                                weightTemp1, weightTemp2, qScale0, qScale1, qScale2, kScale0, (uint16_t)gSize);
 }
 
 __aicore__ inline void MulWeightAndReduceSum2(const LocalTensor<uint16_t>& out_, // out    [2, S2Base]     [128   ]
@@ -1162,9 +1205,10 @@ __aicore__ inline void MulWeightAndReduceSum2(const LocalTensor<uint16_t>& out_,
     __ubuf__ float* qk1 = qk0 + qkStride;
     // kScaleStride is zero
     __ubuf__ uint16_t* out1 = out0 + outStride;
+    __ubuf__ float* weightTemp1 = weightTemp + 64;
 
-    MulWeightAndReduceSum2F32VF(out0, out1, qk0, qk1, qkVLStride, weight0, weight1, weightTemp, qScale0, qScale1,
-                                kScale0, (uint16_t)gSize);
+    MulWeightAndReduceSum2F32VF(out0, out1, qk0, qk1, qkVLStride, weight0, weight1, weightTemp, weightTemp1, qScale0,
+                                qScale1, kScale0, (uint16_t)gSize);
 }
 
 __aicore__ inline void MulWeightAndReduceSum4(const LocalTensor<uint16_t>& out_, // out    [2, S2Base]     [128   ]
@@ -1431,13 +1475,15 @@ __simd_vf__ void MulWeightAndReduceSumOptionalScaleGSizeEvenVF(__ubuf__ uint16_t
     // unroll2
     for (uint16_t qliOptEvenI = (uint16_t)(0); qliOptEvenI < qliOptEvenGSize; qliOptEvenI += 2) {
         Reg::LoadAlign<float>(qliOptEvenRegQK[0],
-                              qliOptEvenQk + 128 * qliOptEvenI); // RowStride是128, 行都落在一个bank上
-        Reg::LoadAlign<float>(qliOptEvenRegQK[1], qliOptEvenQk + 128 * qliOptEvenI + qliOptEvenQkVLStride);
+                              qliOptEvenQk + FP32_QK_ROW_STRIDE * qliOptEvenI); // RowStride是128, 行都落在一个bank上
+        Reg::LoadAlign<float>(qliOptEvenRegQK[1],
+                              qliOptEvenQk + FP32_QK_ROW_STRIDE * qliOptEvenI + qliOptEvenQkVLStride);
         liV2Vector1::BroadcastLane(qliOptEvenRegwBrc, qliOptEvenRegW, qliOptEvenI);
         liV2Vector1::WeightedAccum(qliOptEvenRegSum0, qliOptEvenRegQK, qliOptEvenRegwBrc, qliOptEvenMaskAllB32);
 
-        Reg::LoadAlign<float>(qliOptEvenRegQK[0], qliOptEvenQk + 128 * qliOptEvenI + 128);
-        Reg::LoadAlign<float>(qliOptEvenRegQK[1], qliOptEvenQk + 128 * qliOptEvenI + 128 + qliOptEvenQkVLStride);
+        Reg::LoadAlign<float>(qliOptEvenRegQK[0], qliOptEvenQk + FP32_QK_ROW_STRIDE * qliOptEvenI + FP32_QK_ROW_STRIDE);
+        Reg::LoadAlign<float>(qliOptEvenRegQK[1], qliOptEvenQk + FP32_QK_ROW_STRIDE * qliOptEvenI + FP32_QK_ROW_STRIDE +
+                                                      qliOptEvenQkVLStride);
         liV2Vector1::BroadcastLane(qliOptEvenRegwBrc, qliOptEvenRegW, qliOptEvenI + 1);
         liV2Vector1::WeightedAccum(qliOptEvenRegSum1, qliOptEvenRegQK, qliOptEvenRegwBrc, qliOptEvenMaskAllB32);
     }
@@ -1503,20 +1549,24 @@ __simd_vf__ void MulWeightAndReduceSumOptionalScaleGSizeOddVF(__ubuf__ uint16_t*
 
     // unroll2
     for (uint16_t qliOptOddI = (uint16_t)(0); (uint16_t)(qliOptOddI + 1) < qliOptOddGSize; qliOptOddI += 2) {
-        Reg::LoadAlign<float>(qliOptOddRegQK[0], qliOptOddQk + 128 * qliOptOddI); // RowStride是128, 行都落在一个bank上
-        Reg::LoadAlign<float>(qliOptOddRegQK[1], qliOptOddQk + 128 * qliOptOddI + qliOptOddQkVLStride);
+        Reg::LoadAlign<float>(qliOptOddRegQK[0],
+                              qliOptOddQk + FP32_QK_ROW_STRIDE * qliOptOddI); // RowStride是128, 行都落在一个bank上
+        Reg::LoadAlign<float>(qliOptOddRegQK[1], qliOptOddQk + FP32_QK_ROW_STRIDE * qliOptOddI + qliOptOddQkVLStride);
         liV2Vector1::BroadcastLane(qliOptOddRegwBrc, qliOptOddRegW, qliOptOddI);
         liV2Vector1::WeightedAccum(qliOptOddRegSum0, qliOptOddRegQK, qliOptOddRegwBrc, qliOptOddMaskAllB32);
 
-        Reg::LoadAlign<float>(qliOptOddRegQK[0], qliOptOddQk + 128 * qliOptOddI + 128);
-        Reg::LoadAlign<float>(qliOptOddRegQK[1], qliOptOddQk + 128 * qliOptOddI + 128 + qliOptOddQkVLStride);
+        Reg::LoadAlign<float>(qliOptOddRegQK[0], qliOptOddQk + FP32_QK_ROW_STRIDE * qliOptOddI + FP32_QK_ROW_STRIDE);
+        Reg::LoadAlign<float>(qliOptOddRegQK[1],
+                              qliOptOddQk + FP32_QK_ROW_STRIDE * qliOptOddI + FP32_QK_ROW_STRIDE + qliOptOddQkVLStride);
         liV2Vector1::BroadcastLane(qliOptOddRegwBrc, qliOptOddRegW, qliOptOddI + 1);
         liV2Vector1::WeightedAccum(qliOptOddRegSum1, qliOptOddRegQK, qliOptOddRegwBrc, qliOptOddMaskAllB32);
     }
 
-    Reg::LoadAlign<float>(qliOptOddRegQK[0],
-                          qliOptOddQk + 128 * (qliOptOddGSize - 1)); // RowStride是128, 行都落在一个bank上
-    Reg::LoadAlign<float>(qliOptOddRegQK[1], qliOptOddQk + 128 * (qliOptOddGSize - 1) + qliOptOddQkVLStride);
+    Reg::LoadAlign<float>(
+        qliOptOddRegQK[0],
+        qliOptOddQk + FP32_QK_ROW_STRIDE * (qliOptOddGSize - 1)); // RowStride是128, 行都落在一个bank上
+    Reg::LoadAlign<float>(qliOptOddRegQK[1],
+                          qliOptOddQk + FP32_QK_ROW_STRIDE * (qliOptOddGSize - 1) + qliOptOddQkVLStride);
     liV2Vector1::BroadcastLane(qliOptOddRegwBrc, qliOptOddRegW, qliOptOddGSize - 1);
     liV2Vector1::WeightedAccum(qliOptOddRegSum0, qliOptOddRegQK, qliOptOddRegwBrc, qliOptOddMaskAllB32);
 
@@ -1588,13 +1638,11 @@ __aicore__ inline void MulWeightAndReduceSumMX(const LocalTensor<uint16_t>& out_
 // 计算S1=2
 // float in uint16 out
 template <bool WITH_SCALE>
-__simd_vf__ void MulWeightAndReduceSumOptionalScale2VF(__ubuf__ uint16_t* qliOptTwoOut0,
-                                                       __ubuf__ uint16_t* qliOptTwoOut1, __ubuf__ float* qliOptTwoQk0,
-                                                       __ubuf__ float* qliOptTwoQk1, uint32_t qliOptTwoQkVLStride,
-                                                       __ubuf__ float* qliOptTwoWeight0,
-                                                       __ubuf__ float* qliOptTwoWeight1,
-                                                       __ubuf__ float* qliOptTwoWeightTemp, float qliOptTwoKScaleValue,
-                                                       float qliOptTwoQScaleValue, uint16_t qliOptTwoGSize)
+__simd_vf__ void MulWeightAndReduceSumOptionalScale2VF(
+    __ubuf__ uint16_t* qliOptTwoOut0, __ubuf__ uint16_t* qliOptTwoOut1, __ubuf__ float* qliOptTwoQk0,
+    __ubuf__ float* qliOptTwoQk1, uint32_t qliOptTwoQkVLStride, __ubuf__ float* qliOptTwoWeight0,
+    __ubuf__ float* qliOptTwoWeight1, __ubuf__ float* qliOptTwoWeightTemp, __ubuf__ float* qliOptTwoWeightTemp1,
+    float qliOptTwoKScaleValue, float qliOptTwoQScaleValue, uint16_t qliOptTwoGSize)
 {
     if constexpr (!WITH_SCALE) {
         (void)qliOptTwoKScaleValue;
@@ -1626,32 +1674,53 @@ __simd_vf__ void MulWeightAndReduceSumOptionalScale2VF(__ubuf__ uint16_t* qliOpt
         Reg::Muls(qliOptTwoRegW[1], qliOptTwoRegW[1], qliOptTwoQScaleValue, qliOptTwoMaskAllB32);
     }
     // regW[0]与weight1混合使用
+#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
     Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(qliOptTwoWeightTemp, qliOptTwoRegW[1], qliOptTwoMaskAllB32);
+#else
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(qliOptTwoWeightTemp, qliOptTwoRegW[0], qliOptTwoMaskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(qliOptTwoWeightTemp1, qliOptTwoRegW[1], qliOptTwoMaskAllB32);
+#endif
     Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
     liV2Vector1::DuplicateZero(qliOptTwoRegSum0, qliOptTwoMaskAllB32);
     liV2Vector1::DuplicateZero(qliOptTwoRegSum1, qliOptTwoMaskAllB32);
 
     for (uint16_t qliOptTwoI = (uint16_t)(0); qliOptTwoI < qliOptTwoGSize; qliOptTwoI++) {
-        Reg::LoadAlign<float>(qliOptTwoRegQK0[0], qliOptTwoQk0 + 128 * qliOptTwoI);
-        Reg::LoadAlign<float>(qliOptTwoRegQK0[1], qliOptTwoQk0 + 128 * qliOptTwoI + qliOptTwoQkVLStride);
-        Reg::LoadAlign<float>(qliOptTwoRegQK1[0], qliOptTwoQk1 + 128 * qliOptTwoI);
-        Reg::LoadAlign<float>(qliOptTwoRegQK1[1], qliOptTwoQk1 + 128 * qliOptTwoI + qliOptTwoQkVLStride);
+#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+        Reg::LoadAlign<float>(qliOptTwoRegQK0[0], qliOptTwoQk0 + FP32_QK_ROW_STRIDE * qliOptTwoI);
+        Reg::LoadAlign<float>(qliOptTwoRegQK0[1], qliOptTwoQk0 + FP32_QK_ROW_STRIDE * qliOptTwoI + qliOptTwoQkVLStride);
+        Reg::LoadAlign<float>(qliOptTwoRegQK1[0], qliOptTwoQk1 + FP32_QK_ROW_STRIDE * qliOptTwoI);
+        Reg::LoadAlign<float>(qliOptTwoRegQK1[1], qliOptTwoQk1 + FP32_QK_ROW_STRIDE * qliOptTwoI + qliOptTwoQkVLStride);
         // 混合使用对整体性能更好
         liV2Vector1::BroadcastLane(qliOptTwoRegwBrc[0], qliOptTwoRegW[0], qliOptTwoI);
         // Weight无bank冲突，用LoadAlign来提取weight标量
         // 地址空间处理：原 BroadcastLane(ptr) 内联为 LoadAlign BRC，避免 __ubuf__ 传给 __local_mem__ 参数
         Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliOptTwoRegwBrc[1], qliOptTwoWeightTemp + qliOptTwoI);
-// A6 (9201/9202): relu在fixpipe随路做，vec1不做
-#if !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
+        // A6 (9201/9202): relu在fixpipe随路做，vec1不做
+
         Reg::Relu(qliOptTwoRegQK0[0], qliOptTwoRegQK0[0], qliOptTwoMaskAllB32);
         Reg::Relu(qliOptTwoRegQK0[1], qliOptTwoRegQK0[1], qliOptTwoMaskAllB32);
         Reg::Relu(qliOptTwoRegQK1[0], qliOptTwoRegQK1[0], qliOptTwoMaskAllB32);
         Reg::Relu(qliOptTwoRegQK1[1], qliOptTwoRegQK1[1], qliOptTwoMaskAllB32);
-#endif
+
         Reg::MulAddDst(qliOptTwoRegSum0[0], qliOptTwoRegQK0[0], qliOptTwoRegwBrc[0], qliOptTwoMaskAllB32);
         Reg::MulAddDst(qliOptTwoRegSum0[1], qliOptTwoRegQK0[1], qliOptTwoRegwBrc[0], qliOptTwoMaskAllB32);
         Reg::MulAddDst(qliOptTwoRegSum1[0], qliOptTwoRegQK1[0], qliOptTwoRegwBrc[1], qliOptTwoMaskAllB32);
         Reg::MulAddDst(qliOptTwoRegSum1[1], qliOptTwoRegQK1[1], qliOptTwoRegwBrc[1], qliOptTwoMaskAllB32);
+#else
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliOptTwoRegwBrc[0], qliOptTwoWeightTemp + qliOptTwoI);
+        Reg::LoadAlign<float>(qliOptTwoRegQK0[1], qliOptTwoQk0 + FP32_QK_ROW_STRIDE * qliOptTwoI + qliOptTwoQkVLStride);
+
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliOptTwoRegwBrc[1], qliOptTwoWeightTemp1 + qliOptTwoI);
+        Reg::LoadAlign<float>(qliOptTwoRegQK0[0], qliOptTwoQk0 + FP32_QK_ROW_STRIDE * qliOptTwoI);
+
+        Reg::MulAddDst(qliOptTwoRegSum0[0], qliOptTwoRegQK0[0], qliOptTwoRegwBrc[0], qliOptTwoMaskAllB32);
+        Reg::MulAddDst(qliOptTwoRegSum0[1], qliOptTwoRegQK0[1], qliOptTwoRegwBrc[0], qliOptTwoMaskAllB32);
+
+        Reg::LoadAlign<float>(qliOptTwoRegQK1[0], qliOptTwoQk1 + FP32_QK_ROW_STRIDE * qliOptTwoI);
+        Reg::LoadAlign<float>(qliOptTwoRegQK1[1], qliOptTwoQk1 + FP32_QK_ROW_STRIDE * qliOptTwoI + qliOptTwoQkVLStride);
+        Reg::MulAddDst(qliOptTwoRegSum1[0], qliOptTwoRegQK1[0], qliOptTwoRegwBrc[1], qliOptTwoMaskAllB32);
+        Reg::MulAddDst(qliOptTwoRegSum1[1], qliOptTwoRegQK1[1], qliOptTwoRegwBrc[1], qliOptTwoMaskAllB32);
+#endif
     }
 
     if constexpr (WITH_SCALE) {
@@ -1702,10 +1771,12 @@ __aicore__ inline void MulWeightAndReduceSumOptionalScale2Impl(
     __ubuf__ float* qliOptImplQk1 = qliOptImplQk0 + qliOptImplQkStride;
     __ubuf__ uint16_t* qliOptImplOut1 = qliOptImplOut0 + qliOptImplOutStride;
 
-    MulWeightAndReduceSumOptionalScale2VF<WITH_SCALE>(qliOptImplOut0, qliOptImplOut1, qliOptImplQk0, qliOptImplQk1,
-                                                      qliOptImplQkVLStride, qliOptImplWeight0, qliOptImplWeight1,
-                                                      qliOptImplWeightTempAddr, qliOptImplKScaleValue,
-                                                      qliOptImplQScaleValue, (uint16_t)qliOptImplGSize);
+    __ubuf__ float* qliOptImplWeightTempAddr1 = qliOptImplWeightTempAddr + 64;
+
+    MulWeightAndReduceSumOptionalScale2VF<WITH_SCALE>(
+        qliOptImplOut0, qliOptImplOut1, qliOptImplQk0, qliOptImplQk1, qliOptImplQkVLStride, qliOptImplWeight0,
+        qliOptImplWeight1, qliOptImplWeightTempAddr, qliOptImplWeightTempAddr1, qliOptImplKScaleValue,
+        qliOptImplQScaleValue, (uint16_t)qliOptImplGSize);
 }
 
 __aicore__ inline void MulWeightAndReduceSumPerTensor2(
@@ -1743,7 +1814,7 @@ __simd_vf__ void MulWeightAndReduceSumOptionalScale4VF(
     __ubuf__ float* qliOptTwoQk2, __ubuf__ float* qliOptTwoQk3, uint32_t qliOptTwoQkVLStride,
     __ubuf__ float* qliOptTwoWeight0, __ubuf__ float* qliOptTwoWeight1, __ubuf__ float* qliOptTwoWeight2,
     __ubuf__ float* qliOptTwoWeight3, __ubuf__ float* qliOptTwoWeightTemp, __ubuf__ float* qliOptTwoWeightTemp1,
-    uint16_t qliOptTwoGSize)
+    __ubuf__ float* qliOptTwoWeightTemp2, __ubuf__ float* qliOptTwoWeightTemp3, uint16_t qliOptTwoGSize)
 {
     Reg::RegTensor<float> qliOptTwoRegwBrc[4];
     Reg::RegTensor<float> qliOptTwoRegQK0[2];
@@ -1772,8 +1843,11 @@ __simd_vf__ void MulWeightAndReduceSumOptionalScale4VF(
     Reg::LoadAlign<float>(qliOptTwoRegW[2], qliOptTwoWeight2);
     Reg::LoadAlign<float>(qliOptTwoRegW[3], qliOptTwoWeight3);
     // regW[0]与weight1混合使用
-    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(qliOptTwoWeightTemp, qliOptTwoRegW[1], qliOptTwoMaskAllB32);
-    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(qliOptTwoWeightTemp1, qliOptTwoRegW[3], qliOptTwoMaskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(qliOptTwoWeightTemp, qliOptTwoRegW[0], qliOptTwoMaskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(qliOptTwoWeightTemp1, qliOptTwoRegW[1], qliOptTwoMaskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(qliOptTwoWeightTemp2, qliOptTwoRegW[2], qliOptTwoMaskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(qliOptTwoWeightTemp3, qliOptTwoRegW[3], qliOptTwoMaskAllB32);
+
     Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
     liV2Vector1::DuplicateZero(qliOptTwoRegSum0, qliOptTwoMaskAllB32);
     liV2Vector1::DuplicateZero(qliOptTwoRegSum1, qliOptTwoMaskAllB32);
@@ -1781,28 +1855,32 @@ __simd_vf__ void MulWeightAndReduceSumOptionalScale4VF(
     liV2Vector1::DuplicateZero(qliOptTwoRegSum3, qliOptTwoMaskAllB32);
 
     for (uint16_t qliOptTwoI = (uint16_t)(0); qliOptTwoI < qliOptTwoGSize; qliOptTwoI++) {
-        liV2Vector1::BroadcastLane(qliOptTwoRegwBrc[0], qliOptTwoRegW[0], qliOptTwoI);
-        Reg::LoadAlign<float>(qliOptTwoRegQK0[0], qliOptTwoQk0 + 128 * qliOptTwoI);
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliOptTwoRegwBrc[0], qliOptTwoWeightTemp + qliOptTwoI);
+        Reg::LoadAlign<float>(qliOptTwoRegQK0[1], qliOptTwoQk0 + FP32_QK_ROW_STRIDE * qliOptTwoI + qliOptTwoQkVLStride);
+
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliOptTwoRegwBrc[1], qliOptTwoWeightTemp1 + qliOptTwoI);
+        Reg::LoadAlign<float>(qliOptTwoRegQK0[0], qliOptTwoQk0 + FP32_QK_ROW_STRIDE * qliOptTwoI);
+
         Reg::MulAddDst(qliOptTwoRegSum0[0], qliOptTwoRegQK0[0], qliOptTwoRegwBrc[0], qliOptTwoMaskAllB32);
-        Reg::LoadAlign<float>(qliOptTwoRegQK0[1], qliOptTwoQk0 + 128 * qliOptTwoI + qliOptTwoQkVLStride);
         Reg::MulAddDst(qliOptTwoRegSum0[1], qliOptTwoRegQK0[1], qliOptTwoRegwBrc[0], qliOptTwoMaskAllB32);
 
-        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliOptTwoRegwBrc[1], qliOptTwoWeightTemp + qliOptTwoI);
-        Reg::LoadAlign<float>(qliOptTwoRegQK1[0], qliOptTwoQk1 + 128 * qliOptTwoI);
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliOptTwoRegwBrc[2], qliOptTwoWeightTemp2 + qliOptTwoI);
+        Reg::LoadAlign<float>(qliOptTwoRegQK1[1], qliOptTwoQk1 + FP32_QK_ROW_STRIDE * qliOptTwoI + qliOptTwoQkVLStride);
+
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliOptTwoRegwBrc[3], qliOptTwoWeightTemp3 + qliOptTwoI);
+        Reg::LoadAlign<float>(qliOptTwoRegQK1[0], qliOptTwoQk1 + FP32_QK_ROW_STRIDE * qliOptTwoI);
+
         Reg::MulAddDst(qliOptTwoRegSum1[0], qliOptTwoRegQK1[0], qliOptTwoRegwBrc[1], qliOptTwoMaskAllB32);
-        Reg::LoadAlign<float>(qliOptTwoRegQK1[1], qliOptTwoQk1 + 128 * qliOptTwoI + qliOptTwoQkVLStride);
         Reg::MulAddDst(qliOptTwoRegSum1[1], qliOptTwoRegQK1[1], qliOptTwoRegwBrc[1], qliOptTwoMaskAllB32);
 
-        liV2Vector1::BroadcastLane(qliOptTwoRegwBrc[2], qliOptTwoRegW[2], qliOptTwoI);
-        Reg::LoadAlign<float>(qliOptTwoRegQK2[0], qliOptTwoQk2 + 128 * qliOptTwoI);
+        Reg::LoadAlign<float>(qliOptTwoRegQK2[0], qliOptTwoQk2 + FP32_QK_ROW_STRIDE * qliOptTwoI);
         Reg::MulAddDst(qliOptTwoRegSum2[0], qliOptTwoRegQK2[0], qliOptTwoRegwBrc[2], qliOptTwoMaskAllB32);
-        Reg::LoadAlign<float>(qliOptTwoRegQK2[1], qliOptTwoQk2 + 128 * qliOptTwoI + qliOptTwoQkVLStride);
+        Reg::LoadAlign<float>(qliOptTwoRegQK2[1], qliOptTwoQk2 + FP32_QK_ROW_STRIDE * qliOptTwoI + qliOptTwoQkVLStride);
         Reg::MulAddDst(qliOptTwoRegSum2[1], qliOptTwoRegQK2[1], qliOptTwoRegwBrc[2], qliOptTwoMaskAllB32);
 
-        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliOptTwoRegwBrc[3], qliOptTwoWeightTemp1 + qliOptTwoI);
-        Reg::LoadAlign<float>(qliOptTwoRegQK3[0], qliOptTwoQk3 + 128 * qliOptTwoI);
+        Reg::LoadAlign<float>(qliOptTwoRegQK3[0], qliOptTwoQk3 + FP32_QK_ROW_STRIDE * qliOptTwoI);
         Reg::MulAddDst(qliOptTwoRegSum3[0], qliOptTwoRegQK3[0], qliOptTwoRegwBrc[3], qliOptTwoMaskAllB32);
-        Reg::LoadAlign<float>(qliOptTwoRegQK3[1], qliOptTwoQk3 + 128 * qliOptTwoI + qliOptTwoQkVLStride);
+        Reg::LoadAlign<float>(qliOptTwoRegQK3[1], qliOptTwoQk3 + FP32_QK_ROW_STRIDE * qliOptTwoI + qliOptTwoQkVLStride);
         Reg::MulAddDst(qliOptTwoRegSum3[1], qliOptTwoRegQK3[1], qliOptTwoRegwBrc[3], qliOptTwoMaskAllB32);
     }
 
@@ -1866,18 +1944,22 @@ __aicore__ inline void MulWeightAndReduceSumMX4(const LocalTensor<uint16_t>& out
     __ubuf__ float* qliOptImplQk2 = qliOptImplQk1 + qkStride;
     __ubuf__ float* qliOptImplQk3 = qliOptImplQk2 + qkStride;
 
-    __ubuf__ float* qliOptImplWeightTempAddr1 = qliOptImplWeightTempAddr + 256;
+    __ubuf__ float* qliOptImplWeightTempAddr1 = qliOptImplWeightTempAddr + 64;
+    __ubuf__ float* qliOptImplWeightTempAddr2 = qliOptImplWeightTempAddr + 256;
+    __ubuf__ float* qliOptImplWeightTempAddr3 = qliOptImplWeightTempAddr + 320;
     MulWeightAndReduceSumOptionalScale4VF(qliOptImplOut0, qliOptImplOut1, qliOptImplOut2, qliOptImplOut3, qliOptImplQk0,
                                           qliOptImplQk1, qliOptImplQk2, qliOptImplQk3, qkVLStride, qliOptImplWeight0,
                                           qliOptImplWeight1, qliOptImplWeight2, qliOptImplWeight3,
-                                          qliOptImplWeightTempAddr, qliOptImplWeightTempAddr1, (uint16_t)gSize);
+                                          qliOptImplWeightTempAddr, qliOptImplWeightTempAddr1,
+                                          qliOptImplWeightTempAddr2, qliOptImplWeightTempAddr3, (uint16_t)gSize);
 }
 
 __simd_vf__ void MulWeightAndReduceSumOptionalScale3VF(
     __ubuf__ uint16_t* qliOptTwoOut0, __ubuf__ uint16_t* qliOptTwoOut1, __ubuf__ uint16_t* qliOptTwoOut2,
     __ubuf__ float* qliOptTwoQk0, __ubuf__ float* qliOptTwoQk1, __ubuf__ float* qliOptTwoQk2,
     uint32_t qliOptTwoQkVLStride, __ubuf__ float* qliOptTwoWeight0, __ubuf__ float* qliOptTwoWeight1,
-    __ubuf__ float* qliOptTwoWeight2, __ubuf__ float* qliOptTwoWeightTemp, uint16_t qliOptTwoGSize)
+    __ubuf__ float* qliOptTwoWeight2, __ubuf__ float* qliOptTwoWeightTemp, __ubuf__ float* qliOptTwoWeightTemp1,
+    __ubuf__ float* qliOptTwoWeightTemp2, uint16_t qliOptTwoGSize)
 {
     Reg::RegTensor<float> qliOptTwoRegwBrc[3];
     Reg::RegTensor<float> qliOptTwoRegQK0[2];
@@ -1903,29 +1985,34 @@ __simd_vf__ void MulWeightAndReduceSumOptionalScale3VF(
     Reg::LoadAlign<float>(qliOptTwoRegW[1], qliOptTwoWeight1);
     Reg::LoadAlign<float>(qliOptTwoRegW[2], qliOptTwoWeight2);
     // regW[0]与weight1混合使用
-    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(qliOptTwoWeightTemp, qliOptTwoRegW[1], qliOptTwoMaskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(qliOptTwoWeightTemp, qliOptTwoRegW[0], qliOptTwoMaskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(qliOptTwoWeightTemp1, qliOptTwoRegW[1], qliOptTwoMaskAllB32);
+    Reg::StoreAlign<float, Reg::StoreDist::DIST_NORM>(qliOptTwoWeightTemp2, qliOptTwoRegW[2], qliOptTwoMaskAllB32);
     Reg::LocalMemBar<Reg::MemType::VEC_STORE, Reg::MemType::VEC_LOAD>();
     liV2Vector1::DuplicateZero(qliOptTwoRegSum0, qliOptTwoMaskAllB32);
     liV2Vector1::DuplicateZero(qliOptTwoRegSum1, qliOptTwoMaskAllB32);
     liV2Vector1::DuplicateZero(qliOptTwoRegSum2, qliOptTwoMaskAllB32);
 
     for (uint16_t qliOptTwoI = (uint16_t)(0); qliOptTwoI < qliOptTwoGSize; qliOptTwoI++) {
-        liV2Vector1::BroadcastLane(qliOptTwoRegwBrc[0], qliOptTwoRegW[0], qliOptTwoI);
-        Reg::LoadAlign<float>(qliOptTwoRegQK0[0], qliOptTwoQk0 + 128 * qliOptTwoI);
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliOptTwoRegwBrc[0], qliOptTwoWeightTemp + qliOptTwoI);
+        Reg::LoadAlign<float>(qliOptTwoRegQK0[1], qliOptTwoQk0 + FP32_QK_ROW_STRIDE * qliOptTwoI + qliOptTwoQkVLStride);
+
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliOptTwoRegwBrc[1], qliOptTwoWeightTemp1 + qliOptTwoI);
+        Reg::LoadAlign<float>(qliOptTwoRegQK0[0], qliOptTwoQk0 + FP32_QK_ROW_STRIDE * qliOptTwoI);
+
         Reg::MulAddDst(qliOptTwoRegSum0[0], qliOptTwoRegQK0[0], qliOptTwoRegwBrc[0], qliOptTwoMaskAllB32);
-        Reg::LoadAlign<float>(qliOptTwoRegQK0[1], qliOptTwoQk0 + 128 * qliOptTwoI + qliOptTwoQkVLStride);
         Reg::MulAddDst(qliOptTwoRegSum0[1], qliOptTwoRegQK0[1], qliOptTwoRegwBrc[0], qliOptTwoMaskAllB32);
 
-        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliOptTwoRegwBrc[1], qliOptTwoWeightTemp + qliOptTwoI);
-        Reg::LoadAlign<float>(qliOptTwoRegQK1[0], qliOptTwoQk1 + 128 * qliOptTwoI);
-        Reg::MulAddDst(qliOptTwoRegSum1[0], qliOptTwoRegQK1[0], qliOptTwoRegwBrc[1], qliOptTwoMaskAllB32);
-        Reg::LoadAlign<float>(qliOptTwoRegQK1[1], qliOptTwoQk1 + 128 * qliOptTwoI + qliOptTwoQkVLStride);
+        Reg::LoadAlign<float, Reg::LoadDist::DIST_BRC_B32>(qliOptTwoRegwBrc[2], qliOptTwoWeightTemp2 + qliOptTwoI);
+        Reg::LoadAlign<float>(qliOptTwoRegQK1[1], qliOptTwoQk1 + FP32_QK_ROW_STRIDE * qliOptTwoI + qliOptTwoQkVLStride);
         Reg::MulAddDst(qliOptTwoRegSum1[1], qliOptTwoRegQK1[1], qliOptTwoRegwBrc[1], qliOptTwoMaskAllB32);
 
-        liV2Vector1::BroadcastLane(qliOptTwoRegwBrc[2], qliOptTwoRegW[2], qliOptTwoI);
-        Reg::LoadAlign<float>(qliOptTwoRegQK2[0], qliOptTwoQk2 + 128 * qliOptTwoI);
+        Reg::LoadAlign<float>(qliOptTwoRegQK1[0], qliOptTwoQk1 + FP32_QK_ROW_STRIDE * qliOptTwoI);
+        Reg::MulAddDst(qliOptTwoRegSum1[0], qliOptTwoRegQK1[0], qliOptTwoRegwBrc[1], qliOptTwoMaskAllB32);
+
+        Reg::LoadAlign<float>(qliOptTwoRegQK2[0], qliOptTwoQk2 + FP32_QK_ROW_STRIDE * qliOptTwoI);
         Reg::MulAddDst(qliOptTwoRegSum2[0], qliOptTwoRegQK2[0], qliOptTwoRegwBrc[2], qliOptTwoMaskAllB32);
-        Reg::LoadAlign<float>(qliOptTwoRegQK2[1], qliOptTwoQk2 + 128 * qliOptTwoI + qliOptTwoQkVLStride);
+        Reg::LoadAlign<float>(qliOptTwoRegQK2[1], qliOptTwoQk2 + FP32_QK_ROW_STRIDE * qliOptTwoI + qliOptTwoQkVLStride);
         Reg::MulAddDst(qliOptTwoRegSum2[1], qliOptTwoRegQK2[1], qliOptTwoRegwBrc[2], qliOptTwoMaskAllB32);
     }
 
@@ -1980,9 +2067,13 @@ __aicore__ inline void MulWeightAndReduceSumMX3(const LocalTensor<uint16_t>& out
     __ubuf__ float* qliOptImplQk1 = qliOptImplQk0 + qkStride;
     __ubuf__ float* qliOptImplQk2 = qliOptImplQk1 + qkStride;
 
+    __ubuf__ float* qliOptImplWeightTempAddr1 = qliOptImplWeightTempAddr + 64;
+    __ubuf__ float* qliOptImplWeightTempAddr2 = qliOptImplWeightTempAddr + 256;
+
     MulWeightAndReduceSumOptionalScale3VF(qliOptImplOut0, qliOptImplOut1, qliOptImplOut2, qliOptImplQk0, qliOptImplQk1,
                                           qliOptImplQk2, qkVLStride, qliOptImplWeight0, qliOptImplWeight1,
-                                          qliOptImplWeight2, qliOptImplWeightTempAddr, (uint16_t)gSize);
+                                          qliOptImplWeight2, qliOptImplWeightTempAddr, qliOptImplWeightTempAddr1,
+                                          qliOptImplWeightTempAddr2, (uint16_t)gSize);
 }
 
 __simd_callee__ inline void CastWeightToBf16(AscendC::Reg::RegTensor<bfloat16_t>& dst, __ubuf__ float* src,

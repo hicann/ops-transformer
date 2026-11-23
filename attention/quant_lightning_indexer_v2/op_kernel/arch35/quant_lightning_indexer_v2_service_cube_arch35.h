@@ -768,14 +768,17 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::Fixp(uint64_t qliV2S1GmOffset, uint6
         fixpipeParams.srcStride = (s1gL0RealSize + 1) >> 1 << 1;       // 已16对齐
         fixpipeParams.dstStride = UB_BANK_DEPTH_STRIDE / sizeof(QK_T); // 落到同一个bank
 #if CVRATIO > 1
+        fixpipeParams.dstStride = UB_BANK_DEPTH_STRIDE / sizeof(QK_T); // 落到同一个bank
         // A5(1:2):双目标模式，按M维度拆分， M / 2 * N写入每个UB，M必须为2的倍数
         fixpipeParams.dualDstCtl = 1;
 #else
+        fixpipeParams.dstStride = UB_BANK_DEPTH_STRIDE_1K / sizeof(QK_T); // 落到同一个bank
         // A6(1:1):单目标模式，不拆M，relu随路执行（vec1不做relu)
         fixpipeParams.dualDstCtl = 0;
         fixpipeParams.reluEn = true;
 #endif
 
+#if CVRATIO > 1
         // nSize已保证N方向32B对齐
         if (nSize <= (256 / sizeof(float))) {
             // N方向小于一个bank(256B), 只需搬一个ND块, 且不用补齐
@@ -791,10 +794,17 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::Fixp(uint64_t qliV2S1GmOffset, uint6
             fixpipeParams.params.dstNdStride = qliV2CubeConstInfo.s2BaseSize * qliV2CubeConstInfo.mBaseSizeMax /
                                                CVRATIO; // s2BasicBlock_ * M_BASE_SIZE / CVRATIO
         }
+#else
+        fixpipeParams.nSize = nSize;
+        fixpipeParams.params.ndNum = 1;
+        fixpipeParams.params.srcNdStride = 0;
+        fixpipeParams.params.dstNdStride = 0;
+#endif
         // 未考虑s1gGmOffset和s2GmOffset，将matmul结果从L0C搬运到UB
         Fixpipe<QK_T, CL0_T, QLIV2_CFG_ROW_MAJOR_UB>(
-            mm1ResUB_[(qliV2CubeRunInfo.loop % 2) * qliV2CubeConstInfo.s2BaseSize / 2],
+            mm1ResUB_[(qliV2CubeRunInfo.loop % 2) * qliV2CubeConstInfo.s2BaseSize / CVRATIO],
             cL0_[(l0BufIdx_ % L0_BUF_NUM) * l0cBufferOffset_], fixpipeParams);
+
     } else {
         uint32_t nSize = CeilAlign(s2L0RealSize, static_cast<uint64_t>(UB_BLOCK / sizeof(QK_T)));
         // 有效数据不足16行，只需输出部分行即可; L0C上bmm1结果矩阵M方向size必须是偶数

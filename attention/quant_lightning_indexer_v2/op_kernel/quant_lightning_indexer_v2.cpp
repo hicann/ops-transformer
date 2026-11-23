@@ -55,7 +55,7 @@ using namespace QLIV2Kernel;
         op.Process(); \
     } while (0)
 
-template <int DT_Q, int DT_K, int DT_OUT, int PAGE_ATTENTION, int Q_LAYOUT_T, int K_LAYOUT_T>
+template <int DT_Q, int DT_K, int DT_OUT, int PAGE_ATTENTION, int Q_LAYOUT_T, int K_LAYOUT_T, int QUANT_MODE>
 __global__ __aicore__ void quant_lightning_indexer_v2(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* weights, __gm__ uint8_t* queryScale,
     __gm__ uint8_t* keyScale, __gm__ uint8_t* cuSeqlensQ, __gm__ uint8_t* cuSeqlensK, __gm__ uint8_t* sequsedQ,
@@ -76,12 +76,7 @@ __global__ __aicore__ void quant_lightning_indexer_v2(
 #if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)) || (__CCE_AICORE__ == 310)
     // 声明条件与本分支条件保持一致，避免在 9201/9202 下 __CCE_AICORE__ != 310 的编译组合漏声明
     TPipe tPipe;
-    constexpr uint32_t QUANT_MODE_FP8 = 1;
-    constexpr uint32_t QUANT_MODE_INT8 = 2;
-    constexpr uint32_t QUANT_MODE_MXFP8 = 3;
-    constexpr uint32_t QUANT_MODE_HIFLOAT8 = 4;
-    constexpr uint32_t QUANT_MODE_MXFP4 = 5;
-    constexpr uint32_t QUANT_MODE_HIFLOAT4 = 6;
+
 #if (__CCE_AICORE__ == 310) && !(defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
     if (QLIV2FastDispatch<DT_Q, DT_K, PAGE_ATTENTION, Q_LAYOUT_T, K_LAYOUT_T>::TryRun(
             query, key, weights, queryScale, keyScale, cuSeqlensQ, cuSeqlensK, sequsedK, blockTable, outputIdxOffset,
@@ -89,27 +84,28 @@ __global__ __aicore__ void quant_lightning_indexer_v2(
         return;
     }
 #endif
-    if (tiling_data->quantMode == QUANT_MODE_FP8) {
+    if constexpr (QUANT_MODE == QUANT_MODE_FP8) {
         INVOKE_LI_NO_KFC_OP_IMPL(QLIV2Preload, fp8_e4m3fn_t, fp8_e4m3fn_t, float, uint16_t, int32_t, PAGE_ATTENTION,
-                                 LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T), float, float, float);
-    } else if (tiling_data->quantMode == QUANT_MODE_MXFP8) {
+                                 LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T), float, float, QUANT_MODE);
+    } else if constexpr (QUANT_MODE == QUANT_MODE_MXFP8) {
         INVOKE_LI_NO_KFC_OP_IMPL(QLIV2Preload, fp8_e4m3fn_t, fp8_e4m3fn_t, float, uint16_t, int32_t, PAGE_ATTENTION,
-                                 LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T), fp8_e8m0_t, float, float);
-    } else if (tiling_data->quantMode == QUANT_MODE_HIFLOAT8) {
+                                 LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T), fp8_e8m0_t, float, QUANT_MODE);
+    } else if constexpr (QUANT_MODE == QUANT_MODE_HIFLOAT8) {
         INVOKE_LI_NO_KFC_OP_IMPL(QLIV2Preload, hifloat8, hifloat8, float, uint16_t, int32_t, PAGE_ATTENTION,
-                                 LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T), float, float, float);
-    } else if (tiling_data->quantMode == QUANT_MODE_MXFP4) {
+                                 LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T), float, float, QUANT_MODE);
+    } else if constexpr (QUANT_MODE == QUANT_MODE_MXFP4) {
         INVOKE_LI_NO_KFC_OP_IMPL(QLIV2Preload, fp4x2_e2m1_t, fp4x2_e2m1_t, bfloat16_t, uint16_t, int32_t,
                                  PAGE_ATTENTION, LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T), fp8_e8m0_t, float,
-                                 float);
-    } else if (tiling_data->quantMode == QUANT_MODE_INT8) {
+                                 QUANT_MODE);
+    } else if constexpr (QUANT_MODE == QUANT_MODE_INT8) {
         INVOKE_LI_NO_KFC_OP_IMPL(QLIV2Preload, int8_t, int8_t, int32_t, uint16_t, int32_t, PAGE_ATTENTION,
-                                 LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T), half, half, int32_t);
+                                 LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T), half, half, QUANT_MODE);
     }
 #if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
-    else if (tiling_data->quantMode == QUANT_MODE_HIFLOAT4) {
+    else if constexpr (QUANT_MODE == QUANT_MODE_HIFLOAT4) {
         INVOKE_LI_NO_KFC_OP_IMPL(QLIV2Preload, hifloat4x2_t, hifloat4x2_t, bfloat16_t, uint16_t, int32_t,
-                                 PAGE_ATTENTION, LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T), float, float);
+                                 PAGE_ATTENTION, LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T), float, float,
+                                 QUANT_MODE);
     }
 #endif
 

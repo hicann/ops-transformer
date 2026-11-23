@@ -80,11 +80,12 @@ __aicore__ inline T CeilDiv(T num, T rnd)
 // stride (banks*bank_groups*block  (bank_groups*block        block      1))  (512  (256  32   1))
 #define UB_BLOCK 32 // 32B
 #define UB_BANK_GROUPS 8
-#define UB_BANKS 2
+#define UB_BANKS 2 // A5:2个bank，A6:4个bank，这个指的是ping pong一行占用的bank数
 #define UB_BANK_DEPTH 512
-
-#define UB_BANK_GROUP_STRIDE UB_BLOCK                               // 32B
-#define UB_BANK_STRIDE (UB_BANK_GROUPS * UB_BLOCK)                  // 256B
-#define UB_BANK_DEPTH_STRIDE (UB_BANKS * UB_BANK_GROUPS * UB_BLOCK) // 512B
-
-#endif // LIGHTNING_INDEXER_V2_BASE_ARCH35_H
+#define UB_BANK_GROUP_STRIDE UB_BLOCK              // 32B
+#define UB_BANK_STRIDE (UB_BANK_GROUPS * UB_BLOCK) // 256B
+#define UB_BANK_DEPTH_STRIDE \
+    (UB_BANKS * UB_BANK_GROUPS * \
+     UB_BLOCK) // A5:ping bank0, pong bank1; A6:ping bank0 2, pong bank1 3。 指的ping pong一行的字节数
+#define UB_BANK_DEPTH_STRIDE_1K 1024 // A6：ping bank0 1, pong bank2 3。 指的ping pong一行的字节数
+#endif                               // LIGHTNING_INDEXER_V2_BASE_ARCH35_H

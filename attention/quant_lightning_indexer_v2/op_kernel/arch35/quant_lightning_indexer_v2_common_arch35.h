@@ -30,6 +30,14 @@ using FP8E4M3 = fp8_e4m3fn_t;
 using FP4E2M1 = fp4x2_e2m1_t;
 using FP8E8M0 = fp8_e8m0_t;
 
+// tiling key 中的 quant_mode 取值（与 op_host保持一致），与模板参数 int QUANT_MODE 同类型
+constexpr uint32_t QUANT_MODE_FP8 = 1;
+constexpr uint32_t QUANT_MODE_INT8 = 2;
+constexpr uint32_t QUANT_MODE_MXFP8 = 3;
+constexpr uint32_t QUANT_MODE_HIFLOAT8 = 4;
+constexpr uint32_t QUANT_MODE_MXFP4 = 5;
+constexpr uint32_t QUANT_MODE_HIFLOAT4 = 6;
+
 constexpr uint32_t MX_SCALE_GROUP_SIZE = 32; // 每32个D维度元素一个scale
 constexpr uint32_t FP8_TWO = 2;              // 2个FP8E8M0打包成1个BF16
 constexpr uint32_t FP4_PACK_NUM = 2;         // 2个FP4E2M1打包成1个字节存储
@@ -46,8 +54,11 @@ enum class LI_LAYOUT : uint32_t {
 template <typename Q_T, typename K_T, typename QK_T, typename SCORE_T, typename OUT_T,
           const bool PAGE_ATTENTION = false, LI_LAYOUT Q_LAYOUT_T = LI_LAYOUT::BSND,
           LI_LAYOUT K_LAYOUT_T = LI_LAYOUT::PA_BBND, typename SCALE_T = float, typename WEIGHT_T = float,
-          typename... Args>
+          int QUANT_MODE = 0, typename... Args>
 struct QLIV2Type {
+    static constexpr int quantMode = QUANT_MODE;
+    static_assert(QUANT_MODE >= QUANT_MODE_FP8 && QUANT_MODE <= QUANT_MODE_HIFLOAT4,
+                  "quant_lightning_indexer_v2 requires QUANT_MODE from tiling key");
     static_assert((std::is_same_v<QK_T, float> &&
                    (std::is_same_v<SCORE_T, uint32_t> || std::is_same_v<SCORE_T, uint16_t>)) ||
                       (std::is_same_v<QK_T, bfloat16_t> && std::is_same_v<SCORE_T, uint16_t>) ||

@@ -2076,8 +2076,9 @@ ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo* tilingI
     uint32_t pageAttentionFlag = static_cast<uint32_t>(tilingInfo->pageAttentionFlag);
     uint32_t inputQLayout = static_cast<uint32_t>(tilingInfo->inputQLayout);
     uint32_t inputKLayout = static_cast<uint32_t>(tilingInfo->inputKLayout);
-    uint64_t tilingKey =
-        GET_TPL_TILING_KEY(inputQType, inputKType, outputType, pageAttentionFlag, inputQLayout, inputKLayout);
+    uint32_t quantMode = static_cast<uint32_t>(*tilingInfo->opParamInfo.quantMode);
+    uint64_t tilingKey = GET_TPL_TILING_KEY(inputQType, inputKType, outputType, pageAttentionFlag, inputQLayout,
+                                            inputKLayout, quantMode);
     context_->SetTilingKey(tilingKey);
     // fast 模板不设置 ScheduleMode，慢路径保持 mode 1
     if (!fastTemplate) {
