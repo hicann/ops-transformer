@@ -35,7 +35,7 @@ static const char* A5SocInfo = R"JSON({
     "L0C_SIZE": 262144,
     "vector_core_cnt": 40,
     "cube_core_cnt": 20,
-    "socVersion": "Ascend950"
+    "socVersion": "3510"
   }
 })JSON";
 
@@ -90,7 +90,7 @@ static gert::TilingContextPara MakeBsndContext(int64_t b, int64_t s1, int64_t s2
                                        {"maskMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(maskMode)},
                                        {"cmpRatio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(cmpRatio)},
                                    },
-                                   &g_compileInfo, "Ascend950", A5SocInfo, 4096);
+                                   &g_compileInfo, "3510", A5SocInfo, 4096);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ TEST_F(DenseLISoftmaxLseV2Tiling, Arch35_Reject_WrongDimNum)
                                      {"maskMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                      {"cmpRatio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
                                  },
-                                 &g_compileInfo, "Ascend950", A5SocInfo, 4096);
+                                 &g_compileInfo, "3510", A5SocInfo, 4096);
     TilingInfo tilingInfo;
     EXPECT_FALSE(ExecuteTiling(para, tilingInfo));
 }
@@ -241,7 +241,7 @@ static gert::TilingContextPara MakeTndContext(int64_t b, int64_t t1, int64_t t2,
                                        {"maskMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(maskMode)},
                                        {"cmpRatio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(cmpRatio)},
                                    },
-                                   &g_compileInfo, "Ascend950", A5SocInfo, 4096);
+                                   &g_compileInfo, "3510", A5SocInfo, 4096);
 }
 
 // ---------------------------------------------------------------------------
@@ -290,7 +290,7 @@ TEST_F(DenseLISoftmaxLseV2Tiling, Arch35_Bsnd_Causal_Cmp4_WithResidual)
                                      {"maskMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
                                      {"cmpRatio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(4)},
                                  },
-                                 &g_compileInfo, "Ascend950", A5SocInfo, 4096);
+                                 &g_compileInfo, "3510", A5SocInfo, 4096);
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, UINT64_MAX);
 }
 
@@ -332,7 +332,7 @@ TEST_F(DenseLISoftmaxLseV2Tiling, Arch35_Bsnd_WithSequsedQ)
                                      {"maskMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                      {"cmpRatio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
                                  },
-                                 &g_compileInfo, "Ascend950", A5SocInfo, 4096);
+                                 &g_compileInfo, "3510", A5SocInfo, 4096);
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, UINT64_MAX);
 }
 
@@ -363,7 +363,7 @@ TEST_F(DenseLISoftmaxLseV2Tiling, Arch35_Reject_NoMetadata)
                                      {"maskMode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                      {"cmpRatio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
                                  },
-                                 &g_compileInfo, "Ascend950", A5SocInfo, 4096);
+                                 &g_compileInfo, "3510", A5SocInfo, 4096);
     TilingInfo tilingInfo;
     EXPECT_FALSE(ExecuteTiling(para, tilingInfo));
 }

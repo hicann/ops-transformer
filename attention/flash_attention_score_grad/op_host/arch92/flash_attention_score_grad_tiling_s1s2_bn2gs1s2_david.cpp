@@ -618,7 +618,6 @@ ge::graphStatus FlashAttentionScoreGradTilingUs1s2Bs2David::GetPlatformInfo()
         auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo*>(context_->GetCompileInfo());
         OP_CHECK_IF(compileInfoPtr == nullptr, OP_LOGE(context_, "compile_info is null"), return ge::GRAPH_FAILED);
 
-        socVersion = compileInfoPtr->socVersion;
         npuArch = compileInfoPtr->npuArch;
         fBaseParams.coreNum = compileInfoPtr->aivNum;
         fBaseParams.aicNum = compileInfoPtr->aicNum;
@@ -629,7 +628,6 @@ ge::graphStatus FlashAttentionScoreGradTilingUs1s2Bs2David::GetPlatformInfo()
         fBaseParams.l2CacheSize = compileInfoPtr->l2CacheSize;
     } else {
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
-        socVersion = ascendcPlatform.GetSocVersion();
         npuArch = ascendcPlatform.GetCurNpuArch();
         coreNum = ascendcPlatform.GetCoreNumAiv();
         fBaseParams.coreNum = coreNum;

@@ -444,7 +444,6 @@ protected:
     ge::graphStatus GetSparseBlockInfoBn2();
 
     FuzzyBaseInfoParamsDavid fBaseParams{};
-    platform_ascendc::SocVersion socVersion;
     NpuArch npuArch = Ops::Base::DAV_RESV;
     TndBaseInfo tndBaseInfo;
 };

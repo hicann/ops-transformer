@@ -152,7 +152,6 @@ protected:
     int64_t maxS1Val;
     int64_t maxS2Val;
 
-    platform_ascendc::SocVersion socVersion;
     bool deterministic;
     bool hasRope = false;
     bool hasSink = false;

@@ -46,7 +46,7 @@ const std::string SOC_INFO = R"({
         "CORE_NUM": 32,
         "cube_core_cnt": 32,
         "vector_core_cnt": 64,
-        "socVersion": "Ascend950"
+        "socVersion": "3510"
     }
 })";
 
@@ -64,7 +64,6 @@ gert::TilingContextPara MakeTilingContext(const std::string& layout = "BSND")
         info.l2CacheSize = 134217728;
         info.l0aSize = 65536;
         info.l0bSize = 65536;
-        info.socVersion = platform_ascendc::SocVersion::ASCEND950;
         info.npuArch = Ops::Base::DAV_3510;
         return info;
     }();
@@ -107,7 +106,7 @@ gert::TilingContextPara MakeTilingContext(const std::string& layout = "BSND")
                                         {"layout_q", Ops::Transformer::AnyValue::CreateFrom<std::string>(layout)},
                                         {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>(layout)},
                                     },
-                                    &compileInfo, "Ascend950", SOC_INFO, TILING_BUFFER_SIZE);
+                                    &compileInfo, "3510", SOC_INFO, TILING_BUFFER_SIZE);
     if (layout == "BNSD") {
         context.inputTensorDesc_[0].shape_ = {{2, 4, 512, 128}, {2, 4, 512, 128}};
         context.inputTensorDesc_[1].shape_ = {{2, 4, 1024, 128}, {2, 4, 1024, 128}};

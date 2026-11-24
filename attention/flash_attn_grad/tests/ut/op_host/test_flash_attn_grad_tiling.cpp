@@ -35,7 +35,7 @@ static const char* A5SocInfo = R"JSON({
     "L0C_SIZE": 262144,
     "vector_core_cnt": 40,
     "cube_core_cnt": 20,
-    "socVersion": "Ascend950"
+    "socVersion": "3510"
   }
 })JSON";
 
@@ -118,7 +118,7 @@ static gert::TilingContextPara MakeBsndContext(optiling::FlashAttnGradCompileInf
                                        {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>(layout)},
                                        {"layout_out", Ops::Transformer::AnyValue::CreateFrom<std::string>(layout)},
                                    },
-                                   compileInfo, "Ascend950", A5SocInfo, 81920);
+                                   compileInfo, "3510", A5SocInfo, 81920);
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +230,7 @@ TEST_F(FlashAttnGradTiling, Arch35_Bsnd_D128_Causal)
             {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
             {"layout_out", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
         },
-        &compileInfo, "Ascend950", A5SocInfo, 81920);
+        &compileInfo, "3510", A5SocInfo, 81920);
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, UINT64_MAX);
 }
 
@@ -353,7 +353,7 @@ TEST_F(FlashAttnGradTiling, Arch35_Bnsd_D128_NoMask)
                                      {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
                                      {"layout_out", Ops::Transformer::AnyValue::CreateFrom<std::string>("BNSD")},
                                  },
-                                 &compileInfo, "Ascend950", A5SocInfo, 81920);
+                                 &compileInfo, "3510", A5SocInfo, 81920);
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, UINT64_MAX);
 }
 
@@ -400,6 +400,6 @@ TEST_F(FlashAttnGradTiling, Arch35_Bsnd_D128_WithSink)
                                      {"layout_kv", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
                                      {"layout_out", Ops::Transformer::AnyValue::CreateFrom<std::string>("BSND")},
                                  },
-                                 &compileInfo, "Ascend950", A5SocInfo, 81920);
+                                 &compileInfo, "3510", A5SocInfo, 81920);
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, UINT64_MAX);
 }

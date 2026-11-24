@@ -21,7 +21,7 @@ namespace op_api {
 
 constexpr int64_t SMLAG_METADATA_SIZE = 1024;
 
-bool IsAscend950()
+bool IsDavSoc()
 {
     const char* socName = aclrtGetSocName();
     return socName != nullptr &&
@@ -38,7 +38,7 @@ at::Tensor SparseFlashMlaGradMetadata(
     int64_t cmpRatio, int64_t oriMaskMode, int64_t cmpMaskMode, int64_t oriWinLeft, int64_t oriWinRight,
     c10::string_view layoutQ, c10::string_view layoutKv, bool hasOriKv, bool hasCmpKv)
 {
-    if (!IsAscend950()) {
+    if (!IsDavSoc()) {
         return at::Tensor();
     }
 
@@ -116,7 +116,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     const at::Tensor& cmpTopkLengthConst = cmpTopkLength.value_or(at::Tensor());
     const at::Tensor& sinksConst = sinks.value_or(at::Tensor());
     at::Tensor metadataConst = metadata.value_or(at::Tensor());
-    if (!IsAscend950() && metadataConst.defined()) {
+    if (!IsDavSoc() && metadataConst.defined()) {
         metadataConst = at::Tensor();
     }
 

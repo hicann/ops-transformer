@@ -109,7 +109,6 @@ protected:
     virtual ge::graphStatus GetBlockInfoOfTNDForBn2() {};
     ge::graphStatus GetSparseBlockInfoBn2();
     FuzzyBaseInfoParamsRegbase fBaseParams{};
-    platform_ascendc::SocVersion socVersion;
     NpuArch npuArch = Ops::Base::DAV_RESV;
     TndBaseInfo tndBaseInfo;
 };

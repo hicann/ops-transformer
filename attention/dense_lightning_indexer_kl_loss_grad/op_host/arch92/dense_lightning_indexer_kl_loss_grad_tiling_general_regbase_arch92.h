@@ -160,7 +160,6 @@ protected:
     int64_t dwWorkspaceLen;
     int64_t softmaxOutWorkspaceLen;
 
-    platform_ascendc::SocVersion socVersion;
     bool deterministic = false;
 
     const char* opName;

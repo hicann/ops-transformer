@@ -104,7 +104,6 @@ struct QuantFlashAttnGradCompileInfo {
     uint64_t l0cSize;
     uint64_t l2CacheSize;
     int64_t coreNum;
-    platform_ascendc::SocVersion socVersion;
     NpuArch npuArch;
 };
 } // namespace optiling

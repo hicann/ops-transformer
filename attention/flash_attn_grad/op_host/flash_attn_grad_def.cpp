@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include "op_common/op_host/util/op_arch_helper.h"
 #include "register/op_def_registry.h"
 
 namespace ops {
@@ -115,7 +116,8 @@ public:
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("opFile.value", "flash_attn_grad");
-        this->AICore().AddConfig("ascend950", aicore_config);
+        // DAV_3510 按映射表注册 ascend950 + ascend350（opbase g_archToSocNames）。
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_3510, aicore_config);
     }
 };
 OP_ADD(FlashAttnGrad);

@@ -234,9 +234,9 @@ static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingC
                 OP_LOGE(context->GetNodeName(), "num of core obtained is 0, aicNum=%u, aivNum=%u.", aicNum, aivNum),
                 return ge::GRAPH_PARAM_INVALID);
 
-    auto socVersion = ascendcPlatform.GetSocVersion();
+    auto npuArch = ascendcPlatform.GetCurNpuArch();
     if (!Ops::Transformer::OpTiling::IsRegbaseSocVersion(context)) {
-        OP_LOGE(context->GetNodeName(), "SOC Version[%d] is not supported.", static_cast<int32_t>(socVersion));
+        OP_LOGE(context->GetNodeName(), "NpuArch[%d] is not regbase-supported.", static_cast<int32_t>(npuArch));
         return ge::GRAPH_PARAM_INVALID;
     }
 
@@ -443,7 +443,6 @@ static ge::graphStatus DenseLightningIndexerSoftmaxLseV2TilingFunc(gert::TilingC
     constexpr int64_t TKV_HALF = TKV / 2;
     constexpr int64_t KV_CACHE_NUM_ARCH35 = 46832;
     constexpr int64_t KV_CACHE_NUM_ARCH92 = 30448;
-    auto npuArch = ascendcPlatform.GetCurNpuArch();
     bool isArch35 = (npuArch == Ops::Base::DAV_3510);
     int64_t kvCacheNum = isArch35 ? KV_CACHE_NUM_ARCH35 : KV_CACHE_NUM_ARCH92;
     int64_t kvTileElems = isArch35 ? TKV_HALF : TKV;

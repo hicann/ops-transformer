@@ -215,14 +215,14 @@ static bool StrideLimited()
     return false;
 }
 
-static bool IsAscend950()
+static bool IsDav3510()
 {
     return GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510;
 }
 
 static bool NeedTransposeSoftmaxTensor(const char* softmaxInLayout)
 {
-    return softmaxInLayout != nullptr && strcmp(softmaxInLayout, "same_as_input") == 0 && !IsAscend950();
+    return softmaxInLayout != nullptr && strcmp(softmaxInLayout, "same_as_input") == 0 && !IsDav3510();
 }
 
 static bool CheckIsNeedPad(const FagInShapeInfo& fagShape)

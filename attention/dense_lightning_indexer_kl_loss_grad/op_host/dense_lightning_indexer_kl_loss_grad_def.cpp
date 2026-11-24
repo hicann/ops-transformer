@@ -13,6 +13,7 @@
  * \brief
  */
 
+#include "op_common/op_host/util/op_arch_helper.h"
 #include "register/op_def_registry.h"
 
 namespace ops {
@@ -104,7 +105,9 @@ public:
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("aclnnSupport.value", "support_aclnn");
-        this->AICore().AddConfig("ascend950", aicore_config);
+        // ascend950 按 NpuArch::DAV_3510 注册：opbase 的 g_archToSocNames 映射
+        // DAV_3510 -> {"ascend950", "ascend350"}，与逐个 AddConfig 语义等价（对齐 ops-nn matmul 族用法）。
+        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_3510, aicore_config);
         this->AICore().AddConfig("ascend960dt", aicore_config);
         this->AICore().AddConfig("ascend960pr", aicore_config);
     }

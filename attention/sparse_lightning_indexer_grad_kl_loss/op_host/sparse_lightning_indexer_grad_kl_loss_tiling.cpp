@@ -112,7 +112,6 @@ ge::graphStatus TilingPrepareForSparseLightningIndexerGradKLLoss(gert::TilingPar
     compileInfoPtr->aivNum = ascendcPlatform.GetCoreNumAiv();
     compileInfoPtr->aicNum = ascendcPlatform.GetCoreNumAic();
     compileInfoPtr->npuArch = ascendcPlatform.GetCurNpuArch();
-    compileInfoPtr->socVersion = ascendcPlatform.GetSocVersion();
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, compileInfoPtr->ubSize);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, compileInfoPtr->l1Size);
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, compileInfoPtr->l0cSize);

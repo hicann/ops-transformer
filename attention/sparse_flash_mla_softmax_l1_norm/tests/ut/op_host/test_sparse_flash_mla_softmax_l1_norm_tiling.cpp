@@ -35,7 +35,7 @@ static const char* A5SocInfo = R"JSON({
     "L0C_SIZE": 262144,
     "vector_core_cnt": 40,
     "cube_core_cnt": 20,
-    "socVersion": "Ascend950"
+    "socVersion": "3510"
   }
 })JSON";
 

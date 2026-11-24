@@ -64,7 +64,6 @@ protected:
     bool CheckSparseLeftAndRight(int64_t s1oDimIdx, int64_t s2IdxLeft, int64_t s2IdxRight, int64_t bIdx = 0,
                                  int64_t blockIdx = 0);
     FuzzyBaseInfoParamsRegbase fBaseParams;
-    platform_ascendc::SocVersion socVersion;
     NpuArch npuArch = Ops::Base::DAV_RESV;
 };
 
