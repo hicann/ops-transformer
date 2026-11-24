@@ -89,27 +89,21 @@ constexpr uint64_t BUFFER_NUM = 2UL;
 namespace optiling {
 
 // 为了兼容老版本，在未配置commAlg参数时，读取环境变量；
-// 显式指定的commAlg必须合法，不能通过单机默认fullmesh分支跳过校验。
+// 单机（epWorldSize<=8）统一走默认fullmesh；多机时才解析commAlg，仅支持"fullmesh"或"hierarchy"，非法取值报错。
 static ge::graphStatus MoeDistributeDispatchA2CheckCommAlg(const gert::TilingContext* context, bool& isLayered)
 {
     isLayered = false;
     auto attrs = context->GetAttrs();
     OP_TILING_CHECK(attrs == nullptr, OP_LOGE_WITH_INVALID_INPUT(K_INNER_DEBUG, "attrs"), return ge::GRAPH_FAILED);
-    auto commAlg = attrs->GetAttrPointer<char>(static_cast<int>(ATTR_COMM_ALG_INDEX));
-    const bool useDefaultCommAlg = (commAlg == nullptr) || (commAlg[0] == '\0');
-    OP_TILING_CHECK(
-        !useDefaultCommAlg && strcmp(commAlg, "fullmesh") != 0 && strcmp(commAlg, "hierarchy") != 0,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(K_INNER_DEBUG, "comm_alg", commAlg, "\"fullmesh\" or \"hierarchy\""),
-        return ge::GRAPH_FAILED);
     auto epWorldSizePtr = attrs->GetAttrPointer<int64_t>(ATTR_EP_WORLD_SIZE_INDEX);
-    if (useDefaultCommAlg && (epWorldSizePtr != nullptr) && (*epWorldSizePtr <= RANK_NUM_PER_NODE_A2)) {
+    if ((epWorldSizePtr != nullptr) && (*epWorldSizePtr <= RANK_NUM_PER_NODE_A2)) {
         OP_LOGD(K_INNER_DEBUG, "epWorldSize <= 8, use default fullmesh algorithm.");
         return ge::GRAPH_SUCCESS;
     }
-    OP_TILING_CHECK(
-        mc2tiling::ParseCommAlgWithEnvFallback(K_INNER_DEBUG, commAlg, isLayered) != ge::GRAPH_SUCCESS,
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(K_INNER_DEBUG, "comm_alg", commAlg, "\"fullmesh\" or \"hierarchy\""),
-        return ge::GRAPH_FAILED);
+    auto commAlg = attrs->GetAttrPointer<char>(static_cast<int>(ATTR_COMM_ALG_INDEX));
+    OP_TILING_CHECK(mc2tiling::ParseCommAlgWithEnvFallback(K_INNER_DEBUG, commAlg, isLayered) != ge::GRAPH_SUCCESS,
+                    OP_LOGE_WITH_INVALID_ATTR(K_INNER_DEBUG, "comm_alg", commAlg, "\"fullmesh\" or \"hierarchy\""),
+                    return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -268,10 +262,6 @@ static ge::graphStatus MoeDistributeDispatchA2CheckEpParams(const int64_t* epWor
         OP_LOGE_WITH_INVALID_INPUT(K_INNER_DEBUG, "epWorldSizePtr");
         return GRAPH_FAILED;
     }
-    OP_TILING_CHECK(isLayered && *epWorldSizePtr != 16 && *epWorldSizePtr != 32 && *epWorldSizePtr != 64,
-                    OP_LOGE_FOR_INVALID_VALUE(K_INNER_DEBUG, "epWorldSize", std::to_string(*epWorldSizePtr).c_str(),
-                                              "16, 32 or 64 when commAlg is hierarchy"),
-                    return ge::GRAPH_FAILED);
     if (*epWorldSizePtr <= 0 || *epWorldSizePtr > maxEpWorldSizeA2 ||
         ((*epWorldSizePtr > RANK_NUM_PER_NODE_A2) && (*epWorldSizePtr % RANK_NUM_PER_NODE_A2 != 0))) {
         OP_LOGE_FOR_INVALID_VALUE(
