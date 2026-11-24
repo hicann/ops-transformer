@@ -1102,35 +1102,6 @@ ge::graphStatus GBSATiling::CalculateWorkSpace(gert::TilingContext* context)
         }
         userWorkspaceSize = fdPartialOOffset_ + partialOSize;
     }
-    // Internal page-NZ KV buffers amortize over long prefill; public input tensors and tiling ABI stay unchanged.
-    bool usePackedKv = dataType_ == ge::DT_INT8;
-    if (totalQTokens_ < static_cast<uint64_t>(batch_) * 128U) {
-        usePackedKv = false;
-    }
-    if (isPaged_ && static_cast<uint64_t>(batch_) * maxBlocksPerBatch_ >
-                        (totalKvTokens_ + static_cast<uint64_t>(batch_) * 128U) / 128U) {
-        usePackedKv = false;
-    }
-    if (usePackedKv) {
-        constexpr uint64_t ALIGNMENT = 512U;
-        const uint64_t paddingTokens = static_cast<uint64_t>(batch_) * 128U;
-        const uint64_t bytesPerToken = static_cast<uint64_t>(kvHeads_) * embeddingSize_;
-        const uint64_t maximum = std::numeric_limits<uint64_t>::max();
-        if (totalKvTokens_ > maximum - paddingTokens ||
-            totalKvTokens_ + paddingTokens > (maximum - (ALIGNMENT - 1U)) / bytesPerToken) {
-            OPS_REPORT_VECTOR_INNER_ERR("GenericBlockSparseAttention", "Packed KV workspace size overflow.");
-            return ge::GRAPH_FAILED;
-        }
-        const uint64_t packedTokens =
-            isPaged_ ? static_cast<uint64_t>(batch_) * maxBlocksPerBatch_ * 128U : totalKvTokens_ + paddingTokens;
-        const uint64_t packedBytes = AlignUp(packedTokens * bytesPerToken, ALIGNMENT);
-        if (userWorkspaceSize > maximum - (ALIGNMENT - 1U) ||
-            packedBytes > (maximum - AlignUp(userWorkspaceSize, ALIGNMENT)) / 2U) {
-            OPS_REPORT_VECTOR_INNER_ERR("GenericBlockSparseAttention", "Packed KV workspace offset overflow.");
-            return ge::GRAPH_FAILED;
-        }
-        userWorkspaceSize = AlignUp(userWorkspaceSize, ALIGNMENT) + 2U * packedBytes;
-    }
     if (userWorkspaceSize > std::numeric_limits<size_t>::max() - libapiSize_) {
         OPS_REPORT_VECTOR_INNER_ERR("GenericBlockSparseAttention", "workspace size overflow.");
         return ge::GRAPH_FAILED;

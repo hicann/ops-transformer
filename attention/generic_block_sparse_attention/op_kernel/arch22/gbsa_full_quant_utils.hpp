@@ -124,11 +124,14 @@ using CompactVCopyPlan = VCopyPlanStorage<FullQuantLayout::PAGE_TOKENS / 4U>;
 static_assert(sizeof(CompactVCopyPlan) == 2080U);
 
 struct Tile {
+    uint32_t alignedColumns = 0U;
     Page pages[FullQuantLayout::PAGES_PER_TILE];
 };
 // INT8 PV reduces K in 32-element units. Capacity stays 512; execution is compact.
 __aicore__ inline uint32_t TileColumns(const Tile& tile)
 {
+    if (tile.alignedColumns != 0U)
+        return tile.alignedColumns;
     uint32_t valid = 0;
     for (uint32_t i = 0; i < FullQuantLayout::PAGES_PER_TILE; ++i) {
         valid += tile.pages[i].validTokens;
@@ -263,10 +266,39 @@ public:
         return valid;
     }
 
+    __aicore__ inline Tile PageTile(uint32_t& nextBlockListIndex, uint32_t selectedBlockEndPos) const
+    {
+        Tile tile{};
+        for (auto& part : tile.pages) {
+            if (nextBlockListIndex >= selectedBlockEndPos) {
+                break;
+            }
+            const uint32_t blockListIndex = nextBlockListIndex++;
+            int32_t logicalBlockId;
+            if constexpr (hasResidualBlock) {
+                logicalBlockId = blockListIndex == explicitCount_ ? static_cast<int32_t>(residualBlockId_) :
+                                                                    indices_.GetValue(blockListIndex);
+            } else {
+                logicalBlockId = indices_.GetValue(blockListIndex);
+            }
+            SparseRun block;
+            if (ReadBlock(logicalBlockId, block)) {
+                part.sourceToken = block.token;
+                part.validTokens = block.length;
+                tile.alignedColumns += block.length;
+            }
+        }
+        tile.alignedColumns = (tile.alignedColumns + 31U) / 32U * 32U;
+        return tile;
+    }
+
     // Cube only needs chunk bounds before issuing K. Do not walk the same
     // sparse list here and again when generating DMA descriptors.
     __aicore__ inline Tile DescribeTile(uint32_t& cursor, uint32_t count) const
     {
+        if (blockY_ == FullQuantLayout::PAGE_TOKENS) {
+            return PageTile(cursor, count);
+        }
         Tile tile{};
         for (auto& part : tile.pages) {
             part.firstIndex = cursor;
@@ -297,6 +329,18 @@ public:
     __aicore__ inline void ForEachKvRecord(const Page& part, uint64_t kPageStride, uint64_t vPageStride, uint32_t heads,
                                            uint32_t head, uint64_t kvStart, Emit emit) const
     {
+        if (blockY_ == FullQuantLayout::PAGE_TOKENS) {
+            if (part.validTokens != 0U) {
+                KvCopyRecord copyRecord{};
+                copyRecord.key = KvOffset(part.sourceToken, kPageStride, heads, head, kvStart);
+                copyRecord.value = KvOffset(part.sourceToken, vPageStride, heads, head, kvStart);
+                copyRecord.rows = static_cast<uint16_t>(part.validTokens);
+                // One ND matrix starts at row zero of the current L1 slot.
+                copyRecord.ndNum = 1U;
+                emit(copyRecord);
+            }
+            return;
+        }
         KvCopyRecord pending{};
         uint64_t pendingSpan = 0;
         const uint64_t tokenStride = TokenStride(heads);
@@ -358,6 +402,9 @@ public:
     template <class PlanType = CopyPlan>
     __aicore__ inline Tile NextTile(uint32_t& cursor, uint32_t count, PlanType* plan = nullptr) const
     {
+        if (blockY_ == FullQuantLayout::PAGE_TOKENS) {
+            return PageTile(cursor, count);
+        }
         const uint32_t blocksPerChunk = FullQuantLayout::PAGE_TOKENS / blockY_;
         Tile tile{};
         uint32_t record = 0;

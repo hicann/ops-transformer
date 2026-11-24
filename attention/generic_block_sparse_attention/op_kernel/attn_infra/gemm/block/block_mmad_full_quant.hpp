@@ -14,7 +14,6 @@
 #include "../tile_common/gbsa_gemm_tile_copy.hpp"
 #include "../../../arch22/gbsa_full_quant_utils.hpp"
 #include "../../../arch22/kernel_utils.hpp"
-#include "../../../arch22/gbsa_packed_kv.hpp"
 
 namespace GbsaKernelArch22::Int8 {
 
@@ -45,15 +44,12 @@ class GbsaFullQuantCubeArch22 {
 
 public:
     __aicore__ inline explicit GbsaFullQuantCubeArch22(Resource& resource, uint32_t headDim = FullQuantLayout::HEAD_DIM,
-                                                       uint32_t kvHeads = 1, bool kvHeadMajor = false,
-                                                       bool packedKv = false, uint32_t packedBlockY = 128U)
+                                                       uint32_t kvHeads = 1, bool kvHeadMajor = false)
         : resource_(resource),
           headDim_(headDim),
           kvHeads_(kvHeads),
           copyDim_(headDim),
-          kvHeadMajor_(kvHeadMajor),
-          packedKv_(packedKv),
-          packedBlockY_(packedBlockY)
+          kvHeadMajor_(kvHeadMajor)
     {}
 
     __aicore__ inline void Init()
@@ -191,8 +187,6 @@ private:
     uint32_t kvHeads_;
     uint32_t copyDim_;
     bool kvHeadMajor_;
-    bool packedKv_;
-    uint32_t packedBlockY_;
     uint32_t headOffset_ = 0;
     uint32_t rows_ = FullQuantLayout::ROWS;
     uint32_t rowRound_ = FullQuantLayout::ROWS;

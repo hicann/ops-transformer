@@ -124,7 +124,7 @@ struct UbCopyPlan {
     }
 };
 
-template <class ElementO, bool singleRowTile = false, bool compactUb = false>
+template <class ElementO, bool singleRowTile = false, bool compactUb = false, bool fullPage = false>
 class GbsaFullQuantVectorArch22 {
     using BufferLayout = VectorUbLayout<singleRowTile, compactUb>;
     static_assert(!compactUb || singleRowTile);
@@ -138,9 +138,27 @@ public:
         : resource_(resource)
     {}
 
+    __aicore__ inline void InitPageBufferEvents()
+    {
+        pageScaleEvents_ = true;
+        for (uint32_t id = 0; id < FullQuantLayout::DOUBLE_BUFFER; ++id) {
+            AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(id + 2U);
+            AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(id);
+        }
+    }
+
+    __aicore__ inline void DrainPageBufferEvents()
+    {
+        pageScaleEvents_ = false;
+        for (uint32_t id = 0; id < FullQuantLayout::DOUBLE_BUFFER; ++id) {
+            AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(id + 2U);
+            AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(id);
+        }
+    }
+
     __aicore__ inline void Init(uint32_t rows, AscendC::GlobalTensor<float> qScale, AscendC::GlobalTensor<float> vScale,
                                 AscendC::GlobalTensor<float> pScale, uint32_t headDim = FullQuantLayout::HEAD_DIM,
-                                uint32_t scaleHeadStride = 1U)
+                                uint32_t scaleHeadStride = 1U, uint32_t head = UINT32_MAX)
     {
         qScaleReady_ = false;
         headDim_ = headDim;
@@ -152,6 +170,10 @@ public:
         rows_ = totalRows_ < BATCH_ROWS ? totalRows_ : BATCH_ROWS;
         if (totalRows_ == 0U) {
             return;
+        }
+        if constexpr (fullPage) {
+            AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(0U);
+            AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(1U);
         }
         if (scaleHeadStride == 1U) {
             // Q head scales are contiguous. The existing MTE2_V fence below completes Qscale and Vscale.
@@ -169,22 +191,29 @@ public:
                 Ub<float>(BufferLayout::Q_SCALE).SetValue(row, 0.0f);
             }
         }
-        pScale_ = pScale.GetValue(0);
-        Ub<float>(BufferLayout::P_SCALE).SetValue(0, pScale_);
-        if (headDim_ != alignedDim_) {
-            AscendC::Duplicate(Ub<float>(BufferLayout::V_SCALE), 0.0f, alignedDim_);
+        const bool reloadPvScales = !compactUb || head == UINT32_MAX || head != lastVHead_;
+        if (reloadPvScales) {
+            lastVHead_ = head;
+            pScale_ = pScale.GetValue(0);
+            Ub<float>(BufferLayout::P_SCALE).SetValue(0, pScale_);
+            if (headDim_ != alignedDim_) {
+                AscendC::Duplicate(Ub<float>(BufferLayout::V_SCALE), 0.0f, alignedDim_);
+            }
+            if (!singleRowTile || headDim_ != alignedDim_) {
+                // Wide-row normalization stays on V. Finish's pipe waits do not
+                // order the next MTE2 Vscale write after the preceding O update.
+                Sync<AscendC::HardEvent::V_MTE2>();
+            }
+            AscendC::DataCopyExtParams copy{1, headDim_ * uint32_t{sizeof(float)}, 0, 0, 0};
+            AscendC::DataCopyPadExtParams<float> padding{false, 0, 0, 0};
+            AscendC::DataCopyPad(Ub<float>(BufferLayout::V_SCALE), vScale, copy, padding);
+            Sync<AscendC::HardEvent::MTE2_V>();
+            // Vscale and Pscale are invariant throughout this task.
+            AscendC::Muls(Ub<float>(BufferLayout::V_SCALE), Ub<float>(BufferLayout::V_SCALE), 1.0f / pScale_,
+                          alignedDim_);
+        } else {
+            Sync<AscendC::HardEvent::MTE2_V>();
         }
-        if (!singleRowTile || headDim_ != alignedDim_) {
-            // Wide-row normalization stays on V. Finish's pipe waits do not
-            // order the next MTE2 Vscale write after the preceding O update.
-            Sync<AscendC::HardEvent::V_MTE2>();
-        }
-        AscendC::DataCopyExtParams copy{1, headDim_ * uint32_t{sizeof(float)}, 0, 0, 0};
-        AscendC::DataCopyPadExtParams<float> padding{false, 0, 0, 0};
-        AscendC::DataCopyPad(Ub<float>(BufferLayout::V_SCALE), vScale, copy, padding);
-        Sync<AscendC::HardEvent::MTE2_V>();
-        // Vscale and Pscale are invariant throughout this task.
-        AscendC::Muls(Ub<float>(BufferLayout::V_SCALE), Ub<float>(BufferLayout::V_SCALE), 1.0f / pScale_, alignedDim_);
         AscendC::Duplicate(Ub<float>(BufferLayout::O_ACC), 0.0f, ((totalRows_ + 7U) / 8U * 8U) * alignedDim_);
         AscendC::Duplicate(Ub<float>(BufferLayout::RUNNING_SUM), 0.0f, (totalRows_ + 7U) / 8U * 8U);
         AscendC::Duplicate(Ub<float>(BufferLayout::RUNNING_MAX), -3.402823466e38f, (totalRows_ + 7U) / 8U * 8U);
@@ -199,6 +228,12 @@ public:
 
     __aicore__ inline void Finish()
     {
+        if constexpr (fullPage) {
+            if (totalRows_ != 0U) {
+                AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(0U);
+                AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(1U);
+            }
+        }
         if constexpr (!singleRowTile) {
             if (totalRows_ != 0U) {
                 for (uint32_t slot = 0U; slot < FullQuantLayout::DOUBLE_BUFFER; ++slot) {
@@ -272,6 +307,8 @@ private:
     uint32_t cachedKHead_ = UINT32_MAX;
     uint32_t cachedKLength_ = 0;
     bool cacheMapsReady_ = false;
+    uint32_t lastVHead_ = UINT32_MAX;
+    bool pageScaleEvents_ = false;
     bool qScaleReady_ = false;
     bool shortScaleOffsetsReady_ = false;
     float pScale_ = 1.0f;

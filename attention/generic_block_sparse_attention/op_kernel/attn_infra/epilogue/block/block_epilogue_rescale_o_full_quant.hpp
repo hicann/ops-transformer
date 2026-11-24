@@ -14,8 +14,8 @@
 
 namespace GbsaKernelArch22::Int8 {
 
-template <class ElementO, bool singleRowTile, bool compactUb>
-struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueRescaleO {
+template <class ElementO, bool singleRowTile, bool compactUb, bool fullPage>
+struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb, fullPage>::EpilogueRescaleO {
     static constexpr uint32_t OUT_ELEMENTS = BATCH_ROWS * FullQuantLayout::HEAD_DIM;
     static constexpr uint32_t UPDATE_ELEMENTS = 8192U;
     static_assert(singleRowTile || UPDATE_ELEMENTS * sizeof(float) <= BufferLayout::O_TEMP);
@@ -134,14 +134,18 @@ struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueRe
             if (remaining < 64U) {
                 state.RowMask(remaining);
             }
-            AscendC::Mul<float, false>(work[column], work[column],
+            AscendC::Mul<float, false>(round == 0U ? acc[column] : work[column], work[column],
                                        state.template Ub<float>(BufferLayout::V_SCALE)[column], uint64_t{0},
                                        state.rows_, AscendC::BinaryRepeatParams(1, 1, 1, rowStride, rowStride, 0));
-            AscendC::Mul<float, false>(acc[column], acc[column], alpha, uint64_t{0}, state.rows_,
-                                       AscendC::BinaryRepeatParams(1, 1, 0, rowStride, rowStride, 1));
+            if (round != 0U) {
+                AscendC::Mul<float, false>(acc[column], acc[column], alpha, uint64_t{0}, state.rows_,
+                                           AscendC::BinaryRepeatParams(1, 1, 0, rowStride, rowStride, 1));
+            }
         }
         state.FullMask();
         AscendC::PipeBarrier<PIPE_V>();
+        if (round == 0U)
+            return;
         AscendC::Add(acc, acc, work, state.rows_ * state.alignedDim_);
         AscendC::PipeBarrier<PIPE_V>();
     }
@@ -160,6 +164,10 @@ struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueRe
                                             (state.alignedDim_ - copyAligned) / 16U, 0, 0};
             if (headStride == 0U || headStride == state.headDim_) {
                 AscendC::DataCopyPad(output[(state.rowStart_ + state.rowOffset_) * state.headDim_], dst, copy);
+            } else if ((headStride - state.headDim_) <= UINT32_MAX / sizeof(ElementO)) {
+                copy.dstStride = (headStride - state.headDim_) * sizeof(ElementO);
+                AscendC::DataCopyPad(output[static_cast<uint64_t>(state.rowStart_ + state.rowOffset_) * headStride],
+                                     dst, copy);
             } else {
                 copy.blockCount = 1U;
                 copy.srcStride = 0U;
@@ -182,7 +190,7 @@ struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueRe
         }
         auto result = state.template Ub<float>(BufferLayout::O_TEMP);
         auto maximum = result[BATCH_ROWS];
-        if constexpr (singleRowTile) {
+        if constexpr (singleRowTile && !compactUb) {
             state.template Sync<AscendC::HardEvent::V_S>();
             for (uint32_t row = 0; row < BATCH_ROWS; ++row) {
                 const float sum = state.template Ub<float>(BufferLayout::RUNNING_SUM).GetValue(state.rowOffset_ + row);
@@ -210,7 +218,7 @@ struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueRe
         } else {
             // A separate aligned source block per row is required for strided scalar output.
             auto packed = result[BATCH_ROWS];
-            if constexpr (singleRowTile) {
+            if constexpr (singleRowTile && !compactUb) {
                 state.template Sync<AscendC::HardEvent::V_S>();
                 for (uint32_t row = 0U; row < state.rows_; ++row) {
                     packed.SetValue(row * STAT_STRIDE, result.GetValue(row));
@@ -221,11 +229,18 @@ struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueRe
                               BATCH_ROWS / 8U, AscendC::BrcbRepeatParams(1, 8));
                 state.template Sync<AscendC::HardEvent::V_MTE3>();
             }
-            const AscendC::DataCopyExtParams copy{1, sizeof(float), 0, 0, 0};
-            for (uint32_t row = 0U; row < state.rows_; ++row) {
-                AscendC::DataCopyPad(
-                    output[static_cast<uint64_t>(state.rowStart_ + state.rowOffset_ + row) * headStride],
-                    packed[row * STAT_STRIDE], copy);
+            if (headStride <= UINT32_MAX / sizeof(float)) {
+                const AscendC::DataCopyExtParams multi{static_cast<uint16_t>(state.rows_), sizeof(float), 0U,
+                                                       static_cast<uint32_t>((headStride - 1U) * sizeof(float)), 0U};
+                AscendC::DataCopyPad(output[static_cast<uint64_t>(state.rowStart_ + state.rowOffset_) * headStride],
+                                     packed, multi);
+            } else {
+                const AscendC::DataCopyExtParams copy{1, sizeof(float), 0, 0, 0};
+                for (uint32_t row = 0U; row < state.rows_; ++row) {
+                    AscendC::DataCopyPad(
+                        output[static_cast<uint64_t>(state.rowStart_ + state.rowOffset_ + row) * headStride],
+                        packed[row * STAT_STRIDE], copy);
+                }
             }
         }
         state.template Sync<AscendC::HardEvent::MTE3_V>();

@@ -151,18 +151,11 @@ struct GbsaFullQuantCubeArch22<singleRowTile>::BlockMmadQK {
         uint32_t copyDim;
         uint32_t headOffset;
         bool headMajor;
-        bool packed;
-        uint32_t packedBlockY;
 
         __aicore__ inline void operator()(const KvCopyRecord& r)
         {
-            if (packed) {
-                PackedKv::Emit<true>(dst, src, layout, r.dstRow, r.key, r.rows, r.ndNum, r.keyStride, headDim,
-                                     packedBlockY);
-            } else {
-                GbsaSparsePairCopy::Emit<true>(dst, src, layout, r.dstRow, r.key - headOffset, r.rows, r.ndNum,
-                                               r.keyStride, copyDim, headMajor ? headDim : heads * headDim);
-            }
+            GbsaSparsePairCopy::Emit<true>(dst, src, layout, r.dstRow, r.key - headOffset, r.rows, r.ndNum, r.keyStride,
+                                           copyDim, headMajor ? headDim : heads * headDim);
             plan.records[plan.end[chunk]++] = {r.value, r.valueStride, r.rows, r.dstRow, r.ndNum};
         }
     };
@@ -174,10 +167,10 @@ struct GbsaFullQuantCubeArch22<singleRowTile>::BlockMmadQK {
         uint32_t head, uint64_t kvStart,
         const SparseSource<isPaged, hasResidualBlock, AscendC::GlobalTensor<int32_t>>& source)
     {
-        source.ForEachKvRecord(part, kPageStride, vPageStride, heads, head, kvStart,
-                               KeyEmitter<TensorLayout, PlanType>{dst, src, layout, plan, chunk, heads, state.HeadDim(),
-                                                                  state.copyDim_, state.headOffset_, state.kvHeadMajor_,
-                                                                  state.packedKv_, state.packedBlockY_});
+        source.ForEachKvRecord(
+            part, kPageStride, vPageStride, heads, head, kvStart,
+            KeyEmitter<TensorLayout, PlanType>{dst, src, layout, plan, chunk, heads, state.HeadDim(), state.copyDim_,
+                                               state.headOffset_, state.kvHeadMajor_});
     }
 
 private:

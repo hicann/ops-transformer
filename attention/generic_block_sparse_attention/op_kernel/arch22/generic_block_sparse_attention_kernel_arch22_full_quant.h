@@ -19,6 +19,9 @@
 
 namespace GbsaKernelArch22::Int8 {
 
+constexpr uint32_t LAYOUT_BNSD = 2U;
+constexpr uint32_t LAYOUT_PA_BNBD = 3U;
+
 struct FullQuantScales {
     GM_ADDR query;
     GM_ADDR key;
@@ -170,23 +173,19 @@ private:
         // A single Cube row-fractal has constant strides; larger groups share
         // the same implementation with capacity-driven row/column tiling.
         if (tiling.groupSize <= 16U) {
-            if (PackedKv::Enabled(tiling)) {
-                if (tiling.blockShapeY >= 4U) {
-                    Run<isPaged, hasResidualBlock, true, true, true>(params, scales, tiling);
-                } else {
-                    Run<isPaged, hasResidualBlock, true, false, true>(params, scales, tiling);
-                }
+            if (tiling.blockShapeY == FullQuantLayout::PAGE_TOKENS) {
+                Run<isPaged, hasResidualBlock, true, true, true>(params, scales, tiling);
             } else if (tiling.blockShapeY >= 4U) {
                 Run<isPaged, hasResidualBlock, true, true, false>(params, scales, tiling);
             } else {
                 Run<isPaged, hasResidualBlock, true, false, false>(params, scales, tiling);
             }
         } else {
-            Run<isPaged, hasResidualBlock, false>(params, scales, tiling);
+            Run<isPaged, hasResidualBlock, false, false, false>(params, scales, tiling);
         }
     }
 
-    template <bool isPaged, bool hasResidualBlock, bool singleRowTile, bool compactUb = false, bool packedMode = false>
+    template <bool isPaged, bool hasResidualBlock, bool singleRowTile, bool compactUb = false, bool fullPage = false>
     __aicore__ inline void Run(const GbsaKernelParamsArch22& params, const FullQuantScales& scales,
                                const Tiling& tiling)
     {
@@ -195,21 +194,6 @@ private:
             return;
         }
         Bind(params, scales, tiling);
-        constexpr bool packedKv = packedMode;
-        if (packedKv) {
-#ifdef __DAV_C220_VEC__
-            PackedKv::PackAll<isPaged>(resource_, params, tiling);
-            AscendC::CrossCoreSetFlag<0x2, PIPE_MTE3>(5);
-#else
-            AscendC::CrossCoreWaitFlag(5);
-#endif
-            // Every Cube first waits its two local Vector packers; the all-core barrier then covers all pages.
-            AscendC::PipeBarrier<PIPE_ALL>();
-            AscendC::SyncAll<false>();
-            key_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(params.workSpace + PackedKv::Offset(tiling)));
-            value_.SetGlobalBuffer(reinterpret_cast<__gm__ int8_t*>(params.workSpace + PackedKv::Offset(tiling) +
-                                                                    PackedKv::Bytes(tiling)));
-        }
         // Above 127, saturation depends on the partial max; retain the
         // whole-KV quantization order rather than merging saturated partials.
         const bool fdEnabled =
@@ -229,8 +213,8 @@ private:
         const uint32_t pBytes = rows * FullQuantLayout::KV_TILE;
         const uint32_t oBytes = rows * FullQuantLayout::HEAD_DIM * sizeof(int32_t);
         const bool batchedQ = tiling.qLayout != 0U;
-        const bool headMajorQ = tiling.qLayout == 2U;
-        const bool headMajorKv = packedKv || tiling.kvLayout == 2U || tiling.kvLayout == 3U;
+        const bool headMajorQ = tiling.qLayout == LAYOUT_BNSD;
+        const bool headMajorKv = tiling.kvLayout == LAYOUT_BNSD || tiling.kvLayout == LAYOUT_PA_BNBD;
         const uint64_t qHeadStride =
             headMajorQ ? static_cast<uint64_t>(tiling.qSeqCapacity) * tiling.embeddingSize : tiling.embeddingSize;
         const uint32_t scaleHeadStride = headMajorQ ? tiling.qSeqCapacity : 1U;
@@ -244,12 +228,14 @@ private:
         uint32_t core = AscendC::GetBlockIdx();
 #ifdef __DAV_C220_VEC__
         core /= AscendC::GetSubBlockNum();
-        GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb> vector(resource_);
+        GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb, fullPage> vector(resource_);
         typename decltype(vector)::EpilogueOnlineSoftmax softmax{vector};
+        if constexpr (fullPage) {
+            vector.InitPageBufferEvents();
+        }
         typename decltype(vector)::EpilogueRescaleO rescaleO{vector};
 #else
-        GbsaFullQuantCubeArch22<singleRowTile> cube(resource_, tiling.embeddingSize, tiling.kvHeads, headMajorKv,
-                                                    packedKv, tiling.blockShapeY);
+        GbsaFullQuantCubeArch22<singleRowTile> cube(resource_, tiling.embeddingSize, tiling.kvHeads, headMajorKv);
         typename decltype(cube)::BlockMmadQK qk{cube};
         typename decltype(cube)::BlockMmadPV pv{cube};
         cube.Init();
@@ -281,6 +267,10 @@ private:
 #ifdef __DAV_C220_CUBE__
         bool taskDonePending = false;
 #endif
+        const uint32_t sparseOrigin = batchedQ ? 0U : static_cast<uint32_t>(cuSeqLengthsQ_.GetValue(0));
+        uint32_t cachedBatch = UINT32_MAX;
+        uint32_t kvLength = 0U;
+        uint64_t kvStart = 0U;
         for (uint32_t work = taskStart; work < taskEnd; work += taskStep) {
             const uint32_t task = work / rowPartitions;
             const uint32_t part = work % rowPartitions;
@@ -313,26 +303,23 @@ private:
                     (static_cast<uint64_t>(token) * tiling.numHeads + head * tiling.groupSize + groupRowStart) *
                         tiling.embeddingSize;
             const uint64_t scaleOffset = queryOffset / tiling.embeddingSize;
-            const uint32_t queryLength =
-                !batchedQ && params.sequsedQ == nullptr ?
-                    static_cast<uint32_t>(cuSeqLengthsQ_.GetValue(batch + 1) - cuSeqLengthsQ_.GetValue(batch)) :
-                    sequsedQ_.GetValue(batch);
-            uint64_t kvStart = 0;
-            uint32_t kvLength = 0;
-            if constexpr (isPaged) {
-                kvLength = sequsedKv_.GetValue(batch);
-            } else {
-                kvStart =
-                    batchedQ ? static_cast<uint64_t>(batch) * tiling.kvSeqCapacity : cuSeqLengthsKv_.GetValue(batch);
-                const uint32_t storageLength =
-                    batchedQ ? tiling.kvSeqCapacity : cuSeqLengthsKv_.GetValue(batch + 1) - kvStart;
-                kvLength = params.sequsedKv == nullptr ? storageLength : sequsedKv_.GetValue(batch);
+            const uint32_t queryLength = cursor.actualEnd - cursor.actualStart;
+            if (batch != cachedBatch) {
+                cachedBatch = batch;
+                if constexpr (isPaged) {
+                    kvLength = sequsedKv_.GetValue(batch);
+                } else {
+                    kvStart = batchedQ ? static_cast<uint64_t>(batch) * tiling.kvSeqCapacity :
+                                         cuSeqLengthsKv_.GetValue(batch);
+                    const uint32_t storageLength =
+                        batchedQ ? tiling.kvSeqCapacity : cuSeqLengthsKv_.GetValue(batch + 1) - kvStart;
+                    kvLength = params.sequsedKv == nullptr ? storageLength : sequsedKv_.GetValue(batch);
+                }
             }
             const int64_t causalEnd = static_cast<int64_t>(kvLength) - queryLength + tokenInBatch + 1;
             const uint32_t visibleEnd =
                 tiling.maskType == 0U ? kvLength : (causalEnd > 0 ? static_cast<uint32_t>(causalEnd) : 0U);
-            const uint32_t queryBlock =
-                batchedQ ? token : GsaFd::StorageQBlock(cuSeqLengthsQ_, batch, tokenInBatch, token, 1);
+            const uint32_t queryBlock = token - sparseOrigin;
             const uint64_t sparseRow = static_cast<uint64_t>(head) * tiling.qBlockNum + queryBlock;
             int32_t count = counts_.GetValue(sparseRow);
             const uint32_t selected =
@@ -348,31 +335,12 @@ private:
             const uint32_t explicitBegin = rawBegin < selected ? rawBegin : selected;
             const uint32_t explicitEnd = rawEnd < selected ? rawEnd : selected;
             const uint32_t localSelected = explicitEnd - explicitBegin;
+            const bool includeResidualBlock = rawBegin <= selected && rawEnd > selected;
             auto indices = indices_[sparseRow * tiling.topK + explicitBegin];
-            const uint64_t sourceKvHeadStride = packedKv ?
-                                                    (isPaged ? static_cast<uint64_t>(tiling.maxBlocksPerBatch) * 128U :
-                                                               static_cast<uint64_t>((kvLength + 127U) / 128U * 128U)) *
-                                                        tiling.embeddingSize :
-                                                    kvHeadStride;
-            const uint64_t dataKvStart = packedKv ?
-                                             (isPaged ? static_cast<uint64_t>(batch) * tiling.maxBlocksPerBatch * 128U :
-                                                        (kvStart / 128U + batch) * 128U) :
-                                             kvStart;
-            const uint64_t dataKPageStride = packedKv && isPaged ?
-                                                 static_cast<uint64_t>(128U) * tiling.kvHeads * tiling.embeddingSize :
-                                                 tiling.kStride0;
-            const uint64_t dataVPageStride = packedKv && isPaged ? dataKPageStride : tiling.vStride0;
-#ifdef __DAV_C220_CUBE__
-            // PA is resolved once by the packer. Cube now reads logical blocks without a page-table lookup.
-            constexpr bool sourcePaged = isPaged && !packedMode;
-#else
-            // Kscale retains its original physical-page input format.
-            constexpr bool sourcePaged = isPaged;
-#endif
-            SparseSource<sourcePaged, hasResidualBlock, AscendC::GlobalTensor<int32_t>> source(
+            SparseSource<isPaged, hasResidualBlock, AscendC::GlobalTensor<int32_t>> source(
                 indices, table_[static_cast<uint64_t>(batch) * tiling.maxBlocksPerBatch], tiling.blockShapeY,
-                visibleEnd, tiling.maxBlocksPerBatch, localSelected, tiling.embeddingSize, kvTokenStride,
-                sourceKvHeadStride, rawBegin <= selected && rawEnd > selected);
+                visibleEnd, tiling.maxBlocksPerBatch, localSelected, tiling.embeddingSize, kvTokenStride, kvHeadStride,
+                includeResidualBlock);
             const uint32_t validBlocks = source.CountValid(localSelected);
             const uint32_t blocksPerTile = FullQuantLayout::KV_TILE / tiling.blockShapeY;
             const uint32_t rounds = (validBlocks + blocksPerTile - 1) / blocksPerTile;
@@ -381,7 +349,7 @@ private:
             auto gOTmp = temporary_[static_cast<uint64_t>(core) * FullQuantLayout::STAGES * oBytes / sizeof(int32_t)];
 #ifdef __DAV_C220_VEC__
             vector.Init(localRows, qScale_[scaleOffset], vScale_[head * tiling.embeddingSize], pScale_,
-                        tiling.embeddingSize, scaleHeadStride);
+                        tiling.embeddingSize, scaleHeadStride, head);
             auto taskKScale = kScale_;
             uint64_t scaleKvStart = kvStart;
             uint64_t scaleKvTokens = tiling.totalKvTokens;
@@ -390,9 +358,11 @@ private:
                 scaleKvStart = 0U;
                 scaleKvTokens = tiling.kvSeqCapacity;
             }
-            const bool useKScaleCache = softmax.template PrepareHeadKScaleCache<isPaged>(
-                taskKScale, source, batch, tiling.kvHeads, head, kvLength, scaleKvStart, scaleKvTokens,
-                tiling.blockShapeY, !fdEnabled && queryLength > 1U && rounds > 0U && taskStep % tiling.kvHeads == 0U);
+            const bool reuseKScale =
+                !fullPage && !fdEnabled && queryLength > 1U && rounds > 0U && taskStep % tiling.kvHeads == 0U;
+            const bool useKScaleCache = !fullPage && softmax.template PrepareHeadKScaleCache<isPaged>(
+                                                         taskKScale, source, batch, tiling.kvHeads, head, kvLength,
+                                                         scaleKvStart, scaleKvTokens, tiling.blockShapeY, reuseKScale);
 #else
             qk.LoadQuery(query_[queryOffset], localRows, head, qHeadStride);
 #endif
@@ -401,7 +371,8 @@ private:
             CopyPlan spanPlan;
 #else
             // compactUb dispatch guarantees Y>=4, hence at most32 sparse records per128-token chunk.
-            using CubePlan = std::conditional_t<compactUb, CompactVCopyPlan, VCopyPlan>;
+            using CubePlan = std::conditional_t<fullPage, VCopyPlanStorage<1U>,
+                                                std::conditional_t<compactUb, CompactVCopyPlan, VCopyPlan>>;
             CubePlan kvPlans[FullQuantLayout::STAGES];
 #endif
             // Lifetime proof for the three GM slots:
@@ -417,7 +388,11 @@ private:
                     const uint32_t stage = step % FullQuantLayout::STAGES;
 #ifdef __DAV_C220_VEC__
                     if (vector.HasRows()) {
-                        if (useKScaleCache) {
+                        if constexpr (fullPage) {
+                            tiles[stage] = source.PageTile(selectionCursor, validBlocks);
+                            softmax.template PrefetchPageKScale<isPaged>(taskKScale, tiles[stage], tiling.kvHeads, head,
+                                                                         step, scaleKvStart, scaleKvTokens);
+                        } else if (useKScaleCache) {
                             tiles[stage] = softmax.PrefetchCachedKScale(source, selectionCursor, validBlocks, step,
                                                                         tiling.blockShapeY);
                         } else {
@@ -445,10 +420,10 @@ private:
                                     tiling.scaleValue);
                     AscendC::CrossCoreSetFlag<0x2, PIPE_MTE3>(P_READY);
 #else
-                    tiles[stage] = source.DescribeTile(selectionCursor, validBlocks);
-                    qk.template Qk<sourcePaged>(key_, gS[stage * sBytes / sizeof(int32_t)], tiles[stage],
-                                                dataKPageStride, dataVPageStride, tiling.kvHeads, head, dataKvStart,
-                                                source, kvPlans[stage]);
+                    tiles[stage] = fullPage ? source.PageTile(selectionCursor, validBlocks) :
+                                              source.DescribeTile(selectionCursor, validBlocks);
+                    qk.template Qk<isPaged>(key_, gS[stage * sBytes / sizeof(int32_t)], tiles[stage], tiling.kStride0,
+                                            tiling.vStride0, tiling.kvHeads, head, kvStart, source, kvPlans[stage]);
                     AscendC::CrossCoreSetFlag<0x2, PIPE_FIX>(QK_READY);
 #endif
                 }
@@ -502,6 +477,11 @@ private:
             taskDonePending = true;
 #endif
         }
+#ifdef __DAV_C220_VEC__
+        if constexpr (fullPage) {
+            vector.DrainPageBufferEvents();
+        }
+#endif
 #ifdef __DAV_C220_CUBE__
         if (taskDonePending) {
             AscendC::CrossCoreWaitFlag(TASK_DONE);
@@ -534,13 +514,13 @@ private:
         }
     }
 
-    template <bool singleRowTile, bool compactUb>
-    __aicore__ inline void WriteEmptyUnscheduled(__gm__ const GbsaMetadata::Metadata* meta,
-                                                 const GbsaKernelParamsArch22& params, const Tiling& tiling,
-                                                 GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>& vector,
-                                                 uint32_t core)
+    template <bool singleRowTile, bool compactUb, bool fullPage>
+    __aicore__ inline void WriteEmptyUnscheduled(
+        __gm__ const GbsaMetadata::Metadata* meta, const GbsaKernelParamsArch22& params, const Tiling& tiling,
+        GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb, fullPage>& vector, uint32_t core)
     {
-        typename GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueRescaleO rescaleO{vector};
+        typename GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb, fullPage>::EpilogueRescaleO rescaleO{
+            vector};
         const bool batched = tiling.qLayout != 0U;
         const uint64_t headStride = tiling.qLayout == 2U ?
                                         static_cast<uint64_t>(tiling.qSeqCapacity) * tiling.embeddingSize :

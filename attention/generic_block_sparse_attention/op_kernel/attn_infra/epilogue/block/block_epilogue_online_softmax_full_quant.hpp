@@ -14,8 +14,8 @@
 
 namespace GbsaKernelArch22::Int8 {
 
-template <class ElementO, bool singleRowTile, bool compactUb>
-struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueOnlineSoftmax {
+template <class ElementO, bool singleRowTile, bool compactUb, bool fullPage>
+struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb, fullPage>::EpilogueOnlineSoftmax {
     static constexpr uint32_t ROW_ELEMENTS = BATCH_ROWS * FullQuantLayout::KV_TILE;
     static constexpr uint32_t Q_BROADCAST = BufferLayout::END;
     static_assert(Q_BROADCAST + FullQuantLayout::MAX_VECTOR_ROWS * 32U <= 192U * FullQuantLayout::KIB);
@@ -154,6 +154,30 @@ struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueOn
             }
         }
         return tile;
+    }
+
+    template <bool isPaged>
+    __aicore__ inline void PrefetchPageKScale(AscendC::GlobalTensor<float> scales, const Tile& tile, uint32_t heads,
+                                              uint32_t head, uint32_t round, uint64_t kvStart, uint64_t total)
+    {
+        auto dst = state.template Ub<float>(BufferLayout::K_SCALE + (round % FullQuantLayout::DOUBLE_BUFFER) *
+                                                                        FullQuantLayout::KV_TILE * sizeof(float));
+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(round % FullQuantLayout::DOUBLE_BUFFER);
+        for (uint32_t page = 0; page < FullQuantLayout::PAGES_PER_TILE; ++page) {
+            const auto& part = tile.pages[page];
+            if (part.validTokens != 0U) {
+                auto offset = ScaleOffset<isPaged>(part.sourceToken, heads, head, kvStart, total);
+                CopyScaleSpan(dst[page * FullQuantLayout::PAGE_TOKENS], scales[offset], part.validTokens);
+                if (part.validTokens % 32U != 0U) {
+                    const uint32_t afterDma = (part.validTokens + 7U) / 8U * 8U;
+                    const uint32_t end = (part.validTokens + 31U) / 32U * 32U;
+                    if (afterDma < end) {
+                        AscendC::Duplicate(dst[page * FullQuantLayout::PAGE_TOKENS + afterDma], 0.0f, end - afterDma);
+                        AscendC::PipeBarrier<PIPE_V>();
+                    }
+                }
+            }
+        }
     }
 
     template <bool isPaged, class PlanType>
@@ -299,15 +323,18 @@ struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueOn
         const uint32_t slot = compactUb     ? 0U :
                               singleRowTile ? scaleSlot :
                                               (state.rowOffset_ / BATCH_ROWS) % FullQuantLayout::DOUBLE_BUFFER;
-        auto input = state.template Ub<int32_t>(BufferLayout::S_INPUT + slot * ROW_ELEMENTS * sizeof(int32_t));
+        constexpr uint32_t SECOND_S = 72U * FullQuantLayout::KIB;
+        static_assert(SECOND_S >= K_CACHE_BASE + ROW_ELEMENTS &&
+                      SECOND_S + ROW_ELEMENTS * sizeof(int32_t) <= 192U * FullQuantLayout::KIB);
+        auto input = state.template Ub<int32_t>(state.pageScaleEvents_ && scaleSlot ?
+                                                    SECOND_S :
+                                                    BufferLayout::S_INPUT + slot * ROW_ELEMENTS * sizeof(int32_t));
         auto work = compactUb     ? input.template ReinterpretCast<float>() :
                     singleRowTile ? state.template Ub<float>(BufferLayout::SCORES) :
                                     input.template ReinterpretCast<float>();
-        auto p = state.template Ub<int8_t>(BufferLayout::P_OUTPUT + slot * ROW_ELEMENTS);
+        auto p = state.template Ub<int8_t>(fullPage && scaleSlot ? K_CACHE_BASE :
+                                                                   BufferLayout::P_OUTPUT + slot * ROW_ELEMENTS);
         // Each AIV emits only its valid rows; Cube ignores padded MMAD rows.
-        if constexpr (singleRowTile) {
-            AscendC::Duplicate(p.template ReinterpretCast<int32_t>(), 0, ROW_ELEMENTS / sizeof(int32_t));
-        }
         if (state.rows_ != 0) {
             if constexpr (!singleRowTile) {
                 // O input aliases S; protect the first S DMA after an O update.
@@ -316,17 +343,27 @@ struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueOn
                 }
                 AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(slot);
             }
+            if (state.pageScaleEvents_)
+                AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(scaleSlot + 2U);
             AscendC::DataCopy(input, scores[(state.rowStart_ + state.rowOffset_) * state.columns_],
                               state.rows_ * state.columns_);
             // Both transfers use MTE2: this fence completes S and the earlier K-scale DMA.
             state.template Sync<AscendC::HardEvent::MTE2_V>();
             AscendC::Cast(work, input, AscendC::RoundMode::CAST_NONE, state.rows_ * state.columns_);
             AscendC::PipeBarrier<PIPE_V>();
-            SoftmaxRows(work, tile, round, scaleSlot, attentionScale);
+            if (compactUb && state.rows_ == BATCH_ROWS && state.columns_ == FullQuantLayout::KV_TILE) {
+                SoftmaxRows<true>(work, tile, round, scaleSlot, attentionScale);
+            } else {
+                SoftmaxRows<false>(work, tile, round, scaleSlot, attentionScale);
+            }
             if constexpr (!singleRowTile) {
                 AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(slot);
             }
+            if constexpr (fullPage)
+                AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(scaleSlot);
             Quantize(work, p, state.rows_ * state.columns_);
+            if (state.pageScaleEvents_)
+                AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(scaleSlot + 2U);
             if constexpr (!singleRowTile) {
                 AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(slot);
             }
@@ -336,7 +373,10 @@ struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueOn
                           state.rows_ * state.columns_);
         // P is reusable only after MTE3 has consumed the local slot.
         if constexpr (singleRowTile) {
-            state.template Sync<AscendC::HardEvent::MTE3_V>();
+            if constexpr (fullPage)
+                AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(scaleSlot);
+            else
+                state.template Sync<AscendC::HardEvent::MTE3_V>();
         } else {
             AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(slot);
         }
@@ -436,75 +476,89 @@ struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueOn
 
     // Same 512-column, three-level block reduction as the FP16 epilogue.
     // The last mask covers only valid rows, including GQA tails smaller than eight.
-    template <bool IS_MAX>
+    template <bool IS_MAX, bool full>
     __aicore__ inline void ReduceRows(AscendC::LocalTensor<float> dst, AscendC::LocalTensor<float> scores)
     {
         auto scratch = state.template Ub<float>(BufferLayout::P_INT32);
-        if ((state.columns_ % 64U) == 0U) {
+        if (((full ? FullQuantLayout::KV_TILE : state.columns_) % 64U) == 0U) {
             state.FullMask();
             if constexpr (IS_MAX) {
-                AscendC::BlockReduceMax<float, false>(scratch, scores, state.rows_ * state.columns_ / 64U, uint64_t{0},
-                                                      1, 1, 8);
+                AscendC::BlockReduceMax<float, false>(
+                    scratch, scores,
+                    (full ? BATCH_ROWS : state.rows_) * (full ? FullQuantLayout::KV_TILE : state.columns_) / 64U,
+                    uint64_t{0}, 1, 1, 8);
             } else {
-                AscendC::BlockReduceSum<float, false>(scratch, scores, state.rows_ * state.columns_ / 64U, uint64_t{0},
-                                                      1, 1, 8);
+                AscendC::BlockReduceSum<float, false>(
+                    scratch, scores,
+                    (full ? BATCH_ROWS : state.rows_) * (full ? FullQuantLayout::KV_TILE : state.columns_) / 64U,
+                    uint64_t{0}, 1, 1, 8);
             }
             AscendC::PipeBarrier<PIPE_V>();
-            state.RowMask(state.columns_ / 8U);
+            state.RowMask((full ? FullQuantLayout::KV_TILE : state.columns_) / 8U);
             if constexpr (IS_MAX) {
-                AscendC::BlockReduceMax<float, false>(scratch[BATCH_ROWS * 64U], scratch, state.rows_, uint64_t{0}, 1,
-                                                      1, state.columns_ / 64U);
+                AscendC::BlockReduceMax<float, false>(scratch[BATCH_ROWS * 64U], scratch,
+                                                      (full ? BATCH_ROWS : state.rows_), uint64_t{0}, 1, 1,
+                                                      (full ? FullQuantLayout::KV_TILE : state.columns_) / 64U);
             } else {
-                AscendC::BlockReduceSum<float, false>(scratch[BATCH_ROWS * 64U], scratch, state.rows_, uint64_t{0}, 1,
-                                                      1, state.columns_ / 64U);
+                AscendC::BlockReduceSum<float, false>(scratch[BATCH_ROWS * 64U], scratch,
+                                                      (full ? BATCH_ROWS : state.rows_), uint64_t{0}, 1, 1,
+                                                      (full ? FullQuantLayout::KV_TILE : state.columns_) / 64U);
             }
             AscendC::PipeBarrier<PIPE_V>();
             uint64_t mask = 0;
-            const uint32_t count = state.rows_ < 8U ? state.rows_ : 8U;
+            const uint32_t count = (full ? BATCH_ROWS : state.rows_) < 8U ? (full ? BATCH_ROWS : state.rows_) : 8U;
             for (uint32_t row = 0; row < count; ++row) {
-                mask |= ((uint64_t{1} << (state.columns_ / 64U)) - 1U) << (row * 8U);
+                mask |= ((uint64_t{1} << ((full ? FullQuantLayout::KV_TILE : state.columns_) / 64U)) - 1U)
+                        << (row * 8U);
             }
             AscendC::SetVectorMask<int8_t>(0, mask);
             if constexpr (IS_MAX) {
-                AscendC::BlockReduceMax<float, false>(dst, scratch[BATCH_ROWS * 64U], (state.rows_ + 7U) / 8U,
-                                                      uint64_t{0}, 1, 1, 8);
+                AscendC::BlockReduceMax<float, false>(dst, scratch[BATCH_ROWS * 64U],
+                                                      ((full ? BATCH_ROWS : state.rows_) + 7U) / 8U, uint64_t{0}, 1, 1,
+                                                      8);
             } else {
-                AscendC::BlockReduceSum<float, false>(dst, scratch[BATCH_ROWS * 64U], (state.rows_ + 7U) / 8U,
-                                                      uint64_t{0}, 1, 1, 8);
+                AscendC::BlockReduceSum<float, false>(dst, scratch[BATCH_ROWS * 64U],
+                                                      ((full ? BATCH_ROWS : state.rows_) + 7U) / 8U, uint64_t{0}, 1, 1,
+                                                      8);
             }
         } else {
             // A final 32-column fragment uses a masked two-level per-segment tree.
-            for (uint32_t column = 0; column < state.columns_; column += 64U) {
-                const uint32_t width = state.columns_ - column < 64U ? state.columns_ - column : 64U;
+            for (uint32_t column = 0; column < (full ? FullQuantLayout::KV_TILE : state.columns_); column += 64U) {
+                const uint32_t width = (full ? FullQuantLayout::KV_TILE : state.columns_) - column < 64U ?
+                                           (full ? FullQuantLayout::KV_TILE : state.columns_) - column :
+                                           64U;
                 state.RowMask(width);
                 if constexpr (IS_MAX) {
-                    AscendC::BlockReduceMax<float, false>(scratch, scores[column], state.rows_, uint64_t{0}, 1, 1,
-                                                          state.columns_ / 8U);
+                    AscendC::BlockReduceMax<float, false>(scratch, scores[column], (full ? BATCH_ROWS : state.rows_),
+                                                          uint64_t{0}, 1, 1,
+                                                          (full ? FullQuantLayout::KV_TILE : state.columns_) / 8U);
                 } else {
-                    AscendC::BlockReduceSum<float, false>(scratch, scores[column], state.rows_, uint64_t{0}, 1, 1,
-                                                          state.columns_ / 8U);
+                    AscendC::BlockReduceSum<float, false>(scratch, scores[column], (full ? BATCH_ROWS : state.rows_),
+                                                          uint64_t{0}, 1, 1,
+                                                          (full ? FullQuantLayout::KV_TILE : state.columns_) / 8U);
                 }
                 AscendC::PipeBarrier<PIPE_V>();
                 uint64_t mask = 0;
-                for (uint32_t row = 0; row < (state.rows_ < 8U ? state.rows_ : 8U); ++row) {
+                for (uint32_t row = 0;
+                     row < ((full ? BATCH_ROWS : state.rows_) < 8U ? (full ? BATCH_ROWS : state.rows_) : 8U); ++row) {
                     mask |= ((uint64_t{1} << (width / 8U)) - 1U) << (row * 8U);
                 }
                 AscendC::SetVectorMask<int8_t>(0, mask);
                 auto result = column == 0U ? dst : scratch[BATCH_ROWS * 64U];
                 if constexpr (IS_MAX) {
-                    AscendC::BlockReduceMax<float, false>(result, scratch, (state.rows_ + 7U) / 8U, uint64_t{0}, 1, 1,
-                                                          8);
+                    AscendC::BlockReduceMax<float, false>(
+                        result, scratch, ((full ? BATCH_ROWS : state.rows_) + 7U) / 8U, uint64_t{0}, 1, 1, 8);
                 } else {
-                    AscendC::BlockReduceSum<float, false>(result, scratch, (state.rows_ + 7U) / 8U, uint64_t{0}, 1, 1,
-                                                          8);
+                    AscendC::BlockReduceSum<float, false>(
+                        result, scratch, ((full ? BATCH_ROWS : state.rows_) + 7U) / 8U, uint64_t{0}, 1, 1, 8);
                 }
                 AscendC::PipeBarrier<PIPE_V>();
                 if (column != 0U) {
-                    state.RowMask(state.rows_);
+                    state.RowMask((full ? BATCH_ROWS : state.rows_));
                     if constexpr (IS_MAX) {
-                        AscendC::Max(dst, dst, result, state.rows_);
+                        AscendC::Max(dst, dst, result, (full ? BATCH_ROWS : state.rows_));
                     } else {
-                        AscendC::Add(dst, dst, result, state.rows_);
+                        AscendC::Add(dst, dst, result, (full ? BATCH_ROWS : state.rows_));
                     }
                     AscendC::PipeBarrier<PIPE_V>();
                 }
@@ -514,6 +568,7 @@ struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueOn
         state.FullMask();
     }
 
+    template <bool full>
     __aicore__ inline void SoftmaxRows(AscendC::LocalTensor<float> scores, const Tile& tile, uint32_t round,
                                        uint32_t slot, float attentionScale)
     {
@@ -533,45 +588,63 @@ struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueOn
         AscendC::PipeBarrier<PIPE_V>();
         auto broadcastQ = state.template Ub<float>(Q_BROADCAST + state.rowOffset_ * STAT_STRIDE * sizeof(float));
         state.FullMask();
-        for (uint32_t column = 0; column < state.columns_; column += 64) {
-            state.RowMask(state.columns_ - column < 64U ? state.columns_ - column : 64U);
+        for (uint32_t column = 0; column < (full ? FullQuantLayout::KV_TILE : state.columns_); column += 64) {
+            if constexpr (!full) {
+                state.RowMask((full ? FullQuantLayout::KV_TILE : state.columns_) - column < 64U ?
+                                  (full ? FullQuantLayout::KV_TILE : state.columns_) - column :
+                                  64U);
+            }
             AscendC::Mul<float, false>(
                 scores[column], scores[column],
                 state.template Ub<float>(BufferLayout::K_SCALE +
                                          slot * FullQuantLayout::KV_TILE * sizeof(float))[column],
-                uint64_t{0}, state.rows_,
-                AscendC::BinaryRepeatParams(1, 1, 1, state.columns_ / 8U, state.columns_ / 8U, 0));
+                uint64_t{0}, (full ? BATCH_ROWS : state.rows_),
+                AscendC::BinaryRepeatParams(1, 1, 1, (full ? FullQuantLayout::KV_TILE : state.columns_) / 8U,
+                                            (full ? FullQuantLayout::KV_TILE : state.columns_) / 8U, 0));
         }
+        if (state.pageScaleEvents_)
+            AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(slot);
         AscendC::PipeBarrier<PIPE_V>();
-        for (uint32_t column = 0; column < state.columns_; column += 64) {
-            state.RowMask(state.columns_ - column < 64U ? state.columns_ - column : 64U);
+        for (uint32_t column = 0; column < (full ? FullQuantLayout::KV_TILE : state.columns_); column += 64) {
+            if constexpr (!full) {
+                state.RowMask((full ? FullQuantLayout::KV_TILE : state.columns_) - column < 64U ?
+                                  (full ? FullQuantLayout::KV_TILE : state.columns_) - column :
+                                  64U);
+            }
             AscendC::Mul<float, false>(
-                scores[column], scores[column], broadcastQ, uint64_t{0}, state.rows_,
-                AscendC::BinaryRepeatParams(1, 1, 0, state.columns_ / 8U, state.columns_ / 8U, 1));
+                scores[column], scores[column], broadcastQ, uint64_t{0}, (full ? BATCH_ROWS : state.rows_),
+                AscendC::BinaryRepeatParams(1, 1, 0, (full ? FullQuantLayout::KV_TILE : state.columns_) / 8U,
+                                            (full ? FullQuantLayout::KV_TILE : state.columns_) / 8U, 1));
         }
         AscendC::PipeBarrier<PIPE_V>();
         // One masked vector fill per affected 64-token segment, repeated over all rows.
-        for (uint32_t page = 0; page * FullQuantLayout::PAGE_TOKENS < state.columns_; ++page) {
+        for (uint32_t page = 0;
+             page * FullQuantLayout::PAGE_TOKENS < (full ? FullQuantLayout::KV_TILE : state.columns_); ++page) {
             for (uint32_t column = 0;
-                 column < FullQuantLayout::PAGE_TOKENS && page * FullQuantLayout::PAGE_TOKENS + column < state.columns_;
+                 column < FullQuantLayout::PAGE_TOKENS &&
+                 page * FullQuantLayout::PAGE_TOKENS + column < (full ? FullQuantLayout::KV_TILE : state.columns_);
                  column += 64) {
                 const uint32_t valid = tile.pages[page].validTokens;
                 if (valid < column + 64) {
                     const uint32_t first = valid > column ? valid - column : 0;
-                    const uint32_t remaining = state.columns_ - page * FullQuantLayout::PAGE_TOKENS - column;
+                    const uint32_t remaining = (full ? FullQuantLayout::KV_TILE : state.columns_) -
+                                               page * FullQuantLayout::PAGE_TOKENS - column;
                     const uint64_t active = remaining >= 64U ? ~uint64_t{0} : ((uint64_t{1} << remaining) - 1U);
                     uint64_t mask[2] = {(~uint64_t{0} << first) & active, 0};
                     AscendC::Duplicate(scores[page * FullQuantLayout::PAGE_TOKENS + column], -3.402823466e38f, mask,
-                                       state.rows_, 1, state.columns_ / 8U);
+                                       (full ? BATCH_ROWS : state.rows_), 1,
+                                       (full ? FullQuantLayout::KV_TILE : state.columns_) / 8U);
                 }
             }
         }
         AscendC::PipeBarrier<PIPE_V>();
-        ReduceRows<true>(reduceMax, scores);
-        state.RowMask(state.rows_);
-        AscendC::Max<float, false>(reduceMax, maximum, reduceMax, uint64_t{0}, 1,
-                                   AscendC::BinaryRepeatParams(1, 1, 1, 8, 8, 8));
-        AscendC::PipeBarrier<PIPE_V>();
+        ReduceRows<true, full>(reduceMax, scores);
+        state.RowMask((full ? BATCH_ROWS : state.rows_));
+        if (round != 0U) {
+            AscendC::Max<float, false>(reduceMax, maximum, reduceMax, uint64_t{0}, 1,
+                                       AscendC::BinaryRepeatParams(1, 1, 1, 8, 8, 8));
+            AscendC::PipeBarrier<PIPE_V>();
+        }
         if (round == 0) {
             AscendC::Duplicate(packedAlpha, 0.0f, BATCH_ROWS);
         } else {
@@ -591,23 +664,35 @@ struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueOn
         AscendC::DataCopy(maximum, reduceMax, BATCH_ROWS);
         AscendC::PipeBarrier<PIPE_V>();
         state.FullMask();
-        for (uint32_t column = 0; column < state.columns_; column += 64) {
-            state.RowMask(state.columns_ - column < 64U ? state.columns_ - column : 64U);
+        for (uint32_t column = 0; column < (full ? FullQuantLayout::KV_TILE : state.columns_); column += 64) {
+            if constexpr (!full) {
+                state.RowMask((full ? FullQuantLayout::KV_TILE : state.columns_) - column < 64U ?
+                                  (full ? FullQuantLayout::KV_TILE : state.columns_) - column :
+                                  64U);
+            }
             AscendC::Sub<float, false>(
-                scores[column], scores[column], broadcast, uint64_t{0}, state.rows_,
-                AscendC::BinaryRepeatParams(1, 1, 0, state.columns_ / 8U, state.columns_ / 8U, 1));
+                scores[column], scores[column], broadcast, uint64_t{0}, (full ? BATCH_ROWS : state.rows_),
+                AscendC::BinaryRepeatParams(1, 1, 0, (full ? FullQuantLayout::KV_TILE : state.columns_) / 8U,
+                                            (full ? FullQuantLayout::KV_TILE : state.columns_) / 8U, 1));
         }
         AscendC::PipeBarrier<PIPE_V>();
         state.FullMask();
-        AscendC::Exp(scores, scores, state.rows_ * state.columns_);
+        AscendC::Exp(scores, scores,
+                     (full ? BATCH_ROWS : state.rows_) * (full ? FullQuantLayout::KV_TILE : state.columns_));
         AscendC::PipeBarrier<PIPE_V>();
-        ReduceRows<false>(reduceSum, scores);
-        state.RowMask(state.rows_);
-        AscendC::Mul<float, false>(sum, sum, packedAlpha, uint64_t{0}, 1,
-                                   AscendC::BinaryRepeatParams(1, 1, 1, 8, 8, 8));
-        AscendC::PipeBarrier<PIPE_V>();
-        AscendC::Add<float, false>(sum, sum, reduceSum, uint64_t{0}, 1, AscendC::BinaryRepeatParams(1, 1, 1, 8, 8, 8));
-        AscendC::PipeBarrier<PIPE_V>();
+        ReduceRows<false, full>(reduceSum, scores);
+        state.RowMask((full ? BATCH_ROWS : state.rows_));
+        if (round == 0U) {
+            AscendC::DataCopy(sum, reduceSum, BATCH_ROWS);
+            AscendC::PipeBarrier<PIPE_V>();
+        } else {
+            AscendC::Mul<float, false>(sum, sum, packedAlpha, uint64_t{0}, 1,
+                                       AscendC::BinaryRepeatParams(1, 1, 1, 8, 8, 8));
+            AscendC::PipeBarrier<PIPE_V>();
+            AscendC::Add<float, false>(sum, sum, reduceSum, uint64_t{0}, 1,
+                                       AscendC::BinaryRepeatParams(1, 1, 1, 8, 8, 8));
+            AscendC::PipeBarrier<PIPE_V>();
+        }
         state.FullMask();
     }
 
@@ -626,11 +711,11 @@ struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb>::EpilogueOn
         // Reuse the existing wide-row FP32 rounding path for every row tile.
         // Clipped probabilities are in [0,127], so the rounded values are exact in FP16/INT8.
         auto halfValue = state.template Ub<half>(BufferLayout::P_FP16);
-        AscendC::Cast(weights, weights, AscendC::RoundMode::CAST_RINT, elements);
+        // Integer and half-integer boundaries in [0,127] are exact, even-significand half values.
+        // Round-to-odd preserves the side of each boundary until the final nearest-even conversion.
+        AscendC::Cast(halfValue, weights, AscendC::RoundMode::CAST_ODD, elements);
         AscendC::PipeBarrier<PIPE_V>();
-        AscendC::Cast(halfValue, weights, AscendC::RoundMode::CAST_NONE, elements);
-        AscendC::PipeBarrier<PIPE_V>();
-        AscendC::Cast(dst, halfValue, AscendC::RoundMode::CAST_NONE, elements);
+        AscendC::Cast(dst, halfValue, AscendC::RoundMode::CAST_RINT, elements);
     }
 };
 

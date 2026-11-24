@@ -109,14 +109,9 @@ struct GbsaFullQuantCubeArch22<singleRowTile>::BlockMmadPV {
     {
         for (uint32_t i = plan.begin[chunk]; i < plan.end[chunk]; ++i) {
             const auto& r = plan.records[i];
-            if (state.packedKv_) {
-                PackedKv::Emit<false>(dst, src, layout, r.dstRow, r.source, r.rows, r.ndNum, r.stride, state.HeadDim(),
-                                      state.packedBlockY_);
-            } else {
-                GbsaSparsePairCopy::Emit<false>(dst, src, layout, r.dstRow, r.source - state.headOffset_, r.rows,
-                                                r.ndNum, r.stride, state.copyDim_,
-                                                state.kvHeadMajor_ ? state.HeadDim() : heads * state.HeadDim());
-            }
+            GbsaSparsePairCopy::Emit<false>(dst, src, layout, r.dstRow, r.source - state.headOffset_, r.rows, r.ndNum,
+                                            r.stride, state.copyDim_,
+                                            state.kvHeadMajor_ ? state.HeadDim() : heads * state.HeadDim());
         }
     }
 
