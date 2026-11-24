@@ -72,7 +72,7 @@ Some fields of the output format are used only by the corresponding TTK mode.
 ### Original Table Sample Before Conversion
 
 | testcase_name | batch_size | q_seq | k_seq | q_head_num | k_head_num | head_dim | qk_dtype | weight_dtype | layout_q | layout_k | cu_seqlens_q | cu_seqlens_k | seqused_q | seqused_k | topk | mask_mode | cmp_ratio | max_seqlen_q | return_value | query_datarange | key_datarange | weights_datarange |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | liv2_tnd_example | 2 | 1 | 4096 | 64 | 1 | 128 | bfloat16 | bfloat16 | TND | TND | [0, 1, 2] | [0, 4096, 8192] | [1, 1] | [4096, 4096] | 2048 | 3 | 1 | 1 | 0 | [-1, 1] | [-1, 1] | [-1, 1] |
 
 ## Output and Append Contract
