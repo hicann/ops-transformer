@@ -184,6 +184,7 @@ ge::graphStatus InferDataType4FlashAttentionScoreGrad(gert::InferDataTypeContext
                     return ge::GRAPH_FAILED);
 
         auto outDtypePtr = attrs->GetAttrPointer<int64_t>(INDEX_OUTDTYPE);
+        OP_CHECK_NULL_WITH_CONTEXT(context, outDtypePtr);
         int64_t outDtype = *outDtypePtr;
         if (outDtype == 0) {
             // dq, outidx:0
