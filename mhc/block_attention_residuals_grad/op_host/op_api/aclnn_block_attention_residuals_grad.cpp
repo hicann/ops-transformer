@@ -428,7 +428,7 @@ aclnnStatus aclnnBlockAttentionResidualsGrad(void* workspace, uint64_t workspace
 {
     auto ret = CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
     if (ret != 0) {
-        OP_LOGE(ACLNN_ERR_INNER, "BlockAttentionResidualsGrad launch failed, ret = %d.", ret);
+        OP_LOGE_WITHOUT_REPORT(ACLNN_ERR_INNER, "BlockAttentionResidualsGrad launch failed, ret = %d.", ret);
         return ret;
     }
     return ret;

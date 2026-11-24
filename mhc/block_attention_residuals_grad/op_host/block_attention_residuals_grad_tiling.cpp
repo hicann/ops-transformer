@@ -264,15 +264,24 @@ static void PrintInfo(gert::TilingContext* context, BlockAttentionResidualsGradT
 
 static ge::graphStatus GetPlatformInfo(gert::TilingContext* context, uint64_t& ub, uint32_t& coreNum)
 {
-    OP_CHECK_NULL_WITH_CONTEXT(context, context);
+    if (context == nullptr) {
+        OP_LOGE_WITHOUT_REPORT("BlockAttentionResidualsGrad", "Tiling context is null.");
+        return ge::GRAPH_FAILED;
+    }
     auto platformInfo = context->GetPlatformInfo();
-    OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);
+    if (platformInfo == nullptr) {
+        OP_LOGE_WITHOUT_REPORT(context, "Platform info from the tiling context is null.");
+        return ge::GRAPH_FAILED;
+    }
     platform_ascendc::PlatformAscendC platform(platformInfo);
     coreNum = platform.GetCoreNumAiv();
     platform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ub);
-    OP_CHECK_IF(coreNum == 0 || ub == 0,
-                OP_LOGE(context, "Invalid platform resources in Tiling: aivCoreNum=%u, ubSize=%lu.", coreNum, ub),
-                return ge::GRAPH_FAILED);
+    if (coreNum == 0 || ub == 0) {
+        const std::string reason = "Invalid platform resources: aivCoreNum=" + std::to_string(coreNum) +
+                                   ", ubSize=" + std::to_string(ub) + ".";
+        OP_LOGE_WITHOUT_REPORT(context, "%s", reason.c_str());
+        return ge::GRAPH_FAILED;
+    }
     OP_LOGD(context, "tiling: ub=%luB coreNum=%u", ub, coreNum);
     return ge::GRAPH_SUCCESS;
 }
@@ -300,9 +309,15 @@ static ge::graphStatus CheckShapeBlockAttentionResidualsGrad(gert::TilingContext
     int64_t N = blockResShape.GetDim(1);
     int64_t blockResHidden = blockResShape.GetDim(2);
     const auto* attrs = context->GetAttrs();
-    OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    if (attrs == nullptr) {
+        OP_LOGE_WITHOUT_REPORT(context, "Attributes from the tiling context are null.");
+        return ge::GRAPH_FAILED;
+    }
     const auto* validBlockNum = attrs->GetInt(0);
-    OP_CHECK_NULL_WITH_CONTEXT(context, validBlockNum);
+    if (validBlockNum == nullptr) {
+        OP_LOGE_WITHOUT_REPORT(context, "The valid_block_num attribute is missing from the tiling context.");
+        return ge::GRAPH_FAILED;
+    }
     if (*validBlockNum != -1 && *validBlockNum != N) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "valid_block_num",
                                               std::to_string(*validBlockNum).c_str(),
@@ -357,7 +372,12 @@ static ge::graphStatus CheckMainInputDtypeSupported(gert::TilingContext* context
                                                     const char* inputName)
 {
     const gert::CompileTimeTensorDesc* desc = context->GetInputDesc(inputIndex);
-    OP_CHECK_NULL_WITH_CONTEXT(context, desc);
+    if (desc == nullptr) {
+        const char* opName = context->GetNodeName() == nullptr ? "BlockAttentionResidualsGrad" : context->GetNodeName();
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(opName, inputName,
+                                                 "The input descriptor is missing from the tiling context.");
+        return ge::GRAPH_FAILED;
+    }
     const ge::DataType dataType = desc->GetDataType();
     if (!IsSupportedMainDtype(dataType)) {
         OP_LOGE_FOR_INVALID_DTYPE(context->GetNodeName(), inputName, DtypeName(dataType), "FLOAT16/BFLOAT16/FLOAT32");
@@ -465,7 +485,10 @@ static ge::graphStatus CalcWorkspaceSize(gert::TilingContext* context, bool spli
     platform_ascendc::PlatformAscendC ascendcPlatform(context->GetPlatformInfo());
     uint64_t sysWorkspaceSize = ascendcPlatform.GetLibApiWorkSpaceSize();
     size_t* ws = context->GetWorkspaceSizes(1);
-    OP_CHECK_NULL_WITH_CONTEXT(context, ws);
+    if (ws == nullptr) {
+        OP_LOGE_WITHOUT_REPORT(context, "Failed to obtain workspace sizes from the tiling context.");
+        return ge::GRAPH_FAILED;
+    }
     uint64_t userWorkspaceSize = perCoreWkspBytes * static_cast<uint64_t>(coreNum);
     if (splitH) {
         const uint64_t metaWkspBytes =
@@ -481,8 +504,9 @@ static ge::graphStatus TilingBlockAttentionResidualsGrad(gert::TilingContext* co
 {
     uint64_t ub = 0;
     uint32_t coreNum = 0;
-    OP_CHECK_IF(GetPlatformInfo(context, ub, coreNum) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context, "get platform info failed"), return ge::GRAPH_FAILED);
+    if (GetPlatformInfo(context, ub, coreNum) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     if (CheckShapeBlockAttentionResidualsGrad(context) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
@@ -496,8 +520,14 @@ static ge::graphStatus TilingBlockAttentionResidualsGrad(gert::TilingContext* co
     const int64_t totalBlocks = blockResShape.GetDim(1) + 1;
     const uint64_t availableUb = ub > UB_RESERVE_BYTES ? ub - UB_RESERVE_BYTES : 0;
     const HiddenTilingResult hiddenTiling = CalcHiddenTiling(context, ub, H, totalBlocks, dtypeBytes);
-    OP_CHECK_IF(hiddenTiling.hiddenTileSize <= 0, OP_LOGE(context, "failed to calculate a valid H tile"),
-                return ge::GRAPH_FAILED);
+    if (hiddenTiling.hiddenTileSize <= 0) {
+        const std::string reason = "Failed to calculate a valid H tile: H=" + std::to_string(H) +
+                                   ", totalBlocks=" + std::to_string(totalBlocks) +
+                                   ", dtypeBytes=" + std::to_string(dtypeBytes) + ", ubSize=" + std::to_string(ub) +
+                                   ", availableUb=" + std::to_string(availableUb) + ".";
+        OP_LOGE_WITHOUT_REPORT(context, "%s", reason.c_str());
+        return ge::GRAPH_FAILED;
+    }
 
     const uint64_t tilingKey =
         hiddenTiling.splitH ? GET_TPL_TILING_KEY(TPL_H_MODE_SPLIT) : GET_TPL_TILING_KEY(TPL_H_MODE_FULL);
@@ -508,20 +538,30 @@ static ge::graphStatus TilingBlockAttentionResidualsGrad(gert::TilingContext* co
 
     OP_CHECK_IF(DoTiling(context, partialBlockShape.GetDim(0), blockResShape.GetDim(1), H, coreNum,
                          hiddenTiling.hiddenTileSize, hiddenTiling.splitH) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context, "tiling failed"), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(CalcWorkspaceSize(context, hiddenTiling.splitH, coreNum) != ge::GRAPH_SUCCESS,
-                OP_LOGE(context, "workspace failed"), return ge::GRAPH_FAILED);
+                OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "tiling failed"), return ge::GRAPH_FAILED);
+    if (CalcWorkspaceSize(context, hiddenTiling.splitH, coreNum) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
 
 static ge::graphStatus TilingPrepareForBlockAttentionResidualsGrad(gert::TilingParseContext* context)
 {
-    OP_CHECK_NULL_WITH_CONTEXT(context, context);
+    if (context == nullptr) {
+        OP_LOGE_WITHOUT_REPORT("BlockAttentionResidualsGrad", "Tiling parse context is null.");
+        return ge::GRAPH_FAILED;
+    }
     BlockAttentionResidualsGradCompileInfo* compileInfo =
         context->GetCompiledInfo<BlockAttentionResidualsGradCompileInfo>();
-    OP_CHECK_NULL_WITH_CONTEXT(context, compileInfo);
+    if (compileInfo == nullptr) {
+        OP_LOGE_WITHOUT_REPORT("BlockAttentionResidualsGrad", "Compiled info from the tiling parse context is null.");
+        return ge::GRAPH_FAILED;
+    }
     auto platformInfo = context->GetPlatformInfo();
-    OP_CHECK_NULL_WITH_CONTEXT(context, platformInfo);
+    if (platformInfo == nullptr) {
+        OP_LOGE_WITHOUT_REPORT("BlockAttentionResidualsGrad", "Platform info from the tiling parse context is null.");
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
 

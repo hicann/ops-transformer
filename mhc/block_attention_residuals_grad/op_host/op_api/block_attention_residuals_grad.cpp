@@ -36,7 +36,8 @@ const aclTensor* BlockAttentionResidualsGrad(const aclTensor* partialBlock, cons
                     OP_INPUT(partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, invNorm, probs),
                     OP_OUTPUT(gradPartialBlock, gradBlockRes, gradProjWeight, gradNormWeight), OP_ATTR(validBlockNum));
     if (ret != ACLNN_SUCCESS) {
-        OP_LOGE(ACLNN_ERR_INNER_STATIC_WORKSPACE_INVALID, "BlockAttentionResidualsGrad INFER_SHAPE failed.");
+        OP_LOGE_WITHOUT_REPORT(ACLNN_ERR_INNER_STATIC_WORKSPACE_INVALID,
+                               "BlockAttentionResidualsGrad INFER_SHAPE failed, ret = %d.", ret);
         return nullptr;
     }
 
@@ -45,8 +46,9 @@ const aclTensor* BlockAttentionResidualsGrad(const aclTensor* partialBlock, cons
         OP_INPUT(partialBlock, blockRes, projWeight, normWeight, gradHiddenStates, invNorm, probs),
         OP_OUTPUT(gradPartialBlock, gradBlockRes, gradProjWeight, gradNormWeight), OP_ATTR(validBlockNum));
     if (launcherRet != ACLNN_SUCCESS) {
-        OP_LOGE(ACLNN_ERR_INNER_STATIC_WORKSPACE_INVALID,
-                "BlockAttentionResidualsGrad ADD_TO_LAUNCHER_LIST_AICORE failed.");
+        OP_LOGE_WITHOUT_REPORT(ACLNN_ERR_INNER_STATIC_WORKSPACE_INVALID,
+                               "BlockAttentionResidualsGrad ADD_TO_LAUNCHER_LIST_AICORE failed, ret = %d.",
+                               launcherRet);
         return nullptr;
     }
 

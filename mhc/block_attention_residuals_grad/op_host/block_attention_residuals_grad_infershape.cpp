@@ -220,13 +220,22 @@ static bool CheckShapeBlockAttentionResidualsGrad(gert::InferShapeContext* conte
 static ge::graphStatus CheckValidBlockNum(gert::InferShapeContext* context, int64_t blockNum)
 {
     const auto* attrs = context->GetAttrs();
-    OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    if (attrs == nullptr) {
+        const char* opName = context->GetNodeName() == nullptr ? "BlockAttentionResidualsGrad" : context->GetNodeName();
+        OP_LOGE_WITHOUT_REPORT(opName, "InferShape failed: GetAttrs() returned null attribute metadata");
+        return GRAPH_FAILED;
+    }
     const auto* validBlockNum = attrs->GetInt(0);
-    OP_CHECK_NULL_WITH_CONTEXT(context, validBlockNum);
+    if (validBlockNum == nullptr) {
+        const char* opName = context->GetNodeName() == nullptr ? "BlockAttentionResidualsGrad" : context->GetNodeName();
+        OP_LOGE_WITHOUT_REPORT(opName, "InferShape failed: GetInt(0) returned null valid_block_num metadata");
+        return GRAPH_FAILED;
+    }
     // Defer equality with N until the block dimension is known.
     if (*validBlockNum < -1 || (*validBlockNum != -1 && blockNum != UNKNOWN_DIM && *validBlockNum != blockNum)) {
-        OP_LOGE(context->GetNodeName(), "valid_block_num must be -1 or N=%ld (when known), got %ld", blockNum,
-                *validBlockNum);
+        const std::string reason = "valid_block_num must be -1 or N=" + std::to_string(blockNum) + " when N is known";
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "valid_block_num",
+                                              std::to_string(*validBlockNum).c_str(), reason.c_str());
         return GRAPH_FAILED;
     }
     return GRAPH_SUCCESS;
@@ -234,8 +243,10 @@ static ge::graphStatus CheckValidBlockNum(gert::InferShapeContext* context, int6
 
 static ge::graphStatus InferShapeBlockAttentionResidualsGrad(gert::InferShapeContext* context)
 {
-    OP_CHECK_IF(context == nullptr, OP_LOGE("BlockAttentionResidualsGrad", "infer shape context is nullptr"),
-                return GRAPH_FAILED);
+    if (context == nullptr) {
+        OP_LOGE_WITHOUT_REPORT("BlockAttentionResidualsGrad", "infer shape context is null");
+        return GRAPH_FAILED;
+    }
     OP_LOGD(context->GetNodeName(), "Enter BlockAttentionResidualsGrad InferShape.");
 
     const gert::Shape* partialBlockShape = context->GetInputShape(INPUT_PARTIAL_BLOCK);
@@ -245,22 +256,46 @@ static ge::graphStatus InferShapeBlockAttentionResidualsGrad(gert::InferShapeCon
     const gert::Shape* gradHiddenStatesShape = context->GetInputShape(INPUT_GRAD_HIDDEN_STATES);
     const gert::Shape* invNormShape = context->GetInputShape(INPUT_INV_NORM);
     const gert::Shape* probsShape = context->GetInputShape(INPUT_PROBS);
-    OP_CHECK_NULL_WITH_CONTEXT(context, partialBlockShape);
-    OP_CHECK_NULL_WITH_CONTEXT(context, blockResShape);
-    OP_CHECK_NULL_WITH_CONTEXT(context, projWeightShape);
-    OP_CHECK_NULL_WITH_CONTEXT(context, normWeightShape);
-    OP_CHECK_NULL_WITH_CONTEXT(context, gradHiddenStatesShape);
-    OP_CHECK_NULL_WITH_CONTEXT(context, invNormShape);
-    OP_CHECK_NULL_WITH_CONTEXT(context, probsShape);
+    OP_CHECK_IF(partialBlockShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "partial_block"),
+                return GRAPH_FAILED);
+    OP_CHECK_IF(blockResShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "block_res"),
+                return GRAPH_FAILED);
+    OP_CHECK_IF(projWeightShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "proj_weight"),
+                return GRAPH_FAILED);
+    OP_CHECK_IF(normWeightShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "norm_weight"),
+                return GRAPH_FAILED);
+    OP_CHECK_IF(gradHiddenStatesShape == nullptr,
+                OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "grad_hidden_states"), return GRAPH_FAILED);
+    OP_CHECK_IF(invNormShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "inv_norm"),
+                return GRAPH_FAILED);
+    OP_CHECK_IF(probsShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "probs"),
+                return GRAPH_FAILED);
 
     gert::Shape* gradPartialBlockShape = context->GetOutputShape(OUTPUT_GRAD_PARTIAL_BLOCK);
     gert::Shape* gradBlockResShape = context->GetOutputShape(OUTPUT_GRAD_BLOCK_RES);
     gert::Shape* gradProjWeightShape = context->GetOutputShape(OUTPUT_GRAD_PROJ_WEIGHT);
     gert::Shape* gradNormWeightShape = context->GetOutputShape(OUTPUT_GRAD_NORM_WEIGHT);
-    OP_CHECK_NULL_WITH_CONTEXT(context, gradPartialBlockShape);
-    OP_CHECK_NULL_WITH_CONTEXT(context, gradBlockResShape);
-    OP_CHECK_NULL_WITH_CONTEXT(context, gradProjWeightShape);
-    OP_CHECK_NULL_WITH_CONTEXT(context, gradNormWeightShape);
+    if (gradPartialBlockShape == nullptr) {
+        const char* opName = context->GetNodeName() == nullptr ? "BlockAttentionResidualsGrad" : context->GetNodeName();
+        OP_LOGE_WITHOUT_REPORT(opName,
+                               "InferShape failed: GetOutputShape(0) returned null grad_partial_block metadata");
+        return GRAPH_FAILED;
+    }
+    if (gradBlockResShape == nullptr) {
+        const char* opName = context->GetNodeName() == nullptr ? "BlockAttentionResidualsGrad" : context->GetNodeName();
+        OP_LOGE_WITHOUT_REPORT(opName, "InferShape failed: GetOutputShape(1) returned null grad_block_res metadata");
+        return GRAPH_FAILED;
+    }
+    if (gradProjWeightShape == nullptr) {
+        const char* opName = context->GetNodeName() == nullptr ? "BlockAttentionResidualsGrad" : context->GetNodeName();
+        OP_LOGE_WITHOUT_REPORT(opName, "InferShape failed: GetOutputShape(2) returned null grad_proj_weight metadata");
+        return GRAPH_FAILED;
+    }
+    if (gradNormWeightShape == nullptr) {
+        const char* opName = context->GetNodeName() == nullptr ? "BlockAttentionResidualsGrad" : context->GetNodeName();
+        OP_LOGE_WITHOUT_REPORT(opName, "InferShape failed: GetOutputShape(3) returned null grad_norm_weight metadata");
+        return GRAPH_FAILED;
+    }
 
     const int64_t blockNum = blockResShape->GetDimNum() == RANK_3D ? blockResShape->GetDim(DIM_BLOCK) : UNKNOWN_DIM;
     if (CheckValidBlockNum(context, blockNum) != GRAPH_SUCCESS) {
@@ -313,8 +348,10 @@ static ge::graphStatus InferShapeBlockAttentionResidualsGrad(gert::InferShapeCon
 
 static ge::graphStatus InferDataTypeBlockAttentionResidualsGrad(gert::InferDataTypeContext* context)
 {
-    OP_CHECK_IF(context == nullptr, OP_LOGE("BlockAttentionResidualsGrad", "infer data type context is nullptr"),
-                return GRAPH_FAILED);
+    if (context == nullptr) {
+        OP_LOGE_WITHOUT_REPORT("BlockAttentionResidualsGrad", "InferDataType context is null.");
+        return GRAPH_FAILED;
+    }
     OP_LOGD(context->GetNodeName(), "Enter BlockAttentionResidualsGrad InferDataType.");
 
     const auto partialBlockDtype = context->GetInputDataType(INPUT_PARTIAL_BLOCK);
