@@ -23,9 +23,9 @@
 
 ## 功能说明
 
-- 接口功能：融合GroupedMatmul、dequant、SwiGLU和quant。该接口为weight NZ特化版本，支持Ascend 950PR&950DT系列产品的单Tensor MX A8W8、MX A8W4及A4W4 BF16输出场景。`weight`必须为三维FRACTAL_NZ格式，A8W8和A4W4支持转置和非转置weightNZ；MX A8W4仅支持转置weightNZ。`x`仅支持非转置输入。
+- 接口功能：融合GroupedMatmul、dequant、SwiGLU和quant。该接口为weight NZ特化版本，支持Ascend 950PR&950DT系列产品的单Tensor MX A8W8和MX A8W4场景。`weight`必须为三维FRACTAL_NZ格式，MX A8W8支持转置和非转置weightNZ；MX A8W4仅支持转置weightNZ。`x`仅支持非转置输入。
 
-- 相比V2，V3增加SwiGLU计算参数`swigluMode`、`clampLimit`、`gluAlpha`和`gluBias`，以及MX量化参数`roundMode`、`scaleAlg`和`dstTypeMax`。量化输出路径的`swigluMode`仅支持2；A4W4 BF16输出路径支持0或2，且`outputScale`必须为nullptr。
+- 相比V2，V3增加SwiGLU计算参数`swigluMode`、`clampLimit`、`gluAlpha`和`gluBias`，以及MX量化参数`roundMode`、`scaleAlg`和`dstTypeMax`。量化输出路径的`swigluMode`仅支持2。
 
 - 计算公式：
 
@@ -127,7 +127,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
 
   | 参数名 | 输入/输出 | 描述 | 使用说明 | 数据类型 | 数据格式 | 维度 | 非连续的Tensor |
   | --- | --- | --- | --- | --- | --- | --- | --- |
-  | x（const aclTensor *） | 输入 | 激活矩阵。 | A8W8/A8W4为FP8；A4W4为FP4。 | FLOAT8_E4M3FN、FLOAT4_E2M1 | ND | 2维，(M, K) | √ |
+  | x（const aclTensor *） | 输入 | 激活矩阵。 | A8W8/A8W4均为FP8。 | FLOAT8_E4M3FN | ND | 2维，(M, K) | √ |
   | weight（const aclTensorList *） | 输入 | 分组权重矩阵。 | 支持转置和非转置weightNZ；具体view和storage shape见约束说明。 | FLOAT8_E4M3FN、FLOAT4_E2M1 | FRACTAL_NZ | 3维，(E, K, N) | 仅支持约束说明中的转置weight view |
   | weightScale（const aclTensorList *） | 输入 | 权重量化因子。 | 与weight对应，具体view和storage shape见约束说明。 | FLOAT8_E8M0 | ND | 4维，(E, ceil(K / 64), N, 2) | √ |
   | weightAssistMatrix（const aclTensorList *） | 输入 | 权重辅助矩阵。 | 当前不支持有效数据；可传nullptr、长度为0的TensorList，或长度为1且唯一元素为nullptr/shape (0)的TensorList。 | - | - | - | - |
@@ -140,15 +140,15 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
   | quantMode（int64_t） | 输入 | 输出量化模式。 | 当前仅支持2，表示MX量化。 | - | - | - | - |
   | groupListType（int64_t） | 输入 | 分组列表解释方式。 | 0表示cumsum，1表示count。 | - | - | - | - |
   | tuningConfigOptional（const aclIntArray *） | 输入 | tiling调优配置。 | 当前不支持，必须传nullptr或空数组。 | INT64 | - | - | - |
-  | swigluMode（int64_t） | 输入 | SwiGLU计算模式。 | 量化输出仅支持2：沿最后一维前后分半，前半为激活分支，后半为线性分支。A4W4 BF16输出还支持0。 | - | - | - | - |
-  | clampLimit（double） | 输入 | 表示SwiGLU中间结果的裁剪上限。 | 激活分支裁剪上限为clampLimit，线性分支裁剪范围为[-clampLimit, clampLimit]；swigluMode=2时必须为有限、可由FLOAT表示且转换为FLOAT后仍大于0的值；A4W4的swigluMode=0不使用该参数。 | - | - | - | - |
-  | gluAlpha（double） | 输入 | 表示Sigmoid输入的缩放系数。 | swigluMode=2时必须为有限且可由FLOAT表示的值；A4W4的swigluMode=0不使用该参数。 | - | - | - | - |
-  | gluBias（double） | 输入 | 表示线性分支的偏置。 | swigluMode=2时必须为有限且可由FLOAT表示的值；A4W4的swigluMode=0不使用该参数。 | - | - | - | - |
+  | swigluMode（int64_t） | 输入 | SwiGLU计算模式。 | 量化输出仅支持2：沿最后一维前后分半，前半为激活分支，后半为线性分支。 | - | - | - | - |
+  | clampLimit（double） | 输入 | 表示SwiGLU中间结果的裁剪上限。 | 激活分支裁剪上限为clampLimit，线性分支裁剪范围为[-clampLimit, clampLimit]；swigluMode=2时必须为有限、可由FLOAT表示且转换为FLOAT后仍大于0的值。 | - | - | - | - |
+  | gluAlpha（double） | 输入 | 表示Sigmoid输入的缩放系数。 | swigluMode=2时必须为有限且可由FLOAT表示的值。 | - | - | - | - |
+  | gluBias（double） | 输入 | 表示线性分支的偏置。 | swigluMode=2时必须为有限且可由FLOAT表示的值。 | - | - | - | - |
   | roundMode（const char *） | 输入 | MX量化舍入模式。 | 传入nullptr或空字符串时按`"rint"`处理；当前仅支持`"rint"`。 | - | - | - | - |
   | scaleAlg（int64_t） | 输入 | MX量化scale算法。 | 当前接口支持0（OCP）和1（cuBLAS）；其他值会报错。 | - | - | - | - |
   | dstTypeMax（double） | 输入 | MX量化目标类型最大值。 | 当前MXFP8输出仅支持0.0。 | - | - | - | - |
-  | output（aclTensor *） | 输出 | 计算结果。 | A8W8/A8W4为FP8量化结果；A4W4为BF16。 | FLOAT8_E4M3FN、BFLOAT16 | ND | 2维，(M, N / 2) | √ |
-  | outputScale（aclTensor *） | 可选输出 | MXFP8输出scale。 | A8W8/A8W4必须传入；A4W4 BF16输出必须传nullptr。 | FLOAT8_E8M0 | ND | 3维，(M, ceil((N / 2) / 64), 2) | √ |
+  | output（aclTensor *） | 输出 | 计算结果。 | A8W8/A8W4均为FP8量化结果。 | FLOAT8_E4M3FN | ND | 2维，(M, N / 2) | √ |
+  | outputScale（aclTensor *） | 输出 | MXFP8输出scale。 | A8W8/A8W4均必须传入。 | FLOAT8_E8M0 | ND | 3维，(M, ceil((N / 2) / 64), 2) | √ |
   | workspaceSize（uint64_t *） | 输出 | Device侧workspace大小。 | 返回值。 | - | - | - | - |
   | executor（aclOpExecutor **） | 输出 | 算子执行器。 | 返回值，传给第二段接口。 | - | - | - | - |
 
@@ -194,7 +194,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
       <td>weightAssistMatrix、bias、smoothScale或tuningConfigOptional传入了当前场景不支持的内容。</td>
     </tr>
     <tr>
-      <td>A8W8/A8W4的swigluMode不等于2，或A4W4的swigluMode不为0或2；swigluMode=2时，clampLimit、gluAlpha、gluBias不满足有限性及float32可表示性约束，其中clampLimit转换为float32后还必须大于0。</td>
+      <td>swigluMode不等于2，或clampLimit、gluAlpha、gluBias不满足有限性及float32可表示性约束，其中clampLimit转换为float32后还必须大于0。</td>
     </tr>
     <tr>
       <td>roundMode、scaleAlg、dstTypeMax不满足MXFP8场景约束。</td>
@@ -225,22 +225,24 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
 
 aclnnGroupedMatmulSwigluQuantWeightNzV3默认为确定性实现。
 
-### MX A8W4
+### 公共约束
 
-- `x`固定为FLOAT8_E4M3FN，`weight`固定为FLOAT4_E2M1 FRACTAL_NZ；不接受FLOAT8_E5M2、FLOAT4_E1M2或ND权重。`xScale`、`weightScale`及`outputScale`均为FLOAT8_E8M0，`output`固定为FLOAT8_E4M3FN。
-- 当前仅支持单Tensor承载全部expert，仅支持`transposeWeight=true`，由weight和weightScale的view stride识别，不额外暴露转置参数。
-- API入口的weight view均为`(E, K, N)`。转置stride为`(K*N, 1, K)`，物理storage为`(E, ceil(K/64), ceil(N/16), 16, 64)`。FP4的C0为64，不能沿用FP8的32；storage维度以FP4元素计数，每字节打包两个FP4元素。
-- weightScale的入口view均为`(E, ceil(K/64), N, 2)`。转置stride为`(N*ceil(K/64)*2, 2, ceil(K/64)*2, 1)`，对应storage为`(E, N, ceil(K/64), 2)`。weight与weightScale的转置属性必须一致。入口复用既有转置归一化和scale连续化函数。
-- `E`范围为`[1,1024]`，`M`为正整数，`K`、`N`为正的128整数倍；`xScale`、输出及groupList的shape和分组语义与下方A8W8规则一致。
-- `smoothScale`可为nullptr；非空时必须严格为FLOAT、ND、`(E,N/2)`，不接受`(E)`、`(N/2)`或其他广播shape。支持非连续输入，入口检查存储边界后进行连续化，并传给既有执行函数。
-- 仅支持`swigluMode=2`、`dequantMode=2`、`dequantDtype=ACL_FLOAT`、`quantMode=2`、`roundMode="rint"`（nullptr或空字符串取默认值）、`scaleAlg=0/1`、`dstTypeMax=0.0`。
+以下约束适用于MX A8W8和MX A8W4；各场景更严格的维度及布局要求见对应表格。
 
-### 原有MX A8W8
+- groupList约束：shape为`(E)`，数据类型为INT64，格式为ND，长度为E；`groupListType`仅支持0或1。
+  - `groupListType=0`：groupList须为非负单调非递减数列（累积和），最后一个值不大于x的第一维M。
+  - `groupListType=1`：groupList须为非负数列（各组大小），数值总和不大于M。
+  - groupList未指定的output区域不参与计算，其内容不作保证；对应outputScale的处理见各场景约束表。
+- `E`表示expert数量，取值为`[1, 1024]`范围内的整数。
+- weight约束：TensorList长度必须为1，唯一Tensor的首维为E，承载全部expert，不支持按expert拆成多个Tensor。仅支持各场景表格列出的布局，不支持任意非连续权重view。
+- weightScale约束：TensorList长度必须为1，与weight的唯一Tensor对应；最后一维固定为2，转置属性必须与weight一致。
+- weight、weightScale的转置属性通过view stride区分；支持的view shape、view stride和storage布局见各场景表格。
 
-  <!-- npu="950" id7 -->
-  - <term>Ascend 950PR&950DT系列产品</term>：
-    - MX量化场景下需满足以下约束条件：
-        - 数据类型需要满足下表：
+### MX A8W4场景
+
+  <!-- npu="950" id9 -->
+  - <term>MX A8W4量化场景下需满足以下约束条件</term>：
+    - 数据类型需要满足下表：
           <table style="undefined;table-layout: fixed; width: 1134px"><colgroup>
           <col style="width: 130px">
           <col style="width: 130px">
@@ -252,19 +254,20 @@ aclnnGroupedMatmulSwigluQuantWeightNzV3默认为确定性实现。
           </colgroup>
           <thead>
             <tr>
-              <th>MX量化场景</th>
+              <th>量化场景</th>
               <th>x</th>
               <th>weight</th>
               <th>weightScale</th>
               <th>xScale</th>
               <th>output</th>
               <th>outputScale</th>
-            </tr></thead>
+            </tr>
+          </thead>
           <tbody>
             <tr>
-              <td>MXFP8</td>
+              <td>MX A8W4</td>
               <td>FLOAT8_E4M3FN</td>
-              <td>FLOAT8_E4M3FN</td>
+              <td>FLOAT4_E2M1</td>
               <td>FLOAT8_E8M0</td>
               <td>FLOAT8_E8M0</td>
               <td>FLOAT8_E4M3FN</td>
@@ -273,7 +276,7 @@ aclnnGroupedMatmulSwigluQuantWeightNzV3默认为确定性实现。
           </tbody>
           </table>
 
-        - shape约束需要满足下表：
+    - shape约束需要满足下表：
           <table style="undefined;table-layout: fixed; width: 1134px"><colgroup>
           <col style="width: 130px">
           <col style="width: 130px">
@@ -285,22 +288,21 @@ aclnnGroupedMatmulSwigluQuantWeightNzV3默认为确定性实现。
           </colgroup>
           <thead>
             <tr>
-              <th>MX量化场景</th>
+              <th>量化场景</th>
               <th>x</th>
               <th>weight</th>
               <th>weightScale</th>
               <th>xScale</th>
               <th>output</th>
               <th>outputScale</th>
-            </tr></thead>
+            </tr>
+          </thead>
           <tbody>
             <tr>
-              <td>MXFP8</td>
+              <td>MX A8W4</td>
               <td>(M, K)</td>
-              <td>转置时view：(E, K, N)，stride：(K * N, 1, K)，storage：(E, ceil(K / 32), ceil(N / 16), 16, 32)<br>
-              非转置时view：(E, K, N)，stride：(K * N, N, 1)，storage：(E, ceil(N / 32), ceil(K / 16), 16, 32)</td>
-              <td>转置时view：(E, ceil(K / 64), N, 2)，stride：(N * ceil(K / 64) * 2, 2, ceil(K / 64) * 2, 1)，storage：(E, N, ceil(K / 64), 2)<br>
-              非转置时view：(E, ceil(K / 64), N, 2)，stride：(ceil(K / 64) * N * 2, N * 2, 2, 1)，storage：(E, ceil(K / 64), N, 2)</td>
+              <td>转置时view：(E, K, N)，stride：(K * N, 1, K)，storage：(E, ceil(K / 64), ceil(N / 16), 16, 64)</td>
+              <td>转置时view：(E, ceil(K / 64), N, 2)，stride：(N * ceil(K / 64) * 2, 2, ceil(K / 64) * 2, 1)，storage：(E, N, ceil(K / 64), 2)</td>
               <td>(M, ceil(K / 64), 2)</td>
               <td>(M, N / 2)</td>
               <td>(M, ceil((N / 2) / 64), 2)</td>
@@ -308,19 +310,97 @@ aclnnGroupedMatmulSwigluQuantWeightNzV3默认为确定性实现。
           </tbody>
           </table>
 
-        - 转置和非转置的weight、weightScale具有相同的view shape，但view stride和storage布局不同，转置属性通过view stride区分。
-        - `E`表示expert数量，取值为`[1, 1024]`范围内的整数。
-        - `M`表示x的行数，必须为非负整数。
-        - `K`表示矩阵乘归约维度，必须为正整数。
-        - `N`表示GroupedMatmul结果的列数，必须为正整数且为64的整数倍。
-        - `M=0`且其他参数合法时返回空输出，workspace大小为0。
+    - 场景特有约束需要满足下表：
 
-        - weight约束：TensorList长度必须为1，唯一Tensor的首维为E，承载全部expert，不支持按expert拆成多个Tensor。仅支持上表列出的非转置或转置布局，不支持任意非连续权重view。
-        - weightScale约束：TensorList长度必须为1，与weight的唯一Tensor对应；最后一维固定为2，转置属性必须与weight一致。
-        - groupList约束：长度为E，`groupListType`仅支持0或1。
-            - `groupListType=0`：groupList须为非负单调非递减数列（累积和），最后一个值不大于x中tensor的第一维。
-            - `groupListType=1`：groupList须为非负数列（各组大小），数值总和不大于x中tensor的第一维。
-            - groupList未指定的output区域不参与计算，其内容不作保证。MXFP8场景下，对应的outputScale填充编码0。MX A8W4场景下，对应的outputScale内容不作保证。
+      | 约束项 | MX A8W4要求 |
+      | --- | --- |
+      | M | 必须为正整数，不支持M=0。 |
+      | K、N | 均须为128的正整数倍。 |
+      | weight及weightScale布局 | 仅支持上表中的转置weightNZ及配套转置weightScale，不支持非转置weight。 |
+      | FP4存储 | C0为64，storage维度按逻辑FP4元素计数，每字节打包两个FP4元素；不能使用FP8的C0=32布局替代。 |
+      | smoothScale | 可为nullptr；非空时必须为FLOAT、ND、`(E,N/2)`，不接受`(E)`、`(N/2)`或其他广播shape，支持非连续输入。 |
+  <!-- end id9 -->
+
+### MX A8W8场景
+
+  <!-- npu="950" id7 -->
+  - MXA8W8量化场景下需满足以下约束条件：
+      - 数据类型需要满足下表：
+        <table style="undefined;table-layout: fixed; width: 1134px"><colgroup>
+        <col style="width: 130px">
+        <col style="width: 130px">
+        <col style="width: 300px">
+        <col style="width: 300px">
+        <col style="width: 130px">
+        <col style="width: 130px">
+        <col style="width: 130px">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>量化场景</th>
+            <th>x</th>
+            <th>weight</th>
+            <th>weightScale</th>
+            <th>xScale</th>
+            <th>output</th>
+            <th>outputScale</th>
+          </tr></thead>
+        <tbody>
+          <tr>
+            <td>MX A8W8</td>
+            <td>FLOAT8_E4M3FN</td>
+            <td>FLOAT8_E4M3FN</td>
+            <td>FLOAT8_E8M0</td>
+            <td>FLOAT8_E8M0</td>
+            <td>FLOAT8_E4M3FN</td>
+            <td>FLOAT8_E8M0</td>
+          </tr>
+        </tbody>
+        </table>
+
+      - shape约束需要满足下表：
+        <table style="undefined;table-layout: fixed; width: 1134px"><colgroup>
+        <col style="width: 130px">
+        <col style="width: 130px">
+        <col style="width: 250px">
+        <col style="width: 320px">
+        <col style="width: 180px">
+        <col style="width: 250px">
+        <col style="width: 160px">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>量化场景</th>
+            <th>x</th>
+            <th>weight</th>
+            <th>weightScale</th>
+            <th>xScale</th>
+            <th>output</th>
+            <th>outputScale</th>
+          </tr></thead>
+        <tbody>
+          <tr>
+            <td>MX A8W8</td>
+            <td>(M, K)</td>
+            <td>转置时view：(E, K, N)，stride：(K * N, 1, K)，storage：(E, ceil(K / 32), ceil(N / 16), 16, 32)<br>
+            非转置时view：(E, K, N)，stride：(K * N, N, 1)，storage：(E, ceil(N / 32), ceil(K / 16), 16, 32)</td>
+            <td>转置时view：(E, ceil(K / 64), N, 2)，stride：(N * ceil(K / 64) * 2, 2, ceil(K / 64) * 2, 1)，storage：(E, N, ceil(K / 64), 2)<br>
+            非转置时view：(E, ceil(K / 64), N, 2)，stride：(ceil(K / 64) * N * 2, N * 2, 2, 1)，storage：(E, ceil(K / 64), N, 2)</td>
+            <td>(M, ceil(K / 64), 2)</td>
+            <td>(M, N / 2)</td>
+            <td>(M, ceil((N / 2) / 64), 2)</td>
+          </tr>
+        </tbody>
+        </table>
+
+      - 场景特有约束需要满足下表：
+
+        | 约束项 | MX A8W8要求 |
+        | --- | --- |
+        | M | 支持M=0；其他参数合法时返回空输出，workspace大小为0。 |
+        | K | 为正整数，无额外对齐要求。 |
+        | N | 为64的正整数倍。 |
+        | smoothScale | 必须为nullptr。 |
   <!-- end id7 -->
 
 ## 调用示例
