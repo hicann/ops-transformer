@@ -31,6 +31,68 @@ constexpr uint32_t DROPE_SIZE = 64;
 constexpr uint32_t SELECTED_BLOCK_SIZE = 1;
 static const std::string METADATA_NAME = "metadata";
 
+namespace {
+bool HasCmpKv(const gert::StorageShape* shape)
+{
+    return shape != nullptr && shape->GetStorageShape().GetShapeSize() != 0;
+}
+
+bool HasSinks(const gert::StorageShape* shape)
+{
+    if (shape == nullptr) {
+        return false;
+    }
+    const auto& storageShape = shape->GetStorageShape();
+    return storageShape.GetDimNum() != 1 || storageShape.GetDim(DIM_0) != 0;
+}
+
+ge::graphStatus CheckSinks(gert::TilingContext* context, int64_t n1, bool& hasSinks)
+{
+    const size_t sinksIndex = static_cast<size_t>(InputIndex::SINKS);
+    const size_t gradIndex = static_cast<size_t>(OutputIndex::DSINKS);
+    auto sinksShape = context->GetOptionalInputShape(sinksIndex);
+    auto gradShape = context->GetOutputShape(gradIndex);
+    hasSinks = HasSinks(sinksShape);
+    OP_CHECK_IF(hasSinks != HasSinks(gradShape),
+                OP_LOGE(context, "sinks and d_sinks must both be provided or both be omitted."),
+                return ge::GRAPH_FAILED);
+    if (!hasSinks) {
+        return ge::GRAPH_SUCCESS;
+    }
+
+    const auto& shape = sinksShape->GetStorageShape();
+    OP_CHECK_IF(shape.GetDimNum() != 1 || shape.GetDim(DIM_0) != n1,
+                OP_LOGE(context, "sinks shape must be [N1], where N1 is %ld.", n1), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(gradShape->GetStorageShape() != shape, OP_LOGE(context, "d_sinks shape must match sinks shape."),
+                return ge::GRAPH_FAILED);
+
+    auto sinksDesc = context->GetOptionalInputDesc(sinksIndex);
+    auto gradDesc = context->GetOutputDesc(gradIndex);
+    OP_CHECK_IF(sinksDesc == nullptr || sinksDesc->GetDataType() != ge::DT_FLOAT,
+                OP_LOGE(context, "sinks dtype must be FP32."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(gradDesc == nullptr || gradDesc->GetDataType() != ge::DT_FLOAT,
+                OP_LOGE(context, "d_sinks dtype must be FP32."), return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus CheckUsedSeq(gert::TilingContext* context, InputIndex index, const char* name, int64_t batch,
+                             bool& hasUsedSeq)
+{
+    auto seq = context->GetOptionalInputTensor(static_cast<size_t>(index));
+    hasUsedSeq = seq != nullptr;
+    if (!hasUsedSeq) {
+        return ge::GRAPH_SUCCESS;
+    }
+
+    OP_CHECK_IF(seq->GetDataType() != ge::DT_INT32, OP_LOGE(context, "%s dtype must be INT32.", name),
+                return ge::GRAPH_FAILED);
+    const auto& shape = seq->GetStorageShape();
+    OP_CHECK_IF(batch <= 0 || shape.GetDimNum() != 1 || shape.GetDim(DIM_0) != batch,
+                OP_LOGE(context, "%s shape must be [B], where B is %ld.", name, batch), return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+} // namespace
+
 ge::graphStatus CheckAttentionInShape(gert::TilingContext* context)
 {
     auto attentionInShape = context->GetInputShape(static_cast<size_t>(InputIndex::ATTENTION_OUT));
@@ -71,7 +133,7 @@ ge::graphStatus CheckAttentionInShape(gert::TilingContext* context)
             return ge::GRAPH_FAILED;
         }
     }
-    if (cmpKVShape != nullptr) {
+    if (HasCmpKv(cmpKVShape)) {
         auto cmpKVShapeDim = cmpKVShape->GetStorageShape().GetDimNum();
         if (attentionInShapeDim != cmpKVShapeDim) {
             OP_LOGE(context, "The dimnum of attentionIn %zu should be equal to cmp_kv %zu", attentionInShapeDim,
@@ -732,7 +794,9 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetOriWinToken(int64_t oriMa
 
 ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
 {
-    OP_CHECK_IF((context_->GetInputShape(static_cast<size_t>(InputIndex::QUERY)) == nullptr),
+    auto query = context_->GetInputShape(static_cast<size_t>(InputIndex::QUERY));
+    auto queryDesc = context_->GetInputDesc(static_cast<size_t>(InputIndex::QUERY));
+    OP_CHECK_IF(query == nullptr || queryDesc == nullptr,
                 OPS_REPORT_VECTOR_INNER_ERR(opName, "InputShape of q is nullptr."), return ge::GRAPH_FAILED);
 
     // attrs
@@ -740,19 +804,10 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     const char* layoutKV = context_->GetAttrs()->GetAttrPointer<char>(static_cast<size_t>(AttrIndex::LAYOUT_KV));
 
     // input
-    const gert::Shape& qShape = context_->GetInputShape(static_cast<size_t>(InputIndex::QUERY))->GetStorageShape();
+    const gert::Shape& qShape = query->GetStorageShape();
     const gert::Shape& dqueryShape = context_->GetOutputShape(static_cast<size_t>(OutputIndex::DQ))->GetStorageShape();
-    const gert::Shape& doriKVShape =
-        context_->GetOutputShape(static_cast<size_t>(OutputIndex::DORI_KV))->GetStorageShape();
-    const gert::Shape& dcmpKVShape =
-        context_->GetOutputShape(static_cast<size_t>(OutputIndex::DCMP_KV))->GetStorageShape();
-    const gert::Shape& dsinksShape =
-        context_->GetOutputShape(static_cast<size_t>(OutputIndex::DSINKS))->GetStorageShape();
-    const gert::Shape& oriSoftmaxL1Shape =
-        context_->GetOutputShape(static_cast<size_t>(OutputIndex::ORI_SOFTMAX_L1_NORM))->GetStorageShape();
-    const gert::Shape& cmpSoftmaxL1Shape =
-        context_->GetOutputShape(static_cast<size_t>(OutputIndex::CMP_SOFTMAX_L1_NORM))->GetStorageShape();
     uint32_t dimSize = qShape.GetDimNum();
+    auto queryType = queryDesc->GetDataType();
     int64_t dimDq = qShape.GetDim(dimSize - 1);
 
     auto status = CheckOutShapeInfo(qShape, "query", dqueryShape, layoutQ);
@@ -765,14 +820,24 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
         return ge::GRAPH_FAILED;
     }
 
+    auto dout = context_->GetInputShape(static_cast<size_t>(InputIndex::ATTENTION_OUT_GRAD));
+    auto out = context_->GetInputShape(static_cast<size_t>(InputIndex::ATTENTION_OUT));
+    OP_CHECK_IF(!IsSameShape(dout, query) || !IsSameShape(dout, out),
+                OP_LOGE(context_, "d_out shape must match query and out shapes."), return ge::GRAPH_FAILED);
+
     auto oriKV = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::ORI_KV));
     if (oriKV != nullptr) {
         tmpData.oriKV = true;
         const gert::Shape& oriKVShape = oriKV->GetStorageShape();
-        status = CheckOutShapeInfo(oriKVShape, "ori_kv", doriKVShape, layoutKV);
-        if (status == ge::GRAPH_FAILED) {
-            return ge::GRAPH_FAILED;
-        }
+        const size_t gradIndex = static_cast<size_t>(OutputIndex::DORI_KV);
+        OP_CHECK_IF(oriKVShape.GetDimNum() != dimSize || !IsSameShape(oriKV, context_->GetOutputShape(gradIndex)),
+                    OP_LOGE(context_, "ori_kv rank must match query rank and d_ori_kv shape must match ori_kv shape."),
+                    return ge::GRAPH_FAILED);
+        auto gradDesc = context_->GetOutputDesc(gradIndex);
+        OP_CHECK_IF(gradDesc == nullptr || gradDesc->GetDataType() != queryType ||
+                        (queryType != ge::DT_BF16 && queryType != ge::DT_FLOAT16),
+                    OP_LOGE(context_, "d_ori_kv must have the same FP16 or BF16 dtype as query."),
+                    return ge::GRAPH_FAILED);
         int64_t dimDorikv = oriKVShape.GetDim(dimSize - 1);
         if (dimDorikv != D_SIZE) {
             OP_LOGE(context_, "head_dim of ori_kv[%ld] should be equal to 512.", dimDorikv);
@@ -794,14 +859,20 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
         tmpData.s2 = 0;
     }
 
-    auto cmpKV = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::CMP_KV));
-    if (cmpKV != nullptr) {
+    const size_t cmpKvIndex = static_cast<size_t>(InputIndex::CMP_KV);
+    auto cmpKV = context_->GetOptionalInputShape(cmpKvIndex);
+    if (HasCmpKv(cmpKV)) {
         tmpData.cmpKV = true;
         const gert::Shape& cmpKVShape = cmpKV->GetStorageShape();
-        status = CheckOutShapeInfo(cmpKVShape, "cmp_kv", dcmpKVShape, layoutKV);
-        if (status == ge::GRAPH_FAILED) {
-            return ge::GRAPH_FAILED;
-        }
+        auto dcmpKV = context_->GetOutputShape(static_cast<size_t>(OutputIndex::DCMP_KV));
+        OP_CHECK_IF(cmpKVShape.GetDimNum() != dimSize || !IsSameShape(cmpKV, dcmpKV),
+                    OP_LOGE(context_, "cmp_kv rank must match query rank and d_cmp_kv shape must match cmp_kv shape."),
+                    return ge::GRAPH_FAILED);
+        auto cmpDesc = context_->GetOptionalInputDesc(cmpKvIndex);
+        OP_CHECK_IF(cmpDesc == nullptr || cmpDesc->GetDataType() != queryType ||
+                        (queryType != ge::DT_BF16 && queryType != ge::DT_FLOAT16),
+                    OP_LOGE(context_, "cmp_kv must have the same FP16 or BF16 dtype as query."),
+                    return ge::GRAPH_FAILED);
         int64_t dimDcmpkv = cmpKVShape.GetDim(dimSize - 1);
         if (dimDcmpkv != D_SIZE) {
             OP_LOGE(context_, "head_dim of cmp_kv[%ld] should be equal to 512.", dimDcmpkv);
@@ -822,9 +893,6 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     } else {
         tmpData.s3 = 0;
     }
-
-    auto dout = context_->GetInputShape(static_cast<size_t>(InputIndex::ATTENTION_OUT_GRAD))->GetStorageShape();
-    auto out = context_->GetInputShape(static_cast<size_t>(InputIndex::ATTENTION_OUT))->GetStorageShape();
 
     auto oriSparseIndices = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::ORI_SPARSE_INDICES));
     if (oriSparseIndices != nullptr) {
@@ -852,12 +920,6 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
         tmpData.cmp_selected_block_count = cmp_selected_block_count;
     }
 
-    auto usedSeqQ = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::SEQUSED_Q));
-    if (usedSeqQ != nullptr) {
-        tmpData.usedSeqQ = true;
-        const gert::Shape& usedSeqQShape = usedSeqQ->GetStorageShape();
-    }
-
     auto usedSeqOriKV = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::SEQUSED_ORI_KV));
     if (usedSeqOriKV != nullptr) {
         tmpData.usedSeqOriKV = true;
@@ -876,11 +938,6 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     if (cmpRatio < 1 || cmpRatio > 128) {
         OP_LOGE(context_, "cmp_ratio must be in the range [1, 128], but got [%ld].", cmpRatio);
         return ge::GRAPH_FAILED;
-    }
-    auto usedSeqCmpKV = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::SEQUSED_CMP_KV));
-    if (usedSeqCmpKV != nullptr) {
-        tmpData.usedSeqCmpKV = true;
-        const gert::Shape& usedSeqCmpKVShape = usedSeqCmpKV->GetStorageShape();
     }
     auto cmpResidualKV = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::CMP_RESIDUAL_KV));
     if (cmpMaskMode == 3 && cmpRatio != 1 && cmpResidualKV == nullptr) {
@@ -911,12 +968,6 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     if (softmaxLseShape.GetDimNum() == 0) {
         OP_LOGE(context_, "The shape of softmax_lse cannot be zero! ");
         return ge::GRAPH_FAILED;
-    }
-
-    auto sinks = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::SINKS));
-    if (sinks != nullptr) {
-        tmpData.sinks = true;
-        const gert::Shape& sinksShape = sinks->GetStorageShape();
     }
 
     auto metadataTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::METADATA));
@@ -950,8 +1001,12 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     }
 
     if (strcmp(layoutQ, TND_STR) == 0) {
-        const gert::Shape& actSeqQLenShape =
-            context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::CU_SEQLENS_Q))->GetStorageShape();
+        auto cuSeqQ = context_->GetOptionalInputShape(static_cast<size_t>(InputIndex::CU_SEQLENS_Q));
+        OP_CHECK_IF(cuSeqQ == nullptr, OP_LOGE(context_, "cu_seqlens_q must be provided for TND."),
+                    return ge::GRAPH_FAILED);
+        const auto& actSeqQLenShape = cuSeqQ->GetStorageShape();
+        OP_CHECK_IF(actSeqQLenShape.GetDimNum() != 1 || actSeqQLenShape.GetDim(DIM_0) < 2,
+                    OP_LOGE(context_, "cu_seqlens_q shape must be [B+1] with positive B."), return ge::GRAPH_FAILED);
         tmpData.b = actSeqQLenShape.GetDim(DIM_0) - 1;
         tmpData.t1 = qShape.GetDim(DIM_0);
         tmpData.s1 = tmpData.t1;
@@ -974,6 +1029,12 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     }
 
     int64_t n1 = tmpData.n2 * tmpData.g;
+    if (CheckUsedSeq(context_, InputIndex::SEQUSED_Q, "seqused_q", tmpData.b, tmpData.usedSeqQ) != ge::GRAPH_SUCCESS ||
+        CheckUsedSeq(context_, InputIndex::SEQUSED_CMP_KV, "seqused_cmp_kv", tmpData.b, tmpData.usedSeqCmpKV) !=
+            ge::GRAPH_SUCCESS ||
+        CheckSinks(context_, n1, tmpData.sinks) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     if (tmpData.n2 != 1 && (n1 != 128 || n1 != 64)) {
         OP_LOGE(context_, "SparseFlashMlaGrad only support n2=1 and n1=64/128, but got n2=%ld n1=%ld.", tmpData.n2, n1);
     }
@@ -996,8 +1057,7 @@ ge::graphStatus SparseFlashMlaGradTilingBs1Regbase::GetBaseShapeInfo()
     tmpData.d = baseParams_->get_d();
     tmpData.d1 = baseParams_->get_d1();
     tmpData.dataTypeSize = B32;
-    tmpData.queryType =
-        static_cast<uint32_t>(context_->GetInputDesc(static_cast<size_t>(InputIndex::QUERY))->GetDataType());
+    tmpData.queryType = static_cast<uint32_t>(queryType);
     tmpData.selected_block_size = selected_block_size;
 
     auto ret = CheckDtypeValid(context_);
