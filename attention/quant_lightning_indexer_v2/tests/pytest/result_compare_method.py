@@ -429,7 +429,9 @@ def _reshape_topk_value(topk_value, total_rows, sparse_count, params):
 
 
 def _align_int8_sort_scores(topk_value, quant_mode, result, sort_score_dtype):
-    if quant_mode != 2:
+    # quant_mode=2 (W8A8 int8) 与 quant_mode=7 (W4A4 int4, tiling 内部归一化为 2 下发)
+    # 的 sort score 均为 int8 逻辑口径，bfloat16 对齐处理一致。
+    if quant_mode not in (2, 7):
         return topk_value
     if sort_score_dtype is None:
         sort_score_dtype = torch.float32

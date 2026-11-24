@@ -28,7 +28,7 @@ from cann_ops_transformer.ops.attention.quant_lightning_indexer_v2 import (  # n
 )
 from result_compare_method import compare_topk_valid  # noqa: E402
 
-torch.npu.set_device(0)
+torch.npu.set_device(int(os.environ.get("QLI_TEST_DEVICE_ID", "0")))
 
 NEG_INF = float("-inf")
 CAND_BLOCKS = 2048
@@ -52,6 +52,13 @@ def select_candidate_blocks_ref(score_row, compress_len, topk_blocks, bs):
     keep = topv > NEG_INF
     out[:k][keep] = topi[keep].to(torch.int32)
     return out, blocks
+
+
+def _pack_int4_pairs(dense_int):
+    """低半字节存偶数下标、高半字节存奇数下标，与 int4b_t 解包语义一致。"""
+    lo = (dense_int[..., 0::2] & 0x0F).to(torch.uint8)
+    hi = (dense_int[..., 1::2] & 0x0F).to(torch.uint8)
+    return lo | (hi << 4)
 
 
 def topk_golden(score_row, topk):
@@ -87,6 +94,8 @@ def gen_case_inputs(case):
     block_size = case.get("pa_block_size", 128)
     layout = case.get("layout", "BSND")
     pa_gap = case.get("pa_gap", False)
+    qm = case.get("quant_mode", 2)
+    q_lo, q_hi = (-8, 8) if qm == 7 else (-20, 21)
     gen = torch.Generator().manual_seed(case.get("seed", 7))
     np.random.seed(case.get("seed", 7) + 500)  # block_table 排列也固定 (保证可复现)
 
@@ -96,12 +105,13 @@ def gen_case_inputs(case):
         q_flat = torch.cat(
             [
                 torch.randint(
-                    -20, 21, (sq, g, HEAD_DIM), dtype=torch.int32, generator=gen
+                    q_lo, q_hi, (sq, g, HEAD_DIM), dtype=torch.int32, generator=gen
                 )
                 for sq in seqs_q
             ]
         ).to(torch.int8)
         q = q_flat.npu()
+        q_packed = _pack_int4_pairs(q_flat).npu() if qm == 7 else q
         cu_q = [0]
         for sq in seqs_q:
             cu_q.append(cu_q[-1] + sq)
@@ -120,7 +130,7 @@ def gen_case_inputs(case):
             .npu()
         )
         k_dense = torch.randint(
-            -20, 21, (b, 1, s2max, HEAD_DIM), dtype=torch.int32, generator=gen
+            q_lo, q_hi, (b, 1, s2max, HEAD_DIM), dtype=torch.int32, generator=gen
         ).to(torch.int8)
         k_scale_dense = (
             torch.empty(b, 1, s2max).uniform_(0.5, 1.0, generator=gen).to(torch.float16)
@@ -155,7 +165,7 @@ def gen_case_inputs(case):
             num_heads_k=1,
             head_dim=HEAD_DIM,
             topk=topk,
-            quant_mode=2,
+            quant_mode=qm,
             cu_seqlens_q=cu_q_t,
             seqused_k=seqused_k_t,
             cmp_residual_k=cmp_res_t,
@@ -173,6 +183,10 @@ def gen_case_inputs(case):
         )
         return {
             "q": q,
+            "q_packed": q_packed,
+            "k_phys_packed": (
+                _pack_int4_pairs(k_phys).npu() if qm == 7 else k_phys.npu()
+            ),
             "w": w,
             "q_scale": q_scale,
             "k_dense": k_dense,
@@ -195,11 +209,11 @@ def gen_case_inputs(case):
         }
 
     # BSND / PA_BBND 基础路径
-    q = (
-        torch.randint(-20, 21, (b, s1, g, HEAD_DIM), dtype=torch.int32, generator=gen)
-        .to(torch.int8)
-        .npu()
-    )
+    q_dense = torch.randint(
+        q_lo, q_hi, (b, s1, g, HEAD_DIM), dtype=torch.int32, generator=gen
+    ).to(torch.int8)
+    q = q_dense.npu()
+    q_packed = _pack_int4_pairs(q_dense).npu() if qm == 7 else q
     w = torch.empty(b, s1, g).uniform_(-1, 1, generator=gen).to(torch.float16).npu()
     q_scale = (
         torch.empty(b, s1, g).uniform_(0.5, 1.0, generator=gen).to(torch.float16).npu()
@@ -208,7 +222,7 @@ def gen_case_inputs(case):
     # 稠密 k/k_scale (golden 用), 再按 block_table 散射成 PA 物理布局
     s2max = max(seqused_k)
     k_dense = torch.randint(
-        -20, 21, (b, 1, s2max, HEAD_DIM), dtype=torch.int32, generator=gen
+        q_lo, q_hi, (b, 1, s2max, HEAD_DIM), dtype=torch.int32, generator=gen
     ).to(torch.int8)
     k_scale_dense = (
         torch.empty(b, 1, s2max).uniform_(0.5, 1.0, generator=gen).to(torch.float16)
@@ -276,6 +290,19 @@ def gen_case_inputs(case):
                 ksp[bid, : end - start, 0] = k_scale_dense[bi, 0, start:end]
         k_phys.copy_(kp.npu())
         k_scale_phys.copy_(ksp.npu())
+        if qm == 7:
+            blk_elems_p = block_size * (HEAD_DIM // 2)
+            pbuf = torch.zeros(
+                n_blk * gap * blk_elems_p, dtype=torch.uint8, device="npu"
+            )
+            k_phys_packed = torch.as_strided(
+                pbuf,
+                (n_blk, block_size, 1, HEAD_DIM // 2),
+                (gap * blk_elems_p, HEAD_DIM // 2, HEAD_DIM // 2, 1),
+            )
+            k_phys_packed.copy_(_pack_int4_pairs(kp).npu())
+        else:
+            k_phys_packed = k_phys
     else:
         k_phys = torch.zeros(total_blocks, block_size, 1, HEAD_DIM, dtype=torch.int8)
         k_scale_phys = torch.zeros(total_blocks, block_size, 1, dtype=torch.float16)
@@ -290,6 +317,7 @@ def gen_case_inputs(case):
                 k_scale_phys[bid, : end - start, 0] = k_scale_dense[bi, 0, start:end]
         k_phys = k_phys.npu()
         k_scale_phys = k_scale_phys.npu()
+        k_phys_packed = _pack_int4_pairs(k_phys.cpu()).npu() if qm == 7 else k_phys
     seqused_k_t = torch.tensor(seqused_k, dtype=torch.int32).npu()
 
     cmp_res_t = None
@@ -339,7 +367,7 @@ def gen_case_inputs(case):
         num_heads_k=1,
         head_dim=HEAD_DIM,
         topk=topk,
-        quant_mode=2,
+        quant_mode=qm,
         seqused_k=seqused_k_t,
         cmp_residual_k=cmp_res_t,
         batch_size=b,
@@ -354,6 +382,8 @@ def gen_case_inputs(case):
 
     return {
         "q": q,
+        "q_packed": q_packed,
+        "k_phys_packed": k_phys_packed,
         "w": w,
         "q_scale": q_scale,
         "k_dense": k_dense,
@@ -386,7 +416,7 @@ def npu_run(inputs, case):
     candidate_on = case["candidate"]
     common = dict(
         topk=case["topk"],
-        quant_mode=2,
+        quant_mode=case.get("quant_mode", 2),
         cu_seqlens_q=inputs.get("cu_q_t"),
         cu_seqlens_k=inputs.get("cu_k_t"),
         seqused_k=inputs["seqused_k_t"],
@@ -403,9 +433,10 @@ def npu_run(inputs, case):
     empty_cand = torch.empty(0, dtype=torch.int32, device=inputs["q"].device)
 
     if not candidate_on:
+        is_int4 = case.get("quant_mode", 2) == 7
         idx, vals = quant_lightning_indexer(
-            inputs["q"],
-            inputs["k_phys"],
+            inputs["q_packed"] if is_int4 else inputs["q"],
+            inputs["k_phys_packed"] if is_int4 else inputs["k_phys"],
             inputs["w"],
             inputs["q_scale"],
             inputs["k_scale_phys"],
@@ -421,9 +452,10 @@ def npu_run(inputs, case):
         )
 
     # 统一入口：显式传两个 candidate 参数即走 candidate 重载（四输出）
+    is_int4 = case.get("quant_mode", 2) == 7
     ret = quant_lightning_indexer(
-        inputs["q"],
-        inputs["k_phys"],
+        inputs["q_packed"] if is_int4 else inputs["q"],
+        inputs["k_phys_packed"] if is_int4 else inputs["k_phys"],
         inputs["w"],
         inputs["q_scale"],
         inputs["k_scale_phys"],
@@ -465,10 +497,12 @@ def golden_run_ext(inputs, case, need_rows=None):
     mask_mode = case["mask_mode"]
     candidate_on = case["candidate"]
     seqs_q = case.get("seqs_q") or [case["q_seq"]] * b
-    q_all = inputs["q"].cpu().to(torch.int32)
+    # 128 维 INT8/INT4 点积的绝对值不超过 128 * 128^2 < 2^24，FP32 可精确
+    # 表示所有乘积与累计整数。直接用 FP32 GEMM，避免 CPU INT32 GEMM 的低效内核。
+    q_all = inputs["q"].cpu().to(torch.float32)
     w_all = inputs["w"].cpu()
     qs_all = inputs["q_scale"].cpu()
-    k_all = inputs["k_dense"].cpu().to(torch.int32)
+    k_all = inputs["k_dense"].cpu().to(torch.float32)
     ks_all = inputs["k_scale_dense"].cpu()
     seqused_k = case["seqused_k"]
     if case.get("layout") == "TND":
@@ -2005,6 +2039,46 @@ NEW_CASES = [
         None,
     ),
 ]
+
+# INT4 candidate 独立精度回归：保留 candidate 开启的 g=32 约束，覆盖两种 query 布局。
+NEW_CASES.extend(
+    [
+        (
+            "int4_bsnd_m1",
+            {
+                "name": "int4_bsnd_m1",
+                "batch": 2,
+                "q_seq": 4,
+                "seqused_k": [1024, 2048],
+                "cmp_ratio": 1,
+                "mask_mode": 3,
+                "candidate": True,
+                "g": 32,
+                "topk": 512,
+                "quant_mode": 7,
+            },
+            None,
+        ),
+        (
+            "int4_tnd_m1",
+            {
+                "name": "int4_tnd_m1",
+                "batch": 2,
+                "q_seq": 8,
+                "seqs_q": [8, 4],
+                "seqused_k": [1024, 2048],
+                "cmp_ratio": 1,
+                "mask_mode": 3,
+                "candidate": True,
+                "g": 32,
+                "topk": 512,
+                "layout": "TND",
+                "quant_mode": 7,
+            },
+            None,
+        ),
+    ]
+)
 
 ARGVALUES = [tuple(c) for c in CASES] + [
     pytest.param(d, id=nid, marks=[pytest.mark.xfail(reason=reason, strict=True)])

@@ -49,6 +49,12 @@ __global__ __aicore__ void quant_sparse_lightning_indexer(
     GET_TILING_DATA_WITH_STRUCT(QLIV2TilingDataConsumer, tiling_data_in, tiling);
     const QLIV2TilingDataConsumer* __restrict tiling_data = &tiling_data_in;
 
-    INVOKE_LI_CANDIDATE_OP_IMPL(QLIV2Preload, int8_t, int8_t, float, uint16_t, int32_t, PAGE_ATTENTION,
-                                LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T));
+    if constexpr (DT_Q == DT_INT4) {
+        // W4A4: int4 打包存储(每uint8承载2个int4, 低nibble在前), Cube 原生 int4xint4 Mmad -> int32
+        INVOKE_LI_CANDIDATE_OP_IMPL(QLIV2Preload, int4b_t, int4b_t, float, uint16_t, int32_t, PAGE_ATTENTION,
+                                    LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T));
+    } else {
+        INVOKE_LI_CANDIDATE_OP_IMPL(QLIV2Preload, int8_t, int8_t, float, uint16_t, int32_t, PAGE_ATTENTION,
+                                    LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T));
+    }
 }

@@ -28,17 +28,17 @@ class QuantLightningIndexerV2 : public OpDef {
 public:
     explicit QuantLightningIndexerV2(const char *name) : OpDef(name)
     {
-        this->Input("q").ParamType(REQUIRED).DataType({Ops::Transformer::DT_INT8}).FormatList({ge::FORMAT_ND}).AutoContiguous();
-        this->Input("k").ParamType(REQUIRED).DataType({Ops::Transformer::DT_INT8}).FormatList({ge::FORMAT_ND}).IgnoreContiguous();
-        this->Input("w").ParamType(REQUIRED).DataType({Ops::Transformer::DT_FLOAT16}).FormatList({ge::FORMAT_ND}).AutoContiguous();
+        this->Input("q").ParamType(REQUIRED).DataType({Ops::Transformer::DT_INT8, Ops::Transformer::DT_INT4}).FormatList({ge::FORMAT_ND}).AutoContiguous();
+        this->Input("k").ParamType(REQUIRED).DataType({Ops::Transformer::DT_INT8, Ops::Transformer::DT_INT4}).FormatList({ge::FORMAT_ND}).IgnoreContiguous();
+        this->Input("w").ParamType(REQUIRED).DataType({Ops::Transformer::DT_FLOAT16, Ops::Transformer::DT_FLOAT16}).FormatList({ge::FORMAT_ND}).AutoContiguous();
         this->Input("q_descale")
             .ParamType(REQUIRED)
-            .DataTypeList({Ops::Transformer::DT_FLOAT16})
+            .DataType({Ops::Transformer::DT_FLOAT16, Ops::Transformer::DT_FLOAT16})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("k_descale")
             .ParamType(REQUIRED)
-            .DataTypeList({Ops::Transformer::DT_FLOAT16})
+            .DataType({Ops::Transformer::DT_FLOAT16, Ops::Transformer::DT_FLOAT16})
             .FormatList({ge::FORMAT_ND})
             .IgnoreContiguous();
         this->Input("cu_seqlens_q")

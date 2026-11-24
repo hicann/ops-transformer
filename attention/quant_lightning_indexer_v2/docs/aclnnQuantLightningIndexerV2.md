@@ -117,12 +117,13 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>输入</td>
       <td>公式中量化后的Query。</td>
       <td>不支持空Tensor。</td>
-      <td>INT8、FLOAT8_e4m3fn、HIFLOAT8、FLOAT4_e2m1</td>
+      <td>INT8、FLOAT8_e4m3fn、HIFLOAT8、FLOAT4_e2m1、INT4</td>
       <td>ND</td>
       <td>
           <ul>
                 <li>layoutQOptional为BSND时，shape为(B,S1,N1,D)。</li>
                 <li>layoutQOptional为TND时，shape为(T1,N1,D)。</li>
+                <li>quantMode为7时为INT4打包存储，shape的D轴仍按逻辑值128填写。</li>
           </ul>
       </td>
       <td>x</td>
@@ -137,11 +138,12 @@ aclnnStatus aclnnQuantLightningIndexerV2(
                 <li>block_num为PageAttention时block总数，block_size为一个block的token数。</li>
           </ul>
       </td>
-      <td>INT8、FLOAT8_e4m3fn、HIFLOAT8、FLOAT4_e2m1</td>
+      <td>INT8、FLOAT8_e4m3fn、HIFLOAT8、FLOAT4_e2m1、INT4</td>
       <td>ND</td>
       <td>
           <ul>
                 <li>layoutKOptional为PA_BBND时，shape为(block_num, block_size, N2, D)；为BSND时为(B,S2,N2,D)；为TND时为(T2,N2,D)。</li>
+                <li>quantMode为7时为INT4打包存储，shape的D轴仍按逻辑值128填写。</li>
           </ul>
       </td>
       <td>支持0轴非连续</td>
@@ -469,14 +471,15 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 <!-- npu="A3,910b" id11 -->
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
   - `layoutKOptional`支持PA_BBND、TND：q N1为64时仅支持PA_BBND（必须传入sequsedKOptional）；N1为24/32时支持PA_BBND（必须传入sequsedKOptional）或TND（必须传入cuSeqlensKOptional，不支持传入sequsedKOptional）。
-  - `quantMode`仅支持2（Per-Token-Head量化）。
+  - `quantMode`支持2（Per-Token-Head INT8量化）和7（Per-Token-Head INT4量化，W4A4全量化；torch侧以pack后的uint8上送，由quantMode=7确认是int4载体；aclnn C++侧支持真实int4 tensor直传）。
   - `cmpRatio`仅支持2的幂次方且范围为[1, 128]，即1/2/4/8/16/32/64/128；N1为24/32时仅支持1。
   - 不支持`outputIdxOffsetOptional`。
   - 不支持`returnValue`。
-  - q和k：支持INT8，不支持FLOAT8_e4m3fn、HIFLOAT8和FLOAT4_e2m1。
+  - q和k：`quantMode`为2时支持INT8，`quantMode`为7时支持INT4；不支持FLOAT8_e4m3fn、HIFLOAT8和FLOAT4_e2m1。
   - qDescale和kDescale：支持FLOAT16，不支持FLOAT32和FLOAT8_e8m0。
   - w：支持FLOAT16，不支持FLOAT32。
-  - q N1支持64、32、24：N1为24/32时，要求`layoutQOptional`为TND、`maskMode`为3、`cmpRatio`为1、不传`returnValue`，不满足时接口报错。
+  - `quantMode`为7时：q N1仅支持64，k N2仅支持1；q/k为INT4打包存储（每字节承载2个signed int4元素，低半字节为偶数下标元素，补码表示-8..7，zero_point=0），shape的D轴仍按逻辑值128填写；qDescale/kDescale的shape与`quantMode`为2时一致（per-token scale）。
+  - q N1支持64、32、24：N1为24/32时，要求`layoutQOptional`为TND、`maskMode`为3、`cmpRatio`为1、不传`returnValue`，不满足时接口报错（N1为24/32仅`quantMode`为2时支持）。
   - topk仅支持[1, 2048]。
   - N1为24/32暂不支持TND Padding功能：`layoutQOptional`为TND时不支持传入sequsedQOptional，传入时接口报错。
 <!-- end id11 -->
@@ -556,8 +559,14 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 
 ## 约束说明
 
-- headdim支持128。
+- headdim支持128（`quantMode`为7时为INT4打包存储，shape的D轴仍按逻辑值128填写）。
 - block_size取值为16的倍数，最大支持1024。
+- `quantMode`为7（Atlas A3/A2系列，W4A4 INT4全量化）时：
+  - q、k的数据类型为INT4（打包存储，每字节承载2个signed int4元素，低半字节为偶数下标元素，补码表示-8..7，zero_point=0），shape的D轴仍按逻辑值128填写。
+  - q N1仅支持64，k N2仅支持1。
+  - qDescale和kDescale为FLOAT16，shape与`quantMode`为2时一致（per-token-head粒度）。
+  - `layoutKOptional`为PA_BBND时，k的stride0（D轴步长，按逻辑元素计）需为偶数（2元素对齐）。
+  - 不支持N1为24/32的fast场景（fast模板仅`quantMode`为2时开放）。
 - 当`layoutKOptional`不为PA_BBND时，`layoutQOptional`和`layoutKOptional`必须一致。
 - 当`quantMode`为3/5时，`qDescale`和`kDescale`的维数分别比`q`和`k`多1，前缀维度保持一致，末两维为(D/64, 2)；D必须为64的倍数，每个scale对应D轴上连续32个逻辑元素。
 - 当传入的参数layoutQOptional为TND时，必须传入cuSeqlensQOptional，如果也传入sequsedQOptional，应保证由sequsedQOptional传入的各个batch的q长度不超过根据cuSeqlensQOptional计算出的各个batch的q序列长度。当某个batch由sequsedQOptional传入的q序列长度seqlen1小于由cuSeqlensQOptional计算出的q长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的q输出的sparseIndicesOut和sparseValuesOut全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致AI Core执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。q N1为24或32场景暂不支持TND Padding功能，不应传入sequsedQOptional，传入时接口报错。

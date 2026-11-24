@@ -24,7 +24,7 @@ The framework implements functional verification of the quant_lightning_indexer_
   - **key_layout**: PA_BBND, BSND, TND
 
 - **Data types**:
-  - **qk_dtype**: FLOAT8_E4M3FN, INT8, HIFLOAT8, FLOAT4_E2M1
+  - **qk_dtype**: FLOAT8_E4M3FN, INT8, HIFLOAT8, FLOAT4_E2M1, UINT8 (packed INT4 when `quant_mode=7`)
   - **dequant_dtype**: FP32 (Ascend950), FP16 (Ascend910_93), FLOAT8_E8M0 (MXFP8/MXFP4)
   - **actual_seq_dtype**: INT32
 
@@ -255,7 +255,7 @@ bash batch_isolated_run.sh ./pt_path 1 graph   # Graph mode + performance profil
 | head_dim | int | `128` |
 | block_size | int | `512` |
 | block_num | int | `8` |
-| qk_dtype | str | `FLOAT8_E4M3FN` / `INT8` / `HIFLOAT8` / `FLOAT4_E2M1` |
+| qk_dtype | str | `FLOAT8_E4M3FN` / `INT8` / `HIFLOAT8` / `FLOAT4_E2M1` / `UINT8` (packed INT4) |
 | dequant_dtype | str | `FP32` / `FP16` / `FLOAT8_E8M0` |
 | actual_seq_dtype | str | `INT32` |
 | cu_seqlens_q | None/str | `None` or `"[0, 1]"` |
@@ -264,7 +264,7 @@ bash batch_isolated_run.sh ./pt_path 1 graph   # Graph mode + performance profil
 | seqused_k | str | `"[28,24,80,96,47,76,0,111]"` |
 | cmp_residual_k | None/str | `None` or `"[0,0,0,0,0,0,0,0]"` (required when cmp_ratio>1)|
 | max_seqlen_q | int | `-1` |
-| quant_mode | int | `1` / `2` / `4` |
+| quant_mode | int | `1` / `2` / `4` / `7` (A2/A3 W4A4 INT4, with qk_dtype=torch.uint8 carrying packed data) |
 | layout_query | str | `BSND` / `TND` |
 | layout_key | str | `PA_BBND` |
 | sparse_count | int | `512` |
@@ -283,7 +283,7 @@ bash batch_isolated_run.sh ./pt_path 1 graph   # Graph mode + performance profil
 - `dequant_dtype`: For Ascend950 with `quant_mode=3/5`, only `FLOAT8_E8M0` is supported; other quantization modes support `FP32`. Ascend910_93 supports `FP16`.
 - When `cmp_ratio > 1` and `sparse_mode != 0`, `cmp_residual_k` is required (a list with a length equal to batch_size).
 - When `return_value=1`, `output_idx_offset` must be set to a valid value.
-- Ascend910_93 requires `quant_mode=2`.
+- Ascend910_93 requires `quant_mode=2` (W8A8 INT8) or `quant_mode=7` (W4A4 INT4, with qk_dtype=torch.uint8 as the packed carrier).
 
 ## Output Files
 

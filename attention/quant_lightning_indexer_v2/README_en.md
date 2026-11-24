@@ -30,8 +30,8 @@ English | [简体中文](./README.md)
 
 | Parameter Name                     | Input/Output/Attribute | Description  | Data Type       | Data Format   |
 |----------------------------|-----------|----------------------------------------------------------------------|----------------|------------|
-| q                     | Input      | $Q_{index}^{Quant}\in\R^{g\times d}$ in the formula, representing input Index Query; non-contiguous is not supported.| INT8, FLOAT8_e4m3fn, HIFLOAT8, FLOAT4_e2m1 | ND         |
-| k                   | Input      | $K_{index}^{Quant}\in\R^{S_{k}\times d}$ in the formula, representing the compressed input Index Key; non-contiguity on axis 0 is supported.| INT8, FLOAT8_e4m3fn, HIFLOAT8, FLOAT4_e2m1 | ND |
+| q                     | Input      | $Q_{index}^{Quant}\in\R^{g\times d}$ in the formula, representing input Index Query; non-contiguous is not supported. When `quant_mode` is 7, INT4 data is packed for storage, while the D axis of the shape remains the logical value 128.| INT8, FLOAT8_e4m3fn, HIFLOAT8, FLOAT4_e2m1, INT4 | ND         |
+| k                   | Input      | $K_{index}^{Quant}\in\R^{S_{k}\times d}$ in the formula, representing the compressed input Index Key; non-contiguity on axis 0 is supported. When `quant_mode` is 7, INT4 data is packed for storage, while the D axis of the shape remains the logical value 128.| INT8, FLOAT8_e4m3fn, HIFLOAT8, FLOAT4_e2m1, INT4 | ND |
 | w                 | Input      | $W$ in the formula, representing the weight coefficient; non-contiguous is not supported. | FLOAT16, FLOAT32 | ND |
 | q_descale             | Input      | $Scale_Q$ in the formula, representing the dequantization coefficient of Index Query; non-contiguous is not supported. When `quant_mode` is 3/5, the shape is obtained by replacing the D axis of `q` with (D/64, 2); when `quant_mode` is 4, the shape is (1,); in other scenarios, the shape is consistent with w | FLOAT16, FLOAT32, FLOAT8_e8m0     | ND         |
 | k_descale            | Input      | $Scale_K$ in the formula, representing the dequantization coefficient of Index Key; non-contiguity on axis 0 is supported. When `quant_mode` is 3/5, the shape is obtained by replacing the D axis of `k` with (D/64, 2); when `quant_mode` is 4, the shape is (1,); in other scenarios, the shape is obtained by removing the D axis of `k` | FLOAT16, FLOAT32, FLOAT8_e8m0       | ND         |
@@ -70,15 +70,17 @@ English | [简体中文](./README.md)
   - When the passed-in parameter layout_q is TND, cu_seqlens_q must be passed in. If seqused_q is also passed in, ensure that the q length of each batch passed in by seqused_q does not exceed the q sequence length of each batch computed from cu_seqlens_q. When the q sequence length seqlen1 of a batch passed in by seqused_q is less than the q length seqlen2 computed from cu_seqlens_q, the TND Padding feature is enabled, and the sparse_indices and sparse_values of the q output for the difference between seqlen2 and seqlen1 of that batch are all set to invalid values. In some long-sequence scenarios, if too much invalid data needs to be padded, aicore execution may time out due to hardware limitations. You can compute the amount of data to pad through (seqlen2 - seqlen1) * topk, and it is recommended to keep this amount within 400 million.
 
 - <term>Atlas A3 products</term> and <term>Atlas A2 products</term>:
-  - `quant_mode` supports only 2.
-  - `q` and `k` support INT8 and do not support FLOAT8_e4m3fn, HIFLOAT8, or FLOAT4_e2m1.
+  - `quant_mode` supports 2 (INT8) and 7 (INT4, W4A4 full quantization). At the PyTorch layer, packed uint8 is passed with `quant_mode=7` identifying the INT4 payload; at the aclnn C++ layer, native INT4 tensors can be passed directly.
+  - When `quant_mode` is 2, `q` and `k` support INT8; when it is 7, `q` and `k` support INT4. FLOAT8_e4m3fn, HIFLOAT8, and FLOAT4_e2m1 are not supported.
   - `q_descale` and `k_descale` support FLOAT16 and do not support FLOAT32 or FLOAT8_e8m0.
   - `w` supports FLOAT16 and does not support FLOAT32.
   - `output_idx_offset` and `return_value` are not supported.
+  - When `quant_mode` is 7, N of `q` must be 64 and N of `k` must be 1. Each byte of `q` and `k` stores two signed INT4 elements, with the low nibble holding the even-indexed element, two's-complement values in [-8, 7], and zero_point=0. The D axis of the shape remains the logical value 128. Quantization uses per-token-head granularity; the shapes of `q_descale` and `k_descale` are the same as for `quant_mode=2` (per-token scales).
   - `layout_k` supports PA_BBND and TND: when N of `q` is 64, only PA_BBND is supported (`seqused_k` must be passed in); when N is 24/32, PA_BBND (`seqused_k` must be passed in) or TND (`cu_seqlens_k` must be passed in, and `seqused_k` is not supported) is supported.
-  - N of `q` supports 64, 32, and 24, and N of `k` supports only 1; when N is 24/32, `layout_q` must be TND, `mask_mode` must be 3, and `cmp_ratio` must be 1; otherwise the API reports an error.
+  - N of `q` supports 64, 32, and 24, and N of `k` supports only 1; when N is 24/32, `layout_q` must be TND, `mask_mode` must be 3, and `cmp_ratio` must be 1; otherwise the API reports an error. N of 24/32 is supported only with `quant_mode=2`.
   - When N is 24/32, the TND Padding feature is not supported: passing in `seqused_q` when `layout_q` is TND causes the API to report an error.
   - `topk` supports [1, 2048].
+  - When `layout_k` is PA_BBND, stride 0 of `k` (the D-axis stride, counted in logical elements) must be even (two-element alignment).
 
 ## Invocation Example
 

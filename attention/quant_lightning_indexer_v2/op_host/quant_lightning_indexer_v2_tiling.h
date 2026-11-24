@@ -117,6 +117,10 @@ using lightning_indexer_v2_checker::MX_SCALE_SHAPE_ALIGN;
 using lightning_indexer_v2_checker::MX_E8M0_SCALE_PACK_NUM;
 using lightning_indexer_v2_checker::MXFP4_PACK_NUM;
 using lightning_indexer_v2_checker::HIFLOAT4_PACK_NUM;
+// quant_mode=7: W4A4 signed int4，q/k 以 DT_INT4 进入 tiling/kernel（与 W8A8 复用 dtype 位段分发）。
+// torch 侧无 int4 dtype，以 nibble 打包的 uint8 为载体（低半字节=偶数下标，补码 -8..7）。
+constexpr uint32_t QUANT_MODE_INT4 = 7;
+constexpr uint32_t INT4_PACK_NUM = 2;
 constexpr uint32_t MX_SCALE_GROUP_SIZE = 32; // MX量化每32个D维元素对应1个E8M0 scale
 constexpr uint32_t HIFLOAT4_BLOCK_SIZE = 64; // HIFLOAT4每64个D维元素对应1个scale
 

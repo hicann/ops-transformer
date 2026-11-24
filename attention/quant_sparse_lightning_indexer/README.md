@@ -26,7 +26,7 @@
 ## 功能说明
 
 - 算子定位：本算子是两级 TopK 的第二级。第一级算子 `QuantLightningIndexerV2` 以 `candidate_topk_blocks=2048` 开启 source 后，把每个 token 的行（key 序列）按 `candidate_block_size` 个位置切块，块级打分后选出 `candidate_topk_blocks` 个候选块，输出块级索引 `candidate_block_indices`；本算子接收该索引，只在候选块覆盖的位置上做 token 级 TopK，输出最终的 `sparse_indices` 供稀疏 attention 使用。
-- API功能：推理场景下稀疏 attention 前处理的计算，在候选块范围内选出关键的稀疏 token，并对输入 query 和 key 进行量化实现存 8 算 8，获取最大收益。
+- API功能：推理场景下稀疏 attention 前处理的计算，在候选块范围内选出关键的稀疏 token，并对输入 query 和 key 进行量化实现存算（INT8 存 8 算 8 / INT4 存 4 算 4），获取最大收益。
 - 计算公式：与 QuantLightningIndexerV2 相同，区别在于 TopK 的作用域被限制在候选块内：
 
     $$out = \text{Top-}k\left\{[1]_{1\times g}@\left[(W@[1]_{1\times S_{k}})\odot\text{ReLU}\left(\left(Scale_Q@Scale_K^T\right)\odot\left(Q_{index}^{Quant}@{\left(K_{index}^{Quant}\right)}^T\right)\right)\right]\right\},\quad p \in \text{候选块}$$
@@ -43,8 +43,8 @@
 
 | 参数名                     | 输入/输出/属性 | 描述  | 数据类型       | 数据格式   |
 |----------------------------|-----------|----------------------------------------------------------------------|----------------|------------|
-| q | 输入 | 公式中的$Q_{index}^{Quant}\in\R^{g\times d}$，表示输入Index Query，不支持非连续。 | INT8、FLOAT4_e2m1 | ND |
-| k | 输入 | 公式中的$K_{index}^{Quant}\in\R^{S_{k}\times d}$，表示压缩后的输入Index Key，支持0轴非连续。布局限制见约束说明。 | INT8、FLOAT4_e2m1 | ND |
+| q | 输入 | 公式中的$Q_{index}^{Quant}\in\R^{g\times d}$，表示输入Index Query，不支持非连续。 | INT8、FLOAT4_e2m1、INT4 | ND |
+| k | 输入 | 公式中的$K_{index}^{Quant}\in\R^{S_{k}\times d}$，表示压缩后的输入Index Key，支持0轴非连续。布局限制见约束说明。 | INT8、FLOAT4_e2m1、INT4 | ND |
 | w | 输入 | 公式中的$W$，表示权重系数，不支持非连续。 | FLOAT16、FLOAT32 | ND |
 | q_descale | 输入 | 公式中的$Scale_Q$，表示Index Query的反量化系数，不支持非连续。`quant_mode`为5时，shape为将`q`的D轴替换为(D/64, 2)；其他场景shape与w一致 | FLOAT16、FLOAT8_e8m0 | ND |
 | k_descale | 输入 | 公式中的$Scale_K$，表示Index Key的反量化系数，支持0轴非连续。`quant_mode`为5时，shape为将`k`的D轴替换为(D/64, 2)；其他场景shape为移除`k`的D轴。分页存储要求见约束说明。 | FLOAT16、FLOAT8_e8m0 | ND |
@@ -100,9 +100,9 @@
 
 <!-- npu="A3,910b" id7 -->
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-  - `quant_mode`仅支持2。
-  - `q`、`k`支持INT8，不支持FLOAT8_e4m3fn、HIFLOAT8和FLOAT4_e2m1。
-  - `q_descale`和`k_descale`支持FLOAT16，不支持FLOAT32和FLOAT8_e8m0。
+  - `quant_mode`支持2和7。2为INT8（存8算8），7为INT4（W4A4存4算4）。
+  - `q`、`k`支持INT8与INT4，不支持FLOAT8_e4m3fn、HIFLOAT8和FLOAT4_e2m1。`quant_mode`为2时`q`、`k`必须是INT8；为7时`q`、`k`必须是INT4（以打包`uint8`存储，同一字节内低nibble在前、高nibble在后，无零点偏移，逻辑shape为打包字节数×2，实际通过PyTorch Adapter以`torch.uint8`张量传入）。
+  - `q_descale`和`k_descale`支持FLOAT16，不支持FLOAT32和FLOAT8_e8m0。`quant_mode`为7时反量化系数粒度与2一致（q按token×head、k按token），无需更改shape。
   - `w`支持FLOAT16，不支持FLOAT32。
   - 不支持`return_value=1`（`sparse_values`恒为shape (0,)）。
   - `k`的N仅支持1；`q`的N与`k`的N之比仅支持64或32（即`q`的N支持64或32）。
@@ -112,7 +112,7 @@
   - `candidate_block_length`为预留接口（本期不消费），仅接受空 tensor；传入非空 tensor 会在 tiling 报错。
   - q_descale的shape与w一致，k_descale的shape为k去掉最后一维。
   - cmp_ratio仅支持1、2、4、8、16、32、64、128。
-  - 逻辑head_dim为128。PA_BBND布局下，k的shape为(block_num,block_size,1,128)，block_size为16的倍数；k和k_descale支持第0轴带padding，其余轴必须连续。
+  - 逻辑head_dim为128。PA_BBND布局下，k的shape为(block_num,block_size,1,128)，block_size为16的倍数；k和k_descale支持第0轴带padding，其余轴必须连续。`quant_mode`为7时该shape仍按逻辑元素描述（128个INT4元素打包为64字节），PA页内每行物理占64字节。
 <!-- end id7 -->
 
 ## 调用示例

@@ -14,10 +14,12 @@
 # 来源与本分支改造:
 #   由主算子测试 tests/pytest/qli_cand_orig.py（其上溯 /opt/tjj/qli_cand_test/test_qli_cand.py）按
 #   cand_mode 切片迁移而来，承载全部 cand_mode=2（第二级 consumer）用例；2026-10-08 并入原
-#   qli_consumer_two_level.py（算子级精度矩阵）中形状不重复的 13 个用例。
+#   qli_consumer_two_level.py（算子级精度矩阵）中形状不重复的 13 个用例与其端到端检查。
 #   - 本算子无 candidate_mode 属性：固定消费第一级输出的块级候选索引，候选尺寸约定与第一级一致
 #     （候选块个数由 candidate_block_indices 末维推导；候选块大小 candidate_block_size=8）
-#   - 每条用例使用本算子参考实现生成候选，仅比对 consumer 自身精度
+#   - 每条用例默认「吃 golden 候选」比对（隔离 consumer 自身精度）；E2E_IDS 中的用例额外跑一遍
+#     「吃第一级 NPU 候选」的端到端比对（_e2e_check：以第一级真实输出为输入，与同一候选下的
+#     golden 比对，属链路一致性验证；第一级自身精度由主算子测试覆盖）
 #   - 用例返回统一补成 3 元组（第三元恒空，与该 mode 语义一致），下游比对代码无需改动
 #   - 删除「新接口规范适配层」相关用例（该 py 适配层已在本分支删除）；
 #     1M 组与 cand_blocks=64（超出本分支 2048-only 契约）的用例 2026-10-08 按约定删除
@@ -53,6 +55,15 @@ from cann_ops_transformer.ops.attention.quant_sparse_lightning_indexer import ( 
     quant_sparse_lightning_indexer_metadata,
 )
 
+try:
+    from cann_ops_transformer.ops.attention.quant_lightning_indexer_v2 import (  # noqa: E402
+        quant_lightning_indexer,
+        quant_lightning_indexer_metadata,
+    )
+except Exception:  # pylint: disable=broad-except
+    quant_lightning_indexer = None
+    quant_lightning_indexer_metadata = None
+
 compare_spec = importlib.util.spec_from_file_location(
     "qsli_pytest_compare", Path(__file__).with_name("result_compare_method.py")
 )
@@ -69,8 +80,20 @@ CAND_BS = 8
 HEAD_DIM = 128
 
 
+def _pack_int4_pairs(dense_int):
+    """int4 稠密张量 (值域 [-8,7], 末维 D) → 打包 uint8 (低 nibble 在前):
+    偶数索引元素存低 4bit, 奇数索引元素存高 4bit; 末维 D → D//2 (物理字节)。
+    负数按 two's complement 取低 4 位 (-8 & 0xF = 8), 与 kernel unpack(int4b_t) 语义一致。"""
+    lo = (dense_int[..., 0::2] & 0x0F).to(torch.uint8)
+    hi = (dense_int[..., 1::2] & 0x0F).to(torch.uint8)
+    return lo | (hi << 4)
+
+
 def gen_case_inputs(case):
-    """生成 NPU 输入 (int8/PA) 与 golden 所需的稠密表示; 支持 layout=TND 与 pa_gap (key 0 轴非连续)"""
+    """生成 NPU 输入 (int8/int4-packed/PA) 与 golden 所需的稠密表示; 支持 layout=TND 与 pa_gap (key 0 轴非连续)。
+    quant_mode=7 (W4A4): 稠密 q/k 值域 [-8,7] (inputs["q"]/["k_dense"], golden 零改动复用);
+    另生成打包 uint8 inputs["q_packed"]/["k_phys_packed"] (低 nibble 在前, 物理末维 D//2) 仅供 NPU 入口 —
+    torch_extension 的 FixQLIV2AclDtypes 将其描述为 ACL_INT4, aclnn 层自动折算回逻辑 nibble shape。"""
     b = case["batch"]
     s1 = case["q_seq"]
     g = case["g"]
@@ -82,6 +105,8 @@ def gen_case_inputs(case):
     block_size = case.get("pa_block_size", 128)
     layout = case.get("layout", "BSND")
     pa_gap = case.get("pa_gap", False)
+    qm = case.get("quant_mode", 2)
+    q_lo, q_hi = (-8, 8) if qm == 7 else (-20, 21)
     gen = torch.Generator().manual_seed(case.get("seed", 7))
     np.random.seed(case.get("seed", 7) + 500)  # block_table 排列也固定 (保证可复现)
 
@@ -91,12 +116,13 @@ def gen_case_inputs(case):
         q_flat = torch.cat(
             [
                 torch.randint(
-                    -20, 21, (sq, g, HEAD_DIM), dtype=torch.int32, generator=gen
+                    q_lo, q_hi, (sq, g, HEAD_DIM), dtype=torch.int32, generator=gen
                 )
                 for sq in seqs_q
             ]
         ).to(torch.int8)
         q = q_flat.npu()
+        q_packed = _pack_int4_pairs(q_flat).npu() if qm == 7 else q
         cu_q = [0]
         for sq in seqs_q:
             cu_q.append(cu_q[-1] + sq)
@@ -115,7 +141,7 @@ def gen_case_inputs(case):
             .npu()
         )
         k_dense = torch.randint(
-            -20, 21, (b, 1, s2max, HEAD_DIM), dtype=torch.int32, generator=gen
+            q_lo, q_hi, (b, 1, s2max, HEAD_DIM), dtype=torch.int32, generator=gen
         ).to(torch.int8)
         k_scale_dense = (
             torch.empty(b, 1, s2max).uniform_(0.5, 1.0, generator=gen).to(torch.float16)
@@ -150,7 +176,7 @@ def gen_case_inputs(case):
             num_heads_k=1,
             head_dim=HEAD_DIM,
             topk=topk,
-            quant_mode=2,
+            quant_mode=qm,
             cu_seqlens_q=cu_q_t,
             seqused_k=seqused_k_t,
             cmp_residual_k=cmp_res_t,
@@ -162,13 +188,16 @@ def gen_case_inputs(case):
             mask_mode=case["mask_mode"],
             cmp_ratio=ratio,
         )
+        k_phys_packed = _pack_int4_pairs(k_phys).npu() if qm == 7 else k_phys.npu()
         return {
             "q": q,
+            "q_packed": q_packed,
             "w": w,
             "q_scale": q_scale,
             "k_dense": k_dense,
             "k_scale_dense": k_scale_dense,
             "k_phys": k_phys.npu(),
+            "k_phys_packed": k_phys_packed,
             "k_scale_phys": k_scale_phys.npu(),
             "block_table": block_table_t,
             "seqused_k_t": seqused_k_t,
@@ -186,11 +215,11 @@ def gen_case_inputs(case):
         }
 
     # BSND / PA_BBND 基础路径
-    q = (
-        torch.randint(-20, 21, (b, s1, g, HEAD_DIM), dtype=torch.int32, generator=gen)
-        .to(torch.int8)
-        .npu()
-    )
+    q_dense = torch.randint(
+        q_lo, q_hi, (b, s1, g, HEAD_DIM), dtype=torch.int32, generator=gen
+    ).to(torch.int8)
+    q = q_dense.npu()
+    q_packed = _pack_int4_pairs(q_dense).npu() if qm == 7 else q
     w = torch.empty(b, s1, g).uniform_(-1, 1, generator=gen).to(torch.float16).npu()
     q_scale = (
         torch.empty(b, s1, g).uniform_(0.5, 1.0, generator=gen).to(torch.float16).npu()
@@ -199,7 +228,7 @@ def gen_case_inputs(case):
     # 稠密 k/k_scale (golden 用), 再按 block_table 散射成 PA 物理布局
     s2max = max(seqused_k)
     k_dense = torch.randint(
-        -20, 21, (b, 1, s2max, HEAD_DIM), dtype=torch.int32, generator=gen
+        q_lo, q_hi, (b, 1, s2max, HEAD_DIM), dtype=torch.int32, generator=gen
     ).to(torch.int8)
     k_scale_dense = (
         torch.empty(b, 1, s2max).uniform_(0.5, 1.0, generator=gen).to(torch.float16)
@@ -250,6 +279,12 @@ def gen_case_inputs(case):
             (n_blk, block_size, 1, HEAD_DIM),
             (gap * blk_elems, HEAD_DIM, HEAD_DIM, 1),
         )
+        blk_elems_p = block_size * 1 * (HEAD_DIM // 2)
+        pbuf = (
+            torch.zeros(n_blk * gap * blk_elems_p, dtype=torch.uint8, device="npu")
+            if qm == 7
+            else None
+        )
         sbuf = torch.zeros(n_blk * gap * block_size, dtype=torch.float16, device="npu")
         k_scale_phys = torch.as_strided(
             sbuf, (n_blk, block_size, 1), (gap * block_size, 1, 1)
@@ -267,6 +302,15 @@ def gen_case_inputs(case):
                 ksp[bid, : end - start, 0] = k_scale_dense[bi, 0, start:end]
         k_phys.copy_(kp.npu())
         k_scale_phys.copy_(ksp.npu())
+        if qm == 7:
+            k_phys_packed = torch.as_strided(
+                pbuf,
+                (n_blk, block_size, 1, HEAD_DIM // 2),
+                (gap * blk_elems_p, HEAD_DIM // 2, HEAD_DIM // 2, 1),
+            )
+            k_phys_packed.copy_(_pack_int4_pairs(kp).npu())
+        else:
+            k_phys_packed = k_phys
     else:
         k_phys = torch.zeros(total_blocks, block_size, 1, HEAD_DIM, dtype=torch.int8)
         k_scale_phys = torch.zeros(total_blocks, block_size, 1, dtype=torch.float16)
@@ -281,6 +325,7 @@ def gen_case_inputs(case):
                 k_scale_phys[bid, : end - start, 0] = k_scale_dense[bi, 0, start:end]
         k_phys = k_phys.npu()
         k_scale_phys = k_scale_phys.npu()
+        k_phys_packed = _pack_int4_pairs(k_phys.cpu()).npu() if qm == 7 else k_phys
     seqused_k_t = torch.tensor(seqused_k, dtype=torch.int32).npu()
 
     cmp_res_t = None
@@ -323,7 +368,7 @@ def gen_case_inputs(case):
         num_heads_k=1,
         head_dim=HEAD_DIM,
         topk=topk,
-        quant_mode=2,
+        quant_mode=qm,
         seqused_k=seqused_k_t,
         cmp_residual_k=cmp_res_t,
         batch_size=b,
@@ -337,11 +382,13 @@ def gen_case_inputs(case):
 
     return {
         "q": q,
+        "q_packed": q_packed,
         "w": w,
         "q_scale": q_scale,
         "k_dense": k_dense,
         "k_scale_dense": k_scale_dense,
         "k_phys": k_phys,
+        "k_phys_packed": k_phys_packed,
         "k_scale_phys": k_scale_phys,
         "block_table": block_table_t,
         "seqused_k_t": seqused_k_t,
@@ -373,7 +420,7 @@ def npu_run(inputs, case, cand_in_npu=None):
     assert cand_in_npu is not None, "cand_mode=2 用例需先准备候选索引输入"
     common = dict(
         topk=case["topk"],
-        quant_mode=2,
+        quant_mode=case.get("quant_mode", 2),
         cu_seqlens_q=inputs.get("cu_q_t"),
         cu_seqlens_k=inputs.get("cu_k_t"),
         seqused_k=inputs["seqused_k_t"],
@@ -390,9 +437,10 @@ def npu_run(inputs, case, cand_in_npu=None):
     cand_blocks = case.get("cand_blocks", CAND_BLOCKS)
     if cand_blocks != CAND_BLOCKS:
         pytest.skip(f"本分支候选块个数仅支持 {CAND_BLOCKS}（用例给 {cand_blocks}）")
+    is_int4 = case.get("quant_mode", 2) == 7
     idx, vals = quant_sparse_lightning_indexer(
-        inputs["q"],
-        inputs["k_phys"],
+        inputs["q_packed"] if is_int4 else inputs["q"],
+        inputs["k_phys_packed"] if is_int4 else inputs["k_phys"],
         inputs["w"],
         inputs["q_scale"],
         inputs["k_scale_phys"],
@@ -401,6 +449,109 @@ def npu_run(inputs, case, cand_in_npu=None):
         **common,
     )
     return idx, vals, torch.empty(0, dtype=torch.int32, device=inputs["q"].device)
+
+
+def npu_run_source(inputs, case):
+    """第一级（source）入口: 仅为端到端路径生成候选输入。
+
+    走 QLI v2 的统一入口并显式传两个 candidate 参数（即 candidate 重载，candidate_topk_blocks=2048）。
+    返回块级候选索引张量 [.., candidate_topk_blocks]，直接作为第二级的 candidate_block_indices 传入。
+    source 与 consumer 的 metadata 布局不同，不能使用 inputs 中的 consumer metadata 驱动 source。
+    """
+    is_int4 = case.get("quant_mode", 2) == 7
+    source_metadata = quant_lightning_indexer_metadata(
+        num_heads_q=case.get("g", 32),
+        num_heads_k=1,
+        head_dim=HEAD_DIM,
+        topk=case["topk"],
+        quant_mode=case.get("quant_mode", 2),
+        cu_seqlens_q=inputs.get("cu_q_t"),
+        cu_seqlens_k=inputs.get("cu_k_t"),
+        seqused_k=inputs["seqused_k_t"],
+        cmp_residual_k=inputs.get("cmp_res_t"),
+        batch_size=case["batch"],
+        max_seqlen_q=max(case.get("seqs_q", [case["q_seq"]])),
+        max_seqlen_k=inputs["s2max"],
+        layout_q=case.get("layout", "BSND"),
+        layout_k="PA_BBND",
+        mask_mode=case["mask_mode"],
+        cmp_ratio=case["cmp_ratio"],
+        candidate_topk_blocks=CAND_BLOCKS,
+        candidate_block_size=CAND_BS,
+    )
+    ret = quant_lightning_indexer(
+        inputs["q_packed"] if is_int4 else inputs["q"],
+        inputs["k_phys_packed"] if is_int4 else inputs["k_phys"],
+        inputs["w"],
+        inputs["q_scale"],
+        inputs["k_scale_phys"],
+        topk=case["topk"],
+        quant_mode=case.get("quant_mode", 2),
+        cu_seqlens_q=inputs.get("cu_q_t"),
+        cu_seqlens_k=inputs.get("cu_k_t"),
+        seqused_k=inputs["seqused_k_t"],
+        cmp_residual_k=inputs.get("cmp_res_t"),
+        block_table=inputs["block_table"],
+        output_idx_offset=inputs.get("output_idx_offset_t"),
+        metadata=source_metadata,
+        max_seqlen_q=max(case.get("seqs_q", [case["q_seq"]])),
+        layout_q=case.get("layout", "BSND"),
+        layout_k="PA_BBND",
+        mask_mode=case["mask_mode"],
+        cmp_ratio=case["cmp_ratio"],
+        candidate_topk_blocks=CAND_BLOCKS,
+        candidate_block_size=CAND_BS,
+    )
+    return ret[2]
+
+
+def _e2e_check(inputs, case, seqs_q, s2max, topk):
+    """端到端检查: 第一级 NPU 候选 -> 第二级 -> 与「同一候选下」的 golden 比对。
+
+    迁移自原 qli_consumer_two_level.py 的路径②（生产链路形态）。属一致性验证: 候选来自第一级
+    真实输出而非 golden，因此校验的是"consumer 在真实候选下行为正确"，不校验第一级精度。
+    """
+    if quant_lightning_indexer is None:
+        pytest.skip("第一级算子 quant_lightning_indexer 不可用，跳过 E2E 链路检查")
+    cand_src = npu_run_source(inputs, case)
+    idx_e2e, _, cand_dummy = npu_run(inputs, case, cand_src)
+    torch.npu.synchronize()
+    assert cand_dummy.numel() == 0, "consumer 输出第三元应为空"
+    golden_inputs = dict(inputs)
+    golden_inputs["candidate_block_length"] = cand_src.cpu().ge(0).sum(dim=-1)
+    idx_gold, _, score_rows, _ = golden_run_ext(golden_inputs, case, cand_src.cpu())
+    if case.get("layout") == "TND":
+        fails = []
+        for r in range(sum(seqs_q)):
+            v4 = score_rows[r].reshape(1, 1, 1, -1).numpy()
+            ok_r, msg_r = cmp_indices(
+                idx_e2e.reshape(-1, topk)[r].cpu().unsqueeze(0),
+                idx_gold.reshape(-1, topk)[r].unsqueeze(0),
+                f"e2e@r{r}",
+                v4,
+                1,
+            )
+            if not ok_r:
+                fails.append(msg_r)
+        assert not fails, (
+            f"[{case['name']}] 端到端(第一级NPU候选) TND 逐行比对失败: {fails[:3]}"
+        )
+    else:
+        v4 = (
+            torch.stack(score_rows)
+            .reshape(case["batch"], case["q_seq"], s2max)
+            .unsqueeze(1)
+            .numpy()
+        )
+        ok, msg = cmp_indices(
+            idx_e2e.reshape(-1, topk),
+            idx_gold.reshape(-1, topk),
+            "sparse_indices(端到端)",
+            v4,
+            case["q_seq"],
+        )
+        assert ok, f"[{case['name']}] 端到端(第一级NPU候选) {msg}"
+    print(f"[{case['name']}] 端到端(第一级 NPU 候选) 一致")
 
 
 def gen_cand_input(case, kind, inputs):
@@ -496,7 +647,12 @@ def gen_cand_input(case, kind, inputs):
                 out = torch.full((cb,), -1, dtype=torch.int32)
                 out[:nb_sel] = sel
                 rows.append(out)
-    cand_golden = torch.stack(rows).reshape(b, -1, 1, cb)
+    if case.get("layout") == "TND":
+        # TND: 期望 shape [T,1,cb] (拼接总行, 与大 shape TND 分支及 aclnn 文档一致);
+        # 变长 seqs_q 无法 reshape 成 [B,S1,1,cb] (总行数非 b 的倍数)
+        cand_golden = torch.stack(rows).unsqueeze(1)  # [T, 1, cb]
+    else:
+        cand_golden = torch.stack(rows).reshape(b, -1, 1, cb)  # BSND: [B,S1,1,cb]
     return cand_golden.npu(), cand_golden
 
 
@@ -1393,6 +1549,368 @@ NEW_CASES = [
         },
         None,
     ),
+    # ---- W4A4 (quant_mode=7, int4b_t): decode/prefill x BSND/TND/PA-gap —— golden 零改动复用
+    # (量化折叠进 scale, 稠密值域 [-8,7] 代入); packed uint8 低 nibble 在前经 FixQLIV2AclDtypes
+    # 描述为 ACL_INT4, aclnn 层折算回逻辑 nibble shape ----
+    (
+        "int4_bsnd_m2",
+        {
+            "name": "int4_bsnd_m2",
+            "batch": 1,
+            "q_seq": 1,
+            "seqused_k": [4096],
+            "cmp_ratio": 1,
+            "mask_mode": 0,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+            "quant_mode": 7,
+        },
+        None,
+    ),
+    (
+        "int4_prefill_m2",
+        {
+            "name": "int4_prefill_m2",
+            "batch": 1,
+            "q_seq": 8,
+            "seqused_k": [2048],
+            "cmp_ratio": 1,
+            "mask_mode": 0,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+            "quant_mode": 7,
+        },
+        None,
+    ),
+    (
+        "int4_tnd_m2",
+        {
+            "name": "int4_tnd_m2",
+            "batch": 1,
+            "q_seq": 1,
+            "seqs_q": [1],
+            "seqused_k": [4096],
+            "cmp_ratio": 1,
+            "mask_mode": 0,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+            "layout": "TND",
+            "quant_mode": 7,
+        },
+        None,
+    ),
+    (
+        "int4_pa_gap_m2",
+        {
+            "name": "int4_pa_gap_m2",
+            "batch": 1,
+            "q_seq": 1,
+            "seqused_k": [4096],
+            "cmp_ratio": 1,
+            "mask_mode": 0,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+            "pa_gap": True,
+            "quant_mode": 7,
+        },
+        None,
+    ),
+    (
+        "int4_big16k_m2",
+        {
+            "name": "int4_big16k_m2",
+            "batch": 1,
+            "q_seq": 16384,
+            "seqused_k": [16384],
+            "cmp_ratio": 1,
+            "mask_mode": 3,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+            "pool": 7936,
+            "table_w": 1055,
+            "sample_rows": True,
+            "quant_mode": 7,
+        },
+        None,
+    ),
+    # ---- int4 (quant_mode=7) 泛化矩阵: 冒烟 5 用例之外的功能+精度泛化, 与 int8 同参数用例一一对应 ----
+    # 变长 batch (b>1, seqused_k 变长): 冒烟仅覆盖 batch=1, 此处验证分核与 batch 维展开
+    (
+        "int4_b2_varlen_m2",
+        {
+            "name": "int4_b2_varlen_m2",
+            "batch": 2,
+            "q_seq": 4,
+            "seqused_k": [1024, 3072],
+            "cmp_ratio": 1,
+            "mask_mode": 3,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+            "quant_mode": 7,
+        },
+        None,
+    ),
+    # g=64 (q N 与 k N 之比 64, mBase=128 门控路径): 对应 int8 g64_decode
+    (
+        "int4_g64_decode_m2",
+        {
+            "name": "int4_g64_decode_m2",
+            "batch": 1,
+            "q_seq": 1,
+            "seqused_k": [2048],
+            "cmp_ratio": 1,
+            "mask_mode": 0,
+            "cand_mode": 2,
+            "g": 64,
+            "topk": 512,
+            "quant_mode": 7,
+        },
+        None,
+    ),
+    # cmp_ratio=2 压缩 + mask3 + 残余: 对应 int8 r2_prefill
+    (
+        "int4_cmp2_m2",
+        {
+            "name": "int4_cmp2_m2",
+            "batch": 1,
+            "q_seq": 4,
+            "seqused_k": [2048],
+            "cmp_ratio": 2,
+            "cmp_res": [1],
+            "mask_mode": 3,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+            "quant_mode": 7,
+        },
+        None,
+    ),
+    # 大 topk=2048 (topk 槽位上限): 对应 int8 sparse2048
+    (
+        "int4_topk2048_m2",
+        {
+            "name": "int4_topk2048_m2",
+            "batch": 1,
+            "q_seq": 1,
+            "seqused_k": [4096],
+            "cmp_ratio": 1,
+            "mask_mode": 0,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 2048,
+            "quant_mode": 7,
+        },
+        None,
+    ),
+    # pa_gap 分页 padding + prefill (q_seq>1) 组合: 对应 int8 pa_gap 形态
+    (
+        "int4_pa_gap_prefill_m2",
+        {
+            "name": "int4_pa_gap_prefill_m2",
+            "batch": 1,
+            "q_seq": 4,
+            "seqused_k": [2048],
+            "cmp_ratio": 1,
+            "mask_mode": 3,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+            "pa_gap": True,
+            "quant_mode": 7,
+        },
+        None,
+    ),
+    # TND + 变长 batch/seqused_k (q 变长 + k 变长双变): 对应 int8 TND 变长形态
+    (
+        "int4_tnd_b2_m2",
+        {
+            "name": "int4_tnd_b2_m2",
+            "batch": 2,
+            "q_seq": 3,
+            "seqs_q": [2, 3],
+            "seqused_k": [1536, 2560],
+            "cmp_ratio": 1,
+            "mask_mode": 3,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+            "layout": "TND",
+            "quant_mode": 7,
+        },
+        None,
+    ),
+    # s2 非对齐 tail (1000: 末 tile CeilDiv 边界 + PA 行槽不满): 对应 int8 r1_tail
+    (
+        "int4_tail_m2",
+        {
+            "name": "int4_tail_m2",
+            "batch": 2,
+            "q_seq": 4,
+            "seqused_k": [1000, 2000],
+            "cmp_ratio": 1,
+            "mask_mode": 3,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+            "quant_mode": 7,
+        },
+        None,
+    ),
+    # ---- DeepSeek v4.1 网络负载用例（来源: qli_network_info/QLI_v2_shape_对比_native_vs_dsl.md
+    #      原生 N-3 consumer 形态: B=16, T1=96(=16×S1 6), N1=32(g=32), D=128, topk=512,
+    #      候选 2048 块 × 块 8 token(CAND_BS=8), PA128 页, cmp_ratio=1(非压缩层), seqused_k=8192----
+    #      网络真实 128K 上下文由 decode_long_m1/big128k 系列覆盖; 本组用 8K 控制单例时长,
+    #      负载维度(B/T1/N1/D/topk/候选规格)与网络一致。int8 与 int4 双量化各一份 ----
+    # ① N-3 消费层形态(int8): TND 拼接 T1=96, seqused_k 均匀 8192, 候选块数满容量场景
+    (
+        "dsv41_consumer_m2",
+        {
+            "name": "dsv41_consumer_m2",
+            "batch": 16,
+            "q_seq": 6,
+            "seqused_k": [8192] * 16,
+            "cmp_ratio": 1,
+            "mask_mode": 0,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+        },
+        None,
+    ),
+    # ② N-3 消费层形态(W4A4 int4): 同 ① 仅 quant_mode=7
+    (
+        "dsv41_consumer_int4_m2",
+        {
+            "name": "dsv41_consumer_int4_m2",
+            "batch": 16,
+            "q_seq": 6,
+            "seqused_k": [8192] * 16,
+            "cmp_ratio": 1,
+            "mask_mode": 0,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+            "quant_mode": 7,
+        },
+        None,
+    ),
+    # ③ N-3 消费层 + TND 变长 seqs_q(int8): 网络 prefill 时 T1 按请求变长(等总 96)
+    (
+        "dsv41_tnd_m2",
+        {
+            "name": "dsv41_tnd_m2",
+            "batch": 16,
+            "q_seq": 6,
+            "seqs_q": [6] * 16,
+            "seqused_k": [8192] * 16,
+            "cmp_ratio": 1,
+            "mask_mode": 0,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+            "layout": "TND",
+        },
+        None,
+    ),
+    # ④ N-3 消费层 + TND 变长 seqs_q(W4A4 int4): 同 ③ 仅 quant_mode=7
+    (
+        "dsv41_tnd_int4_m2",
+        {
+            "name": "dsv41_tnd_int4_m2",
+            "batch": 16,
+            "q_seq": 6,
+            "seqs_q": [6] * 16,
+            "seqused_k": [8192] * 16,
+            "cmp_ratio": 1,
+            "mask_mode": 0,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+            "layout": "TND",
+            "quant_mode": 7,
+        },
+        None,
+    ),
+    # ⑤ 压缩层形态(N-1 语义, int8): cmp_ratio=2 + mask_mode=3 + cmp_residual(压缩 causal),
+    #    consumer 侧在候选上仍走压缩可见长度 vl; seqused_k=8192 → act_k=16384
+    (
+        "dsv41_compress_m2",
+        {
+            "name": "dsv41_compress_m2",
+            "batch": 16,
+            "q_seq": 6,
+            "seqused_k": [8192] * 16,
+            "cmp_ratio": 2,
+            "cmp_res": [1] * 16,
+            "mask_mode": 3,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+        },
+        None,
+    ),
+    # ⑥ 压缩层形态(W4A4 int4): 同 ⑤ 仅 quant_mode=7
+    (
+        "dsv41_compress_int4_m2",
+        {
+            "name": "dsv41_compress_int4_m2",
+            "batch": 16,
+            "q_seq": 6,
+            "seqused_k": [8192] * 16,
+            "cmp_ratio": 2,
+            "cmp_res": [1] * 16,
+            "mask_mode": 3,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+            "quant_mode": 7,
+        },
+        None,
+    ),
+    # ⑦ 网络 128K 上下文 PA 规格(int8): pool/table_w 对齐生产页池比例(16 请求 × 8K,
+    #    页 128 → 每请求 64 块; pool=2048 富余, table_w=1024 对齐网络 block_table 宽度)
+    (
+        "dsv41_pool_m2",
+        {
+            "name": "dsv41_pool_m2",
+            "batch": 16,
+            "q_seq": 6,
+            "seqused_k": [8192] * 16,
+            "pool": 2048,
+            "table_w": 1024,
+            "cmp_ratio": 1,
+            "mask_mode": 0,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+        },
+        None,
+    ),
+    # ⑧ 网络 128K 上下文 PA 规格(W4A4 int4): 同 ⑦ 仅 quant_mode=7
+    (
+        "dsv41_pool_int4_m2",
+        {
+            "name": "dsv41_pool_int4_m2",
+            "batch": 16,
+            "q_seq": 6,
+            "seqused_k": [8192] * 16,
+            "pool": 2048,
+            "table_w": 1024,
+            "cmp_ratio": 1,
+            "mask_mode": 0,
+            "cand_mode": 2,
+            "g": 32,
+            "topk": 512,
+            "quant_mode": 7,
+        },
+        None,
+    ),
     (
         "tnd_m2_rand",
         {
@@ -1941,6 +2459,20 @@ ARGVALUES = [tuple(c) for c in CASES] + [
 ALL_IDS = [c[0] for c in CASES] + [nid for nid, _, _ in NEW_CASES]
 
 
+# 端到端（吃第一级 NPU 候选）额外跑一遍的用例: 覆盖 decode/prefill/TND/0 轴非连续/offset
+# 与两个锚点（pin_overflow: 位置块数 2049=容量+1；decode_long_m1: s1=1 x s2=131072）
+E2E_IDS = {
+    "r1_m2_self",
+    "r1_m2_prefill",
+    "r2_m2_self",
+    "tnd_m2_rand",
+    "pa_gap_m2",
+    "off_m2",
+    "pin_overflow",
+    "decode_long_m1",
+}
+
+
 def _sample_rows(case):
     """抽样行集合: 固定行 (首/等分/尾, 覆盖 vl 极小到极大) + 固定 seed 随机行"""
     seqs_q = case.get("seqs_q") or [case["q_seq"]] * case["batch"]
@@ -2030,6 +2562,8 @@ def test_qli_cand(t):
             ]
             if case["cand_mode"] == 2:
                 assert cand_npu.numel() == 0
+            if case["cand_mode"] == 2 and case["name"] in E2E_IDS:
+                _e2e_check(inputs, case, seqs_q, s2max, topk)
             print(f"[{case['name']}] PASS")
             return
         # BSND 统一矩阵路径: values4d [B,1,S1,s2max] (每批行数统一 q_seq; TND 已走上方逐行分支)
@@ -2115,4 +2649,6 @@ def test_qli_cand(t):
     if case["cand_mode"] == 2:
         # 消费不改变候选输入, 校验透传无关性: 输出第三元为空
         assert cand_npu.numel() == 0
+    if case["cand_mode"] == 2 and case["name"] in E2E_IDS:
+        _e2e_check(inputs, case, seqs_q, s2max, topk)
     print(f"[{case['name']}] PASS")

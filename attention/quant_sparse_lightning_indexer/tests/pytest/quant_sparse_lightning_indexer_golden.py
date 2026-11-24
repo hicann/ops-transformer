@@ -410,18 +410,20 @@ def golden_run_ext(inputs, case, cand_blocks_in=None, need_rows=None):
     if isinstance(inputs["q"], list):
         q_l, w_l, qs_l = inputs["q"], inputs["w"], inputs["q_scale"]
         k_l, ks_l = inputs["k_dense"], inputs["k_scale_dense"]
-        if quant_mode == 2:
-            q_l = [q.to(torch.int32) for q in q_l]
-            k_l = [k.to(torch.int32) for k in k_l]
+        if quant_mode in (2, 7):
+            q_l = [q.to(torch.float32) for q in q_l]
+            k_l = [k.to(torch.float32) for k in k_l]
     else:
         q_all = inputs["q"].cpu()
         w_all = inputs["w"].cpu()
         qs_all = inputs["q_scale"].cpu()
         k_all = inputs["k_dense"].cpu()
         ks_all = inputs["k_scale_dense"].cpu()
-        if quant_mode == 2:
-            q_all = q_all.to(torch.int32)
-            k_all = k_all.to(torch.int32)
+        if quant_mode in (2, 7):
+            # 128 维 INT8/INT4 点积上界为 128 * 128^2 < 2^24，FP32 GEMM 与
+            # INT32 结果逐位一致，避免 CPU INT32 GEMM 的低效内核。
+            q_all = q_all.to(torch.float32)
+            k_all = k_all.to(torch.float32)
         if case.get("layout") == "TND":
             # TND: 仅 Q 侧拼接 (cu_q 前缀切分); K 为 PA 的 [B,1,S2max,D] 稠密表示, 与 BSND 同构索引
             cu_q = inputs["cu_q"]

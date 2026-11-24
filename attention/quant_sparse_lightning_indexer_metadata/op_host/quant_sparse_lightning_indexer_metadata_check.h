@@ -33,6 +33,7 @@ inline constexpr int64_t QLI_V2_QUANT_MODE_2 = 2;
 inline constexpr int64_t QLI_V2_QUANT_MODE_3 = 3;
 inline constexpr int64_t QLI_V2_QUANT_MODE_4 = 4;
 inline constexpr int64_t QLI_V2_QUANT_MODE_5 = 5;
+inline constexpr int64_t QLI_V2_QUANT_MODE_7 = 7; // W4A4 int4 (arch22), 与第二级算子 QuantSparseLightningIndexer 对齐
 inline constexpr int64_t QLI_V2_NO_MASK_MODE = 0;
 inline constexpr int64_t QLI_V2_CAUSAL_MASK_MODE = 3;
 inline constexpr int64_t QLI_V2_CMP_RATIO_LOWER_BOUND = 1;
@@ -200,9 +201,9 @@ aclnnStatus CheckSingleParamQsliMetadata(int64_t numHeadsQ, int64_t numHeadsK, i
         CHECK_COND(topk >= QLI_V2_TOPK_LOWER_BOUND && topk <= QLI_V2_A3_TOPK_UPPER_BOUND, ACLNN_ERR_PARAM_INVALID,
                    "topk should be [%lld, %lld], but got %lld", QLI_V2_TOPK_LOWER_BOUND, QLI_V2_A3_TOPK_UPPER_BOUND,
                    topk);
-        // quant_mode 校验
-        CHECK_COND(quantMode == QLI_V2_QUANT_MODE_2, ACLNN_ERR_PARAM_INVALID, "quant_mode should be 2, but got %lld",
-                   quantMode);
+        // quant_mode 校验 (2=INT8 W8A8, 7=INT4 W4A4 arch22, 与第二级算子对齐)
+        CHECK_COND(quantMode == QLI_V2_QUANT_MODE_2 || quantMode == QLI_V2_QUANT_MODE_7, ACLNN_ERR_PARAM_INVALID,
+                   "quant_mode should be 2 or 7, but got %lld", quantMode);
         // cmp_ratio 校验
         CHECK_COND((cmpRatio >= QLI_V2_CMP_RATIO_LOWER_BOUND) && (cmpRatio <= QLI_V2_CMP_RATIO_UPPER_BOUND) &&
                        ((cmpRatio & (cmpRatio - 1)) == 0),

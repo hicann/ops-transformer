@@ -261,7 +261,7 @@ bash batch_isolated_run.sh ./pt_path 1 graph   # graph模式 + 性能采集
 | seqused_k | str | `"[28,24,80,96,47,76,0,111]"` |
 | cmp_residual_k | None/str | `None` 或 `"[0,0,0,0,0,0,0,0]"`（cmp_ratio>1时必填）|
 | max_seqlen_q | int | `-1` |
-| quant_mode | int | `1` / `2` / `4` |
+| quant_mode | int | `1` / `2` / `4` / `7`（A2/A3 W4A4 int4，qk_dtype=torch.uint8 打包上送） |
 | layout_query | str | `BSND` / `TND` |
 | layout_key | str | `PA_BBND` |
 | sparse_count | int | `512` |
@@ -280,7 +280,7 @@ bash batch_isolated_run.sh ./pt_path 1 graph   # graph模式 + 性能采集
 - `dequant_dtype`：Ascend950的`quant_mode=3/5`仅支持`FLOAT8_E8M0`，其他量化模式支持`FP32`；Ascend910_93支持`FP16`
 - `cmp_ratio > 1`且`sparse_mode != 0`时，`cmp_residual_k`必填（长度=batch_size的列表）
 - `return_value=1`时，`output_idx_offset`需提供有效值
-- Ascend910_93要求`quant_mode=2`
+- Ascend910_93要求`quant_mode=2`（W8A8 int8）或`quant_mode=7`（W4A4 int4，qk_dtype=torch.uint8 打包载体，tiling 内部归一化为 2 下发）
 
 ## 输出文件
 

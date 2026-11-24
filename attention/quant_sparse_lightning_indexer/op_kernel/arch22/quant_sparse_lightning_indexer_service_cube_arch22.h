@@ -59,6 +59,8 @@ public:
     static constexpr uint32_t FIX_MTE1_EVENT = EVENT_ID4;
 
     static constexpr uint64_t S8_BLOCK_CUBE = 32;
+    // W4A4(int4b_t): L1->L0 的 _s4 fract 每 32 字节承载 64 个 int4 逻辑元素 (IFA arch22 先例 kSize/64)
+    static constexpr uint64_t S4_BLOCK_CUBE = 64;
 
     static constexpr uint32_t MTE2_MTE1_EVENT = EVENT_ID2;
     static constexpr uint32_t MTE1_M_EVENT = EVENT_ID2;
@@ -75,11 +77,16 @@ public:
     static constexpr uint64_t WEIGHT_BUFFER_OFFSET = S1G_BASIC_BLOCK_L1 * BLOCK_CUBE;
     static constexpr uint64_t L0AB_BUFFER_OFFSET_S8_16K = 16 * 1024;
     static constexpr uint64_t L0AB_BUFFER_OFFSET_FP16_16K = 16 * 512;
+    // int4b_t 元素 0.5B: LocalTensor 按元素寻址, 16KB 字节步进需 2 倍元素偏移,
+    // 与 half 视角 (FP16_16K) 的 S/W buffer 保持同相位 16KB 步进, 否则 Key/Q buffer
+    // 与 S/W buffer 错位重叠引发 L0A/L0B read/write conflict (Mmad 并发读同地址)
+    static constexpr uint64_t L0AB_BUFFER_OFFSET_S4_16K = L0AB_BUFFER_OFFSET_S8_16K * 2;
     static constexpr uint64_t L0C_BUFFER_OFFSET = 64 * 256;
 
 private:
     __aicore__ inline void WeightDmaCopy(uint64_t s1gL1RealSize, const QLIV2Common::RunInfo& runInfo);
     __aicore__ inline void LoadKeyToL0b(uint64_t s2L0RealSize);
+    __aicore__ inline uint64_t GetL0abElemOffset() const;
     __aicore__ inline void LoadQueryToL0a(uint64_t s1gL1Offset, uint64_t s1gL1RealSize, uint64_t s1gL0RealSize);
     __aicore__ inline void QueryNd2Nz(uint64_t s1gL1RealSize, const QLIV2Common::RunInfo& runInfo);
     __aicore__ inline void KeyNd2NzForPA(uint64_t s2L1RealSize, uint64_t s2GmOffset,
@@ -330,13 +337,23 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::KeyNd2NzForPA(uint64_t s2L1RealSize,
         Nd2NzParams nd2nzPara;
         nd2nzPara.ndNum = 1;
         nd2nzPara.nValue = s2Mte2Size; // 行数
-        nd2nzPara.dValue = constInfo_.headDim;
-        nd2nzPara.srcDValue = constInfo_.headDim;
+        // GM 偏移 (keyGmOffset/blkStride) 保持 int4 逻辑元素寻址 (GlobalTensor<int4b_t> 按 nibble 折算),
+        // 仅 Nd2Nz 的 src/dst 列宽按 int8 字节视角折半 (IFA arch22 KVINT4 先例 dValue=headDim/2)
+        if constexpr (IsSameType<K_T, int4b_t>::value) {
+            nd2nzPara.dValue = constInfo_.headDim / 2;
+            nd2nzPara.srcDValue = constInfo_.headDim / 2;
+        } else {
+            nd2nzPara.dValue = constInfo_.headDim;
+            nd2nzPara.srcDValue = constInfo_.headDim;
+        }
         nd2nzPara.dstNzC0Stride = CeilAlign(s2L1RealSize, (uint64_t)BLOCK_CUBE); // 对齐到16 单位block
         nd2nzPara.dstNzNStride = 1;
         nd2nzPara.srcNdMatrixStride = 0;
         nd2nzPara.dstNzMatrixStride = 0;
-        DataCopy(keyL1_[(keyL1BufIdx_ % DOUBLE_BUF_NUM) * KEY_BUFFER_OFFSET + s2L1Offset * S8_BLOCK_CUBE],
+        // L1 行偏移按物理 32B 行槽守恒 (IFA full_quant PA 先例 blockElementCnt: int8=32/int4=64 元素),
+        // int4b_t 的 LocalTensor 按 nibble 寻址 (element=0.5B), 32B 行槽需 64 元素步进
+        uint64_t l1RowStep = IsSameType<K_T, int4b_t>::value ? S4_BLOCK_CUBE : S8_BLOCK_CUBE;
+        DataCopy(keyL1_[(keyL1BufIdx_ % DOUBLE_BUF_NUM) * KEY_BUFFER_OFFSET + s2L1Offset * l1RowStep],
                  keyGm_[keyGmOffset], nd2nzPara);
 
         s2L1Offset += s2Mte2Size;
@@ -354,8 +371,14 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::KeyNd2Nz(uint64_t s2L1RealSize, cons
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
     nd2nzPara.nValue = s2L1RealSize; // 行数
-    nd2nzPara.dValue = constInfo_.headDim;
-    nd2nzPara.srcDValue = dStride;
+    // GM 偏移 (tensorKeyOffset/s2GmOffset) 保持 int4 逻辑元素寻址, 仅列宽按 int8 字节视角折半
+    if constexpr (IsSameType<K_T, int4b_t>::value) {
+        nd2nzPara.dValue = constInfo_.headDim / 2;
+        nd2nzPara.srcDValue = dStride / 2;
+    } else {
+        nd2nzPara.dValue = constInfo_.headDim;
+        nd2nzPara.srcDValue = dStride;
+    }
     nd2nzPara.dstNzC0Stride = CeilAlign(s2L1RealSize, (uint64_t)BLOCK_CUBE); // 对齐到16 单位block
     nd2nzPara.dstNzNStride = 1;
     nd2nzPara.srcNdMatrixStride = 0;
@@ -385,8 +408,14 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::QueryNd2Nz(uint64_t s1gL1RealSize, c
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
     nd2nzPara.nValue = s1gL1RealSize; // 行数
-    nd2nzPara.dValue = constInfo_.headDim;
-    nd2nzPara.srcDValue = constInfo_.headDim;
+    // W4A4: Q 按 int4 打包存储, Nd2Nz 列宽按 int8 字节视角折半; GM 偏移保持逻辑元素寻址
+    if constexpr (IsSameType<Q_T, int4b_t>::value) {
+        nd2nzPara.dValue = constInfo_.headDim / 2;
+        nd2nzPara.srcDValue = constInfo_.headDim / 2;
+    } else {
+        nd2nzPara.dValue = constInfo_.headDim;
+        nd2nzPara.srcDValue = constInfo_.headDim;
+    }
     nd2nzPara.dstNzC0Stride = CeilAlign(s1gL1RealSize, (uint64_t)BLOCK_CUBE); // 对齐到16 单位block
     nd2nzPara.dstNzNStride = 1;
     nd2nzPara.srcNdMatrixStride = 0;
@@ -397,6 +426,13 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::QueryNd2Nz(uint64_t s1gL1RealSize, c
 }
 
 // s1g, d
+template <typename QLIV2T>
+__aicore__ inline uint64_t QLIV2Matmul<QLIV2T>::GetL0abElemOffset() const
+{
+    // Q/K 为 int4b_t 时元素为 0.5B, 16KB 字节步进需 2 倍元素数; half 视角 (S/W) 保持原偏移
+    return IsSameType<Q_T, int4b_t>::value ? L0AB_BUFFER_OFFSET_S4_16K : L0AB_BUFFER_OFFSET_S8_16K;
+}
+
 template <typename QLIV2T>
 __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadQueryToL0a(uint64_t s1gL1Offset, uint64_t s1gL1RealSize,
                                                            uint64_t s1gL0RealSize)
@@ -413,8 +449,10 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadQueryToL0a(uint64_t s1gL1Offset,
     loadData3DParams.padList[3] = 255; // 尾部数据不影响滑窗的结果
 
     // SetLoadToA0Params
+    // W4A4: LoadData3D 参数以逻辑元素为单位 (CANN 校验 int4b_t channelSize 允许值 64 = 32B fract),
+    // _s4 指令自动按 nibble 处理, kExtension/channelSize 保持 headDim 不折半 (IFA full_quant LoadDataL0A 先例)
+    loadData3DParams.kExtension = constInfo_.headDim;                   // K width维度目的
     loadData3DParams.mExtension = CeilAlign(s1gL0RealSize, BLOCK_CUBE); // M height维度目的
-    loadData3DParams.kExtension = constInfo_.headDim;                   // K   width维度目的
     loadData3DParams.mStartPt = s1gL1Offset;
     loadData3DParams.kStartPt = 0;
     loadData3DParams.strideW = 1;
@@ -428,7 +466,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadQueryToL0a(uint64_t s1gL1Offset,
     loadData3DParams.enTranspose = 0;
     loadData3DParams.fMatrixCtrl = 0;
 
-    LoadData<Q_T, LOAD3DV2_CONFIG>(l0a_[(l0BufIdx_ % L0AB_BUF_NUM) * L0AB_BUFFER_OFFSET_S8_16K],
+    LoadData<Q_T, LOAD3DV2_CONFIG>(l0a_[(l0BufIdx_ % L0AB_BUF_NUM) * GetL0abElemOffset()],
                                    queryL1_[(qwL1Mte2BufIdx_ % DOUBLE_BUF_NUM) * QUERY_BUFFER_OFFSET],
                                    loadData3DParams);
 }
@@ -491,11 +529,16 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadKeyToL0b(uint64_t s2L0RealSize)
 {
     LoadData2DParams loadData2DParams;
     loadData2DParams.startIndex = 0;
-    loadData2DParams.repeatTimes = CeilDiv(s2L0RealSize, BLOCK_CUBE) * CeilDiv(constInfo_.headDim, S8_BLOCK_CUBE);
+    if constexpr (IsSameType<K_T, int4b_t>::value) {
+        // W4A4: _s4 fract 每 32 字节承载 64 个 int4 逻辑元素, K 维 fract 数减半 (IFA 先例 kSize/64)
+        loadData2DParams.repeatTimes = CeilDiv(s2L0RealSize, BLOCK_CUBE) * CeilDiv(constInfo_.headDim, S4_BLOCK_CUBE);
+    } else {
+        loadData2DParams.repeatTimes = CeilDiv(s2L0RealSize, BLOCK_CUBE) * CeilDiv(constInfo_.headDim, S8_BLOCK_CUBE);
+    }
     loadData2DParams.srcStride = 1;
     loadData2DParams.dstGap = 0;
     loadData2DParams.ifTranspose = false;
-    LoadData(l0b_[(l0BufIdx_ % L0AB_BUF_NUM) * L0AB_BUFFER_OFFSET_S8_16K],
+    LoadData(l0b_[(l0BufIdx_ % L0AB_BUF_NUM) * GetL0abElemOffset()],
              keyL1_[(keyL1BufIdx_ % DOUBLE_BUF_NUM) * KEY_BUFFER_OFFSET], loadData2DParams);
 }
 
@@ -530,8 +573,8 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::ComputeQk(uint64_t s1gL0RealSize, ui
     mmadParams.cmatrixInitVal = true;
     mmadParams.cmatrixSource = false;
     Mmad(cL0_[(l0cBufIdx_ % DOUBLE_BUF_NUM) * L0C_BUFFER_OFFSET],
-         l0a_[(l0BufIdx_ % L0AB_BUF_NUM) * L0AB_BUFFER_OFFSET_S8_16K],
-         l0b_[(l0BufIdx_ % L0AB_BUF_NUM) * L0AB_BUFFER_OFFSET_S8_16K], mmadParams);
+         l0a_[(l0BufIdx_ % L0AB_BUF_NUM) * GetL0abElemOffset()], l0b_[(l0BufIdx_ % L0AB_BUF_NUM) * GetL0abElemOffset()],
+         mmadParams);
     if ((mmadParams.m / 16) * (mmadParams.n / 16) < 10) {
         PipeBarrier<PIPE_M>();
     }

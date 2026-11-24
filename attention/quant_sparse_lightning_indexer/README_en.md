@@ -26,7 +26,7 @@ The **second stage** operator (consumer, candidate-consuming) of the two-level T
 ## Function Description
 
 - Operator role: this is the second stage of the two-level TopK. The first-stage operator `QuantLightningIndexerV2` enables source with `candidate_topk_blocks=2048`, splits each token's row (the key sequence) into blocks of `candidate_block_size` positions, scores the blocks and selects `candidate_topk_blocks` candidate blocks, then outputs the block-level index `candidate_block_indices`. This operator receives that index, performs token-level TopK only on the positions covered by candidate blocks, and outputs the final `sparse_indices` for sparse attention.
-- API function: sparse-attention preprocessing in inference scenarios; selects the key sparse tokens within candidate blocks and quantizes the input query and key (8-bit storage, 8-bit computation) for maximum benefit.
+- API function: sparse-attention preprocessing in inference scenarios; selects the key sparse tokens within candidate blocks and quantizes the input query and key (INT8 8-bit storage and computation / INT4 4-bit storage and computation) for maximum benefit.
 - Formula: identical to QuantLightningIndexerV2, except that the TopK domain is restricted to candidate blocks:
 
     $$out = \text{Top-}k\left\{[1]_{1\times g}@\left[(W@[1]_{1\times S_{k}})\odot\text{ReLU}\left(\left(Scale_Q@Scale_K^T\right)\odot\left(Q_{index}^{Quant}@{\left(K_{index}^{Quant}\right)}^T\right)\right)\right]\right\},\quad p \in \text{candidate block}$$
@@ -43,8 +43,8 @@ The **second stage** operator (consumer, candidate-consuming) of the two-level T
 
 | Parameter | Input/Output/Attribute | Description | Data Type | Format |
 |-----------|-------------------|-------------|-----------|--------|
-| q | Input | $Q_{index}^{Quant}\in\R^{g\times d}$ in the formula, representing input Index Query; non-contiguous is not supported. | INT8, FLOAT4_e2m1 | ND |
-| k | Input | $K_{index}^{Quant}\in\R^{S_{k}\times d}$ in the formula, representing the compressed input Index Key; non-contiguity on axis 0 is supported. See Constraints for layout restrictions. | INT8, FLOAT4_e2m1 | ND |
+| q | Input | $Q_{index}^{Quant}\in\R^{g\times d}$ in the formula, representing input Index Query; non-contiguous is not supported. | INT8, FLOAT4_e2m1, INT4 | ND |
+| k | Input | $K_{index}^{Quant}\in\R^{S_{k}\times d}$ in the formula, representing the compressed input Index Key; non-contiguity on axis 0 is supported. See Constraints for layout restrictions. | INT8, FLOAT4_e2m1, INT4 | ND |
 | w | Input | $W$ in the formula, representing the weight coefficient; non-contiguous is not supported. | FLOAT16, FLOAT32 | ND |
 | q_descale | Input | $Scale_Q$ in the formula, representing the dequantization coefficient of Index Query; non-contiguous is not supported. When `quant_mode` is 5, the shape is obtained by replacing the D axis of `q` with (D/64, 2); in other scenarios, the shape is consistent with w | FLOAT16, FLOAT8_e8m0 | ND |
 | k_descale | Input | $Scale_K$ in the formula, representing the dequantization coefficient of Index Key; non-contiguity on axis 0 is supported. When `quant_mode` is 5, the shape is obtained by replacing the D axis of `k` with (D/64, 2); in other scenarios, the shape is obtained by removing the D axis of `k`. See Constraints for paged storage requirements. | FLOAT16, FLOAT8_e8m0 | ND |
@@ -100,9 +100,9 @@ The **second stage** operator (consumer, candidate-consuming) of the two-level T
 
 <!-- npu="A3,910b" id7 -->
 - <term>Atlas A3 products</term>, <term>Atlas A2 products</term>:
-  - `quant_mode` supports only 2.
-  - `q` and `k` support INT8; FLOAT8_e4m3fn, HIFLOAT8 and FLOAT4_e2m1 are not supported.
-  - `q_descale` and `k_descale` support FLOAT16; FLOAT32 and FLOAT8_e8m0 are not supported.
+  - `quant_mode` supports 2 and 7: 2 means INT8 (8-bit storage and computation), and 7 means INT4 (W4A4 4-bit storage and computation).
+  - `q` and `k` support INT8 and INT4; FLOAT8_e4m3fn, HIFLOAT8 and FLOAT4_e2m1 are not supported. When `quant_mode` is 2, `q` and `k` must be INT8; when it is 7, they must be INT4 (stored as packed uint8, with the low nibble preceding the high nibble in each byte, no zero-point offset, and a logical element count equal to twice the packed byte count; passed through the PyTorch Adapter as a `torch.uint8` tensor).
+  - `q_descale` and `k_descale` support FLOAT16; FLOAT32 and FLOAT8_e8m0 are not supported. When `quant_mode` is 7, the dequantization granularity is the same as for 2 (per token and head for q, and per token for k), with no shape change.
   - `w` supports FLOAT16; FLOAT32 is not supported.
   - `return_value=1` is not supported (`sparse_values` is always of shape (0,)).
   - N of `k` supports only 1; the ratio of N of `q` to N of `k` supports only 64 or 32 (that is, N of `q` supports 64 or 32).
@@ -112,7 +112,7 @@ The **second stage** operator (consumer, candidate-consuming) of the two-level T
   - `candidate_block_length` is a reserved interface (not consumed in this release) and only accepts an empty tensor; passing a non-empty tensor makes tiling fail.
   - q_descale has the same shape as w; k_descale has the shape of k with its last axis removed.
   - cmp_ratio supports only 1, 2, 4, 8, 16, 32, 64 and 128.
-  - The logical head dimension is 128. For PA_BBND, k has shape (block_num,block_size,1,128), with block_size a multiple of 16. k and k_descale support padding on axis 0; all inner axes must be contiguous.
+  - The logical head dimension is 128. For PA_BBND, k has shape (block_num,block_size,1,128), with block_size a multiple of 16. k and k_descale support padding on axis 0; all inner axes must be contiguous. When `quant_mode` is 7, this shape still describes logical elements (128 INT4 elements are packed into 64 bytes), and each PA page row occupies 64 physical bytes.
 <!-- end id7 -->
 
 ## Usage Example

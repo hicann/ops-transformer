@@ -213,7 +213,7 @@ aclnnStatus aclnnQuantLightningIndexerV3Metadata(
       <td>quantMode（int64_t）</td>
       <td>输入</td>
       <td>表示量化模式。</td>
-      <td>当前仅支持2（Per-Token-Head量化），q、k的数据类型为INT8，w、qDescale、kDescale的数据类型为FLOAT16。</td>
+      <td>当前支持2、7（Per-Token-Head量化）：2对应INT8，7对应INT4；w、qDescale、kDescale的数据类型均为FLOAT16。</td>
       <td>-</td>
       <td>-</td>
       <td>-</td>

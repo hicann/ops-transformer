@@ -424,10 +424,15 @@ ge::graphStatus QLIV2InfoParser::CheckAttrParaInfo()
                                               "Sparse_mode only supports 0 or 3"),
         return ge::GRAPH_FAILED);
     if (npuArch_ == NpuArch::DAV_2201) {
-        OP_CHECK_IF(*qliV2Params_.quantMode != 2,
+        // DAV_2201 支持 per-token-head 量化模式：quant_mode=2（W8A8）或 quant_mode=7（W4A4
+        // signed int4）。quant_mode=7 下 q/k 载体可为 pack 后的
+        // DT_UINT8 或真实 DT_INT4 tensor（见 GetAndCheckInOutDataType），两者最终均按
+        // DT_INT4 语义下发；其余 quant_mode 仅允许 2。
+        OP_CHECK_IF((*qliV2Params_.quantMode != QUANT_MODE_INT8) && (*qliV2Params_.quantMode != QUANT_MODE_INT4),
                     OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "quant_mode",
                                                           std::to_string(*qliV2Params_.quantMode).c_str(),
-                                                          "This SoC requires quant_mode=2."),
+                                                          "This SoC requires quant_mode=2 (W8A8 per-token-head) "
+                                                          "or quant_mode=7 (W4A4 int4 per-token-head)."),
                     return ge::GRAPH_FAILED);
     } else if (npuArch_ == NpuArch::DAV_3510) {
         OP_CHECK_IF((*qliV2Params_.quantMode != QUANT_MODE_FP8) && (*qliV2Params_.quantMode != QUANT_MODE_INT8) &&
@@ -559,13 +564,30 @@ ge::graphStatus QLIV2InfoParser::GetAndCheckInOutDataType()
                                                        "The dtype of q_descale and k_descale must be same"),
                 return ge::GRAPH_FAILED);
     if (npuArch_ == NpuArch::DAV_2201) {
-        OP_CHECK_IF(
-            inputQType_ != Ops::Transformer::DT_INT8,
-            OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
-                opName_, "q,k",
-                (QLIV2DataTypeToSerialString(inputQType_) + "," + QLIV2DataTypeToSerialString(inputKType_)).c_str(),
-                "Both q and k must have dtype INT8."),
-            return ge::GRAPH_FAILED);
+        // quant_mode=2：仅 W8A8（DT_INT8）；quant_mode=7：仅 W4A4（DT_INT4，两种物理载体
+        // pack uint8 / 真实 int4 均已在此前归一化）。两者均需 q/k dtype 一致且 scale 为 FP16。
+        if (*qliV2Params_.quantMode == QUANT_MODE_INT8) {
+            OP_CHECK_IF(
+                inputQType_ != Ops::Transformer::DT_INT8,
+                OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+                    opName_, "q,k",
+                    (QLIV2DataTypeToSerialString(inputQType_) + "," + QLIV2DataTypeToSerialString(inputKType_)).c_str(),
+                    "For quant_mode=2 on this SoC, q and k must have dtype INT8 (W8A8)."),
+                return ge::GRAPH_FAILED);
+        } else if (*qliV2Params_.quantMode == QUANT_MODE_INT4) {
+            OP_CHECK_IF(
+                inputQType_ != Ops::Transformer::DT_INT4,
+                OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+                    opName_, "q,k",
+                    (QLIV2DataTypeToSerialString(inputQType_) + "," + QLIV2DataTypeToSerialString(inputKType_)).c_str(),
+                    "For quant_mode=7 on this SoC, q and k must have dtype INT4 (W4A4)."),
+                return ge::GRAPH_FAILED);
+        } else {
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "quant_mode",
+                                                  std::to_string(*qliV2Params_.quantMode).c_str(),
+                                                  "This SoC only supports quant_mode=2 or 7.");
+            return ge::GRAPH_FAILED;
+        }
         OP_CHECK_IF(inputQueryScaleType_ != Ops::Transformer::DT_FLOAT16,
                     OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(opName_, "q_descale,k_descale",
                                                            (QLIV2DataTypeToSerialString(inputQueryScaleType_) + "," +
@@ -1677,15 +1699,14 @@ ge::graphStatus QLIV2InfoParser::CheckKeyContiguous() const
                         "2-element FP4 packing alignment, but got " +
                             std::to_string(keyStridesVec_[0])),
                     return ge::GRAPH_FAILED);
-            } else if (*qliV2Params_.quantMode == QUANT_MODE_HIFLOAT4) {
-                OP_CHECK_IF(
-                    keyStridesVec_[0] <= 0 || keyStridesVec_[0] % HIFLOAT4_PACK_NUM != 0,
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
-                        opName_, "k",
-                        "When quant_mode is 6 and layout_k is PA_BBND, key stride0 must be positive and satisfy "
-                        "2-element HiFloat4 packing alignment, but got " +
-                            std::to_string(keyStridesVec_[0])),
-                    return ge::GRAPH_FAILED);
+            } else if (*qliV2Params_.quantMode == QUANT_MODE_HIFLOAT4 || *qliV2Params_.quantMode == QUANT_MODE_INT4) {
+                OP_CHECK_IF(keyStridesVec_[0] <= 0 || keyStridesVec_[0] % HIFLOAT4_PACK_NUM != 0,
+                            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                                opName_, "k",
+                                "When quant_mode is 6 or 7 and layout_k is PA_BBND, key stride0 must be "
+                                "positive and satisfy 2-element 4-bit data packing alignment, but got " +
+                                    std::to_string(keyStridesVec_[0])),
+                            return ge::GRAPH_FAILED);
             } else {
                 OP_CHECK_IF(keyStridesVec_[0] <= 0,
                             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
@@ -1766,13 +1787,23 @@ void QLIV2InfoParser::GenerateInfo(QLIV2TilingInfo& QLIV2Info)
             // FP4 shape stride以逻辑元素计数，kernel侧以打包后的uint8为寻址单位。
             keyStride0 /= MXFP4_PACK_NUM;
         } else if (*qliV2Params_.quantMode == QUANT_MODE_HIFLOAT4) {
+            // 9201/9202 HIFLOAT4：kernel侧用hifloat4x2_t（1元素=1字节=2个HIFLOAT4）寻址，
+            // 逻辑元素stride需折算为载体stride
             keyStride0 /= HIFLOAT4_PACK_NUM;
         }
+        // DAV_2201 W4A4 int4（DT_INT4）：kernel侧GlobalTensor<int4b_t>按逻辑元素（0.5B/元素）寻址，
+        // stride保持逻辑元素口径不折算
         QLIV2Info.keyStride0 = keyStride0;
     } else if (kLayout_ == DataLayout::PA_BBND && *qliV2Params_.quantMode == QUANT_MODE_HIFLOAT4) {
+        // 9201/9202 HIFLOAT4：hifloat4x2_t载体stride按 headDim/2 计
         QLIV2Info.keyStride0 = static_cast<uint32_t>(blockSize_) * n2Size_ * (headDim_ / HIFLOAT4_PACK_NUM);
     } else {
         QLIV2Info.keyStride0 = 0; // 非PA无需使用stride
+    }
+    // W4A4 int4（DT_INT4）专用：descale 描述符携带 stride 时强制 key 走紧凑回退。
+    // 非 int4 模式保持主线原行为（不清零），避免影响既有功能逻辑。
+    if (*qliV2Params_.quantMode == QUANT_MODE_INT4 && !keyDequantScaleStridesVec_.empty()) {
+        QLIV2Info.keyStride0 = 0;
     }
     if (!keyDequantScaleStridesVec_.empty()) {
         QLIV2Info.keyDequantScaleStride0 = static_cast<uint32_t>(keyDequantScaleStridesVec_[0]);
@@ -2205,7 +2236,11 @@ ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo* tilingI
     tilingData_.set_maxSeqlenQ(tilingInfo->maxSeqlenQ);
     tilingData_.set_keyStride0(tilingInfo->keyStride0);
     tilingData_.set_keyDequantScaleStride0(tilingInfo->keyDequantScaleStride0);
-    tilingData_.set_quantMode(*tilingInfo->opParamInfo.quantMode);
+    // quant_mode=7（W4A4 int4 per-token-head）内部归一化为 2 下发：kernel/TilingKey 路径
+    // 按 q/k dtype 位段（DT_INT4/DT_UINT8 载体）完成 int4/int8 模板分发，quantMode 字段
+    // 仅承载 scale 粒度语义（per-token-head），无需向 kernel 暴露 7 的枚举差异
+    tilingData_.set_quantMode(
+        *tilingInfo->opParamInfo.quantMode == QUANT_MODE_INT4 ? QUANT_MODE_INT8 : *tilingInfo->opParamInfo.quantMode);
     tilingData_.set_usedCoreNum(fastTemplate ? fastTemplateAicNum : blockDim);
     // ---- fast 模板（arch22 g=24/32，candidate 关闭时生效）----
     tilingData_.set_fastUsedCoreNum(fastTemplate ? fastTemplateAicNum : 0U);

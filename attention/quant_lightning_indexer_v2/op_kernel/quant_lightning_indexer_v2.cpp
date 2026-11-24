@@ -111,15 +111,21 @@ __global__ __aicore__ void quant_lightning_indexer_v2(
 
 #else
     // fastUsedCoreNum != 0 表示 tiling 侧已判定走 fast 模板；candidate 开启时
-    // host tiling 恒不选 fast，两条路径互斥
+    // host tiling 恒不选 fast，int4 也由 tiling 校验拦截，各路径互斥
     if (tiling_data->fastUsedCoreNum != 0U) {
         INVOKE_LI_FAST_OP_IMPL(QLIV2FastKernel, int8_t, int8_t, float, uint16_t, int32_t, PAGE_ATTENTION,
                                LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T));
         return;
     }
     TPipe tPipe;
-    // 910B 统一走 QLIV2Preload：candidate 参数在关闭态为空，行为与原单级 TopK 一致
-    INVOKE_LI_CANDIDATE_OP_IMPL(QLIV2Preload, int8_t, int8_t, float, uint16_t, int32_t, PAGE_ATTENTION,
-                                LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T));
+    // 910B 统一走 QLIV2Preload：candidate 参数在关闭态为空，行为与原单级 TopK 一致。
+    // W8A8/W4A4 由 TilingKey 的 dtype 位段（DT_Q/DT_K）在编译期完成模板分发。
+    if constexpr (DT_Q == QLIV2_TPL_INT4) {
+        INVOKE_LI_CANDIDATE_OP_IMPL(QLIV2Preload, int4b_t, int4b_t, float, uint16_t, int32_t, PAGE_ATTENTION,
+                                    LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T));
+    } else {
+        INVOKE_LI_CANDIDATE_OP_IMPL(QLIV2Preload, int8_t, int8_t, float, uint16_t, int32_t, PAGE_ATTENTION,
+                                    LI_LAYOUT(Q_LAYOUT_T), LI_LAYOUT(K_LAYOUT_T));
+    }
 #endif
 }

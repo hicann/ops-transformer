@@ -49,10 +49,29 @@ inline bool IsFp4CompatibleTensor(const at::Tensor& tensor)
 // V3 metadata（candidate 与 DCP 共用）固定输出 1024 个 int32
 constexpr int64_t QLI_V3_METADATA_SIZE = 1024;
 constexpr int64_t E8M0_SCALE_PACK_NUM = 2;
+constexpr uint32_t QUANT_MODE_INT8 = 2;
 constexpr int64_t MASK_MODE_RIGHT_DOWN_CAUSAL = 3;
 constexpr uint32_t QUANT_MODE_HIFLOAT8 = 4;
 constexpr uint32_t QUANT_MODE_MXFP4 = 5;
 constexpr uint32_t QUANT_MODE_HIFLOAT4 = 6;
+constexpr uint32_t QUANT_MODE_INT4 = 7;
+
+// quant_mode 表达量化模式（scale 粒度/形态），DAV_2201 支持 per-token-head：
+//   quant_mode=2：per-token-head W8A8，q/k 以 torch.int8 承载；
+//   quant_mode=7：per-token-head W4A4 signed int4。
+// torch 侧无 int4 dtype，q/k 以 nibble 打包的 torch.uint8 承载（低半字节=偶下标、补码
+// -8..7、zero_point=0），物理 shape D 轴按存储（headDim/2）给出；本 extension 按
+// quant_mode=7 将 uint8 映射为 ACL_INT4，框架按 2 逻辑元素/字节折算为逻辑 D=headDim。
+// 真实 int4 tensor（ACL_INT4 直传、逻辑 D=headDim）仅支持 aclnn C++ API 场景，
+// 两种载体在 tiling 层统一为 DT_INT4 + 逻辑 D shape（tiling 内部归一化 7 到 2 下发）。
+inline bool IsDav2201Platform()
+{
+    const char* socName = aclrtGetSocName();
+    if (socName == nullptr) {
+        return false;
+    }
+    return std::strstr(socName, "Ascend910B") != nullptr || std::strstr(socName, "Ascend910_93") != nullptr;
+}
 
 inline void FixQLIV2AclDtypes(int64_t quantMode, TensorWrapper& queryWrapper, TensorWrapper& keyWrapper,
                               TensorWrapper& queryScaleWrapper, TensorWrapper& keyScaleWrapper)
@@ -74,7 +93,36 @@ inline void FixQLIV2AclDtypes(int64_t quantMode, TensorWrapper& queryWrapper, Te
         keyWrapper.dtype = ACL_FLOAT4_E2M1;
     }
 
+    if (quantMode == QUANT_MODE_INT8 && IsDav2201Platform()) {
+        // A2/A3（DAV_2201）quant_mode=2（per-token-head W8A8）：q/k 必须为 torch.int8。
+        TORCH_CHECK(queryWrapper.tensor_.scalar_type() == at::kChar && keyWrapper.tensor_.scalar_type() == at::kChar,
+                    "When quant_mode is 2 on Ascend910B/910_93, query and key must be torch.int8 (W8A8)");
+        TORCH_CHECK(
+            queryScaleWrapper.tensor_.scalar_type() == at::kHalf && keyScaleWrapper.tensor_.scalar_type() == at::kHalf,
+            "When quant_mode is 2, query_dequant_scale and key_dequant_scale must be torch.float16");
+        return;
+    }
+
+    if (quantMode == QUANT_MODE_INT4 && IsDav2201Platform()) {
+        // A2/A3（DAV_2201）quant_mode=7（per-token-head W4A4 signed int4）：torch 侧无 int4
+        // dtype，q/k 以 nibble 打包的 torch.uint8 承载（低半字节=偶下标，补码 -8..7，
+        // zero_point=0）。uint8 物理 shape D 轴按存储（headDim/2）给出，映射 ACL_INT4 后
+        // 框架按 2 逻辑元素/字节折算为逻辑 D=headDim。真实 int4 tensor（ACL_INT4 直传）
+        // 仅支持 aclnn C++ API 场景，不经过本 torch extension。
+        TORCH_CHECK(queryWrapper.tensor_.scalar_type() == at::kByte && keyWrapper.tensor_.scalar_type() == at::kByte,
+                    "When quant_mode is 7 on Ascend910B/910_93, query and key must be packed torch.uint8 "
+                    "(signed int4, low nibble = even index); real int4 tensor is only supported via aclnn C++ API");
+        TORCH_CHECK(
+            queryScaleWrapper.tensor_.scalar_type() == at::kHalf && keyScaleWrapper.tensor_.scalar_type() == at::kHalf,
+            "When quant_mode is 7, query_dequant_scale and key_dequant_scale must be torch.float16");
+        // ACL_INT4 为 acl 全局枚举（acl_base_rt.h，=29），非 cann_ops_transformer 扩展枚举
+        queryWrapper.dtype = ACL_INT4;
+        keyWrapper.dtype = ACL_INT4;
+        return;
+    }
+
     if (quantMode == QUANT_MODE_HIFLOAT4) {
+        // quant_mode=6 HIFLOAT4（仅 DAV_9201/9202/Ascend950），scale 为按 D 分组的 float32。
         TORCH_CHECK(queryWrapper.tensor_.scalar_type() == at::kByte,
                     "When quant_mode is 6, query must be packed torch.uint8");
         TORCH_CHECK(keyWrapper.tensor_.scalar_type() == at::kByte,

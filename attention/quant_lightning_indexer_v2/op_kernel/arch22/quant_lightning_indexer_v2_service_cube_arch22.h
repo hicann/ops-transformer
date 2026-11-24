@@ -49,7 +49,9 @@ public:
 
     static constexpr IsResetLoad3dConfig LOAD3DV2_CONFIG = {true, true}; // isSetFMatrix isSetPadding;
     static constexpr uint64_t DOUBLE_BUF_NUM = 2;
-    static constexpr uint64_t L0AB_BUF_NUM = 4;
+    // QK 侧 L0A/L0B 槽数（每槽 16KB，共 [0,48K)），WS 侧独占 [48K,64K) 固定区做地址隔离：
+    // 4 槽共享时 QK 与 WS 网格跨槽交叠，int4 mad_s4 时序下产生 L0 读写冲突，隔离后物理消除。
+    static constexpr uint64_t L0AB_BUF_NUM = 3;
 
     static constexpr uint32_t KEY_MTE1_MTE2_EVENT = EVENT_ID2;
     static constexpr uint32_t QW_MTE1_MTE2_EVENT = EVENT_ID5; // KEY_MTE1_MTE2_EVENT + DOUBLE_BUF_NUM;
@@ -57,6 +59,9 @@ public:
     static constexpr uint32_t M_FIX_EVENT = EVENT_ID0;
     static constexpr uint32_t FIX_M_EVENT = EVENT_ID2;
     static constexpr uint32_t FIX_MTE1_EVENT = EVENT_ID4;
+    // WS 固定区复用保护（M->MTE1）：ProcessWs 尾部 Set，下一轮开头 Wait，防止
+    // LoadSToL0b/LoadWeightToL0a 写区与上一轮 WS Mmad 读区交叠。
+    static constexpr uint32_t WS_M_MTE1_EVENT = EVENT_ID7;
 
     static constexpr uint64_t S8_BLOCK_CUBE = 32;
 
@@ -74,10 +79,29 @@ public:
     static constexpr uint64_t KEY_BUFFER_OFFSET = S2_BASIC_BLOCK_L0 * D_BASIC_BLOCK;
     static constexpr uint64_t WEIGHT_BUFFER_OFFSET = S1G_BASIC_BLOCK_L1 * BLOCK_CUBE;
     static constexpr uint64_t L0AB_BUFFER_OFFSET_S8_16K = 16 * 1024;
-    static constexpr uint64_t L0AB_BUFFER_OFFSET_FP16_16K = 16 * 512;
+    // WS 侧 L0A/L0B 固定区基址（half 视图索引，物理字节 48KB），紧邻 QK 3 槽网格之后，
+    // 物理隔离两流地址交叠；容量约束 gSize<=64 时安全，当前 gSize=2。
+    static constexpr uint64_t L0AB_BUFFER_OFFSET_WS_HALF = 24 * 1024;
     static constexpr uint64_t L0C_BUFFER_OFFSET = 64 * 256;
 
 private:
+    // Nd2Nz 的 dValue/srcDValue 按物理字节计：int4b_t 为逻辑元素数/2，其余为逻辑元素数
+    __aicore__ inline uint64_t GetNd2NzPhysD() const
+    {
+        if constexpr (IsSameType<Q_T, int4b_t>::value || IsSameType<K_T, int4b_t>::value) {
+            return constInfo_.headDim / 2; // int4: 2 逻辑元素/字节
+        } else {
+            return constInfo_.headDim;
+        }
+    }
+    __aicore__ inline uint64_t GetNd2NzDLog2PhysRatio() const
+    {
+        if constexpr (IsSameType<Q_T, int4b_t>::value || IsSameType<K_T, int4b_t>::value) {
+            return 2;
+        } else {
+            return 1;
+        }
+    }
     __aicore__ inline void WeightDmaCopy(uint64_t s1gL1RealSize, const QLIV2Common::RunInfo& runInfo);
     __aicore__ inline void LoadKeyToL0b(uint64_t s2L0RealSize);
     __aicore__ inline void LoadQueryToL0a(uint64_t s1gL1Offset, uint64_t s1gL1RealSize, uint64_t s1gL0RealSize);
@@ -181,14 +205,14 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::ProcessWs(uint64_t s1gL0RealSize, ui
 {
     WaitFlag<HardEvent::FIX_M>(FIX_M_EVENT + l0cBufIdx_ % DOUBLE_BUF_NUM);
     for (int64_t s1gOffset = 0; s1gOffset < s1gL0RealSize; s1gOffset += constInfo_.gSize) {
-        WaitFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + l0BufIdx_ % L0AB_BUF_NUM);
+        // WS 固定区复用保护（首由 Alloc 初始 Set 放行）
+        WaitFlag<HardEvent::M_MTE1>(WS_M_MTE1_EVENT);
         LoadSToL0b(s1gL0RealSize, mmInfo.s2L0RealSize, sL1BufIdx, s1gOffset);
         LoadWeightToL0a(s1gOffset + s1gL1Offset);
 
         ComputeWs(s1gL0RealSize, mmInfo.s2L0RealSize, s1gOffset);
 
-        SetFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + l0BufIdx_ % L0AB_BUF_NUM);
-        l0BufIdx_++;
+        SetFlag<HardEvent::M_MTE1>(WS_M_MTE1_EVENT);
     }
 
     FixpResToGm(s1gL0RealSize / constInfo_.gSize, mmInfo.s2L0RealSize, s1gL1Offset / constInfo_.gSize,
@@ -313,6 +337,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::KeyNd2NzForPA(uint64_t s2L1RealSize,
     while (s2L1Offset < s2L1RealSize) {
         uint64_t s2BlkId = (s2L1Offset + s2GmOffset) / constInfo_.kCacheBlockSize;
         uint64_t s2BlkOffset = (s2L1Offset + s2GmOffset) % constInfo_.kCacheBlockSize;
+        // keyGmOffset 按 GlobalTensor<K_T> 逻辑元素寻址（int4b_t 为 0.5B/元素），keyStride0/headDim 均为逻辑口径
         uint64_t keyGmOffset =
             blkTableGm_.GetValue(runInfo.bIdx * constInfo_.maxBlockNumPerBatch + s2BlkId) * constInfo_.keyStride0 +
             s2BlkOffset * constInfo_.headDim;
@@ -322,13 +347,15 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::KeyNd2NzForPA(uint64_t s2L1RealSize,
         Nd2NzParams nd2nzPara;
         nd2nzPara.ndNum = 1;
         nd2nzPara.nValue = s2Mte2Size; // 行数
-        nd2nzPara.dValue = constInfo_.headDim;
-        nd2nzPara.srcDValue = constInfo_.headDim;
+        nd2nzPara.dValue = GetNd2NzPhysD();
+        nd2nzPara.srcDValue = GetNd2NzPhysD();
         nd2nzPara.dstNzC0Stride = CeilAlign(s2L1RealSize, (uint64_t)BLOCK_CUBE); // 对齐到16 单位block
         nd2nzPara.dstNzNStride = 1;
         nd2nzPara.srcNdMatrixStride = 0;
         nd2nzPara.dstNzMatrixStride = 0;
-        DataCopy(keyL1_[(keyL1BufIdx_ % DOUBLE_BUF_NUM) * KEY_BUFFER_OFFSET + s2L1Offset * S8_BLOCK_CUBE],
+        // L1 NZ 每 C0 分形恒为 32B，行偏移换算为 K_T 元素数与 dtype 相关
+        uint64_t dstC0Elems = S8_BLOCK_CUBE * GetNd2NzDLog2PhysRatio();
+        DataCopy(keyL1_[(keyL1BufIdx_ % DOUBLE_BUF_NUM) * KEY_BUFFER_OFFSET + s2L1Offset * dstC0Elems],
                  keyGm_[keyGmOffset], nd2nzPara);
 
         s2L1Offset += s2Mte2Size;
@@ -339,6 +366,7 @@ template <typename QLIV2T>
 __aicore__ inline void QLIV2Matmul<QLIV2T>::KeyNd2Nz(uint64_t s2L1RealSize, const MmInfo& mmInfo,
                                                      const QLIV2Common::RunInfo& runInfo)
 {
+    // dStride 为逻辑元素 stride（GlobalTensor<K_T> 逻辑元素寻址）
     uint64_t dStride = constInfo_.headDim;
     if constexpr (K_LAYOUT_T == LI_LAYOUT::BSND || K_LAYOUT_T == LI_LAYOUT::TND) {
         dStride = constInfo_.headDim * constInfo_.kHeadNum; // constInfo_.kHeadNum
@@ -346,8 +374,8 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::KeyNd2Nz(uint64_t s2L1RealSize, cons
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
     nd2nzPara.nValue = s2L1RealSize; // 行数
-    nd2nzPara.dValue = constInfo_.headDim;
-    nd2nzPara.srcDValue = dStride;
+    nd2nzPara.dValue = GetNd2NzPhysD();
+    nd2nzPara.srcDValue = dStride / GetNd2NzDLog2PhysRatio();
     nd2nzPara.dstNzC0Stride = CeilAlign(s2L1RealSize, (uint64_t)BLOCK_CUBE); // 对齐到16 单位block
     nd2nzPara.dstNzNStride = 1;
     nd2nzPara.srcNdMatrixStride = 0;
@@ -377,8 +405,8 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::QueryNd2Nz(uint64_t s1gL1RealSize, c
     Nd2NzParams nd2nzPara;
     nd2nzPara.ndNum = 1;
     nd2nzPara.nValue = s1gL1RealSize; // 行数
-    nd2nzPara.dValue = constInfo_.headDim;
-    nd2nzPara.srcDValue = constInfo_.headDim;
+    nd2nzPara.dValue = GetNd2NzPhysD();
+    nd2nzPara.srcDValue = GetNd2NzPhysD();
     nd2nzPara.dstNzC0Stride = CeilAlign(s1gL1RealSize, (uint64_t)BLOCK_CUBE); // 对齐到16 单位block
     nd2nzPara.dstNzNStride = 1;
     nd2nzPara.srcNdMatrixStride = 0;
@@ -457,9 +485,8 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadSToL0b(uint64_t s1gL1RealSize, u
     loadData3DParams.fMatrixCtrl = 0;
 
     loadData3DParams.mStartPt = mStartPt;
-    LoadData<half, LOAD3DV2_CONFIG>(
-        l0b_.template ReinterpretCast<half>()[(l0BufIdx_ % L0AB_BUF_NUM) * L0AB_BUFFER_OFFSET_FP16_16K],
-        sL1_[(sL1BufIdx % DOUBLE_BUF_NUM) * SL1_BUFFER_OFFSET], loadData3DParams);
+    LoadData<half, LOAD3DV2_CONFIG>(l0b_.template ReinterpretCast<half>()[L0AB_BUFFER_OFFSET_WS_HALF],
+                                    sL1_[(sL1BufIdx % DOUBLE_BUF_NUM) * SL1_BUFFER_OFFSET], loadData3DParams);
 }
 
 // s1,g,1(16), 2,64,16
@@ -472,7 +499,7 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadWeightToL0a(uint64_t s1gL1Offset
     loadData2DParams.srcStride = 1;
     loadData2DParams.dstGap = 0;
     loadData2DParams.ifTranspose = true;
-    LoadData(l0a_.template ReinterpretCast<half>()[(l0BufIdx_ % L0AB_BUF_NUM) * L0AB_BUFFER_OFFSET_FP16_16K],
+    LoadData(l0a_.template ReinterpretCast<half>()[L0AB_BUFFER_OFFSET_WS_HALF],
              weightL1_[(qwL1Mte2BufIdx_ % DOUBLE_BUF_NUM) * WEIGHT_BUFFER_OFFSET + s1gL1Offset * BLOCK_CUBE],
              loadData2DParams);
 }
@@ -483,7 +510,8 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::LoadKeyToL0b(uint64_t s2L0RealSize)
 {
     LoadData2DParams loadData2DParams;
     loadData2DParams.startIndex = 0;
-    loadData2DParams.repeatTimes = CeilDiv(s2L0RealSize, BLOCK_CUBE) * CeilDiv(constInfo_.headDim, S8_BLOCK_CUBE);
+    // K 分形数按物理字节计（C0 分形恒 32B），int4 按逻辑 headDim 计算会多搬一倍致 L0B 越界
+    loadData2DParams.repeatTimes = CeilDiv(s2L0RealSize, BLOCK_CUBE) * CeilDiv(GetNd2NzPhysD(), S8_BLOCK_CUBE);
     loadData2DParams.srcStride = 1;
     loadData2DParams.dstGap = 0;
     loadData2DParams.ifTranspose = false;
@@ -505,8 +533,8 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::ComputeWs(uint64_t s1gL0RealSize, ui
     mmadParams.cmatrixSource = false;
     Mmad(cL0_.template ReinterpretCast<float>()[(l0cBufIdx_ % DOUBLE_BUF_NUM) * L0C_BUFFER_OFFSET +
                                                 s1gOffset * S2_BASIC_BLOCK_L0],
-         l0a_.template ReinterpretCast<half>()[(l0BufIdx_ % L0AB_BUF_NUM) * L0AB_BUFFER_OFFSET_FP16_16K],
-         l0b_.template ReinterpretCast<half>()[(l0BufIdx_ % L0AB_BUF_NUM) * L0AB_BUFFER_OFFSET_FP16_16K], mmadParams);
+         l0a_.template ReinterpretCast<half>()[L0AB_BUFFER_OFFSET_WS_HALF],
+         l0b_.template ReinterpretCast<half>()[L0AB_BUFFER_OFFSET_WS_HALF], mmadParams);
 }
 
 template <typename QLIV2T>
@@ -587,6 +615,8 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::AllocEventID()
     SetFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + 1);
     SetFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + 2);
     SetFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + 3);
+    // WS 固定区复用保护初始放行，保证首轮 LoadData 可写
+    SetFlag<HardEvent::M_MTE1>(WS_M_MTE1_EVENT);
 
     SetFlag<HardEvent::FIX_M>(FIX_M_EVENT + 0);
     SetFlag<HardEvent::FIX_M>(FIX_M_EVENT + 1);
@@ -606,6 +636,8 @@ __aicore__ inline void QLIV2Matmul<QLIV2T>::FreeEventID()
     WaitFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + 1);
     WaitFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + 2);
     WaitFlag<HardEvent::M_MTE1>(M_MTE1_EVENT + 3);
+    // 与 Alloc 的初始 Set 配对，等待最后一次 WS Mmad 完成
+    WaitFlag<HardEvent::M_MTE1>(WS_M_MTE1_EVENT);
 
     WaitFlag<HardEvent::FIX_M>(FIX_M_EVENT + 0);
     WaitFlag<HardEvent::FIX_M>(FIX_M_EVENT + 1);

@@ -52,6 +52,18 @@ inline void FixQLIV2AclDtypes(int64_t quantMode, TensorWrapper& queryWrapper, Te
         return;
     }
 
+    if (quantMode == 7) {
+        // W4A4 (arch22): int4b_t 打包存储为 torch.uint8 (低 nibble 在前), 逻辑 shape 末维为物理字节数 x2。
+        // TensorWrapper.dtype 改写为 ACL_INT4 后, aclnn_common 的 ConvertType 按 4-bit 描述符自动把
+        // shape/stride/storage_offset 从打包字节视角折算成逻辑 nibble 元素视角 (op_host tiling 收到逻辑 shape)。
+        TORCH_CHECK(queryWrapper.tensor_.scalar_type() == at::kByte,
+                    "When quant_mode is 7, query must be packed torch.uint8 (int4, low nibble first)");
+        TORCH_CHECK(keyWrapper.tensor_.scalar_type() == at::kByte,
+                    "When quant_mode is 7, key must be packed torch.uint8 (int4, low nibble first)");
+        queryWrapper.dtype = ACL_INT4;
+        keyWrapper.dtype = ACL_INT4;
+    }
+
     if (quantMode == 5) {
         TORCH_CHECK(IsFp4CompatibleTensor(queryWrapper.tensor_),
                     "When quant_mode is 5, query must be torch.float4_e2m1fn_x2 or packed torch.uint8");

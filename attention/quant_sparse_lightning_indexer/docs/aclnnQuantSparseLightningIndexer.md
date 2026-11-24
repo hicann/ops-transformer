@@ -120,9 +120,9 @@ aclnnStatus aclnnQuantSparseLightningIndexer(
     <tr>
       <td>q</td>
       <td>输入</td>
-      <td>公式中量化后的 Query。</td>
+      <td>公式中量化后的 Query。quantMode为7时以打包uint8（INT4，低nibble在前）存储，shape按逻辑元素描述。</td>
       <td>不支持空tensor。layout_q为BSND时，shape为(B,S1,N1,D)；layout_q为TND时，shape为(T1,N1,D)。</td>
-      <td>INT8</td>
+      <td>INT8、INT4</td>
       <td>ND</td>
       <td>3-4</td>
       <td>x</td>
@@ -130,7 +130,7 @@ aclnnStatus aclnnQuantSparseLightningIndexer(
     <tr>
       <td>k</td>
       <td>输入</td>
-      <td>公式中量化后的 Key。</td>
+      <td>公式中量化后的 Key。quantMode为7时以打包uint8（INT4，低nibble在前）存储，shape按逻辑元素描述。</td>
       <td>
           <ul>
                 <li>不支持空tensor。</li>
@@ -138,7 +138,7 @@ aclnnStatus aclnnQuantSparseLightningIndexer(
                 <li>layout_k为PA_BBND时，shape为(block_num, block_size, N2, D)。</li>
           </ul>
       </td>
-      <td>INT8</td>
+      <td>INT8、INT4</td>
       <td>ND</td>
       <td>4</td>
       <td>支持0轴非连续</td>
@@ -293,7 +293,7 @@ aclnnStatus aclnnQuantSparseLightningIndexer(
       <td>quantMode</td>
       <td>属性</td>
       <td>用于标识输入的量化模式。</td>
-      <td>本算子仅支持2（INT8量化）。</td>
+      <td>A2/A3系列支持2（INT8量化）和7（INT4量化，存4算4，q、k以打包uint8存储，低nibble在前，无零点偏移；反量化系数粒度与2一致）。950系列仅支持5（MXFP4量化）。</td>
       <td>INT32</td>
       <td>-</td>
       <td>-</td>
@@ -505,7 +505,7 @@ aclnnStatus aclnnQuantSparseLightningIndexer(
 
 ## 约束说明
 
-- `quantMode`仅支持2；`q`、`k`支持INT8，`qDescale`、`kDescale`、`w`支持FLOAT16。
+- `quantMode`支持2和7；`quantMode`为2时`q`、`k`为INT8，为7时`q`、`k`为INT4（打包`uint8`存储，低nibble在前，shape按逻辑元素描述）；`qDescale`、`kDescale`、`w`支持FLOAT16。
 - `k`的N仅支持1；`q`的N与`k`的N之比仅支持64或32（即`q`的N支持64或32）。
 - `topk`支持[1, 2048]。
 - `layout_k`仅支持`PA_BBND`，因此`blockTableOptional`与`sequsedKOptional`必传，`cuSeqlensKOptional`不能传入。

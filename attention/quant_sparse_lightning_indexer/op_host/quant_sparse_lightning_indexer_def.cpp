@@ -22,12 +22,12 @@ public:
     {
         this->Input("q")
             .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_INT8})
+            .DataTypeList({ge::DT_INT8, ge::DT_INT4})
             .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("k")
             .ParamType(REQUIRED)
-            .DataTypeList({ge::DT_INT8})
+            .DataTypeList({ge::DT_INT8, ge::DT_INT4})
             .FormatList({ge::FORMAT_ND})
             .IgnoreContiguous();
         this->Input("w")

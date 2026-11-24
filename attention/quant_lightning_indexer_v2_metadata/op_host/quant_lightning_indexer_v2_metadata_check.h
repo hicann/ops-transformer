@@ -34,6 +34,9 @@ inline constexpr int64_t QLI_V2_QUANT_MODE_3 = 3;
 inline constexpr int64_t QLI_V2_QUANT_MODE_4 = 4;
 inline constexpr int64_t QLI_V2_QUANT_MODE_5 = 5;
 inline constexpr int64_t QLI_V2_QUANT_MODE_6 = 6;
+// quant_mode=7：W4A4 signed int4（仅 A2/A3；torch pack uint8 上送或
+// aclnn C++ 真实 int4 tensor 直传，与主算子 quant_mode=7 语义对齐）
+inline constexpr int64_t QLI_V2_QUANT_MODE_7 = 7;
 inline constexpr int64_t QLI_V2_NO_MASK_MODE = 0;
 inline constexpr int64_t QLI_V2_CAUSAL_MASK_MODE = 3;
 inline constexpr int64_t QLI_V2_CMP_RATIO_LOWER_BOUND = 1;
@@ -261,9 +264,10 @@ aclnnStatus CheckSingleParamQliV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t 
         CHECK_COND(topk >= QLI_V2_TOPK_LOWER_BOUND && topk <= QLI_V2_A3_TOPK_UPPER_BOUND, ACLNN_ERR_PARAM_INVALID,
                    "For Atlas A2/A3, topk should be [%lld, %lld], but got %lld", QLI_V2_TOPK_LOWER_BOUND,
                    QLI_V2_A3_TOPK_UPPER_BOUND, topk);
-        // quant_mode 校验
-        CHECK_COND(quantMode == QLI_V2_QUANT_MODE_2, ACLNN_ERR_PARAM_INVALID,
-                   "For Atlas A2/A3, quant_mode should be 2, but got %lld", quantMode);
+        // quant_mode 校验: A2/A3 仅支持 per-token-head 量化模式(2)；W8A8/W4A4 为 q/k dtype 差异
+        // （INT8/INT4），不占用 quant_mode 枚举。
+        CHECK_COND(quantMode == QLI_V2_QUANT_MODE_2 || quantMode == QLI_V2_QUANT_MODE_7, ACLNN_ERR_PARAM_INVALID,
+                   "For Atlas A2/A3, quant_mode should be 2 (INT8) or 7 (W4A4 INT4), but got %lld", quantMode);
         // cmp_ratio 校验
         CHECK_COND((cmpRatio >= QLI_V2_CMP_RATIO_LOWER_BOUND) && (cmpRatio <= QLI_V2_CMP_RATIO_UPPER_BOUND) &&
                        ((cmpRatio & (cmpRatio - 1)) == 0),

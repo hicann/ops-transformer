@@ -374,7 +374,8 @@ ge::graphStatus QLIV2InfoParserConsumer::CheckAttrParaInfo()
                                               "Sparse_mode only supports 0 or 3"),
         return ge::GRAPH_FAILED);
     if (npuArch_ == NpuArch::DAV_2201) {
-        OP_CHECK_IF(*opParamInfo_.quantMode != 2, OP_LOGE(opName_, "input attr quant_mode only supported 2."),
+        OP_CHECK_IF((*opParamInfo_.quantMode != QUANT_MODE_INT8 && *opParamInfo_.quantMode != QUANT_MODE_INT4),
+                    OP_LOGE(opName_, "input attr quant_mode only supported 2(INT8) or 7(INT4)."),
                     return ge::GRAPH_FAILED);
     }
 
@@ -481,8 +482,12 @@ ge::graphStatus QLIV2InfoParserConsumer::GetAndCheckInOutDataType()
                                                "The dtype of q_descale and k_descale must be same"),
         return ge::GRAPH_FAILED);
     if (npuArch_ == NpuArch::DAV_2201) {
-        OP_CHECK_IF(inputQType_ != ge::DT_INT8,
-                    OP_LOGE(opName_, "The data types of the input query and key must be int8."),
+        // quant_mode=2: INT8; quant_mode=7: INT4(打包存储, 逻辑shape不变) — q/k 必须与量化模式匹配
+        bool isInt4Mode = (*opParamInfo_.quantMode == QUANT_MODE_INT4);
+        ge::DataType expectQKType = isInt4Mode ? ge::DT_INT4 : ge::DT_INT8;
+        OP_CHECK_IF(inputQType_ != expectQKType,
+                    OP_LOGE(opName_, "The data types of the input query and key must be int8 when quant_mode=2, "
+                                     "or int4 when quant_mode=7."),
                     return ge::GRAPH_FAILED);
         OP_CHECK_IF(
             inputQueryScaleType_ != ge::DT_FLOAT16,

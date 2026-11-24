@@ -28,8 +28,8 @@
 
 | 参数名                     | 输入/输出/属性 | 描述  | 数据类型       | 数据格式   |
 |----------------------------|-----------|----------------------------------------------------------------------|----------------|------------|
-| q                     | 输入      | 公式中的$Q_{index}^{Quant}\in\R^{g\times d}$，表示输入Index Query，不支持非连续。| INT8、FLOAT8_e4m3fn、HIFLOAT8、FLOAT4_e2m1 | ND         |
-| k                   | 输入      | 公式中的$K_{index}^{Quant}\in\R^{S_{k}\times d}$，表示压缩后的输入Index Key，支持0轴非连续。| INT8、FLOAT8_e4m3fn、HIFLOAT8、FLOAT4_e2m1 | ND |
+| q                     | 输入      | 公式中的$Q_{index}^{Quant}\in\R^{g\times d}$，表示输入Index Query，不支持非连续。`quant_mode`为7时为INT4打包存储（shape的D轴仍按逻辑值128填写）。| INT8、FLOAT8_e4m3fn、HIFLOAT8、FLOAT4_e2m1、INT4 | ND         |
+| k                   | 输入      | 公式中的$K_{index}^{Quant}\in\R^{S_{k}\times d}$，表示压缩后的输入Index Key，支持0轴非连续。`quant_mode`为7时为INT4打包存储（shape的D轴仍按逻辑值128填写）。| INT8、FLOAT8_e4m3fn、HIFLOAT8、FLOAT4_e2m1、INT4 | ND |
 | w                 | 输入      | 公式中的$W$，表示权重系数，不支持非连续。 | FLOAT16、FLOAT32 | ND |
 | q_descale             | 输入      | 公式中的$Scale_Q$，表示Index Query的反量化系数，不支持非连续。`quant_mode`为3/5时，shape为将`q`的D轴替换为(D/64, 2)；`quant_mode`为4时，shape为(1,)；其他场景shape与w一致 | FLOAT16、FLOAT32、FLOAT8_e8m0     | ND         |
 | k_descale            | 输入      | 公式中的$Scale_K$，表示Index Key的反量化系数，支持0轴非连续。`quant_mode`为3/5时，shape为将`k`的D轴替换为(D/64, 2)；`quant_mode`为4时，shape为(1,)；其他场景shape为移除`k`的D轴 | FLOAT16、FLOAT32、FLOAT8_e8m0       | ND         |
@@ -68,15 +68,17 @@
   - 当传入的参数layout_q为TND时，必须传入cu_seqlens_q，如果也传入seqused_q，应保证由seqused_q传入的各个batch的q长度不超过根据cu_seqlens_q计算出的各个batch的q序列长度。当某个batch由seqused_q传入的q序列长度seqlen1小于由cu_seqlens_q计算出的q长度seqlen2时，会启用TND Padding功能，将该batch的seqlen2与seqlen1差值部分的q输出的sparse_indices和sparse_values全部置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。
 
 - <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：
-  - `quant_mode`仅支持2。
-  - `q`、`k`支持INT8，不支持FLOAT8_e4m3fn、HIFLOAT8和FLOAT4_e2m1。
+  - `quant_mode`支持2（INT8）和7（INT4，W4A4全量化；torch侧以pack后的uint8上送，由`quant_mode=7`确认是int4载体；aclnn C++侧支持真实int4 tensor直传）。
+  - `quant_mode`为2时`q`、`k`支持INT8；`quant_mode`为7时`q`、`k`支持INT4；不支持FLOAT8_e4m3fn、HIFLOAT8和FLOAT4_e2m1。
   - `q_descale`和`k_descale`支持FLOAT16，不支持FLOAT32和FLOAT8_e8m0。
   - `w`支持FLOAT16，不支持FLOAT32。
   - 不支持`output_idx_offset`和`return_value`。
+  - `quant_mode`为7时：`q`的N仅支持64，`k`的N仅支持1；q/k为INT4打包存储（每字节承载2个signed int4元素，低半字节为偶数下标元素，补码表示-8..7，zero_point=0），shape的D轴仍按逻辑值128填写；量化粒度为pertoken-head，`q_descale`/`k_descale`的shape与`quant_mode`为2时一致（per-token scale）。
   - `layout_k`支持PA_BBND、TND：`q`的N为64时仅支持PA_BBND（必须传入`seqused_k`）；N为24/32时支持PA_BBND（必须传入`seqused_k`）或TND（必须传入`cu_seqlens_k`，不支持传入`seqused_k`）。
-  - `q`的N支持64、32、24，`k`的N仅支持1；N为24/32时要求`layout_q`为TND、`mask_mode`为3、`cmp_ratio`为1，不满足时接口报错。
+  - `q`的N支持64、32、24，`k`的N仅支持1；N为24/32时要求`layout_q`为TND、`mask_mode`为3、`cmp_ratio`为1，不满足时接口报错（N为24/32仅`quant_mode`为2时支持）。
   - N为24/32暂不支持TND Padding功能：`layout_q`为TND时不支持传入`seqused_q`，传入时接口报错。
   - `topk`支持[1, 2048]。
+  - `layout_k`为PA_BBND时，`k`的stride0（D轴步长，按逻辑元素计）需为偶数（2元素对齐）。
 
 ## 调用示例
 

@@ -27,6 +27,7 @@ constexpr int64_t KEY_HEAD_NUM = 1;
 constexpr int64_t HEAD_DIM = 128;
 constexpr int64_t TOPK_MAX = 2048;
 constexpr int64_t QUANT_MODE_INT8 = 2;
+constexpr int64_t QUANT_MODE_INT4 = 7;
 constexpr int64_t MASK_MODE_NONE = 0;
 constexpr int64_t MASK_MODE_CAUSAL = 3;
 constexpr int64_t CMP_RATIO_MAX = 128;
@@ -65,7 +66,8 @@ aclnnStatus aclnnQuantLightningIndexerV3MetadataGetWorkspaceSize(
         return ACLNN_ERR_PARAM_NULLPTR;
     }
     if ((numHeadsQ != QUERY_HEAD_NUM_32 && numHeadsQ != QUERY_HEAD_NUM_64) || numHeadsK != KEY_HEAD_NUM ||
-        headDim != HEAD_DIM || topk < 1 || topk > TOPK_MAX || quantMode != QUANT_MODE_INT8 || batchSize < 0 ||
+        headDim != HEAD_DIM || topk < 1 || topk > TOPK_MAX ||
+        (quantMode != QUANT_MODE_INT8 && quantMode != QUANT_MODE_INT4) || batchSize < 0 ||
         batchSize == std::numeric_limits<int64_t>::max() || maxSeqlenQ < -1 || maxSeqlenK < -1 ||
         (maskMode != MASK_MODE_NONE && maskMode != MASK_MODE_CAUSAL) || cmpRatio < 1 || cmpRatio > CMP_RATIO_MAX ||
         (cmpRatio & (cmpRatio - 1)) != 0) {

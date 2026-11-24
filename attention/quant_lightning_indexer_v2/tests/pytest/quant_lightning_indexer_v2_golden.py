@@ -111,10 +111,22 @@ HIF4_E6M2_MIN = 2.0 ** (-48)  # E6M2 最小可表示值
 HIF4_SCALE_PACK_DTYPE = torch.uint32  # scale 比特打包 dtype
 HIF4_SCALE_FAKE_DTYPE = torch.float32  # 传 NPU 的伪装 dtype (view as)
 
+QUANT_MODE_INT8 = 2
 QUANT_MODE_MXFP8 = 3
 QUANT_MODE_HIFLOAT8 = 4
 QUANT_MODE_MXFP4 = 5
 QUANT_MODE_HIF4 = 6
+QUANT_MODE_INT4 = 7  # W4A4 signed int4（仅 DAV_2201）
+# quant_mode 表达量化模式（scale 粒度/形态）：A2/A3 仅 per-token-head。
+#   - quant_mode=2（QUANT_MODE_INT8）：W8A8，qk_dtype=torch.int8；
+#   - quant_mode=7（QUANT_MODE_INT4）：W4A4 signed int4（nibble 打包：低半字节=偶下标，
+#     补码 -8..7，zero_point=0，物理 D=head_dim/2，仅 DAV_2201 即 Ascend910B/910_93）。
+# torch 侧无 int4 dtype，q/k 以 pack 后的 torch.uint8 承载，quant_mode 用于确认是
+# 真实的 uint8 还是 int4；真实 int4 tensor 仅支持 aclnn C++ API 场景。
+# tiling 内部将 7 归一化为 2 下发，kernel/TilingKey 路径不变。
+INT4_PACK_NUM = 2  # 2 个 int4 打包成 1 个 uint8（低半字节=偶下标）
+INT4_VALUE_MIN = -8  # signed int4 补码值域下限
+INT4_VALUE_MAX = 7  # signed int4 补码值域上限
 MX_SCALE_SHAPE_ALIGN = 64
 MX_SCALE_PACK_NUM = 2
 MX_SCALE_GROUP_SIZE = MX_SCALE_SHAPE_ALIGN // MX_SCALE_PACK_NUM
@@ -157,6 +169,70 @@ def is_mxfp4_quant_mode(quant_mode):
 
 def is_hifp4_quant_mode(quant_mode):
     return quant_mode == QUANT_MODE_HIF4
+
+
+_QLIV2_SOC_NAME_CACHE = None
+
+
+def _qliv2_soc_name():
+    """惰性获取 SoC 名称：优先 SOC_VERSION 环境变量，其次 torch_npu 设备属性，
+    均不可用时返回空串（此时按 HIF4 语义处理，与历史行为一致）。"""
+    global _QLIV2_SOC_NAME_CACHE
+    if _QLIV2_SOC_NAME_CACHE is None:
+        soc = os.environ.get("SOC_VERSION", "")
+        if not soc:
+            try:
+                soc = torch.npu.get_device_properties().name
+            except Exception:
+                soc = ""
+        _QLIV2_SOC_NAME_CACHE = soc
+    return _QLIV2_SOC_NAME_CACHE
+
+
+def is_int4_quant_mode(quant_mode, qk_dtype=None):
+    """W4A4 signed int4 模式判定。
+    quant_mode=7（QUANT_MODE_INT4）即 int4 模式；兼容历史口径：quant_mode=2 且
+    qk_dtype=torch.uint8（pack 载体）同样判定为 int4 模式（旧用例仍可运行）。"""
+    if quant_mode == QUANT_MODE_INT4:
+        return True
+    return quant_mode == QUANT_MODE_INT8 and qk_dtype == torch.uint8
+
+
+def is_hifp4_semantics(quant_mode):
+    """quant_mode=6 即 HIF4 单一语义；保留函数名兼容既有调用点。
+    （W4A4 int4 复用 quant_mode=2，由 qk_dtype 区分，无需 SoC 分流。）"""
+    return is_hifp4_quant_mode(quant_mode)
+
+
+def pack_int4_to_uint8(in_tensor):
+    """signed int4 逻辑张量（int8，-8..7）-> uint8 物理张量（末维减半）。
+    打包约定与算子一致：低半字节=偶下标元素，byte[i] = (v[2i+1] & 0xF) << 4 | (v[2i] & 0xF)。"""
+    if in_tensor.shape[-1] % INT4_PACK_NUM != 0:
+        raise ValueError(
+            f"int4 packing requires even last-dim, got {in_tensor.shape[-1]}"
+        )
+    flat = in_tensor.reshape(-1).to(torch.int8) & 0xF
+    low = flat[0::2].to(torch.uint8)
+    high = flat[1::2].to(torch.uint8)
+    packed = (high << 4) | low
+    new_shape = list(in_tensor.shape)
+    new_shape[-1] //= INT4_PACK_NUM
+    return packed.reshape(new_shape)
+
+
+def unpack_uint8_to_int4(in_tensor):
+    """uint8 物理张量（末维 D/2）-> int8 逻辑张量（末维 D，补码 -8..7）。"""
+    flat = in_tensor.reshape(-1).to(torch.int16)
+    low = flat & 0xF
+    high = (flat >> 4) & 0xF
+    low_signed = torch.where(low >= 8, low - 16, low).to(torch.int8)
+    high_signed = torch.where(high >= 8, high - 16, high).to(torch.int8)
+    out = torch.empty(flat.numel() * INT4_PACK_NUM, dtype=torch.int8)
+    out[0::2] = low_signed
+    out[1::2] = high_signed
+    new_shape = list(in_tensor.shape)
+    new_shape[-1] *= INT4_PACK_NUM
+    return out.reshape(new_shape)
 
 
 def round_fp64_to_bf16_rne(value):
@@ -219,11 +295,13 @@ def reduce_mxfp8_weighted_qk(weight_matrix, qk_matrix):
     return acc_fp32
 
 
-def get_qk_physical_head_dim(head_dim, quant_mode):
+def get_qk_physical_head_dim(head_dim, quant_mode, qk_dtype=None):
+    if is_int4_quant_mode(quant_mode, qk_dtype):
+        # W4A4 int4: 2 逻辑元素打包 1 byte, 物理 D 维 = 逻辑 head_dim / 2
+        return head_dim // INT4_PACK_NUM
     if is_mxfp4_quant_mode(quant_mode) or is_hifp4_quant_mode(quant_mode):
         return head_dim // FP4_PACK_NUM
-    else:
-        return head_dim
+    return head_dim
 
 
 def e8m0_raw_to_float(raw):
@@ -595,6 +673,23 @@ class GeneralizedQLIV2:
                                         :curr_actualSeq_k,
                                     ],
                                 ) = self.cal_atten_per_batch_hifp4(b_idx)
+                            elif is_int4_quant_mode(self.quant_mode, self.qk_dtype):
+                                # W4A4 int4（quant_mode=7；兼容 quant_mode=2 + uint8 历史口径）：
+                                # forward 输入为解包后的 int8 逻辑张量，golden 计算与 W8A8 同路径
+                                (
+                                    y[
+                                        b_idx : (b_idx + 1),
+                                        :,
+                                        s1_start:s1_end,
+                                        :actual_selected_count,
+                                    ],
+                                    y_value[
+                                        b_idx : (b_idx + 1),
+                                        :,
+                                        s1_start:s1_end,
+                                        :curr_actualSeq_k,
+                                    ],
+                                ) = self.cal_atten_per_batch_int8(b_idx)
                             else:
                                 (
                                     y[
@@ -731,6 +826,23 @@ class GeneralizedQLIV2:
                                     :curr_actualSeq_k,
                                 ],
                             ) = self.cal_atten_per_batch_hifp4(b_idx)
+                        elif is_int4_quant_mode(self.quant_mode, self.qk_dtype):
+                            # W4A4 int4（quant_mode=7；兼容 quant_mode=2 + uint8 历史口径）：
+                            # forward 输入为解包后的 int8 逻辑张量，golden 计算与 W8A8 同路径
+                            (
+                                y[
+                                    b_idx : (b_idx + 1),
+                                    :,
+                                    :curr_actualSeq_q,
+                                    :actual_selected_count,
+                                ],
+                                y_value[
+                                    b_idx : (b_idx + 1),
+                                    :,
+                                    :curr_actualSeq_q,
+                                    :curr_actualSeq_k,
+                                ],
+                            ) = self.cal_atten_per_batch_int8(b_idx)
                         else:
                             (
                                 y[
@@ -1430,7 +1542,9 @@ class GeneralizedQLIV2:
             k_scale_shape = k_scale_shape + mx_scale_tail_shape
             if layout_key in ["BSND", "TND"]:
                 layout_key_scale = layout_key
-        if is_hifp4_quant_mode(self.quant_mode):
+        # 仅 HIF4 语义需要 group scale 尾维与物理 shape 替换; DAV_2201 int4 的 golden
+        # 计算走 int8 逻辑路径（逻辑 shape、per-token scale），整体跳过本块。
+        if is_hifp4_semantics(self.quant_mode):
             hif4_scale_tail = math.ceil(head_dim / HIF4_GROUP_SIZE)
             q_scale_shape = q_scale_shape + [hif4_scale_tail]
             k_scale_shape = k_scale_shape + [hif4_scale_tail]
@@ -1459,7 +1573,7 @@ class GeneralizedQLIV2:
                 key_dequant_scale, k_scale_shape
             )
             q_scale_is_weights = False
-        if is_hifp4_quant_mode(self.quant_mode):
+        if is_hifp4_semantics(self.quant_mode):
             q_scale_is_weights = False
         if output_idx_offset is not None:
             output_idx_offset = output_idx_offset.cpu()
@@ -1864,7 +1978,12 @@ def qliv2_output_single(
             k_scale_datarange = ast.literal_eval(k_scale_datarange)
 
     hifp8mode = 1 if quant_mode == QUANT_MODE_HIFLOAT8 else 0
-    hifp4mode = 1 if quant_mode == QUANT_MODE_HIF4 else 0
+    # int4mode: quant_mode=2（per-token-head）且 qk_dtype=uint8 的 W4A4 signed int4 语义
+    # （仅 DAV_2201，Ascend910B/910_93）, 与 hifp4mode 互斥（此时 hifp4mode 恒为 0）。
+    # int4 生成 [-8,7] int8 逻辑张量作 golden 计算载体(cpu_ref), 打包为 uint8 物理张量
+    # （末维 D/2）作 NPU 上送载体。
+    int4mode = 1 if is_int4_quant_mode(quant_mode, qk_dtype) else 0
+    hifp4mode = 1 if is_hifp4_semantics(quant_mode) else 0
     if is_mx_quant_mode(quant_mode):
         validate_mx_scale_dtype(dequant_dtype)
 
@@ -2039,7 +2158,7 @@ def qliv2_output_single(
         s1size=s1size,
     )
 
-    qk_physical_head_dim = get_qk_physical_head_dim(head_dim, quant_mode)
+    qk_physical_head_dim = get_qk_physical_head_dim(head_dim, quant_mode, qk_dtype)
     mx_scale_tail_shape = (head_dim // MX_SCALE_SHAPE_ALIGN, MX_SCALE_PACK_NUM)
     if layout_query == "BSND":
         q_logical_shape = (batch_size, q_seq, q_head_num, head_dim)
@@ -2048,6 +2167,17 @@ def qliv2_output_single(
             query, query_cpu_ref = make_mxfp4_tensor_pair(
                 q_logical_shape, query_datarange, qk_dtype, to_npu=False
             )
+        elif int4mode == 1:
+            # DAV_2201 int4: int8 逻辑载体（[-8,7] 补码）用于 golden 计算,
+            # nibble 打包 uint8（低半字节=偶下标）用于 NPU 上送。
+            query_cpu_ref = torch.from_numpy(
+                np.random.randint(
+                    max(query_datarange[0], INT4_VALUE_MIN),
+                    min(query_datarange[1], INT4_VALUE_MAX) + 1,
+                    q_logical_shape,
+                ).astype(np.int8)
+            )
+            query = pack_int4_to_uint8(query_cpu_ref)
         elif hifp4mode == 1:
             query = _gen_hifp4_tensor(q_logical_shape, query_datarange)
             query_cpu_ref = query
@@ -2079,7 +2209,9 @@ def qliv2_output_single(
             query_dequant_scale_cpu = torch.tensor(
                 np.random.uniform(q_scale, q_scale, (batch_size, q_seq, q_head_num))
             ).to(dequant_dtype)
-        elif quant_mode == QUANT_MODE_HIF4:
+        # int4（DAV_2201）的 q_scale 为 per-token fp16（无 HIF4 group 尾维）,
+        # 走下方 else 分支生成, 故此处判定收紧为 hifp4mode。
+        elif hifp4mode == 1:
             q_scale_shape_hif4 = [
                 batch_size,
                 q_seq,
@@ -2120,6 +2252,17 @@ def qliv2_output_single(
             query, query_cpu_ref = make_mxfp4_tensor_pair(
                 q_logical_shape, query_datarange, qk_dtype, to_npu=False
             )
+        elif int4mode == 1:
+            # DAV_2201 int4: int8 逻辑载体（[-8,7] 补码）用于 golden 计算,
+            # nibble 打包 uint8（低半字节=偶下标）用于 NPU 上送。
+            query_cpu_ref = torch.from_numpy(
+                np.random.randint(
+                    max(query_datarange[0], INT4_VALUE_MIN),
+                    min(query_datarange[1], INT4_VALUE_MAX) + 1,
+                    q_logical_shape,
+                ).astype(np.int8)
+            )
+            query = pack_int4_to_uint8(query_cpu_ref)
         elif hifp4mode == 1:
             query = _gen_hifp4_tensor(q_logical_shape, query_datarange)
             query_cpu_ref = query
@@ -2151,7 +2294,9 @@ def qliv2_output_single(
             query_dequant_scale_cpu = torch.tensor(
                 np.random.uniform(q_scale, q_scale, (q_t_size, q_head_num))
             ).to(dequant_dtype)
-        elif quant_mode == QUANT_MODE_HIF4:
+        # int4（DAV_2201）的 q_scale 为 per-token fp16（无 HIF4 group 尾维）,
+        # 走下方 else 分支生成, 故此处判定收紧为 hifp4mode。
+        elif hifp4mode == 1:
             q_scale_shape_hif4 = [
                 q_t_size,
                 q_head_num,
@@ -2187,6 +2332,17 @@ def qliv2_output_single(
             key, key_cpu_ref = make_mxfp4_tensor_pair(
                 k_logical_shape, key_datarange, qk_dtype, to_npu=False
             )
+        elif int4mode == 1:
+            # DAV_2201 int4: int8 逻辑载体（[-8,7] 补码）用于 golden 计算,
+            # nibble 打包 uint8（低半字节=偶下标）用于 NPU 上送。
+            key_cpu_ref = torch.from_numpy(
+                np.random.randint(
+                    max(key_datarange[0], INT4_VALUE_MIN),
+                    min(key_datarange[1], INT4_VALUE_MAX) + 1,
+                    k_logical_shape,
+                ).astype(np.int8)
+            )
+            key = pack_int4_to_uint8(key_cpu_ref)
         elif hifp4mode == 1:
             key = _gen_hifp4_tensor(k_logical_shape, key_datarange)
             key_cpu_ref = key
@@ -2216,6 +2372,8 @@ def qliv2_output_single(
             key_dequant_scale_cpu = torch.tensor(
                 np.random.uniform(k_scale, k_scale, (batch_size, k_seq, k_head_num))
             ).to(dequant_dtype)
+        # int4（DAV_2201）的 k_scale 为 per-token fp16（无 HIF4 group 尾维）,
+        # 走下方 else 分支生成, 故此处判定收紧为 hifp4mode。
         elif hifp4mode == 1:
             k_scale_shape_hif4 = [
                 batch_size,
@@ -2261,6 +2419,17 @@ def qliv2_output_single(
             key, key_cpu_ref = make_mxfp4_tensor_pair(
                 k_logical_shape, key_datarange, qk_dtype, to_npu=False
             )
+        elif int4mode == 1:
+            # DAV_2201 int4: int8 逻辑载体（[-8,7] 补码）用于 golden 计算,
+            # nibble 打包 uint8（低半字节=偶下标）用于 NPU 上送。
+            key_cpu_ref = torch.from_numpy(
+                np.random.randint(
+                    max(key_datarange[0], INT4_VALUE_MIN),
+                    min(key_datarange[1], INT4_VALUE_MAX) + 1,
+                    k_logical_shape,
+                ).astype(np.int8)
+            )
+            key = pack_int4_to_uint8(key_cpu_ref)
         elif hifp4mode == 1:
             key = _gen_hifp4_tensor(k_logical_shape, key_datarange)
             key_cpu_ref = key
@@ -2290,6 +2459,8 @@ def qliv2_output_single(
             key_dequant_scale_cpu = torch.tensor(
                 np.random.uniform(k_scale, k_scale, (k_t_size, k_head_num))
             ).to(dequant_dtype)
+        # int4（DAV_2201）的 k_scale 为 per-token fp16（无 HIF4 group 尾维）,
+        # 走下方 else 分支生成, 故此处判定收紧为 hifp4mode。
         elif hifp4mode == 1:
             k_scale_shape_hif4 = [
                 k_t_size,
@@ -2334,6 +2505,17 @@ def qliv2_output_single(
             key_bnsd, key_bnsd_cpu_ref = make_mxfp4_tensor_pair(
                 k_logical_shape, key_datarange, qk_dtype, to_npu=False
             )
+        elif int4mode == 1:
+            # DAV_2201 int4: int8 逻辑载体（[-8,7] 补码）用于 golden 计算,
+            # nibble 打包 uint8（低半字节=偶下标）用于 NPU 上送。
+            key_bnsd_cpu_ref = torch.from_numpy(
+                np.random.randint(
+                    max(key_datarange[0], INT4_VALUE_MIN),
+                    min(key_datarange[1], INT4_VALUE_MAX) + 1,
+                    k_logical_shape,
+                ).astype(np.int8)
+            )
+            key_bnsd = pack_int4_to_uint8(key_bnsd_cpu_ref)
         elif hifp4mode == 1:
             key_bnsd = _gen_hifp4_tensor(k_logical_shape, key_datarange)
             key_bnsd_cpu_ref = key_bnsd
@@ -2362,6 +2544,8 @@ def qliv2_output_single(
             key_dequant_scale_bns = torch.tensor(
                 np.random.uniform(k_scale, k_scale, (batch_size, k_head_num, k_max_s2))
             ).to(dequant_dtype)
+        # int4（DAV_2201）的 k_scale 为 per-token fp16（无 HIF4 group 尾维）,
+        # 走下方 else 分支生成, 故此处判定收紧为 hifp4mode。
         elif hifp4mode == 1:
             k_scale_shape_hif4 = [
                 batch_size,
@@ -2407,6 +2591,10 @@ def qliv2_output_single(
             # FP4 shell dtype仅用于接口语义；PA重排按其底层packed uint8字节完成。
             key_storage_dtype = torch.uint8
             key_bnsd_storage = key_bnsd.view(torch.uint8)
+        elif int4mode == 1:
+            # int4: key_bnsd 已是打包 uint8 物理张量（末维 D/2）, 与 NPU 上送一致。
+            key_storage_dtype = torch.uint8
+            key_bnsd_storage = key_bnsd
         else:
             key_storage_dtype = qk_dtype
             key_bnsd_storage = key_bnsd
@@ -2468,6 +2656,8 @@ def qliv2_output_single(
                                     :,
                                 ]
                             )
+        # int4（DAV_2201）key scale 为 per-token fp16, PA 重排无 HIF4 group 尾维,
+        # 走下方 else 分支, 故此处判定收紧为 hifp4mode。
         elif hifp4mode == 1:
             hif4_scale_tail = math.ceil(head_dim / HIF4_GROUP_SIZE)
             key_dequant_scale_expand = torch.zeros(
@@ -2527,6 +2717,7 @@ def qliv2_output_single(
             not is_mx_quant_mode(quant_mode)
             and quant_mode != QUANT_MODE_HIFLOAT8
             and not is_hifp4_quant_mode(quant_mode)
+            and not is_int4_quant_mode(quant_mode, qk_dtype)
             and DISCONTINUOUS_KEYS
         )
         if judge:
