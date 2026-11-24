@@ -213,3 +213,34 @@ TEST_F(SparseLightningIndexerGradKLLossTilingRegbase, tiling_invalid_query_head_
     auto para = MakeBsndPara(compileInfo, ge::DT_FLOAT16, ge::DT_FLOAT16, "BSND", 3, 2048, 16);
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }
+
+TEST_F(SparseLightningIndexerGradKLLossTilingRegbase, tiling_invalid_rope_dtype_failed)
+{
+    for (const auto index : {8U, 9U}) {
+        for (const auto dtype : {ge::DT_INT8, ge::DT_INT32}) {
+            SCOPED_TRACE(index);
+            SCOPED_TRACE(dtype);
+            auto compileInfo = MakeCompileInfo();
+            auto para = MakeBsndPara(compileInfo);
+            para.inputTensorDesc_[index].dtype_ = dtype;
+            ExecuteTestCase(para, ge::GRAPH_FAILED);
+        }
+    }
+}
+
+TEST_F(SparseLightningIndexerGradKLLossTilingRegbase, tiling_invalid_softmax_rank_failed)
+{
+    for (const auto index : {6U, 7U}) {
+        SCOPED_TRACE(index);
+        auto compileInfo = MakeCompileInfo();
+        auto para = MakeBsndPara(compileInfo);
+        para.inputTensorDesc_[index].shape_ = {{1, 1, 128, 8, 1, 1, 1, 1, 1}, {1, 1, 128, 8, 1, 1, 1, 1, 1}};
+        ExecuteTestCase(para, ge::GRAPH_FAILED);
+
+        int64_t actualSeqQuery[] = {128};
+        int64_t actualSeqKey[] = {256};
+        auto tndPara = MakeTndPara(compileInfo, actualSeqQuery, actualSeqKey);
+        tndPara.inputTensorDesc_[index].shape_ = {{1, 128, 16, 1, 1, 1, 1, 1, 1}, {1, 128, 16, 1, 1, 1, 1, 1, 1}};
+        ExecuteTestCase(tndPara, ge::GRAPH_FAILED);
+    }
+}

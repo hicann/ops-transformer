@@ -379,3 +379,39 @@ TEST_F(SparseLightningIndexerKLLossGradTiling, sparse_lightning_indexer_kl_loss_
     context.outputTensorDesc_[3].shape_ = context.inputTensorDesc_[4].shape_;
     ExecuteTestCase(context, ge::GRAPH_FAILED);
 }
+
+TEST_F(SparseLightningIndexerKLLossGradTiling, sparse_lightning_indexer_kl_loss_grad_tiling_invalid_seqused_shape)
+{
+    for (const std::string& layout : {"BSND", "TND"}) {
+        for (const auto index : {7U, 8U}) {
+            SCOPED_TRACE(layout);
+            SCOPED_TRACE(index);
+            auto context = MakeTilingContext(layout);
+            context.inputTensorDesc_[index].shape_ = {{0, 4, 16}, {0, 4, 16}};
+            ExecuteTestCase(context, ge::GRAPH_FAILED);
+            context.inputTensorDesc_[index].shape_ = {{0}, {0}};
+            ExecuteTestCase(context, ge::GRAPH_FAILED);
+            context.inputTensorDesc_[index].shape_ = {{2, 1}, {2, 1}};
+            ExecuteTestCase(context, ge::GRAPH_FAILED);
+        }
+    }
+}
+
+TEST_F(SparseLightningIndexerKLLossGradTiling, sparse_lightning_indexer_kl_loss_grad_tiling_seqused_batch_size)
+{
+    for (const std::string& layout : {"BSND", "TND"}) {
+        for (const auto index : {7U, 8U}) {
+            SCOPED_TRACE(layout);
+            SCOPED_TRACE(index);
+            auto context = MakeTilingContext(layout); // B = 2 in both layouts.
+            context.inputTensorDesc_[index].shape_ = {{2}, {2}};
+            TilingInfo tilingInfo;
+            ASSERT_TRUE(ExecuteTiling(context, tilingInfo));
+            for (const int64_t length : {1, 3}) {
+                SCOPED_TRACE(length);
+                context.inputTensorDesc_[index].shape_ = {{length}, {length}};
+                ExecuteTestCase(context, ge::GRAPH_FAILED);
+            }
+        }
+    }
+}

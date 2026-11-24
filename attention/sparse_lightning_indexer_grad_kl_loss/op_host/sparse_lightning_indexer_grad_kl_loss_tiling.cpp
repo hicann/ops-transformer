@@ -36,8 +36,48 @@ constexpr uint32_t PRE_LOAD_NUM = 2;
 constexpr uint32_t BLOCK_TABLE_ELEM_BYTE = 4;
 constexpr int32_t SPARSE_MODE_BAND = 4;
 
+static ge::graphStatus CheckRopeDtypesAndSoftmaxRanks(gert::TilingContext* context)
+{
+    const uint32_t ropeIndices[] = {QUERY_ROPE_INPUT_INDEX, KEY_ROPE_INPUT_INDEX};
+    const char* ropeNames[] = {"query_rope", "key_rope"};
+    for (size_t index = 0; index < 2; ++index) {
+        if (context->GetOptionalInputShape(ropeIndices[index]) == nullptr) {
+            continue;
+        }
+        const auto* desc = context->GetOptionalInputDesc(ropeIndices[index]);
+        OP_CHECK_NULL_WITH_CONTEXT(context, desc);
+        const auto dtype = desc->GetDataType();
+        OP_CHECK_IF(dtype != ge::DT_FLOAT16 && dtype != ge::DT_BF16,
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), ropeNames[index],
+                                                          ge::TypeUtils::DataTypeToSerialString(dtype).c_str(),
+                                                          "RoPE inputs must have FLOAT16 or BFLOAT16 dtype"),
+                    return ge::GRAPH_FAILED);
+    }
+
+    const auto* attrs = context->GetAttrs();
+    OP_CHECK_NULL_WITH_CONTEXT(context, attrs);
+    const auto* layout = attrs->GetAttrPointer<char>(LAYOUT_ATTR_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context, layout);
+    const size_t expectedRank = std::string(layout) == "TND" ? DIM_NUM_THREE : DIM_NUM_FOUR;
+    const uint32_t softmaxIndices[] = {SOFTMAX_MAX_INPUT_INDEX, SOFTMAX_SUM_INPUT_INDEX};
+    const char* softmaxNames[] = {"softmax_max", "softmax_sum"};
+    for (size_t index = 0; index < 2; ++index) {
+        const auto* shape = context->GetInputShape(softmaxIndices[index]);
+        OP_CHECK_NULL_WITH_CONTEXT(context, shape);
+        const auto rank = shape->GetStorageShape().GetDimNum();
+        OP_CHECK_IF(rank != expectedRank,
+                    OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                        context->GetNodeName(), softmaxNames[index], std::to_string(rank).c_str(),
+                        "Softmax inputs must be rank 3 for TND or rank 4 for BSND"),
+                    return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus TilingSparseLightningIndexerGradKLLoss(gert::TilingContext* context)
 {
+    OP_CHECK_IF(CheckRopeDtypesAndSoftmaxRanks(context) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context, "Invalid RoPE dtype or softmax rank."), return ge::GRAPH_FAILED);
     auto platformInfoPtr = context->GetPlatformInfo();
     auto sligPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     auto npuArch = sligPlatform.GetCurNpuArch();

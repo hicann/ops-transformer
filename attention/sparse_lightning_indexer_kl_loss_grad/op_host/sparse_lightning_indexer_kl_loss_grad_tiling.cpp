@@ -73,6 +73,55 @@ static ge::graphStatus CheckRequiredInputsNotEmpty(gert::TilingContext* context)
     return ge::GRAPH_SUCCESS;
 }
 
+static ge::graphStatus CheckSeqUsedShapes(gert::TilingContext* context)
+{
+    if (context->GetOptionalInputShape(SEQUSED_QUERY_INPUT_INDEX) == nullptr &&
+        context->GetOptionalInputShape(SEQUSED_KEY_INPUT_INDEX) == nullptr) {
+        return ge::GRAPH_SUCCESS;
+    }
+
+    const auto* queryShape = context->GetInputShape(QUERY_INPUT_INDEX);
+    OP_CHECK_NULL_WITH_CONTEXT(context, queryShape);
+    const auto& qShape = queryShape->GetStorageShape();
+    const auto queryRank = qShape.GetDimNum();
+    OP_CHECK_IF(queryRank != DIM_NUM_THREE && queryRank != DIM_NUM_FOUR,
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "q", std::to_string(queryRank).c_str(),
+                                                         "Query must be rank 3 for TND or rank 4 for BSND"),
+                return ge::GRAPH_FAILED);
+
+    int64_t batchSize = qShape.GetDim(0);
+    if (queryRank == DIM_NUM_THREE) {
+        const auto* cuSeqShape = context->GetOptionalInputShape(CU_SEQLENS_QUERY_INPUT_INDEX);
+        OP_CHECK_NULL_WITH_CONTEXT(context, cuSeqShape);
+        const auto& cuShape = cuSeqShape->GetStorageShape();
+        OP_CHECK_IF(cuShape.GetDimNum() != 1 || cuShape.GetDim(0) <= 1,
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                        context->GetNodeName(), "cu_seqlens_q",
+                        "TND requires a one-dimensional cumulative sequence length tensor with B+1 elements and B > 0"),
+                    return ge::GRAPH_FAILED);
+        batchSize = cuShape.GetDim(0) - 1;
+    }
+
+    const uint32_t inputIndices[] = {SEQUSED_QUERY_INPUT_INDEX, SEQUSED_KEY_INPUT_INDEX};
+    const char* inputNames[] = {"seqused_q", "seqused_k"};
+    for (size_t index = 0; index < 2; ++index) {
+        const auto* shape = context->GetOptionalInputShape(inputIndices[index]);
+        if (shape == nullptr) {
+            continue;
+        }
+        const auto& storageShape = shape->GetStorageShape();
+        const std::string shapeInfo = "rank=" + std::to_string(storageShape.GetDimNum()) +
+                                      ", size=" + std::to_string(storageShape.GetShapeSize());
+        const std::string reason =
+            "Sequence lengths must be one-dimensional tensors with shape (B,), where B=" + std::to_string(batchSize);
+        OP_CHECK_IF(storageShape.GetDimNum() != 1 || storageShape.GetDim(0) != batchSize,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(context->GetNodeName(), inputNames[index], shapeInfo.c_str(),
+                                                          reason.c_str()),
+                    return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus TilingSparseLightningIndexerKLLossGrad(gert::TilingContext* context)
 {
     if (context == nullptr) {
@@ -82,6 +131,9 @@ ge::graphStatus TilingSparseLightningIndexerKLLossGrad(gert::TilingContext* cont
         CheckRequiredInputsNotEmpty(context) != ge::GRAPH_SUCCESS,
         OP_LOGE_WITHOUT_REPORT(context, "SparseLightningIndexerKLLossGrad does not support empty input tensors."),
         return ge::GRAPH_FAILED);
+
+    OP_CHECK_IF(CheckSeqUsedShapes(context) != ge::GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(context, "Invalid seqused_q or seqused_k shape."), return ge::GRAPH_FAILED);
 
     auto platformInfoPtr = context->GetPlatformInfo();
     auto sligPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
