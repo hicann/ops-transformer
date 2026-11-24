@@ -22,6 +22,14 @@ import numpy as np
 import torch
 
 
+def is_empty_stat(value):
+    return (
+        isinstance(value, (torch.Tensor, np.ndarray))
+        and value.shape == (0,)
+        and value.dtype in (torch.float32, np.dtype("float32"))
+    )
+
+
 class PytestResultComparator:
     """Load and invoke the canonical pytest comparison without changing TTK logging."""
 
@@ -100,38 +108,58 @@ class PytestResultComparator:
             else (f"pytest check_result output[{output_index}] returned {status!r}"),
         }
 
-    @staticmethod
-    def is_empty_tensor(value):
-        if torch.is_tensor(value):
-            return value.numel() == 0
-        return isinstance(value, np.ndarray) and value.size == 0
-
-    def compare(self, *outputs):
-        if len(outputs) < 2 or len(outputs) % 2 != 0:
+    def compare(self, *outputs, compare_context=None):
+        if len(outputs) != 6:
             return {
                 "pass": False,
                 "precision": "invalid",
-                "error_info": "compare expects NPU outputs followed by golden outputs",
+                "error_info": "expected attention, max and sum for both NPU and golden",
             }
         module = self.load_module()
-        half = len(outputs) // 2
+        actual, expected = outputs[:3], outputs[3:]
+        stats_enabled = (
+            compare_context.attributes.get("return_softmax_lse")
+            if compare_context is not None
+            else None
+        )
+        if stats_enabled is None:
+            # Older dumps used two None markers for disabled statistics.
+            stats_enabled = not all(x is None or is_empty_stat(x) for x in expected[1:])
         results = []
-        for output_index, (npu_output, golden) in enumerate(
-            zip(outputs[:half], outputs[half:])
-        ):
-            if golden is None:
-                results.append({"pass": True, "precision": "SUPPRESSED"})
+        for output_index, (npu_output, golden) in enumerate(zip(actual, expected)):
+            if output_index > 0 and not stats_enabled:
+                passed = is_empty_stat(npu_output) and (
+                    golden is None or is_empty_stat(golden)
+                )
+                results.append(
+                    {
+                        "pass": passed,
+                        "precision": "EMPTY" if passed else "invalid",
+                        "error_info": None
+                        if passed
+                        else f"disabled output[{output_index}] must be an empty FP32 vector",
+                    }
+                )
                 continue
-            if npu_output is None:
+            if npu_output is None or golden is None:
                 results.append(
                     {
                         "pass": False,
                         "precision": "NO_OUTPUT",
-                        "error_info": f"NPU output[{output_index}] is None",
+                        "error_info": f"required NPU or golden output[{output_index}] is missing",
                     }
                 )
                 continue
-            if self.is_empty_tensor(golden) and self.is_empty_tensor(npu_output):
+            if npu_output.shape != golden.shape or (
+                output_index > 0 and is_empty_stat(golden)
+            ):
+                results.append(
+                    {
+                        "pass": False,
+                        "precision": "invalid",
+                        "error_info": f"invalid shape at output[{output_index}]: NPU {npu_output.shape}, golden {golden.shape}",
+                    }
+                )
                 continue
             result = module.check_result(
                 self.to_torch(golden), self.to_torch(npu_output)
@@ -143,6 +171,6 @@ class PytestResultComparator:
 COMPARATOR = PytestResultComparator()
 
 
-def compare(*outputs):
+def compare(*outputs, compare_context=None):
     """Compare outputs with the operator's canonical pytest policy."""
-    return COMPARATOR.compare(*outputs)
+    return COMPARATOR.compare(*outputs, compare_context=compare_context)

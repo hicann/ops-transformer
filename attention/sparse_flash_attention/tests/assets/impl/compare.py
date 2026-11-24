@@ -21,30 +21,6 @@ from pathlib import Path
 import numpy as np
 import torch
 
-try:
-    from ttk.utilities.container_utils import get_global_storage
-except Exception:
-    try:
-        from ttk.switches import get_global_storage
-    except Exception:
-        get_global_storage = None
-
-try:
-    from ttk.core_modules.comparison.cross_check import CrossCheckComparison
-    from ttk.core_modules.comparison.resolve import resolve_tolerance
-
-    _TTK_CROSS_CHECK_AVAILABLE = True
-except Exception:
-    try:
-        from ttk.core_modules.common.comparison.cross_check import (
-            CrossCheckComparison,
-        )
-        from ttk.core_modules.common.comparison.resolve import resolve_tolerance
-
-        _TTK_CROSS_CHECK_AVAILABLE = True
-    except Exception:
-        _TTK_CROSS_CHECK_AVAILABLE = False
-
 
 class PytestResultComparator:
     """Load and invoke the canonical pytest comparison without changing TTK logging."""
@@ -130,7 +106,7 @@ class PytestResultComparator:
             return value.numel() == 0
         return isinstance(value, np.ndarray) and value.size == 0
 
-    def compare(self, *outputs):
+    def compare(self, *outputs, compare_context=None):
         if len(outputs) < 2 or len(outputs) % 2 != 0:
             return {
                 "pass": False,
@@ -139,19 +115,21 @@ class PytestResultComparator:
             }
         module = self.load_module()
         half = len(outputs) // 2
+        attrs = compare_context.attributes if compare_context is not None else {}
+        stats_enabled = attrs.get("return_softmax_lse", attrs.get("returnSoftmaxLse"))
         results = []
         for output_index, (npu_output, golden) in enumerate(
             zip(outputs[:half], outputs[half:])
         ):
-            if golden is None:
+            if output_index > 0 and golden is None and not stats_enabled:
                 results.append({"pass": True, "precision": "SUPPRESSED"})
                 continue
-            if npu_output is None:
+            if npu_output is None or golden is None:
                 results.append(
                     {
                         "pass": False,
                         "precision": "NO_OUTPUT",
-                        "error_info": f"NPU output[{output_index}] is None",
+                        "error_info": f"required NPU or golden output[{output_index}] is missing",
                     }
                 )
                 continue
@@ -168,123 +146,6 @@ class PytestResultComparator:
 COMPARATOR = PytestResultComparator()
 
 
-def compare(*outputs):
+def compare(*outputs, compare_context=None):
     """Compare outputs with the operator's canonical pytest policy."""
-    return COMPARATOR.compare(*outputs)
-
-
-# ---------------------------------------------------------------------------
-# ttk built-in cross_check (three-way comparison) entry points
-# ---------------------------------------------------------------------------
-
-
-def _get_compare_method():
-    if get_global_storage is not None:
-        try:
-            return getattr(get_global_storage(), "compare_method", None)
-        except Exception:
-            return None
-    return None
-
-
-def cross_check_requested():
-    return _get_compare_method() == "cross_check"
-
-
-def is_cross_check_available():
-    return _TTK_CROSS_CHECK_AVAILABLE
-
-
-def _resolve_cross_check_params(spec_tolerance, dtype_str):
-    standards = resolve_tolerance(
-        spec_tolerance, None, None, [dtype_str], "cross_check"
-    )
-    return standards[0].params
-
-
-def _ttk_cross_check_single(npu_out, golden_out, bench_out, idx, dtype_str, params):
-    c = CrossCheckComparison(
-        npu_out, bench_out, idx, dtype_str, params, third_party=golden_out
-    )
-    precision_str, log, is_pass, metrics = c.compare()
-    return {
-        "pass": is_pass,
-        "precision": precision_str,
-        "metrics": metrics,
-        "error_info": None if is_pass else log,
-    }
-
-
-def _dtype_key(value):
-    if torch.is_tensor(value):
-        return str(value.dtype).removeprefix("torch.")
-    return str(np.asarray(value).dtype)
-
-
-def run_ttk_cross_check(*outputs, bench_outputs=None, spec_tolerance=None):
-    """NPU outputs followed by golden outputs, each compared against the bench."""
-    if len(outputs) < 2 or len(outputs) % 2 != 0:
-        return {
-            "pass": False,
-            "precision": "invalid",
-            "error_info": "compare expects NPU outputs followed by golden outputs",
-        }
-    half = len(outputs) // 2
-    results = []
-    for output_index, (npu_output, golden) in enumerate(
-        zip(outputs[:half], outputs[half:])
-    ):
-        bench = None
-        if bench_outputs is not None and output_index < len(bench_outputs):
-            bench = bench_outputs[output_index]
-        if golden is None:
-            results.append({"pass": True, "precision": "SUPPRESSED"})
-            continue
-        if npu_output is None:
-            results.append(
-                {
-                    "pass": False,
-                    "precision": "NO_OUTPUT",
-                    "error_info": f"NPU output[{output_index}] is None",
-                }
-            )
-            continue
-        if COMPARATOR.is_empty_tensor(golden) and COMPARATOR.is_empty_tensor(
-            npu_output
-        ):
-            continue
-        if bench is None or COMPARATOR.is_empty_tensor(bench):
-            results.append(
-                {
-                    "pass": False,
-                    "precision": "NO_BENCH",
-                    "error_info": f"cross_check bench output[{output_index}] is missing",
-                }
-            )
-            continue
-        dtype_str = _dtype_key(golden)
-        params = _resolve_cross_check_params(spec_tolerance, dtype_str)
-        results.append(
-            _ttk_cross_check_single(
-                COMPARATOR.to_torch(npu_output),
-                COMPARATOR.to_torch(golden),
-                COMPARATOR.to_torch(bench),
-                output_index,
-                dtype_str,
-                params,
-            )
-        )
-    return results
-
-
-def dispatch(*outputs, bench_outputs=None, spec_tolerance=None):
-    """Route to ttk cross_check when enabled, otherwise the pytest policy."""
-    if (
-        _get_compare_method() == "cross_check"
-        and bench_outputs is not None
-        and _TTK_CROSS_CHECK_AVAILABLE
-    ):
-        return run_ttk_cross_check(
-            *outputs, bench_outputs=bench_outputs, spec_tolerance=spec_tolerance
-        )
-    return COMPARATOR.compare(*outputs)
+    return COMPARATOR.compare(*outputs, compare_context=compare_context)

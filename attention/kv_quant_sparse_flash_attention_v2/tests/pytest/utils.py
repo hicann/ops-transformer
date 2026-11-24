@@ -752,6 +752,15 @@ def qsfa_v2_run_npu(test_data, testcase_name=None, device_id=0, result_path=None
                 )
                 else "Failed"
             )
+        elif len(npu_result) != 3 or any(
+            not torch.is_tensor(stat)
+            or stat.shape != (0,)
+            or stat.dtype != torch.float32
+            for stat in npu_result[1:]
+        ):
+            raise ValueError(
+                "disabled softmax_max and softmax_sum must be empty FP32 vectors"
+            )
     except Exception:
         if result_path:
             save_result(

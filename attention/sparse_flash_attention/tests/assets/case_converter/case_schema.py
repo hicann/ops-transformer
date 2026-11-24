@@ -645,9 +645,8 @@ def output_contract(shapes, types, attributes):
         else (heads, q[0], q[-2] // heads)
     )
     if not boolean(attributes["return_softmax_lse"]):
-        lse = None
-    lse_type = "float32" if lse is not None else None
-    return ((output, lse, lse), (types[0], lse_type, lse_type))
+        lse = (0,)
+    return ((output, lse, lse), (types[0], "float32", "float32"))
 
 
 def aclnn_inputs(shapes, types, attributes, values):

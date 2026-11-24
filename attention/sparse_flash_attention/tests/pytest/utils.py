@@ -21,9 +21,7 @@ import pandas as pd
 import pytest
 import torch
 import check_valid_param
-import result_compare_method
 import sparse_flash_attention_golden
-from batch import sparse_flash_attention_process
 
 
 STR_MAP_DICT = {
@@ -513,6 +511,9 @@ def convert_param_combination_to_cs_format(param_combination):
 
 
 def sfa_run_npu(test_data, testcase_name=None, device_id=0, result_path=None):
+    import result_compare_method
+    from batch import sparse_flash_attention_process
+
     params = test_data.get("params")
     if testcase_name:
         params["Testcase_Prefix"] = testcase_name

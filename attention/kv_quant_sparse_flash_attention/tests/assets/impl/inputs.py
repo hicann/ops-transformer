@@ -12,9 +12,7 @@
 
 """Input adapter that delegates KvQuantSparseFlashAttention construction to pytest."""
 
-import importlib.util
-import sys
-from pathlib import Path
+import logging
 
 import torch
 
@@ -22,37 +20,15 @@ import torch
 class KvQuantSparseFlashAttentionInputAdapter:
     """Delegate packed input construction to pytest while keeping adapter state local."""
 
-    @staticmethod
-    def module_load_error(path, exc):
-        return RuntimeError(
-            "Failed to load KvQuantSparseFlashAttention module; "
-            f"stage=assets Golden store; module={path.resolve()}; "
-            f"original error: {type(exc).__name__}: {exc}"
-        )
-
     def golden_module(self):
-        name = "qsfa_ttk_golden"
-        if name in sys.modules:
-            return sys.modules[name]
-        path = Path(__file__).with_name("golden.py")
-        try:
-            spec = importlib.util.spec_from_file_location(name, path)
-            if spec is None or spec.loader is None:
-                raise ImportError(f"cannot create import spec for {path}")
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[name] = module
-            spec.loader.exec_module(module)
-        except Exception as exc:
-            sys.modules.pop(name, None)
-            raise self.module_load_error(path, exc) from exc
-        return module
+        from . import golden
+
+        return golden
 
     @staticmethod
     def copy_tensor(destination, source, name):
         if destination is None:
             if source is not None:
-                import logging
-
                 logging.warning(
                     f"{name} is absent from CSV but pytest generator produced a tensor. Skipping copy."
                 )
@@ -183,7 +159,7 @@ class KvQuantSparseFlashAttentionInputAdapter:
             tile_size,
             rope_head_dim,
         )
-        generated = pytest_golden.generate_input_tensors(params)
+        generated = pytest_golden.generate_input_tensors(params, use_tq4_ranges=True)
         output, generated, _ = pytest_golden.compute_cpu(generated, params)
         if output is None:
             raise RuntimeError("KvQuantSparseFlashAttention pytest compute_cpu failed")
@@ -211,9 +187,56 @@ class KvQuantSparseFlashAttentionInputAdapter:
                 params["actualseqlengthskv"],
                 "actual_seq_lengths_kv",
             )
+        reference_inputs = {
+            name: item.detach().cpu().clone() if torch.is_tensor(item) else item
+            for name, item in locals().items()
+            if name
+            in (
+                "query",
+                "key",
+                "value",
+                "sparse_indices",
+                "scale_value",
+                "key_quant_mode",
+                "value_quant_mode",
+                "key_dequant_scale",
+                "value_dequant_scale",
+                "block_table",
+                "actual_seq_lengths_query",
+                "actual_seq_lengths_kv",
+                "sparse_block_size",
+                "layout_query",
+                "layout_kv",
+                "sparse_mode",
+                "attention_mode",
+                "quant_scale_repo_mode",
+                "tile_size",
+                "rope_head_dim",
+                "sinks",
+                "return_softmax_lse",
+            )
+        }
+        reference_inputs.update(
+            {
+                name: kwargs[name]
+                for name in ("pre_tokens", "next_tokens", "key_dtype", "value_dtype")
+                if name in kwargs
+            }
+        )
         golden_module.CASE_DATA.put(
+            testcase_name, {"reference_inputs": reference_inputs}
+        )
+        logging.info(
+            "[%s] QSFA CPU inputs ready from pytest: query=%s %s, key=%s %s, "
+            "layout=%s/%s, sparse_mode=%s",
             testcase_name,
-            {"golden": output.detach().cpu()},
+            tuple(query.shape),
+            query.dtype,
+            tuple(key.shape),
+            key.dtype,
+            layout_query,
+            layout_kv,
+            sparse_mode,
         )
 
 

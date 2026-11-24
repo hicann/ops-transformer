@@ -57,15 +57,15 @@ def kv_quant_sparse_flash_attention_ttk(
     layout_query: str = "BSND",
     layout_kv: str = "BSND",
     sparse_mode: int = 3,
-    pre_tokens: int = (1 << 63) - 1,
-    next_tokens: int = (1 << 63) - 1,
+    pre_tokens: int = 9223372036854775807,
+    next_tokens: int = 9223372036854775807,
     attention_mode: int = 0,
     quant_scale_repo_mode: int = 1,
     tile_size: int = 128,
     rope_head_dim: int = 64,
-    key_dtype: Optional[int] = None,
-    value_dtype: Optional[int] = None,
-):
+    key_dtype: Optional[str] = None,
+    value_dtype: Optional[str] = None,
+) -> torch.Tensor:
     """Call the installed API with explicit key/value dtype semantics."""
     return torch_npu.npu_kv_quant_sparse_flash_attention(
         query,

@@ -19,7 +19,6 @@ import json
 import math
 import struct
 import torch
-import tensorflow as tf
 import copy
 
 
@@ -27,6 +26,8 @@ INVALID_VALUE = -1
 
 
 def get_np_dtype(type_str):
+    import tensorflow as tf
+
     type_dict = {
         "fp32": np.float32,
         "float32": np.float32,

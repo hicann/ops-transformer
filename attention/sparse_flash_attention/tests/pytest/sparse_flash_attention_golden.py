@@ -15,7 +15,10 @@ import os
 import torch
 import copy
 
-import generate_tensor_data
+if __package__:
+    from . import generate_tensor_data
+else:
+    import generate_tensor_data
 
 SFA_S2_BASE_SIZE = 128
 SFA_CUBE_K_GROUP = 16
@@ -347,9 +350,11 @@ def generate_input_tensors(params):
     return result
 
 
-def compute_cpu(input_tensor_dict, params, return_bench=False):
+def compute_cpu(input_tensor_dict, params, return_bench=False, *, promote=False):
     try:
-        out_data = compute_golden(input_tensor_dict, params, return_bench=return_bench)
+        out_data = compute_golden(
+            input_tensor_dict, params, return_bench=return_bench, promote=promote
+        )
         return out_data, input_tensor_dict, params
     except Exception as e:
         import traceback
@@ -557,7 +562,8 @@ def _generate_block_table_and_cache(
         kv_nopa_preprocessing(input_tensor_dict, fa_param)
 
 
-def compute_golden(input_tensor_dict, params, return_bench=False):
+def compute_golden(input_tensor_dict, params, return_bench=False, *, promote=False):
+    """Compute the pytest golden, retaining FP32 intermediates when promote=True."""
     print("cpu执行中...")
 
     def _to_cpu_float32_tensor(val):
@@ -595,7 +601,7 @@ def compute_golden(input_tensor_dict, params, return_bench=False):
         input_tensor_dict, fa_param, params, actualSeqLengths_kv, out_shape
     )
 
-    y_all, softmax_max, softmax_sum = _t_increattention_bnsd(fa_param)
+    y_all, softmax_max, softmax_sum = _t_increattention_bnsd(fa_param, promote=promote)
     y_all = trans_bnsd_to_layout(
         y_all, out_shape, layoutQuery, fa_param["actualSeqLengths_q"]
     )
@@ -663,20 +669,19 @@ def gatherKV(
     return emptyFlag, k_sparse, v_sparse
 
 
-def softmax(x, sinks=None):
+def softmax(x, sinks=None, *, joint_reduction=False):
     x = x.float()
-    if sinks is not None:
-        sinks = sinks.float().unsqueeze(1)
-        x_max = torch.max(torch.cat([x, sinks], dim=-1), dim=-1, keepdim=True).values
+    sink_column = None if sinks is None else sinks.float().reshape(-1, 1)
+    logits = x if sink_column is None else torch.cat((x, sink_column), dim=-1)
+    maximum = logits.max(dim=-1, keepdim=True).values
+    weights = torch.exp(x - maximum)
+    if joint_reduction and sink_column is not None:
+        total = torch.exp(logits - maximum).sum(dim=-1, keepdim=True)
     else:
-        x_max = x.max(dim=-1, keepdim=True).values
-    x_sub = x - x_max
-    y = torch.exp(x_sub)
-    x_sum = y.sum(dim=-1, keepdim=True)
-    if sinks is not None:
-        x_sum = x_sum + torch.exp(sinks - x_max)
-    ans = y / x_sum
-    return ans, x_max, x_sum
+        total = weights.sum(dim=-1, keepdim=True)
+        if sink_column is not None:
+            total = total + torch.exp(sink_column - maximum)
+    return weights / total, maximum, total
 
 
 def online_softmax_bmm2(scale_res, v_sparse, sinks, q_dtype, quantize_exp):
@@ -686,9 +691,9 @@ def online_softmax_bmm2(scale_res, v_sparse, sinks, q_dtype, quantize_exp):
         running_max = sinks.float().reshape(rows).clone()
         running_sum = torch.ones_like(running_max)
     else:
-        running_max = torch.full((rows,), float("-inf"), dtype=torch.float32)
-        running_sum = torch.zeros(rows, dtype=torch.float32)
-    acc = torch.zeros((rows, dim), dtype=torch.float32)
+        running_max = scale_res.new_full((rows,), float("-inf"), dtype=torch.float32)
+        running_sum = scale_res.new_zeros(rows, dtype=torch.float32)
+    acc = scale_res.new_zeros((rows, dim), dtype=torch.float32)
 
     for start in range(0, kv_len, SFA_S2_BASE_SIZE):
         chunk = scale_res[:, start : start + SFA_S2_BASE_SIZE]
@@ -771,7 +776,33 @@ def bmm1(q_curr, k_sparse, calc_dtype):
     return torch.matmul(q_curr.float(), k_sparse.float().T)
 
 
-def _t_increattention_bnsd(fa_param, quantize_exp=True):
+def compute_golden_row(
+    q,
+    k,
+    v,
+    scale,
+    sink,
+    q_dtype,
+    *,
+    promote=False,
+    quantize_exp=True,
+    check_npu_overflow=False,
+):
+    """Score the selected KV tokens for one query and its group of heads."""
+    if promote:
+        # Independent FP32 reduction avoids sharing the ordinary GEMM's rounding error.
+        scores = torch.stack([torch.linalg.vecdot(k, head) for head in q]) * scale
+        weights, maximum, total = softmax(scores, sink, joint_reduction=True)
+        return weights @ v, maximum, total
+    if check_npu_overflow:
+        dtype = torch.bfloat16 if q_dtype == "bfloat16" else torch.float16
+        scores = bmm1(q, k, dtype) * scale
+    else:
+        scores = (q @ k.T) * scale
+    return online_softmax_bmm2(scores, v, sink, q_dtype, quantize_exp)
+
+
+def _t_increattention_bnsd(fa_param, quantize_exp=True, *, promote=False):
     batch_size = fa_param["b"]
     numheads = fa_param["numHeads"]
     numKeyValueHeads = fa_param["numKeyValueHeads"]
@@ -816,11 +847,6 @@ def _t_increattention_bnsd(fa_param, quantize_exp=True):
         qLastPrefill = 0 if batch == 0 else sum(actualSeqLengths_q[0:batch])
         for n2Idx in range(numKeyValueHeads):
             for s1Idx in range(curr_actualSeq_q):
-                if s1Idx < curr_actualSeq_q - curr_actualSeq and sparse_mode != 0:
-                    y[batch, n2Idx * g : (n2Idx + 1) * g, s1Idx, :] = torch.zeros(
-                        [g, out_shape_bnsd[-1]], dtype=torch.float32
-                    )
-                    continue
                 q_curr = q_bnsd_tensor[batch, n2Idx * g : (n2Idx + 1) * g, s1Idx, :]
                 sparse_indices_Indices = sparseIndicesIndices[batch, n2Idx, s1Idx, :]
 
@@ -851,22 +877,16 @@ def _t_increattention_bnsd(fa_param, quantize_exp=True):
                             torch.ones_like(cur_sinks),
                         )
                     continue
-                bmm1Res = bmm1(
+                bmm2Res, x_max, x_sum = compute_golden_row(
                     q_curr,
                     k_sparse,
-                    torch.bfloat16
-                    if fa_param["q_dtype"] == "bfloat16"
-                    else torch.float16,
-                )
-                scaleRes = bmm1Res * scaleValue
-
-                # 与算子 arch35 的分块在线 softmax 对齐：s2 方向按 SFA_S2_BASE_SIZE
-                bmm2Res, x_max, x_sum = online_softmax_bmm2(
-                    scaleRes,
                     v_sparse,
+                    scaleValue,
                     cur_sinks,
                     fa_param["q_dtype"],
-                    quantize_exp,
+                    promote=promote,
+                    quantize_exp=quantize_exp,
+                    check_npu_overflow=True,
                 )
                 y[batch, n2Idx * g : (n2Idx + 1) * g, s1Idx, :] = bmm2Res
                 set_softmax_lse(

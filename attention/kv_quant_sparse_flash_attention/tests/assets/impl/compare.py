@@ -113,15 +113,12 @@ class PytestResultComparator:
         for output_index, (npu_output, golden) in enumerate(
             zip(outputs[:half], outputs[half:])
         ):
-            if golden is None:
-                results.append({"pass": True, "precision": "SUPPRESSED"})
-                continue
-            if npu_output is None:
+            if npu_output is None or golden is None:
                 results.append(
                     {
                         "pass": False,
                         "precision": "NO_OUTPUT",
-                        "error_info": f"NPU output[{output_index}] is None",
+                        "error_info": f"required NPU or golden output[{output_index}] is missing",
                     }
                 )
                 continue

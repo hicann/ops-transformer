@@ -10,10 +10,11 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""Pytest-backed CPU golden adapter for SparseFlashAttention."""
+"""Input conversion and mixed-precision CPU reference for SparseFlashAttention."""
 
 import copy
 import importlib.util
+import logging
 import sys
 import threading
 from importlib import metadata
@@ -21,35 +22,21 @@ from pathlib import Path
 
 import torch
 
-try:
-    from ttk.utilities.container_utils import get_global_storage
-except Exception:
-    get_global_storage = None
-
-
-def _get_compare_method():
-    if get_global_storage is not None:
-        try:
-            return getattr(get_global_storage(), "compare_method", None)
-        except Exception:
-            return None
-    return None
-
-
-def compare_method_is_cross_check():
-    return _get_compare_method() == "cross_check"
+# The TTK file plugin provides a flat operator-local package; checkout imports use tests.pytest.
+if __package__.endswith(".assets.impl"):
+    from ...pytest.sparse_flash_attention_golden import compute_golden_row
+else:
+    from .sparse_flash_attention_golden import compute_golden_row
 
 
 class CaseDataStore:
-    """Keep the pytest-generated result paired with its TTK testcase."""
-
     def __init__(self):
         self.cases = {}
 
     def put(self, testcase_name, data):
         if testcase_name is None:
             raise RuntimeError(
-                "SparseFlashAttention requires testcase_name for pytest-backed golden"
+                "SparseFlashAttention requires testcase_name for final inputs"
             )
         self.cases = {str(testcase_name): data}
 
@@ -57,158 +44,9 @@ class CaseDataStore:
         data = self.cases.get(str(testcase_name)) if testcase_name is not None else None
         if data is None:
             raise RuntimeError(
-                "SparseFlashAttention golden requires customize_inputs to run "
-                "before golden generation"
+                "SparseFlashAttention Promote requires customize_inputs for this testcase"
             )
         return data
-
-
-def peek_bench(testcase_name):
-    """取当前用例的三方标杆输出(cross_check 用)；未生成或未开启三方时返回 None。"""
-    if testcase_name is None:
-        return None
-    entry = CASE_DATA.cases.get(str(testcase_name))
-    if not entry:
-        return None
-    return entry.get("bench")
-
-
-def depage_cache(cache, block_table, block_size):
-    """PA cache 反查逻辑布局 (B, NB*block_size, N, D)。"""
-    B, NB = block_table.shape
-    out = torch.zeros(
-        (B, NB * block_size, cache.shape[2], cache.shape[3]), dtype=cache.dtype
-    )
-    for b in range(B):
-        for i in range(NB):
-            blk = int(block_table[b, i])
-            if blk == -1:
-                continue
-            out[b, i * block_size : (i + 1) * block_size] = cache[blk]
-    return out
-
-
-def flatten_slots(value):
-    flat = []
-    if isinstance(value, (list, tuple)):
-        for item in value:
-            flat.extend(flatten_slots(item))
-    else:
-        flat.append(value)
-    return flat
-
-
-def unpack_context_tensors(compare_context):
-    """按 API 签名从 compare_context 张量槽定位输入与 sinks。
-
-    aclnn 列表为 C 签名全长槽(含输出槽): V1 = 9 输入 + 3 输出、V2 = 10 输入 +
-    3 输出。旧版 V1 无 sinks, 截断输入位并显式 sinks=None, 避免把 attentionOut
-    误当 sinks。e2e 框架接口列表仅含声明的输入槽(未用可选位为 None 占位), 按
-    签名序 (query, key, value, sparse_indices, block_table, actual_seq_q,
-    actual_seq_kv, query_rope, key_rope, sinks) 解析, 尾部缺省补 None。
-    """
-    tensors = flatten_slots(compare_context.input_tensors or ())
-    api_name = getattr(compare_context, "api_name", "") or ""
-    if api_name == "aclnnSparseFlashAttention":
-        if len(tensors) < 9:
-            raise RuntimeError(
-                "SFA lazy bench expects 9 input slots for %s, got %d"
-                % (api_name, len(tensors))
-            )
-        return tensors[:9], None
-    if api_name == "aclnnSparseFlashAttentionV2":
-        if len(tensors) < 10:
-            raise RuntimeError(
-                "SFA lazy bench expects 10 input slots for %s, got %d"
-                % (api_name, len(tensors))
-            )
-        return tensors[:9], tensors[9]
-    padded = list(tensors[:10])
-    padded += [None] * (10 - len(padded))
-    return padded[:9], padded[9]
-
-
-def compute_bench_from_context(compare_context):
-    """cross_check 懒计算: 用比对侧 compare_context 携带的 API 输入张量(与 NPU
-    完全对齐)重建无 exp 量化三方标杆, 并缓存进 CASE_DATA。生成阶段不再预产
-    bench, 超大 case 非 cross_check 场景零额外开销。
-    """
-    if compare_context is None:
-        return None
-    attrs = dict(compare_context.attributes or {})
-    inputs, sinks = unpack_context_tensors(compare_context)
-    query, key, _, sparse_indices, block_table, _, _, query_rope, key_rope = inputs
-    params, pytest_golden = SparseFlashAttentionPytestAdapter.convert_params(
-        attrs, compare_context.testcase_name
-    )
-    layout_kv = str(params.get("layout_kv", "BSND")).upper()
-    is_pa = layout_kv == "PA_BSND"
-    if is_pa:
-        block_size = int(attrs.get("pytest_block_size") or 512)
-        key_logical = depage_cache(key, block_table, block_size)
-        krope_logical = depage_cache(key_rope, block_table, block_size)
-    else:
-        key_logical, krope_logical = key, key_rope
-    input_tensor_dict = {
-        "query": query,
-        "key": key_logical,
-        "value": key_logical,
-        "sparse_indices": sparse_indices,
-        "block_table": block_table if is_pa else None,
-        "query_rope": query_rope,
-        "key_rope": krope_logical,
-        "sinks": sinks,
-        "scale_value": attrs.get("scale_value", params["scalevalue"]),
-        "sparse_block_size": params["sparse_blocksize"],
-        "layout_query": params["layout_query"],
-        "layout_kv": params["layout_kv"],
-        "sparse_mode": params["sparsemode"],
-        "attention_mode": params["attention_mode"],
-        "pre_tokens": (1 << 63) - 1,
-        "next_tokens": (1 << 63) - 1,
-        "return_softmax_lse": params["return_softmax_lse"],
-    }
-    si_api = sparse_indices
-    orig_si = pytest_golden._generate_sparse_indices
-    orig_bt = pytest_golden._generate_block_table_and_cache
-
-    def reuse_si(ito, fa_param, p, out_shape, layoutQuery):
-        if fa_param["tnd_flag"]:
-            shape = fa_param["sparse_indices_bnsd_shape"]
-            si_bnsd = torch.full(tuple(shape), -1, dtype=torch.int32)
-            t0 = 0
-            for b, act in enumerate(fa_param["actualSeqLengths_q"]):
-                si_bnsd[b, :, :act, :] = si_api[t0 : t0 + act].permute(1, 0, 2)
-                t0 += act
-            fa_param["sparse_indices_bnsd_tensor"] = si_bnsd
-        else:
-            fa_param["sparse_indices_bnsd_tensor"] = si_api.permute(
-                0, 2, 1, 3
-            ).contiguous()
-        ito["sparse_indices"] = si_api
-
-    def reuse_bt(ito, fa_param, p, act_kv, out_shape):
-        fa_param["block_table"] = block_table
-        ito["block_table"] = block_table
-        pytest_golden.kv_pa_preprocessing(ito, fa_param, p)
-
-    pytest_golden._generate_sparse_indices = reuse_si
-    if is_pa:
-        pytest_golden._generate_block_table_and_cache = reuse_bt
-    try:
-        out = pytest_golden.compute_golden(input_tensor_dict, params, return_bench=True)
-    finally:
-        pytest_golden._generate_sparse_indices = orig_si
-        pytest_golden._generate_block_table_and_cache = orig_bt
-    if not isinstance(out, (tuple, list)) or len(out) != 4:
-        raise RuntimeError("SFA lazy bench: unexpected compute_golden output")
-    bench = normalize_pytest_outputs(
-        (out[3], out[1], out[2]), query, params["return_softmax_lse"]
-    )
-    entry = CASE_DATA.cases.get(str(compare_context.testcase_name))
-    if entry is not None:
-        entry["bench"] = bench
-    return bench
 
 
 CASE_DATA = CaseDataStore()
@@ -390,50 +228,359 @@ class SparseFlashAttentionPytestAdapter:
         return params, pytest_golden
 
 
-def normalize_pytest_outputs(outputs, query, return_softmax_lse):
-    if not isinstance(outputs, (list, tuple)) or len(outputs) != 3:
-        raise RuntimeError(
-            "SparseFlashAttention pytest compute_cpu returned an invalid output tuple"
-        )
-    # 对齐算子Cast(CAST_ROUND)语义:仅"有限值"超出目标dtype表示范围时钳到上下界，±inf/NaN 原样保留
-    attn_fp32 = outputs[0].detach().cpu().float()
-    attn_out = torch.where(
-        torch.isfinite(attn_fp32),
-        attn_fp32.clamp(-torch.finfo(query.dtype).max, torch.finfo(query.dtype).max),
-        attn_fp32,
-    ).to(dtype=query.dtype)
-    if not bool(return_softmax_lse):
-        # None 占位落盘为 golden_i_none marker，TTK 原生按抑制比较处理，
-        # 使 e2e prepare 的 bin 目录可被 aclnn replay 直接复用。
-        return attn_out, None, None
-    softmax_max = outputs[1].detach().cpu()
-    softmax_sum = outputs[2].detach().cpu()
-    return attn_out, softmax_max, softmax_sum
-
-
 def cpu_sparse_flash_attention(
     query, key, value, sparse_indices, scale_value, *, testcase_name=None, **kwargs
 ):
-    """Return the result generated by pytest for this exact TTK testcase."""
-    del query, key, value, sparse_indices, scale_value, kwargs
-    return CASE_DATA.get(testcase_name)["golden"]
+    arguments = dict(
+        query=query,
+        key=key,
+        value=value,
+        sparse_indices=sparse_indices,
+        scale_value=scale_value,
+        **kwargs,
+    )
+    if (
+        arguments.pop("golden_mode", "Enable") == "Promote"
+        or query.dtype == torch.float32
+    ):
+        inputs = CASE_DATA.get(testcase_name)["reference_inputs"]
+        for name, cached in inputs.items():
+            if torch.is_tensor(cached):
+                current = arguments.get(name)
+                if not torch.is_tensor(current) or current.shape != cached.shape:
+                    raise ValueError(f"cached {name} shape differs from this testcase")
+        return reference_from_inputs(
+            **inputs, promote=True, testcase_name=testcase_name
+        )
+    return mixed_reference(**arguments)
 
 
-def cpu_sparse_flash_attention_aclnn(*args, testcase_name=None, **kwargs):
-    """ACLNN 直调版 golden：按 aclnn C 签名顺序接收全部位置参数。"""
-    del args, kwargs
-    return CASE_DATA.get(testcase_name)["golden"]
+def aclnn_arguments(args, kwargs, with_sinks):
+    names = [
+        "query",
+        "key",
+        "value",
+        "sparse_indices",
+        "block_table",
+        "actual_seq_lengths_query",
+        "actual_seq_lengths_kv",
+        "query_rope",
+        "key_rope",
+    ]
+    if with_sinks:
+        names.append("sinks")
+    names += [
+        "scale_value",
+        "sparse_block_size",
+        "layout_query",
+        "layout_kv",
+        "sparse_mode",
+        "pre_tokens",
+        "next_tokens",
+        "attention_mode",
+        "return_softmax_lse",
+        "attention_out",
+        "softmax_max",
+        "softmax_sum",
+    ]
+    if len(args) != len(names):
+        raise ValueError(
+            f"ACLNN SparseFlashAttention expects {len(names)} positional arguments"
+        )
+    arguments = dict(zip(names, args))
+    for name in ("attention_out", "softmax_max", "softmax_sum"):
+        arguments.pop(name)
+    arguments.update(kwargs)
+    return arguments
 
 
-__golden__ = {
-    "e2e": {
-        "torch_npu.npu_sparse_flash_attention": "cpu_sparse_flash_attention",
-        "torch.ops.cann_ops_transformer.sparse_flash_attention": (
-            "cpu_sparse_flash_attention"
-        ),
-    },
-    "aclnn": {
-        "aclnnSparseFlashAttention": "cpu_sparse_flash_attention_aclnn",
-        "aclnnSparseFlashAttentionV2": "cpu_sparse_flash_attention_aclnn",
-    },
-}
+def cpu_sparse_flash_attention_aclnn(*args, **kwargs):
+    return cpu_sparse_flash_attention(**aclnn_arguments(args, kwargs, False))
+
+
+def cpu_sparse_flash_attention_aclnn_v2(*args, **kwargs):
+    return cpu_sparse_flash_attention(**aclnn_arguments(args, kwargs, True))
+
+
+def integer_vector(value, name, count=None):
+    if value is None:
+        return None
+    if value.ndim != 1 or value.dtype not in (torch.int32, torch.int64):
+        raise ValueError(f"{name} must be a one-dimensional integer tensor")
+    values = value.detach().cpu().tolist()
+    if count is not None and len(values) != count:
+        raise ValueError(f"{name} must contain {count} entries")
+    return values
+
+
+def sequence_layout(tensor, layout, lengths, name, batch=None):
+    values = integer_vector(lengths, name)
+    if layout == "BSND":
+        if tensor.ndim != 4 or (batch is not None and tensor.shape[0] != batch):
+            raise ValueError(f"{name} BSND shape mismatch")
+        values = [tensor.shape[1]] * tensor.shape[0] if values is None else values
+        if len(values) != tensor.shape[0] or any(
+            x < 0 or x > tensor.shape[1] for x in values
+        ):
+            raise ValueError(f"{name} lengths exceed BSND capacity")
+        return values, [b * tensor.shape[1] for b in range(tensor.shape[0])]
+    if layout != "TND" or tensor.ndim != 3 or values is None:
+        raise ValueError(f"{name} TND requires cumulative lengths")
+    if (
+        not values
+        or values[-1] != tensor.shape[0]
+        or (batch is not None and len(values) != batch)
+    ):
+        raise ValueError(f"{name} cumulative lengths must span the tensor")
+    starts = [0] + values[:-1]
+    sizes = [end - start for start, end in zip(starts, values)]
+    if any(x < 0 for x in sizes):
+        raise ValueError(f"{name} cumulative lengths must be nondecreasing")
+    return sizes, starts
+
+
+def prepare_reference(
+    query,
+    key,
+    value,
+    sparse_indices,
+    scale_value,
+    *,
+    block_table=None,
+    actual_seq_lengths_query=None,
+    actual_seq_lengths_kv=None,
+    query_rope=None,
+    key_rope=None,
+    sinks=None,
+    sparse_block_size=1,
+    layout_query="BSND",
+    layout_kv="BSND",
+    sparse_mode=3,
+    attention_mode=0,
+    pre_tokens=(1 << 63) - 1,
+    next_tokens=(1 << 63) - 1,
+    **kwargs,
+):
+    """Allocate output/stat buffers and expose the visible Q/K/V for each query and KV head.
+
+    Both precision paths consume these rows. Sparse selection and layout addressing
+    are shared, while the caller chooses how to compute scores and probabilities.
+    """
+    if attention_mode != 2 or sparse_mode not in (0, 3):
+        raise ValueError(
+            "SparseFlashAttention reference requires attention_mode=2, sparse_mode=0/3"
+        )
+    if pre_tokens != (1 << 63) - 1 or next_tokens != (1 << 63) - 1:
+        raise ValueError(
+            "SparseFlashAttention supports only the default pre_tokens/next_tokens"
+        )
+    if query.dtype not in (torch.float16, torch.bfloat16):
+        raise ValueError("SparseFlashAttention requires FP16/BF16 final inputs")
+    if (query_rope is None) != (key_rope is None):
+        raise ValueError("query_rope/key_rope must be present or absent together")
+    if key.dtype != query.dtype or (
+        value is not None and (value.shape != key.shape or value.dtype != key.dtype)
+    ):
+        raise ValueError("query/key/value dtype or shape mismatch")
+    if not isinstance(sparse_block_size, int) or sparse_block_size <= 0:
+        raise ValueError("sparse_block_size must be a positive integer")
+    q_lengths, starts = sequence_layout(
+        query, layout_query, actual_seq_lengths_query, "query"
+    )
+    batch = len(q_lengths)
+    if layout_kv == "PA_BSND":
+        kv_lengths = integer_vector(actual_seq_lengths_kv, "KV lengths", batch)
+        if key.ndim != 4 or kv_lengths is None or block_table is None:
+            raise ValueError(
+                "PA_BSND requires a rank-4 cache, block table and KV lengths"
+            )
+        if (
+            block_table.ndim != 2
+            or block_table.shape[0] != batch
+            or block_table.dtype not in (torch.int32, torch.int64)
+        ):
+            raise ValueError("block_table shape/dtype mismatch")
+        if any(x < 0 or x > block_table.shape[1] * key.shape[1] for x in kv_lengths):
+            raise ValueError("block_table columns do not cover KV lengths")
+        kv_starts = [0] * batch
+    else:
+        kv_lengths, kv_starts = sequence_layout(
+            key, layout_kv, actual_seq_lengths_kv, "KV", batch
+        )
+    heads, kv_heads, dim = query.shape[-2], key.shape[-2], query.shape[-1]
+    if key.shape[-1] != dim or kv_heads <= 0 or heads % kv_heads:
+        raise ValueError("query/key head geometry mismatch")
+    if sparse_indices.dtype not in (
+        torch.int32,
+        torch.int64,
+    ) or sparse_indices.shape != (
+        *query.shape[:-2],
+        kv_heads,
+        sparse_indices.shape[-1],
+    ):
+        raise ValueError("sparse_indices shape/dtype mismatch")
+    if query_rope is not None:
+        if (
+            query_rope.shape[:-1] != query.shape[:-1]
+            or key_rope.shape[:-1] != key.shape[:-1]
+            or query_rope.shape[-1] != key_rope.shape[-1]
+        ):
+            raise ValueError("RoPE shape mismatch")
+        if query_rope.dtype != query.dtype or key_rope.dtype != key.dtype:
+            raise ValueError("RoPE dtype mismatch")
+    q = query.detach().cpu().float()
+    k = key.detach().cpu().float()
+    v = (key if value is None else value).detach().cpu().float()
+    if query_rope is not None:
+        q = torch.cat((q, query_rope.detach().cpu().float()), dim=-1)
+        k = torch.cat((k, key_rope.detach().cpu().float()), dim=-1)
+    q = q.reshape(-1, heads, q.shape[-1])
+    k = k.reshape(-1, kv_heads, k.shape[-1])
+    v = v.reshape(-1, kv_heads, dim)
+    indices = (
+        sparse_indices.detach().cpu().reshape(-1, kv_heads, sparse_indices.shape[-1])
+    )
+    sink_values = None if sinks is None else sinks.detach().cpu().float()
+    if sink_values is not None and sink_values.shape != (heads,):
+        raise ValueError("sinks must have one value per query head")
+    output = torch.zeros(query.shape, dtype=torch.float32)
+    group = heads // kv_heads
+    shape = (
+        (batch, kv_heads, query.shape[1], group)
+        if layout_query == "BSND"
+        else (kv_heads, query.shape[0], group)
+    )
+    statistics = (torch.zeros(shape), torch.zeros(shape))
+
+    def rows():
+        for b, q_length in enumerate(q_lengths):
+            for row in range(q_length):
+                visible = (
+                    kv_lengths[b]
+                    if sparse_mode == 0
+                    else max(0, kv_lengths[b] - q_length + row + 1)
+                )
+                flat_row = starts[b] + row
+                for head in range(kv_heads):
+                    positions = []
+                    count = min(
+                        indices.shape[-1],
+                        (visible + sparse_block_size - 1) // sparse_block_size,
+                    )
+                    for block in indices[flat_row, head, :count].tolist():
+                        if block == -1:
+                            break
+                        if block < 0 or block * sparse_block_size >= kv_lengths[b]:
+                            raise ValueError("sparse index out of range")
+                        positions.extend(
+                            range(
+                                block * sparse_block_size,
+                                min((block + 1) * sparse_block_size, visible),
+                            )
+                        )
+                    logical = torch.tensor(positions, dtype=torch.long)
+                    if layout_kv == "PA_BSND":
+                        pages = (
+                            block_table[b, logical // key.shape[1]]
+                            .detach()
+                            .cpu()
+                            .long()
+                        )
+                        if torch.any((pages < 0) | (pages >= key.shape[0])):
+                            raise ValueError(
+                                "block_table contains an invalid physical page"
+                            )
+                        physical = pages * key.shape[1] + logical % key.shape[1]
+                    else:
+                        physical = kv_starts[b] + logical
+                    out_index = (
+                        (b, row, slice(head * group, (head + 1) * group))
+                        if layout_query == "BSND"
+                        else (flat_row, slice(head * group, (head + 1) * group))
+                    )
+                    stat_index = (
+                        (b, head, row) if layout_query == "BSND" else (head, flat_row)
+                    )
+                    sink = (
+                        None
+                        if sink_values is None
+                        else sink_values[head * group : (head + 1) * group]
+                    )
+                    yield (
+                        q[flat_row, head * group : (head + 1) * group],
+                        k[physical, head],
+                        v[physical, head],
+                        sink,
+                        out_index,
+                        stat_index,
+                    )
+
+    return output, statistics, rows, query.dtype, scale_value
+
+
+def reference_from_inputs(
+    query,
+    key,
+    value,
+    sparse_indices,
+    scale_value,
+    *,
+    promote=False,
+    testcase_name=None,
+    **kwargs,
+):
+    """Address final API tensors once and pass each visible row to the operator's pytest golden."""
+    if promote:
+        if query.device.type != "cpu":
+            raise ValueError("the independent FP32 golden requires CPU inputs")
+        logging.info(
+            "[%s] SFA FP32 golden: preparing final inputs for pytest compute_golden_row, layout=%s/%s",
+            testcase_name,
+            kwargs.get("layout_query", "BSND"),
+            kwargs.get("layout_kv", "BSND"),
+        )
+    output, statistics, rows, dtype, scale = prepare_reference(
+        query, key, value, sparse_indices, scale_value, **kwargs
+    )
+    if promote:
+        logging.info(
+            "[%s] SFA pytest FP32: QK -> softmax -> PV, scale=%s",
+            testcase_name,
+            scale,
+        )
+    q_dtype = str(dtype).removeprefix("torch.")
+    for q, k, v, sink, out_index, stat_index in rows():
+        if not k.shape[0]:
+            if sink is not None:
+                statistics[0][stat_index], statistics[1][stat_index] = sink, 1.0
+            continue
+        result, maximum, total = compute_golden_row(
+            q, k, v, scale, sink, q_dtype, promote=promote
+        )
+        output[out_index] = result
+        statistics[0][stat_index], statistics[1][stat_index] = (
+            maximum[:, 0],
+            total[:, 0],
+        )
+    if promote:
+        logging.info(
+            "[%s] SFA FP32 golden ready: attention=%s %s",
+            testcase_name,
+            tuple(output.shape),
+            output.dtype,
+        )
+    if not promote:
+        finite = torch.isfinite(output)
+        output = torch.where(
+            finite,
+            output.clamp(-torch.finfo(dtype).max, torch.finfo(dtype).max),
+            output,
+        ).to(dtype)
+    if not kwargs.get("return_softmax_lse", False):
+        return output, None, None
+    return output, *statistics
+
+
+def mixed_reference(*args, **kwargs):
+    """Use the ordinary precision contract for the existing two-party and provider callers."""
+    return reference_from_inputs(*args, promote=False, **kwargs)

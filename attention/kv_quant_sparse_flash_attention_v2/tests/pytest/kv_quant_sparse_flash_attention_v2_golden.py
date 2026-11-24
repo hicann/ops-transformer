@@ -17,9 +17,31 @@ import torch
 import copy
 import time
 
-import generate_tensor_data
+if __package__:
+    from . import generate_tensor_data
+else:
+    import generate_tensor_data
 
-EMPTY_SOFTMAX_MAX = -2.0e38
+
+def padding_statistics(shape, device):
+    """Initialize untouched BSND rows as the target kernel does, in both precision modes."""
+    soc = os.environ.get("SOC_VERSION")
+    if not soc:
+        npu = getattr(torch, "npu", None)
+        if npu is not None and npu.is_available():
+            soc = npu.get_device_name()
+        else:
+            soc = os.environ.get("QSFA_MODEL_ARCH", "A5")
+    # Offline CPU/CUDA preparation uses the replay target, including the pytest model selector.
+    arch22 = soc.upper() in ("A2", "A3") or soc.lower().startswith(
+        ("ascend910b", "ascend910_93")
+    )
+    maximum = -2.0e38 if arch22 else float("-inf")
+    total = 1.0 if arch22 else 0.0
+    return (
+        torch.full(shape, maximum, dtype=torch.float32, device=device),
+        torch.full(shape, total, dtype=torch.float32, device=device),
+    )
 
 
 def trans_np_hifuint8_tensor_to_float32(in_tensor):
@@ -564,9 +586,11 @@ def generate_input_tensors(params):
     }
 
 
-def compute_cpu(input_tensor_dict, params):
+def compute_cpu(input_tensor_dict, params, *, promote=False):
     try:
-        out_data, softmax_max, softmax_sum = compute_golden(input_tensor_dict, params)
+        out_data, softmax_max, softmax_sum = compute_golden(
+            input_tensor_dict, params, promote=promote
+        )
         return (out_data, softmax_max, softmax_sum), input_tensor_dict, params
     except Exception as e:
         import traceback
@@ -818,7 +842,8 @@ def _generate_block_table_and_cache(
     return None
 
 
-def compute_golden(input_tensor_dict, params):
+def compute_golden(input_tensor_dict, params, *, promote=False):
+    """Compute the pytest golden, retaining FP32 intermediates when promote=True."""
     print("cpu执行中...")
 
     # CPU golden 链路工作在 float32 torch tensor
@@ -865,10 +890,12 @@ def compute_golden(input_tensor_dict, params):
         return early_exit, torch.empty(0), torch.empty(0)
 
     # ===计算入口===
-    y_all, softmax_max, softmax_sum = _t_increattention_bnsd(fa_param)
+    y_all, softmax_max, softmax_sum = _t_increattention_bnsd(fa_param, promote=promote)
     y_all = trans_bnsd_to_layout(
         y_all, out_shape, layoutQuery, fa_param["actualSeqLengths_q"]
     )
+    if not params.get("return_softmax_lse", False):
+        return y_all, y_all.new_empty(0), y_all.new_empty(0)
     return y_all, softmax_max, softmax_sum
 
 
@@ -923,23 +950,55 @@ def gatherKV(
     return emptyFlag, k_sparse, v_sparse
 
 
-def softmax(x, sinks=None):
+def softmax(x, sinks=None, *, joint_reduction=False):
     x = x.float()
-    if sinks is not None:
-        sinks = sinks.float().unsqueeze(1)
-        x_max = torch.max(torch.cat([x, sinks], dim=-1), dim=-1, keepdim=True).values
+    sink_column = None if sinks is None else sinks.float().reshape(-1, 1)
+    logits = x if sink_column is None else torch.cat((x, sink_column), dim=-1)
+    maximum = logits.max(dim=-1, keepdim=True).values
+    weights = torch.exp(x - maximum)
+    if joint_reduction and sink_column is not None:
+        total = torch.exp(logits - maximum).sum(dim=-1, keepdim=True)
     else:
-        x_max = x.max(dim=-1, keepdim=True).values
-    x_sub = x - x_max
-    y = torch.exp(x_sub)
-    x_sum = y.sum(dim=-1, keepdim=True)
-    if sinks is not None:
-        x_sum = x_sum + torch.exp(sinks - x_max)
-    ans = y / x_sum
-    return ans, x_max, x_sum
+        total = weights.sum(dim=-1, keepdim=True)
+        if sink_column is not None:
+            total = total + torch.exp(sink_column - maximum)
+    return weights / total, maximum, total
 
 
-def _t_increattention_bnsd(fa_param):
+def compute_golden_row(q, k, v, scale, sink, q_dtype, rope_dim, *, promote=False):
+    """Compute attention, max and shifted sum for one nonempty query/KV-head group."""
+    if promote:
+        scores = (q @ k.T) * scale
+        weights, maximum, total = softmax(scores, sink, joint_reduction=True)
+        return weights @ v, maximum, total
+
+    # Ordinary V2 rounds the NoPE sum once and each 16-element RoPE addition to FP32.
+    nope = q.shape[-1] - rope_dim
+    acc = (q[:, :nope].double() @ k[:, :nope].double().T).float()
+    for start in range(nope, q.shape[-1], 16):
+        acc = (
+            acc.double()
+            + q[:, start : start + 16].double() @ k[:, start : start + 16].double().T
+        ).float()
+    scores = acc * scale
+    maximum = sink.float().clone()
+    total = torch.ones_like(maximum)
+    accumulator = v.new_zeros((q.shape[0], v.shape[-1]), dtype=torch.float32)
+    for start in range(0, k.shape[0], 128):
+        tile = scores[:, start : start + 128]
+        updated = torch.maximum(maximum, tile.max(dim=-1).values)
+        weights = torch.exp(tile - updated[:, None])
+        rescale = torch.exp(maximum - updated)
+        accumulator = (
+            accumulator * rescale[:, None]
+            + weights.to(q_dtype).float() @ v[start : start + 128].float()
+        )
+        total = total * rescale + weights.sum(dim=-1)
+        maximum = updated
+    return accumulator / total[:, None], maximum[:, None], total[:, None]
+
+
+def _t_increattention_bnsd(fa_param, *, promote=False):
     batch_size = fa_param["b"]
     numheads = fa_param["numHeads"]
     numKeyValueHeads = fa_param["numKeyValueHeads"]
@@ -960,29 +1019,20 @@ def _t_increattention_bnsd(fa_param):
     else:
         sinks_tensor = sinks_tensor.cpu().float()
 
-    q_bnsd_tensor = fa_param["q_bnsd_tensor"]
     k_bnsd_tensor = fa_param["k_bnsd_tensor"].float()
-    k_dequant_scale_bnsd_tensor = fa_param["k_dequant_scale_bnsd_tensor"].float()
-    v_bnsd_tensor = fa_param["v_bnsd_tensor"].float()
-    v_dequant_scale_bnsd_tensor = fa_param["v_dequant_scale_bnsd_tensor"].float()
-    tile_size = 128
-    if fa_param["q_dtype"] == "float16":
-        k_bnsd_tensor[..., :512] = (
-            k_bnsd_tensor[..., :512]
-            * torch.repeat_interleave(k_dequant_scale_bnsd_tensor, tile_size, dim=-1)
-        ).to(torch.float16)
-    elif fa_param["q_dtype"] == "bfloat16":
-        k_bnsd_tensor[..., :512] = (
-            k_bnsd_tensor[..., :512]
-            * torch.repeat_interleave(k_dequant_scale_bnsd_tensor, tile_size, dim=-1)
-        ).to(torch.bfloat16)
-    elif fa_param["q_dtype"] == "float32":
-        k_bnsd_tensor[..., :512] = (
-            k_bnsd_tensor[..., :512]
-            * torch.repeat_interleave(k_dequant_scale_bnsd_tensor, tile_size, dim=-1)
-        ).to(torch.float32)
-    v_bnsd_tensor = k_bnsd_tensor[..., :512].clone()
-    matmul_dtype = torch.float32
+    q_dtype_name = fa_param["q_dtype"]
+    q_torch_dtype = {"float16": torch.float16, "bfloat16": torch.bfloat16}.get(
+        q_dtype_name, torch.float32
+    )
+    v_bnsd_tensor = k_bnsd_tensor[..., :512]
+    if promote or q_dtype_name in ("float16", "bfloat16", "float32"):
+        v_bnsd_tensor = v_bnsd_tensor * fa_param[
+            "k_dequant_scale_bnsd_tensor"
+        ].float().repeat_interleave(128, dim=-1)
+        if not promote:
+            v_bnsd_tensor = v_bnsd_tensor.to(q_torch_dtype).float()
+        # Do not scale the prepared cache in place: another precision mode can consume it.
+        k_bnsd_tensor = torch.cat((v_bnsd_tensor, k_bnsd_tensor[..., 512:]), dim=-1)
     y = torch.zeros(out_shape_bnsd, dtype=torch.float32)
 
     q_bnsd_tensor = fa_param["q_bnsd_tensor"].float()
@@ -993,8 +1043,7 @@ def _t_increattention_bnsd(fa_param):
     else:
         total_t1 = sum(actualSeqLengths_q)
         lse_shape = [numKeyValueHeads, total_t1, g]
-    softmax_max_all = torch.full(lse_shape, EMPTY_SOFTMAX_MAX, dtype=torch.float32)
-    softmax_sum_all = torch.ones(lse_shape, dtype=torch.float32)
+    softmax_max_all, softmax_sum_all = padding_statistics(lse_shape, y.device)
 
     t_offset = 0
     for batch in range(batch_size):
@@ -1002,14 +1051,15 @@ def _t_increattention_bnsd(fa_param):
         curr_actualSeq = actualSeqLengths_kv[batch]
         for n2Idx in range(numKeyValueHeads):
             for s1Idx in range(curr_actualSeq_q):
-                cur_sinks = None
-                if sinks_tensor is not None:
-                    cur_sinks = sinks_tensor[n2Idx * g : (n2Idx + 1) * g]
-                    # Empty active rows contain only the explicit virtual sink.
-                    if layout_query == "BSND":
-                        softmax_max_all[batch, n2Idx, s1Idx, :] = cur_sinks
-                    else:
-                        softmax_max_all[n2Idx, t_offset + s1Idx, :] = cur_sinks
+                cur_sinks = sinks_tensor[n2Idx * g : (n2Idx + 1) * g]
+                stat_index = (
+                    (batch, n2Idx, s1Idx)
+                    if layout_query == "BSND"
+                    else (n2Idx, t_offset + s1Idx)
+                )
+                # An active empty row still contains the sink, whereas padding never enters this loop.
+                softmax_max_all[stat_index] = cur_sinks
+                softmax_sum_all[stat_index] = 1.0
                 if s1Idx < curr_actualSeq_q - curr_actualSeq and sparse_mode != 0:
                     y[batch, n2Idx * g : (n2Idx + 1) * g, s1Idx, :] = torch.zeros(
                         [g, out_shape_bnsd[-1]], dtype=torch.float32
@@ -1033,63 +1083,20 @@ def _t_increattention_bnsd(fa_param):
                 )
                 if emptyFlag:
                     continue
-                k_dim = q_curr.shape[-1]
-                rope_dim = 64
-                nope_dim = k_dim - rope_dim
-                nope_sum = torch.matmul(
-                    q_curr[..., :nope_dim].to(torch.float64),
-                    k_sparse[..., :nope_dim].to(torch.float64).T,
+                bmm2Res, x_max, x_sum = compute_golden_row(
+                    q_curr,
+                    k_sparse,
+                    v_sparse,
+                    scaleValue,
+                    cur_sinks,
+                    q_torch_dtype,
+                    64,
+                    promote=promote,
                 )
-                nope_quant = nope_sum
-                acc = nope_quant.float()
-                q_rope_f64 = q_curr[..., nope_dim:].to(torch.float64)
-                k_rope_f64 = k_sparse[..., nope_dim:].to(torch.float64)
-                for chunk_start in range(0, rope_dim, 16):
-                    chunk_sum = torch.matmul(
-                        q_rope_f64[..., chunk_start : chunk_start + 16],
-                        k_rope_f64[..., chunk_start : chunk_start + 16].T,
-                    )
-                    acc = (acc.double() + chunk_sum).float()
-                bmm1Res = acc
-                scaleRes = bmm1Res * scaleValue
-                s2_base_size = 128
-                if fa_param["q_dtype"] == "float16":
-                    q_torch_dtype = torch.float16
-                elif fa_param["q_dtype"] == "bfloat16":
-                    q_torch_dtype = torch.bfloat16
-                else:
-                    q_torch_dtype = torch.float32
-                if cur_sinks is not None:
-                    running_max = cur_sinks.float().clone()
-                    running_sum = torch.ones(g, dtype=torch.float32)
-                else:
-                    running_max = torch.full((g,), float("-inf"), dtype=torch.float32)
-                    running_sum = torch.zeros(g, dtype=torch.float32)
-                out_acc = torch.zeros([g, out_shape_bnsd[-1]], dtype=torch.float32)
-                v_sparse_f32 = v_sparse.float()
-                for block_start in range(0, v_sparse.shape[0], s2_base_size):
-                    block_x = scaleRes[:, block_start : block_start + s2_base_size]
-                    new_max = torch.maximum(running_max, block_x.max(dim=-1).values)
-                    exp_x = torch.exp(block_x - new_max.unsqueeze(-1))
-                    p_quantized = exp_x.to(q_torch_dtype).float()
-                    rescale = torch.exp(running_max - new_max)
-                    out_acc = out_acc * rescale.unsqueeze(-1) + torch.matmul(
-                        p_quantized,
-                        v_sparse_f32[block_start : block_start + s2_base_size],
-                    )
-                    running_sum = running_sum * rescale + exp_x.sum(dim=-1)
-                    running_max = new_max
-                bmm2Res = out_acc / running_sum.unsqueeze(-1)
-                x_max = running_max.unsqueeze(-1)
-                x_sum = running_sum.unsqueeze(-1)
                 y[batch, n2Idx * g : (n2Idx + 1) * g, s1Idx, :] = bmm2Res
 
-                if layout_query == "BSND":
-                    softmax_max_all[batch, n2Idx, s1Idx, :] = x_max.squeeze(-1)
-                    softmax_sum_all[batch, n2Idx, s1Idx, :] = x_sum.squeeze(-1)
-                else:
-                    softmax_max_all[n2Idx, t_offset + s1Idx, :] = x_max.squeeze(-1)
-                    softmax_sum_all[n2Idx, t_offset + s1Idx, :] = x_sum.squeeze(-1)
+                softmax_max_all[stat_index] = x_max.squeeze(-1)
+                softmax_sum_all[stat_index] = x_sum.squeeze(-1)
         t_offset += curr_actualSeq_q
 
     return y, softmax_max_all, softmax_sum_all

@@ -19,15 +19,15 @@ import json
 import math
 import struct
 import torch
-import tensorflow as tf
 import copy
-from ml_dtypes import float8_e4m3fn
 
 
 INVALID_VALUE = -1
 
 
 def get_np_dtype(type_str):
+    import tensorflow as tf
+
     type_dict = {
         "fp32": np.float32,
         "float32": np.float32,
@@ -176,6 +176,9 @@ def _fp32_ssr_round_to_hif8(fraction32_int, hif8_bits_num, exponent):
     else:
         hif8_value = fraction32_int >> (23 - hif8_bits_num)
         f14_t14 = fraction32_int - (hif8_value << (23 - hif8_bits_num))
+        # Exact HIF8 values must not round up, including 32768 at the finite limit.
+        if f14_t14 == 0:
+            return False, hif8_value
         f14_values = f14_t14 >> (23 - hif8_bits_num - 14)
         t14_values = f14_t14 & t14_mask
     if f14_values >= t14_values:

@@ -12,47 +12,23 @@
 
 """Input adapter that delegates SparseFlashAttention data construction to pytest."""
 
-import importlib.util
-import sys
-from pathlib import Path
+import logging
 
 import torch
+
+from . import golden as golden_module
 
 
 class SparseFlashAttentionInputAdapter:
     """Delegate input construction to pytest while keeping adapter state local."""
 
-    @staticmethod
-    def module_load_error(path, exc):
-        return RuntimeError(
-            "Failed to load SparseFlashAttention module; "
-            f"stage=assets Golden store; module={path.resolve()}; "
-            f"original error: {type(exc).__name__}: {exc}"
-        )
-
     def golden_module(self):
-        name = "sfa_ttk_golden"
-        if name in sys.modules:
-            return sys.modules[name]
-        path = Path(__file__).with_name("golden.py")
-        try:
-            spec = importlib.util.spec_from_file_location(name, path)
-            if spec is None or spec.loader is None:
-                raise ImportError(f"cannot create import spec for {path}")
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[name] = module
-            spec.loader.exec_module(module)
-        except Exception as exc:
-            sys.modules.pop(name, None)
-            raise self.module_load_error(path, exc) from exc
-        return module
+        return golden_module
 
     @staticmethod
     def copy_tensor(destination, source, name):
         if destination is None:
             if source is not None:
-                import logging
-
                 logging.warning(
                     f"{name} is absent from CSV but pytest generator produced a tensor. Skipping copy."
                 )
@@ -213,12 +189,64 @@ class SparseFlashAttentionInputAdapter:
         if sinks is not None:
             self.copy_tensor(sinks, generated.get("sinks"), "sinks")
 
-        entry = {
-            "golden": golden_module.normalize_pytest_outputs(
-                outputs, query, params["return_softmax_lse"]
+        reference_inputs = {
+            name: item.detach().cpu().clone() if torch.is_tensor(item) else item
+            for name, item in locals().items()
+            if name
+            in (
+                "query",
+                "key",
+                "value",
+                "sparse_indices",
+                "scale_value",
+                "block_table",
+                "actual_seq_lengths_query",
+                "actual_seq_lengths_kv",
+                "query_rope",
+                "key_rope",
+                "sinks",
+                "sparse_block_size",
+                "layout_query",
+                "layout_kv",
+                "sparse_mode",
+                "attention_mode",
+                "return_softmax_lse",
             )
         }
-        golden_module.CASE_DATA.put(testcase_name, entry)
+        for name, item in reference_inputs.items():
+            values = kwargs.get(name + "_values")
+            if values is None:
+                continue
+            if not torch.is_tensor(item):
+                raise ValueError(f"{name}_values requires a declared tensor")
+            source = torch.as_tensor(values, dtype=item.dtype)
+            if source.shape != item.shape:
+                raise ValueError(f"{name}_values shape mismatch")
+            locals_tensor = locals()[name]
+            locals_tensor.copy_(source.to(locals_tensor.device))
+            item.copy_(source)
+        reference_inputs.update(
+            {
+                name: kwargs[name]
+                for name in ("pre_tokens", "next_tokens")
+                if name in kwargs
+            }
+        )
+        golden_module.CASE_DATA.put(
+            testcase_name, {"reference_inputs": reference_inputs}
+        )
+        logging.info(
+            "[%s] SFA CPU inputs ready from pytest: query=%s %s, key=%s %s, "
+            "layout=%s/%s, sparse_mode=%s",
+            testcase_name,
+            tuple(query.shape),
+            query.dtype,
+            tuple(key.shape),
+            key.dtype,
+            layout_query,
+            layout_kv,
+            sparse_mode,
+        )
 
 
 def expect_error(kwargs):
@@ -323,6 +351,8 @@ def generate_sfa_inputs_aclnn_v2(
         layout_query=layoutQueryOptional,
         layout_kv=layoutKvOptional,
         sparse_mode=sparseMode,
+        pre_tokens=preTokens,
+        next_tokens=nextTokens,
         attention_mode=attentionMode,
         return_softmax_lse=returnSoftmaxLse,
         testcase_name=testcase_name,
@@ -376,6 +406,8 @@ def generate_sfa_inputs_aclnn(
         layout_query=layoutQueryOptional,
         layout_kv=layoutKvOptional,
         sparse_mode=sparseMode,
+        pre_tokens=preTokens,
+        next_tokens=nextTokens,
         attention_mode=attentionMode,
         return_softmax_lse=returnSoftmaxLse,
         testcase_name=testcase_name,

@@ -17,7 +17,10 @@ import torch
 import copy
 import time
 
-import generate_tensor_data
+if __package__:
+    from . import generate_tensor_data
+else:
+    import generate_tensor_data
 
 
 def trans_np_hifuint8_tensor_to_float32(in_tensor):
@@ -542,7 +545,7 @@ def _tq4_q_lengths(params):
     return actual_seq_q
 
 
-def _tq4_generate_inputs(params):
+def _tq4_generate_inputs(params, *, use_input_ranges=False):
     shape = params["shape_input"]
     if params["layout_kv"] != "PA_BSND":
         raise ValueError(
@@ -556,7 +559,6 @@ def _tq4_generate_inputs(params):
         raise ValueError("TQ4 cache shape must use packed 386-byte slots")
 
     q_dtype = _tq4_q_dtype(params)
-    query_cache = (torch.randn(shape["query_cache"]) * 0.1).to(q_dtype)
     key_cache = torch.zeros(shape["key_cache"], dtype=torch.uint8)
     flat = key_cache.contiguous().view(-1, expected_slot_dim)
     slots = flat.shape[0]
@@ -569,18 +571,35 @@ def _tq4_generate_inputs(params):
     if slots > 1:
         codes[1, :16] = torch.arange(15, -1, -1, dtype=torch.uint8)
     flat[:, : params["D"] // 2] = codes[:, 0::2] | (codes[:, 1::2] << 4)
-    scale = (torch.rand(slots, generator=generator) * 2.875 + 0.125).half()
-    if slots > 0:
+    if use_input_ranges:
+        query = generate_tensor_data.gen_tensor_data(params, "query")
+        query_rope = generate_tensor_data.gen_tensor_data(params, "query_rope")
+        query_cache = torch.cat((query, query_rope), dim=-1)
+        # The CSV describes the stored RoPE and one scale per physical token.
+        packed_params = dict(
+            params,
+            shape_input=dict(
+                shape, key_rope=[slots, params["rope_head_dim"]], dequant_scale=[slots]
+            ),
+        )
+        scale = generate_tensor_data.gen_tensor_data(
+            packed_params, "dequant_scale"
+        ).half()
+        rope = generate_tensor_data.gen_tensor_data(packed_params, "key_rope").to(
+            q_dtype
+        )
+    else:
+        query_cache = (torch.randn(shape["query_cache"]) * 0.1).to(q_dtype)
+        scale = (torch.rand(slots, generator=generator) * 2.875 + 0.125).half()
         scale[: min(slots, 4)] = torch.tensor(
             [0.125, 0.5, 1.0, 3.0], dtype=torch.float16
         )[:slots]
-    # The fused path stores RoPE pre-divided by scale; the vector service
-    # applies that token scale on the score column before softmax.
-    rope = (
-        torch.randn((slots, params["rope_head_dim"]), generator=generator)
-        * 0.02
-        / scale.float()[:, None]
-    ).to(q_dtype)
+        # The native pytest stores RoPE pre-divided by the per-token scale.
+        rope = (
+            torch.randn((slots, params["rope_head_dim"]), generator=generator)
+            * 0.02
+            / scale.float()[:, None]
+        ).to(q_dtype)
     flat[:, params["D"] // 2 : params["D"] // 2 + params["rope_head_dim"] * 2] = (
         rope.contiguous().view(torch.uint8)
     )
@@ -659,7 +678,12 @@ def _tq4_generate_inputs(params):
     }
 
 
-def _tq4_golden(input_tensor_dict, params):
+def tq4_weighted_value(scores, value, q_dtype):
+    """Project TQ4's ordinary FP64 probabilities and round the result to the interface dtype."""
+    return (torch.softmax(scores, dim=-1) @ value).to(q_dtype).float()
+
+
+def _tq4_golden(input_tensor_dict, params, *, promote=False):
     q_dtype = _tq4_q_dtype(params)
     query = input_tensor_dict["query_cache"].detach().cpu().contiguous()
     cache = input_tensor_dict["key_cache"].detach().cpu().contiguous().view(torch.uint8)
@@ -672,32 +696,36 @@ def _tq4_golden(input_tensor_dict, params):
     # for BF16, where using the FP64 codebook would hide the LUT rounding).
     packed_codes = packed[:, : params["D"] // 2]
     codebook = torch.tensor(TQ4_CENTERS, dtype=torch.float32)
-    byte_lut = torch.empty((256, 2), dtype=q_dtype)
+    lut_dtype = torch.float32 if promote else q_dtype
+    byte_lut = torch.empty((256, 2), dtype=lut_dtype)
     byte_values = torch.arange(256, dtype=torch.int64)
-    byte_lut[:, 0] = codebook[byte_values & 0xF].to(q_dtype)
-    byte_lut[:, 1] = codebook[byte_values >> 4].to(q_dtype)
+    byte_lut[:, 0] = codebook[byte_values & 0xF].to(lut_dtype)
+    byte_lut[:, 1] = codebook[byte_values >> 4].to(lut_dtype)
     # Keep the LUT rounding above, then promote the already-rounded values for
     # the CPU reference matmul. The FP64 calculation isolates the TQ4
     # quantization/LUT error; it is not intended to reproduce every Cube
     # intermediate BF16 cast bit-for-bit.
+    compute_dtype = torch.float32 if promote else torch.float64
     latent = (
-        byte_lut[packed_codes.long()].reshape(packed.shape[0], params["D"]).double()
+        byte_lut[packed_codes.long()]
+        .reshape(packed.shape[0], params["D"])
+        .to(compute_dtype)
     )
     rope = (
         packed[:, params["D"] // 2 : params["D"] // 2 + params["rope_head_dim"] * 2]
         .contiguous()
         .view(q_dtype)
-        .double()
+        .to(compute_dtype)
     )
     scale = (
         packed[:, params["D"] // 2 + params["rope_head_dim"] * 2 :]
         .contiguous()
         .view(torch.float16)
-        .double()
+        .to(compute_dtype)
         .flatten()
     )
 
-    q = query.view(-1, query.shape[-2], query.shape[-1]).double()
+    q = query.view(-1, query.shape[-2], query.shape[-1]).to(compute_dtype)
     q_nope, q_rope = q[..., : params["D"]], q[..., params["D"] :]
     q_lengths, kv_lengths = _tq4_q_lengths(params), params["actualseqlengthskv"]
     indices = input_tensor_dict["sparse_indices"].detach().cpu().long()
@@ -708,13 +736,25 @@ def _tq4_golden(input_tensor_dict, params):
     block_size = params["block_size"]
     start = 0
     for batch, length in enumerate(q_lengths):
+        # In the final BSND tensor each batch starts at the padded sequence capacity.
+        row_start = (
+            batch * query.shape[1]
+            if promote and params["layout_query"] == "BSND"
+            else start
+        )
         for offset in range(length):
-            row = start + offset
+            row = row_start + offset
             visible = kv_lengths[batch]
             if params["sparsemode"] == 3:
                 visible = kv_lengths[batch] - length + offset + 1
+            blocks = flat_indices[row]
+            if promote:
+                block_size_sparse = params["sparse_blocksize"]
+                blocks = blocks[
+                    : (max(0, visible) + block_size_sparse - 1) // block_size_sparse
+                ]
             selected = []
-            for block in flat_indices[row].tolist():
+            for block in blocks.tolist():
                 if block == -1:
                     break
                 selected.extend(
@@ -732,24 +772,29 @@ def _tq4_golden(input_tensor_dict, params):
                 table[batch, selected_t // block_size] * block_size
                 + selected_t % block_size
             )
+            if promote:
+                token_scale = scale[physical, None]
+                v = latent[physical] * token_scale
+                k = torch.cat((v, rope[physical] * token_scale), dim=-1)
+                output_rows[row] = compute_golden_row(
+                    q[row], k, v, params["scalevalue"], q_dtype, promote=True
+                )
+                continue
             scores = (
                 (q_nope[row] @ latent[physical].T + q_rope[row] @ rope[physical].T)
                 * scale[physical]
                 * params["scalevalue"]
             )
-            weights = torch.softmax(scores, dim=-1)
-            output_rows[row] = (
-                (weights @ (latent[physical] * scale[physical][:, None]))
-                .to(q_dtype)
-                .float()
+            output_rows[row] = tq4_weighted_value(
+                scores, latent[physical] * scale[physical, None], q_dtype
             )
         start += length
-    return output.to(q_dtype)
+    return output if promote else output.to(q_dtype)
 
 
-def generate_input_tensors(params):
+def generate_input_tensors(params, *, use_tq4_ranges=False):
     if params["key_quant_mode"] == 3 and params["value_quant_mode"] == 3:
-        return _tq4_generate_inputs(params)
+        return _tq4_generate_inputs(params, use_input_ranges=use_tq4_ranges)
     tensor_keys = [
         "query",
         "key",
@@ -795,9 +840,9 @@ def generate_input_tensors(params):
     }
 
 
-def compute_cpu(input_tensor_dict, params):
+def compute_cpu(input_tensor_dict, params, *, promote=False):
     try:
-        out_data = compute_golden(input_tensor_dict, params)
+        out_data = compute_golden(input_tensor_dict, params, promote=promote)
         return out_data, input_tensor_dict, params
     except Exception as e:
         import traceback
@@ -1049,9 +1094,10 @@ def _generate_block_table_and_cache(
     return None
 
 
-def compute_golden(input_tensor_dict, params):
+def compute_golden(input_tensor_dict, params, *, promote=False):
+    """Compute the pytest golden, retaining FP32 intermediates when promote=True."""
     if params["key_quant_mode"] == 3 and params["value_quant_mode"] == 3:
-        return _tq4_golden(input_tensor_dict, params)
+        return _tq4_golden(input_tensor_dict, params, promote=promote)
     print("cpu执行中...")
 
     # CPU golden 链路工作在 float32 torch tensor
@@ -1098,7 +1144,7 @@ def compute_golden(input_tensor_dict, params):
         return early_exit
 
     # ===计算入口===
-    y_all = _t_increattention_bnsd(fa_param)
+    y_all = _t_increattention_bnsd(fa_param, promote=promote)
     y_all = trans_bnsd_to_layout(
         y_all, out_shape, layoutQuery, fa_param["actualSeqLengths_q"]
     )
@@ -1166,7 +1212,17 @@ def softmax(x):
     return ans
 
 
-def _t_increattention_bnsd(fa_param):
+def compute_golden_row(q, k, v, scale, q_dtype, *, promote=False, fused_softmax=False):
+    """Compute one nonempty attention row. Only ordinary per-tile probabilities round to Q dtype."""
+    scores = (q.float() @ k.float().T) * scale
+    # Pytest uses the explicit reduction; TTK ordinary historically uses torch.softmax.
+    weights = torch.softmax(scores, dim=-1) if fused_softmax else softmax(scores)
+    if not promote:
+        weights = weights.to(q_dtype).float()
+    return weights @ v.float()
+
+
+def _t_increattention_bnsd(fa_param, *, promote=False):
     batch_size = fa_param["b"]
     numheads = fa_param["numHeads"]
     numKeyValueHeads = fa_param["numKeyValueHeads"]
@@ -1181,29 +1237,20 @@ def _t_increattention_bnsd(fa_param):
     sparse_mode = fa_param["sparse_mode"]
     g = numheads // numKeyValueHeads
 
-    q_bnsd_tensor = fa_param["q_bnsd_tensor"]
     k_bnsd_tensor = fa_param["k_bnsd_tensor"].float()
-    k_dequant_scale_bnsd_tensor = fa_param["k_dequant_scale_bnsd_tensor"].float()
-    v_bnsd_tensor = fa_param["v_bnsd_tensor"].float()
-    v_dequant_scale_bnsd_tensor = fa_param["v_dequant_scale_bnsd_tensor"].float()
-    tile_size = 128
-    if fa_param["q_dtype"] == "float16":
-        k_bnsd_tensor[..., :512] = (
-            k_bnsd_tensor[..., :512]
-            * torch.repeat_interleave(k_dequant_scale_bnsd_tensor, tile_size, dim=-1)
-        ).to(torch.float16)
-    elif fa_param["q_dtype"] == "bfloat16":
-        k_bnsd_tensor[..., :512] = (
-            k_bnsd_tensor[..., :512]
-            * torch.repeat_interleave(k_dequant_scale_bnsd_tensor, tile_size, dim=-1)
-        ).to(torch.bfloat16)
-    elif fa_param["q_dtype"] == "float32":
-        k_bnsd_tensor[..., :512] = (
-            k_bnsd_tensor[..., :512]
-            * torch.repeat_interleave(k_dequant_scale_bnsd_tensor, tile_size, dim=-1)
-        ).to(torch.float32)
-    v_bnsd_tensor = k_bnsd_tensor[..., :512].clone()
-    matmul_dtype = torch.float32
+    q_dtype_name = fa_param["q_dtype"]
+    q_torch_dtype = {"float16": torch.float16, "bfloat16": torch.bfloat16}.get(
+        q_dtype_name, torch.float32
+    )
+    v_bnsd_tensor = k_bnsd_tensor[..., :512]
+    if promote or q_dtype_name in ("float16", "bfloat16", "float32"):
+        v_bnsd_tensor = v_bnsd_tensor * fa_param[
+            "k_dequant_scale_bnsd_tensor"
+        ].float().repeat_interleave(128, dim=-1)
+        if not promote:
+            v_bnsd_tensor = v_bnsd_tensor.to(q_torch_dtype).float()
+        # Do not scale the prepared cache in place: another precision mode can consume it.
+        k_bnsd_tensor = torch.cat((v_bnsd_tensor, k_bnsd_tensor[..., 512:]), dim=-1)
     y = torch.zeros(out_shape_bnsd, dtype=torch.float32)
 
     q_bnsd_tensor = fa_param["q_bnsd_tensor"].float()
@@ -1236,19 +1283,14 @@ def _t_increattention_bnsd(fa_param):
                 )
                 if emptyFlag:
                     continue
-                bmm1Res = torch.matmul(q_curr.float(), k_sparse.float().T)
-                scaleRes = bmm1Res * scaleValue
-                softmax_res = softmax(scaleRes)
-                if fa_param["q_dtype"] == "float16":
-                    bmm2Res = torch.matmul(
-                        softmax_res.to(torch.float16).float(), v_sparse.float()
-                    )
-                elif fa_param["q_dtype"] == "bfloat16":
-                    bmm2Res = torch.matmul(
-                        softmax_res.to(torch.bfloat16).float(), v_sparse.float()
-                    )
-                else:
-                    bmm2Res = torch.matmul(softmax_res.float(), v_sparse.float())
+                bmm2Res = compute_golden_row(
+                    q_curr,
+                    k_sparse,
+                    v_sparse,
+                    scaleValue,
+                    q_torch_dtype,
+                    promote=promote,
+                )
                 y[batch, n2Idx * g : (n2Idx + 1) * g, s1Idx, :] = bmm2Res
     return y
 

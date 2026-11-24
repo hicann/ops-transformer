@@ -10,36 +10,31 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-"""TestSpec adapter for KvQuantSparseFlashAttention assets."""
+"""Two-party TestSpec adapter for KvQuantSparseFlashAttention assets."""
 
 import importlib.util
 import sys
 from pathlib import Path
 
-
 ASSET_IMPL_DIR = Path(__file__).with_name("impl")
+PACKAGE = "_kv_quant_sparse_flash_attention_ttk_impl"
+if PACKAGE not in sys.modules:
+    package_spec = importlib.util.spec_from_file_location(
+        PACKAGE,
+        ASSET_IMPL_DIR / "__init__.py",
+        # Standalone plugins also import the operator-local pytest golden.
+        submodule_search_locations=[
+            str(ASSET_IMPL_DIR),
+            str(ASSET_IMPL_DIR.parents[1] / "pytest"),
+        ],
+    )
+    package = importlib.util.module_from_spec(package_spec)
+    sys.modules[PACKAGE] = package
+    package_spec.loader.exec_module(package)
 
 
 def load_impl_module(stem):
-    name = f"qsfa_ttk_{stem}"
-    if name in sys.modules:
-        return sys.modules[name]
-    path = ASSET_IMPL_DIR / f"{stem}.py"
-    try:
-        spec = importlib.util.spec_from_file_location(name, path)
-        if spec is None or spec.loader is None:
-            raise ImportError(f"cannot create import spec for {path}")
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[name] = module
-        spec.loader.exec_module(module)
-    except Exception as exc:
-        sys.modules.pop(name, None)
-        raise RuntimeError(
-            "Failed to load KvQuantSparseFlashAttention assets module; "
-            f"stage=impl/{stem}; module={path.resolve()}; "
-            f"original error: {type(exc).__name__}: {exc}"
-        ) from exc
-    return module
+    return importlib.import_module(f"{PACKAGE}.{stem}")
 
 
 golden_module = load_impl_module("golden")
@@ -50,12 +45,10 @@ compare_module = load_impl_module("compare")
 class KvQuantSparseFlashAttentionSpec:
     golden = golden_module.cpu_kv_quant_sparse_flash_attention
     customize_inputs = inputs_module.generate_qsfa_inputs
-    tolerance = {
-        "float16": {"standard": "stat_rel_err"},
-        "bfloat16": {"standard": "stat_rel_err"},
-    }
-
     compare = staticmethod(compare_module.compare)
+    tolerance = {
+        dtype: {"standard": "close"} for dtype in ("float16", "bfloat16", "float32")
+    }
 
 
 __spec__ = {
