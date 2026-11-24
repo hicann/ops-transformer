@@ -26,6 +26,14 @@
 #include "kernel_operator.h"
 #include "msa_index_score_common.h"
 
+// Keep A8C8 request planning and packet accounting out of A2/A3 floating-point kernels.
+#if (__CCE_AICORE__ != 310) && defined(ORIG_DTYPE_QUERY) && \
+    (ORIG_DTYPE_QUERY == DT_FLOAT16 || ORIG_DTYPE_QUERY == DT_BF16)
+#define MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER 1
+#else
+#define MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER 0
+#endif
+
 namespace MsaIndexScoreNs {
 
 __aicore__ inline uint32_t MsaCeilDiv(uint32_t a, uint32_t b)
@@ -47,6 +55,11 @@ __aicore__ inline void MsaC2UbHalfSplit(uint32_t mActual, uint32_t& m0, uint32_t
 __aicore__ inline uint32_t MsaMinU32(uint32_t a, uint32_t b)
 {
     return a < b ? a : b;
+}
+
+__aicore__ inline uint32_t MsaMaxU32(uint32_t a, uint32_t b)
+{
+    return a > b ? a : b;
 }
 
 __aicore__ inline int32_t MsaClampI32(int32_t v, int32_t lo, int32_t hi)
@@ -117,15 +130,15 @@ public:
 
     // rotateChunk：A2/A3 把每个请求的 chunk 0 错开到不同核。950 保持 false。
     // nStiles 不能整除 chunks 时，多出来的 stile 否则会每个请求都落在核 0..extra-1 上。
-    __aicore__ inline void Init(uint32_t batch, uint32_t numQHeads, uint32_t maxBlocksPerBatch,
-                                uint32_t scoreBlockStride, uint32_t sparseMode, uint32_t initBlocks,
-                                uint32_t localBlocks, uint32_t keyLayout, uint32_t kvChunks,
-                                const AscendC::GlobalTensor<int32_t>& actualSeqQlen,
-                                const AscendC::GlobalTensor<int32_t>& actualSeqKlen,
-                                const AscendC::GlobalTensor<int32_t>& startLoc, bool rotateChunk = false,
-                                uint32_t qMaxSeq = 0U, uint32_t kMaxSeq = 0U, uint32_t tableWidth = 0U,
-                                uint32_t /* chunkBudget */ = 0U, uint32_t pageSize = MSA_BLOCK_SIZE,
-                                uint32_t totalQ = ~0U, uint32_t compressFactor = 1U, uint32_t hostTotalTasks = 0U)
+    template <bool REQUEST_PLAN = false>
+    __aicore__ inline void Init(
+        uint32_t batch, uint32_t numQHeads, uint32_t maxBlocksPerBatch, uint32_t scoreBlockStride, uint32_t sparseMode,
+        uint32_t initBlocks, uint32_t localBlocks, uint32_t keyLayout, uint32_t kvChunks,
+        const AscendC::GlobalTensor<int32_t>& actualSeqQlen, const AscendC::GlobalTensor<int32_t>& actualSeqKlen,
+        const AscendC::GlobalTensor<int32_t>& startLoc, bool rotateChunk = false, uint32_t qMaxSeq = 0U,
+        uint32_t kMaxSeq = 0U, uint32_t tableWidth = 0U, uint32_t chunkBudget = 0U, uint32_t pageSize = MSA_BLOCK_SIZE,
+        uint32_t totalQ = ~0U, uint32_t compressFactor = 1U, uint32_t hostTotalTasks = 0U,
+        uint32_t requestPlanCores = 0U, uint32_t requestPlanTaskIdx = 0U, bool checkBatchPacketRows = false)
     {
         // actual_seq_klen 是压缩前的 token 数。compress_factor>1 时 key 行数 = ceil(token / cf)，
         // 一个逻辑 block 仍是 BLOCK_SIZE 个 token，落到 key 上是 rowsPerBlock_ 行。
@@ -167,17 +180,119 @@ public:
             curTasks_ = (batch_ == 1U) ? hostTotalTasks : CountBatchTasks();
             return;
         }
+
+#if !MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER
+        tailWaveFactor_ = 1U;
+        tailWaveStart_ = 0U;
+        useRequestPlan_ = false;
+        batchPacketRows_ = checkBatchPacketRows;
+        if constexpr (REQUEST_PLAN) {
+            if (batch_ > 1U && batch_ <= requestPlanCores && requestPlanCores <= 24U && chunkBudget == 0U &&
+                keyLayout_ == MSA_KEY_LAYOUT_BBND && kvChunks_ > 1U && sparseMode_ == MSA_SPARSE_MODE_RIGHT_DOWN &&
+                initBlocks_ == 0U && localBlocks_ == 0U &&
+                (totalQ_ == ~0U || static_cast<uint64_t>(totalQ_) * numQHeads_ <= batch_ * 64U)) {
+                useRequestPlan_ = TryPlanRequestChunks(requestPlanCores, requestPlanTaskIdx);
+                if (useRequestPlan_) {
+                    if (requestPlanTaskIdx < totalTasks_) {
+                        LoadBatchMetadata(curBatch_, true);
+                    }
+                    return;
+                }
+            }
+        }
+        // A rejected planner may have left its sweep before EOF. Reuse the full
+        // legacy task-count loop in that case, including empty requests.
+        batchPacketRows_ = checkBatchPacketRows;
+#endif
         totalTasks_ = 0;
         for (uint32_t b = 0; b < batch_; ++b) {
             LoadBatch(b);
             totalTasks_ += curTasks_;
+#if !MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER
+            AccumulateBatchPacketRows();
+#endif
         }
         Reset();
+    }
+
+    // Split only the final partial M wave when actual task startup and S-tile
+    // counts predict a smaller busiest-core workload.
+    __aicore__ inline void ConfigureTailWaveSplit(uint32_t cores)
+    {
+        constexpr uint32_t coreCount = 24U;
+        const uint32_t tiles = MsaCeilDiv(curRows_, MSA_ROW_TILE_M);
+        if (cores != coreCount || batch_ != 1U || kvChunks_ != 1U || useRequestPlan_ ||
+            keyLayout_ != MSA_KEY_LAYOUT_BBND || pageSize_ != MSA_BLOCK_SIZE ||
+            sparseMode_ != MSA_SPARSE_MODE_RIGHT_DOWN || initBlocks_ != 0U || localBlocks_ != 0U ||
+            tiles < 2U * coreCount || tiles > 4U * coreCount || qLen_ <= 0 || kvLen_ <= 0) {
+            return;
+        }
+        const uint32_t remainder = tiles % coreCount;
+        if (remainder == 0U) {
+            return;
+        }
+        uint32_t divisor = coreCount;
+        uint32_t next = remainder;
+        while (next != 0U) {
+            const uint32_t value = divisor % next;
+            divisor = next;
+            next = value;
+        }
+        const uint32_t factor = coreCount / divisor;
+        if (factor < 2U || factor > 3U) {
+            return;
+        }
+        const uint32_t prefix = tiles - remainder;
+        uint32_t originalWork[coreCount] = {};
+        uint32_t candidateWork[coreCount] = {};
+        for (uint32_t tile = 0U; tile < tiles; ++tile) {
+            uint32_t start = 0U;
+            uint32_t rows = 0U;
+            GetMTile(tile, start, rows);
+            const uint32_t stiles = MsaCeilDiv(VisibleEndBlkOf(start, rows), MSA_BLOCKS_PER_STILE);
+            originalWork[tile % coreCount] += stiles + 1U;
+            if (tile < prefix) {
+                candidateWork[tile % coreCount] += stiles + 1U;
+                continue;
+            }
+            if (stiles < factor) {
+                return;
+            }
+            const uint32_t first = prefix + (tile - prefix) * factor;
+            for (uint32_t part = 0U; part < factor; ++part) {
+                const uint32_t count = stiles / factor + (part < stiles % factor ? 1U : 0U);
+                candidateWork[(first + part) % coreCount] += count + 1U;
+            }
+        }
+        uint32_t originalPeak = 0U;
+        uint32_t candidatePeak = 0U;
+        for (uint32_t core = 0U; core < coreCount; ++core) {
+            originalPeak = MsaMaxU32(originalPeak, originalWork[core]);
+            candidatePeak = MsaMaxU32(candidatePeak, candidateWork[core]);
+        }
+        if (candidatePeak + 1U >= originalPeak) {
+            return;
+        }
+        tailWaveStart_ = prefix;
+        tailWaveFactor_ = factor;
+        totalTasks_ = prefix + remainder * factor;
+        curTasks_ = totalTasks_;
+    }
+
+    __aicore__ inline bool BatchPacketRows() const
+    {
+        return batchPacketRows_ && totalTasks_ != 0U;
     }
 
     __aicore__ inline uint32_t TotalTasks() const
     {
         return totalTasks_;
+    }
+
+    __aicore__ inline bool IsSingleFullCausalPrefill(uint32_t launchCores, int32_t maxQTokens) const
+    {
+        return batch_ == 1U && kvChunks_ == 1U && sparseMode_ == MSA_SPARSE_MODE_RIGHT_DOWN && qLen_ > 0 &&
+               qLen_ <= maxQTokens && qLen_ == kvLen_ && curRows_ % MSA_ROW_TILE_M == 0U && totalTasks_ > launchCores;
     }
 
     __aicore__ inline void Reset()
@@ -227,7 +342,19 @@ public:
         uint32_t mActual = 0;
         uint32_t sChunkIdx = 0;
         uint32_t sChunks = 1;
-        if (kvChunks_ <= 1U) {
+#if !MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER
+        if (useRequestPlan_) {
+            mActual = curRows_;
+            sChunkIdx = local;
+            sChunks = curTasks_;
+        } else if (tailWaveFactor_ > 1U && local >= tailWaveStart_) {
+            const uint32_t tail = local - tailWaveStart_;
+            GetMTile(tailWaveStart_ + tail / tailWaveFactor_, mStart, mActual);
+            sChunkIdx = tail % tailWaveFactor_;
+            sChunks = tailWaveFactor_;
+        } else
+#endif
+            if (kvChunks_ <= 1U) {
             GetMTile(local, mStart, mActual);
         } else {
             uint32_t acc = 0;
@@ -250,6 +377,91 @@ public:
     }
 
 private:
+    __aicore__ inline void AccumulateBatchPacketRows()
+    {
+        if (batchPacketRows_ && qLen_ != 0) {
+            const uint64_t rows = static_cast<uint64_t>(qLen_) * numQHeads_;
+            batchPacketRows_ = rows >= MSA_PACKET_MIN_M && rows <= MSA_PACKET_MAX_M;
+        }
+    }
+
+    // Each accepted request has one M tile and at most one task per core.
+    __aicore__ inline bool TryPlanRequestChunks(uint32_t cores, uint32_t taskIdx)
+    {
+        uint32_t stiles[24];
+        uint32_t work = 0U;
+        uint32_t legacyTasks = 0U;
+        uint32_t legacySinglePeak = 0U;
+        const uint32_t blockCap = BlockCap();
+        for (uint32_t b = 0; b < batch_; ++b) {
+            LoadBatchMetadata(b, false);
+            AccumulateBatchPacketRows();
+            if (curRows_ == 0U || curRows_ > 64U || kvLen_ <= 0) {
+                return false;
+            }
+            // The last query of the single M tile sees all valid KV pages for
+            // both accepted sparse modes. Preserve the scheduler's page cap.
+            const uint32_t pages = MsaMinU32(MsaCeilDiv(static_cast<uint32_t>(kvLen_), BLOCK_SIZE), blockCap);
+            const uint32_t count = MsaCeilDiv(pages, MSA_BLOCKS_PER_STILE);
+            if (count == 0U) {
+                return false;
+            }
+            stiles[b] = count;
+            work += count;
+            const uint32_t legacyChunks = MsaMinU32(count, kvChunks_);
+            legacyTasks += legacyChunks;
+            legacySinglePeak = MsaMaxU32(legacySinglePeak, MsaCeilDiv(count, legacyChunks));
+        }
+
+        const uint32_t cap = MsaCeilDiv(2U * work, 2U * cores - batch_);
+        uint32_t finalCap = cap;
+        uint32_t tasks = BuildRequestChunks(stiles, cap, taskIdx);
+        if (tasks > cores) {
+            // sum ceil(stiles/cap) <= floor((work-B)/cap) + B.
+            const uint32_t safeCap = MsaCeilDiv(work - batch_ + 1U, cores - batch_ + 1U);
+            finalCap = safeCap;
+            tasks = BuildRequestChunks(stiles, safeCap, taskIdx);
+        }
+        if (tasks > cores) {
+            return false;
+        }
+
+        {
+            // Measure in units of one S-tile per task startup. The old peak
+            // is at least either of the following two lower bounds.
+            const uint32_t legacyLower = MsaMaxU32(legacySinglePeak + 1U, MsaCeilDiv(work + legacyTasks, cores));
+            uint32_t plannedPeak = 0U;
+            for (uint32_t b = 0U; b < batch_; ++b) {
+                plannedPeak = MsaMaxU32(plannedPeak, MsaCeilDiv(stiles[b], MsaCeilDiv(stiles[b], finalCap)));
+            }
+            if (legacyLower <= plannedPeak + 2U) {
+                return false;
+            }
+        }
+        totalTasks_ = tasks;
+        return true;
+    }
+
+    __aicore__ inline uint32_t BuildRequestChunks(const uint32_t* stiles, uint32_t cap, uint32_t taskIdx)
+    {
+        uint32_t tasks = 0U;
+        for (uint32_t b = 0; b < batch_; ++b) {
+            const uint32_t chunks = MsaCeilDiv(stiles[b], cap);
+            if (chunks > 24U || tasks + chunks > 24U) {
+                return 25U;
+            }
+            {
+                if (tasks <= taskIdx && taskIdx - tasks < chunks) {
+                    curBatch_ = b;
+                    taskBase_ = tasks;
+                    curTasks_ = chunks;
+                }
+            }
+            tasks += chunks;
+        }
+        return tasks;
+    }
+
     __aicore__ inline void GetMTile(uint32_t tileIdx, uint32_t& mStart, uint32_t& mActual) const
     {
         mStart = tileIdx * MSA_ROW_TILE_M;
@@ -433,7 +645,16 @@ private:
         }
     }
 
+#if MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER
     __aicore__ inline void LoadBatchMeta(uint32_t b)
+#else
+    __aicore__ inline void LoadBatchMeta(uint32_t b)
+    {
+        LoadBatchMetadata(b, true);
+    }
+
+    __aicore__ inline void LoadBatchMetadata(uint32_t b, bool loadStart)
+#endif
     {
         if (b >= batch_) {
             curRows_ = 0;
@@ -486,9 +707,23 @@ private:
         } else {
             LoadCompressedBatch(b);
         }
+#if MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER
         startLoc_ = gStartLoc_.GetValue(b);
+#else
+        if (loadStart) {
+            startLoc_ = gStartLoc_.GetValue(b);
+        }
+#endif
     }
 
+#if MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER
+    __aicore__ inline void LoadBatchMetadata(uint32_t b, bool /* loadStart */)
+    {
+        LoadBatchMeta(b);
+    }
+#endif
+
+#if MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER
     __aicore__ inline void LoadBatch(uint32_t b)
     {
         if (b >= batch_) {
@@ -499,6 +734,13 @@ private:
         LoadBatchMeta(b);
         curTasks_ = CountBatchTasks();
     }
+#else
+    __aicore__ inline void LoadBatch(uint32_t b)
+    {
+        LoadBatchMeta(b);
+        curTasks_ = b >= batch_ ? 0U : CountBatchTasks();
+    }
+#endif
 
     AscendC::GlobalTensor<int32_t> gActualSeqQlen_;
     AscendC::GlobalTensor<int32_t> gActualSeqKlen_;
@@ -523,6 +765,10 @@ private:
     uint32_t rowsPerBlock_ = BLOCK_SIZE;
     uint32_t blocksPerStile_ = MSA_BLOCKS_PER_STILE;
 
+    uint32_t tailWaveStart_ = 0U;
+    uint32_t tailWaveFactor_ = 1U;
+    bool useRequestPlan_ = false;
+    bool batchPacketRows_ = false;
     uint32_t totalTasks_ = 0;
     uint32_t curBatch_ = 0;
     uint32_t taskBase_ = 0;
@@ -537,5 +783,7 @@ private:
 };
 
 } // namespace MsaIndexScoreNs
+
+#undef MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER
 
 #endif // MSA_INDEX_SCORE_TASK_H

@@ -9,7 +9,9 @@
  */
 
 #include <cstddef>
+#include "acl/acl.h"
 #include "aclnn_msa_index_score.h"
+#include "opdev/op_errno.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,6 +41,10 @@ aclnnStatus aclnnMsaIndexScoreGetWorkspaceSize(
     int64_t compressFactor, const aclTensor* scoreOptional, const aclTensor* sparseIndicesOptional,
     const aclTensor* sparseValuesOptional, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
+    aclDataType queryType = ACL_DT_UNDEFINED;
+    if (query != nullptr && aclGetDataType(query, &queryType) == ACL_SUCCESS && queryType == ACL_INT8) {
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     // 原始参数表固定 layout_query="TND"、pool_block_size=128。
     return aclnnInnerMsaIndexScoreGetWorkspaceSize(
         query, key, startLoc, blockTableOptional, queryScaleOptional, keyScaleOptional, attenMaskOptional,

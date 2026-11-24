@@ -291,8 +291,8 @@ TEST_F(MsaIndexScoreProto, MsaIndexScore_inferdtype)
                 .NodeOutputTd(0, ge::FORMAT_ND, ge::FORMAT_ND)
                 .NodeOutputTd(1, ge::FORMAT_ND, ge::FORMAT_ND)
                 .NodeOutputTd(2, ge::FORMAT_ND, ge::FORMAT_ND)
-                .InputDataTypes(
-                    {&queryDtype, &keyDtype, &i32Dtype, &f32Dtype, &maskDtype, &i32Dtype, &i32Dtype, &i32Dtype})
+                .InputDataTypes({&queryDtype, &keyDtype, &i32Dtype, &i32Dtype, &f32Dtype, &f32Dtype, &maskDtype,
+                                 &i32Dtype, &i32Dtype})
                 .NodeAttrs({{"layout_key", Ops::Transformer::AnyValue::CreateFrom<std::string>("BBND")},
                             {"sparse_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(3)},
                             {"init_blocks", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},

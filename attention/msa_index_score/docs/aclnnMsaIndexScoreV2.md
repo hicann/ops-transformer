@@ -124,7 +124,7 @@ aclnnStatus aclnnMsaIndexScoreV2(
       <td>输入</td>
       <td>公式中的Q_idx。</td>
       <td>必选，禁止传入nullptr。布局由layoutQueryOptional指定。</td>
-      <td>BFLOAT16、FLOAT16；Ascend 950 扩展类型见约束说明</td>
+      <td>Atlas A2/A3 支持 FLOAT16、BFLOAT16 和 A8C8（INT8）。Ascend 950PR&amp;950DT 支持 FLOAT16、BFLOAT16、FLOAT8_E5M2、FLOAT8_E4M3FN 和 MXFP4（FLOAT4_E2M1，使用 E8M0 缩放系数）。</td>
       <td>ND</td>
       <td>3（[T1, N1, D]）或4（[B, S1, N1, D]、[B, N1, S1, D]）</td>
       <td>×</td>
@@ -142,7 +142,7 @@ aclnnStatus aclnnMsaIndexScoreV2(
     <tr>
       <td>startLoc</td>
       <td>输入</td>
-      <td>当前query所在逻辑block索引（非token前缀）。</td>
+      <td>当前query所在逻辑打分块的索引。例如token位置129、块长128时，传入块索引1。</td>
       <td>必选，禁止传入nullptr。块长 128 时用于定位局部窗口，块长 16 的局部窗口由各 token 的可见长度确定。</td>
       <td>INT32</td>
       <td>ND</td>
@@ -162,21 +162,21 @@ aclnnStatus aclnnMsaIndexScoreV2(
     <tr>
       <td>queryScaleOptional</td>
       <td>输入</td>
-      <td>MXFP4 query 的逐组缩放系数。</td>
-      <td>MXFP4×MXFP4 时必选，禁止传入nullptr。其他场景传nullptr。</td>
-      <td>FLOAT8_E8M0</td>
+      <td>Q 的 A8C8 逐 token、逐 head 反量化系数或 MXFP4 逐组缩放系数。</td>
+      <td>A8C8 和 MXFP4×MXFP4 时必选，禁止传入nullptr。其他场景传nullptr。</td>
+      <td>A8C8 为 FLOAT，MXFP4 为 FLOAT8_E8M0</td>
       <td>ND</td>
-      <td>与 query 同布局，末维为 D/32</td>
+      <td>A8C8 为 [Tq,Hq]；MXFP4 与 query 同布局，末维为 D/32</td>
       <td>-</td>
     </tr>
     <tr>
       <td>keyScaleOptional</td>
       <td>输入</td>
-      <td>MXFP4 key 的逐组缩放系数。</td>
-      <td>MXFP4 key 时必选，禁止传入nullptr。其他场景传nullptr。</td>
-      <td>FLOAT8_E8M0</td>
+      <td>K 的 A8C8 逐 token 反量化系数或 MXFP4 逐组缩放系数。</td>
+      <td>A8C8 和 MXFP4 key 时必选，禁止传入nullptr。其他场景传nullptr。</td>
+      <td>A8C8 为 FLOAT，MXFP4 为 FLOAT8_E8M0</td>
       <td>ND</td>
-      <td>与 key 同布局，末维为 D/32。</td>
+      <td>A8C8 分页为 [NP,1,128]，TND 为 [Tk,1] 或 [Tk]；MXFP4 与 key 同布局，末维为 D/32。</td>
       <td>-</td>
     </tr>
     <tr>
@@ -273,7 +273,7 @@ aclnnStatus aclnnMsaIndexScoreV2(
       <td>returnChoice</td>
       <td>输入</td>
       <td>输出模式。</td>
-      <td>只支持 0、1、2。0 输出完整 score，1 输出 TopK 块号，2 输出 TopK 块号及对应分数。1 和 2 仅 Ascend 950 支持。</td>
+      <td>各平台支持的输入类型均支持 0、1、2。取 0 时输出完整 score，取 1 时输出 TopK 块号，取 2 时输出 TopK 块号及对应分数。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -464,15 +464,16 @@ aclnnStatus aclnnMsaIndexScoreV2(
 - `poolBlockSize` 只支持 16 或 128。块长 16 要求 $N1$ 整除 128。
 - TND key 只支持 TND query。BSND / BNSD key 在块长 128 时只支持 TND query，在块长 16 时只支持同布局的 query。BBND / BNBD key 支持平台允许的三种 query 布局。
 - BSND / BNSD 布局下，每条请求的 query 长度和按 $\lceil n_k/c\rceil$ 换算的 key 行数须分别在对应张量的容量内。允许单条请求或整批的有效长度为 0。没有可见 KV 时按计算公式填充 score 或 TopK 输出。
-- 同型浮点输入的两个缩放系数均传 `nullptr`。FLOAT16 query 配 INT8 key 为预留组合。MXFP4×MXFP4 仅支持 $N2=1$、$D=64$ 或 128，两个 E8M0 缩放系数均必选，禁止传入 `nullptr`。
+- 同型浮点输入的两个缩放系数均传 `nullptr`。A8C8 通过本 V2 接口调用，Qscale 和 Kscale 均为 FP32，Kscale 连续存储。FLOAT16 query 配 INT8 key 为预留组合。MXFP4×MXFP4 仅支持 $N2=1$、$D=64$ 或 128，两个 E8M0 缩放系数均必选，禁止传入 `nullptr`。
 - 分页 key 的物理页轴允许非连续，其余长度大于 1 的轴须为紧凑步长。分页 key 的缩放系数须按物理页紧凑存储。非分页 key 须连续。
 - 分页时，`blockTableOptional` 的第二维 $MB$ 可以大于实际使用的页数。每个物理页包含 $block\_size/(L/c)$ 个逻辑块，按页表容量分配时，score 末维为 $\mathrm{RoundUp}(MB\times block\_size/(L/c),16)$。非分页按各请求逻辑块数的最大值分配，并向上对齐到 16。整批无 KV 时，仍分配至少 16 列。
 - `initBlocks` 和 `localBlocks` 须为非负整数，且各自不超过逻辑块上限。块长 16 的 TopK 模式下，如果任何 token 可能看到超过 128 个逻辑块，两者之和不得超过 128。
 
 <!-- npu="A3, 910b" id8 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
+    - query 和 key 支持 BFLOAT16、FLOAT16，以及同型 INT8 的 A8C8。
     - `layoutQueryOptional`：仅支持`"TND"`。
-    - `poolBlockSize` 只支持 128，BBND / BNBD 的物理页长只支持 128 行。`compressFactor` 只支持 1，`returnChoice` 只支持 0。
+    - `poolBlockSize` 只支持 128，BBND / BNBD 的物理页长只支持 128 行。`compressFactor` 只支持 1，`returnChoice` 支持 0、1、2。
 <!-- end id8 -->
 <!-- npu="950" id9 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
@@ -866,4 +867,4 @@ std::vector<int64_t> queryShapeBnsd = {B, N1, S1, D};
 std::vector<int64_t> keyShapeBnsd = {B, N2, S2, D};
 ```
 
-在 Ascend 950 上调用融合 TopK 时，显式传入 `returnChoice=1` 或 2 及所需的 `topk`（块长 16 时传 128），并将 `score` 设为 `nullptr`。按参数表创建 `sparseIndices`，在 `returnChoice=2` 时同时创建 `sparseValues`。压缩 key 时还须显式传入对应的 `compressFactor`，例如 4。
+调用融合 TopK 时，显式传入 `returnChoice=1` 或 2 及所需的 `topk`（块长 16 时传 128），并将 `score` 设为 `nullptr`。按参数表创建 `sparseIndices`，在 `returnChoice=2` 时同时创建 `sparseValues`。压缩 key 时还须显式传入对应的 `compressFactor`，例如 4。

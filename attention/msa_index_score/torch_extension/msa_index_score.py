@@ -49,6 +49,10 @@ def _normalize_layout_key(layout_key: Optional[str]) -> str:
     return layout
 
 
+def _check_v1_query(query):
+    torch._check(query.dtype != torch.int8, lambda: "A8C8 requires msa_index_score_v2")
+
+
 class MsaIndexScoreOpBuilder(OpBuilder):
     def __init__(self):
         super(MsaIndexScoreOpBuilder, self).__init__(
@@ -89,6 +93,7 @@ class MsaIndexScoreOpBuilder(OpBuilder):
             local_blocks: int = DEFAULT_LOCAL_BLOCKS,
             compress_factor: int = 1,
         ):
+            _check_v1_query(query)
             torch._check(
                 compress_factor == 1, lambda: "compress_factor only supports 1"
             )
@@ -191,6 +196,7 @@ def _msa_index_score(
     local_blocks: int = DEFAULT_LOCAL_BLOCKS,
     compress_factor: int = 1,
 ) -> torch.Tensor:
+    _check_v1_query(query)
     layout = _normalize_layout_key(layout_key)
     if layout == "BBND" and key.dim() == 3 and int(key.size(1)) == 128:
         key = key.unsqueeze(2)
@@ -260,6 +266,7 @@ def msa_index_score(
         ``return_choice=1``：``[N1, T1, topk]`` int32。
         ``return_choice=2``：indices 与同 shape 的 float32 values。
     """
+    _check_v1_query(query)
     if return_choice != 0:
         outputs = _get_op_module().msa_index_score_sparse(
             query,

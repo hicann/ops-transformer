@@ -30,6 +30,7 @@ struct MsaTopkCand {
     int32_t index;
 };
 
+template <bool NATIVE_A8C8 = false>
 class MsaIndexScoreTopk {
 public:
     __aicore__ inline void Run(const MsaIndexScoreTilingData* __restrict tiling,
@@ -537,8 +538,13 @@ private:
         if (writeValues) {
             AscendC::DataCopy(values[outBase], outScore, k);
         }
-        AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
-        AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
+        if constexpr (NATIVE_A8C8) {
+            // The next row can reuse this buffer through Scalar, Vector or MTE2.
+            AscendC::PipeBarrier<PIPE_ALL>();
+        } else {
+            AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
+            AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
+        }
         return true;
     }
 
@@ -582,7 +588,8 @@ private:
             nAlign = MSA_TOPK_SORT32_LEN;
         }
         auto sorted = ubTrunk_[nAlign * MSA_TOPK_SORT_PAIR];
-        if (limit < valid) {
+        // Sort padding can tie with a valid native score clamped to MSA_FILL_VALUE.
+        if (limit < (NATIVE_A8C8 ? nAlign : valid)) {
             const float boundary = sorted.GetValue((limit - 1U) * MSA_TOPK_SORT_PAIR);
             const float next = sorted.GetValue(limit * MSA_TOPK_SORT_PAIR);
             AscendC::SetFlag<AscendC::HardEvent::S_V>(EVENT_ID3);
@@ -651,8 +658,13 @@ private:
         if (writeValues) {
             AscendC::DataCopy(values[outBase], outScore, k);
         }
-        AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
-        AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
+        if constexpr (NATIVE_A8C8) {
+            // The next row can reuse this buffer through Scalar, Vector or MTE2.
+            AscendC::PipeBarrier<PIPE_ALL>();
+        } else {
+            AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
+            AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
+        }
         return true;
     }
 
@@ -772,8 +784,13 @@ private:
                 AscendC::DataCopyPad(values[outBase], dstValue, params);
             }
         }
-        AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
-        AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
+        if constexpr (NATIVE_A8C8) {
+            // The next row can reuse this buffer through Scalar, Vector or MTE2.
+            AscendC::PipeBarrier<PIPE_ALL>();
+        } else {
+            AscendC::SetFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
+            AscendC::WaitFlag<AscendC::HardEvent::MTE3_MTE2>(EVENT_ID0);
+        }
     }
 
     __aicore__ inline void SelectRow(const MsaIndexScoreTilingData* __restrict tiling,

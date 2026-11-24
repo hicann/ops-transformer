@@ -90,7 +90,7 @@ if _TORCHAIR_AVAILABLE:
             ir=IrDef("MsaIndexScore")
             .input(
                 "query",
-                "DT_FLOAT16, DT_BF16, DT_HIFLOAT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_FLOAT4_E2M1",
+                "DT_FLOAT16, DT_BF16, DT_INT8, DT_HIFLOAT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_FLOAT4_E2M1",
             )
             .input(
                 "key",

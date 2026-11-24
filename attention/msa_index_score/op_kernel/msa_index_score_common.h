@@ -31,6 +31,11 @@ constexpr uint32_t MSA_ROW_TILE_M = 128;
 
 // Cube L0A fractal / 向量归约对齐行数。末尾短 tile 不足该值时向前重叠。
 constexpr uint32_t MSA_M_ALIGN = 16;
+constexpr uint32_t MSA_PACKET_MIN_M = MSA_M_ALIGN + 1U;
+// Two rounded page accumulators share one 64 KiB L0C bank.
+constexpr uint32_t MSA_PACKET_MAX_M = 4U * MSA_M_ALIGN;
+// Reserved upper gqaGroup bit; the lower bits retain the actual GQA ratio.
+constexpr uint32_t MSA_PACKET_CANDIDATE = 1U << 22U;
 
 // BlockMmad 的 L1TileShape::K。headDim <= 该值时 kLoop = 1，
 // headDim 更大时 BlockMmad 内部自动多轮 K 迭代。
@@ -95,6 +100,8 @@ constexpr uint32_t MSA_BLOCK16_MAX_WIN_GROUP = 4;
 constexpr uint32_t MSA_A5_S_PING_BYTES_B16 = MSA_A5_S_PING_ROWS * MSA_BLOCK16_MAX_WIN_GROUP * MSA_BLOCK_SIZE * 2U;
 // UB 手工布局 512B 对齐。
 constexpr uint32_t MSA_UB_ALIGN_BYTES = 512;
+// Fixed-scale FP32 S/reduction, 64-page scores, two Half DMA slots and Qscale broadcast.
+constexpr uint32_t MSA_FIXED_SCALE_UB_BYTES = 196096;
 
 // BlockMmad L1B pingpong 级数：950 int8 仍为 2（单页 scratch 竞态）；A2/A3 int8 在
 // arch22 kernel 里改用 MSA_L1B_STAGES_FP16（双槽后安全）。
@@ -307,5 +314,44 @@ MSA_FN constexpr uint32_t MsaAlignUpPow2(uint32_t value, uint32_t align)
 {
     return (value + align - 1U) & ~(align - 1U);
 }
+
+// arch22 fixed-scale A8C8 specializes paired Fixpipe and grouped causal masking independently.
+#define MSA_TILING_KEY_INT8_INT8_FIXED 24
+#define MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED 25
+#define MSA_TILING_KEY_INT8_INT8_FIXED_GROUP_MASK 26
+#define MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED_GROUP_MASK 27
+// Original key21 P0 policy, renumbered after the schMode registry migration.
+#define MSA_TILING_KEY_INT8_INT8_FIXED_WIDE_SCORE 28
+// The five 1:2 A8C8 score policies have matching TopK entries.
+#define MSA_TILING_KEY_INT8_INT8_FIXED_TOPK 29
+#define MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED_TOPK 30
+#define MSA_TILING_KEY_INT8_INT8_FIXED_GROUP_MASK_TOPK 31
+#define MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED_GROUP_MASK_TOPK 32
+#define MSA_TILING_KEY_INT8_INT8_FIXED_WIDE_SCORE_TOPK 33
+#define MSA_TILING_KEY_INT8_INT8_FIXED_MIX_ONE 36
+
+// Native scale metadata is appended after the existing K/Q scratch region.
+// Public tensor arguments and the tiling POD retain their current layout.
+namespace MsaIndexScoreNs {
+// Conservative token (not token-head row) threshold, rechecked per request.
+constexpr uint32_t MSA_WIDE_SCORE_MIN_Q_TOKENS = 128U;
+
+// GetMTile borrows preceding rows when the final M-tile has 1..15 rows.
+// Fixed-scale paths use this store owner: overlapping rows belong exclusively to
+// the final tile, preserving golden v2's last-tile-wins visibility/masks.
+// Compute extents, Cube work and S-chunk partitioning remain unchanged.
+MSA_FN constexpr uint32_t MsaWideScoreOwnerEnd(uint32_t qLen, uint32_t numQHeads, uint32_t mStart, uint32_t mActual)
+{
+    const uint64_t totalRows = static_cast<uint64_t>(qLen) * numQHeads;
+    const uint32_t remainder = static_cast<uint32_t>(totalRows % MSA_ROW_TILE_M);
+    const uint32_t end = mStart + mActual;
+    if (totalRows > MSA_ROW_TILE_M && remainder > 0U && remainder < MSA_M_ALIGN && end < totalRows &&
+        end > totalRows - MSA_M_ALIGN) {
+        return static_cast<uint32_t>(totalRows - MSA_M_ALIGN);
+    }
+    return end;
+}
+
+} // namespace MsaIndexScoreNs
 
 #endif // MSA_INDEX_SCORE_COMMON_H

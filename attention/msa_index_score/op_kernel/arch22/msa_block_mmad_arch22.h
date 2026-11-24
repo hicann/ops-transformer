@@ -31,11 +31,12 @@
 #include "../catlass/gemm/tile/msa_tile_mmad.hpp"
 
 #include "../msa_index_score_common.h"
+#include "msa_native_half_copy_arch22.h"
 
 namespace MsaIndexScoreNs {
 
 template <class AType_, class BType_, class CType_, uint32_t STAGES_IN = MSA_L1B_STAGES_FP16,
-          bool USE_UNIT_FLAG_ = false>
+          bool USE_UNIT_FLAG_ = false, bool ZERO_PAD_Q_ = false, bool FIXED_SCALE_ = false>
 class MsaBlockMmad {
 public:
     using ArchTag = Catlass::Arch::AtlasA2;
@@ -52,7 +53,7 @@ public:
     using CopyGmToL1B = typename TileCopy::CopyGmToL1B;
     using CopyL1ToL0A = typename TileCopy::CopyL1ToL0A;
     using CopyL1ToL0B = typename TileCopy::CopyL1ToL0B;
-    using CopyL0CToGm = typename TileCopy::CopyL0CToGm;
+    using CopyL0CToGm = std::conditional_t<FIXED_SCALE_, MsaNativeHalfCopy, typename TileCopy::CopyL0CToGm>;
     using ElementAccumulator =
         typename Catlass::Gemm::helper::ElementAccumulatorSelector<ElementA, ElementB>::ElementAccumulator;
     using LayoutAInL1 = typename CopyL1ToL0A::LayoutSrc;
@@ -137,10 +138,11 @@ public:
         }
     }
 
+    template <bool PAIR_PAGE = false>
     __aicore__ inline void operator()(const AscendC::GlobalTensor<ElementA>& gmA, const LayoutA& layoutA,
                                       const AscendC::GlobalTensor<ElementB>& gmB, const LayoutB& layoutB,
                                       const AscendC::GlobalTensor<ElementC>& gmC, const LayoutC& layoutC,
-                                      const Catlass::GemmCoord& actualShape, bool needLoadL1)
+                                      const Catlass::GemmCoord& actualShape, bool needLoadL1, bool completePair = false)
     {
         const uint32_t mRound = RoundUp<L1AAlignHelper::M_ALIGNED>(actualShape.m());
         const uint32_t nRound = RoundUp<L1BAlignHelper::N_ALIGNED>(actualShape.n());
@@ -160,6 +162,7 @@ public:
             auto layoutTileA = layoutA.GetTileLayout(Catlass::MakeCoord(actualShape.m(), actualShape.k()));
             AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(l1AEvent_);
             AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1AEvent_);
+            InitializeQRowPadding(actualShape.m());
             copyGmToL1A_(l1ATensor_, gmA, layoutAInL1, layoutTileA);
             AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1AEvent_);
             AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(l1AEvent_);
@@ -255,14 +258,26 @@ public:
             kActual = kActualNext;
         }
 
-        LayoutC layoutBlock = layoutC.GetTileLayout(actualShape.GetCoordMN());
-        if constexpr (USE_UNIT_FLAG) {
-            copyL0CToGm_(gmC, l0CTensorList_[l0CListId_], layoutBlock, layoutInL0C, 0b11);
+        if constexpr (PAIR_PAGE) {
+            static_assert(FIXED_SCALE_ && USE_UNIT_FLAG && L0C_STAGES == 2,
+                          "sequential paired Fixpipe requires fixed scales and two unitFlag C regions");
+            // Preserve the sequential Q/K/MMAD schedule above. C0 is retained
+            // until the following page publishes C1; only Fixpipe is combined.
+            if (completePair) {
+                auto pairedCLayout = LayoutCInL0::MakeLayoutInL0C(Catlass::MakeCoord(L1_M, 2U * L1_N));
+                const LayoutC pairedGmLayout(L1_M, 2U * L1_N, layoutC.stride(0));
+                copyL0CToGm_(gmC, l0CTensorList_[0], pairedGmLayout, pairedCLayout, 0b11);
+            }
         } else {
-            AscendC::SetFlag<AscendC::HardEvent::M_FIX>(l0CEventList_[l0CListId_]);
-            AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(l0CEventList_[l0CListId_]);
-            copyL0CToGm_(gmC, l0CTensorList_[l0CListId_], layoutBlock, layoutInL0C);
-            AscendC::SetFlag<AscendC::HardEvent::FIX_M>(l0CEventList_[l0CListId_]);
+            LayoutC layoutBlock = layoutC.GetTileLayout(actualShape.GetCoordMN());
+            if constexpr (USE_UNIT_FLAG) {
+                copyL0CToGm_(gmC, l0CTensorList_[l0CListId_], layoutBlock, layoutInL0C, 0b11);
+            } else {
+                AscendC::SetFlag<AscendC::HardEvent::M_FIX>(l0CEventList_[l0CListId_]);
+                AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(l0CEventList_[l0CListId_]);
+                copyL0CToGm_(gmC, l0CTensorList_[l0CListId_], layoutBlock, layoutInL0C);
+                AscendC::SetFlag<AscendC::HardEvent::FIX_M>(l0CEventList_[l0CListId_]);
+            }
         }
         l0CListId_ = (l0CListId_ + 1 < L0C_STAGES) ? (l0CListId_ + 1) : 0;
     }
@@ -277,6 +292,7 @@ public:
         const uint32_t kActual = Min(actualShape.k(), L1_K);
         AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(l1AEvent_);
         AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1AEvent_);
+        InitializeQRowPadding(actualShape.m());
         copyGmToL1A_(l1ATensor_, gmA, layoutAInL1, layoutTileA);
         AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1AEvent_);
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(l1AEvent_);
@@ -301,6 +317,35 @@ public:
         AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventList_[slot]);
         l1ListId_ = (slot + 1U < STAGES) ? (slot + 1U) : 0U;
         ++kInflight_;
+    }
+
+    // A paired zN rectangle must begin at physical C0; C1 followed by C0 wraps.
+    __aicore__ inline bool CanConsumePair() const
+    {
+        return l0CListId_ == 0U;
+    }
+
+    // Two complete INT8 M128/N128/K128 results share one
+    // M128/N256 Fixpipe. Each independent C region publishes unitFlag3.
+    // The caller guarantees two in-flight K pages and a C0-aligned start.
+    __aicore__ inline void ConsumePair(const AscendC::GlobalTensor<ElementC>& gmC, const LayoutC& layoutC,
+                                       const Catlass::GemmCoord& actualShape)
+    {
+        static_assert(std::is_same_v<ElementA, int8_t> && std::is_same_v<ElementB, int8_t>,
+                      "paired Fixpipe expects native INT8 inputs");
+        static_assert(
+            (std::is_same_v<ElementC, int32_t> || FIXED_SCALE_) && std::is_same_v<ElementAccumulator, int32_t>,
+            "paired Fixpipe writes raw INT32");
+        static_assert(USE_UNIT_FLAG && L1_M == 128 && L1_N == 128 && L1_K == 128,
+                      "paired Fixpipe requires the unitFlag3 128-cube route");
+        static_assert(L0C_STAGES == 2 && STAGES >= 2,
+                      "paired Fixpipe requires two adjacent C regions and two in-flight K pages");
+        (void)actualShape;
+        ConsumePairPageToL0C();
+        ConsumePairPageToL0C();
+        auto pairedCLayout = LayoutCInL0::MakeLayoutInL0C(Catlass::MakeCoord(L1_M, 2U * L1_N));
+        const LayoutC pairedGmLayout(L1_M, 2U * L1_N, layoutC.stride(0));
+        copyL0CToGm_(gmC, l0CTensorList_[0], pairedGmLayout, pairedCLayout, 0b11);
     }
 
     // 等最早发出的那页 K 进 L1，再做 L1→L0、MMA、fixpipe。Q 已在 L0A。
@@ -347,7 +392,90 @@ public:
         --kInflight_;
     }
 
+    __aicore__ inline void BeginBatchPacket()
+    {
+        static_assert(FIXED_SCALE_ && std::is_same_v<ElementAccumulator, int32_t>);
+        constexpr uint32_t packetMaxAlignedM = (MSA_PACKET_MAX_M + MSA_M_ALIGN - 1U) / MSA_M_ALIGN * MSA_M_ALIGN;
+        static_assert(2U * packetMaxAlignedM * L1_N * sizeof(ElementAccumulator) <= L0C_TILE_SIZE,
+                      "both rounded page accumulators must fit in one L0C bank");
+        AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(l0CEventList_[l0CListId_]);
+    }
+
+    __aicore__ inline void ConsumeBatchPacketPage(const Catlass::GemmCoord& shape, uint32_t packetPage)
+    {
+        const uint32_t slot = (l1ListId_ + STAGES - kInflight_) % STAGES;
+        const uint32_t kActual = Min(shape.k(), L1_K);
+        auto layoutBInL1 = LayoutBInL1::template MakeLayout<ElementB>(L1_K, L1_N);
+        auto layoutBInL0 = LayoutBInL0::template MakeLayout<ElementB>(kActual, L1_N);
+        auto l0BTile = l0BTensorList_[l0BListId_];
+        AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0BEventList_[l0BListId_]);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventList_[slot]);
+        copyL1ToL0B_(l0BTile, l1BTensorList_[slot], layoutBInL0, layoutBInL1);
+        AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventList_[slot]);
+        AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
+        const uint32_t mRound = RoundUp<L1AAlignHelper::M_ALIGNED>(shape.m());
+        auto l0CTile = l0CTensorList_[l0CListId_][packetPage * mRound * L1_N];
+        AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
+        tileMmad_(l0CTile, l0ATensorList_[L0A_RESIDENT_ID], l0BTile, mRound, L1_N, kActual, true, 0);
+        AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0BEventList_[l0BListId_]);
+        l0BListId_ = (l0BListId_ + 1U < L0B_STAGES) ? (l0BListId_ + 1U) : 0U;
+        --kInflight_;
+    }
+
+    template <uint32_t PAGES>
+    __aicore__ inline void PublishBatchPacket(const AscendC::GlobalTensor<ElementC>& gmC, const LayoutC& layoutC,
+                                              uint32_t mActual)
+    {
+        constexpr uint32_t n = PAGES * L1_N;
+        const uint32_t mRound = RoundUp<L1AAlignHelper::M_ALIGNED>(mActual);
+        auto physicalC = LayoutCInL0::MakeLayoutInL0C(Catlass::MakeCoord(mRound, n));
+        const LayoutC outputC(mActual, n, layoutC.stride(0));
+        const int32_t event = l0CEventList_[l0CListId_];
+        AscendC::SetFlag<AscendC::HardEvent::M_FIX>(event);
+        AscendC::WaitFlag<AscendC::HardEvent::M_FIX>(event);
+        copyL0CToGm_(gmC, l0CTensorList_[l0CListId_], outputC, physicalC, 0U);
+        AscendC::SetFlag<AscendC::HardEvent::FIX_M>(event);
+        l0CListId_ = (l0CListId_ + 1U < L0C_STAGES) ? (l0CListId_ + 1U) : 0U;
+    }
+
 private:
+    // Identical L1/L0B ownership to ConsumeK; output is deferred until both
+    // adjacent C regions are ready. UnitFlag3 protects each region on reuse.
+    __aicore__ inline void ConsumePairPageToL0C()
+    {
+        const uint32_t slot = (l1ListId_ + STAGES - kInflight_) % STAGES;
+        auto layoutBInL1 = LayoutBInL1::template MakeLayout<ElementB>(L1_K, L1_N);
+        auto l0BTile = l0BTensorList_[l0BListId_];
+        const LayoutBInL0 layoutBInL0 = LayoutBInL0::template MakeLayout<ElementB>(L1_K, L1_N);
+        AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(l0BEventList_[l0BListId_]);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventList_[slot]);
+        copyL1ToL0B_(l0BTile, l1BTensorList_[slot], layoutBInL0, layoutBInL1);
+        AscendC::SetFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventList_[slot]);
+        AscendC::SetFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(EVENT_ID0);
+        tileMmad_(l0CTensorList_[l0CListId_], l0ATensorList_[L0A_RESIDENT_ID], l0BTile, L1_M, L1_N, L1_K, true, 0b11);
+        AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(l0BEventList_[l0BListId_]);
+        l0BListId_ = (l0BListId_ + 1U < L0B_STAGES) ? (l0BListId_ + 1U) : 0U;
+        l0CListId_ = (l0CListId_ + 1U < L0C_STAGES) ? (l0CListId_ + 1U) : 0U;
+        --kInflight_;
+    }
+
+    __aicore__ inline void InitializeQRowPadding(uint32_t actualM)
+    {
+        if constexpr (ZERO_PAD_Q_) {
+            static_assert(std::is_same_v<ElementA, int8_t>, "native Q padding expects int8");
+            if (actualM % MSA_M_ALIGN != 0U) {
+                // ND2NZ writes actualM rows, while LoadData reads whole 16-row fractals.
+                // Clear the existing L1 allocation so all physical padding bytes are initialized.
+                // InitConstValue on A2 supports uint16_t, but not int8_t; zero is bit-identical.
+                auto qWords = l1ATensor_.template ReinterpretCast<uint16_t>();
+                AscendC::InitConstValueParams<uint16_t> zero(1U, L1A_SIZE / MSA_DATABLOCK_BYTES, 0U, 0U);
+                AscendC::InitConstValue(qWords, zero);
+                AscendC::PipeBarrier<PIPE_MTE2>();
+            }
+        }
+    }
+
     AscendC::LocalTensor<ElementA> l1ATensor_;
     AscendC::LocalTensor<ElementB> l1BTensorList_[STAGES];
     AscendC::LocalTensor<ElementA> l0ATensorList_[STAGES];

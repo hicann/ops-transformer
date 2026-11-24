@@ -16,7 +16,7 @@ try:
     import torch_npu
     import torchair
     from typing import Optional
-    from torchair.ge._ge_graph import Tensor, TensorSpec
+    from torchair.ge._ge_graph import Tensor, TensorSpec, DataType
     from torchair.ge._ge_graph import auto_convert_to_tensor
     from torchair._ge_concrete_graph.compat_ir import ge_op, IrDef
     from torchair._ge_concrete_graph.fx2ge_converter import (
@@ -53,6 +53,8 @@ if _TORCHAIR_AVAILABLE:
         dependencies=None,
         node_name=None,
     ):
+        if query.dtype in (torch.int8, DataType.DT_INT8):
+            raise ValueError("A8C8 requires msa_index_score_v2")
         if compress_factor != 1:
             raise ValueError("compress_factor only supports 1")
         if dependencies is None:
@@ -90,7 +92,7 @@ if _TORCHAIR_AVAILABLE:
             ir=IrDef("MsaIndexScore")
             .input(
                 "query",
-                "DT_FLOAT16, DT_BF16, DT_INT8, DT_HIFLOAT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_FLOAT4_E2M1",
+                "DT_FLOAT16, DT_BF16, DT_HIFLOAT8, DT_FLOAT8_E5M2, DT_FLOAT8_E4M3FN, DT_FLOAT4_E2M1",
             )
             .input(
                 "key",

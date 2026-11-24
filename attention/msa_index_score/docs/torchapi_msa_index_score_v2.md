@@ -73,12 +73,12 @@ cann_ops_transformer.msa_index_score_v2(
 
 | 参数名 | 参数类型 | 描述 | dtype | shape |
 | --- | --- | --- | --- | --- |
-| query | 必选 | $Q_{idx}$。布局由 `layout_query` 指定，须连续。 | fp16 / bf16，950 的扩展类型见下文 | TND `[T1, N1, D]`；BSND `[B, S1, N1, D]`；BNSD `[B, N1, S1, D]` |
+| query | 必选 | $Q_{idx}$。布局由 `layout_query` 指定，须连续。 | fp16 / bf16，Atlas A2/A3 支持 int8，950 的扩展类型见下文 | TND `[T1, N1, D]`；BSND `[B, S1, N1, D]`；BNSD `[B, N1, S1, D]` |
 | key | 必选 | $K_{idx}$。布局由 `layout_key` 指定。分页允许物理页轴非连续，其余长度大于 1 的轴须为紧凑步长。非分页须连续。 | 与 query 同型 | TND `[T2, N2, D]`；BSND `[B, S2, N2, D]`；BNSD `[B, N2, S2, D]`；BBND `[NP, P, N2, D]`；BNBD `[NP, N2, P, D]` |
-| start_loc | 必选 | 每条请求当前 query 所在的逻辑块号。块长 128 用它定位局部窗口。 | int32 | `[B]` |
+| start_loc | 必选 | 每条请求当前 query 所在的逻辑打分块号。token 位置129、块长128时传入1。块长 128 用它定位局部窗口。 | int32 | `[B]` |
 | block_table | 分页必选 | 逻辑页到物理页的映射，值为 key 第 0 维的下标。非分页传 `None`。 | int32 | `[B, MB]` |
-| query_scale | MXFP4 必选 | query 每 32 个元素一组的缩放系数，其他类型传 `None`。 | `torch.float8_e8m0fnu` | 与 query 同布局，末维为 `D/32` |
-| key_scale | MXFP4 必选 | key 每 32 个元素一组的缩放系数，其他类型传 `None`。分页时按物理页紧凑存储。 | `torch.float8_e8m0fnu` | 与 key 同布局，末维为 `D/32` |
+| query_scale | A8C8、MXFP4 必选 | A8C8 为逐 token、逐 head 的 Q 反量化系数，MXFP4 为每 32 个元素一组的缩放系数，其他类型传 `None`。 | A8C8 为 float32，MXFP4 为 `torch.float8_e8m0fnu` | A8C8 为 `[Tq,Hq]`；MXFP4 与 query 同布局，末维为 `D/32` |
+| key_scale | A8C8、MXFP4 必选 | A8C8 为逐 K token 的反量化系数，MXFP4 为每 32 个元素一组的缩放系数，其他类型传 `None`。分页时按物理页紧凑存储。 | A8C8 为 float32，MXFP4 为 `torch.float8_e8m0fnu` | A8C8 分页为 `[NP,1,128]`，TND 为 `[Tk,1]` 或 `[Tk]`；MXFP4 与 key 同布局，末维为 `D/32` |
 | atten_mask | `sparse_mode=3` 必选 | 因果模板，0 表示可见，1 表示屏蔽。取 `sparse_mode=0` 时传 `None`。 | int8 | `[2048, 2048]` |
 | actual_seq_qlen | 必选 | query 有效长度的前缀和，从 0 开始，单调不减。 | int32 | `[B+1]` |
 | actual_seq_klen | 必选 | 按压缩前的 KV token 数计。分页传各请求的可见长度，非分页传从 0 开始且单调不减的前缀和。 | int32 | 分页 `[B]`；非分页 `[B+1]` |
@@ -96,7 +96,7 @@ cann_ops_transformer.msa_index_score_v2(
 
 <!-- npu="A3,910b" id8 -->
 - <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>：
-    - query 和 key 支持 fp16 / bf16。query 仅支持 TND，逻辑块长与物理页长均只支持 128，`return_choice` 只支持 0。
+    - query 和 key 支持 fp16 / bf16，以及同型 int8 的 A8C8。query 仅支持 TND，逻辑块长与物理页长均只支持 128，`return_choice` 支持 0、1、2。A8C8 TopK 在打分阶段结束并同步后执行，按 head 选出逻辑块。
 <!-- end id8 -->
 <!-- npu="950" id7 -->
 - <term>Ascend 950PR&950DT系列产品</term>：
@@ -126,7 +126,7 @@ cann_ops_transformer.msa_index_score_v2(
 - 单条请求或整批的有效 query / KV 长度可以为 0。BSND / BNSD 的有效 query 长度不能超过 `S1`，每条请求的压缩 key 行数不能超过 `S2`。分页的物理页长须是 `pool_block_size / compress_factor` 的正整数倍。
 - `N2` 只支持 1。query 和 key 的逻辑 `D` 必须相同，支持 16 到 128 之间的 16 倍数。MXFP4 只支持 `D=64` 或 128。块长 16 要求 `N1` 整除 128。
 - `init_blocks` 和 `local_blocks` 须为非负整数，且各自不超过逻辑块上限。块长 16 的 TopK 中，如果有 token 可以看到超过 128 个逻辑块，两者之和不得超过 128。
-- `return_choice=1` 和 2 仅 Ascend 950 支持。TorchAir 构图使用 `return_choice=0` 或 1，`return_choice=2` 用于单算子调用。
+- Atlas A2/A3 和 Ascend 950 都支持 `return_choice=1` 和 `return_choice=2`。TorchAir 构图支持模式 0 和 1，模式 2 用于单算子调用。
 
 ## 确定性计算
 

@@ -92,6 +92,11 @@ TILING_DATA_FIELD_DEF(uint32_t, compressFactor)
 TILING_DATA_FIELD_DEF(uint32_t, rowsPerBlock)
 TILING_DATA_FIELD_DEF(uint32_t, totalTasks)
 TILING_DATA_FIELD_DEF(uint64_t, mxScaleScratchOffset)
+// Native arch22 A8C8: byte offsets from user workspace; old offsets retain their units.
+TILING_DATA_FIELD_DEF(uint32_t, paddedHeadDim)
+TILING_DATA_FIELD_DEF(uint64_t, kScratchOffsetBytes)
+TILING_DATA_FIELD_DEF(uint64_t, qScratchOffsetBytes)
+TILING_DATA_FIELD_DEF(uint32_t, qScratchBytesPerCore)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(MsaIndexScore, MsaIndexScoreTilingData)
 
@@ -123,10 +128,14 @@ struct MsaIndexScoreInfo {
     uint32_t topk = 0;
     bool isQuant = false;
     bool isMxFp4 = false;
+    bool isQueryQuant = false;
     bool isAscend950 = false;
     ge::DataType queryDtype = ge::DT_BF16;
     ge::DataType keyDtype = ge::DT_BF16;
 };
+
+// Checks dtype combinations and both dequant scale contracts; does not select a kernel.
+ge::graphStatus CheckMsaIndexScoreQuantInputs(gert::TilingContext* context, MsaIndexScoreInfo& info);
 
 } // namespace optiling
 

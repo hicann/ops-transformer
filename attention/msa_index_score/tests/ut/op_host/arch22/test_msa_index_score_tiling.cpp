@@ -13,6 +13,7 @@
  * \brief Atlas A2/A3（arch22）tiling UT。平台信息在用例内 mock。
  */
 
+#include <algorithm>
 #include <cstdint>
 #include <iostream>
 #include <string>
@@ -20,6 +21,7 @@
 #include <gtest/gtest.h>
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
+#include "../../../../op_kernel/msa_index_score_common.h"
 
 using namespace std;
 
@@ -79,6 +81,10 @@ struct MsaTilingSpec {
     std::vector<int64_t> blockTableShape{1, 2};
     bool hasScale{false};
     std::vector<int64_t> scaleShape{};
+    bool hasQueryScale{false};
+    std::vector<int64_t> queryScaleShape{32, 8};
+    ge::DataType queryScaleDtype{ge::DT_FLOAT};
+    ge::DataType scaleDtype{ge::DT_FLOAT};
     bool hasMask{false};
     std::vector<int64_t> qlenShape{2};
     std::vector<int64_t> klenShape{1};
@@ -109,8 +115,8 @@ gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocPa
     inputs.push_back(Present(spec.keyShape, spec.keyDtype));
     inputs.push_back(spec.startLocShape.empty() ? Absent(ge::DT_INT32) : Present(spec.startLocShape, ge::DT_INT32));
     inputs.push_back(spec.hasBlockTable ? Present(spec.blockTableShape, ge::DT_INT32) : Absent(ge::DT_INT32));
-    inputs.push_back(Absent(ge::DT_FLOAT)); // query_scale，当前预留
-    inputs.push_back(spec.hasScale ? Present(spec.scaleShape, ge::DT_FLOAT) : Absent(ge::DT_FLOAT));
+    inputs.push_back(spec.hasQueryScale ? Present(spec.queryScaleShape, spec.queryScaleDtype) : Absent(ge::DT_FLOAT));
+    inputs.push_back(spec.hasScale ? Present(spec.scaleShape, spec.scaleDtype) : Absent(ge::DT_FLOAT));
     inputs.push_back(spec.hasMask ? Present({2048, 2048}, ge::DT_INT8) : Absent(ge::DT_INT8));
     inputs.push_back(spec.qlenShape.empty() ? Absent(ge::DT_INT32) : Present(spec.qlenShape, ge::DT_INT32));
     auto klenDesc = spec.klenShape.empty() ? Absent(ge::DT_INT32) : Present(spec.klenShape, ge::DT_INT32);
@@ -149,6 +155,43 @@ void RunTiling(const MsaTilingSpec& spec, const MsaSocParam& soc, ge::graphStatu
     struct MsaCompileInfo {
     } compileInfo;
     ExecuteTestCase(MakeTilingPara(spec, soc, &compileInfo), expect, expectKey);
+}
+
+bool RunTilingForInfo(const MsaTilingSpec& spec, const MsaSocParam& soc, TilingInfo& info)
+{
+    struct MsaCompileInfo {
+    } compileInfo;
+    return ExecuteTiling(MakeTilingPara(spec, soc, &compileInfo), info);
+}
+
+MsaTilingSpec A8C8Spec()
+{
+    MsaTilingSpec spec;
+    spec.queryDtype = ge::DT_INT8;
+    spec.keyDtype = ge::DT_INT8;
+    spec.hasScale = true;
+    spec.scaleShape = {2, 1, 128};
+    spec.hasQueryScale = true;
+    return spec;
+}
+
+MsaTilingSpec PagedA8C8ScoreSpec(int64_t tokens, int64_t heads, int64_t pages, int64_t dim = 128, int64_t batch = 1)
+{
+    auto spec = A8C8Spec();
+    spec.queryShape = {tokens, heads, dim};
+    spec.queryScaleShape = {tokens, heads};
+    spec.keyShape = {batch * pages, 128, 1, dim};
+    spec.scaleShape = {batch * pages, 1, 128};
+    spec.blockTableShape = {batch, pages};
+    spec.qlenShape = {batch + 1};
+    spec.klenShape = {batch};
+    spec.startLocShape = {batch};
+    spec.scoreShape = {heads, tokens, (pages + 15) / 16 * 16};
+    spec.sparseMode = 3;
+    spec.hasMask = true;
+    spec.initBlocks = 0;
+    spec.localBlocks = 0;
+    return spec;
 }
 
 // tiling data 按 uint32 字段顺序打包。用 (batch, totalQ, numQHeads, numKvHeads, gqa, headDim) 定位起点。
@@ -280,10 +323,9 @@ TEST_P(MsaIndexScoreTilingArch22, batch_seq_pool128_host_klen)
         spec.klenData = {0, 1024, 5120};
         spec.startLocShape = {2};
         spec.scoreShape = {8, 32, 32};
-        struct MsaCompileInfo {
-        } compileInfo;
+
         TilingInfo tilingInfo;
-        ASSERT_TRUE(ExecuteTiling(MakeTilingPara(spec, GetParam(), &compileInfo), tilingInfo));
+        ASSERT_TRUE(RunTilingForInfo(spec, GetParam(), tilingInfo));
         EXPECT_EQ(tilingInfo.tilingKey, MSA_KEY_FP16);
         ASSERT_GE(tilingInfo.tilingDataSize, 29U * sizeof(uint32_t));
         const auto* words = reinterpret_cast<const uint32_t*>(tilingInfo.tilingData.get());
@@ -389,10 +431,8 @@ TEST_P(MsaIndexScoreTilingArch22, short_m_long_s_kv_chunks)
     spec.keyShape = {32, 128, 1, 128};
     spec.blockTableShape = {1, 32};
     spec.scoreShape = {8, 32, 32};
-    struct MsaCompileInfo {
-    } compileInfo;
     TilingInfo tilingInfo;
-    ASSERT_TRUE(ExecuteTiling(MakeTilingPara(spec, soc, &compileInfo), tilingInfo));
+    ASSERT_TRUE(RunTilingForInfo(spec, soc, tilingInfo));
     EXPECT_EQ(tilingInfo.tilingKey, MSA_KEY_FP16);
     ASSERT_GE(tilingInfo.tilingDataSize, 27U * sizeof(uint32_t));
     const auto* words = reinterpret_cast<const uint32_t*>(tilingInfo.tilingData.get());
@@ -474,4 +514,236 @@ TEST_F(MsaIndexScoreTilingFp8Arch22, a2_a3_topk_pool16_rejected)
     spec.indicesShape = {8, 32, 16};
     RunTiling(spec, kSoc910B, ge::GRAPH_FAILED);
     RunTiling(spec, kSoc91093, ge::GRAPH_FAILED);
+}
+
+TEST_P(MsaIndexScoreTilingArch22, a8c8_supported_layouts_and_dimensions)
+{
+    auto spec = A8C8Spec();
+    RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED);
+    spec.layout = "BNBD";
+    spec.keyShape = {2, 1, 128, 128};
+    RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED);
+    spec.layout = "TND";
+    spec.hasBlockTable = false;
+    spec.klenShape = {2};
+    spec.keyShape = {256, 1, 128};
+    for (const auto& shape : std::vector<std::vector<int64_t>>{{256}, {256, 1}}) {
+        spec.scaleShape = shape;
+        RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED);
+    }
+    for (int64_t dim : {16, 48, 96, 129}) {
+        spec = PagedA8C8ScoreSpec(1, 4, 64, dim);
+        RunTiling(spec, GetParam(), dim > 128 ? ge::GRAPH_FAILED : ge::GRAPH_SUCCESS, MSA_TILING_KEY_INT8_INT8_FIXED);
+    }
+    RunTiling(A8C8Spec(), kSoc950, ge::GRAPH_FAILED);
+}
+
+TEST_P(MsaIndexScoreTilingArch22, a8c8_key_routes_and_boundaries)
+{
+    struct Route {
+        int64_t tokens, heads, pages, dim, batch;
+        uint64_t key;
+    };
+    for (const auto& route : std::vector<Route>{{1, 4, 64, 64, 1, MSA_TILING_KEY_INT8_INT8_FIXED},
+                                                {1, 4, 64, 128, 1, MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED},
+                                                {15, 8, 64, 128, 1, MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED},
+                                                {16, 8, 64, 64, 1, MSA_TILING_KEY_INT8_INT8_FIXED_GROUP_MASK},
+                                                {16, 8, 64, 128, 1, MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED_GROUP_MASK},
+                                                {255, 4, 80, 96, 2, MSA_TILING_KEY_INT8_INT8_FIXED},
+                                                {256, 4, 80, 96, 2, MSA_TILING_KEY_INT8_INT8_FIXED_WIDE_SCORE},
+                                                {64, 1, 65, 64, 2, MSA_TILING_KEY_INT8_INT8_FIXED_MIX_ONE},
+                                                {65, 1, 65, 64, 2, MSA_TILING_KEY_INT8_INT8_FIXED},
+                                                {80, 1, 65, 96, 2, MSA_TILING_KEY_INT8_INT8_FIXED_MIX_ONE},
+                                                {81, 1, 65, 96, 2, MSA_TILING_KEY_INT8_INT8_FIXED},
+                                                {1, 1, 64, 128, 1, MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED},
+                                                {1, 1, 65, 128, 1, MSA_TILING_KEY_INT8_INT8_FIXED_MIX_ONE},
+                                                {1, 4, 255, 64, 1, MSA_TILING_KEY_INT8_INT8_FIXED},
+                                                {1, 4, 256, 64, 1, MSA_TILING_KEY_INT8_INT8_FIXED_MIX_ONE},
+                                                {1, 4, 257, 64, 1, MSA_TILING_KEY_INT8_INT8_FIXED}}) {
+        SCOPED_TRACE("tokens=" + std::to_string(route.tokens) + " D=" + std::to_string(route.dim));
+        RunTiling(PagedA8C8ScoreSpec(route.tokens, route.heads, route.pages, route.dim, route.batch), GetParam(),
+                  ge::GRAPH_SUCCESS, route.key);
+    }
+}
+
+TEST_P(MsaIndexScoreTilingArch22, a8c8_topk_preserves_score_routes_and_uses_two_aivs)
+{
+    struct Route {
+        int64_t tokens, heads, pages, dim, batch;
+        uint64_t scoreKey, topkScoreKey;
+    };
+    for (const auto& route : std::vector<Route>{
+             {1, 4, 64, 64, 1, MSA_TILING_KEY_INT8_INT8_FIXED, MSA_TILING_KEY_INT8_INT8_FIXED},
+             {1, 4, 64, 128, 1, MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED, MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED},
+             {16, 8, 64, 64, 1, MSA_TILING_KEY_INT8_INT8_FIXED_GROUP_MASK, MSA_TILING_KEY_INT8_INT8_FIXED_GROUP_MASK},
+             {16, 8, 64, 128, 1, MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED_GROUP_MASK,
+              MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED_GROUP_MASK},
+             {256, 4, 80, 96, 2, MSA_TILING_KEY_INT8_INT8_FIXED_WIDE_SCORE, MSA_TILING_KEY_INT8_INT8_FIXED_WIDE_SCORE},
+             {1, 1, 65, 128, 1, MSA_TILING_KEY_INT8_INT8_FIXED_MIX_ONE, MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED},
+             {1, 4, 256, 64, 1, MSA_TILING_KEY_INT8_INT8_FIXED_MIX_ONE, MSA_TILING_KEY_INT8_INT8_FIXED}}) {
+        SCOPED_TRACE("tokens=" + std::to_string(route.tokens) + " D=" + std::to_string(route.dim));
+        auto spec = PagedA8C8ScoreSpec(route.tokens, route.heads, route.pages, route.dim, route.batch);
+        RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, route.scoreKey);
+        const auto topkKey = route.topkScoreKey + MSA_TILING_KEY_INT8_INT8_FIXED_TOPK - MSA_TILING_KEY_INT8_INT8_FIXED;
+        spec.returnChoice = 1;
+        spec.hasScore = false;
+        spec.hasIndices = true;
+        spec.indicesShape = {route.heads, route.tokens, spec.topk};
+        RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, topkKey);
+        spec.returnChoice = 2;
+        spec.hasValues = true;
+        spec.valuesShape = spec.indicesShape;
+        RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, topkKey);
+        spec.hasValues = false;
+        RunTiling(spec, GetParam(), ge::GRAPH_FAILED);
+    }
+}
+
+TEST_P(MsaIndexScoreTilingArch22, a8c8_wide_score_has_safe_fallbacks)
+{
+    auto spec = PagedA8C8ScoreSpec(256, 4, 80, 96, 2);
+    spec.layout = "TND";
+    spec.hasBlockTable = false;
+    spec.klenShape = {3};
+    spec.keyShape = {20480, 1, 96};
+    spec.scaleShape = {20480, 1};
+    RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, MSA_TILING_KEY_INT8_INT8_FIXED_WIDE_SCORE);
+    spec = PagedA8C8ScoreSpec(256, 4, 64, 96, 2);
+    RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, MSA_TILING_KEY_INT8_INT8_FIXED);
+    spec = PagedA8C8ScoreSpec(256, 4, 80, 96, 2);
+    spec.layout = "BNBD";
+    spec.keyShape = {160, 1, 128, 96};
+    RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, MSA_TILING_KEY_INT8_INT8_FIXED);
+}
+
+TEST_P(MsaIndexScoreTilingArch22, a8c8_memory_padding_and_empty_query)
+{
+    auto spec = A8C8Spec();
+    TilingInfo aligned, padded;
+    ASSERT_TRUE(RunTilingForInfo(spec, GetParam(), aligned));
+    spec.queryShape[2] = spec.keyShape[3] = 48;
+    ASSERT_TRUE(RunTilingForInfo(spec, GetParam(), padded));
+    ASSERT_EQ(aligned.workspaceSizes.size(), 1U);
+    ASSERT_EQ(padded.workspaceSizes.size(), 1U);
+    EXPECT_EQ(padded.workspaceSizes[0] - aligned.workspaceSizes[0],
+              static_cast<int64_t>(GetParam().coreNum * 128U * 64U));
+    auto soc = GetParam();
+    soc.ubSize = MsaIndexScoreNs::MSA_FIXED_SCALE_UB_BYTES + 255U;
+    RunTiling(spec, soc, ge::GRAPH_FAILED);
+    ++soc.ubSize;
+    RunTiling(spec, soc, ge::GRAPH_SUCCESS, MSA_TILING_KEY_INT8_INT8_FIXED);
+    spec = PagedA8C8ScoreSpec(0, 4, 64);
+    RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED);
+}
+
+TEST_P(MsaIndexScoreTilingArch22, a8c8_owner_count_and_pool_exclusion)
+{
+    auto spec = PagedA8C8ScoreSpec(1, 4, 256, 64);
+    TilingInfo info;
+    ASSERT_TRUE(RunTilingForInfo(spec, GetParam(), info));
+    const auto* words = reinterpret_cast<const uint32_t*>(info.tilingData.get());
+    size_t base = 0;
+    ASSERT_TRUE(FindTilingBase(words, info.tilingDataSize / sizeof(uint32_t), 1, 1, 4, 1, 64, base));
+    EXPECT_EQ(words[base + 11], 16U);
+    EXPECT_EQ(words[base + 28], 16U);
+    spec.keyShape[0] = spec.scaleShape[0] = 255;
+    RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, MSA_TILING_KEY_INT8_INT8_FIXED);
+    spec = PagedA8C8ScoreSpec(1, 4, 256, 64);
+    spec.localBlocks = 1;
+    RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, MSA_TILING_KEY_INT8_INT8_FIXED);
+}
+
+TEST_P(MsaIndexScoreTilingArch22, a8c8_short_chunks_cover_unequal_queries)
+{
+    auto spec = PagedA8C8ScoreSpec(1024, 1, 64, 128, 2);
+    TilingInfo info;
+    ASSERT_TRUE(RunTilingForInfo(spec, GetParam(), info));
+    EXPECT_EQ(info.tilingKey, MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED_GROUP_MASK);
+    const auto* words = reinterpret_cast<const uint32_t*>(info.tilingData.get());
+    size_t base = 0;
+    ASSERT_TRUE(FindTilingBase(words, info.tilingDataSize / sizeof(uint32_t), 2, 1024, 1, 1, 128, base));
+    EXPECT_EQ(words[base + 11], 18U);
+    EXPECT_EQ(words[base + 28], 2U);
+}
+
+TEST_P(MsaIndexScoreTilingArch22, a8c8_scale_contract_rejects_invalid_inputs)
+{
+    auto spec = A8C8Spec();
+    spec.hasQueryScale = false;
+    RunTiling(spec, GetParam(), ge::GRAPH_FAILED);
+    spec = A8C8Spec();
+    spec.hasScale = false;
+    RunTiling(spec, GetParam(), ge::GRAPH_FAILED);
+    for (const auto& shape : std::vector<std::vector<int64_t>>{{256}, {32, 1}, {32, 8, 1}}) {
+        spec = A8C8Spec();
+        spec.queryScaleShape = shape;
+        RunTiling(spec, GetParam(), ge::GRAPH_FAILED);
+    }
+    spec = A8C8Spec();
+    spec.scaleShape = {2, 1, 127};
+    RunTiling(spec, GetParam(), ge::GRAPH_FAILED);
+    for (auto dtype : {ge::DT_FLOAT16, ge::DT_BF16}) {
+        spec = A8C8Spec();
+        spec.queryScaleDtype = dtype;
+        RunTiling(spec, GetParam(), ge::GRAPH_FAILED);
+        spec = A8C8Spec();
+        spec.scaleDtype = dtype;
+        RunTiling(spec, GetParam(), ge::GRAPH_FAILED);
+    }
+}
+
+TEST_P(MsaIndexScoreTilingArch22, a8c8_dtype_layout_and_pool_restrictions)
+{
+    auto spec = A8C8Spec();
+    spec.keyDtype = ge::DT_FLOAT16;
+    RunTiling(spec, GetParam(), ge::GRAPH_FAILED);
+    spec = A8C8Spec();
+    spec.layoutQuery = "BSND";
+    RunTiling(spec, GetParam(), ge::GRAPH_FAILED);
+    spec = A8C8Spec();
+    spec.poolBlockSize = 16;
+    RunTiling(spec, GetParam(), ge::GRAPH_FAILED);
+    spec = A8C8Spec();
+    spec.keyShape[2] = 2;
+    spec.scaleShape = {2, 2, 128};
+    RunTiling(spec, GetParam(), ge::GRAPH_FAILED);
+    spec = A8C8Spec();
+    spec.queryDtype = ge::DT_FLOAT16;
+    RunTiling(spec, GetParam(), ge::GRAPH_FAILED);
+    spec = MsaTilingSpec{};
+    spec.hasQueryScale = true;
+    RunTiling(spec, GetParam(), ge::GRAPH_FAILED);
+}
+
+TEST(MsaWideScoreOwner, borrowed_tail_is_written_by_last_covering_tile)
+{
+    using namespace MsaIndexScoreNs;
+    for (uint32_t heads : {1U, 4U}) {
+        for (uint32_t q : {0U, 1U, 31U, 32U, 33U, 127U, 128U, 129U, 143U, 144U, 257U}) {
+            const uint32_t rows = q * heads;
+            std::vector<uint32_t> last(rows, ~0U), owner(rows, ~0U), writes(rows, 0U);
+            for (uint32_t tile = 0; tile * MSA_ROW_TILE_M < rows; ++tile) {
+                uint32_t start = tile * MSA_ROW_TILE_M;
+                uint32_t count = std::min(MSA_ROW_TILE_M, rows - start);
+                if (count < MSA_M_ALIGN && start >= MSA_M_ALIGN) {
+                    start -= MSA_M_ALIGN - count;
+                    count = MSA_M_ALIGN;
+                }
+                const uint32_t end = MsaWideScoreOwnerEnd(q, heads, start, count);
+                ASSERT_GE(end, start);
+                ASSERT_LE(end, start + count);
+                for (uint32_t r = start; r < start + count; ++r) {
+                    last[r] = tile;
+                    if (r < end) {
+                        owner[r] = tile;
+                        ++writes[r];
+                    }
+                }
+            }
+            for (uint32_t r = 0; r < rows; ++r) {
+                ASSERT_EQ(writes[r], 1U) << "q=" << q << " heads=" << heads << " row=" << r;
+                ASSERT_EQ(owner[r], last[r]) << "q=" << q << " heads=" << heads << " row=" << r;
+            }
+        }
+    }
 }

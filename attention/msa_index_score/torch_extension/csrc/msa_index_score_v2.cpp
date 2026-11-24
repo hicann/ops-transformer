@@ -145,11 +145,11 @@ void CheckMsaSparseAndDtypes(const at::Tensor& query, const at::Tensor& key, con
         return name != nullptr && (std::string(name) == "hifloat8" || std::string(name) == "HiFloat8");
     };
     const bool is_mxfp4 = query.scalar_type() == at::kFloat4_e2m1fn_x2;
-    const bool q_ok = query.scalar_type() == at::kHalf || query.scalar_type() == at::kBFloat16 ||
-                      query.scalar_type() == at::kFloat8_e5m2 || query.scalar_type() == at::kFloat8_e4m3fn ||
-                      is_hifloat8(query.scalar_type()) || is_mxfp4;
+    const bool q_ok = query.scalar_type() == at::kChar || query.scalar_type() == at::kHalf ||
+                      query.scalar_type() == at::kBFloat16 || query.scalar_type() == at::kFloat8_e5m2 ||
+                      query.scalar_type() == at::kFloat8_e4m3fn || is_hifloat8(query.scalar_type()) || is_mxfp4;
     TORCH_CHECK(q_ok,
-                "query dtype must be float16 / bfloat16 / hifloat8 / float8_e5m2 / float8_e4m3fn / "
+                "query dtype must be int8 / float16 / bfloat16 / hifloat8 / float8_e5m2 / float8_e4m3fn / "
                 "float4_e2m1fn_x2, but got ",
                 query.scalar_type());
     const bool is_fp8 = query.scalar_type() == at::kFloat8_e5m2 || query.scalar_type() == at::kFloat8_e4m3fn ||
@@ -162,9 +162,8 @@ void CheckMsaSparseAndDtypes(const at::Tensor& query, const at::Tensor& key, con
         TORCH_CHECK(key_scale.value().scalar_type() == at::kFloat8_e8m0fnu,
                     "MXFP4 key key_scale dtype must be float8_e8m0fnu, got ", key_scale.value().scalar_type());
     } else if (is_quant) {
-        TORCH_CHECK(query.scalar_type() == at::kHalf, "int8 key requires float16 query.");
-        TORCH_CHECK(key_scale.has_value() && key_scale.value().defined() && key_scale.value().numel() > 0,
-                    "int8 key requires dequant key_scale.");
+        TORCH_CHECK(query.scalar_type() == at::kChar, "int8 key requires native int8 query; float16/int8 is reserved.");
+        TORCH_CHECK(key_scale.has_value() && key_scale.value().defined(), "int8 key requires dequant key_scale.");
         TORCH_CHECK(key_scale.value().scalar_type() == at::kFloat, "key_scale dtype must be float32.");
         if (is_tnd) {
             TORCH_CHECK(key_scale.value().dim() == SCALE_TND_DIM || (key_scale.value().dim() == 1 && key.size(1) == 1),
@@ -275,6 +274,23 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> msa_index_score_v2(
     int64_t compress_factor)
 {
     CheckMsaRequiredTensors(query, key, start_loc, actual_seq_qlen, actual_seq_klen);
+    if (query.scalar_type() == at::kChar) {
+        TORCH_CHECK(query.device().type() == torch_npu::utils::get_npu_device_type(), "query must be an NPU tensor");
+        TORCH_CHECK(key.device() == query.device(), "key must be on query's device");
+        TORCH_CHECK(start_loc.device() == query.device(), "start_loc must be on query's device");
+        const auto check_device = [&query](const c10::optional<at::Tensor>& tensor, const char* name) {
+            TORCH_CHECK(!tensor.has_value() || !tensor->defined() || tensor->device() == query.device(), name,
+                        " must be on query's device");
+        };
+        check_device(block_table, "block_table");
+        check_device(query_scale, "query_scale");
+        check_device(key_scale, "key_scale");
+        check_device(atten_mask, "atten_mask");
+        TORCH_CHECK(actual_seq_qlen->device().is_cpu() || actual_seq_qlen->device() == query.device(),
+                    "actual_seq_qlen must be on CPU or query's device");
+        TORCH_CHECK(actual_seq_klen->device().is_cpu() || actual_seq_klen->device() == query.device(),
+                    "actual_seq_klen must be on CPU or query's device");
+    }
     const std::string layoutKeyStr = ParseLayoutKey(layout_key);
     const std::string layoutQueryStr = NormalizeLayoutName(layout_query, "TND");
     TORCH_CHECK(layoutQueryStr == "TND" || layoutQueryStr == "BSND" || layoutQueryStr == "BNSD",
@@ -296,9 +312,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> msa_index_score_v2(
                     "MXFP4 requires query_scale.");
         TORCH_CHECK(query_scale.value().scalar_type() == at::kFloat8_e8m0fnu,
                     "MXFP4 query_scale dtype must be float8_e8m0fnu, got ", query_scale.value().scalar_type());
-    } else {
+    } else if (query.scalar_type() != at::kChar) {
         TORCH_CHECK(!query_scale.has_value() || !query_scale.value().defined(),
-                    "query_scale is only valid for MXFP4 x MXFP4.");
+                    "query_scale is only supported for MXFP4 and int8 query.");
     }
     // pool_block_size 只允许 16 / 128；BSND/BNSD 固定 16。存储页长（key 的页维度）与打分块长解耦，
     // 但打分块不能超过存储页容量（kernel 按页表取每块前 bs 个 token）。

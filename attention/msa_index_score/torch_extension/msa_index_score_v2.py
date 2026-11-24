@@ -189,6 +189,12 @@ class MsaIndexScoreV2OpBuilder(OpBuilder):
             compress_factor: int = 1,
         ):
             layout_query = _normalize_layout_query(layout_query)
+            if (
+                _normalize_layout_key(layout_key) == "BBND"
+                and key.dim() == 3
+                and key.size(1) == 128
+            ):
+                key = key.unsqueeze(2)
             torch._check(
                 query.dim() == (3 if layout_query == "TND" else 4),
                 lambda: "query rank does not match layout_query",
@@ -354,17 +360,23 @@ def msa_index_score_v2(
 ):
     """调用 aclnnMsaIndexScoreV2，计算每个逻辑块的分数或返回 TopK。
 
+    Atlas A2/A3 的 A8C8 输入为 INT8 Q/K，query_scale 为 FP32 [Tq,Hq]，
+    key_scale 为 FP32 逐 K token 系数。
+    start_loc 是逻辑打分块索引，例如 token 位置129、块长128时传入1。
+    A8C8 使用 TND query、块长128和 compress_factor=1。
+
     query 支持 TND、BSND、BNSD。非分页 key 与 query 布局一致，
     块长 128 也支持 TND query 配 BSND/BNSD key。分页 key 支持 BBND、BNBD，
     需要传入 block_table。长度张量可放在 CPU 或 NPU，图捕获时使用 NPU 长度张量。
 
     块长 128 按 head 取块内最大值。Ascend 950 支持块长 16，先取块内最大值，
-    再取跨 head 最大值并缩放。FP8 的 query 与 key 类型相同且不传 scale，
+    再取跨 head 最大值并缩放。FP8 的 query 与 key 类型相同，query_scale 和 key_scale 均传 None。
     MXFP4 则需要分别传入 query_scale 和 key_scale（每 32 个元素一组 E8M0）。
     块长 16 支持 compress_factor > 1，实际序列长度仍按压缩前的 token 数传入。
 
     return_choice 为 0 时返回 score，块长 128 为 float32，块长 16 为 float16。
-    在 Ascend 950 上，为 1 时返回 int32 索引，为 2 时返回索引和 float32 分值。
+    Atlas A2/A3 的 fp16、bf16、A8C8 及 Ascend 950 支持为 1 时返回 int32 索引，
+    为 2 时返回索引和 float32 分值。
     块长 128 的 topk 支持 1 到 128，块长 16 的 topk 固定为 128。
     """
     layout_query = _normalize_layout_query(layout_query)

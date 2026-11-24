@@ -78,6 +78,10 @@ struct MsaTilingSpec {
     std::vector<int64_t> blockTableShape{1, 2};
     bool hasScale{false};
     std::vector<int64_t> scaleShape{};
+    bool hasQueryScale{false};
+    std::vector<int64_t> queryScaleShape{32, 8};
+    ge::DataType queryScaleDtype{ge::DT_FLOAT};
+    ge::DataType scaleDtype{ge::DT_FLOAT};
     bool hasMask{false};
     std::vector<int64_t> qlenShape{2};
     std::vector<int64_t> klenShape{1};
@@ -103,7 +107,7 @@ gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocPa
     inputs.push_back(Present(spec.queryShape, spec.queryDtype));
     inputs.push_back(Present(spec.keyShape, spec.keyDtype));
     inputs.push_back(spec.hasBlockTable ? Present(spec.blockTableShape, ge::DT_INT32) : Absent(ge::DT_INT32));
-    inputs.push_back(spec.hasScale ? Present(spec.scaleShape, ge::DT_FLOAT) : Absent(ge::DT_FLOAT));
+    inputs.push_back(spec.hasScale ? Present(spec.scaleShape, spec.scaleDtype) : Absent(ge::DT_FLOAT));
     inputs.push_back(spec.hasMask ? Present({2048, 2048}, ge::DT_INT8) : Absent(ge::DT_INT8));
     inputs.push_back(spec.qlenShape.empty() ? Absent(ge::DT_INT32) : Present(spec.qlenShape, ge::DT_INT32));
     auto klenDesc = spec.klenShape.empty() ? Absent(ge::DT_INT32) : Present(spec.klenShape, ge::DT_INT32);
@@ -114,7 +118,7 @@ gert::TilingContextPara MakeTilingPara(const MsaTilingSpec& spec, const MsaSocPa
     }
     inputs.push_back(klenDesc);
     inputs.push_back(spec.startLocShape.empty() ? Absent(ge::DT_INT32) : Present(spec.startLocShape, ge::DT_INT32));
-    inputs.push_back(Absent(ge::DT_FLOAT)); // query_scale
+    inputs.push_back(spec.hasQueryScale ? Present(spec.queryScaleShape, spec.queryScaleDtype) : Absent(ge::DT_FLOAT));
     const auto oldInputs = inputs;
     inputs = {oldInputs[0], oldInputs[1], oldInputs[7], oldInputs[2], oldInputs[8],
               oldInputs[3], oldInputs[4], oldInputs[5], oldInputs[6]};
@@ -331,9 +335,9 @@ TEST_P(MsaIndexScoreTilingArch35, bsnd_pool16_v2_success)
     spec.keyShape = {1, 64, 1, 128};
     spec.hasBlockTable = false;
     spec.klenShape = {2};
-    // 块长16跨head归约；K仅64行，选择独立N128尾窗直搬路径。
+    // 块长16跨head归约。K仅64行，选择上游 FP16 DirectFloat 路径。
     spec.scoreShape = {1, 32, 16};
-    RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, 35);
+    RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, 67);
 }
 
 TEST_P(MsaIndexScoreTilingArch35, causal_without_mask_fail)
@@ -684,4 +688,20 @@ TEST_F(MsaIndexScoreTilingFp8Arch35, pool128_uses_default_tiling_key)
     spec.poolBlockSize = 0;
     spec.compressFactor = 4;
     RunTiling(spec, kSoc950, ge::GRAPH_FAILED);
+}
+
+TEST_P(MsaIndexScoreTilingArch35, query_scale_rejected_on_950)
+{
+    for (auto dtype :
+         {ge::DT_FLOAT16, ge::DT_BF16, ge::DT_HIFLOAT8, ge::DT_FLOAT8_E5M2, ge::DT_FLOAT8_E4M3FN, ge::DT_INT8}) {
+        MsaTilingSpec spec;
+        spec.queryDtype = dtype;
+        spec.keyDtype = dtype;
+        spec.hasQueryScale = true;
+        if (dtype == ge::DT_INT8) {
+            spec.hasScale = true;
+            spec.scaleShape = {2, 1, 128};
+        }
+        RunTiling(spec, GetParam(), ge::GRAPH_FAILED);
+    }
 }

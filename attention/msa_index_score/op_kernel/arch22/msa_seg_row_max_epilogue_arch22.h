@@ -31,18 +31,23 @@
 
 namespace MsaIndexScoreNs {
 
-template <bool IS_QUANT, bool ENABLE_TOPK = false>
+template <bool IS_QUANT, bool PREFILL_OPT = false, bool FIXED_SCALE = false, bool GROUP_MASK = false,
+          bool WIDE_FIXED_SCORE = false, bool MIX_ONE_WIDE_POLICY = false, bool ENABLE_TOPK = false>
 class MsaSegRowMaxEpilogue {
 public:
+    static_assert(!WIDE_FIXED_SCORE || (FIXED_SCALE && !PREFILL_OPT && !GROUP_MASK),
+                  "wide score stores require an independent non-paired fixed-scale policy");
+    // Every fixed-scale path uses the final covering tile as the sole row writer.
+    static constexpr bool SCORE_ROW_OWNER = FIXED_SCALE;
+    static constexpr bool WIDE_GROUP_SCORE = FIXED_SCALE && GROUP_MASK && !PREFILL_OPT;
     using ArchTag = Catlass::Arch::AtlasA2;
-    // S workspace 元素类型：非量化 fp16，int8 fp32。
-    using ElementS = std::conditional_t<IS_QUANT, float, half>;
+    // Fixed-scale A8C8 and floating-point inputs write FP16 S; legacy antiquant writes FP32.
+    using ElementS = std::conditional_t<IS_QUANT && !FIXED_SCALE, float, half>;
 
     // score 暂存容量：1 AIC : 2 AIV 下每个 subcore 最多拿到半个 M-tile 的行；
     // 一次 flush 覆盖 MSA_STAGE_BLOCKS 个 block（= 每行 1KB 连续写回）。
-    // int8：缩到 160，给 UB 尾部腾出整页 cast（48KB）；非量化保持 256。
     static constexpr uint32_t MSA_STAGE_ROWS = MSA_ROW_TILE_M / MSA_AIV_PER_AIC;
-    static constexpr uint32_t MSA_STAGE_BLOCKS = IS_QUANT ? 160 : 256;
+    static constexpr uint32_t MSA_STAGE_BLOCKS = FIXED_SCALE ? 64U : (IS_QUANT ? 160U : 256U);
     static_assert(MSA_STAGE_BLOCKS % MSA_BLOCKS_PER_STILE == 0, "stage window must hold whole S-tiles");
 
     // UB 手工布局（字节偏移），catlass 不提供 UB allocator。
@@ -54,10 +59,13 @@ public:
     static constexpr uint32_t UB_SIZE_T8 = MSA_REDUCE_ROWS * MSA_FP32_PER_BLOCK * sizeof(float);
     static constexpr uint32_t UB_OFF_ROWMAX = UB_OFF_T8 + UB_SIZE_T8;
     static constexpr uint32_t UB_SIZE_ROWMAX = MSA_REDUCE_ROWS * sizeof(float);
-    // 反量化 scale 一页：block_size 个 fp32 = 512B。
+    // Native caches two whole stiles; each cache is reused by every row pass.
+    static constexpr uint32_t SCALE_STAGES = 2;
+    static constexpr uint32_t SCALE_STILE_ELEMS = MSA_BLOCKS_PER_STILE * MSA_BLOCK_SIZE;
     static constexpr uint32_t UB_OFF_DEQ = UB_OFF_ROWMAX + UB_SIZE_ROWMAX;
-    static constexpr uint32_t UB_SIZE_DEQ = MSA_BLOCK_SIZE * sizeof(float);
-    // 非量化：WholeReduceMax 的 fp16 输出（每 pass MSA_REDUCE_ROWS 个 half）。
+    static constexpr uint32_t UB_SIZE_DEQ =
+        (FIXED_SCALE ? SCALE_STAGES * SCALE_STILE_ELEMS : MSA_BLOCK_SIZE) * sizeof(float);
+    // FP16 WholeReduceMax output for floating-point input paths.
     static constexpr uint32_t UB_OFF_RED16 = UB_OFF_DEQ + UB_SIZE_DEQ;
     static constexpr uint32_t UB_SIZE_RED16 = MSA_REDUCE_ROWS * sizeof(half);
     // score 暂存：本 subcore 的行 × 一次 flush 覆盖的 block 数。
@@ -67,14 +75,23 @@ public:
     static constexpr uint32_t UB_SIZE_STAGE = MSA_STAGE_ROWS * MSA_STAGE_BLOCKS * sizeof(float);
     // 非量化：S16（fp16 载入缓冲）复用量化路径的 fp32 S 区（64KB = 两级 32KB 乒乓）。
     // 说明 GM→UB 与归约串行；两级缓冲让下一 pass 的 MTE2 叠在当前 pass 的 V 上。
-    static constexpr uint32_t UB_OFF_S16 = UB_OFF_S;
     static constexpr uint32_t UB_SIZE_S16 = MSA_ROWS_PER_PASS * MSA_BLOCKS_PER_STILE * MSA_BLOCK_SIZE * sizeof(half);
     static constexpr uint32_t S16_STAGES = 2;
     static constexpr uint32_t UB_TOTAL = UB_OFF_STAGE + UB_SIZE_STAGE;
     static constexpr uint32_t UB_OFF_TAIL =
         ((UB_TOTAL + MSA_UB_ALIGN_BYTES - 1U) / MSA_UB_ALIGN_BYTES) * MSA_UB_ALIGN_BYTES;
+    static constexpr uint32_t UB_OFF_S16 = FIXED_SCALE ? UB_OFF_TAIL : UB_OFF_S;
+    static constexpr uint32_t UB_OFF_QUERY_SCALE = UB_OFF_TAIL + S16_STAGES * UB_SIZE_S16;
+    static constexpr uint32_t UB_OFF_QUERY_BROADCAST = UB_OFF_QUERY_SCALE + MSA_UB_ALIGN_BYTES;
+    static constexpr uint32_t UB_SIZE_QUERY_BROADCAST = MSA_STAGE_ROWS * MSA_BLOCKS_PER_STILE * sizeof(float);
+    static_assert(!FIXED_SCALE || UB_SIZE_S >= MSA_BLOCK_SIZE * MSA_K_TILE, "native padding scratch too small");
     static_assert(UB_TOTAL <= ArchTag::UB_SIZE, "MsaSegRowMaxEpilogue UB out of bounds");
-    static_assert(UB_OFF_S16 + S16_STAGES * UB_SIZE_S16 <= UB_OFF_T64, "S16 ping-pong overlaps T64");
+    static_assert(FIXED_SCALE || UB_OFF_S16 + S16_STAGES * UB_SIZE_S16 <= UB_OFF_T64, "S16 ping-pong overlaps T64");
+
+    static_assert(!FIXED_SCALE || UB_OFF_QUERY_BROADCAST + UB_SIZE_QUERY_BROADCAST <= ArchTag::UB_SIZE,
+                  "fixed-scale epilogue exceeds UB capacity");
+    static_assert(!FIXED_SCALE || UB_OFF_QUERY_BROADCAST + UB_SIZE_QUERY_BROADCAST == MSA_FIXED_SCALE_UB_BYTES,
+                  "fixed-scale Host UB requirement must match the epilogue");
 
     static constexpr uint32_t STILE_WIDTH = MSA_BLOCKS_PER_STILE * MSA_BLOCK_SIZE;
     // fp16：一个 32B datablock 16 个元素，一个 repeat 128 个元素（掩码 128 位）。
@@ -112,6 +129,14 @@ public:
         gScale_ = gScale;
         gBlockTable_ = gBlockTable;
 
+        if constexpr (FIXED_SCALE) {
+            for (uint32_t i = 0; i < SCALE_STAGES; ++i) {
+                ubScalePing_[i] =
+                    resource.ubBuf.template GetBufferByByte<float>(UB_OFF_DEQ + i * SCALE_STILE_ELEMS * sizeof(float));
+            }
+            fixedQuery_ = resource.ubBuf.template GetBufferByByte<float>(UB_OFF_QUERY_SCALE);
+            fixedQueryBroadcast_ = resource.ubBuf.template GetBufferByByte<float>(UB_OFF_QUERY_BROADCAST);
+        }
         ubS_ = resource.ubBuf.template GetBufferByByte<float>(UB_OFF_S);
         ubS16Ping_[0] = resource.ubBuf.template GetBufferByByte<half>(UB_OFF_S16);
         ubS16Ping_[1] = resource.ubBuf.template GetBufferByByte<half>(UB_OFF_S16 + UB_SIZE_S16);
@@ -124,8 +149,19 @@ public:
         ubStage_ = resource.ubBuf.template GetBufferByByte<float>(UB_OFF_STAGE);
     }
 
+    __aicore__ inline void SetQueryScale(const AscendC::GlobalTensor<float>& scale)
+    {
+        gQueryScale_ = scale;
+    }
+
+    __aicore__ inline void SetWideStageAllowed(bool enabled)
+    {
+        wideStageAllowed_ = enabled;
+    }
+
     /// 进入一个新任务（M-tile）：确定本 subcore 负责的行区间并复位 score 暂存窗口。
-    __aicore__ inline void BeginTask(const MsaTask& task, uint32_t subIdx, uint32_t subBlockNum)
+    __aicore__ inline void BeginTask(const MsaTask& task, uint32_t subIdx, uint32_t subBlockNum,
+                                     bool allowWideGroupStage = false)
     {
         if constexpr (ENABLE_TOPK) {
             // start_loc 是请求首 token 所在块。q 跨过 128-token 边界时，后续 token 的块号要逐行加。
@@ -137,33 +173,85 @@ public:
         const uint32_t subM = MsaCeilDiv(task.mActual, subBlockNum);
         mOff_ = subIdx * subM;
         mSub_ = (mOff_ >= task.mActual) ? 0U : MsaMinU32(subM, task.mActual - mOff_);
+        if constexpr (SCORE_ROW_OWNER) {
+            scoreOwnerEnd_ = MsaWideScoreOwnerEnd(task.qLen > 0 ? static_cast<uint32_t>(task.qLen) : 0U, numQHeads_,
+                                                  task.mStart, task.mActual);
+        }
         // 暂存区按半个 M-tile 静态分配；行数超出则退回逐 pass 直写。
-        // score 末维超过一窗（如 275 page → stride 288）时也走直写：滑窗 flush 会和
-        // S16 乒乓共用硬件事件，第二窗首个 stile（GM 下标 256）会丢掉变成 -inf。
-        stageOn_ = (mSub_ > 0U) && (mSub_ <= MSA_STAGE_ROWS) && (strideOutToken_ <= MSA_STAGE_BLOCKS);
+        // Other paths retain the existing single-window guard after the
+        // historical second-window failure. Native prefill alone experiments
+        // with the sliding-window route; this does not fix the BF16 route.
+        if constexpr (FIXED_SCALE && PREFILL_OPT) {
+            stageOn_ = (mSub_ > 0U) && (mSub_ <= MSA_STAGE_ROWS);
+            if constexpr (MIX_ONE_WIDE_POLICY) {
+                stageOn_ = stageOn_ && (wideStageAllowed_ || strideOutToken_ <= MSA_STAGE_BLOCKS);
+            }
+        } else if constexpr (WIDE_FIXED_SCORE) {
+            // Mixed batches and partial final M-tiles keep the old organization
+            // for short requests/subtasks. No extra UB or workspace is needed.
+            stageOn_ = (mSub_ > 0U) && (mSub_ <= MSA_STAGE_ROWS) &&
+                       (strideOutToken_ <= MSA_STAGE_BLOCKS ||
+                        (mSub_ >= 32U && (task.qLen >= static_cast<int32_t>(MSA_WIDE_SCORE_MIN_Q_TOKENS) ||
+                                          (allowWideGroupStage && task.qLen >= 32))));
+        } else {
+            stageOn_ = (mSub_ > 0U) && (mSub_ <= MSA_STAGE_ROWS) && (strideOutToken_ <= MSA_STAGE_BLOCKS);
+        }
+        if constexpr (WIDE_GROUP_SCORE) {
+            stageOn_ = stageOn_ || (allowWideGroupStage && mSub_ >= 32U && mSub_ <= MSA_STAGE_ROWS &&
+                                    task.qLen >= static_cast<int32_t>(MSA_WIDE_SCORE_MIN_Q_TOKENS));
+        }
         stageBlkBase_ = 0;
         stageBlkEnd_ = 0;
+        if constexpr (FIXED_SCALE) {
+            for (uint32_t i = 0; i < SCALE_STAGES; ++i) {
+                nativeScaleBlk_[i] = INVALID_SCALE_BLOCK;
+                nativeScalePending_[i] = false;
+                AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(ScaleEvent(i));
+            }
+        }
         rowInReqBase_ = task.mStart + mOff_;
+        if constexpr (FIXED_SCALE) {
+            LoadQueryScale(task);
+        }
         tokenBase0_ = task.cuQStart;
         writeLo_ = task.sBlkBegin;
         writeHi_ = task.writeTailFill ? strideOutToken_ : task.sBlkEnd;
-        if constexpr (!IS_QUANT) {
+        if constexpr (!IS_QUANT || FIXED_SCALE) {
             // 本任务两级 S16 的 V_MTE2 余额；EndTask 对称 Wait，避免跨任务/跨启动泄漏。
             AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID0);
             AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID1);
         }
         if (stageOn_) {
-            OpenStageWindow(0);
+            uint32_t firstWindow = FIXED_SCALE ? task.sBlkBegin / MSA_STAGE_BLOCKS * MSA_STAGE_BLOCKS : 0U;
+            if constexpr (FIXED_SCALE && PREFILL_OPT && GROUP_MASK) {
+                const bool aligned = writeLo_ % MSA_BLOCKS_PER_STILE == 0U && writeHi_ % MSA_BLOCKS_PER_STILE == 0U;
+                const bool crossesWindow = writeHi_ > firstWindow + MSA_STAGE_BLOCKS;
+                if (strideOutToken_ > MSA_STAGE_BLOCKS && task.writeTailFill && task.sStileBegin < task.sStileEnd &&
+                    writeLo_ == task.sStileBegin * MSA_BLOCKS_PER_STILE && aligned && writeHi_ > writeLo_ &&
+                    writeHi_ - writeLo_ <= MSA_STAGE_BLOCKS && crossesWindow) {
+                    firstWindow = writeLo_;
+                }
+            }
+            OpenStageWindow(firstWindow);
         }
     }
 
     /// 任务结束：把暂存窗口里剩余的 score 写回 GM。
-    __aicore__ inline void EndTask()
+    __aicore__ inline void EndTask(bool allowNarrowGroupedStore = false)
     {
-        FlushStageToStrideEnd();
-        if constexpr (!IS_QUANT) {
+        FlushStageToStrideEnd(allowNarrowGroupedStore);
+        if constexpr (!IS_QUANT || FIXED_SCALE) {
             AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID0);
             AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID1);
+        }
+        if constexpr (FIXED_SCALE) {
+            for (uint32_t i = 0; i < SCALE_STAGES; ++i) {
+                if (nativeScalePending_[i]) {
+                    AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(ScaleEvent(i));
+                    AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(ScaleEvent(i));
+                }
+                AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(ScaleEvent(i));
+            }
         }
     }
 
@@ -172,9 +260,19 @@ public:
         return mSub_;
     }
 
-    __aicore__ inline uint32_t SubOff() const
+    __aicore__ inline void PrefetchFirstScales(const MsaTask& task)
     {
-        return mOff_;
+        if constexpr (FIXED_SCALE) {
+            if (mSub_ == 0U || task.sStileBegin >= task.sStileEnd) {
+                return;
+            }
+            const uint32_t first = task.sStileBegin * MSA_BLOCKS_PER_STILE;
+            if (first >= task.visibleEndBlk) {
+                return;
+            }
+            const uint32_t stage = task.sStileBegin % SCALE_STAGES;
+            IssueNativeScales(task, first, stage);
+        }
     }
 
     __aicore__ inline void BeginSTile(uint32_t blkBase)
@@ -193,15 +291,9 @@ public:
         stageBlkEnd_ = blkBase + MSA_BLOCKS_PER_STILE;
     }
 
-    __aicore__ inline void ProcessOnePass(const AscendC::GlobalTensor<ElementS>& gS, const MsaTask& task,
-                                          uint32_t blkBase, uint32_t rowOff, uint32_t rows)
-    {
-        ProcessPass(gS, task, blkBase, rowOff, rows);
-    }
-
     /// 处理一个 S tile（MSA_BLOCKS_PER_STILE 个 sparse block）中属于本 subcore 的行。
     __aicore__ inline void ProcessSTile(const AscendC::GlobalTensor<ElementS>& gS, const MsaTask& task,
-                                        uint32_t blkBase)
+                                        uint32_t blkBase, bool useUnifiedConsumer = false)
     {
         if (mSub_ == 0U) {
             return;
@@ -209,6 +301,31 @@ public:
         const uint32_t mOff = mOff_;
         const uint32_t mSub = mSub_;
         BeginSTile(blkBase);
+        if constexpr (FIXED_SCALE) {
+            if (blkBase < task.visibleEndBlk) {
+                PrepareNativeScales(task, blkBase);
+                PrefetchNativeScales(task, blkBase);
+                if constexpr ((PREFILL_OPT && GROUP_MASK) || WIDE_FIXED_SCORE) {
+                    ProcessUnifiedRows(gS, task, blkBase, mOff, mSub);
+                } else if constexpr (WIDE_GROUP_SCORE) {
+                    if (useUnifiedConsumer) {
+                        ProcessUnifiedRows(gS, task, blkBase, mOff, mSub);
+                    } else {
+                        ProcessFixedRows(gS, task, blkBase, mOff, mSub);
+                    }
+                } else {
+                    ProcessFixedRows(gS, task, blkBase, mOff, mSub);
+                }
+                ReleaseNativeScales();
+            } else {
+                for (uint32_t p = 0; p < mSub; p += MSA_ROWS_PER_PASS) {
+                    const uint32_t rows = MsaMinU32(MSA_ROWS_PER_PASS, mSub - p);
+                    ProcessPass<PREFILL_OPT && GROUP_MASK>(gS, task, blkBase, mOff + p, rows, true);
+                }
+            }
+            FinishSTile(blkBase);
+            return;
+        }
 
         if constexpr (IS_QUANT) {
             for (uint32_t p0 = 0; p0 < mSub; p0 += MSA_ROWS_PER_PASS) {
@@ -256,6 +373,55 @@ public:
         return stageOn_;
     }
 
+    __aicore__ inline bool TryFinishStagedTail(const MsaTask& task, bool allowNarrowEmptyTail = false)
+    {
+        if constexpr (MIX_ONE_WIDE_POLICY) {
+            if (!wideStageAllowed_) {
+                return false;
+            }
+        }
+        if constexpr (WIDE_GROUP_SCORE) {
+            if (strideOutToken_ <= MSA_STAGE_BLOCKS && !allowNarrowEmptyTail) {
+                return false;
+            }
+        }
+        if constexpr (WIDE_FIXED_SCORE || WIDE_GROUP_SCORE) {
+            if (mSub_ < 32U || !stageOn_) {
+                return false;
+            }
+        }
+        if constexpr ((FIXED_SCALE && PREFILL_OPT) || WIDE_FIXED_SCORE || WIDE_GROUP_SCORE) {
+            const uint32_t tailBegin = task.numComputeSTiles * MSA_BLOCKS_PER_STILE;
+            if (stageOn_ && stageBlkBase_ == 0U && strideOutToken_ <= MSA_STAGE_BLOCKS && task.writeTailFill &&
+                task.sStileEnd == task.numComputeSTiles && tailBegin >= task.visibleEndBlk &&
+                task.numComputeSTiles < task.numSTiles) {
+                // OpenStageWindow already initialized the task-owned tail.
+                // Local/init masks explicitly exclude blk >= visibleEndBlk,
+                // so no per-stile operation can change these invisible values.
+                stageBlkEnd_ = MsaMinU32(writeHi_, strideOutToken_);
+                return true;
+            }
+            if (stageOn_ && strideOutToken_ > MSA_STAGE_BLOCKS && task.writeTailFill &&
+                task.sStileEnd == task.numComputeSTiles && tailBegin >= task.visibleEndBlk &&
+                task.numComputeSTiles < task.numSTiles) {
+                // Complete initialized invisible columns a window at a time.
+                // FlushStage drains MTE3 before OpenStageWindow reuses UB.
+                // Keep the current window base distinct from produced end.
+                for (;;) {
+                    const uint32_t windowEnd = MsaMinU32(stageBlkBase_ + MSA_STAGE_BLOCKS, strideOutToken_);
+                    stageBlkEnd_ = MsaMinU32(writeHi_, windowEnd);
+                    if (stageBlkEnd_ >= writeHi_) {
+                        return true;
+                    }
+                    const uint32_t nextBase = stageBlkBase_ + MSA_STAGE_BLOCKS;
+                    FlushStage();
+                    OpenStageWindow(nextBase);
+                }
+            }
+        }
+        return false;
+    }
+
     /// 宽 score（stride > 一窗，stage 关闭）的不可见尾。
     /// 旧路径对每个 S-tile 走一整遍 ProcessSTile（Duplicate / barrier / 8 列 DataCopy）。
     /// kv 只有约 520 block、stride 为 2064 时，尾部约 193 个 tile，且 kvChunks 整除 AIC
@@ -265,6 +431,11 @@ public:
     {
         if (stageOn_ || mSub_ == 0U) {
             return;
+        }
+        if constexpr (SCORE_ROW_OWNER) {
+            if (ScoreStoreRows(rowInReqBase_, mSub_) == 0U) {
+                return;
+            }
         }
         const uint32_t begin = task.numComputeSTiles * MSA_BLOCKS_PER_STILE;
         if (begin >= strideOutToken_) {
@@ -311,7 +482,7 @@ public:
             uint32_t tOff = rowInReqBase_ / numQHeads_;
             uint32_t h = rowInReqBase_ - tOff * numQHeads_;
             uint64_t tokenBase = static_cast<uint64_t>(tokenBase0_ + tOff) * strideOutToken_ + col;
-            for (uint32_t r = 0; r < mSub_; ++r) {
+            for (uint32_t r = 0; r < ScoreStoreRows(rowInReqBase_, mSub_); ++r) {
                 AscendC::DataCopy(gScore_[tokenBase + static_cast<uint64_t>(h) * strideOutHead_], ubStage_, n);
                 if (++h == numQHeads_) {
                     h = 0U;
@@ -325,11 +496,24 @@ public:
     }
 
 private:
+    // Clip stores only, never computation or UB staging. All score GM writers
+    // are reached through StoreScore, FlushStage or FillInvalidTail below.
+    __aicore__ inline uint32_t ScoreStoreRows(uint32_t rowStart, uint32_t rows) const
+    {
+        if constexpr (SCORE_ROW_OWNER) {
+            if (rowStart >= scoreOwnerEnd_) {
+                return 0U;
+            }
+            return MsaMinU32(rows, scoreOwnerEnd_ - rowStart);
+        }
+        return rows;
+    }
+
     /// 非量化乒乓：把本 pass 的 S 搬进 ubS16Ping_[stage]，不阻塞 Vector。
     __aicore__ inline void IssueS16(const AscendC::GlobalTensor<ElementS>& gS, uint32_t rowOff, uint32_t rows,
                                     uint32_t stage)
     {
-        if constexpr (IS_QUANT) {
+        if constexpr (IS_QUANT && !FIXED_SCALE) {
             return;
         } else {
             const int32_t evt = static_cast<int32_t>(stage);
@@ -359,38 +543,49 @@ private:
         AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(static_cast<int32_t>(stage));
     }
 
-    /// 处理一个 pass（最多 MSA_ROWS_PER_PASS 行 × MSA_BLOCKS_PER_STILE 个 block）。
-    /// sLoaded：非量化乒乓路径已把 S 搬进 ubS16_，跳过本函数内的 GM→UB。
+    // Scale real token values before causal masking when max cannot preserve order.
+
+    // One outlined AIV body for all one-to-eight-page S-tiles, including full pages.
+
+    // A8C8-only member implementations.
+#include "msa_index_score_a8c8_epilogue_arch22.h"
+
+    /// Process at most MSA_ROWS_PER_PASS rows and MSA_BLOCKS_PER_STILE pages.
+    /// Native callers assemble FP16 S before entering this function. For the
+    /// nonquant ping-pong path sLoaded skips the local GM -> UB load.
+    template <bool REDUCED = false>
     __aicore__ inline void ProcessPass(const AscendC::GlobalTensor<ElementS>& gS, const MsaTask& task, uint32_t blkBase,
                                        uint32_t rowOff, uint32_t rows, bool sLoaded = false)
     {
         const bool allInvalid = (blkBase >= task.visibleEndBlk);
 
-        if (!allInvalid) {
-            if (!sLoaded) {
-                // 短 pass 只拷了部分行；SegRowMax 固定按 16 行归约，未写入区域必须是 -inf。
-                // 满 16 行时 DataCopy 覆盖整块 ubS_，可跳过 Duplicate。
-                if (rows < MSA_ROWS_PER_PASS) {
-                    if constexpr (IS_QUANT) {
-                        AscendC::Duplicate(ubS_, MSA_FILL_VALUE, MSA_ROWS_PER_PASS * STILE_WIDTH);
-                    } else {
-                        AscendC::Duplicate(ubS16_, static_cast<half>(MSA_FILL_VALUE), MSA_ROWS_PER_PASS * STILE_WIDTH);
+        if (!allInvalid && !REDUCED) {
+            if constexpr (!FIXED_SCALE) {
+                if (!sLoaded) {
+                    // 短 pass 只拷了部分行；SegRowMax 固定按 16 行归约，未写入区域必须是 -inf。
+                    // 满 16 行时 DataCopy 覆盖整块 ubS_，可跳过 Duplicate。
+                    if (rows < MSA_ROWS_PER_PASS) {
+                        if constexpr (IS_QUANT) {
+                            AscendC::Duplicate(ubS_, MSA_FILL_VALUE, MSA_ROWS_PER_PASS * STILE_WIDTH);
+                        } else {
+                            AscendC::Duplicate(ubS16_, static_cast<half>(MSA_FILL_VALUE),
+                                               MSA_ROWS_PER_PASS * STILE_WIDTH);
+                        }
+                        AscendC::PipeBarrier<PIPE_V>();
                     }
-                    AscendC::PipeBarrier<PIPE_V>();
+                    // 上一 pass 的归约还在读 ubS_/ubS16_（score 已改为暂存在 UB，不再有
+                    // 逐 pass 的 MTE3 顺带排空 V），MTE2 覆盖该缓冲前必须显式等 V。
+                    AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID0);
+                    AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID0);
+                    if constexpr (IS_QUANT) {
+                        AscendC::DataCopy(ubS_, gS[static_cast<uint64_t>(rowOff) * STILE_WIDTH], rows * STILE_WIDTH);
+                    } else {
+                        AscendC::DataCopy(ubS16_, gS[static_cast<uint64_t>(rowOff) * STILE_WIDTH], rows * STILE_WIDTH);
+                    }
+                    AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID0);
+                    AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID0);
                 }
-                // 上一 pass 的归约还在读 ubS_/ubS16_（score 已改为暂存在 UB，不再有
-                // 逐 pass 的 MTE3 顺带排空 V），MTE2 覆盖该缓冲前必须显式等 V。
-                AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID0);
-                AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(EVENT_ID0);
-                if constexpr (IS_QUANT) {
-                    AscendC::DataCopy(ubS_, gS[static_cast<uint64_t>(rowOff) * STILE_WIDTH], rows * STILE_WIDTH);
-                } else {
-                    AscendC::DataCopy(ubS16_, gS[static_cast<uint64_t>(rowOff) * STILE_WIDTH], rows * STILE_WIDTH);
-                }
-                AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID0);
-                AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(EVENT_ID0);
             }
-
             if (isQuant_) {
                 ApplyDequantScale(task, blkBase, MSA_ROWS_PER_PASS);
             }
@@ -402,11 +597,16 @@ private:
             } else {
                 SegRowMaxWhole();
             }
-        } else {
+        } else if (allInvalid) {
             AscendC::Duplicate(ubRowMax_, MSA_FILL_VALUE, MSA_REDUCE_ROWS);
             AscendC::PipeBarrier<PIPE_V>();
         }
 
+        if constexpr (FIXED_SCALE) {
+            if (!allInvalid) {
+                RestoreFixedScale(rowOff, rows);
+            }
+        }
         FillInvalidBlocks(task, blkBase);
         ApplyLocalMaskUb(task, blkBase, rows, rowOff);
 
@@ -455,17 +655,84 @@ private:
     }
 
     /// 当前窗中本 chunk 负责的列；writeTailFill 时 writeHi_ 延到 score 末维。
-    __aicore__ inline void FlushStageToStrideEnd()
+    __aicore__ inline void FlushStageToStrideEnd(bool allowNarrowGroupedStore)
     {
-        FlushStage();
+        FlushStage(allowNarrowGroupedStore);
+    }
+
+    // Group rows by head so each copy follows consecutive tokens, avoiding
+    // the potentially large head stride in the 16-bit DataCopy stride fields.
+    __aicore__ inline bool TryStoreScoreByHead(const AscendC::LocalTensor<float>& source, uint32_t srcRowStride,
+                                               uint32_t rowStart, uint32_t tokenBase, uint32_t col, uint32_t rows,
+                                               uint32_t count, bool allowNarrowGroupedStore = false)
+    {
+        if constexpr (MIX_ONE_WIDE_POLICY) {
+            if (!wideStageAllowed_) {
+                return false;
+            }
+        }
+        if constexpr (WIDE_GROUP_SCORE) {
+            if (strideOutToken_ <= MSA_STAGE_BLOCKS && !allowNarrowGroupedStore) {
+                return false;
+            }
+        }
+        if constexpr (WIDE_FIXED_SCORE || WIDE_GROUP_SCORE) {
+            if (mSub_ < 32U || !stageOn_) {
+                return false;
+            }
+        }
+        if constexpr ((FIXED_SCALE && PREFILL_OPT) || WIDE_FIXED_SCORE || WIDE_GROUP_SCORE) {
+            constexpr uint32_t floatsPerBlock = MSA_DATABLOCK_BYTES / sizeof(float);
+            const uint64_t srcStep = static_cast<uint64_t>(numQHeads_) * srcRowStride;
+            if (rows < 16U || numQHeads_ == 0U || count == 0U || count % floatsPerBlock != 0U ||
+                srcRowStride % floatsPerBlock != 0U || col % floatsPerBlock != 0U ||
+                strideOutHead_ % floatsPerBlock != 0U || strideOutToken_ % floatsPerBlock != 0U || srcStep < count ||
+                strideOutToken_ < count) {
+                return false;
+            }
+            const uint64_t srcGap = (srcStep - count) / floatsPerBlock;
+            const uint32_t dstGap = (strideOutToken_ - count) / floatsPerBlock;
+            const uint32_t fullGroups = rows / numQHeads_;
+            const uint32_t remainder = rows - fullGroups * numQHeads_;
+            const uint32_t maxBlocks = fullGroups + (remainder > 0U);
+            if (srcGap > 65535U || dstGap > 65535U || count / floatsPerBlock > 65535U || maxBlocks > 4095U) {
+                return false;
+            }
+            const uint32_t t0 = rowStart / numQHeads_;
+            const uint32_t h0 = rowStart - t0 * numQHeads_;
+            const uint32_t groups = MsaMinU32(numQHeads_, rows);
+            for (uint32_t i = 0; i < groups; ++i) {
+                const uint32_t headIndex = h0 + i;
+                uint32_t head = headIndex;
+                uint32_t token = tokenBase + t0;
+                if (headIndex >= numQHeads_) {
+                    head -= numQHeads_;
+                    ++token;
+                }
+                const uint32_t blocks = fullGroups + (i < remainder);
+                AscendC::DataCopyParams copy(static_cast<uint16_t>(blocks),
+                                             static_cast<uint16_t>(count / floatsPerBlock),
+                                             static_cast<uint16_t>(srcGap), static_cast<uint16_t>(dstGap));
+                const uint64_t dst =
+                    static_cast<uint64_t>(token) * strideOutToken_ + static_cast<uint64_t>(head) * strideOutHead_ + col;
+                AscendC::DataCopy(gScore_[dst], source[i * srcRowStride], copy);
+            }
+            return true;
+        }
+        return false;
     }
 
     /// 把 score 暂存窗口按行写回 GM：每行一次 ≥32B 对齐的连续 DataCopy。
     /// MTE3 用 EVENT_ID2，避开 S16 乒乓的 EVENT_ID0/1。
-    __aicore__ inline void FlushStage()
+    __aicore__ inline void FlushStage(bool allowNarrowGroupedStore = false)
     {
         if (!stageOn_ || stageBlkEnd_ <= stageBlkBase_) {
             return;
+        }
+        if constexpr (SCORE_ROW_OWNER) {
+            if (ScoreStoreRows(rowInReqBase_, mSub_) == 0U) {
+                return;
+            }
         }
         const uint32_t lo = (writeLo_ > stageBlkBase_) ? writeLo_ : stageBlkBase_;
         const uint32_t hi = (writeHi_ < stageBlkEnd_) ? writeHi_ : stageBlkEnd_;
@@ -476,10 +743,18 @@ private:
         const uint32_t ubOff = lo - stageBlkBase_;
         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID2);
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(EVENT_ID2);
+        if constexpr ((FIXED_SCALE && PREFILL_OPT) || WIDE_FIXED_SCORE || WIDE_GROUP_SCORE) {
+            if (TryStoreScoreByHead(ubStage_[ubOff], MSA_STAGE_BLOCKS, rowInReqBase_, tokenBase0_, lo,
+                                    ScoreStoreRows(rowInReqBase_, mSub_), count, allowNarrowGroupedStore)) {
+                AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID2);
+                AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(EVENT_ID2);
+                return;
+            }
+        }
         uint32_t tOff = rowInReqBase_ / numQHeads_;
         uint32_t h = rowInReqBase_ - tOff * numQHeads_;
         uint64_t tokenBase = static_cast<uint64_t>(tokenBase0_ + tOff) * strideOutToken_ + lo;
-        for (uint32_t r = 0; r < mSub_; ++r) {
+        for (uint32_t r = 0; r < ScoreStoreRows(rowInReqBase_, mSub_); ++r) {
             AscendC::DataCopy(gScore_[tokenBase + static_cast<uint64_t>(h) * strideOutHead_],
                               ubStage_[r * MSA_STAGE_BLOCKS + ubOff], count);
             if (++h == numQHeads_) {
@@ -502,8 +777,16 @@ private:
 
     /// 只对 [fullEndBlk, visibleEndBlk) 的边界 block 逐行置 -inf。
     /// 全可见 block 走无 mask 快通道；全不可见 block 的结果在 FillInvalidBlocks 中整体覆盖。
+    // Adjacent heads of one query token have identical causal validity.
+    // Repeat the original FP32 masks over their rows in the existing layout.
+
     __aicore__ inline void ApplyMask(const MsaTask& task, uint32_t blkBase, uint32_t rowOff, uint32_t rows)
     {
+        if constexpr (GROUP_MASK) {
+            static_assert(FIXED_SCALE, "grouped causal masks require the FP32 fixed-scale path");
+            ApplyFixedMaskByToken(task, blkBase, rowOff, rows);
+            return;
+        }
         if (task.fullEndBlk >= task.visibleEndBlk) {
             return;
         }
@@ -531,7 +814,7 @@ private:
                 if constexpr (IS_QUANT) {
                     FillBlockTail((r * MSA_BLOCKS_PER_STILE + j) * MSA_BLOCK_SIZE, static_cast<uint32_t>(validCount));
                 } else {
-                    // 非量化归约在 fp16 域起步，mask 必须先落在 ubS16_ 上。
+                    // Floating-point input reduces in FP16, so mask ubS16_.
                     FillBlockTailFp16((r * MSA_BLOCKS_PER_STILE + j) * MSA_BLOCK_SIZE,
                                       static_cast<uint32_t>(validCount));
                 }
@@ -824,7 +1107,7 @@ private:
                     params.blockLen = bytes;
                     params.srcStride = 0;
                     params.dstStride = 0;
-                    AscendC::DataCopyPadExtParams<float> pad;
+                    AscendC::DataCopyPadExtParams<float> pad{};
                     pad.isPad = false;
                     pad.leftPadding = 0;
                     pad.rightPadding = 0;
@@ -843,8 +1126,7 @@ private:
         }
     }
 
-    /// 把 ubS_ 视作 [MSA_REDUCE_ROWS, MSA_BLOCK_SIZE] 做行归约，结果落在 ubRowMax_[MSA_REDUCE_ROWS]，
-    /// 其排布恰为 [MSA_ROWS_PER_PASS][MSA_BLOCKS_PER_STILE] 行主序。
+    /// Legacy FP32 reduction, laid out as [MSA_ROWS_PER_PASS, MSA_BLOCKS_PER_STILE].
     __aicore__ inline void SegRowMax()
     {
         constexpr uint32_t HALF_BLOCK = MSA_BLOCK_SIZE / 2;
@@ -866,11 +1148,11 @@ private:
         AscendC::PipeBarrier<PIPE_V>();
     }
 
-    /// 非量化路径：一个 sparse block（128 个 fp16）恰好等于向量单元一个满 repeat，
+    /// FP16 路径：一个 sparse block（128 个 fp16）恰好等于向量单元一个满 repeat，
     /// 故整个 pass 的分段 RowMax 可由单条 WholeReduceMax 完成——每 repeat 归约一个
-    /// block，128 次迭代按 [row][block] 行主序密集写出，与 ubRowMax_ 的排布一致。
+    /// block，MSA_REDUCE_ROWS 次迭代按 [row][block] 行主序密集写出，与 ubRowMax_ 的排布一致。
     /// 相比「配对 Max + Cast + 两级 BlockReduceMax」省掉 3 条全宽向量指令和 3 次 barrier。
-    /// max 在 fp16 上无舍入、Cast fp16→fp32 精确且保序，结果与 fp32 归约逐 bit 一致。
+    /// max 在 fp16 上无舍入，Cast fp16→fp32 精确且保序。
     __aicore__ inline void SegRowMaxWhole()
     {
         constexpr uint8_t SRC_REP_BLK = MSA_BLOCK_SIZE / MSA_HALF_PER_BLOCK; // 8
@@ -917,6 +1199,18 @@ private:
 
     __aicore__ inline void StoreScore(const MsaTask& task, uint32_t blkBase, uint32_t rowOff, uint32_t rows)
     {
+        if constexpr (SCORE_ROW_OWNER) {
+            rows = ScoreStoreRows(task.mStart + rowOff, rows);
+            if (rows == 0U) {
+                return;
+            }
+        }
+        if constexpr ((FIXED_SCALE && PREFILL_OPT) || WIDE_FIXED_SCORE) {
+            if (TryStoreScoreByHead(ubRowMax_, MSA_BLOCKS_PER_STILE, task.mStart + rowOff, task.cuQStart, blkBase, rows,
+                                    MSA_BLOCKS_PER_STILE)) {
+                return;
+            }
+        }
         // 行 = (token, head) 扁平索引、head 为低位，故 pass 内逐行递推即可，
         // 无需每行一次标量整除（整除在 AIV 上是数十 cycle 的长指令）。
         uint32_t tOff = (task.mStart + rowOff) / numQHeads_;
@@ -934,7 +1228,11 @@ private:
 
     AscendC::GlobalTensor<float> gScore_;
     AscendC::GlobalTensor<float> gScale_;
+    AscendC::LocalTensor<float> fixedQuery_;
+    AscendC::LocalTensor<float> fixedQueryBroadcast_;
     AscendC::GlobalTensor<int32_t> gBlockTable_;
+    AscendC::GlobalTensor<float> gQueryScale_;
+    AscendC::LocalTensor<float> ubScalePing_[SCALE_STAGES];
     AscendC::LocalTensor<float> ubS_;
     AscendC::LocalTensor<half> ubS16_;
     AscendC::LocalTensor<half> ubS16Ping_[S16_STAGES];
@@ -956,6 +1254,12 @@ private:
     uint32_t writeHi_ = 0;
     bool stageOn_ = false;
     bool needTokenLocalMask_ = false;
+    bool wideStageAllowed_ = true;
+    bool scaleBeforeReduce_ = false;
+    static constexpr uint32_t INVALID_SCALE_BLOCK = 0xFFFFFFFFU;
+    uint32_t nativeScaleBlk_[SCALE_STAGES] = {INVALID_SCALE_BLOCK, INVALID_SCALE_BLOCK};
+    bool nativeScalePending_[SCALE_STAGES] = {false, false};
+    uint32_t nativeScaleStage_ = 0;
 
     uint32_t numQHeads_ = 1;
     uint32_t strideOutHead_ = 0;
@@ -967,6 +1271,7 @@ private:
     uint32_t keyLayout_ = MSA_KEY_LAYOUT_BBND;
     uint32_t totalK_ = 0;
     bool isQuant_ = false;
+    uint32_t scoreOwnerEnd_; // Set only by SCORE_ROW_OWNER BeginTask; unused by other keys.
 };
 
 } // namespace MsaIndexScoreNs

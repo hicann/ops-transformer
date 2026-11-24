@@ -514,6 +514,26 @@ inline uint32_t EstMxFp4KvChunks(const MsaIndexScoreInfo& info, uint32_t aicNum,
     return best;
 }
 
+// Estimate task startup as the cost of one S-tile.
+inline uint32_t EstStartupAwareKvChunks(uint32_t aicNum, uint32_t batch, uint32_t nStiles)
+{
+    const uint32_t maxChunks = nStiles < aicNum ? nStiles : aicNum;
+    uint32_t bestChunks = 1U;
+    uint64_t bestCost = std::numeric_limits<uint64_t>::max();
+    for (uint32_t chunks = 1U; chunks <= maxChunks; ++chunks) {
+        const uint64_t tasks = static_cast<uint64_t>(batch) * chunks;
+        const uint64_t tasksPerCore = (tasks + aicNum - 1U) / aicNum;
+        const uint32_t stilesPerChunk = (nStiles + chunks - 1U) / chunks;
+        const uint64_t cost = tasksPerCore * (stilesPerChunk + 1U);
+        // Ascending candidates keep fewer owners when the modeled cost ties.
+        if (cost < bestCost) {
+            bestCost = cost;
+            bestChunks = chunks;
+        }
+    }
+    return bestChunks;
+}
+
 inline uint32_t EstKvChunks(const MsaIndexScoreInfo& info, uint32_t aicNum, uint32_t packedM, uint32_t visBlocks)
 {
     if (packedM == 0U || aicNum == 0U) {
@@ -1318,148 +1338,159 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
     const auto* queryDesc = context->GetInputDesc(MSA_IDX_QUERY);
     OP_CHECK_NULL_WITH_CONTEXT(context, queryDesc);
     info.queryDtype = queryDesc->GetDataType();
-    info.isMxFp4 = info.isAscend950 && info.queryDtype == ge::DT_FLOAT4_E2M1 && info.keyDtype == ge::DT_FLOAT4_E2M1;
-    OP_CHECK_IF(!info.isMxFp4 && !IsNonQuantQueryDtype(info.queryDtype, info.isAscend950),
-                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
-                    context->GetNodeName(), "query", Ops::Base::ToString(info.queryDtype).c_str(),
-                    "bf16 or fp16 is supported on A2/A3, and hifloat8, float8_e5m2 or float8_e4m3fn is also "
-                    "supported on Ascend 950; int8 query and float4 are reserved"),
-                return ge::GRAPH_FAILED);
-
-    info.isQuant = (info.keyDtype == ge::DT_INT8);
-    // 预留int8场景，当前拦截
-    OP_CHECK_IF(info.queryDtype == ge::DT_FLOAT16 && info.keyDtype == ge::DT_INT8,
-                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), "query/key",
-                                                      (std::string("query=") + Ops::Base::ToString(info.queryDtype) +
-                                                       ", key=" + Ops::Base::ToString(info.keyDtype))
-                                                          .c_str(),
-                                                      "float16 query with int8 key is not supported yet"),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(info.isAscend950 && info.queryDtype == ge::DT_HIFLOAT8 && info.keyDtype == ge::DT_HIFLOAT8,
-                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), "query/key",
-                                                      (std::string("query=") + Ops::Base::ToString(info.queryDtype) +
-                                                       ", key=" + Ops::Base::ToString(info.keyDtype))
-                                                          .c_str(),
-                                                      "hifloat8 query with hifloat8 key is not supported yet"),
-                return ge::GRAPH_FAILED);
-    // 块长16支持fp16/bf16、无scale的FP8 E4M3FN/E5M2及MXFP4；int8/hifloat8保持128。
-    OP_CHECK_IF(info.poolBlockSize == MSA_BLOCK16_SIZE && !info.isMxFp4 &&
-                    (info.isQuant || info.queryDtype == ge::DT_HIFLOAT8 || info.keyDtype == ge::DT_HIFLOAT8),
-                OP_LOGE(context, "pool_block_size=%u supports fp16 / bf16 / float8_e4m3fn / float8_e5m2 / MXFP4 only.",
-                        MSA_BLOCK16_SIZE),
-                return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        info.pageSize == MSA_BLOCK16_SIZE && !info.isMxFp4 &&
-            (info.isQuant || info.queryDtype == ge::DT_HIFLOAT8 || info.keyDtype == ge::DT_HIFLOAT8),
-        OP_LOGE(context, "BBND/BNBD page size %u supports fp16 / bf16 / float8_e4m3fn / float8_e5m2 / MXFP4 only.",
-                MSA_BLOCK16_SIZE),
-        return ge::GRAPH_FAILED);
-    if (info.isMxFp4) {
-        OP_CHECK_IF(info.numKvHeads != 1, OP_LOGE(context, "MXFP4 x MXFP4 requires numKvHeads == 1."),
-                    return ge::GRAPH_FAILED);
-        OP_CHECK_IF((info.headDim % 64U) != 0,
-                    OP_LOGE(context, "MXFP4 headDim(%u) must be a multiple of 64.", info.headDim),
-                    return ge::GRAPH_FAILED);
-    } else if (info.isQuant) {
-        OP_CHECK_IF(info.queryDtype != ge::DT_FLOAT16, OP_LOGE(context, "ND int8 key currently requires fp16 query."),
-                    return ge::GRAPH_FAILED);
-    } else {
-        OP_CHECK_IF(
-            info.keyDtype != info.queryDtype,
-            OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context->GetNodeName(), "query, key",
-                                                   (std::string("query=") + Ops::Base::ToString(info.queryDtype) +
-                                                    ", key=" + Ops::Base::ToString(info.keyDtype))
-                                                       .c_str(),
-                                                   "the non-quant key dtype must match the query dtype"),
-            return ge::GRAPH_FAILED);
-        OP_CHECK_IF(IsFp8ComputeDtype(info.queryDtype) && !info.isAscend950,
-                    OP_LOGE(context, "FP8 query/key is only supported on Ascend 950."), return ge::GRAPH_FAILED);
-    }
-
-    const gert::StorageShape* scaleShape = context->GetOptionalInputShape(MSA_IDX_KEY_SCALE);
-    const gert::StorageShape* queryScaleShape = context->GetOptionalInputShape(MSA_IDX_QUERY_SCALE);
-    if (info.isMxFp4) {
-        const uint32_t groups = info.headDim / MSA_MX_GROUP;
-        OP_CHECK_IF(!IsOptionalProvided(queryScaleShape) || !IsOptionalProvided(scaleShape),
-                    OP_LOGE(context, "MXFP4 x MXFP4 requires query_scale and key_scale (e8m0, group 32)."),
-                    return ge::GRAPH_FAILED);
-        const auto* queryScaleDesc = context->GetOptionalInputDesc(MSA_IDX_QUERY_SCALE);
-        const auto* scaleDesc = context->GetOptionalInputDesc(MSA_IDX_KEY_SCALE);
-        OP_CHECK_NULL_WITH_CONTEXT(context, queryScaleDesc);
-        OP_CHECK_NULL_WITH_CONTEXT(context, scaleDesc);
-        OP_CHECK_IF(
-            queryScaleDesc->GetDataType() != ge::DT_FLOAT8_E8M0 || scaleDesc->GetDataType() != ge::DT_FLOAT8_E8M0,
-            OP_LOGE(context, "MXFP4 query_scale and key_scale must be float8_e8m0."), return ge::GRAPH_FAILED);
-        const gert::Shape& qs = queryScaleShape->GetStorageShape();
-        const gert::Shape& ks = scaleShape->GetStorageShape();
-        bool qOk =
-            (qs.GetDimNum() == q.GetDimNum()) && (static_cast<uint32_t>(qs.GetDim(qs.GetDimNum() - 1U)) == groups);
-        for (size_t d = 0; qOk && d + 1U < q.GetDimNum(); ++d) {
-            qOk = (qs.GetDim(d) == q.GetDim(d));
-        }
-        OP_CHECK_IF(!qOk, OP_LOGE(context, "query_scale must mirror query layout with last dim D/32."),
-                    return ge::GRAPH_FAILED);
-        bool kOk =
-            (ks.GetDimNum() == kc.GetDimNum()) && (static_cast<uint32_t>(ks.GetDim(ks.GetDimNum() - 1U)) == groups);
-        for (size_t d = 0; kOk && d + 1U < kc.GetDimNum(); ++d) {
-            kOk = (ks.GetDim(d) == kc.GetDim(d));
-        }
-        OP_CHECK_IF(!kOk, OP_LOGE(context, "MXFP4 key_scale must mirror key layout with last dim D/32."),
-                    return ge::GRAPH_FAILED);
-    } else if (info.isQuant) {
-        OP_CHECK_IF(!IsOptionalProvided(scaleShape),
-                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "key_scale",
-                                                             "an int8 key requires the dequant scale input"),
-                    return ge::GRAPH_FAILED);
-        const gert::Shape& sc = scaleShape->GetStorageShape();
-        if (info.keyLayout == MSA_KEY_LAYOUT_TND) {
-            const bool ok2d = (sc.GetDimNum() == MSA_SCALE_TND_DIM_NUM &&
-                               static_cast<uint32_t>(sc.GetDim(MSA_DIM_0)) == info.totalK &&
-                               static_cast<uint32_t>(sc.GetDim(MSA_DIM_1)) == info.numKvHeads);
-            const bool ok1d = (sc.GetDimNum() == MSA_RANK_1D && info.numKvHeads == 1 &&
-                               static_cast<uint32_t>(sc.GetDim(MSA_DIM_0)) == info.totalK);
-            OP_CHECK_IF(!ok2d && !ok1d,
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                            context->GetNodeName(), "key_scale", Ops::Base::ToString(sc).c_str(),
-                            (std::string("the TND dequant scale must be [") + std::to_string(info.totalK) + ", " +
-                             std::to_string(info.numKvHeads) + "] or [" + std::to_string(info.totalK) + "] when N2=1")
-                                .c_str()),
-                        return ge::GRAPH_FAILED);
-        } else {
-            OP_CHECK_IF(sc.GetDimNum() != MSA_SCALE_PA_DIM_NUM,
-                        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "key_scale",
-                                                                 (std::to_string(sc.GetDimNum()) + "D").c_str(),
-                                                                 "PA dequant scale must have 3 dims [NP, N_kv, P]"),
-                        return ge::GRAPH_FAILED);
-            OP_CHECK_IF(static_cast<uint32_t>(sc.GetDim(MSA_DIM_0)) != info.numPages ||
-                            static_cast<uint32_t>(sc.GetDim(MSA_DIM_1)) != info.numKvHeads ||
-                            static_cast<uint32_t>(sc.GetDim(MSA_DIM_2)) != info.pageSize,
-                        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
-                            context->GetNodeName(), "key_scale", Ops::Base::ToString(sc).c_str(),
-                            (std::string("the dequant scale shape must be [") + std::to_string(info.numPages) + ", " +
-                             std::to_string(info.numKvHeads) + ", " + std::to_string(info.pageSize) + "]")
-                                .c_str()),
-                        return ge::GRAPH_FAILED);
-        }
-        const auto* scaleDesc = context->GetOptionalInputDesc(MSA_IDX_KEY_SCALE);
-        if (scaleDesc == nullptr) {
-            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "key_scale",
-                                                     "the dequant scale must be provided for an int8 key");
+    if (info.queryDtype == ge::DT_INT8) {
+        if (CheckMsaIndexScoreQuantInputs(context, info) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
-        OP_CHECK_IF(scaleDesc->GetDataType() != ge::DT_FLOAT,
-                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), "key_scale",
-                                                          Ops::Base::ToString(scaleDesc->GetDataType()).c_str(),
-                                                          "the dequant scale dtype must be float32"),
-                    return ge::GRAPH_FAILED);
     } else {
-        OP_CHECK_IF(IsOptionalProvided(scaleShape),
-                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "key_scale", "provided",
-                                                          "the non-quant path must not pass key_scale"),
+        info.isMxFp4 = info.isAscend950 && info.queryDtype == ge::DT_FLOAT4_E2M1 && info.keyDtype == ge::DT_FLOAT4_E2M1;
+        OP_CHECK_IF(!info.isMxFp4 && !IsNonQuantQueryDtype(info.queryDtype, info.isAscend950),
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        context->GetNodeName(), "query", Ops::Base::ToString(info.queryDtype).c_str(),
+                        "bf16 or fp16 is supported on A2/A3, and hifloat8, float8_e5m2 or float8_e4m3fn is also "
+                        "supported on Ascend 950; int8 query and float4 are reserved"),
                     return ge::GRAPH_FAILED);
+
+        info.isQuant = (info.keyDtype == ge::DT_INT8);
+        // 预留int8场景，当前拦截
+        OP_CHECK_IF(
+            info.queryDtype == ge::DT_FLOAT16 && info.keyDtype == ge::DT_INT8,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), "query/key",
+                                                  (std::string("query=") + Ops::Base::ToString(info.queryDtype) +
+                                                   ", key=" + Ops::Base::ToString(info.keyDtype))
+                                                      .c_str(),
+                                                  "float16 query with int8 key is not supported yet"),
+            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            info.isAscend950 && info.queryDtype == ge::DT_HIFLOAT8 && info.keyDtype == ge::DT_HIFLOAT8,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), "query/key",
+                                                  (std::string("query=") + Ops::Base::ToString(info.queryDtype) +
+                                                   ", key=" + Ops::Base::ToString(info.keyDtype))
+                                                      .c_str(),
+                                                  "hifloat8 query with hifloat8 key is not supported yet"),
+            return ge::GRAPH_FAILED);
+        // Block16 keeps upstream FP16/BF16/FP8/MXFP4 support; native A8C8 remains block128.
+        OP_CHECK_IF(
+            info.poolBlockSize == MSA_BLOCK16_SIZE && !info.isMxFp4 &&
+                (info.isQuant || info.queryDtype == ge::DT_HIFLOAT8 || info.keyDtype == ge::DT_HIFLOAT8),
+            OP_LOGE(context, "pool_block_size=%u supports fp16 / bf16 / float8_e4m3fn / float8_e5m2 / MXFP4 only.",
+                    MSA_BLOCK16_SIZE),
+            return ge::GRAPH_FAILED);
+        // PA 存储页长 16（M3 短页存储）同样仅 950 上的 fp16 / bf16。
+        OP_CHECK_IF(
+            info.pageSize == MSA_BLOCK16_SIZE && !info.isMxFp4 &&
+                (info.isQuant || info.queryDtype == ge::DT_HIFLOAT8 || info.keyDtype == ge::DT_HIFLOAT8),
+            OP_LOGE(context, "BBND/BNBD page size %u supports fp16 / bf16 / float8_e4m3fn / float8_e5m2 / MXFP4 only.",
+                    MSA_BLOCK16_SIZE),
+            return ge::GRAPH_FAILED);
+        if (info.isMxFp4) {
+            OP_CHECK_IF(info.numKvHeads != 1, OP_LOGE(context, "MXFP4 x MXFP4 requires numKvHeads == 1."),
+                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF((info.headDim % 64U) != 0,
+                        OP_LOGE(context, "MXFP4 headDim(%u) must be a multiple of 64.", info.headDim),
+                        return ge::GRAPH_FAILED);
+        } else if (info.isQuant) {
+            OP_CHECK_IF(info.queryDtype != ge::DT_FLOAT16,
+                        OP_LOGE(context, "ND int8 key currently requires fp16 query."), return ge::GRAPH_FAILED);
+        } else {
+            OP_CHECK_IF(
+                info.keyDtype != info.queryDtype,
+                OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(context->GetNodeName(), "query, key",
+                                                       (std::string("query=") + Ops::Base::ToString(info.queryDtype) +
+                                                        ", key=" + Ops::Base::ToString(info.keyDtype))
+                                                           .c_str(),
+                                                       "the non-quant key dtype must match the query dtype"),
+                return ge::GRAPH_FAILED);
+            OP_CHECK_IF(IsFp8ComputeDtype(info.queryDtype) && !info.isAscend950,
+                        OP_LOGE(context, "FP8 query/key is only supported on Ascend 950."), return ge::GRAPH_FAILED);
+        }
+
+        const gert::StorageShape* scaleShape = context->GetOptionalInputShape(MSA_IDX_KEY_SCALE);
+        const gert::StorageShape* queryScaleShape = context->GetOptionalInputShape(MSA_IDX_QUERY_SCALE);
+        if (info.isMxFp4) {
+            const uint32_t groups = info.headDim / MSA_MX_GROUP;
+            OP_CHECK_IF(!IsOptionalProvided(queryScaleShape) || !IsOptionalProvided(scaleShape),
+                        OP_LOGE(context, "MXFP4 x MXFP4 requires query_scale and key_scale (e8m0, group 32)."),
+                        return ge::GRAPH_FAILED);
+            const auto* queryScaleDesc = context->GetOptionalInputDesc(MSA_IDX_QUERY_SCALE);
+            const auto* scaleDesc = context->GetOptionalInputDesc(MSA_IDX_KEY_SCALE);
+            OP_CHECK_NULL_WITH_CONTEXT(context, queryScaleDesc);
+            OP_CHECK_NULL_WITH_CONTEXT(context, scaleDesc);
+            OP_CHECK_IF(
+                queryScaleDesc->GetDataType() != ge::DT_FLOAT8_E8M0 || scaleDesc->GetDataType() != ge::DT_FLOAT8_E8M0,
+                OP_LOGE(context, "MXFP4 query_scale and key_scale must be float8_e8m0."), return ge::GRAPH_FAILED);
+            const gert::Shape& qs = queryScaleShape->GetStorageShape();
+            const gert::Shape& ks = scaleShape->GetStorageShape();
+            bool qOk =
+                (qs.GetDimNum() == q.GetDimNum()) && (static_cast<uint32_t>(qs.GetDim(qs.GetDimNum() - 1U)) == groups);
+            for (size_t d = 0; qOk && d + 1U < q.GetDimNum(); ++d) {
+                qOk = (qs.GetDim(d) == q.GetDim(d));
+            }
+            OP_CHECK_IF(!qOk, OP_LOGE(context, "query_scale must mirror query layout with last dim D/32."),
+                        return ge::GRAPH_FAILED);
+            bool kOk =
+                (ks.GetDimNum() == kc.GetDimNum()) && (static_cast<uint32_t>(ks.GetDim(ks.GetDimNum() - 1U)) == groups);
+            for (size_t d = 0; kOk && d + 1U < kc.GetDimNum(); ++d) {
+                kOk = (ks.GetDim(d) == kc.GetDim(d));
+            }
+            OP_CHECK_IF(!kOk, OP_LOGE(context, "MXFP4 key_scale must mirror key layout with last dim D/32."),
+                        return ge::GRAPH_FAILED);
+        } else if (info.isQuant) {
+            OP_CHECK_IF(!IsOptionalProvided(scaleShape),
+                        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "key_scale",
+                                                                 "an int8 key requires the dequant scale input"),
+                        return ge::GRAPH_FAILED);
+            const gert::Shape& sc = scaleShape->GetStorageShape();
+            if (info.keyLayout == MSA_KEY_LAYOUT_TND) {
+                const bool ok2d = (sc.GetDimNum() == MSA_SCALE_TND_DIM_NUM &&
+                                   static_cast<uint32_t>(sc.GetDim(MSA_DIM_0)) == info.totalK &&
+                                   static_cast<uint32_t>(sc.GetDim(MSA_DIM_1)) == info.numKvHeads);
+                const bool ok1d = (sc.GetDimNum() == MSA_RANK_1D && info.numKvHeads == 1 &&
+                                   static_cast<uint32_t>(sc.GetDim(MSA_DIM_0)) == info.totalK);
+                OP_CHECK_IF(
+                    !ok2d && !ok1d,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        context->GetNodeName(), "key_scale", Ops::Base::ToString(sc).c_str(),
+                        (std::string("the TND dequant scale must be [") + std::to_string(info.totalK) + ", " +
+                         std::to_string(info.numKvHeads) + "] or [" + std::to_string(info.totalK) + "] when N2=1")
+                            .c_str()),
+                    return ge::GRAPH_FAILED);
+            } else {
+                OP_CHECK_IF(sc.GetDimNum() != MSA_SCALE_PA_DIM_NUM,
+                            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "key_scale",
+                                                                     (std::to_string(sc.GetDimNum()) + "D").c_str(),
+                                                                     "PA dequant scale must have 3 dims [NP, N_kv, P]"),
+                            return ge::GRAPH_FAILED);
+                OP_CHECK_IF(static_cast<uint32_t>(sc.GetDim(MSA_DIM_0)) != info.numPages ||
+                                static_cast<uint32_t>(sc.GetDim(MSA_DIM_1)) != info.numKvHeads ||
+                                static_cast<uint32_t>(sc.GetDim(MSA_DIM_2)) != info.pageSize,
+                            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                                context->GetNodeName(), "key_scale", Ops::Base::ToString(sc).c_str(),
+                                (std::string("the dequant scale shape must be [") + std::to_string(info.numPages) +
+                                 ", " + std::to_string(info.numKvHeads) + ", " + std::to_string(info.pageSize) + "]")
+                                    .c_str()),
+                            return ge::GRAPH_FAILED);
+            }
+            const auto* scaleDesc = context->GetOptionalInputDesc(MSA_IDX_KEY_SCALE);
+            if (scaleDesc == nullptr) {
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "key_scale",
+                                                         "the dequant scale must be provided for an int8 key");
+                return ge::GRAPH_FAILED;
+            }
+            OP_CHECK_IF(scaleDesc->GetDataType() != ge::DT_FLOAT,
+                        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context->GetNodeName(), "key_scale",
+                                                              Ops::Base::ToString(scaleDesc->GetDataType()).c_str(),
+                                                              "the dequant scale dtype must be float32"),
+                        return ge::GRAPH_FAILED);
+        } else {
+            OP_CHECK_IF(IsOptionalProvided(scaleShape),
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "key_scale", "provided",
+                                                              "the non-quant path must not pass key_scale"),
+                        return ge::GRAPH_FAILED);
+        }
+        OP_CHECK_IF(!info.isMxFp4 && IsOptionalProvided(queryScaleShape),
+                    OP_LOGE(context, "query_scale is only supported for MXFP4."), return ge::GRAPH_FAILED);
     }
-    OP_CHECK_IF(!info.isMxFp4 && IsOptionalProvided(queryScaleShape),
-                OP_LOGE(context, "query_scale is only supported for MXFP4."), return ge::GRAPH_FAILED);
 
     const int64_t* sparseModeAttr = attrs->GetInt(MSA_ATTR_SPARSE_MODE);
     info.sparseMode = (sparseModeAttr == nullptr) ? MSA_SPARSE_MODE_RIGHT_DOWN : static_cast<uint32_t>(*sparseModeAttr);
@@ -1534,18 +1565,34 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
 
     const bool logicalBlock16 = info.poolBlockSize == MSA_BLOCK16_SIZE;
     const bool block16Mx = logicalBlock16 && info.isMxFp4;
+    const bool fixedScale = info.isQueryQuant && !info.isAscend950;
+    if (info.isQueryQuant) {
+        uint64_t ubBytes = 0, l1Bytes = 0, l0aBytes = 0, l0bBytes = 0, l0cBytes = 0;
+        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, ubBytes);
+        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, l1Bytes);
+        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_A, l0aBytes);
+        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_B, l0bBytes);
+        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, l0cBytes);
+        const uint64_t requiredUbBytes = fixedScale ? MSA_FIXED_SCALE_UB_BYTES : 191488U;
+        OP_CHECK_IF(ubBytes < requiredUbBytes || l1Bytes < 65536U || l0aBytes < 65536U || l0bBytes < 65536U ||
+                        l0cBytes < 131072U,
+                    OP_LOGE(context, "insufficient platform memory for native A8C8 fixed tile."),
+                    return ge::GRAPH_FAILED);
+    }
+    const uint32_t paddedHeadDim = info.isQueryQuant ? RoundUpU32(info.headDim, 32U) : info.headDim;
     const uint32_t scoreBlockStride = RoundUpU32(info.maxBlocksPerBatch, MSA_SCORE_STRIDE_ALIGN);
     // 950 C_to_UB：S 不进 GM；int8/TND 尾页仍要一页 K scratch。A2 与 950 回退（MSA_A5_USE_C2UB=0）走 8-stage S。
-    const uint32_t sElemBytes = (info.isQuant || logicalBlock16) ? sizeof(float) : sizeof(uint16_t);
+    const uint32_t sElemBytes = (logicalBlock16 || (info.isQuant && !fixedScale)) ? sizeof(float) : sizeof(uint16_t);
     const bool c2ub = info.isAscend950 && (MSA_A5_USE_C2UB != 0);
-    const uint32_t sWsBytes = c2ub ? 0U : (aicNum * MSA_WORKSPACE_STAGES * MSA_STILE_ELEM_NUM * sElemBytes);
+    const uint64_t sWsBytes =
+        c2ub ? 0U : (static_cast<uint64_t>(aicNum) * MSA_WORKSPACE_STAGES * MSA_STILE_ELEM_NUM * sElemBytes);
     // BSND 的尾窗可能越过 key 末尾（仅最后一个 batch），与 TND 尾页一样走 scratch 补零。
     const bool paBlock16 = (info.keyLayout == MSA_KEY_LAYOUT_BBND || info.keyLayout == MSA_KEY_LAYOUT_BNBD) &&
                            info.poolBlockSize == MSA_BLOCK16_SIZE;
     // 非 MX 块长 16 的 8 个 page 不连续，先收到 scratch 再做 128 列 GEMM。
     const bool useKScratch =
         block16Mx || (!info.isMxFp4 && (info.isQuant || MsaIsSeqKeyLayout(info.keyLayout) || paBlock16));
-    uint32_t scratchElemBytes = sizeof(uint16_t);
+    uint32_t scratchElemBytes = info.isQueryQuant ? sizeof(int8_t) : sizeof(uint16_t);
     if (info.isMxFp4 || (info.isAscend950 && !info.isQuant && IsFp8ComputeDtype(info.queryDtype))) {
         scratchElemBytes = 1U;
     }
@@ -1555,16 +1602,31 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
     if (!info.isAscend950 && info.isQuant) {
         kScratchElems *= MSA_K_SCRATCH_STAGES_A2;
     }
-    const uint32_t kScratchBytes = useKScratch ? (aicNum * kScratchElems * scratchElemBytes) : 0U;
-    const uint32_t kScratchOffsetElems = sWsBytes / sizeof(float);
-    // 非 MX 的 BSND/BNSD M-tile 先收成连续 (token, head) 再给 Cube。
-    const uint32_t qScratchBytes = ((!info.isMxFp4 || block16Mx) && info.queryLayout != MSA_QUERY_LAYOUT_TND) ?
-                                       (aicNum * MSA_ROW_TILE_M * info.headDim * scratchElemBytes) :
-                                       0U;
-    const uint32_t qScratchElemOff = (qScratchBytes == 0U) ? 0U : ((sWsBytes + kScratchBytes) / scratchElemBytes);
+    const uint64_t kScratchBytes =
+        useKScratch ? (static_cast<uint64_t>(aicNum) * kScratchElems * scratchElemBytes) : 0U;
+    const uint32_t qScratchBytesPerCore =
+        info.isQueryQuant && paddedHeadDim != info.headDim ? MSA_ROW_TILE_M * paddedHeadDim : 0U;
+    // Native Q padding and legacy layout gathering use disjoint, explicitly sized regions.
+    const uint64_t qScratchBytes =
+        info.isQueryQuant ? static_cast<uint64_t>(aicNum) * qScratchBytesPerCore :
+                            (((!info.isMxFp4 || block16Mx) && info.queryLayout != MSA_QUERY_LAYOUT_TND) ?
+                                 static_cast<uint64_t>(aicNum) * MSA_ROW_TILE_M * info.headDim * scratchElemBytes :
+                                 0U);
+    const uint64_t qScratchOffsetBytes = sWsBytes + kScratchBytes;
+    const uint64_t kScratchOffsetWords = sWsBytes / sizeof(float);
+    const uint64_t qScratchElemOffset = qScratchBytes == 0U ? 0U : qScratchOffsetBytes / scratchElemBytes;
+    const uint64_t userWorkspaceBytes = qScratchOffsetBytes + qScratchBytes;
+    const uint64_t libWorkspaceBytes = ascendcPlatform.GetLibApiWorkSpaceSize();
+    OP_CHECK_IF(kScratchOffsetWords > std::numeric_limits<uint32_t>::max() ||
+                    qScratchElemOffset > std::numeric_limits<uint32_t>::max() ||
+                    userWorkspaceBytes > std::numeric_limits<size_t>::max() - libWorkspaceBytes,
+                OP_LOGE(context, "workspace offsets exceed supported range."), return ge::GRAPH_FAILED);
+    const uint32_t kScratchOffsetElems = static_cast<uint32_t>(kScratchOffsetWords);
+    const uint32_t qScratchElemOff = static_cast<uint32_t>(qScratchElemOffset);
 
     uint32_t launchAic = aicNum;
     uint32_t kvChunks = 1U;
+    uint32_t chunkBudget = 0U;
     if (info.totalQ == 0U) {
         launchAic = 1U;
     } else {
@@ -1577,14 +1639,91 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
                                       EstKvChunks(info, aicNum, packedM, visBlocks);
         }
         launchAic = EstLaunchAic(aicNum, packedM, kvChunks);
+        // Use the shape-level average to identify small batched requests.
+        // Device-only per-request lengths can still differ within that bound.
+        const uint64_t packedRows = static_cast<uint64_t>(info.totalQ) * info.numQHeads;
+        if (info.isQueryQuant && !info.isAscend950 && info.batch > 1U && aicNum > 0U && chunkBudget == 0U &&
+            packedRows <= static_cast<uint64_t>(info.batch) * 32U) {
+            const uint32_t nStiles = (visBlocks + MSA_BLOCKS_PER_STILE - 1U) / MSA_BLOCKS_PER_STILE;
+            kvChunks = EstStartupAwareKvChunks(aicNum, info.batch, nStiles);
+            launchAic = EstLaunchAic(aicNum, packedM, kvChunks);
+        }
     }
+
+    const bool fixedPagedScore = fixedScale && info.numKvHeads == 1U && info.queryLayout == MSA_QUERY_LAYOUT_TND &&
+                                 info.keyLayout == MSA_KEY_LAYOUT_BBND && info.pageSize == MSA_BLOCK_SIZE &&
+                                 info.poolBlockSize == MSA_BLOCK_SIZE &&
+                                 info.sparseMode == MSA_SPARSE_MODE_RIGHT_DOWN && info.initBlocks == 0U &&
+                                 info.localBlocks == 0U;
+    const bool pagedA8c8Score = fixedPagedScore && info.headDim == MSA_K_TILE;
+    constexpr uint32_t shortMaxPages = 64U;
+    constexpr uint32_t wideMinPages = 512U;
+    const bool singleQuery =
+        pagedA8c8Score && info.returnChoice == MSA_RETURN_SCORE && info.batch == 1U && info.totalQ == 1U;
+    const bool singleQueryD64 = fixedPagedScore && info.returnChoice == MSA_RETURN_SCORE && info.headDim == 64U &&
+                                info.batch == 1U && info.totalQ == 1U;
+    const bool mixOneDecode =
+        (singleQuery && (info.numQHeads == 1U || info.numQHeads == 2U) && info.tableWidth > shortMaxPages) ||
+        ((singleQuery || singleQueryD64) && info.numQHeads == 4U && info.tableWidth >= wideMinPages);
+    const uint64_t packedRows = static_cast<uint64_t>(info.totalQ) * info.numQHeads;
+    // Every request fits the single AIV's Qscale and score buffers because
+    // the total TND packed rows are an upper bound for each ragged request.
+    const uint32_t mixOneRowLimit = info.headDim == 96U ? 80U : MSA_ROW_TILE_M / MSA_AIV_PER_AIC;
+    const bool mixOneBatch = fixedPagedScore && info.returnChoice == MSA_RETURN_SCORE && info.batch > 1U &&
+                             info.tableWidth > shortMaxPages &&
+                             (info.headDim == 64U || info.headDim == 96U || info.headDim == MSA_K_TILE) &&
+                             packedRows > 0U && packedRows <= mixOneRowLimit;
+
+    constexpr uint32_t shortChunks = 2U;
+    // Each TND request contributes at most M-1 rows to the sum of rounded M tiles.
+    const uint64_t taskUpper =
+        (packedRows + static_cast<uint64_t>(info.batch) * (MSA_ROW_TILE_M - 1U)) / MSA_ROW_TILE_M * shortChunks;
+    const bool shortC2 = pagedA8c8Score && info.batch > 0U && info.tableWidth > MSA_BLOCKS_PER_STILE &&
+                         info.tableWidth <= shortMaxPages && launchAic == aicNum && aicNum == 24U &&
+                         chunkBudget == 0U && packedRows > static_cast<uint64_t>(info.batch) * MSA_ROW_TILE_M &&
+                         taskUpper < aicNum;
+    if (shortC2) {
+        kvChunks = shortChunks;
+        launchAic = static_cast<uint32_t>(taskUpper);
+    }
+
+    // These page capacities bound the two-wave S-tile workload, and
+    // retain the tested capacity of the physical key allocation.
+    constexpr uint32_t ownerSmallPages = 193U;
+    constexpr uint32_t ownerLargePages = 256U;
+    constexpr uint32_t ownerTailPages = 257U;
+    const bool reduceOwners = singleQuery && info.numQHeads == 4U && info.numPages == info.tableWidth &&
+                              (info.tableWidth == ownerSmallPages || info.tableWidth == ownerLargePages ||
+                               info.tableWidth == ownerTailPages) &&
+                              aicNum == 24U && launchAic == aicNum && chunkBudget == 0U;
+    if (reduceOwners) {
+        const uint32_t stiles = RoundUpU32(info.tableWidth, MSA_BLOCKS_PER_STILE) / MSA_BLOCKS_PER_STILE;
+        constexpr uint32_t stilesPerOwner = 2U;
+        const uint32_t owners = RoundUpU32(stiles, stilesPerOwner) / stilesPerOwner;
+        kvChunks = owners;
+        launchAic = owners;
+    }
+    const bool lowDimOwners = singleQueryD64 && info.numQHeads == 4U && info.tableWidth == 256U &&
+                              info.numPages == info.tableWidth && aicNum == 24U && launchAic == aicNum &&
+                              chunkBudget == 0U;
+    if (lowDimOwners) {
+        kvChunks = 16U;
+        launchAic = 16U;
+    }
+    const bool mixOne = mixOneDecode || mixOneBatch || reduceOwners || lowDimOwners;
 
     MsaIndexScoreTilingData tilingData;
     tilingData.set_batch(info.batch);
     tilingData.set_totalQ(info.totalQ);
     tilingData.set_numQHeads(info.numQHeads);
     tilingData.set_numKvHeads(info.numKvHeads);
-    tilingData.set_gqaGroup(info.numQHeads / info.numKvHeads);
+    // Average packed rows is only a cost gate. Each actual request is checked on AIC.
+    const bool packetCandidate = fixedPagedScore && !mixOne && info.batch > 1U && info.tableWidth > shortMaxPages &&
+                                 (info.headDim == 64U || info.headDim == 96U || info.headDim == MSA_K_TILE) &&
+                                 packedRows >= static_cast<uint64_t>(info.batch) * MSA_PACKET_MIN_M &&
+                                 packedRows <= static_cast<uint64_t>(info.batch) * MSA_PACKET_MAX_M;
+    const uint32_t gqaGroup = info.numQHeads / info.numKvHeads;
+    tilingData.set_gqaGroup(gqaGroup | (packetCandidate ? MSA_PACKET_CANDIDATE : 0U));
     tilingData.set_headDim(info.headDim);
     tilingData.set_poolBlockSize(info.poolBlockSize);
     tilingData.set_pageSize(info.pageSize);
@@ -1600,7 +1739,7 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
     tilingData.set_keyLayout(info.keyLayout);
     tilingData.set_totalK(info.totalK);
     tilingData.set_kvChunks(kvChunks);
-    tilingData.set_chunkBudget(0U);
+    tilingData.set_chunkBudget(chunkBudget);
     tilingData.set_compressFactor(info.compressFactor);
     tilingData.set_rowsPerBlock(info.rowsPerBlock);
     tilingData.set_totalTasks(logicalBlock16 ? EstExactTotalTasks(context, info, kvChunks) : 0U);
@@ -1609,6 +1748,10 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
     tilingData.set_qMaxSeq(info.qMaxSeq);
     tilingData.set_kMaxSeq(info.kMaxSeq);
     tilingData.set_qScratchElems(qScratchElemOff);
+    tilingData.set_paddedHeadDim(paddedHeadDim);
+    tilingData.set_kScratchOffsetBytes(sWsBytes);
+    tilingData.set_qScratchOffsetBytes(qScratchOffsetBytes);
+    tilingData.set_qScratchBytesPerCore(qScratchBytesPerCore);
 
     tilingData.set_strideQt(info.numQHeads * info.headDim);
     tilingData.set_strideQn(info.headDim);
@@ -1644,8 +1787,7 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
     tilingData.set_strideOutToken(outStride);
     tilingData.set_kScratchOffsetElems(kScratchOffsetElems);
 
-    size_t userBytes =
-        static_cast<size_t>(sWsBytes) + static_cast<size_t>(kScratchBytes) + static_cast<size_t>(qScratchBytes);
+    size_t userBytes = static_cast<size_t>(userWorkspaceBytes);
     if (info.isAscend950 && sWsBytes == 0U && kScratchBytes == 0U) {
         userBytes += 64U;
     }
@@ -1697,7 +1839,6 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
 
     size_t* workspaces = context->GetWorkspaceSizes(1);
     OP_CHECK_NULL_WITH_CONTEXT(context, workspaces);
-    const size_t libWorkspaceBytes = ascendcPlatform.GetLibApiWorkSpaceSize();
     OP_CHECK_IF(userBytes > std::numeric_limits<size_t>::max() - libWorkspaceBytes,
                 OP_LOGE(context, "Workspace size overflows."), return ge::GRAPH_FAILED);
     workspaces[0] = libWorkspaceBytes + userBytes;
@@ -1769,6 +1910,28 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
                                                              MSA_TILING_KEY_FP16_DIRECT_FLOAT;
             }
         }
+    } else if (info.isQueryQuant) {
+        const bool paired = info.headDim == MSA_K_TILE;
+        const uint64_t packedRows = static_cast<uint64_t>(info.totalQ) * info.numQHeads;
+        const bool groupMask = info.batch == 1U && info.totalQ > 1U && info.sparseMode == MSA_SPARSE_MODE_RIGHT_DOWN &&
+                               packedRows >= MSA_ROW_TILE_M;
+        // Shape-only coarse gate: never infer prefill from Hq (decode may have
+        // many heads). Device additionally checks each request's true qLen and
+        // mSub before enabling the 64-column window, including mixed batches.
+        const bool wideScore =
+            !info.isAscend950 && info.isQuant && info.queryLayout == MSA_QUERY_LAYOUT_TND &&
+            (info.keyLayout == MSA_KEY_LAYOUT_TND || info.keyLayout == MSA_KEY_LAYOUT_BBND) &&
+            info.pageSize == MSA_BLOCK_SIZE && info.sparseMode == MSA_SPARSE_MODE_RIGHT_DOWN &&
+            (info.headDim == 64U || info.headDim == 96U) && info.batch > 1U && scoreBlockStride > 64U &&
+            static_cast<uint64_t>(info.totalQ) >= static_cast<uint64_t>(info.batch) * MSA_WIDE_SCORE_MIN_Q_TOKENS;
+        if (wideScore) {
+            tilingKey = MSA_TILING_KEY_INT8_INT8_FIXED_WIDE_SCORE;
+        } else if (groupMask) {
+            tilingKey =
+                paired ? MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED_GROUP_MASK : MSA_TILING_KEY_INT8_INT8_FIXED_GROUP_MASK;
+        } else {
+            tilingKey = paired ? MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED : MSA_TILING_KEY_INT8_INT8_FIXED;
+        }
     } else if (info.isQuant) {
         tilingKey = MSA_TILING_KEY_FP16_INT8;
     } else if (info.queryDtype == ge::DT_HIFLOAT8) {
@@ -1780,7 +1943,7 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
     } else {
         tilingKey = (info.queryDtype == ge::DT_BF16) ? MSA_TILING_KEY_BF16 : MSA_TILING_KEY_FP16;
     }
-    if (!logicalBlock16 && info.returnChoice != MSA_RETURN_SCORE) {
+    if (!logicalBlock16 && info.returnChoice != MSA_RETURN_SCORE && !info.isQueryQuant) {
         if (info.isMxFp4) {
             tilingKey = MSA_TILING_KEY_MXFP4_TOPK;
         } else if (!info.isAscend950) {
@@ -1803,6 +1966,17 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
             return ge::GRAPH_FAILED;
         }
     }
+    const bool batchedPrefill =
+        pagedA8c8Score && info.batch > 1U &&
+        static_cast<uint64_t>(info.totalQ) >= static_cast<uint64_t>(info.batch) * MSA_WIDE_SCORE_MIN_Q_TOKENS;
+    if (mixOne) {
+        tilingKey = MSA_TILING_KEY_INT8_INT8_FIXED_MIX_ONE;
+    } else if (shortC2 || (tilingKey == MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED && batchedPrefill)) {
+        tilingKey = MSA_TILING_KEY_INT8_INT8_FIXED_PAIRED_GROUP_MASK;
+    }
+    if (info.isQueryQuant && info.returnChoice != MSA_RETURN_SCORE) {
+        tilingKey += MSA_TILING_KEY_INT8_INT8_FIXED_TOPK - MSA_TILING_KEY_INT8_INT8_FIXED;
+    }
     context->SetTilingKey(tilingKey);
     OP_LOGI(context->GetNodeName(),
             "MsaIndexScore tilingKey=%lu headDim=%u layout=%u strideKvBlock=%u launchAic=%u kvChunks=%u "
@@ -1811,6 +1985,106 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
     return ge::GRAPH_SUCCESS;
 }
 } // namespace
+
+ge::graphStatus CheckMsaIndexScoreQuantInputs(gert::TilingContext* context, MsaIndexScoreInfo& info)
+{
+    OP_CHECK_IF(!IsNonQuantQueryDtype(info.queryDtype, info.isAscend950) && info.queryDtype != ge::DT_INT8,
+                OP_LOGE(context, "query dtype must be bf16, fp16 or int8 on A2/A3; Ascend 950 also allows hifloat8 / "
+                                 "float8_e5m2 / float8_e4m3fn."),
+                return ge::GRAPH_FAILED);
+
+    info.isQuant = (info.keyDtype == ge::DT_INT8);
+    info.isQueryQuant = (info.queryDtype == ge::DT_INT8);
+    OP_CHECK_IF(info.isQuant && !info.isQueryQuant,
+                OP_LOGE(context, "int8 key requires native int8 query; FP16 query with INT8 key is reserved."),
+                return ge::GRAPH_FAILED);
+    const auto* queryScaleShape = context->GetOptionalInputShape(MSA_IDX_QUERY_SCALE);
+    if (info.isQueryQuant) {
+        OP_CHECK_IF(info.isAscend950 || !info.isQuant, OP_LOGE(context, "int8 query requires int8 key on A2/A3."),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            info.queryLayout != MSA_QUERY_LAYOUT_TND || info.poolBlockSize != MSA_BLOCK_SIZE || info.numKvHeads != 1,
+            OP_LOGE(context, "int8 query requires TND query, pool_block_size=128 and N2=1."), return ge::GRAPH_FAILED);
+        OP_CHECK_IF(info.keyLayout != MSA_KEY_LAYOUT_TND && info.keyLayout != MSA_KEY_LAYOUT_BBND &&
+                        info.keyLayout != MSA_KEY_LAYOUT_BNBD,
+                    OP_LOGE(context, "native int8 query/key requires TND, BBND or BNBD key layout."),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(!IsOptionalProvided(queryScaleShape), OP_LOGE(context, "int8 query requires query_scale [Tq, Hq]."),
+                    return ge::GRAPH_FAILED);
+        const auto& qs = queryScaleShape->GetStorageShape();
+        OP_CHECK_IF(
+            qs.GetDimNum() != MSA_SCALE_TND_DIM_NUM || qs.GetDim(MSA_DIM_0) != static_cast<int64_t>(info.totalQ) ||
+                qs.GetDim(MSA_DIM_1) != static_cast<int64_t>(info.numQHeads),
+            OP_LOGE(context, "query_scale must be [%u, %u].", info.totalQ, info.numQHeads), return ge::GRAPH_FAILED);
+        const auto* queryScaleDesc = context->GetOptionalInputDesc(MSA_IDX_QUERY_SCALE);
+        OP_CHECK_NULL_WITH_CONTEXT(context, queryScaleDesc);
+        OP_CHECK_IF(queryScaleDesc->GetDataType() != ge::DT_FLOAT,
+                    OP_LOGE(context, "query_scale dtype must be float32."), return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF(IsOptionalProvided(queryScaleShape),
+                    OP_LOGE(context, "query_scale is only supported for int8 query."), return ge::GRAPH_FAILED);
+    }
+    // Block16 keeps upstream FP16/BF16/FP8/MXFP4 support; native A8C8 remains block128.
+    OP_CHECK_IF(info.poolBlockSize == MSA_BLOCK16_SIZE &&
+                    (info.isQuant || info.queryDtype == ge::DT_HIFLOAT8 || info.keyDtype == ge::DT_HIFLOAT8),
+                OP_LOGE(context, "pool_block_size=%u supports fp16 / bf16 / float8_e4m3fn / float8_e5m2 / MXFP4 only.",
+                        MSA_BLOCK16_SIZE),
+                return ge::GRAPH_FAILED);
+    // PA 存储页长 16（M3 短页存储）同样仅 950 上的 fp16 / bf16。
+    OP_CHECK_IF(
+        info.pageSize == MSA_BLOCK16_SIZE &&
+            (info.isQuant || info.queryDtype == ge::DT_HIFLOAT8 || info.keyDtype == ge::DT_HIFLOAT8),
+        OP_LOGE(context, "BBND/BNBD page size %u supports fp16 / bf16 / float8_e4m3fn / float8_e5m2 / MXFP4 only.",
+                MSA_BLOCK16_SIZE),
+        return ge::GRAPH_FAILED);
+    if (info.isQuant) {
+        OP_CHECK_IF(info.queryDtype != ge::DT_FLOAT16 && !info.isQueryQuant,
+                    OP_LOGE(context, "ND int8 key requires fp16 or int8 query."), return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF(info.keyDtype != info.queryDtype, OP_LOGE(context, "non-quant key dtype must match query dtype."),
+                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(IsFp8ComputeDtype(info.queryDtype) && !info.isAscend950,
+                    OP_LOGE(context, "FP8 query/key is only supported on Ascend 950."), return ge::GRAPH_FAILED);
+    }
+
+    const gert::StorageShape* scaleShape = context->GetOptionalInputShape(MSA_IDX_KEY_SCALE);
+    if (info.isQuant) {
+        OP_CHECK_IF(!IsOptionalProvided(scaleShape), OP_LOGE(context, "int8 key requires dequant scale."),
+                    return ge::GRAPH_FAILED);
+        const gert::Shape& sc = scaleShape->GetStorageShape();
+        if (info.keyLayout == MSA_KEY_LAYOUT_TND) {
+            const bool ok2d = (sc.GetDimNum() == MSA_SCALE_TND_DIM_NUM &&
+                               static_cast<uint32_t>(sc.GetDim(MSA_DIM_0)) == info.totalK &&
+                               static_cast<uint32_t>(sc.GetDim(MSA_DIM_1)) == info.numKvHeads);
+            const bool ok1d = (sc.GetDimNum() == MSA_RANK_1D && info.numKvHeads == 1 &&
+                               static_cast<uint32_t>(sc.GetDim(MSA_DIM_0)) == info.totalK);
+            OP_CHECK_IF(!ok2d && !ok1d,
+                        OP_LOGE(context, "TND dequant scale must be [%u, %u] or [%u] (N2=1).", info.totalK,
+                                info.numKvHeads, info.totalK),
+                        return ge::GRAPH_FAILED);
+        } else {
+            OP_CHECK_IF(sc.GetDimNum() != MSA_SCALE_PA_DIM_NUM,
+                        OP_LOGE(context, "PA dequant scale must be 3D [NP, N_kv, P], got rank %zu.", sc.GetDimNum()),
+                        return ge::GRAPH_FAILED);
+            OP_CHECK_IF(static_cast<uint32_t>(sc.GetDim(MSA_DIM_0)) != info.numPages ||
+                            static_cast<uint32_t>(sc.GetDim(MSA_DIM_1)) != info.numKvHeads ||
+                            static_cast<uint32_t>(sc.GetDim(MSA_DIM_2)) != info.pageSize,
+                        OP_LOGE(context, "dequant scale shape must be [%u, %u, %u], got [%ld, %ld, %ld].",
+                                info.numPages, info.numKvHeads, info.pageSize, sc.GetDim(MSA_DIM_0),
+                                sc.GetDim(MSA_DIM_1), sc.GetDim(MSA_DIM_2)),
+                        return ge::GRAPH_FAILED);
+        }
+        const auto* scaleDesc = context->GetOptionalInputDesc(MSA_IDX_KEY_SCALE);
+        OP_CHECK_NULL_WITH_CONTEXT(context, scaleDesc);
+        OP_CHECK_IF(scaleDesc->GetDataType() != ge::DT_FLOAT, OP_LOGE(context, "dequant scale dtype must be float32."),
+                    return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF(IsOptionalProvided(scaleShape), OP_LOGE(context, "non-quant path must not pass scale."),
+                    return ge::GRAPH_FAILED);
+    }
+
+    return ge::GRAPH_SUCCESS;
+}
 
 static ge::graphStatus TilingPrepareForMsaIndexScore(gert::TilingParseContext* /* context */)
 {
