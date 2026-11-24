@@ -3041,6 +3041,25 @@ struct RoceDispatchUbLayout {
     uint64_t flagBytes;
 };
 
+static uint64_t GetRoceDispatchScratchBytes(const MoeDistributeDispatchV2Info& info, bool isScales,
+                                            uint64_t countsBytes)
+{
+    constexpr uint32_t cumsumCoreNum = 2U;
+    const uint64_t hidden = info.h;
+    const uint64_t idsCount = static_cast<uint64_t>(info.bs) * info.k;
+    constexpr uint32_t perGroupMode = static_cast<uint32_t>(QuantModeA5::PERGROUP_DYNAMIC_QUANT);
+    const uint64_t floatBytes =
+        (info.quantMode == perGroupMode && isScales ? AlignRoceBytes(hidden, PERGROUP_BLOCK_SIZE) : hidden) *
+        sizeof(float);
+    return AlignRoceBytes(
+        std::max({floatBytes, AlignRoceBytes(idsCount * sizeof(int32_t)),
+                  info.bs * AlignRoceBytes(info.k) * sizeof(uint16_t),
+                  AlignRoceBytes(idsCount * sizeof(uint16_t), SIZE_ALIGN_256) / sizeof(uint16_t),
+                  AlignRoceBytes(static_cast<uint64_t>(info.moeExpertNum) * sizeof(int32_t), SPLIT_BLOCK_DATA_SIZE),
+                  info.bs * countsBytes, GetRoceFlagBufferBytes(info.aivNum - cumsumCoreNum)}),
+        SIZE_ALIGN_256);
+}
+
 static RoceDispatchUbLayout GetRoceDispatchUbLayout(const gert::TilingContext* context,
                                                     const MoeDistributeDispatchV2Info& info,
                                                     const DispatchV2Config& config, bool isScales)
@@ -3078,15 +3097,7 @@ static RoceDispatchUbLayout GetRoceDispatchUbLayout(const gert::TilingContext* c
     layout.serverPacketBytes =
         AlignRoceBytes(serverDataBytes + UB_ALIGN + 2U * idsBytes + countsBytes, SPLIT_BLOCK_DATA_SIZE) /
         SPLIT_BLOCK_DATA_SIZE * SPLIT_BLOCK_SIZE;
-    const uint64_t idsCount = static_cast<uint64_t>(info.bs) * info.k;
-    const uint64_t floatBytes = (mode == 3U && isScales ? AlignRoceBytes(hidden, 128U) : hidden) * sizeof(float);
-    layout.scratchBytes = AlignRoceBytes(
-        std::max({floatBytes, AlignRoceBytes(idsCount * sizeof(int32_t)),
-                  info.bs * AlignRoceBytes(info.k) * sizeof(uint16_t),
-                  AlignRoceBytes(idsCount * sizeof(uint16_t), 256U) / 2U,
-                  AlignRoceBytes(static_cast<uint64_t>(info.moeExpertNum) * sizeof(int32_t), SPLIT_BLOCK_DATA_SIZE),
-                  info.bs * countsBytes, GetRoceFlagBufferBytes(info.aivNum - 2U)}),
-        256U);
+    layout.scratchBytes = GetRoceDispatchScratchBytes(info, isScales, countsBytes);
     layout.quantScratchBytes = mode > 0U || inputType != outputType ? 2U * layout.scratchBytes : 0U;
     const uint64_t expertCountBytes = static_cast<uint64_t>(info.moeExpertNum) /
                                       (info.epWorldSize - info.sharedExpertRankNum) *

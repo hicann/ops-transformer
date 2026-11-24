@@ -27,6 +27,136 @@ namespace Mc2Kernel {
 using namespace AscendC;
 using namespace MoeDistributeV2Base;
 
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 3510) || (__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+template <typename XType>
+__simd_callee__ inline void DequantizeInt8Repeat(Reg::RegTensor<int8_t>& tokenSrcReg, Reg::RegTensor<float>& evenFp32,
+                                                 Reg::RegTensor<float>& oddFp32, Reg::MaskReg& maskF16,
+                                                 Reg::MaskReg& maskF32)
+{
+    AscendC::Reg::RegTensor<half> tokenHalfReg;
+    AscendC::Reg::RegTensor<float> tokFp32_1;
+    AscendC::Reg::RegTensor<float> tokFp32_2;
+    AscendC::Reg::RegTensor<float> deqFp32_1;
+    AscendC::Reg::RegTensor<float> deqFp32_2;
+    AscendC::Reg::RegTensor<XType> deqXType_1;
+    AscendC::Reg::RegTensor<XType> deqXType_2;
+
+    static constexpr AscendC::Reg::CastTrait castZero = {AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::UNKNOWN,
+                                                         AscendC::Reg::MaskMergeMode::ZEROING,
+                                                         AscendC::RoundMode::UNKNOWN};
+    static constexpr AscendC::Reg::CastTrait castOne = {AscendC::Reg::RegLayout::ONE, AscendC::Reg::SatMode::UNKNOWN,
+                                                        AscendC::Reg::MaskMergeMode::ZEROING,
+                                                        AscendC::RoundMode::UNKNOWN};
+    static constexpr AscendC::Reg::CastTrait castRint = {AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::SAT,
+                                                         AscendC::Reg::MaskMergeMode::ZEROING,
+                                                         AscendC::RoundMode::CAST_RINT};
+
+    Reg::Cast<half, int8_t, castZero>(tokenHalfReg, tokenSrcReg, maskF16);
+    Reg::Cast<float, half, castZero>(tokFp32_1, tokenHalfReg, maskF16);
+    Reg::Cast<float, half, castOne>(tokFp32_2, tokenHalfReg, maskF16);
+
+    Reg::Mul(deqFp32_1, evenFp32, tokFp32_1, maskF32);
+    Reg::Mul(deqFp32_2, oddFp32, tokFp32_2, maskF32);
+
+    Reg::Cast<XType, float, castRint>(deqXType_1, deqFp32_1, maskF32);
+    Reg::Cast<XType, float, castRint>(deqXType_2, deqFp32_2, maskF32);
+    Reg::Cast<float, XType, castZero>(evenFp32, deqXType_1, maskF32);
+    Reg::Cast<float, XType, castZero>(oddFp32, deqXType_2, maskF32);
+}
+
+template <typename XType, bool ApplyExpertScale>
+__aicore__ inline void AccumulateInt8Token(__ubuf__ int8_t* tokenPtr0, __ubuf__ float* dyScaleFp32Ptr,
+                                           __ubuf__ float* sumFinalDstPtr, uint32_t axisH, float scaleVal)
+{
+    constexpr uint32_t elementsPerRepeat = Quant::GetVRegSizeDispatch() / sizeof(float) * INT8_DIVIVE;
+    uint16_t fp32RepeatTimes = Ceil(axisH, elementsPerRepeat);
+    uint32_t tailElements = axisH % elementsPerRepeat;
+    bool hasTail = tailElements != 0U;
+
+    __VEC_SCOPE__
+    {
+        Reg::RegTensor<int8_t> tokenSrcReg;
+        Reg::RegTensor<float> evenFp32;
+        Reg::RegTensor<float> oddFp32;
+        Reg::RegTensor<float> sumFinal_1;
+        Reg::RegTensor<float> sumFinal_2;
+        AscendC::Reg::MaskReg maskF32All = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
+        AscendC::Reg::MaskReg maskF16All = AscendC::Reg::CreateMask<half, AscendC::Reg::MaskPattern::ALL>();
+        AscendC::Reg::MaskReg maskF32Tail;
+        AscendC::Reg::MaskReg maskF16Tail;
+        if (hasTail) {
+            uint32_t tailF32Elements = Ceil(tailElements, INT8_DIVIVE);
+            maskF32Tail = AscendC::Reg::UpdateMask<float>(tailF32Elements);
+            maskF16Tail = AscendC::Reg::UpdateMask<half>(tailElements);
+        }
+        AscendC::Reg::MaskReg maskF32;
+        AscendC::Reg::MaskReg maskF16;
+
+        for (uint16_t i = 0; i < fp32RepeatTimes; ++i) {
+            bool isTailRepeat = hasTail && (i == fp32RepeatTimes - 1U);
+            if (isTailRepeat) {
+                maskF32 = maskF32Tail;
+                maskF16 = maskF16Tail;
+            } else {
+                maskF32 = maskF32All;
+                maskF16 = maskF16All;
+            }
+
+            const uint32_t offset = i * elementsPerRepeat;
+            Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(evenFp32, oddFp32, dyScaleFp32Ptr + offset);
+            Reg::DataCopy<int8_t, Reg::LoadDist::DIST_UNPACK_B8>(tokenSrcReg, tokenPtr0 + offset);
+            Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(sumFinal_1, sumFinal_2, sumFinalDstPtr + offset);
+
+            DequantizeInt8Repeat<XType>(tokenSrcReg, evenFp32, oddFp32, maskF16, maskF32);
+
+            if constexpr (ApplyExpertScale) {
+                Reg::Muls(evenFp32, evenFp32, scaleVal, maskF32);
+                Reg::Muls(oddFp32, oddFp32, scaleVal, maskF32);
+            }
+            Reg::Add(sumFinal_1, sumFinal_1, evenFp32, maskF32);
+            Reg::Add(sumFinal_2, sumFinal_2, oddFp32, maskF32);
+
+            Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(sumFinalDstPtr + offset, sumFinal_1, sumFinal_2,
+                                                                 maskF32);
+        }
+    }
+}
+
+__simd_callee__ inline void ConvertMxFp8Scales(__ubuf__ fp8_e8m0_t* srcPtr0, __ubuf__ float* dyScaleFp32Ptr,
+                                               uint16_t repeatTimes, uint32_t& quantScaleNum, uint32_t fp32RepeatSize)
+{
+    const int16_t expShift = 23; // fp32指数字段起始位，e8m0指数左移到该字段
+    AscendC::Reg::RegTensor<fp8_e8m0_t> vSrcReg;
+    AscendC::Reg::RegTensor<float> dyScaleFp32Reg;
+    AscendC::Reg::MaskReg maskReg;
+    // read all the scales, cast all the e8m0 scale to FP32, store them
+    for (uint16_t i = 0; i < repeatTimes; ++i) {
+        maskReg = AscendC::Reg::UpdateMask<float>(quantScaleNum);
+        Reg::DataCopy<fp8_e8m0_t, Reg::LoadDist::DIST_UNPACK4_B8>(vSrcReg, srcPtr0 + i * fp32RepeatSize);
+        // cast e8m0 to FP32
+        Reg::ShiftLefts((AscendC::Reg::RegTensor<uint32_t>&)dyScaleFp32Reg, (AscendC::Reg::RegTensor<uint32_t>&)vSrcReg,
+                        expShift, maskReg);
+        Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(dyScaleFp32Ptr + i * fp32RepeatSize * INT8_DIVIVE,
+                                                             dyScaleFp32Reg, dyScaleFp32Reg, maskReg);
+    }
+}
+
+template <typename T>
+__simd_callee__ inline void CastMxFp8Repeat(Reg::RegTensor<T>& tokenSrcReg, Reg::RegTensor<float>& tokenFp32SrcReg_1,
+                                            Reg::RegTensor<float>& tokenFp32SrcReg_2, Reg::MaskReg& maskReg3)
+{
+    static constexpr AscendC::Reg::CastTrait castTrait0 = {
+        AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::UNKNOWN, AscendC::Reg::MaskMergeMode::ZEROING,
+        AscendC::RoundMode::UNKNOWN};
+    static constexpr AscendC::Reg::CastTrait castTrait2 = {AscendC::Reg::RegLayout::TWO, AscendC::Reg::SatMode::UNKNOWN,
+                                                           AscendC::Reg::MaskMergeMode::ZEROING,
+                                                           AscendC::RoundMode::UNKNOWN};
+
+    Reg::Cast<float, T, castTrait0>(tokenFp32SrcReg_1, tokenSrcReg, maskReg3);
+    Reg::Cast<float, T, castTrait2>(tokenFp32SrcReg_2, tokenSrcReg, maskReg3);
+}
+#endif
+
 template <typename ExpandXType, typename XType, typename ExpandIdxType, uint8_t QuantMode, bool HasAddRmsNorm>
 class MoeDistributeCombineQuant {
 public:
@@ -164,94 +294,7 @@ public:
         __ubuf__ float* dyScaleFp32Ptr = (__ubuf__ float*)scaleDupLocalTensor_.GetPhyAddr();
         __ubuf__ float* sumFinalDstPtr = (__ubuf__ float*)sumFinalTensor.GetPhyAddr();
 
-        uint32_t fp32RepeatSize = Quant::GetVRegSizeDispatch() / sizeof(float);
-        uint32_t elementsPerRepeat = fp32RepeatSize * INT8_DIVIVE;
-        uint16_t fp32RepeatTimes = Ceil(axisH_, elementsPerRepeat);
-        uint32_t tailElements = axisH_ % elementsPerRepeat;
-        bool hasTail = tailElements != 0U;
-
-        __VEC_SCOPE__
-        {
-            AscendC::Reg::RegTensor<int8_t> tokenSrcReg;
-            AscendC::Reg::RegTensor<half> tokenHalfReg;
-            AscendC::Reg::RegTensor<float> tokFp32_1;
-            AscendC::Reg::RegTensor<float> tokFp32_2;
-            AscendC::Reg::RegTensor<float> dyScaleFp32_1;
-            AscendC::Reg::RegTensor<float> dyScaleFp32_2;
-            AscendC::Reg::RegTensor<float> deqFp32_1;
-            AscendC::Reg::RegTensor<float> deqFp32_2;
-            AscendC::Reg::RegTensor<XType> deqXType_1;
-            AscendC::Reg::RegTensor<XType> deqXType_2;
-            AscendC::Reg::RegTensor<float> sumLocal_1;
-            AscendC::Reg::RegTensor<float> sumLocal_2;
-            AscendC::Reg::RegTensor<float> sumFinal_1;
-            AscendC::Reg::RegTensor<float> sumFinal_2;
-
-            static constexpr AscendC::Reg::CastTrait castZero = {
-                AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::UNKNOWN, AscendC::Reg::MaskMergeMode::ZEROING,
-                AscendC::RoundMode::UNKNOWN};
-            static constexpr AscendC::Reg::CastTrait castOne = {
-                AscendC::Reg::RegLayout::ONE, AscendC::Reg::SatMode::UNKNOWN, AscendC::Reg::MaskMergeMode::ZEROING,
-                AscendC::RoundMode::UNKNOWN};
-            static constexpr AscendC::Reg::CastTrait castRint = {
-                AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::SAT, AscendC::Reg::MaskMergeMode::ZEROING,
-                AscendC::RoundMode::CAST_RINT};
-
-            AscendC::Reg::MaskReg maskF32All = AscendC::Reg::CreateMask<float, AscendC::Reg::MaskPattern::ALL>();
-            AscendC::Reg::MaskReg maskF16All = AscendC::Reg::CreateMask<half, AscendC::Reg::MaskPattern::ALL>();
-            AscendC::Reg::MaskReg maskF32Tail;
-            AscendC::Reg::MaskReg maskF16Tail;
-            if (hasTail) {
-                uint32_t tailF32Elements = Ceil(tailElements, INT8_DIVIVE);
-                maskF32Tail = AscendC::Reg::UpdateMask<float>(tailF32Elements);
-                maskF16Tail = AscendC::Reg::UpdateMask<half>(tailElements);
-            }
-            AscendC::Reg::MaskReg maskF32;
-            AscendC::Reg::MaskReg maskF16;
-
-            for (uint16_t i = 0; i < fp32RepeatTimes; ++i) {
-                bool isTailRepeat = hasTail && (i == fp32RepeatTimes - 1U);
-                if (isTailRepeat) {
-                    maskF32 = maskF32Tail;
-                    maskF16 = maskF16Tail;
-                } else {
-                    maskF32 = maskF32All;
-                    maskF16 = maskF16All;
-                }
-
-                Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(dyScaleFp32_1, dyScaleFp32_2,
-                                                                     dyScaleFp32Ptr + INT8_DIVIVE * i * fp32RepeatSize);
-                Reg::DataCopy<int8_t, Reg::LoadDist::DIST_UNPACK_B8>(tokenSrcReg,
-                                                                     tokenPtr0 + INT8_DIVIVE * i * fp32RepeatSize);
-                Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(sumFinal_1, sumFinal_2,
-                                                                     sumFinalDstPtr + INT8_DIVIVE * i * fp32RepeatSize);
-
-                Reg::Cast<half, int8_t, castZero>(tokenHalfReg, tokenSrcReg, maskF16);
-                Reg::Cast<float, half, castZero>(tokFp32_1, tokenHalfReg, maskF16);
-                Reg::Cast<float, half, castOne>(tokFp32_2, tokenHalfReg, maskF16);
-
-                Reg::Mul(deqFp32_1, dyScaleFp32_1, tokFp32_1, maskF32);
-                Reg::Mul(deqFp32_2, dyScaleFp32_2, tokFp32_2, maskF32);
-
-                Reg::Cast<XType, float, castRint>(deqXType_1, deqFp32_1, maskF32);
-                Reg::Cast<XType, float, castRint>(deqXType_2, deqFp32_2, maskF32);
-                Reg::Cast<float, XType, castZero>(deqFp32_1, deqXType_1, maskF32);
-                Reg::Cast<float, XType, castZero>(deqFp32_2, deqXType_2, maskF32);
-
-                if constexpr (ApplyExpertScale) {
-                    Reg::Muls(sumLocal_1, deqFp32_1, scaleVal, maskF32);
-                    Reg::Muls(sumLocal_2, deqFp32_2, scaleVal, maskF32);
-                    Reg::Add(sumFinal_1, sumFinal_1, sumLocal_1, maskF32);
-                    Reg::Add(sumFinal_2, sumFinal_2, sumLocal_2, maskF32);
-                } else {
-                    Reg::Add(sumFinal_1, sumFinal_1, deqFp32_1, maskF32);
-                    Reg::Add(sumFinal_2, sumFinal_2, deqFp32_2, maskF32);
-                }
-
-                Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(sumFinalDstPtr + i * fp32RepeatSize * INT8_DIVIVE,
-                                                                     sumFinal_1, sumFinal_2, maskF32);
-            }
-        }
+        AccumulateInt8Token<XType, ApplyExpertScale>(tokenPtr0, dyScaleFp32Ptr, sumFinalDstPtr, axisH_, scaleVal);
     }
     __aicore__ inline void QuantMxFp8(LocalTensor<ExpandXType>& outLocal, LocalTensor<ExpandXType>& inLocal)
     {
@@ -294,10 +337,8 @@ public:
         uint16_t repeatTimes = Ceil(quantScaleNum_, fp32RepeatSize);
         uint16_t fp32RepeatTimes = Ceil(axisH_, fp32RepeatSize * INT8_DIVIVE);
         uint32_t axisHx4 = 4 * axisH_; // 4为fp32与fp8字节数比例，用于换算fp8 mask粒度
-        const int16_t expShift = 23;   // fp32指数字段起始位，e8m0指数左移到该字段
         __VEC_SCOPE__
         {
-            AscendC::Reg::RegTensor<fp8_e8m0_t> vSrcReg;
             AscendC::Reg::RegTensor<T> tokenSrcReg;
             AscendC::Reg::RegTensor<float> tokenFp32SrcReg_1;
             AscendC::Reg::RegTensor<float> tokenFp32SrcReg_2;
@@ -306,26 +347,9 @@ public:
             AscendC::Reg::RegTensor<float> sumLocalDstReg_2;
             AscendC::Reg::RegTensor<float> sumFinalDstReg_1;
             AscendC::Reg::RegTensor<float> sumFinalDstReg_2;
-            static constexpr AscendC::Reg::CastTrait castTrait0 = {
-                AscendC::Reg::RegLayout::ZERO, AscendC::Reg::SatMode::UNKNOWN, AscendC::Reg::MaskMergeMode::ZEROING,
-                AscendC::RoundMode::UNKNOWN};
-            static constexpr AscendC::Reg::CastTrait castTrait2 = {
-                AscendC::Reg::RegLayout::TWO, AscendC::Reg::SatMode::UNKNOWN, AscendC::Reg::MaskMergeMode::ZEROING,
-                AscendC::RoundMode::UNKNOWN};
-
-            AscendC::Reg::MaskReg maskReg;
             AscendC::Reg::MaskReg maskReg2;
             AscendC::Reg::MaskReg maskReg3;
-            // read all the scales, cast all the e8m0 scale to FP32, store them
-            for (uint16_t i = 0; i < repeatTimes; ++i) {
-                maskReg = AscendC::Reg::UpdateMask<float>(quantScaleNum_);
-                Reg::DataCopy<fp8_e8m0_t, Reg::LoadDist::DIST_UNPACK4_B8>(vSrcReg, srcPtr0 + i * fp32RepeatSize);
-                // cast e8m0 to FP32
-                Reg::ShiftLefts((AscendC::Reg::RegTensor<uint32_t>&)dyScaleFp32Reg,
-                                (AscendC::Reg::RegTensor<uint32_t>&)vSrcReg, expShift, maskReg);
-                Reg::DataCopy<float, Reg::StoreDist::DIST_INTLV_B32>(dyScaleFp32Ptr + i * fp32RepeatSize * INT8_DIVIVE,
-                                                                     dyScaleFp32Reg, dyScaleFp32Reg, maskReg);
-            }
+            ConvertMxFp8Scales(srcPtr0, dyScaleFp32Ptr, repeatTimes, quantScaleNum_, fp32RepeatSize);
 
             Reg::LocalMemBar<AscendC::Reg::MemType::VEC_STORE, AscendC::Reg::MemType::VEC_LOAD>();
             for (uint16_t i = 0; i < fp32RepeatTimes; ++i) {
@@ -338,8 +362,7 @@ public:
                                                                 tokenPtr0 + INT8_DIVIVE * i * fp32RepeatSize);
                 Reg::DataCopy<float, Reg::LoadDist::DIST_DINTLV_B32>(sumFinalDstReg_1, sumFinalDstReg_2,
                                                                      sumFinalDstPtr + INT8_DIVIVE * i * fp32RepeatSize);
-                Reg::Cast<float, T, castTrait0>(tokenFp32SrcReg_1, tokenSrcReg, maskReg3);
-                Reg::Cast<float, T, castTrait2>(tokenFp32SrcReg_2, tokenSrcReg, maskReg3);
+                CastMxFp8Repeat(tokenSrcReg, tokenFp32SrcReg_1, tokenFp32SrcReg_2, maskReg3);
                 // token与量化参数相乘
                 Reg::Mul(sumLocalDstReg_1, dyScaleFp32Reg, tokenFp32SrcReg_1, maskReg2);
                 Reg::Mul(sumLocalDstReg_2, dyScaleFp32Reg, tokenFp32SrcReg_2, maskReg2);
