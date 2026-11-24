@@ -380,6 +380,11 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
     <tr>
         <td>输入输出format为私有格式。</td>
     </tr>
+    <tr>
+        <td>ACLNN_ERR_RUNTIME_ERROR</td>
+        <td>361001</td>
+        <td>当前SoC不支持该算子。</td>
+    </tr>
       </tbody>
   </table>
 

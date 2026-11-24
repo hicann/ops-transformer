@@ -4910,6 +4910,32 @@ TEST_F(TestAclnnQuantMatmulAlltoAll, InvalidQuantModeCombo2)
     EXPECT_EQ(ret, ACLNN_ERR_PARAM_INVALID);
 }
 
+// 当前SoC不支持该算子(如 Atlas A3 / DAV_2201)时, 应返回运行时错误361001
+TEST_F(TestAclnnQuantMatmulAlltoAll, UnsupportedSocReturnsRuntimeError)
+{
+    op::SetPlatformNpuArch(Ops::Base::DAV_2201);
+    op::SetPlatformSocVersion(op::SocVersion::ASCEND910_93);
+    auto x1 = CreateAclTensor({256, 128}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
+    auto x2 = CreateAclTensor({128, 256}, ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
+    auto bias = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
+    auto x1Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
+    auto x2Scale = CreateAclTensor({256}, ACL_FLOAT, ACL_FORMAT_ND);
+    auto output = CreateAclTensor({512, 128}, ACL_BF16, ACL_FORMAT_ND);
+    vector<int64_t> axesAcl = {-1, -2};
+    aclIntArray* alltoAllAxesOptional = aclCreateIntArray(axesAcl.data(), axesAcl.size());
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+    auto ut = OP_API_UT(aclnnQuantMatmulAlltoAll,
+                        INPUT(x1, x2, bias, x1Scale, x2Scale, nullptr, nullptr, nullptr, alltoAllAxesOptional,
+                              "ut_test_quant_matmul_allto_all", 3, 2, 0, -1, 0, false, false),
+                        OUTPUT(output));
+    aclnnStatus ret = ut.TestGetWorkspaceSizeWithNNopbaseInner(&workspaceSize, executor);
+    EXPECT_EQ(ret, ACLNN_ERR_RUNTIME_ERROR);
+    // 恢复平台状态, 避免影响后续用例
+    op::SetPlatformNpuArch(Ops::Base::DAV_3510);
+    op::SetPlatformSocVersion(op::SocVersion::ASCEND910B);
+}
+
 // KC量化场景 - x1 为空指针
 TEST_F(TestAclnnQuantMatmulAlltoAll, KCQuant_NullX1)
 {

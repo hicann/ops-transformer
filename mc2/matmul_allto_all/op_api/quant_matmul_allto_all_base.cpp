@@ -49,6 +49,20 @@ static bool IsDavidArch()
     return npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201;
 }
 
+// 检查当前SoC是否支持aclnnQuantMatmulAlltoAll。
+static aclnnStatus CheckSocSupport()
+{
+    const auto socVersion = op::GetCurrentPlatformInfo().GetSocVersion();
+    const auto npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
+    if (socVersion == op::SocVersion::ASCEND910B || IsDavidArch()) {
+        return ACLNN_SUCCESS;
+    }
+    OP_LOGE(ACLNN_ERR_RUNTIME_ERROR,
+            "aclnnQuantMatmulAlltoAll is not supported on current SoC, SocVersion is %d, NpuArch is %d.",
+            static_cast<int32_t>(socVersion), static_cast<int32_t>(npuArch));
+    return ACLNN_ERR_RUNTIME_ERROR;
+}
+
 // 检查必要输入是否为空，必须非空
 static bool CheckNotNull(const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const aclTensor* x1Scale,
                          const aclTensor* x2Scale, const aclTensor* output)
@@ -531,6 +545,8 @@ static aclnnStatus CheckAndHandleParams(const aclTensor* x1, const aclTensor* x2
               ACLNN_ERR_PARAM_INVALID);
     CHECK_RET(CheckScaleShape(x1, x2, x1Scale, x2Scale, x1QuantMode, x2QuantMode, transposeX2),
               ACLNN_ERR_PARAM_INVALID);
+    // 检查当前SoC是否支持该算子：不支持时返回ACLNN_ERR_RUNTIME_ERROR(361001)，
+    CHECK_RET(CheckSocSupport() == ACLNN_SUCCESS, ACLNN_ERR_RUNTIME_ERROR);
     // 检查输入的数据类型是否在API支持的数据类型范围之内，需要根据api定义校验
     CHECK_RET(CheckDtypesValid(x1, x2, x1QuantMode, x2QuantMode, x1Scale, x2Scale, biasOptional, output),
               ACLNN_ERR_PARAM_INVALID);

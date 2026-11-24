@@ -382,6 +382,11 @@ aclnnStatus aclnnQuantMatmulAlltoAll(
     <tr>
         <td>The input/output format is a private format.</td>
     </tr>
+    <tr>
+        <td>ACLNN_ERR_RUNTIME_ERROR</td>
+        <td>361001</td>
+        <td>The current SoC does not support this operator.</td>
+    </tr>
       </tbody>
   </table>
 
