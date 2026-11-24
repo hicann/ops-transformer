@@ -25,6 +25,8 @@
 #include "blaze/gemm/utils/common_utils.h"
 #include "include/tensor_api/tensor.h"
 #include "blaze/gemm/block/block_mmad_matmul_basic.h"
+#include "../../../basic/buffer/buffer_channel.h"
+#include "../../../utils/op_state_dump.h"
 #define WINDOW_LEN 1L // 调度器窗口设置为1，非侵入式修改
 #include "blaze/gemm/block/block_scheduler_matmul_basic.h"
 #undef WINDOW_LEN
@@ -34,8 +36,9 @@ namespace Gemm {
 namespace Kernel {
 
 #define MM_KERNEL_CLASS_TEM_PARAMS \
-    template <class ProblemShape, class BlockMmad, class BlockScheduler, class CommPolicy, bool enableBufferReuse>
-#define MM_KERNEL_FUNC_TEM_PARAMS ProblemShape, BlockMmad, BlockScheduler, CommPolicy, enableBufferReuse
+    template <class ProblemShape, class BlockMmad, class BlockScheduler, class BufferSyncManager, \
+              bool enableBufferReuse>
+#define MM_KERNEL_FUNC_TEM_PARAMS ProblemShape, BlockMmad, BlockScheduler, BufferSyncManager, enableBufferReuse
 
 using namespace AscendC;
 using asc::te::get;
@@ -44,16 +47,21 @@ using asc::te::get;
  * @brief 非量化 all-to-all MatMul 内核实现
  * 该类负责具体的矩阵乘块调度和计算，支持本地(LOCAL)和远程(REMOTE)两种切片模式。
  * 核心机制：
- * 1. 非量化 mmad(block_mmad_matmul_basic.h) 支持 splitKIdx 接口：同一个输出块由 rankSize 次
- *    mmad 调用在 L0C 上跨调用累加，splitKIdx==0 清零 L0C 并加 bias，splitKIdx==splitKNum-1 触发单次 fixpipe。
- * 2. 调度器使用非量化 BlockSchedulerMatmulBasic：按下标 for 循环遍历（blockIdx 步进 coreNums），
+ * 1. 非量化 mmad(block_mmad_matmul_basic.h) 同一个输出块由 rankSize 次mmad 调用在 L0C 上跨调用累加，
+ *    首次调用：splitKIdx==0 清零 L0C 并加 bias，
+ *    末次调用：splitKIdx==splitKNum-1 触发单次 fixpipe。
+ * 2. 调度器使用非量化 BlockSchedulerMatmulBasic：按下标 for 循环遍历，
  *    GetBlockShape 返回 {m, n, k_, batch_}（K 即每 rank 的 K 段长度），尾块由 Params 静态切分，
  *    不参与尾块切分的核会收到空子片 {0,0,k_,batch_}，kernel 需 continue 跳过。
- * 3. 通信等待逻辑经 CommPolicy 策略类注入（组合模式）：调用点直接 commPolicy_.WaitTile(tileIdx)，
- *    编译期由模板参数绑定具体策略，无需继承与 static_cast。
+ * 3. 通信等待逻辑经 BufferSyncManager 策略类注入。
+ * 4. comm 通信窗口支持两种模式（由 enableBufferReuse 编译期选择）：
+ *    - enableBufferReuse=true  → 环形 buffer 复用：窗口布局 = [tile][rank]，每个槽位只装一轮数据
+ *                                （窗口总 M = winPerTurn），槽位偏移经 dataChannel_ 逐 tile 推进，
+ *                                配合 Acquire/Release 与写端 AIV 同步覆盖。
+ *    - enableBufferReuse=false → [rank][tile] 全量窗口（hcomm）：窗口总 M = rankSize*oriM，rank 步长 = oriM。
  */
 
-template <class ProblemShape, class BlockMmad, class BlockScheduler, class CommPolicy, bool enableBufferReuse>
+template <class ProblemShape, class BlockMmad, class BlockScheduler, class BufferSyncManager, bool enableBufferReuse>
 class AllToAllMmKernel {
 public:
     __aicore__ inline AllToAllMmKernel() {}
@@ -82,8 +90,8 @@ public:
     using MakeLayoutB = asc::te::frame_layout_format<LayoutB, Std::Int<asc::te::c0_element<BType>>>;
     using MakeLayoutC = asc::te::frame_layout_format<LayoutC, Std::Int<asc::te::c0_element<CType>>>;
     /**
-     * @brief 算子模式：REMOTE (远程同步数据后计算), LOCAL (仅本地计算),
-     *                 DEFERRED_SYNC (per-tile 本地先算驻留 L0C → wait_flag → 远程累加 → 单次 fixpipe)
+     * @brief 算子模式：REMOTE (远程同步数据后计算), LOCAL (本地先算),
+     *                 DEFERRED_SYNC (per-tile 本地先算)
      */
     enum class MatmulMode : uint32_t {
         REMOTE = 0,
@@ -126,22 +134,31 @@ public:
 
 public:
     __aicore__ inline void Init(const Params& params);
-    __aicore__ inline void Run(const Params& params);
-    __aicore__ inline void operator()(const Params& params)
+    __aicore__ inline void Run(const Params& params, Mc2Kernel::OpStateDump& opStateDump);
+    __aicore__ inline void operator()(const Params& params, Mc2Kernel::OpStateDump& opStateDump)
     {
-        Run(params);
+        Run(params, opStateDump);
     }
 
-    __aicore__ inline CommPolicy& GetCommPolicy()
+    __aicore__ inline BufferSyncManager& GetBufferSyncMgr()
     {
-        return commPolicy_;
+        return bufferSyncMgr_;
+    }
+
+    // fusion层向kernel传channel指针
+    __aicore__ inline void SetChannels(Apace::Basic::BufferChannel* dataChannel)
+    {
+        dataChannel_ = dataChannel;
     }
 
 private:
     __aicore__ inline void ResetGmAddr(const Params& params);
-    __aicore__ inline void ProcessLocalBatch(const Params& params, BlockScheduler& bs);
-    __aicore__ inline void ProcessDeferredSyncBatch(const Params& params, BlockScheduler& bs);
-    __aicore__ inline void ProcessRemoteBatch(const Params& params, BlockScheduler& bs);
+    __aicore__ inline void ProcessLocalBatch(const Params& params, BlockScheduler& bs,
+                                             Mc2Kernel::OpStateDump& opStateDump);
+    __aicore__ inline void ProcessDeferredSyncBatch(const Params& params, BlockScheduler& bs,
+                                                    Mc2Kernel::OpStateDump& opStateDump);
+    __aicore__ inline void ProcessRemoteBatch(const Params& params, BlockScheduler& bs,
+                                              Mc2Kernel::OpStateDump& opStateDump);
 
     template <typename TensorALocal, typename TensorB, typename TensorBlockBias, typename TensorBlockC>
     __aicore__ inline void MmadSelfLocalRank(const Params& params, int64_t mPos, int64_t nPos, BlockShape& singleShape,
@@ -150,11 +167,14 @@ private:
 
     template <typename TensorA, typename TensorB, typename TensorBlockBias, typename TensorBlockC>
     __aicore__ inline void MmadRemoteRanks(const Params& params, int64_t mPos, int64_t nPos, BlockShape& singleShape,
-                                           uint64_t winPerTurn, TensorA& gmA, TensorB& gmB,
-                                           TensorBlockBias& gmBlockBias, TensorBlockC& gmBlockC);
+                                           TensorA& gmA, TensorB& gmB, TensorBlockBias& gmBlockBias,
+                                           TensorBlockC& gmBlockC);
 
-    __aicore__ inline void WaitDependTiles(const Params& params, int32_t dependTileIdx, int32_t& readyTileIdx);
-    __aicore__ inline void DrainWaitTiles(const Params& params, uint32_t totalTiles, int32_t& readyTileIdx);
+    __aicore__ inline void WaitDependTiles(const Params& params, uint32_t totalTiles, int32_t dependTileIdx,
+                                           int32_t& readyTileIdx, uint64_t& dataSlotOffset,
+                                           Mc2Kernel::OpStateDump& opStateDump);
+    __aicore__ inline void DrainWaitTiles(const Params& params, uint32_t totalTiles, int32_t& readyTileIdx,
+                                          uint64_t& dataSlotOffset, Mc2Kernel::OpStateDump& opStateDump);
 
     __aicore__ inline int32_t CalcDependTileIdx(int64_t mPos, uint32_t headTileSize, uint32_t totalTiles) const;
 
@@ -164,7 +184,9 @@ private:
 
 private:
     BlockMmad mmadOp_;
-    CommPolicy commPolicy_;
+    BufferSyncManager bufferSyncMgr_;
+    // win 区 datachannel 指针
+    Apace::Basic::BufferChannel* dataChannel_{nullptr};
 
     __gm__ AType* aGmAddr_;      // 远程数据基址（通信缓冲区）
     __gm__ AType* localAGmAddr_; // 本地数据基址
@@ -176,7 +198,8 @@ private:
 };
 
 MM_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::Run(const Params& params)
+__aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::Run(const Params& params,
+                                                                        Mc2Kernel::OpStateDump& opStateDump)
 {
     Init(params);
 
@@ -202,11 +225,11 @@ __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::Run(const Pa
     bool localFirst = ((params.localParams.matmulMode == MatmulMode::LOCAL) && (params.localParams.localMatmul == 2));
     bool deferredSync = (params.localParams.matmulMode == MatmulMode::DEFERRED_SYNC);
     if (localFirst) {
-        ProcessLocalBatch(params, bs);
+        ProcessLocalBatch(params, bs, opStateDump);
     } else if (deferredSync) {
-        ProcessDeferredSyncBatch(params, bs);
+        ProcessDeferredSyncBatch(params, bs, opStateDump);
     } else {
-        ProcessRemoteBatch(params, bs);
+        ProcessRemoteBatch(params, bs, opStateDump);
     }
 
     if (isAtomicAdd_) {
@@ -283,11 +306,11 @@ __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::SetL2Cache(c
 }
 
 MM_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessLocalBatch(const Params& params,
-                                                                                      BlockScheduler& bs)
+__aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessLocalBatch(
+    const Params& params, BlockScheduler& bs, Mc2Kernel::OpStateDump& opStateDump)
 {
-    auto rankSize = params.localParams.rankSize;
-    auto oriM = params.localParams.originalM;
+    uint32_t rankSize = params.localParams.rankSize;
+    uint64_t oriM = params.localParams.originalM;
 
     auto layoutALocal = MakeLayoutA{}(rankSize * oriM, asc::te::get<MNK_K>(params.problemShape));
     auto layoutB =
@@ -312,7 +335,7 @@ __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessLocal
     // 总共启动的核数
     int64_t coreNums = AscendC::GetBlockNum();
 
-    // 遍历当前核的调度任务（按下标步进，空子片 continue 跳过），bs.GetBlockNums()：调度器生成的任务块总数
+    // 遍历当前核的调度任务，bs.GetBlockNums()：调度器生成的任务块总数
     for (int64_t blockIdx = curBlockIdx; blockIdx < bs.GetBlockNums(); blockIdx += coreNums) {
         // 非量化调度器返回 {blkM, blkN, k_, batch_}，k_ 维即当前 rank 的 K 段长度 ka
         auto singleShape = bs.template GetBlockShape<transB, BType>(blockIdx);
@@ -320,6 +343,7 @@ __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessLocal
         if ((asc::te::get<IDX_M_TILEIDX>(singleShape) <= 0) || (asc::te::get<IDX_N_TILEIDX>(singleShape) <= 0)) {
             continue;
         }
+        opStateDump.DoDump(DUMP_FIELD_TURN_INC);
         // GetBlockCoord 必须在 GetBlockShape 之后调用（mSplitOffset_ 由 GetBlockShape 计算）
         auto blockCoord = bs.GetBlockCoord(blockIdx);
         int64_t mPos = asc::te::get<MNK_M>(blockCoord);
@@ -335,21 +359,16 @@ __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessLocal
 }
 
 MM_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessDeferredSyncBatch(const Params& params,
-                                                                                             BlockScheduler& bs)
+__aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessDeferredSyncBatch(
+    const Params& params, BlockScheduler& bs, Mc2Kernel::OpStateDump& opStateDump)
 {
-    auto rankSize = params.localParams.rankSize;
-    auto oriM = params.localParams.originalM;
+    uint32_t rankSize = params.localParams.rankSize;
+    uint64_t oriM = params.localParams.originalM;
 
     const uint32_t headTileSize = params.localParams.headTileSize;
     const uint32_t totalTiles = (oriM + headTileSize - 1) / headTileSize;
     const uint64_t winPerTurn = static_cast<uint64_t>(rankSize) * headTileSize;
-    // comm 通信窗口支持两种布局（由 enableBufferReuse 编译期选择）：
-    //   enableBufferReuse=true  → [tile][rank] 布局：每轮窗口 = rankSize*headTileSize 行，
-    //                             窗口总 M = totalTiles*rankSize*headTileSize；源 rank 步长 = headTileSize
-    //   enableBufferReuse=false → [rank][tile] 布局：窗口总 M = rankSize*oriM；源 rank 步长 = oriM
-    const uint64_t winM =
-        enableBufferReuse ? static_cast<uint64_t>(totalTiles) * winPerTurn : static_cast<uint64_t>(rankSize) * oriM;
+    const uint64_t winM = enableBufferReuse ? winPerTurn : static_cast<uint64_t>(rankSize) * oriM;
 
     auto layoutA = MakeLayoutA{}(winM, asc::te::get<MNK_K>(params.problemShape));
     auto layoutALocal = MakeLayoutA{}(rankSize * oriM, asc::te::get<MNK_K>(params.problemShape));
@@ -359,7 +378,6 @@ __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessDefer
         asc::te::make_frame_layout<asc::te::nd_ext_layout_ptn>(1L, asc::te::get<MNK_N>(params.problemShape));
     auto layoutC = MakeLayoutC{}(asc::te::get<MNK_M>(params.problemShape), asc::te::get<MNK_N>(params.problemShape));
 
-    auto gmA = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(aGmAddr_), layoutA);
     auto gmALocal = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(localAGmAddr_), layoutALocal);
     auto gmB = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(bGmAddr_), layoutB);
     auto gmBias = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(biasGmAddr_), layoutBias);
@@ -368,6 +386,7 @@ __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessDefer
     SetL2Cache(params.problemShape, params.mmTiling.baseM, params.mmTiling.baseN, gmB, gmC);
 
     int32_t readyTileIdx = -1;
+    uint64_t dataSlotOffset = 0;
     int64_t curBlockIdx = AscendC::GetBlockIdx();
     if (curBlockIdx >= bs.GetCoreNums()) {
         return;
@@ -389,34 +408,40 @@ __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessDefer
 
         // Phase 1: 本 rank 的 local A × 本 rank 的 B 段 → L0C（reset，splitKIdx=0）
         //          此处读 GM 的 localAGmAddr_，不依赖通信，可与 AIV 的 UDMA put 并行。
+        opStateDump.DoDump(DUMP_FIELD_TURN_INC);
         MmadSelfLocalRank(params, mPos, nPos, singleShape, gmALocal, gmB, gmBlockBias, gmBlockC);
 
         // Phase 2: 在 self rank mmad 之后 wait，阻塞后续 shmem 读（去重：同一 tile 只 wait 一次）
         int64_t blockM = asc::te::get<IDX_M_TILEIDX>(singleShape);
         int32_t dependTileIdx = CalcDependTileIdx(mPos + blockM - 1, headTileSize, totalTiles);
-        WaitDependTiles(params, dependTileIdx, readyTileIdx);
+        WaitDependTiles(params, totalTiles, dependTileIdx, readyTileIdx, dataSlotOffset, opStateDump);
+
+        // 远程 A 基址随槽位偏移（复用模式 dataSlotOffset 逐 tile 前进；非复用恒 0）
+        auto gmA = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ AType*>(
+                                            reinterpret_cast<__gm__ uint8_t*>(aGmAddr_) + dataSlotOffset)),
+                                        layoutA);
 
         // Phase 3: 遍历其它 rank，在 L0C 上累加（最后一个 rank 触发 fixpipe）
-        MmadRemoteRanks(params, mPos, nPos, singleShape, winPerTurn, gmA, gmB, gmBlockBias, gmBlockC);
+        MmadRemoteRanks(params, mPos, nPos, singleShape, gmA, gmB, gmBlockBias, gmBlockC);
     }
 
     // 存在尾核没用满核，所以这里要等flag兜底
-    DrainWaitTiles(params, totalTiles, readyTileIdx);
+    DrainWaitTiles(params, totalTiles, readyTileIdx, dataSlotOffset, opStateDump);
 }
 
 MM_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessRemoteBatch(const Params& params,
-                                                                                       BlockScheduler& bs)
+__aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessRemoteBatch(
+    const Params& params, BlockScheduler& bs, Mc2Kernel::OpStateDump& opStateDump)
 {
-    auto rankId = params.localParams.rankId;
-    auto rankSize = params.localParams.rankSize;
-    auto oriM = params.localParams.originalM;
+    uint32_t rankId = params.localParams.rankId;
+    uint32_t rankSize = params.localParams.rankSize;
+    uint64_t oriM = params.localParams.originalM;
 
     const uint32_t headTileSize = params.localParams.headTileSize;
     const uint32_t totalTiles = (oriM + headTileSize - 1) / headTileSize;
     const uint64_t winPerTurn = static_cast<uint64_t>(rankSize) * headTileSize;
-    const uint64_t winM =
-        enableBufferReuse ? static_cast<uint64_t>(totalTiles) * winPerTurn : static_cast<uint64_t>(rankSize) * oriM;
+
+    const uint64_t winM = enableBufferReuse ? winPerTurn : static_cast<uint64_t>(rankSize) * oriM;
     constexpr int64_t kPos = 0L;
 
     auto layoutA = MakeLayoutA{}(winM, asc::te::get<MNK_K>(params.problemShape));
@@ -427,7 +452,6 @@ __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessRemot
         asc::te::make_frame_layout<asc::te::nd_ext_layout_ptn>(1L, asc::te::get<MNK_N>(params.problemShape));
     auto layoutC = MakeLayoutC{}(asc::te::get<MNK_M>(params.problemShape), asc::te::get<MNK_N>(params.problemShape));
 
-    auto gmA = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(aGmAddr_), layoutA);
     auto gmALocal = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(localAGmAddr_), layoutALocal);
     auto gmB = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(bGmAddr_), layoutB);
     auto gmBias = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(biasGmAddr_), layoutBias);
@@ -436,6 +460,7 @@ __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessRemot
     SetL2Cache(params.problemShape, params.mmTiling.baseM, params.mmTiling.baseN, gmB, gmC);
 
     int32_t readyTileIdx = -1;
+    uint64_t dataSlotOffset = 0;
     int64_t curBlockIdx = AscendC::GetBlockIdx();
     if (curBlockIdx >= bs.GetCoreNums()) {
         return;
@@ -458,17 +483,22 @@ __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessRemot
         // 等待当前 block 依赖的通信 tile 完成（去重：同一 tile 只 wait 一次）
         int64_t blockM = asc::te::get<IDX_M_TILEIDX>(singleShape);
         int32_t dependTileIdx = CalcDependTileIdx(mPos + blockM - 1, headTileSize, totalTiles);
-        WaitDependTiles(params, dependTileIdx, readyTileIdx);
+        WaitDependTiles(params, totalTiles, dependTileIdx, readyTileIdx, dataSlotOffset, opStateDump);
+
+        // 远程 A 基址随槽位偏移（复用模式 dataSlotOffset 逐 tile 前进；非复用恒 0）
+        auto gmA = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ AType*>(
+                                            reinterpret_cast<__gm__ uint8_t*>(aGmAddr_) + dataSlotOffset)),
+                                        layoutA);
 
         // REMOTE 模式：遍历除本 Rank 外的所有其他卡发送过来的数据，L0C 累加，最后一个 rank 触发 fixpipe
+        opStateDump.DoDump(DUMP_FIELD_TURN_INC);
         uint64_t rankMStep = enableBufferReuse ? static_cast<uint64_t>(headTileSize) : static_cast<uint64_t>(oriM);
         uint64_t mPosInLayout =
             enableBufferReuse ? (static_cast<uint64_t>(mPos) % headTileSize) : static_cast<uint64_t>(mPos);
-        uint64_t tileBaseOffset = enableBufferReuse ? (static_cast<uint64_t>(mPos / headTileSize) * winPerTurn) : 0;
         uint32_t remoteRankCnt = 0;
         for (uint64_t rank = 0; rank < rankSize; rank++) {
             // 远程 A 按 comm 窗口寻址（布局由 enableBufferReuse 编译期选择）
-            uint64_t remoteMPos = tileBaseOffset + rank * rankMStep + mPosInLayout;
+            uint64_t remoteMPos = rank * rankMStep + mPosInLayout;
             // 从通信buffer上切片
             auto gmBlockA = gmA.slice(asc::te::make_coord(remoteMPos, kPos),
                                       asc::te::make_shape(get<MNK_M>(singleShape), get<MNK_K>(params.problemShape)));
@@ -478,7 +508,7 @@ __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessRemot
                     continue; // GM累加模式：self rank 已在 RunLocalMatmul 计算，REMOTE 阶段跳过
                 } else {
                     // self 走本地 A（[rank][oriM] 布局，不经通信窗口）
-                    auto selfMPos = rank * oriM + mPos;
+                    uint64_t selfMPos = rank * oriM + mPos;
                     gmBlockA =
                         gmALocal.slice(asc::te::make_coord(selfMPos, kPos),
                                        asc::te::make_shape(get<MNK_M>(singleShape), get<MNK_K>(params.problemShape)));
@@ -495,28 +525,60 @@ __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::ProcessRemot
     }
 
     // 存在尾核没用满核，所以这里要等flag兜底
-    DrainWaitTiles(params, totalTiles, readyTileIdx);
+    DrainWaitTiles(params, totalTiles, readyTileIdx, dataSlotOffset, opStateDump);
 }
 
 MM_KERNEL_CLASS_TEM_PARAMS
-__aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::WaitDependTiles(const Params& params,
-                                                                                    int32_t dependTileIdx,
-                                                                                    int32_t& readyTileIdx)
+__aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::WaitDependTiles(
+    const Params& params, uint32_t totalTiles, int32_t dependTileIdx, int32_t& readyTileIdx, uint64_t& dataSlotOffset,
+    Mc2Kernel::OpStateDump& opStateDump)
 {
+    // 等待当前 block 依赖的通信 tile 完成（去重：同一 tile 只 wait 一次）
     while (readyTileIdx < dependTileIdx) {
-        readyTileIdx++;
-        commPolicy_.WaitTile(readyTileIdx);
+        if constexpr (enableBufferReuse) {
+            // 复用模式：先 Release 已消费的旧槽位（通知通信端可覆盖），
+            // 再从 dataChannel_ 取下一个槽位并等待其数据就绪，槽位偏移即窗口内逻辑偏移。
+            if (readyTileIdx >= 0 &&
+                readyTileIdx < static_cast<int32_t>(totalTiles) - static_cast<int32_t>(bufferSyncMgr_.slotNum)) {
+                bufferSyncMgr_.Release(static_cast<uint32_t>(readyTileIdx) % bufferSyncMgr_.slotNum %
+                                       Apace::Basic::BufferChannel::FLAG_ID_MODULO);
+            }
+            readyTileIdx++;
+            auto dataSlot = dataChannel_->GetNextSlot();
+            bufferSyncMgr_.Acquire(dataSlot.slotIdx);
+            dataSlotOffset = dataSlot.offset;
+        } else {
+            // 不复用模式（hcomm）：每 tile 固定一个 flag，直接等对应 tile 的 flag。
+            readyTileIdx++;
+            bufferSyncMgr_.Acquire(static_cast<uint32_t>(readyTileIdx));
+        }
+        opStateDump.DoDump(DUMP_FIELD_WAIT);
     }
 }
 
 MM_KERNEL_CLASS_TEM_PARAMS
 __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::DrainWaitTiles(const Params& params,
                                                                                    uint32_t totalTiles,
-                                                                                   int32_t& readyTileIdx)
+                                                                                   int32_t& readyTileIdx,
+                                                                                   uint64_t& dataSlotOffset,
+                                                                                   Mc2Kernel::OpStateDump& opStateDump)
 {
+    // 存在尾核没用满核，所以这里要等flag兜底
     while (readyTileIdx < static_cast<int32_t>(totalTiles) - 1) {
-        readyTileIdx++;
-        commPolicy_.WaitTile(readyTileIdx);
+        if constexpr (enableBufferReuse) {
+            if (readyTileIdx >= 0 &&
+                readyTileIdx < static_cast<int32_t>(totalTiles) - static_cast<int32_t>(bufferSyncMgr_.slotNum)) {
+                bufferSyncMgr_.Release(static_cast<uint32_t>(readyTileIdx) % bufferSyncMgr_.slotNum %
+                                       Apace::Basic::BufferChannel::FLAG_ID_MODULO);
+            }
+            readyTileIdx++;
+            bufferSyncMgr_.Acquire(static_cast<uint32_t>(readyTileIdx) % bufferSyncMgr_.slotNum %
+                                   Apace::Basic::BufferChannel::FLAG_ID_MODULO);
+        } else {
+            readyTileIdx++;
+            bufferSyncMgr_.Acquire(static_cast<uint32_t>(readyTileIdx));
+        }
+        opStateDump.DoDump(DUMP_FIELD_WAIT);
     }
 }
 
@@ -527,7 +589,7 @@ __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::MmadSelfLoca
     TensorBlockBias& gmBlockBias, TensorBlockC& gmBlockC)
 {
     constexpr int64_t kPos = 0L;
-    auto selfMPos = params.localParams.rankId * params.localParams.originalM + mPos;
+    uint64_t selfMPos = params.localParams.rankId * params.localParams.originalM + mPos;
     auto gmBlockA = gmALocal.slice(asc::te::make_coord(selfMPos, kPos),
                                    asc::te::make_shape(get<MNK_M>(singleShape), get<MNK_K>(params.problemShape)));
     auto gmBlockB = gmB.slice(asc::te::make_coord(params.localParams.rankId * get<MNK_K>(params.problemShape), nPos),
@@ -538,11 +600,11 @@ __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::MmadSelfLoca
 MM_KERNEL_CLASS_TEM_PARAMS
 template <typename TensorA, typename TensorB, typename TensorBlockBias, typename TensorBlockC>
 __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::MmadRemoteRanks(
-    const Params& params, int64_t mPos, int64_t nPos, BlockShape& singleShape, uint64_t winPerTurn, TensorA& gmA,
-    TensorB& gmB, TensorBlockBias& gmBlockBias, TensorBlockC& gmBlockC)
+    const Params& params, int64_t mPos, int64_t nPos, BlockShape& singleShape, TensorA& gmA, TensorB& gmB,
+    TensorBlockBias& gmBlockBias, TensorBlockC& gmBlockC)
 {
-    auto rankId = params.localParams.rankId;
-    auto rankSize = params.localParams.rankSize;
+    uint32_t rankId = params.localParams.rankId;
+    uint32_t rankSize = params.localParams.rankSize;
     const uint32_t headTileSize = params.localParams.headTileSize;
     const uint32_t oriM = params.localParams.originalM;
     constexpr int64_t kPos = 0L;
@@ -552,12 +614,11 @@ __aicore__ inline void AllToAllMmKernel<MM_KERNEL_FUNC_TEM_PARAMS>::MmadRemoteRa
     uint64_t rankMStep = enableBufferReuse ? static_cast<uint64_t>(headTileSize) : static_cast<uint64_t>(oriM);
     uint64_t mPosInLayout =
         enableBufferReuse ? (static_cast<uint64_t>(mPos) % headTileSize) : static_cast<uint64_t>(mPos);
-    uint64_t tileBaseOffset = enableBufferReuse ? (static_cast<uint64_t>(mPos / headTileSize) * winPerTurn) : 0;
     for (uint64_t rank = 0; rank < rankSize; rank++) {
         if (rank == rankId) {
             continue;
         }
-        uint64_t remoteMPos = tileBaseOffset + rank * rankMStep + mPosInLayout;
+        uint64_t remoteMPos = rank * rankMStep + mPosInLayout;
         auto gmBlockA_remote = gmA.slice(asc::te::make_coord(remoteMPos, kPos),
                                          asc::te::make_shape(get<MNK_M>(singleShape), get<MNK_K>(params.problemShape)));
         auto gmBlockB_r = gmB.slice(asc::te::make_coord(rank * get<MNK_K>(params.problemShape), nPos),

@@ -11,7 +11,7 @@
 #include <kernel_operator.h>
 #include "allto_all_matmul_v2_tiling_key.h"
 #include "apace/kernel/fusions/all_to_all_matmul/all_to_all_matmul_tiling_data.h"
-#include "apace/kernel/fusions/all_to_all_quant_matmul/all_to_all_mx_quant_matmul_urma_impl.h"
+#include "apace/kernel/fusions/all_to_all_matmul/all_to_all_matmul_urma_impl.h"
 
 using namespace AscendC;
 using namespace Apace;
@@ -24,23 +24,27 @@ __global__ __aicore__ void allto_all_matmul_v2(GM_ADDR context, GM_ADDR x1, GM_A
     (void)all2all_out;
     KERNEL_TASK_TYPE_DEFAULT(KERNEL_TYPE_MIX_AIC_1_1);
 
-    REGISTER_TILING_DEFAULT(allToAllQuantMatmulTilingData);
-    GET_TILING_DATA_WITH_STRUCT(allToAllQuantMatmulTilingData, tilingData, tilingGM);
+    REGISTER_TILING_DEFAULT(AllToAllQuantMatmulTilingData);
+    GET_TILING_DATA_WITH_STRUCT(AllToAllQuantMatmulTilingData, tilingData, tilingGM);
 
     __gm__ CommContext* hcommCtx = reinterpret_cast<__gm__ CommContext*>(context);
 
 #if (ORIG_DTYPE_X1 == DT_FLOAT8_E4M3FN && ORIG_DTYPE_X2 == DT_FLOAT8_E4M3FN)
-    using Impl = AllToAllMxQuantMatmulUrmaImpl<fp8_e4m3fn_t, fp8_e4m3fn_t, DTYPE_Y, false, true>;
+    using Impl =
+        AllToAllMatmulUrmaImpl<fp8_e4m3fn_t, fp8_e4m3fn_t, DTYPE_Y, float, false, true, Apace::QuantFlag::MX_QUANT>;
 #elif (ORIG_DTYPE_X1 == DT_FLOAT8_E5M2 && ORIG_DTYPE_X2 == DT_FLOAT8_E5M2)
-    using Impl = AllToAllMxQuantMatmulUrmaImpl<fp8_e5m2_t, fp8_e5m2_t, DTYPE_Y, false, true>;
+    using Impl =
+        AllToAllMatmulUrmaImpl<fp8_e5m2_t, fp8_e5m2_t, DTYPE_Y, float, false, true, Apace::QuantFlag::MX_QUANT>;
 #elif (ORIG_DTYPE_X1 == DT_FLOAT8_E4M3FN && ORIG_DTYPE_X2 == DT_FLOAT8_E5M2)
-    using Impl = AllToAllMxQuantMatmulUrmaImpl<fp8_e4m3fn_t, fp8_e5m2_t, DTYPE_Y, false, true>;
+    using Impl =
+        AllToAllMatmulUrmaImpl<fp8_e4m3fn_t, fp8_e5m2_t, DTYPE_Y, float, false, true, Apace::QuantFlag::MX_QUANT>;
 #elif (ORIG_DTYPE_X1 == DT_FLOAT8_E5M2 && ORIG_DTYPE_X2 == DT_FLOAT8_E4M3FN)
-    using Impl = AllToAllMxQuantMatmulUrmaImpl<fp8_e5m2_t, fp8_e4m3fn_t, DTYPE_Y, false, true>;
+    using Impl =
+        AllToAllMatmulUrmaImpl<fp8_e5m2_t, fp8_e4m3fn_t, DTYPE_Y, float, false, true, Apace::QuantFlag::MX_QUANT>;
 #elif (ORIG_DTYPE_X1 == DT_FLOAT4_E2M1 && ORIG_DTYPE_X2 == DT_FLOAT4_E2M1)
-    using Impl = AllToAllMxQuantMatmulUrmaImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, false, true>;
+    using Impl = AllToAllMatmulUrmaImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, float, false, true, Apace::QuantFlag::MX_QUANT>;
 #else
-    using Impl = AllToAllMxQuantMatmulUrmaImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, false, true>;
+    using Impl = AllToAllMatmulUrmaImpl<DTYPE_X1, DTYPE_X2, DTYPE_Y, float, false, true, Apace::QuantFlag::MX_QUANT>;
 #endif
 
     Impl impl;

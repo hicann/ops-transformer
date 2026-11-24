@@ -26,7 +26,7 @@
 
 // DFX 头部约定: dumpInfo 必须是 tiling 结构的第一个成员(offset 0)，
 // 异常 dump 回调直接从 tiling blob 起始位置解析 DfxDumpInfo
-struct allToAllQuantMatmulTilingData {
+struct AllToAllQuantMatmulTilingData {
     Utils::DfxDumpInfo dumpInfo{};
     CommTilingData commTilingData;
     CommTilingData scaleCommTilingData;
@@ -34,7 +34,7 @@ struct allToAllQuantMatmulTilingData {
     uint32_t localMatmul{0}; // 是否使能local块计算先行，0：不使能；1：使能atomiadd
 };
 
-struct allToAllMatmulTilingData {
+struct AllToAllMatmulTilingData {
     Utils::DfxDumpInfo dumpInfo{};
     CommTilingData commTilingData;
     MatmulTilingData tileMmTilingData; // 非量化 matmul tiling（mL1/nL1/kL1/l1BufferNum/l0cDB 等，无 scale 字段）

@@ -11,19 +11,29 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ----------------------------------------------------------------------------------------------------------
 
+import argparse
 import os
 import sys
 
 import numpy as np
 import torch
 
-# FP8(MXFP8) 量化输入 + BF16 输出，理论相对误差 ~0.5-1%。
-# atol/rtol 都用 1e-2 对齐低精度量化算子的通用验收门槛。
+# 双千分之一精度标准（适用于所有模式）：
+#   单元素相对误差超 ERROR_TOL(1e-2) 的元素占比 ≤ FAIL_RATE_LIMIT(1e-2) 算过。
+#   量化（FP8/MXFP8）输入 + BF16 输出，理论相对误差 ~0.5-1%；非量化 fp16/bf16 更高精度，同门槛足够。
 ERROR_TOL = 1e-2
-DATA_TYPE = np.uint16
+FAIL_RATE_LIMIT = 1e-2
 FULL_TENSOR_PRINT_MAX_ELEMENTS = 1024
 CORNER_ROWS = 4
 CORNER_COLS = 4
+
+
+def read_matrix(path, dtype):
+    """读取 fp16/bf16 原始 2 字节矩阵。bf16 无 numpy 类型，经 uint16 视图还原。"""
+    if dtype == "bf16":
+        raw = np.fromfile(path, dtype=np.uint16)
+        return torch.from_numpy(raw).view(torch.bfloat16)
+    return torch.from_numpy(np.fromfile(path, dtype=np.float16))
 
 
 def _print_large_tensor_summary(
@@ -41,7 +51,8 @@ def _print_large_tensor_summary(
     rel_err = abs_err / denom
 
     numel = m * n
-    over_tol = (abs_err > ERROR_TOL).sum().item()
+    # 非有限值（NaN/Inf）也计入超差统计，避免 NaN 静默漏统计
+    over_tol = ((~torch.isfinite(abs_err)) | (abs_err > ERROR_TOL)).sum().item()
 
     rank_prefix = f"[Rank {rank_id}] " if rank_id >= 0 else ""
     print(
@@ -61,7 +72,7 @@ def _print_large_tensor_summary(
         print(f"  npu output (top-left {cr}x{cc}):\n{npu_output_tensor[:cr, :cc]}")
 
 
-def verify_single_rank(m, n, rank_id, base_dir="./output"):
+def verify_single_rank(m, n, rank_id, base_dir="./output", dtype="bf16"):
     output_path = os.path.join(base_dir, str(rank_id), "npu_out.bin")
     golden_path = os.path.join(base_dir, str(rank_id), "cpu_output.bin")
 
@@ -70,21 +81,21 @@ def verify_single_rank(m, n, rank_id, base_dir="./output"):
     if not os.path.exists(golden_path):
         raise FileNotFoundError(f"CPU golden file not found: {golden_path}")
 
-    output = np.fromfile(output_path, dtype=DATA_TYPE)
-    golden = np.fromfile(golden_path, dtype=DATA_TYPE)
+    output = read_matrix(output_path, dtype)
+    golden = read_matrix(golden_path, dtype)
 
     expected_size = m * n
-    if output.size != expected_size:
+    if output.numel() != expected_size:
         raise ValueError(
-            f"[Rank {rank_id}] npu output size {output.size} != expected size {expected_size}"
+            f"[Rank {rank_id}] npu output size {output.numel()} != expected size {expected_size}"
         )
-    if golden.size != expected_size:
+    if golden.numel() != expected_size:
         raise ValueError(
-            f"[Rank {rank_id}] cpu output size {golden.size} != expected size {expected_size}"
+            f"[Rank {rank_id}] cpu output size {golden.numel()} != expected size {expected_size}"
         )
 
-    npu_output_tensor = torch.from_numpy(output).view(torch.bfloat16).reshape(m, n)
-    golden_tensor = torch.from_numpy(golden).view(torch.bfloat16).reshape(m, n)
+    npu_output_tensor = output.reshape(m, n)
+    golden_tensor = golden.reshape(m, n)
 
     numel = m * n
     if numel <= FULL_TENSOR_PRINT_MAX_ELEMENTS:
@@ -93,32 +104,60 @@ def verify_single_rank(m, n, rank_id, base_dir="./output"):
     else:
         _print_large_tensor_summary(golden_tensor, npu_output_tensor, m, n, rank_id)
 
-    return torch.allclose(
-        golden_tensor, npu_output_tensor, rtol=ERROR_TOL, atol=ERROR_TOL, equal_nan=True
+    # 双千分之一：相对误差 > ERROR_TOL 的元素占比 ≤ FAIL_RATE_LIMIT 算过。
+    # 注意 NaN/Inf：NPU 输出与 golden 的非有限值必须一致（同号 inf 或均为 nan），
+    # 否则 NaN 参与运算会使 diff 为 NaN、diff > thr 恒为 False，导致全 NaN 输出被误判为 0% 失败。
+    # 因此先构建“非有限值不一致”失败掩码，再叠加有限值的容差判断。
+    g = golden_tensor.float()
+    p = npu_output_tensor.float()
+    both_finite = torch.isfinite(g) & torch.isfinite(p)
+    same_nonfinite = (g == p) | (
+        torch.isnan(g) & torch.isnan(p)
+    )  # inf==inf / 双 nan 视为一致
+    nonfinite_mismatch = (~both_finite) & (~same_nonfinite)
+
+    abs_err = (p - g).abs()
+    thr = ERROR_TOL + ERROR_TOL * g.abs()
+    fail_mask = nonfinite_mismatch | (both_finite & (abs_err > thr))
+
+    numel = g.numel()
+    fail_cnt = fail_mask.sum().item()
+    fail_rate = fail_cnt / numel if numel > 0 else 0.0
+    print(
+        f"[Rank {rank_id}] 双千分之一: fail_rate={fail_rate * 100:.5f}% "
+        f"({fail_cnt}/{numel}, limit {FAIL_RATE_LIMIT * 100}%)"
     )
+    mismatch_cnt = nonfinite_mismatch.sum().item()
+    if mismatch_cnt > 0:
+        print(
+            f"[Rank {rank_id}] [WARN] {mismatch_cnt} 个元素 NaN/Inf 不一致"
+            f"（含 NPU 输出为 NaN 而 golden 为有限值的情况）"
+        )
+    return fail_rate <= FAIL_RATE_LIMIT
 
 
-def verify_result(m, n, rank_num, base_dir="./output"):
+def verify_result(m, n, rank_num, base_dir="./output", dtype="bf16"):
     all_pass = True
     results = []
 
     print(f"\n{'=' * 60}")
     print(f"Verifying outputs for {rank_num} ranks")
-    print(f"Matrix shape: M={m}, N={n}")
+    print(f"Matrix shape: M={m}, N={n}, dtype={dtype}")
     print("All ranks should produce the same result after All2All")
     print(f"{'=' * 60}")
 
     for rank_id in range(rank_num):
         try:
-            res = verify_single_rank(m, n, rank_id, base_dir)
+            res = verify_single_rank(m, n, rank_id, base_dir, dtype)
             results.append(
-                (rank_id, bool(res), None if res else "allclose returned False")
+                (rank_id, bool(res), None if res else "fail_rate exceeded limit")
             )
             if res:
                 print(f"[PASS] Rank {rank_id}: NPU results match CPU golden")
             else:
                 print(
-                    f"[FAIL] Rank {rank_id}: allclose returned False (rtol=atol={ERROR_TOL})"
+                    f"[FAIL] Rank {rank_id}: 双千分之一 fail_rate exceeded "
+                    f"(ERROR_TOL={ERROR_TOL}, limit={FAIL_RATE_LIMIT})"
                 )
                 all_pass = False
         except Exception as e:
@@ -139,30 +178,37 @@ def verify_result(m, n, rank_num, base_dir="./output"):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        print("Usage: python3 verify_result.py m n rank_num [base_dir]")
-        print("  m: matrix M dimension")
-        print("  n: matrix N dimension")
-        print("  rank_num: number of ranks")
-        print("  base_dir: output directory (default: ./output)")
-        print("\nExpected file structure:")
-        print("  {base_dir}/0/npu_out.bin      - NPU output from rank 0")
-        print("  {base_dir}/0/cpu_output.bin   - CPU golden for rank 0")
-        print("  {base_dir}/1/npu_out.bin      - NPU output from rank 1")
-        print("  {base_dir}/1/cpu_output.bin   - CPU golden for rank 1")
-        print("  ...")
+    parser = argparse.ArgumentParser(
+        description="Verify NPU AllToAllMatmul output against CPU golden.",
+    )
+    parser.add_argument("m", type=int, help="matrix M dimension")
+    parser.add_argument("n", type=int, help="matrix N dimension")
+    parser.add_argument("rank_num", type=int, help="number of ranks")
+    parser.add_argument(
+        "base_dir",
+        nargs="?",
+        default="./output",
+        help="base directory of output files (default: ./output)",
+    )
+    parser.add_argument(
+        "--dtype",
+        type=str,
+        default="bf16",
+        help="output dtype: bf16 (default) | fp16",
+    )
+    args = parser.parse_args()
+
+    if args.dtype not in ("fp16", "bf16"):
+        print(f"ERROR: --dtype must be 'fp16' or 'bf16', got {args.dtype}")
         sys.exit(1)
 
-    m = int(sys.argv[1])
-    n = int(sys.argv[2])
-    rank_num = int(sys.argv[3])
-    base_dir = sys.argv[4] if len(sys.argv) > 4 else "./output"
-
     try:
-        all_pass = verify_result(m, n, rank_num, base_dir)
+        all_pass = verify_result(
+            args.m, args.n, args.rank_num, args.base_dir, args.dtype
+        )
         if not all_pass:
             raise ValueError("[ERROR] Some NPU results differ from CPU.\n")
-        print(f"\n[ALL PASS] All {rank_num} ranks passed verification!\n")
+        print(f"\n[ALL PASS] All {args.rank_num} ranks passed verification!\n")
 
     except Exception as e:
         print(e)

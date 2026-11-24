@@ -19,11 +19,12 @@
 #   bash run.sh 2-4                    # 运行 CSV 第 2~4 行
 #   bash run.sh all                    # 运行 CSV 全部行
 #   bash run.sh --csv <file> 1 3       # 指定 csv 文件 + 行号
-#   bash run.sh --cli m k n r h b      # 命令行模式(绕过 csv, b=bufferCount)
+#   bash run.sh --cli m k n r h b [type] [dtype] [lm]  # 命令行模式(绕过 csv, type=quant/nonquant, b=bufferCount)
 #   bash run.sh --skip-build ...       # 跳过编译
 #   bash run.sh --gen-only ...         # 仅生成 CPU golden
 #   bash run.sh --verify-only ...      # 仅精度比对
 #   bash run.sh --perf ...             # 性能模式(msprof采集)
+#   bash run.sh --selftest ...         # 仅验证 verify_result.py 的 NaN/Inf 判定逻辑（不跑 kernel）
 #   环境变量 KERNEL_TIMEOUT=<秒>       # 覆盖默认超时(600s)
 #   perf 模式跑完后: python3 scripts/parse_prof.py --all  解析性能数据
 set -e
@@ -34,7 +35,7 @@ BUILD_DIR="${ST_DIR}/build"
 PROF_DIR="${SCRIPT_DIR}/prof"
 KERNEL_TIMEOUT=${KERNEL_TIMEOUT:-600}  # 默认600秒(10分钟)，可用环境变量 KERNEL_TIMEOUT 覆盖
 
-SKIP_BUILD=0; GEN_ONLY=0; VERIFY_ONLY=0; CLI_MODE=0; PERF_MODE=0
+SKIP_BUILD=0; GEN_ONLY=0; VERIFY_ONLY=0; CLI_MODE=0; PERF_MODE=0; SELFTEST=0
 CSV_FILE="${SCRIPT_DIR}/cases.csv"
 
 # ---- 解析参数 ----
@@ -47,6 +48,7 @@ while [ $# -gt 0 ]; do
         --cli)         CLI_MODE=1; shift ;;
         --csv)         CSV_FILE="$2"; shift 2 ;;
         --perf)        PERF_MODE=1; shift ;;
+        --selftest)    SELFTEST=1; shift ;;
         -h|--help)
             sed -n '1,20p' "$0"; exit 0 ;;
         *)
@@ -86,6 +88,79 @@ else
 fi
 command -v python3 >/dev/null || { echo "ERROR: python3 not available"; exit 1; }
 
+# ---- --selftest: 验证 verify_result.py 的 NaN/Inf 判定逻辑（不跑 kernel）----
+if [ "$SELFTEST" -eq 1 ]; then
+    echo "==== verify_result selftest: NaN/Inf 判定 ===="
+    python3 - "$SCRIPT_DIR" <<'PYEOF'
+import os
+import sys
+import tempfile
+
+import numpy as np
+
+script_dir = sys.argv[1]
+sys.path.insert(0, os.path.join(script_dir, "scripts"))
+import verify_result as vr
+
+m = n = 4
+
+
+def run_case(golden, npu, expect_fail):
+    tmp = tempfile.mkdtemp(prefix="verify_selftest_")
+    try:
+        out_dir = os.path.join(tmp, "0")
+        os.makedirs(out_dir)
+        golden.tofile(os.path.join(out_dir, "cpu_output.bin"))
+        npu.tofile(os.path.join(out_dir, "npu_out.bin"))
+        all_pass = vr.verify_result(m, n, 1, tmp, dtype="fp16")
+        actual_fail = not all_pass
+        if actual_fail != expect_fail:
+            raise AssertionError(
+                f"expect_fail={expect_fail}, actual_fail={actual_fail}"
+            )
+        return "PASS"
+    finally:
+        import shutil
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def case(golden, npu, expect_fail, label):
+    result = run_case(golden, npu, expect_fail)
+    print(f"[{result}] {label}")
+    return result == "PASS"
+
+
+results = []
+g_finite = np.full((m, n), 1.0, np.float16)
+
+# 1) 仅 NPU 输出含 1 个 NaN，golden 全有限 -> 应判 FAIL
+npu = np.full((m, n), 1.0, np.float16)
+npu[0, 0] = np.float16(np.nan)
+results.append(case(g_finite, npu, True, "仅 NPU 输出含 NaN -> 判 FAIL"))
+
+# 2) 整张 NPU 全 NaN -> 应判 FAIL
+npu_all_nan = np.full((m, n), np.nan, np.float16)
+results.append(case(g_finite, npu_all_nan, True, "整张 NPU 全 NaN -> 判 FAIL"))
+
+# 3) 两侧同为 NaN -> 应判 PASS（NaN 匹配 NaN）
+g_nan = np.full((m, n), 1.0, np.float16)
+g_nan[0, 0] = np.float16(np.nan)
+npu = np.full((m, n), 1.0, np.float16)
+npu[0, 0] = np.float16(np.nan)
+results.append(case(g_nan, npu, False, "两侧同为 NaN -> 判 PASS"))
+
+# 4) 有限值一致 -> 应判 PASS
+npu = np.full((m, n), 2.0, np.float16)
+results.append(case(np.full((m, n), 2.0, np.float16), npu, False, "有限值一致 -> 判 PASS"))
+
+if all(results):
+    print("\n[ALL PASS] verify_result NaN/Inf selftest passed")
+    sys.exit(0)
+sys.exit(1)
+PYEOF
+    exit $?
+fi
+
 # ---- 获取 prof 目录列表（用于 msprof 前后对比找新增目录）----
 get_prof_dirs() {
     find "$PROF_DIR" -maxdepth 1 -mindepth 1 -type d -printf '%f\n' 2>/dev/null | sort || true
@@ -104,19 +179,22 @@ print_perf_hint() {
 
 # ---- 单 case 执行函数 ----
 run_single() {
-    local M=$1 K=$2 N=$3 RANK_NUM=$4 HEAD_M_SIZE=$5 BUFFER_COUNT=$6
+    local M=$1 K=$2 N=$3 RANK_NUM=$4 HEAD_M_SIZE=$5 BUFFER_COUNT=$6 TYPE=$7 DTYPE=$8 LM=$9
+    TYPE=${TYPE:-quant}
+    DTYPE=${DTYPE:-bf16}
+    LM=${LM:-0}
     echo ""
     echo "=========================================="
-    echo "apace AllToAllQuantMatmul ST"
-    echo "  M=$M K=$K N=$N rankNum=$RANK_NUM headMSize=$HEAD_M_SIZE bufferCount=$BUFFER_COUNT"
+    echo "apace AllToAllMatmul ST"
+    echo "  M=$M K=$K N=$N rankNum=$RANK_NUM headMSize=$HEAD_M_SIZE bufferCount=$BUFFER_COUNT type=$TYPE dtype=$DTYPE localMatmul=$LM"
     echo "=========================================="
 
     cd "$SCRIPT_DIR"
     rm -rf input output
 
     # ---- 1. 生成数据 ----
-    echo "[1/4] Generate CPU golden + input data..."
-    python3 scripts/gen_data.py "$M" "$K" "$N" "$RANK_NUM"
+    echo "[1/4] Generate CPU golden + input data (type=$TYPE dtype=$DTYPE lm=$LM)..."
+    python3 scripts/gen_data.py "$M" "$K" "$N" "$RANK_NUM" "$TYPE" "$DTYPE" "$LM"
 
     if [ "$GEN_ONLY" -eq 1 ]; then return 0; fi
 
@@ -168,13 +246,13 @@ run_single() {
                 if command -v timeout >/dev/null 2>&1; then
                     set +e
                     timeout ${KERNEL_TIMEOUT}s msprof --output="$PROF_DIR" \
-                        --application="$EXE_PATH $M $K $N $RANK_NUM $MODE $HEAD_M_SIZE $BUFFER_COUNT" 2>&1
+                        --application="$EXE_PATH $M $K $N $RANK_NUM $MODE $HEAD_M_SIZE $BUFFER_COUNT $TYPE $DTYPE $LM" 2>&1
                     local MSPROF_RC=$?
                     set -e
                 else
                     set +e
                     msprof --output="$PROF_DIR" \
-                        --application="$EXE_PATH $M $K $N $RANK_NUM $MODE $HEAD_M_SIZE $BUFFER_COUNT" 2>&1
+                        --application="$EXE_PATH $M $K $N $RANK_NUM $MODE $HEAD_M_SIZE $BUFFER_COUNT $TYPE $DTYPE $LM" 2>&1
                     local MSPROF_RC=$?
                     set -e
                 fi
@@ -230,7 +308,7 @@ run_single() {
                 local precision="FAIL"
                 if [ -d "$SCRIPT_DIR/output" ]; then
                     set +e
-                    python3 scripts/verify_result.py "$M" "$N" "$RANK_NUM" "$SCRIPT_DIR/output" >/dev/null 2>&1
+                    python3 scripts/verify_result.py "$M" "$N" "$RANK_NUM" "$SCRIPT_DIR/output" --dtype "$DTYPE" >/dev/null 2>&1
                     local verify_rc=$?
                     set -e
                     if [ $verify_rc -eq 0 ]; then precision="PASS"; fi
@@ -254,12 +332,12 @@ run_single() {
                 # ---- precision 模式: 直接调 exe ----
                 if command -v timeout >/dev/null 2>&1; then
                     set +e
-                    KERNEL_OUT=$(timeout ${KERNEL_TIMEOUT}s "$EXE_PATH" $M $K $N $RANK_NUM "$MODE" "$HEAD_M_SIZE" "$BUFFER_COUNT" 2>&1)
+                    KERNEL_OUT=$(timeout ${KERNEL_TIMEOUT}s "$EXE_PATH" $M $K $N $RANK_NUM "$MODE" "$HEAD_M_SIZE" "$BUFFER_COUNT" "$TYPE" "$DTYPE" "$LM" 2>&1)
                     KERNEL_RC=$?
                     set -e
                 else
                     set +e
-                    KERNEL_OUT=$("$EXE_PATH" $M $K $N $RANK_NUM "$MODE" "$HEAD_M_SIZE" "$BUFFER_COUNT" 2>&1)
+                    KERNEL_OUT=$("$EXE_PATH" $M $K $N $RANK_NUM "$MODE" "$HEAD_M_SIZE" "$BUFFER_COUNT" "$TYPE" "$DTYPE" "$LM" 2>&1)
                     KERNEL_RC=$?
                     set -e
                 fi
@@ -304,7 +382,7 @@ run_single() {
     # ---- 4. 精度比对（perf 模式已在步骤3内完成 verify，此处跳过）----
     if [ "$PERF_MODE" -eq 0 ]; then
         echo "[4/4] Verify..."
-        python3 scripts/verify_result.py "$M" "$N" "$RANK_NUM" "./output"
+        python3 scripts/verify_result.py "$M" "$N" "$RANK_NUM" "./output" --dtype "$DTYPE"
         return $?
     fi
     echo "[4/4] Verify (done in perf loop)"
@@ -313,7 +391,7 @@ run_single() {
 
 # ---- 选择参数来源 ----
 if [ "${CLI_MODE:-0}" -eq 1 ]; then
-    M=2048; K=3584; N=4096; RANK_NUM=2; HEAD_M_SIZE=512; BUFFER_COUNT=0
+    M=2048; K=3584; N=4096; RANK_NUM=2; HEAD_M_SIZE=512; BUFFER_COUNT=0; TYPE=quant; DTYPE=bf16; LM=0
     idx=0
     [ $idx -lt ${#ARGS[@]} ] && { M=${ARGS[$idx]}; idx=$((idx+1)); }
     [ $idx -lt ${#ARGS[@]} ] && { K=${ARGS[$idx]}; idx=$((idx+1)); }
@@ -321,7 +399,10 @@ if [ "${CLI_MODE:-0}" -eq 1 ]; then
     [ $idx -lt ${#ARGS[@]} ] && { RANK_NUM=${ARGS[$idx]}; idx=$((idx+1)); }
     [ $idx -lt ${#ARGS[@]} ] && { HEAD_M_SIZE=${ARGS[$idx]}; idx=$((idx+1)); }
     [ $idx -lt ${#ARGS[@]} ] && { BUFFER_COUNT=${ARGS[$idx]}; idx=$((idx+1)); }
-    run_single "$M" "$K" "$N" "$RANK_NUM" "$HEAD_M_SIZE" "$BUFFER_COUNT"
+    [ $idx -lt ${#ARGS[@]} ] && { TYPE=${ARGS[$idx]}; idx=$((idx+1)); }
+    [ $idx -lt ${#ARGS[@]} ] && { DTYPE=${ARGS[$idx]}; idx=$((idx+1)); }
+    [ $idx -lt ${#ARGS[@]} ] && { LM=${ARGS[$idx]}; idx=$((idx+1)); }
+    run_single "$M" "$K" "$N" "$RANK_NUM" "$HEAD_M_SIZE" "$BUFFER_COUNT" "$TYPE" "$DTYPE" "$LM"
     rc=$?
     print_perf_hint
     exit $rc
@@ -338,11 +419,11 @@ TOTAL_LINES=$(echo "$DATA_LINES" | grep -c .)
 # 无参数: 列出全部 case 并全部运行
 if [ ${#ARGS[@]} -eq 0 ]; then
     echo "==== cases.csv ($TOTAL_LINES cases) ===="
-    echo "Row  M      K     N     rank  headMSize  bufferCnt"
+    echo "Row  type     M      K     N     rank  headMSize  bufferCnt"
     local_idx=0
     while IFS= read -r line; do
         local_idx=$((local_idx + 1))
-        printf "%-5s %s\n" "$local_idx" "$(echo "$line" | awk -F, '{printf "%-6s %-5s %-5s %-5s %-10s %s", $1,$2,$3,$4,$5,$6}')"
+        printf "%-5s %s\n" "$local_idx" "$(echo "$line" | awk -F, '{printf "%-9s %-6s %-5s %-5s %-5s %-10s %s", $1,$2,$3,$4,$5,$6,$7}')"
     done <<< "$DATA_LINES"
     echo ""
     echo "Running all $TOTAL_LINES cases..."
@@ -366,23 +447,28 @@ RESULTS=()
 
 for row in "${SELECTED_ROWS[@]}"; do
     SELECTED=$(echo "$DATA_LINES" | sed -n "${row}p")
-    M=$(echo "$SELECTED" | awk -F, '{print $1}')
-    K=$(echo "$SELECTED" | awk -F, '{print $2}')
-    N=$(echo "$SELECTED" | awk -F, '{print $3}')
-    RANK_NUM=$(echo "$SELECTED" | awk -F, '{print $4}')
-    HEAD_M_SIZE=$(echo "$SELECTED" | awk -F, '{print $5}')
-    BUFFER_COUNT=$(echo "$SELECTED" | awk -F, '{print $6}')
+    TYPE=$(echo "$SELECTED" | awk -F, '{print $1}')
+    M=$(echo "$SELECTED" | awk -F, '{print $2}')
+    K=$(echo "$SELECTED" | awk -F, '{print $3}')
+    N=$(echo "$SELECTED" | awk -F, '{print $4}')
+    RANK_NUM=$(echo "$SELECTED" | awk -F, '{print $5}')
+    HEAD_M_SIZE=$(echo "$SELECTED" | awk -F, '{print $6}')
+    BUFFER_COUNT=$(echo "$SELECTED" | awk -F, '{print $7}')
     BUFFER_COUNT=${BUFFER_COUNT:-0}
+    CSV_DTYPE=$(echo "$SELECTED" | awk -F, '{print $8}')
+    CSV_LM=$(echo "$SELECTED" | awk -F, '{print $9}')
+    CSV_DTYPE=${CSV_DTYPE:-bf16}
+    CSV_LM=${CSV_LM:-0}
 
     echo ""
     echo "########## CSV row ${row}/${TOTAL_LINES} ##########"
 
-    if run_single "$M" "$K" "$N" "$RANK_NUM" "$HEAD_M_SIZE" "$BUFFER_COUNT"; then
+    if run_single "$M" "$K" "$N" "$RANK_NUM" "$HEAD_M_SIZE" "$BUFFER_COUNT" "$TYPE" "$CSV_DTYPE" "$CSV_LM"; then
         PASS_CNT=$((PASS_CNT + 1))
-        RESULTS+=("PASS  row$row  M=$M K=$K N=$N rank=$RANK_NUM headM=$HEAD_M_SIZE bufferCnt=$BUFFER_COUNT")
+        RESULTS+=("PASS  row$row  type=$TYPE M=$M K=$K N=$N rank=$RANK_NUM headM=$HEAD_M_SIZE bufferCnt=$BUFFER_COUNT dtype=$CSV_DTYPE")
     else
         FAIL_CNT=$((FAIL_CNT + 1))
-        RESULTS+=("FAIL  row$row  M=$M K=$K N=$N rank=$RANK_NUM headM=$HEAD_M_SIZE bufferCnt=$BUFFER_COUNT")
+        RESULTS+=("FAIL  row$row  type=$TYPE M=$M K=$K N=$N rank=$RANK_NUM headM=$HEAD_M_SIZE bufferCnt=$BUFFER_COUNT dtype=$CSV_DTYPE")
     fi
     # 首次编译后，后续 case 跳过编译
     SKIP_BUILD=1

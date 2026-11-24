@@ -17,26 +17,140 @@ import sys
 
 import numpy as np
 import torch
-from en_dtypes import float8_e8m0
-from ml_dtypes import float8_e4m3fn
 
 
-def write_artifacts(
-    base_dir, rank_id, a_segment_fp8, b_fp8, a_segment_scale, b_scale, out
+# ---------------- 非量化（fp16/bf16 + bias）----------------
+
+
+def _target_dtype(dtype):
+    return torch.bfloat16 if dtype == "bf16" else torch.float16
+
+
+def write_tensor(t, path):
+    """按 2 字节原始位写入 fp16/bf16 张量（bf16 无 numpy 类型，经 uint16 视图写）。"""
+    if t.dtype == torch.bfloat16:
+        t.contiguous().view(torch.uint16).numpy().tofile(path)
+    else:
+        t.numpy().tofile(path)
+
+
+def gen_nonquant_data(
+    m,
+    k,
+    n,
+    rank_num,
+    dtype="fp16",
+    lm=0,
+    seed=678,
+    a_range=(-5.0, 5.0),
+    b_range=(-10.0, 10.0),
+    bias_range=(-3.0, 3.0),
 ):
-    input_dir = os.path.join(base_dir, "input", str(rank_id))
-    output_dir = os.path.join(base_dir, "output", str(rank_id))
-    os.makedirs(input_dir, exist_ok=True)
-    os.makedirs(output_dir, exist_ok=True)
+    M_total = m * rank_num
+    K = k
+    N = n
+    Ka = K // rank_num
+    target = _target_dtype(dtype)
 
-    a_segment_fp8.view(np.uint8).tofile(os.path.join(input_dir, "input_a.bin"))
-    b_fp8.view(np.uint8).tofile(os.path.join(input_dir, "input_b.bin"))
-    a_segment_scale.tofile(os.path.join(input_dir, "input_scaleA.bin"))
-    b_scale.tofile(os.path.join(input_dir, "input_scaleB.bin"))
-    out.view(torch.uint16).numpy().tofile(os.path.join(output_dir, "cpu_output.bin"))
+    if K % rank_num != 0:
+        raise ValueError(f"K={K} must be divisible by rank_num={rank_num}")
+
+    np.random.seed(seed)
+
+    a_local_f32 = [
+        np.random.uniform(a_range[0], a_range[1], (M_total, Ka)).astype(np.float32)
+        for _ in range(rank_num)
+    ]
+    b_ori_f32 = np.random.uniform(b_range[0], b_range[1], (N, K)).astype(np.float32)
+    bias_f32 = np.random.uniform(bias_range[0], bias_range[1], (N,)).astype(np.float32)
+
+    # 量化到目标 dtype（kernel 输入与 golden 必须用同一份量化值）
+    a_local_list = [torch.from_numpy(x).to(target) for x in a_local_f32]
+    b_ori = torch.from_numpy(b_ori_f32).to(target)  # (N, K)
+    # bias 量化到目标 dtype：kernel 侧 bias 为量化值经 BiasTable 转 fp32，
+    # golden 必须使用同一份量化值，不能用未量化的 fp32 bias
+    bias = torch.from_numpy(bias_f32).to(target)  # (N,) 目标 dtype
+
+    # all-to-all：dst 收集各 src 的 chunk
+    #   a_after_alltoall[dst][src*m:(src+1)*m, :] = a_local[src][dst*m:(dst+1)*m, :]
+    a_after_alltoall_list = []
+    for dst_rank in range(rank_num):
+        a_after = torch.zeros(M_total, Ka, dtype=torch.float32)
+        for src_rank in range(rank_num):
+            chunk = a_local_list[src_rank][dst_rank * m : (dst_rank + 1) * m, :].float()
+            a_after[src_rank * m : (src_rank + 1) * m, :] = chunk
+        a_after_alltoall_list.append(a_after)
+
+    b_dequant = b_ori.float()  # (N, K)
+
+    out_all_ranks = []
+    for dst_rank in range(rank_num):
+        a_after = a_after_alltoall_list[dst_rank]  # (M_total, Ka) fp32
+        a_permuted = torch.zeros(m, K, dtype=torch.float32)
+        for src_rank in range(rank_num):
+            a_permuted[:, src_rank * Ka : (src_rank + 1) * Ka] = a_after[
+                src_rank * m : (src_rank + 1) * m, :
+            ]
+
+        a_cpu = a_permuted  # (m, K)
+        b_cpu = b_dequant  # (N, K)，逻辑 B = [K,N] 取转置
+        out = torch.matmul(a_cpu, b_cpu.t())  # (m, N)
+        out = out + bias.float()
+
+        if lm == 2:
+            # lm=2（GM累加）：golden 按 kernel 实际算法模拟，用于验证 kernel 机制正确性。
+            # kernel：LOCAL 在 L0C fp32 算 self部分和+bias → 取整成输出 dtype 写 GM；
+            # REMOTE 把其余 rank 部分和在 fp32 累加 → 原子加（取整）到 GM。
+            # 故：self_q=round(self+bias); remote_q=round(Σ_remote); out=round(self_q+remote_q)。
+            self_partial = torch.zeros(m, N, dtype=torch.float32)
+            for src_rank in range(rank_num):
+                if src_rank != dst_rank:
+                    continue
+                seg_a = a_after[src_rank * m : (src_rank + 1) * m, :]
+                seg_b = b_dequant[:, src_rank * Ka : (src_rank + 1) * Ka]
+                self_partial = self_partial + torch.matmul(seg_a, seg_b.t())
+
+            remote_partial = torch.zeros(m, N, dtype=torch.float32)
+            for src_rank in range(rank_num):
+                if src_rank == dst_rank:
+                    continue
+                seg_a = a_after[src_rank * m : (src_rank + 1) * m, :]
+                seg_b = b_dequant[:, src_rank * Ka : (src_rank + 1) * Ka]
+                remote_partial = remote_partial + torch.matmul(seg_a, seg_b.t())
+
+            self_q = (self_partial + bias.float()).to(target)
+            remote_q = remote_partial.to(target)
+            # 显式 .to(target)：保证输出为 fp16/bf16 写盘
+            out = (self_q + remote_q).to(target)
+        else:
+            out = out.to(target)
+
+        out_all_ranks.append(out)
+
+    current_dir = os.getcwd()
+    for rank_id in range(rank_num):
+        input_dir = os.path.join(current_dir, "input", str(rank_id))
+        output_dir = os.path.join(current_dir, "output", str(rank_id))
+        os.makedirs(input_dir, exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True)
+
+        # a_local: (M_total, Ka) fp16/bf16，ND 行主序
+        write_tensor(a_local_list[rank_id], os.path.join(input_dir, "input_a.bin"))
+        # b_ori: (N, K)。kernel TransB=true 用 DN 列主序读 [K,N]，
+        # host 写 [N,K] C-order 即等价于 [K,N] 列主序，故直接写 b_ori 不转置。
+        write_tensor(b_ori, os.path.join(input_dir, "input_b.bin"))
+        # bias: (N,) 目标 dtype（fp16/bf16 各 2 字节，与 kernel BiasType 一致）
+        write_tensor(bias, os.path.join(input_dir, "input_bias.bin"))
+        write_tensor(out_all_ranks[rank_id], os.path.join(output_dir, "cpu_output.bin"))
 
 
-def gen_golden_data_all_to_all_matmul(m, k, n, rank_num):
+# ---------------- 量化（fp8 E4M3 + scale，输出 bf16）----------------
+
+
+def gen_quant_data(m, k, n, rank_num):
+    from en_dtypes import float8_e8m0
+    from ml_dtypes import float8_e4m3fn
+
     M_total = m * rank_num
     K = k
     N = n
@@ -45,7 +159,6 @@ def gen_golden_data_all_to_all_matmul(m, k, n, rank_num):
     if K % rank_num != 0:
         raise ValueError(f"K={K} must be divisible by rank_num={rank_num}")
 
-    # [NOTE] 2026-06-22: fixed seed 方便与 sanity_check.py 对比 shmem_A.bin。
     np.random.seed(42)
 
     b_ori = np.random.uniform(1, 8, (N, K)).astype(float8_e4m3fn)
@@ -63,21 +176,16 @@ def gen_golden_data_all_to_all_matmul(m, k, n, rank_num):
     )
 
     # [FIX] 2026-06-22: TransB=true 时 kernel 用 ScaleBDNLayoutPtn (column-major)
-    # 访问 scaleB，layoutScaleB = (rankDim*kScaleSize, N) = (K/32, N) 按列主序读。
-    # host 必须写成 [N, K/32] C-order (= [K/32, N] 列主序) 才能被正确解读。
-    # 之前 .transpose(1, 0, 2).reshape(K//32, N) 写的是行主序，被 kernel 按列主序
-    # 读成乱序字节，导致最终输出与 golden rel_err 288% 不相关。
+    # 访问 scaleB，host 必须写成 [N, K/32] C-order (= [K/32, N] 列主序) 才能被正确解读。
     b_scale_all = b_scale_ori.reshape(N, K // 32).flatten()
 
     a_local_list = []
     a_scale_list = []
-
     for rank_id in range(rank_num):
         a_local = np.random.uniform(1, 8, (M_total, Ka)).astype(float8_e4m3fn)
         a_scale = np.random.uniform(1, 8, size=(M_total, math.ceil(Ka / 64), 2)).astype(
             float8_e8m0
         )
-
         a_local_list.append(a_local)
         a_scale_list.append(a_scale)
 
@@ -120,36 +228,58 @@ def gen_golden_data_all_to_all_matmul(m, k, n, rank_num):
         out = torch.matmul(a_cpu, b_cpu).to(torch.bfloat16)
         out_all_ranks.append(out)
 
-    # [FIX] 2026-06-22: TransB=true 时 kernel 用 DNExtLayoutPtn (column-major)
-    # 访问 B，layoutB = (rankDim*Ka, N) = (K, N) 按列主序读。
-    # host 必须写成 [N, K] C-order (= [K, N] 列主序)，即直接写 b_ori 不转置。
-    # 之前传 b_ori_transpose 写的是 [K, N] 行主序，被 kernel 按列主序读成乱序字节。
-    # golden 计算里仍用 b_ori_transpose (逻辑 B = [K, N])，不动。
     current_dir = os.getcwd()
     for rank_id in range(rank_num):
-        write_artifacts(
-            current_dir,
-            rank_id,
-            a_local_list[rank_id],
-            b_ori,
-            a_scale_list[rank_id],
-            b_scale_all,
-            out_all_ranks[rank_id],
+        input_dir = os.path.join(current_dir, "input", str(rank_id))
+        output_dir = os.path.join(current_dir, "output", str(rank_id))
+        os.makedirs(input_dir, exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True)
+
+        a_local_list[rank_id].view(np.uint8).tofile(
+            os.path.join(input_dir, "input_a.bin")
+        )
+        b_ori.view(np.uint8).tofile(os.path.join(input_dir, "input_b.bin"))
+        a_scale_list[rank_id].tofile(os.path.join(input_dir, "input_scaleA.bin"))
+        b_scale_all.tofile(os.path.join(input_dir, "input_scaleB.bin"))
+        out_all_ranks[rank_id].view(torch.uint16).numpy().tofile(
+            os.path.join(output_dir, "cpu_output.bin")
         )
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 5:
-        print("Usage: python3 gen_data.py m k n rank_num")
-        print("  m: matrix M dimension")
+    if len(sys.argv) < 5:
+        print("Usage: python3 gen_data.py m k n rank_num [type] [dtype] [lm] [seed]")
+        print("  m: matrix M dimension (per-rank output rows)")
         print("  k: matrix K dimension (total, must be divisible by rank_num)")
         print("  n: matrix N dimension")
         print("  rank_num: number of ranks")
+        print("  type: optional, quant (default) | nonquant")
+        print("  dtype: optional (nonquant), fp16 (default) | bf16")
+        print(
+            "  lm: optional (nonquant), localMatmul mode (0 default | 1 DEFERRED_SYNC | 2 GM累加)"
+        )
+        print("  seed: optional (nonquant), random seed (default 678)")
         sys.exit(1)
 
     m = int(sys.argv[1])
     k = int(sys.argv[2])
     n = int(sys.argv[3])
     rank_num = int(sys.argv[4])
+    data_type = sys.argv[5] if len(sys.argv) >= 6 else "quant"
+    if data_type not in ("quant", "nonquant"):
+        print(f"ERROR: type must be 'quant' or 'nonquant', got {data_type}")
+        sys.exit(1)
 
-    gen_golden_data_all_to_all_matmul(m, k, n, rank_num)
+    if data_type == "quant":
+        gen_quant_data(m, k, n, rank_num)
+    else:
+        dtype = sys.argv[6] if len(sys.argv) >= 7 else "fp16"
+        if dtype not in ("fp16", "bf16"):
+            print(f"ERROR: dtype must be 'fp16' or 'bf16', got {dtype}")
+            sys.exit(1)
+        lm = int(sys.argv[7]) if len(sys.argv) >= 8 else 0
+        if lm not in (0, 1, 2):
+            print(f"ERROR: lm must be 0/1/2, got {lm}")
+            sys.exit(1)
+        seed = int(sys.argv[8]) if len(sys.argv) >= 9 else 678
+        gen_nonquant_data(m, k, n, rank_num, dtype, lm, seed)

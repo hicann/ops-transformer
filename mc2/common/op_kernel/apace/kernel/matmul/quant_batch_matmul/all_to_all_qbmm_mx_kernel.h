@@ -436,7 +436,7 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Mma
 {
     constexpr int64_t kPos = 0L;
     // LOCAL 模式 / DEFERRED_SYNC Phase 1 共用：计算本 Rank 的 A 和 本 Rank 的 B 对应部分
-    auto actualMPos =
+    uint64_t actualMPos =
         static_cast<uint64_t>(params.localParams.rankId) * params.localParams.originalM + static_cast<uint64_t>(mPos);
     auto gmBlockA =
         gmALocal.slice(asc::te::make_coord(actualMPos, kPos),
@@ -460,9 +460,9 @@ QBMM_MX_KERNEL_CLASS_TEM_PARAMS
 __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::ProcessLocalBatch(
     const Params& params, BlockScheduler& bs, Mc2Kernel::OpStateDump& opStateDump)
 {
-    auto rankSize = params.localParams.rankSize;
-    auto oriM = params.localParams.originalM;
-    auto scaleKLen = MxScaleKLen<AType>(asc::te::get<MNK_K>(params.problemShape));
+    uint32_t rankSize = params.localParams.rankSize;
+    uint64_t oriM = params.localParams.originalM;
+    uint64_t scaleKLen = MxScaleKLen<AType>(asc::te::get<MNK_K>(params.problemShape));
 
     auto layoutALocal = MakeLayoutA{}(rankSize * oriM, asc::te::get<MNK_K>(params.problemShape));
     auto layoutScaleALocal = MakeLayoutScaleA{}(rankSize * oriM, scaleKLen);
@@ -516,10 +516,10 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Pro
 {
     // DEFERRED_SYNC 模式：per-tile 内 local 先算驻留 L0C → wait_flag → 远程累加 → 单次 fixpipe。
     // wait_flag 必须由 kernel 内部发出（在 self rank 的 mmad 之后、其它 rank 的 mmad 之前）。
-    auto rankId = params.localParams.rankId;
-    auto rankSize = params.localParams.rankSize;
-    auto oriM = params.localParams.originalM;
-    auto scaleKLen = MxScaleKLen<AType>(asc::te::get<MNK_K>(params.problemShape));
+    uint32_t rankId = params.localParams.rankId;
+    uint32_t rankSize = params.localParams.rankSize;
+    uint64_t oriM = params.localParams.originalM;
+    uint64_t scaleKLen = MxScaleKLen<AType>(asc::te::get<MNK_K>(params.problemShape));
 
     uint32_t totalTiles = (oriM + params.localParams.headTileSize - 1) / params.localParams.headTileSize;
     uint64_t winPerTurn = static_cast<uint64_t>(rankSize) * params.localParams.headTileSize;
@@ -592,12 +592,12 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Pro
         auto gmBlockBias = gmBias.slice(asc::te::make_coord(0L, nPos),
                                         asc::te::make_shape(1L, asc::te::get<IDX_N_TILEIDX>(singleShape)));
         auto gmA = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ AType*>(
-                                            reinterpret_cast<__gm__ char*>(aGmAddr_) + dataSlotOffset)),
+                                            reinterpret_cast<__gm__ uint8_t*>(aGmAddr_) + dataSlotOffset)),
                                         layoutA);
-        auto gmScaleA = asc::te::make_tensor(
-            asc::te::make_mem_ptr<asc::te::location::gm>(
-                reinterpret_cast<__gm__ ScaleType*>(reinterpret_cast<__gm__ char*>(scaleAGmAddr_) + scaleSlotOffset)),
-            layoutScaleA);
+        auto gmScaleA =
+            asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ ScaleType*>(
+                                     reinterpret_cast<__gm__ uint8_t*>(scaleAGmAddr_) + scaleSlotOffset)),
+                                 layoutScaleA);
         uint32_t remoteRankCnt = 1;
         uint64_t rankMStep = enableBufferReuse ? params.localParams.headTileSize : oriM;
         uint64_t mPosInLayout = enableBufferReuse ? (static_cast<uint64_t>(mPos) % params.localParams.headTileSize) :
@@ -637,10 +637,10 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Pro
     const Params& params, BlockScheduler& bs, Mc2Kernel::OpStateDump& opStateDump)
 {
     // REMOTE 模式：低精度模式下遍历除本 Rank 外的所有其他卡发送过来的数据
-    auto rankId = params.localParams.rankId;
-    auto rankSize = params.localParams.rankSize;
-    auto oriM = params.localParams.originalM;
-    auto scaleKLen = MxScaleKLen<AType>(asc::te::get<MNK_K>(params.problemShape));
+    uint32_t rankId = params.localParams.rankId;
+    uint32_t rankSize = params.localParams.rankSize;
+    uint64_t oriM = params.localParams.originalM;
+    uint64_t scaleKLen = MxScaleKLen<AType>(asc::te::get<MNK_K>(params.problemShape));
 
     uint32_t totalTiles = (oriM + params.localParams.headTileSize - 1) / params.localParams.headTileSize;
     uint64_t winPerTurn = static_cast<uint64_t>(rankSize) * params.localParams.headTileSize;
@@ -715,12 +715,12 @@ __aicore__ inline void AllToAllQbmmMxKernel<QBMM_MX_KERNEL_FUNC_TEM_PARAMS>::Pro
         WaitDependTiles(totalTiles, dependTileIdx, readyTileIdx, dataSlotOffset, scaleSlotOffset, opStateDump);
 
         auto gmA = asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ AType*>(
-                                            reinterpret_cast<__gm__ char*>(aGmAddr_) + dataSlotOffset)),
+                                            reinterpret_cast<__gm__ uint8_t*>(aGmAddr_) + dataSlotOffset)),
                                         layoutA);
-        auto gmScaleA = asc::te::make_tensor(
-            asc::te::make_mem_ptr<asc::te::location::gm>(
-                reinterpret_cast<__gm__ ScaleType*>(reinterpret_cast<__gm__ char*>(scaleAGmAddr_) + scaleSlotOffset)),
-            layoutScaleA);
+        auto gmScaleA =
+            asc::te::make_tensor(asc::te::make_mem_ptr<asc::te::location::gm>(reinterpret_cast<__gm__ ScaleType*>(
+                                     reinterpret_cast<__gm__ uint8_t*>(scaleAGmAddr_) + scaleSlotOffset)),
+                                 layoutScaleA);
         auto remoteRankCnt = 0UL;
         uint64_t rankMStep = enableBufferReuse ? params.localParams.headTileSize : oriM;
         uint64_t mPosInLayout = enableBufferReuse ? (static_cast<uint64_t>(mPos) % params.localParams.headTileSize) :

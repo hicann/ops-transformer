@@ -16,6 +16,13 @@
 
 #include "op_state_dump_struct.h"
 
+// 兜底定义: 部分 CANN 版本(如 9.3.0)的 bisheng 内建 wrapper 会消化掉命令行传入的 __CCE_AICORE__
+// (用它配置 arch 后将其置为未定义)，导致下方门控失效、Mc2Kernel 命名空间整体缺失。
+// 310 为 dav-3510 的内核架构版本号(bisheng -E --npu-arch=dav-3510 映射所得)。
+#ifndef __CCE_AICORE__
+#define __CCE_AICORE__ 310
+#endif
+
 #if defined(__CCE_AICORE__)
 #if ASC_DEVKIT_MAJOR >= 9
 #include "basic_api/kernel_basic_intf.h"

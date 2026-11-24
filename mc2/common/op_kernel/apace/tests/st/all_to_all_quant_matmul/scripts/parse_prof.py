@@ -31,7 +31,16 @@ from statistics import median
 _DEFAULT_PROF = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "prof"
 )
-KERNEL_SUBSTR = "AllToAllQuantMatmulKernelE4M3E4M3_Udma"
+# 该 ST 覆盖的所有 kernel（量化 4 组合 + 非量化 fp16/bf16），量/非量都能解析
+DEFAULT_KERNELS = (
+    "AllToAllQuantMatmulKernelE4M3E4M3_Udma",
+    "AllToAllQuantMatmulKernelE5M2E5M2_Udma",
+    "AllToAllQuantMatmulKernelE4M3E5M2_Udma",
+    "AllToAllQuantMatmulKernelE5M2E4M3_Udma",
+    "AllToAllMmKernel_Udma",
+    "AllToAllMmKernel_Bf16_Udma",
+)
+KERNEL_NAMES = DEFAULT_KERNELS  # 可被 --kernel 覆盖
 GROUP_THRESHOLD_S = 5
 OUTLIER_FACTOR = 1.2
 WARMUP_SKIP = 3  # 删除前 N 轮数据（冷启动 + 预热）
@@ -67,7 +76,7 @@ def parse_csv(csv_path):
     with open(csv_path, newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            if KERNEL_SUBSTR not in row.get("Op Name", ""):
+            if not any(k in row.get("Op Name", "") for k in KERNEL_NAMES):
                 continue
             dev = row["Device_id"].strip()
             try:
@@ -145,7 +154,7 @@ def report_case(prof_base, case_dirs, case_idx, mkn_str=None):
                 all_cubes.setdefault(dev, []).extend(cv)
 
     if not all_devices:
-        print(f"  [Case {case_idx}] No AllToAllQuantMatmulKernel rows found.\n")
+        print(f"  [Case {case_idx}] No matched kernel rows found.\n")
         return None
 
     info = read_case_info_from_input(prof_base, case_dirs, mkn_str)
@@ -236,11 +245,20 @@ def main():
         "--mkn", type=str, default=None, help="M K N string, e.g. '1010 4096 2560'"
     )
     parser.add_argument(
+        "--kernel",
+        type=str,
+        default=None,
+        help="Only match this kernel name (default: match all known ST kernels)",
+    )
+    parser.add_argument(
         "--prof-dir",
         default=_DEFAULT_PROF,
         help="prof/ directory (default: auto-detect)",
     )
     args = parser.parse_args()
+    global KERNEL_NAMES
+    if args.kernel:
+        KERNEL_NAMES = (args.kernel,)
     prof_base = os.path.abspath(args.prof_dir)
 
     prof_dirs = [d for d in os.listdir(prof_base) if re.match(r"PROF_\d+_\d{17}_", d)]

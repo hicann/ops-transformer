@@ -263,11 +263,7 @@ private:
 
     __aicore__ inline WaitPolicy& GetWaitPolicy()
     {
-        if constexpr (IsFp) {
-            return matmulKernelImpl_.GetCommPolicy();
-        } else {
-            return matmulKernelImpl_.GetBufferSyncMgr();
-        }
+        return matmulKernelImpl_.GetBufferSyncMgr();
     }
 
     __aicore__ inline uint32_t CalcSplitKNum(MatmulMode matmulMode, bool excludeLocalRank) const
@@ -582,11 +578,7 @@ AllToAllMatmulHcommImpl<X1Type, X2Type, YType, CommDataTypeX1, AlltoAllMatmulTil
 {
     Params params;
     SetupParams(params, matmulMode);
-    if constexpr (IsFp) {
-        matmulKernelImpl_(params);
-    } else {
-        matmulKernelImpl_(params, opStateDump_);
-    }
+    matmulKernelImpl_(params, opStateDump_);
 }
 
 } // namespace Apace
