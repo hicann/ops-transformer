@@ -35,6 +35,9 @@ struct Case {
     aclDataType mixType = ACL_FLOAT;
     bool reservedOutput = false;
     bool wrongOutputShape = false;
+    bool wrongScaleShape = false;
+    bool missingQuantOutputs = false;
+    bool unexpectedY = false;
     aclDataType type = ACL_FLOAT16;
     int64_t d = 2560;
     int64_t mode = 0;
@@ -77,14 +80,29 @@ aclnnStatus Workspace(const Case& c)
     auto combOut = TensorDesc(shape({4, 4}), ACL_FLOAT, ACL_FORMAT_ND);
     auto preOut = TensorDesc(shape({4, c.preOutputLast}), c.preOutputType, ACL_FORMAT_ND);
     auto y = TensorDesc(shape({c.d + (c.wrongOutputShape ? 16 : 0)}), c.type, ACL_FORMAT_ND);
-    auto run = [&](auto g0, auto g2, auto prevIn, auto prevOut) {
+    auto quant = TensorDesc(shape({c.d}), ACL_FLOAT8_E4M3FN, ACL_FORMAT_ND);
+    auto scaleOut =
+        TensorDesc(shape({(c.d + 63) / 64 + (c.wrongScaleShape ? 1 : 0), 2}), ACL_FLOAT8_E8M0, ACL_FORMAT_ND);
+    auto execute = [&](auto g0, auto g2, auto prevIn, auto prevOut, auto yOut, auto quantOut, auto scale) {
         auto ut = OP_API_UT(
             aclnnMegaMhc,
             INPUT(x, residual, post, fn, scales, bases, gamma, comb, prevIn, g0, g2, c.epsilon, c.preNormEpsilon,
                   c.gateEpsilon, c.mode, c.heads, 2.0, c.sinkhornEpsilon, c.iterations, c.rmsScale, c.outputMode),
-            OUTPUT(x2, postOut, combOut, prevOut, y, nullptr, nullptr));
+            OUTPUT(x2, postOut, combOut, prevOut, yOut, quantOut, scale));
         uint64_t size = 0;
         return ut.TestGetWorkspaceSize(&size);
+    };
+    auto run = [&](auto g0, auto g2, auto prevIn, auto prevOut) {
+        if (c.outputMode == 1) {
+            if (c.missingQuantOutputs) {
+                return execute(g0, g2, prevIn, prevOut, nullptr, nullptr, nullptr);
+            }
+            if (c.unexpectedY) {
+                return execute(g0, g2, prevIn, prevOut, y, quant, scaleOut);
+            }
+            return execute(g0, g2, prevIn, prevOut, nullptr, quant, scaleOut);
+        }
+        return execute(g0, g2, prevIn, prevOut, y, nullptr, nullptr);
     };
     auto runMix = [&](auto g0, auto g2) {
         if (c.externalMix) {
@@ -160,7 +178,7 @@ TEST(MegaMhcOpApi, RejectUnsupportedModesAndReservedAttributes)
 
 TEST(MegaMhcOpApi, RejectReservedAndInvalidOutputModes)
 {
-    for (int64_t value : {int64_t{-1}, int64_t{1}, int64_t{2}, int64_t{3}, std::numeric_limits<int64_t>::min(),
+    for (int64_t value : {int64_t{-1}, int64_t{2}, int64_t{3}, std::numeric_limits<int64_t>::min(),
                           std::numeric_limits<int64_t>::max()}) {
         Case c;
         c.outputMode = value;
@@ -290,4 +308,35 @@ TEST(MegaMhcOpApi, ExternalMixRequiresMatchingCurrentPreOutput)
         c.preOutputType = ACL_FLOAT;
         EXPECT_EQ(Workspace(c), ACL_SUCCESS);
     }
+}
+
+TEST(MegaMhcOpApi, QuantModeSupportsExistingTypesOptionsAndPartialMxGroups)
+{
+    for (auto type : {ACL_FLOAT16, ACL_BF16}) {
+        for (int64_t d : {16, 48, 80, 5120, 16384}) {
+            for (bool external : {false, true}) {
+                Case c;
+                c.type = type;
+                c.d = d;
+                c.outputMode = 1;
+                c.externalMix = external;
+                c.mid = true;
+                EXPECT_EQ(Workspace(c), ACLNN_SUCCESS);
+            }
+        }
+    }
+}
+
+TEST(MegaMhcOpApi, RejectQuantOutputContractViolations)
+{
+    Case c;
+    c.outputMode = 1;
+    c.missingQuantOutputs = true;
+    EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_NULLPTR);
+    c.missingQuantOutputs = false;
+    c.wrongScaleShape = true;
+    EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
+    c.wrongScaleShape = false;
+    c.unexpectedY = true;
+    EXPECT_EQ(Workspace(c), ACLNN_ERR_PARAM_INVALID);
 }

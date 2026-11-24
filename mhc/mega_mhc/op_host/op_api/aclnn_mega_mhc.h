@@ -14,7 +14,10 @@
 extern "C" {
 #endif
 /** Build the seven-output contract; newPrevMixOut is required exactly when shiftedPrevMixOptional is supplied.
- * Quantized output pointers remain reserved and must be null. */
+ * outputMode=0 requires yOut; yQuantOut and yScaleOut must be null.
+ * outputMode=1 requires yQuantOut and yScaleOut; yOut must be null. Mode 2 is reserved and unsupported.
+ * numSinkhornIters is the iteration count: 0 returns logits without Sinkhorn iterations;
+ * 20 performs 20 Sinkhorn iterations and returns normalized Res coefficients. */
 aclnnStatus aclnnMegaMhcGetWorkspaceSize(
     const aclTensor* x, const aclTensor* residual, const aclTensor* postMix, const aclTensor* fn,
     const aclTensor* mixScales, const aclTensor* mixBases, const aclTensor* rmsNorm1Weight,

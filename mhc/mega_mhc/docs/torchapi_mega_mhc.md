@@ -23,11 +23,13 @@
 
 ## 功能说明
 
-- 接口功能：MegaMhc融合多阶段RmsNorm、MhcPost和MhcPre计算，支持可选的输入RmsNorm和中间RmsNorm，更新多路残差状态与Post/Res混合系数，并将各路残差加权合并、归一化为下一子层的输入。传入外部Pre混合系数时，还输出本次计算的Pre系数。
+- 接口功能：MegaMhc融合多阶段RmsNorm、MhcPost和MhcPre计算，支持可选的输入RmsNorm和中间RmsNorm，更新多路残差状态与Post/Res混合系数，并将各路残差加权合并、归一化为下一子层的输入。最终结果可按输出模式返回原精度结果或进行MXFP8量化。传入外部Pre混合系数时，还输出本次计算的Pre系数。
 
 - 计算公式：
 
-  以下公式从融合算子中RmsNorm、MhcPost和MhcPre各小算子的计算功能与执行顺序出发，分阶段说明算子功能。$B$为批大小，$S$为序列长度，$T=B\times S$为展平后的token数，$N$为残差head数，$D$为每个head的隐藏维度。使用BS布局时按下式计算；T布局等价于将$B$、$S$折叠为$T$。$\operatorname{FP32}$表示转换为float32，$\operatorname{Cast}_{dtype(x)}$表示转换为输入x的数据类型。
+  以下公式按照RmsNorm、MhcPost、MhcPre及可选MXFP8量化的计算顺序，分阶段说明算子功能。$B$为批大小，$S$为序列长度，$T=B\times S$为展平后的token数，$N$为残差head数，$D$为每个head的隐藏维度。使用BS布局时按下式计算；T布局等价于将$B$、$S$折叠为$T$。$\operatorname{FP32}$表示转换为float32，$\operatorname{Cast}_{dtype(x)}$表示转换为输入x的数据类型。
+
+  系数下标`[b,s,n,0]`中的最后一维对应单个混合系数，公式中的None表示未传入对应可选Tensor。
 
   1. 可选执行RmsNorm算子功能，对输入x进行均方根归一化，简称rms_norm_0阶段。仅当`rms_norm_0_weight`非空时执行下式；为空时跳过本阶段，直接令$x\_1=x$。
 
@@ -115,7 +117,7 @@
 
      传入的`shifted_prev_mix`不再经过上述Pre分支的Sigmoid和`hc_pre_eps`处理；它仅替换加权合并所用的`pre_mix`，不改变Post、Res分支系数的生成。合并结果`h_in`仍在第5阶段执行`rms_norm_1`。本次`pre_mix`与外部`shifted_prev_mix`使用独立UB区域；外部系数可提前载入，本次系数写回后，其UB区域方可再次生成新值。
 
-      MhcPre算子的Res分支Sinkhorn归一化阶段
+     MhcPre算子的Res分支Sinkhorn归一化阶段
 
      令$L=num\_sinkhorn\_iters$。当前版本支持$L=0$或$L=20$。$L=0$时直接返回MhcPre算子的Res分支系数生成阶段的logits，不执行指数变换或Sinkhorn归一化：
 
@@ -144,17 +146,45 @@
 
      其中$i$为行索引，$j$为列索引；当前支持的非零迭代数为20。`sinkhorn_eps`仅用于上述Sinkhorn计算，与MhcPre算子的Pre分支Sigmoid阶段的`hc_pre_eps`及均方根归一化阶段的`hc_norm_eps`分别独立。
 
-  5. 执行RmsNorm算子功能，对加权合并结果进行均方根归一化，简称rms_norm_1阶段。
+  5. 执行RmsNorm算子功能，对加权合并结果进行均方根归一化，得到与x类型一致的结果，简称rms_norm_1阶段。
 
      $$
      \begin{aligned}
      h\_in\_rms_{b,s} &= \operatorname{rsqrt}\left(\frac{1}{D}\sum_{i=0}^{D-1}\operatorname{FP32}(h\_in_{b,s,i})^{2}+rms\_norm\_eps\right), \\
      h\_in\_f32_{b,s,d} &= \operatorname{FP32}(h\_in_{b,s,d})\cdot h\_in\_rms_{b,s}\cdot \operatorname{FP32}(rms\_norm\_1\_weight_d)\cdot rms\_norm\_scale, \\
-     y &= \operatorname{Cast}_{dtype(x)}(h\_in\_f32).
+     y\_rms &= \operatorname{Cast}_{dtype(x)}(h\_in\_f32).
      \end{aligned}
      $$
 
-     系数下标`[b,s,n,0]`中的最后一维对应单个混合系数，公式中的None表示未传入对应可选Tensor。
+     $y\_rms$为原精度归一化结果，作为第6阶段的输入。
+
+  6. 根据`output_mode`选择输出形式，简称输出阶段。该模式不改变前述残差更新和混合系数计算。
+
+     当`output_mode=0`时，返回原精度结果：
+
+     $$
+     y=y\_rms.
+     $$
+
+     当`output_mode=1`时，对第5阶段已转换为`dtype(x)`的$y\_rms$沿D轴进行动态MX量化，返回量化结果`y_quant`和量化尺度`y_scale`。量化方式固定为OCP，目标类型为FLOAT8_E4M3FN，舍入方式为`rint`。
+
+     将每个token的$y\_rms$沿尾轴按$k=32$个连续元素分组，一组输入$\{V_i\}_{i=1}^{k}$量化为$\{mxscale,\{P_i\}_{i=1}^{k}\}$。对于最大绝对值非零、有限且未触及尺度编码边界的分组，共享指数与量化尺度计算如下：
+
+     $$
+     shared\_exp=\left\lfloor\log_2\left(\max_{1\leq i\leq k}|V_i|\right)\right\rfloor-emax,
+     $$
+
+     $$
+     mxscale=2^{shared\_exp}.
+     $$
+
+     $emax$为目标类型最大正规数的指数，FLOAT8_E4M3FN对应$emax=8$。组内每个元素除以共享的$mxscale$，再按`rint`舍入并饱和转换为目标类型：
+
+     $$
+     P_i=\operatorname{cast\_to\_dst\_type}\left(\frac{V_i}{mxscale},\mathrm{rint}\right),\qquad i=1,\ldots,k.
+     $$
+
+     各组的$P_i$按原顺序组成`y_quant`，每组的$mxscale$以FLOAT8_E8M0编码存入`y_scale`。全零分组及尺度指数边界按OCP量化规则处理。量化输入分组中含NaN、+Inf或-Inf时，该组的`y_scale`编码为`0xff`；默认浮点转换模式下，该组的`y_quant`元素均为0。尾组不足32个元素时补0，量化结果仅保留有效D个元素；相邻两组的scale成对存储，多出的scale槽位填入编码0。各输出的shape见参数说明。
 
 ## 函数原型
 
@@ -189,7 +219,7 @@ cann_ops_transformer.mega_mhc(
 
 $N=hc\_mult$，当前为4；$Q=N(N+2)=24$，$K=N\cdot D$。
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 | --- | --- | --- | --- | --- | --- |
 | x | Tensor | 必选 | Attention/MLP输出，对应公式中的x。 | float16、bfloat16 | `[B,S,D]`或`[T,D]` |
 | residual | Tensor | 必选 | MhcPost算子的残差映射阶段的输入，对应公式中的residual。 | float16、bfloat16 | `[B,S,N,D]`或`[T,N,D]` |
@@ -205,31 +235,32 @@ $N=hc\_mult$，当前为4；$Q=N(N+2)=24$，$K=N\cdot D$。
 | rms_norm_eps | float | 可选 | 默认1e-6，对应公式中的rms_norm_eps，用于RmsNorm算子的rms_norm_0、rms_norm_mid和rms_norm_1阶段。转为float32后须有限且大于0。 | - | - |
 | hc_norm_eps | float | 可选 | 默认1e-6，用于计算`x_2`完整N*D行的均方根并缩放投影结果，对应公式中的hc_norm_eps。转为float32后须有限且大于0。 | - | - |
 | hc_pre_eps | float | 可选 | 默认1e-6，对应公式中MhcPre算子的Pre分支Sigmoid阶段的输出附加项hc_pre_eps。转为float32后须有限且大于0。 | - | - |
-| inner_precise | int | 可选 | 指定MhcPre算子的矩阵乘阶段的计算模式，作用于公式中的x_2_rs与proj_w相乘。默认值为0，0：使用float32计算；1：使用HF32计算；2（3BF16）为预留取值，本版不支持。 | - | - |
+| inner_precise | int | 可选 | 指定MhcPre算子的矩阵乘阶段的计算模式，作用于公式中的x_2_rs与proj_w相乘。默认值为0。0：使用float32计算；1：使用HF32计算。2（3BF16）为预留取值，本版不支持。 | - | - |
 | hc_mult | int | 可选 | 默认值为4，对应公式中的N，须与residual的head维一致；本版仅支持4，其他取值为预留取值。 | - | - |
 | hc_post_scale | float | 可选 | MhcPre算子的Post分支Sigmoid阶段的输出倍率，对应公式中的hc_post_scale；默认值为2.0，转换为float32后须有限。 | - | - |
 | sinkhorn_eps | float | 可选 | Sinkhorn归一化的epsilon，默认值为1e-6，转换为FLOAT32后须有限且大于0。 | - | - |
 | num_sinkhorn_iters | int | 可选 | Sinkhorn迭代次数，默认值为0，当前仅支持0或20。取0时不执行Sinkhorn迭代，直接输出logits；取20时执行20次Sinkhorn迭代并输出归一化结果。 | - | - |
 | rms_norm_scale | float | 可选 | 预留参数，默认值为1.0，本版仅支持1.0。 | - | - |
-| output_mode | int | 可选 | 指定输出模式，默认值为0，0：输出非量化结果；1：输出MX Quant量化结果；2：同时输出量化和非量化结果。不支持其他取值；1、2为预留取值，本版仅支持0。 | - | - |
+| output_mode | int | 可选 | 指定输出模式，默认值为0。0：仅输出原精度y；1：仅输出MXFP8的y_quant和y_scale。2（同时输出量化和非量化结果）为预留取值，本版不支持；其他取值非法。 | - | - |
 
 ## 返回值说明
 
-返回`(new_residual, new_post_mix, new_comb_res_mix, new_prev_mix, y, y_quant, y_scale)`。
+返回七元组`(new_residual, new_post_mix, new_comb_res_mix, new_prev_mix, y, y_quant, y_scale)`。未启用的可选输出以`None`占位，返回值的数量和顺序保持固定。
 
-| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度（shape） |
+| 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 | --- | --- | --- | --- | --- | --- |
 | new_residual | Tensor | 必选 | MhcPost算子的输出融合阶段的残差状态；rms_norm_mid_weight非空时为RmsNorm算子的rms_norm_mid阶段的输出，对应公式中的new_residual，即x_2。 | 与x相同 | `[B,S,N,D]`或`[T,N,D]` |
 | new_post_mix | Tensor | 必选 | MhcPre算子的Post分支系数生成阶段的新系数，对应公式中的new_post_mix。 | float32 | `[B,S,N,1]`或`[T,N,1]` |
 | new_comb_res_mix | Tensor | 必选 | MhcPre算子的Res分支系数生成阶段的新系数，对应公式中的new_comb_res_mix；迭代次数为0时输出comb_logits，为20时输出执行20次Sinkhorn迭代后的归一化结果。 | float32 | `[B,S,N,N]`或`[T,N,N]` |
 | new_prev_mix | Optional[Tensor] | 可选 | `shifted_prev_mix`非空时返回本次计算的`pre_mix`，为空时返回`None`；本次系数与外部系数使用独立UB区域，输出形状与`post_mix`相同。 | float32 | `[B,S,N,1]`或`[T,N,1]` |
-| y | Optional[Tensor] | 可选 | MhcPre算子的加权合并阶段与RmsNorm算子的rms_norm_1阶段计算并应用倍率后的原精度结果，对应公式中的y；本版必须输出。 | 与x相同 | `[B,S,D]`或`[T,D]` |
-| y_quant | Optional[Tensor] | 可选 | 预留参数，本版返回None。 | float8_e4m3fn | - |
-| y_scale | Optional[Tensor] | 可选 | 预留参数，本版返回None。 | float8_e8m0fnu | - |
+| y | Optional[Tensor] | 可选 | MhcPre算子的加权合并阶段与RmsNorm算子的rms_norm_1阶段计算并应用倍率后的原精度结果，对应公式中的y；`output_mode=0`时返回Tensor，`output_mode=1`时返回`None`。 | 与x相同 | `[B,S,D]`或`[T,D]` |
+| y_quant | Optional[Tensor] | 可选 | MXFP8 E4M3FN量化结果，对应公式中的y_quant，由各组P_i按原顺序组成；`output_mode=1`时返回Tensor，`output_mode=0`时返回`None`。 | float8_e4m3fn | `[B,S,D]`或`[T,D]` |
+| y_scale | Optional[Tensor] | 可选 | 各32元素分组量化尺度mxscale的E8M0编码，对应公式中的y_scale；相邻两组的scale成对存储。`output_mode=1`时返回Tensor，`output_mode=0`时返回`None`。 | float8_e8m0fnu | `[B,S,ceil(D/64),2]`或`[T,ceil(D/64),2]` |
 
 ## 约束说明
 
-- 当前版本仅支持`output_mode=0`，必须生成`y`；`shifted_prev_mix`非空时还生成`new_prev_mix`，为空时该输出返回`None`。`y_quant`和`y_scale`仍为预留输出，返回`None`。
+- `output_mode`仅支持0和1。模式0返回原精度`y`，`y_quant`和`y_scale`为`None`；模式1返回`y_quant`和`y_scale`，`y`为`None`。模式2为预留取值。
+- `shifted_prev_mix`非`None`时返回本次计算的`new_prev_mix`，为`None`时该输出返回`None`；该规则同时适用于两种输出模式。
 - 支持推理场景下的MHC前向计算，暂不支持反向梯度。
 - 支持单算子模式调用，暂不支持TorchAir图模式调用。
 - 输入均位于同一NPU，格式为ND，前导维采用一致的BS或T布局，不支持广播。

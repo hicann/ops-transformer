@@ -558,6 +558,11 @@ gert::TilingContextPara MakeContext(int64_t rows, int64_t d, bool mid, int64_t m
                                                                     MakeTensor({rows, d}, type),
                                                                     MakeTensor({0}, ge::DT_FLOAT8_E4M3FN),
                                                                     MakeTensor({0}, ge::DT_FLOAT8_E8M0)};
+    if (outputMode == 1) {
+        outputs[4] = MakeTensor({0}, type);
+        outputs[5] = MakeTensor({rows, d}, ge::DT_FLOAT8_E4M3FN);
+        outputs[6] = MakeTensor({rows, (d + 63) / 64, 2}, ge::DT_FLOAT8_E8M0);
+    }
     std::vector<gert::TilingContextPara::OpAttr> attrs{
         {"rms_norm_eps", AnyValue::CreateFrom<float>(1e-6f)},
         {"hc_norm_eps", AnyValue::CreateFrom<float>(1e-6f)},
@@ -587,7 +592,7 @@ TEST(MegaMhcTiling, SerializedDataWorkspaceAndDispatch)
                 SCOPED_TRACE(::testing::Message() << rows << ":" << mid << ":" << mode);
                 TilingInfo info;
                 ASSERT_TRUE(ExecuteTiling(MakeContext(rows, 2560, mid, mode), info));
-                ASSERT_EQ(info.tilingDataSize, 344U);
+                ASSERT_EQ(info.tilingDataSize, optiling::MegaMhcTilingData().GetDataSize());
                 uint32_t prefix[3]{};
                 ASSERT_EQ(memcpy_s(prefix, sizeof(prefix), info.tilingData.get(), sizeof(prefix)), EOK);
                 EXPECT_EQ(prefix[0], rows);
@@ -684,7 +689,7 @@ TEST(MegaMhcTiling, OptionalRms0PreservesGeometryAndSelectsBypass)
 
 TEST(MegaMhcTiling, RejectReservedAndInvalidOutputModes)
 {
-    for (const int64_t outputMode : {-1, 1, 2, 3}) {
+    for (const int64_t outputMode : {-1, 2, 3}) {
         ExecuteTestCase(MakeContext(16, 2560, false, 0, ge::DT_FLOAT16, outputMode), ge::GRAPH_FAILED);
     }
     auto omitted = MakeContext(16, 2560, false, 0);
@@ -790,4 +795,136 @@ TEST(MegaMhcTiling, SeparateExternalMixUbRespectsTightCapacityBoundaries)
     const auto tiled = CalcRowTiling(16384, true, 2, 32, 2, available, true);
     ASSERT_GT(tiled.count, 0U);
     EXPECT_LE(CalcRowTileEpilogueUbSize(tiled.tile, 2, 32, 2, true), available);
+}
+
+TEST(MegaMhcTiling, QuantModeKeepsNormalizedResultsOffGm)
+{
+    for (const int64_t d : {16, 48, 80, 5120, 16384}) {
+        for (const int64_t rows : {1, 48, 1536}) {
+            for (const bool mid : {false, true}) {
+                for (const int64_t mode : {0, 1}) {
+                    TilingInfo baseline, quant;
+                    ASSERT_TRUE(ExecuteTiling(MakeContext(rows, d, mid, mode), baseline));
+                    ASSERT_TRUE(ExecuteTiling(MakeContext(rows, d, mid, mode, ge::DT_FLOAT16, 1), quant));
+                    EXPECT_EQ(quant.tilingKey, baseline.tilingKey);
+                    EXPECT_EQ(quant.blockNum, baseline.blockNum);
+                    // The final two serialized fields are rms1InputOffset and l1PeakBytes.
+                    uint64_t rms1InputOffset = 0U;
+                    ASSERT_EQ(memcpy_s(&rms1InputOffset, sizeof(rms1InputOffset),
+                                       quant.tilingData.get() + quant.tilingDataSize - 2U * sizeof(uint64_t),
+                                       sizeof(rms1InputOffset)),
+                              EOK);
+                    if (d <= 5120) {
+                        EXPECT_EQ(rms1InputOffset, 0U);
+                        EXPECT_EQ(quant.workspaceSizes, baseline.workspaceSizes);
+                    } else {
+                        EXPECT_GT(rms1InputOffset, 0U);
+                        const uint64_t bytes = static_cast<uint64_t>(rows * d * 2);
+                        EXPECT_GE(quant.workspaceSizes[0], rms1InputOffset + bytes);
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST(MegaMhcTiling, QuantScratchTracksPhysicalScaleLoadsAndOptionalTail)
+{
+    using MegaMhc::QuantOutput::MakeScratchLayout;
+    EXPECT_EQ(MakeScratchLayout(0U, 0U).bytes, 0U);
+    EXPECT_EQ(MakeScratchLayout(16U, 16U).bytes, 1792U);
+    EXPECT_EQ(MakeScratchLayout(48U, 48U).bytes, 1792U);
+    EXPECT_EQ(MakeScratchLayout(256U, 256U).bytes, 768U);
+    EXPECT_EQ(MakeScratchLayout(2560U, 2560U).bytes, 768U);
+    EXPECT_EQ(MakeScratchLayout(2576U, 2576U).bytes, 2560U);
+    EXPECT_EQ(MakeScratchLayout(5120U, 5120U).bytes, 1536U);
+    EXPECT_EQ(MakeScratchLayout(5136U, 5136U).bytes, 3328U);
+    EXPECT_EQ(MakeScratchLayout(8192U, 8192U).bytes, 1536U);
+    EXPECT_EQ(MakeScratchLayout(16384U, 16384U).bytes, 3072U);
+    EXPECT_EQ(MakeScratchLayout(8192U, 16U).bytes, 3328U);
+    for (uint32_t elements = 16U; elements <= 16384U; elements += 16U) {
+        for (const uint32_t last : {16U, elements}) {
+            const auto layout = MakeScratchLayout(elements, last);
+            const uint32_t scaleBytes = ((layout.batchElements / 32U + 127U) / 128U) * 256U;
+            const bool tail = elements % 256U != 0U || last % 256U != 0U;
+            // Full-block scale DMA and tail scale writes occupy disjoint ranges.
+            EXPECT_GE(layout.slotBytes, scaleBytes + (tail ? 256U : 0U));
+            EXPECT_GE(layout.slotBytes, 256U);
+            EXPECT_EQ(layout.slotBytes % 256U, 0U);
+            EXPECT_EQ(layout.inverseOffset, 2U * layout.slotBytes);
+            EXPECT_EQ(layout.tailOffset, layout.inverseOffset + layout.slotBytes);
+            EXPECT_EQ(layout.bytes - layout.tailOffset, (elements % 256U != 0U || last % 256U != 0U) ? 1024U : 0U);
+            EXPECT_EQ(CalcQuantOutputUbSize(elements, last, false), 0U);
+            EXPECT_EQ(CalcQuantOutputUbSize(elements, last, true), layout.bytes);
+        }
+    }
+}
+
+TEST(MegaMhcTiling, QuantScratchIsIncludedOnlyInEpilogueLifetime)
+{
+    for (const uint32_t d : {48U, 256U, 2560U, 2576U, 5120U, 8192U, 16384U}) {
+        const uint64_t scratch = CalcQuantOutputUbSize(d, d, true);
+        EXPECT_EQ(CalcEpilogueUbSize(d, 2U, 32U, 8U, 2U, false, true, true),
+                  CalcEpilogueUbSize(d, 2U, 32U, 8U, 2U, false, true) + scratch);
+        EXPECT_EQ(CalcBsHfEpilogueUbSize(d, 8U, 8U, 32U, 1U, 2U, true, true),
+                  CalcBsHfEpilogueUbSize(d, 8U, 8U, 32U, 1U, 2U, true) + scratch);
+    }
+    EXPECT_EQ(CalcRowTileEpilogueUbSize(8192U, 2U, 32U, 2U, true, true, 16U),
+              CalcRowTileEpilogueUbSize(8192U, 2U, 32U, 2U, true) + 3328U);
+    const uint64_t tightBudget = CalcEpilogueUbSize(5120U, 2U, 32U, 48U, 2U);
+    const uint32_t rows = FitReductionRows(48U, 5120U, 2U, 32U, 2U, tightBudget, false, true);
+    EXPECT_GT(rows, 0U);
+    EXPECT_LT(rows, 48U);
+    EXPECT_LE(CalcEpilogueUbSize(5120U, 2U, 32U, rows, 2U, false, false, true), tightBudget);
+}
+
+TEST(MegaMhcTiling, QuantizedDTilesBudgetTheirActualLastTile)
+{
+    for (const uint32_t d : {256U, 2576U, 5120U, 5136U, 8192U, 8208U, 16384U}) {
+        for (const bool mid : {false, true}) {
+            for (const uint64_t budget : {64U * 1024U, 128U * 1024U, 248U * 1024U}) {
+                const uint32_t groups = (4U * d + 1023U) / 1024U;
+                const auto plan = CalcRowTiling(d, mid, groups, 32U, 4U, budget, true, true);
+                ASSERT_GT(plan.count, 0U);
+                EXPECT_EQ((plan.count - 1U) * plan.tile + plan.tail, d);
+                EXPECT_LE(plan.tail, plan.tile);
+                if (plan.enabled != 0U) {
+                    EXPECT_EQ(plan.tile % 128U, 0U);
+                    EXPECT_LE(CalcRowTileProducerUbSize(plan.tile), budget);
+                    EXPECT_LE(CalcRowTileEpilogueUbSize(plan.tile, groups, 32U, 4U, true, true, plan.tail), budget);
+                } else {
+                    EXPECT_LE(CalcEpilogueUbSize(d, groups, 32U, 1U, 4U, false, true, true), budget);
+                }
+            }
+        }
+    }
+}
+
+TEST(MegaMhcTiling, QuantRowBatchKeepsIndependentBanksWithinUb)
+{
+    const uint64_t four = CalcBatchedQuantEpilogueUbSize(2560U, 10U, 32U, 32U, 4U, false, 4U);
+    EXPECT_EQ(CalcQuantBatchRows(2560U, 10U, 32U, 32U, 4U, four, false), 4U);
+    EXPECT_EQ(CalcQuantBatchRows(2560U, 10U, 32U, 32U, 4U, four - 1U, false), 2U);
+    const uint64_t two = CalcBatchedQuantEpilogueUbSize(5120U, 20U, 32U, 32U, 4U, false, 2U);
+    EXPECT_EQ(CalcQuantBatchRows(5120U, 20U, 32U, 32U, 4U, two, false), 2U);
+    EXPECT_EQ(CalcQuantBatchRows(5120U, 20U, 32U, 32U, 4U, two - 1U, false), 1U);
+    EXPECT_EQ(CalcQuantBatchRows(5136U, 21U, 32U, 32U, 4U, 248U * 1024U, false), 1U);
+    EXPECT_EQ(CalcQuantBatchRows(256U, 1U, 32U, 1U, 1U, 248U * 1024U, false), 1U);
+    for (uint32_t d = 256U; d <= 16384U; d += 256U) {
+        for (uint32_t rows : {2U, 3U, 4U, 8U, 32U, 48U}) {
+            const uint32_t groups = (4U * d + 1023U) / 1024U;
+            for (bool mix : {false, true}) {
+                const uint64_t budget = 248U * 1024U;
+                const uint32_t batch = CalcQuantBatchRows(d, groups, 32U, rows, 4U, budget, mix);
+                EXPECT_TRUE(batch == 1U || batch == 2U || batch == 4U);
+                EXPECT_LE(batch, rows);
+                if (batch > 1U) {
+                    EXPECT_LE(CalcBatchedQuantEpilogueUbSize(d, groups, 32U, rows, 4U, mix, batch), budget);
+                    // Distinct input/output banks plus gamma remain live together.
+                    EXPECT_GE(CalcBatchedQuantEpilogueUbSize(d, groups, 32U, rows, 4U, mix, batch),
+                              2ULL * batch * 5U * d * sizeof(uint16_t) + d * sizeof(float));
+                }
+            }
+        }
+    }
 }

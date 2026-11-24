@@ -53,8 +53,14 @@ constexpr uint32_t kNewPrevMixOutputIndex = 3U;
 constexpr uint32_t kYOutputIndex = 4U;
 constexpr uint32_t kYQuantOutputIndex = 5U;
 constexpr uint32_t kYScaleOutputIndex = 6U;
-constexpr uint32_t kReservedOutputCount = 3U;
-constexpr uint32_t kActiveOutputCount = 4U;
+constexpr uint32_t kOutputCount = kYScaleOutputIndex + 1U;
+// OCP uses one scale per 32 values; the output stores two scales per pair.
+constexpr int64_t kQuantGroupElements = 32;
+constexpr int64_t kQuantScalesPerPair = 2;
+constexpr int64_t kQuantPairElements = kQuantGroupElements * kQuantScalesPerPair;
+constexpr int64_t kOutputModeUnquantized = 0;
+constexpr int64_t kOutputModeMxFp8 = 1;
+constexpr int64_t kOutputModeReserved = 2;
 
 constexpr size_t kHcEpsAttrIndex = 2U;
 constexpr size_t kOpImplModeAttrIndex = 3U;
@@ -265,26 +271,6 @@ ge::graphStatus MegaMhcTiling::GetShapeAttrsInfo()
 ge::graphStatus MegaMhcTiling::ParseInputsAndAttributes()
 {
     const bool hasShiftedPrevMix = context_->GetDynamicInputTensor(kShiftedPrevMixInputIndex, 0) != nullptr;
-    // Inactive public outputs are absent or represented by empty launcher placeholders.
-    const uint32_t reservedIndices[] = {kNewPrevMixOutputIndex, kYQuantOutputIndex, kYScaleOutputIndex};
-    const ge::DataType reservedTypes[] = {ge::DT_FLOAT, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E8M0};
-    for (uint32_t i = 0; i < kReservedOutputCount; ++i) {
-        if (reservedIndices[i] == kNewPrevMixOutputIndex && hasShiftedPrevMix) {
-            continue;
-        }
-        const auto* desc = context_->GetOutputDesc(reservedIndices[i]);
-        const auto* shape = context_->GetOutputShape(reservedIndices[i]);
-        if (desc != nullptr && (shape == nullptr || desc->GetDataType() != reservedTypes[i] ||
-                                shape->GetStorageShape().GetDimNum() != 1 || shape->GetStorageShape().GetDim(0) != 0)) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                context_->GetNodeName(), kOutputNames[reservedIndices[i]],
-                (std::string("shape=") + (shape == nullptr ? "nullptr" : ShapeToString(shape->GetStorageShape())) +
-                 ", dtype=" + ge::TypeUtils::DataTypeToSerialString(desc->GetDataType()))
-                    .c_str(),
-                "reserved output must be absent or shape [0] with its declared dtype");
-            return ge::GRAPH_FAILED;
-        }
-    }
     constexpr size_t kInputCount = 11;
     for (size_t index = 0; index < kInputCount; ++index) {
         // comb_res_mix is declared optional, but must be present in this version.
@@ -445,28 +431,6 @@ ge::graphStatus MegaMhcTiling::ParseInputsAndAttributes()
         }
     }
 
-    const uint32_t activeOutputs[] = {0U, 1U, kNewCombResMixOutputIndex, kYOutputIndex, kNewPrevMixOutputIndex};
-    const gert::Shape* expectedShapes[] = {&residual, &hPost, &hRes, &xShape, &hPost};
-    const ge::DataType outputTypes[] = {inputType_, ge::DT_FLOAT, ge::DT_FLOAT, inputType_, ge::DT_FLOAT};
-    const uint32_t activeOutputCount = kActiveOutputCount + (hasShiftedPrevMix ? 1U : 0U);
-    for (uint32_t i = 0; i < activeOutputCount; ++i) {
-        const auto* desc = context_->GetOutputDesc(activeOutputs[i]);
-        const auto* shape = context_->GetOutputShape(activeOutputs[i]);
-        if (desc == nullptr || shape == nullptr || desc->GetDataType() != outputTypes[i] ||
-            shape->GetStorageShape() != *expectedShapes[i]) {
-            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
-                context_->GetNodeName(), kOutputNames[activeOutputs[i]],
-                (std::string("shape=") + (shape == nullptr ? "nullptr" : ShapeToString(shape->GetStorageShape())) +
-                 ", dtype=" +
-                 (desc == nullptr ? "nullptr" : ge::TypeUtils::DataTypeToSerialString(desc->GetDataType())))
-                    .c_str(),
-                ("expected shape " + ShapeToString(*expectedShapes[i]) + " and dtype " +
-                 ge::TypeUtils::DataTypeToSerialString(outputTypes[i]))
-                    .c_str());
-            return ge::GRAPH_FAILED;
-        }
-    }
-
     const auto* attrs = context_->GetAttrs();
     if (attrs == nullptr) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "attrs", "nullptr",
@@ -483,16 +447,51 @@ ge::graphStatus MegaMhcTiling::ParseInputsAndAttributes()
     const auto* sinkhornIters = attrs->GetAttrPointer<int64_t>(kSinkhornItersAttrIndex);
     const auto* rmsScale = attrs->GetAttrPointer<float>(kRmsNormScaleAttrIndex);
     const auto* outputModeAttr = attrs->GetAttrPointer<int64_t>(kOutputModeAttrIndex);
-    const int64_t outputMode = outputModeAttr == nullptr ? 0 : *outputModeAttr;
-    if (outputMode < 0 || outputMode > 2) {
+    const int64_t outputMode = outputModeAttr == nullptr ? kOutputModeUnquantized : *outputModeAttr;
+    if (outputMode < kOutputModeUnquantized || outputMode > kOutputModeReserved) {
         OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "output_mode", std::to_string(outputMode).c_str(),
                                   "0, 1 or 2");
         return ge::GRAPH_FAILED;
     }
-    if (outputMode != 0) {
+    if (outputMode == kOutputModeReserved) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context_->GetNodeName(), "output_mode",
                                               std::to_string(outputMode).c_str(),
-                                              "MX Quant output modes 1 and 2 are reserved in this version");
+                                              "output mode 2 is reserved in this version");
+        return ge::GRAPH_FAILED;
+    }
+    outputMode_ = static_cast<uint32_t>(outputMode);
+    tilingData_.set_outputMode(outputMode_);
+    auto scaleShape = xShape;
+    scaleShape.SetDim(xShape.GetDimNum() - 1U, (d_ + kQuantPairElements - 1U) / kQuantPairElements);
+    scaleShape.AppendDim(kQuantScalesPerPair);
+    const gert::Shape* expectedShapes[] = {&residual,
+                                           &hPost,
+                                           &hRes,
+                                           &hPost,
+                                           outputMode_ == kOutputModeUnquantized ? &xShape : nullptr,
+                                           outputMode_ == kOutputModeMxFp8 ? &xShape : nullptr,
+                                           outputMode_ == kOutputModeMxFp8 ? &scaleShape : nullptr};
+    const ge::DataType outputTypes[] = {inputType_, ge::DT_FLOAT,         ge::DT_FLOAT,      ge::DT_FLOAT,
+                                        inputType_, ge::DT_FLOAT8_E4M3FN, ge::DT_FLOAT8_E8M0};
+    for (uint32_t index = 0U; index < kOutputCount; ++index) {
+        const auto* expected = index == kNewPrevMixOutputIndex && !hasShiftedPrevMix ? nullptr : expectedShapes[index];
+        const auto* desc = context_->GetOutputDesc(index);
+        const auto* shape = context_->GetOutputShape(index);
+        if (expected == nullptr) {
+            // Launchers may retain inactive slots as an empty tensor of the declared dtype.
+            if (desc == nullptr ||
+                (shape != nullptr && desc->GetDataType() == outputTypes[index] &&
+                 shape->GetStorageShape().GetDimNum() == 1U && shape->GetStorageShape().GetDim(0) == 0)) {
+                continue;
+            }
+        } else if (desc != nullptr && shape != nullptr && desc->GetDataType() == outputTypes[index] &&
+                   shape->GetStorageShape() == *expected) {
+            continue;
+        }
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            context_->GetNodeName(), kOutputNames[index], "invalid output shape or dtype",
+            expected == nullptr ? "inactive output must be absent or empty with its declared dtype" :
+                                  "active output must match the mode-dependent shape and dtype");
         return ge::GRAPH_FAILED;
     }
     hcPostScale_ = postScale == nullptr ? kDefaultHcPostScale : *postScale;
@@ -589,7 +588,10 @@ void MegaMhcTiling::FillCubeTilingData()
 /** Plan Cube/UB tiles and workspace from platform capacities. */
 ge::graphStatus MegaMhcTiling::DoOpTiling()
 {
-    const uint64_t availableUb = std::min<uint64_t>(ubBytes_, kUbLimitBytes);
+    const uint64_t physicalUb = std::min<uint64_t>(ubBytes_, kUbLimitBytes);
+    // Quantization scratch belongs to the generic epilogue output lifetime.
+    const bool quantOutput = outputMode_ == kOutputModeMxFp8;
+    const uint64_t availableUb = physicalUb;
     const bool hasShiftedPrevMix = context_->GetDynamicInputTensor(kShiftedPrevMixInputIndex, 0) != nullptr;
     const bool packedNz = (hasMid_ ? MegaMhc::kWithMidProjectionTransport : MegaMhc::kNoMidProjectionTransport) ==
                           MegaMhc::ProjectionTransport::UbToL1;
@@ -624,7 +626,7 @@ ge::graphStatus MegaMhcTiling::DoOpTiling()
 
     const auto rowTiling =
         mega_mhc::CalcRowTiling(d_, hasMid_, cubeTiling_.partialGroupCount, cubeTiling_.fixpipeRowStride,
-                                cubeTiling_.kGrid, availableUb, hasShiftedPrevMix);
+                                cubeTiling_.kGrid, availableUb, hasShiftedPrevMix, quantOutput);
     if (rowTiling.count == 0U) {
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context_->GetNodeName(), "D, UB bytes",
                                                (std::to_string(d_) + ", " + std::to_string(ubBytes_)).c_str(),
@@ -727,11 +729,11 @@ ge::graphStatus MegaMhcTiling::DoOpTiling()
         request.wavePipeline ?
             static_cast<uint32_t>(CeilDiv(totalRows_, cubeTiling_.activeAiv)) :
             std::min(projectionRows, static_cast<uint32_t>(CeilDiv(totalRows_, cubeTiling_.activeAiv)));
-    const uint32_t capacityRows =
-        tiledRows ?
-            1U :
-            mega_mhc::FitReductionRows(reductionRowLimit, d_, cubeTiling_.partialGroupCount,
-                                       cubeTiling_.fixpipeRowStride, cubeTiling_.kGrid, availableUb, hasShiftedPrevMix);
+    const uint32_t capacityRows = tiledRows ?
+                                      1U :
+                                      mega_mhc::FitReductionRows(reductionRowLimit, d_, cubeTiling_.partialGroupCount,
+                                                                 cubeTiling_.fixpipeRowStride, cubeTiling_.kGrid,
+                                                                 availableUb, hasShiftedPrevMix, quantOutput);
     const uint32_t reduceRows = tiledRows ? 1U : mega_mhc::BalanceReductionRows(reductionRowLimit, capacityRows);
     if (reduceRows == 0U) {
         return ge::GRAPH_FAILED;
@@ -748,7 +750,7 @@ ge::graphStatus MegaMhcTiling::DoOpTiling()
         !partialHoldsInput && hasMid_ && scheduleMode_ == mega_mhc::ScheduleMode::BS &&
         totalRows_ >= kWithMidPrefetchMinRows &&
         mega_mhc::CalcEpilogueUbSize(d_, cubeTiling_.partialGroupCount, cubeTiling_.fixpipeRowStride, reduceRows,
-                                     cubeTiling_.kGrid, true, hasShiftedPrevMix) <= availableUb;
+                                     cubeTiling_.kGrid, true, hasShiftedPrevMix, quantOutput) <= availableUb;
     tilingData_.set_epiloguePrefetch(
         tiledRows ? 0U : (partialHoldsInput ? 1U : (reserveEpilogueInput ? kEpiloguePrefetchInput : 0U)));
     const uint64_t producerPeak =
@@ -758,7 +760,7 @@ ge::graphStatus MegaMhcTiling::DoOpTiling()
                                                                    singleMidResidual ? 1U : kMultipleMidResidualSlots));
     // Add a second FP32 UB stage only when the simultaneous live buffers fit.
     // Cube geometry and GM staging remain unchanged.
-    const uint64_t concurrentProducer = request.wavePipeline ? mega_mhc::CalcProducerUbSize(d_, false, true) : 0U;
+    const uint64_t concurrentProducer = liveProducer;
     const uint32_t stageUbSlots = projectionUbTiling.stageSlots;
     tilingData_.set_stageUbSlots(stageUbSlots);
     const uint64_t projectionPeak = projectionUbTiling.bytes;
@@ -811,7 +813,7 @@ ge::graphStatus MegaMhcTiling::DoOpTiling()
                 concurrentUb < availableUb ?
             mega_mhc::FitReductionRows(waveProducerRows, d_, tilingData_.get_partialGroupCount(),
                                        cubeTiling_.fixpipeRowStride, cubeTiling_.kGrid, availableUb - concurrentUb,
-                                       hasShiftedPrevMix) :
+                                       hasShiftedPrevMix, quantOutput) :
             0U;
     tilingData_.set_waveEpilogueRows(waveEpilogueRows);
     if (waveEpilogueRows != 0U) {
@@ -826,30 +828,45 @@ ge::graphStatus MegaMhcTiling::DoOpTiling()
                                  projectionMode_ == mega_mhc::ProjectionMode::HF32 && cubeTiling_.kGrid == 1U;
     tilingData_.set_compactPartials(compactPartials ? 1U : 0U);
 
-    const auto bsEpilogue = compactPartials ?
-                                mega_mhc::CalcBsHfEpilogueTiling(
-                                    totalRows_, d_, tilingData_.get_reduceRows(), tilingData_.get_reduceRowsAligned(),
-                                    cubeTiling_.fixpipeRowStride, cubeTiling_.kGrid, availableUb, hasShiftedPrevMix) :
-                                mega_mhc::BsHfEpilogueTiling{};
+    // Batch only the independent full-row epilogue. Keep concurrent wave and
+    // compact BS lifetimes on their existing plans; never shrink reduction rows
+    // or disable an overlap schedule merely to obtain a larger quant batch.
+    const uint32_t quantBatchRows =
+        quantOutput && !tiledRows && !compactPartials && waveEpilogueRows == 0U ?
+            mega_mhc::CalcQuantBatchRows(d_, cubeTiling_.partialGroupCount, cubeTiling_.fixpipeRowStride, reduceRows,
+                                         cubeTiling_.kGrid, availableUb, hasShiftedPrevMix) :
+            1U;
+    tilingData_.set_quantBatchRows(quantBatchRows);
+    if (quantBatchRows > 1U) {
+        tilingData_.set_epiloguePrefetch(kEpiloguePrefetchInput);
+    }
+
+    const auto bsEpilogue = compactPartials ? mega_mhc::CalcBsHfEpilogueTiling(
+                                                  totalRows_, d_, tilingData_.get_reduceRows(),
+                                                  tilingData_.get_reduceRowsAligned(), cubeTiling_.fixpipeRowStride,
+                                                  cubeTiling_.kGrid, availableUb, hasShiftedPrevMix, quantOutput) :
+                                              mega_mhc::BsHfEpilogueTiling{};
     tilingData_.set_bsEpilogueBatch(bsEpilogue.batch);
     tilingData_.set_bsEpilogueInputBytes(bsEpilogue.inputBytes);
     const uint64_t epiloguePeak =
+        quantBatchRows > 1U ?
+            mega_mhc::CalcBatchedQuantEpilogueUbSize(d_, cubeTiling_.partialGroupCount, cubeTiling_.fixpipeRowStride,
+                                                     reduceRows, cubeTiling_.kGrid, hasShiftedPrevMix, quantBatchRows) :
         bsEpilogue.batch != 0U ? bsEpilogue.ubBytes :
         tiledRows              ? mega_mhc::CalcRowTileEpilogueUbSize(rowTiling.tile, cubeTiling_.partialGroupCount,
                                                                      cubeTiling_.fixpipeRowStride, cubeTiling_.kGrid,
-                                                                     hasShiftedPrevMix) :
+                                                                     hasShiftedPrevMix, quantOutput, rowTiling.tail) :
                                  mega_mhc::CalcEpilogueUbSize(
                         d_, cubeTiling_.partialGroupCount, cubeTiling_.fixpipeRowStride, reduceRows, cubeTiling_.kGrid,
-                        tilingData_.get_epiloguePrefetch() == kEpiloguePrefetchInput, hasShiftedPrevMix);
+                        tilingData_.get_epiloguePrefetch() == kEpiloguePrefetchInput, hasShiftedPrevMix, quantOutput);
     const uint64_t rms0Peak =
         mega_mhc::CalcUbAllocSize(d_ * kInputStorageBytes) + mega_mhc::CalcUbAllocSize(kRmsScalarScratchBytes);
     const uint64_t waveEpiloguePeak =
         waveEpilogueRows != 0U ?
             mega_mhc::CalcEpilogueUbSize(d_, cubeTiling_.partialGroupCount, cubeTiling_.fixpipeRowStride,
-                                         waveEpilogueRows, cubeTiling_.kGrid, false, hasShiftedPrevMix) :
+                                         waveEpilogueRows, cubeTiling_.kGrid, false, hasShiftedPrevMix, quantOutput) :
             0U;
-    const uint64_t pipelinePeak =
-        request.wavePipeline ? mega_mhc::CalcProducerUbSize(d_, false, true) + projectionPeak + waveEpiloguePeak : 0U;
+    const uint64_t pipelinePeak = request.wavePipeline ? liveProducer + projectionPeak + waveEpiloguePeak : 0U;
     const uint64_t ubPeak = std::max({producerPeak, batchedProjectionPeak, epiloguePeak, rms0Peak, pipelinePeak});
     if (ubPeak > availableUb) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
@@ -963,7 +980,19 @@ ge::graphStatus MegaMhcTiling::CalcWorkspaceSize()
             "workspace size arithmetic and alignment must not overflow uint64");
         return ge::GRAPH_FAILED;
     }
-    const uint64_t userBytes = stageOffset + stageBytes;
+    uint64_t userBytes = stageOffset + stageBytes;
+    uint64_t rms1InputOffset = 0;
+    if (outputMode_ == kOutputModeMxFp8 && tilingData_.get_rowTileMode() != 0U) {
+        uint64_t rms1InputBytes = 0;
+        if (!AlignWorkspace(userBytes, kWorkspaceAlign, rms1InputOffset) ||
+            !CheckedBytes(totalRows_, d_, 1U, kInputStorageBytes, rms1InputBytes) ||
+            rms1InputBytes > std::numeric_limits<uint64_t>::max() - rms1InputOffset) {
+            OP_LOGE(context_->GetNodeName(), "tiled RMS1 input workspace size overflow");
+            return ge::GRAPH_FAILED;
+        }
+        userBytes = rms1InputOffset + rms1InputBytes;
+    }
+    tilingData_.set_rms1InputOffset(rms1InputOffset);
     if (userBytes > std::numeric_limits<uint64_t>::max() - kRuntimeWorkspaceBytes) {
         OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
             context_->GetNodeName(), "userBytes, runtimeWorkspaceBytes",

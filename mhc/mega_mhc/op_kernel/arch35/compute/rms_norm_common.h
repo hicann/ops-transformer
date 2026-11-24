@@ -18,6 +18,7 @@ constexpr uint32_t kRegPairLanes = 128U;
 constexpr uint32_t kRegLaneRounding = 63U;
 constexpr uint16_t kReductionInitialStride = 32U;
 constexpr float kNewtonHalf = 0.5f;
+constexpr float kNewtonThreeHalves = 1.5f;
 constexpr uint32_t kHeadCount = 4U;
 constexpr uint32_t kHeadMatrixElements = 16U;
 constexpr uint32_t kProjectionCoefficientElements = 24U;
@@ -186,7 +187,7 @@ __aicore__ inline void AddFp32Scalar(__ubuf__ float* accumulator, __ubuf__ float
     }
 }
 
-/** Compute invRms=rsqrt(sumSquares/rowLength+epsilon), refined by y+=0.5*y*(1-x*y*y).
+/** Compute invRms=rsqrt(sumSquares/rowLength+epsilon), refined using fused reciprocal and square residuals.
  * COMPENSATED preserves sumCarry through division, epsilon addition and refinement; result is in lane zero. */
 template <bool COMPENSATED = false>
 __simd_callee__ inline void InverseRmsRegister(__ubuf__ float* sumSquares, float meanScale, float epsilon,
@@ -230,23 +231,30 @@ __simd_callee__ inline void InverseRmsRegister(__ubuf__ float* sumSquares, float
         Reg::Add(rms, rms, eps, mask);
     }
     Reg::Adds(mean, rms, 0.0f, mask);
-    Reg::Sqrt(rms, mean, mask);
-    Reg::Div(rms, one, rms, mask);
-    Reg::Adds(initialInverse, rms, 0.0f, mask);
-    Reg::Muls(negative, rms, -1.0f, mask);
-    Reg::Mul(product, rms, mean, mask);
+    Reg::RegTensor<float> reciprocal;
+    Reg::RegTensor<float> correction;
+    Reg::Duplicate(halfInverse, kNewtonHalf, mask);
+    Reg::Duplicate(correction, kNewtonThreeHalves, mask);
     Reg::Duplicate(error, 1.0f, mask);
-    Reg::MulAddDst(error, product, negative, mask);
+    Reg::Div(reciprocal, one, mean, mask);
+    Reg::Sqrt(rms, reciprocal, mask);
+    Reg::Adds(initialInverse, rms, 0.0f, mask);
+    // First refine y=sqrt(1/mean), then recover the residual using fused products.
+    Reg::Muls(product, mean, -kNewtonHalf, mask);
+    Reg::Mul(product, product, rms, mask);
+    Reg::MulAddDst(correction, product, rms, mask);
+    Reg::Mul(rms, rms, correction, mask);
+    Reg::Muls(negative, mean, -1.0f, mask);
+    Reg::MulAddDst(error, negative, reciprocal, mask);
+    Reg::Muls(product, rms, -1.0f, mask);
+    Reg::MulAddDst(reciprocal, product, rms, mask);
+    Reg::MulAddDst(error, mean, reciprocal, mask);
     if constexpr (COMPENSATED) {
-        // Recover the low product in mean*rms before evaluating 1-mean*rms*rms.
-        Reg::RegTensor<float> productError;
-        Reg::Muls(productError, product, -1.0f, mask);
-        Reg::MulAddDst(productError, rms, mean, mask);
-        Reg::MulAddDst(error, productError, negative, mask);
-        Reg::Mul(productError, meanCarry, rms, mask);
-        Reg::MulAddDst(error, productError, rms, mask);
+        // The compensated mean represents mean-meanCarry.
+        Reg::Mul(product, meanCarry, rms, mask);
+        Reg::MulAddDst(error, product, rms, mask);
     }
-    Reg::Muls(halfInverse, rms, kNewtonHalf, mask);
+    Reg::Mul(error, error, rms, mask);
     Reg::MulAddDst(rms, error, halfInverse, mask);
     // Preserve rsqrt(+Inf)=0 and NaN propagation instead of applying an invalid Newton correction.
     Reg::Duplicate(limit, FLT_MAX, mask);
@@ -275,7 +283,7 @@ namespace RmsNormDetail {
  * FROM_SQUARES computes invRms from sumSquares; otherwise it consumes the precomputed statistic. */
 template <typename T, bool FROM_SQUARES>
 __aicore__ inline void ApplyRow(__ubuf__ T* inputRow, __ubuf__ float* gammaRow, uint32_t rowLength,
-                                __ubuf__ float* invRms, __ubuf__ T* outputRow, float epsilon)
+                                __ubuf__ float* invRms, __ubuf__ T* outputRow, float epsilon, uint32_t rowCount = 1U)
 {
     const float meanScale = 1.0f / static_cast<float>(rowLength);
     const uint16_t fullRepeats = static_cast<uint16_t>(rowLength / kRegCastVectorLanes);
@@ -283,47 +291,57 @@ __aicore__ inline void ApplyRow(__ubuf__ T* inputRow, __ubuf__ float* gammaRow, 
     const uint16_t tailRepeats = static_cast<uint16_t>((tailElements + kRegLaneRounding) / kRegFloatLanes);
     __VEC_SCOPE__
     {
-        Reg::MaskReg mask;
-        Reg::RegTensor<T> input;
-        Reg::RegTensor<float> value;
-        Reg::RegTensor<float> gamma;
-        Reg::RegTensor<float> inverse;
-        Reg::RegTensor<float> scaled;
-        Reg::RegTensor<T> output;
-        if constexpr (FROM_SQUARES) {
-            Reg::RegTensor<float> scalarInverse;
-            InverseRmsRegister(invRms, meanScale, epsilon, scalarInverse);
-            Reg::MaskReg fullMask = MaskForCount(kRegFloatLanes);
-            Reg::Duplicate(inverse, scalarInverse, fullMask);
-        } else {
-            Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(inverse, invRms);
-        }
-        mask = Compute::MaskForCount(kRegFloatLanes);
-        for (uint16_t repeat = 0; repeat < fullRepeats; ++repeat) {
-            const uint32_t offset = repeat * Compute::kRegCastVectorLanes;
-            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, inputRow + offset);
-            Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
-            Reg::LoadAlign<float>(gamma, gammaRow + offset);
-            Reg::Mul(scaled, value, inverse, mask);
-            Reg::Mul(scaled, scaled, gamma, mask);
-            Reg::Cast<T, float, kCastFloatToInput>(output, scaled, mask);
-            Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(outputRow + offset, output, mask);
-        }
-        mask = Compute::MaskForCount(tailElements);
-        for (uint16_t repeat = 0U; repeat < tailRepeats; ++repeat) {
-            const uint32_t offset = fullRepeats * Compute::kRegCastVectorLanes;
-            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, inputRow + offset);
-            Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
-            Reg::LoadAlign<float>(gamma, gammaRow + offset);
-            Reg::Mul(scaled, value, inverse, mask);
-            Reg::Mul(scaled, scaled, gamma, mask);
-            Reg::Cast<T, float, kCastFloatToInput>(output, scaled, mask);
-            Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(outputRow + offset, output, mask);
+        for (uint16_t row = 0U; row < static_cast<uint16_t>(rowCount); ++row) {
+            Reg::MaskReg mask;
+            Reg::RegTensor<T> input;
+            Reg::RegTensor<float> value;
+            Reg::RegTensor<float> gamma;
+            Reg::RegTensor<float> inverse;
+            Reg::RegTensor<float> scaled;
+            Reg::RegTensor<T> output;
+            if constexpr (FROM_SQUARES) {
+                Reg::RegTensor<float> scalarInverse;
+                InverseRmsRegister(invRms + row, meanScale, epsilon, scalarInverse);
+                Reg::MaskReg fullMask = MaskForCount(kRegFloatLanes);
+                Reg::Duplicate(inverse, scalarInverse, fullMask);
+            } else {
+                Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(inverse, invRms + row);
+            }
+            mask = Compute::MaskForCount(kRegFloatLanes);
+            for (uint16_t repeat = 0; repeat < fullRepeats; ++repeat) {
+                const uint32_t offset = repeat * Compute::kRegCastVectorLanes;
+                Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, inputRow + row * rowLength + offset);
+                Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
+                Reg::LoadAlign<float>(gamma, gammaRow + offset);
+                Reg::Mul(scaled, value, inverse, mask);
+                Reg::Mul(scaled, scaled, gamma, mask);
+                Reg::Cast<T, float, kCastFloatToInput>(output, scaled, mask);
+                Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(outputRow + row * rowLength + offset, output, mask);
+            }
+            mask = Compute::MaskForCount(tailElements);
+            for (uint16_t repeat = 0U; repeat < tailRepeats; ++repeat) {
+                const uint32_t offset = fullRepeats * Compute::kRegCastVectorLanes;
+                Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, inputRow + row * rowLength + offset);
+                Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
+                Reg::LoadAlign<float>(gamma, gammaRow + offset);
+                Reg::Mul(scaled, value, inverse, mask);
+                Reg::Mul(scaled, scaled, gamma, mask);
+                Reg::Cast<T, float, kCastFloatToInput>(output, scaled, mask);
+                Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(outputRow + row * rowLength + offset, output, mask);
+            }
         }
     }
 }
 
 } // namespace RmsNormDetail
+
+/** Normalize independent contiguous rows in one VF, preserving each row's inverse and rounding. */
+template <typename T>
+__aicore__ inline void ComputeRmsNormRowsFromSquares(__ubuf__ T* input, __ubuf__ float* weight, uint32_t length,
+                                                     uint32_t rows, float epsilon, __ubuf__ float* sumSquares)
+{
+    RmsNormDetail::ApplyRow<T, true>(input, weight, length, sumSquares, input, epsilon, rows);
+}
 
 /** Normalize using the full-row square sum: y[i]=Cast<T>(FP32(x[i])*rsqrt(sum/length+eps)*weight[i]).
  * The caller supplies squares of the rounded stage input. RMS0/Mid/RMS1 share the same arithmetic. */

@@ -100,10 +100,13 @@ TILING_DATA_FIELD_DEF(uint32_t, stageRowStride);
 TILING_DATA_FIELD_DEF(uint32_t, compactPartials);
 TILING_DATA_FIELD_DEF(uint32_t, bsEpilogueBatch);
 TILING_DATA_FIELD_DEF(uint32_t, bsEpilogueInputBytes);
+TILING_DATA_FIELD_DEF(uint32_t, outputMode);
+TILING_DATA_FIELD_DEF(uint32_t, quantBatchRows);
 
 TILING_DATA_FIELD_DEF(uint64_t, partialMmOffset);
 TILING_DATA_FIELD_DEF(uint64_t, partialRmsOffset);
 TILING_DATA_FIELD_DEF(uint64_t, stageOffset);
+TILING_DATA_FIELD_DEF(uint64_t, rms1InputOffset);
 TILING_DATA_FIELD_DEF(uint64_t, l1PeakBytes);
 END_TILING_DATA_DEF;
 

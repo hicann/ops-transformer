@@ -16,11 +16,13 @@ English | [简体中文](./README.md)
 ## Function Description
 
 - Operator function:
-  MegaMhc fuses the computation of multi-stage RmsNorm, MhcPost, and MhcPre, supports an optional input RmsNorm and an optional intermediate RmsNorm, updates the multi-path residual states and Post/Res mixing coefficients, and merges and normalizes the residuals of all paths with weights into the input of the next sublayer. When external Pre mixing coefficients are supplied, it also outputs the Pre coefficients calculated by the current invocation.
+  MegaMhc fuses the computation of multi-stage RmsNorm, MhcPost, and MhcPre, supports an optional input RmsNorm and an optional intermediate RmsNorm, updates the multi-path residual states and Post/Res mixing coefficients, and merges and normalizes the residuals of all paths with weights into the input of the next sublayer. Depending on the output mode, the final result is returned at its original precision or quantized to MXFP8. When external Pre mixing coefficients are supplied, it also outputs the Pre coefficients calculated by the current invocation.
 
 - Computation formula:
 
-  The following formulas describe the operator function stage by stage based on the computation functions and execution order of the sub-operators RmsNorm, MhcPost, and MhcPre in the fused operator. $B$ is the batch size, $S$ is the sequence length, $T=B\times S$ is the number of tokens after flattening, $N$ is the number of residual heads, and $D$ is the hidden dimension of each head. The BS layout is calculated using the following formulas. The T layout is equivalent to folding $B$ and $S$ into $T$. $\operatorname{FP32}$ indicates conversion to float32, and $\operatorname{Cast}_{dtype(x)}$ indicates conversion to the data type of input x.
+  The following formulas describe the operator stage by stage in the computation order of RmsNorm, MhcPost, MhcPre, and optional MXFP8 quantization. $B$ is the batch size, $S$ is the sequence length, $T=B\times S$ is the number of tokens after flattening, $N$ is the number of residual heads, and $D$ is the hidden dimension of each head. The BS layout is calculated using the following formulas. The T layout is equivalent to folding $B$ and $S$ into $T$. $\operatorname{FP32}$ indicates conversion to float32, and $\operatorname{Cast}_{dtype(x)}$ indicates conversion to the data type of input x.
+
+  The last dimension in the coefficient subscript `[b,s,n,0]` corresponds to a single mixing coefficient. None in the formula indicates that the corresponding optional tensor is not passed in.
 
   1. Optionally performs the RmsNorm operator function to perform root mean square normalization on input x, referred to as the rms_norm_0 stage. The following formula is executed only when `rms_norm_0_weight` is not empty. When it is empty, this stage is skipped and $x\_1=x$ is set directly.
 
@@ -137,17 +139,45 @@ English | [简体中文](./README.md)
 
      Here, $i$ is the row index and $j$ is the column index. The supported nonzero iteration count is 20. `sinkhorn_eps` is used only for the preceding Sinkhorn computation and is independent of `hc_pre_eps` in the Sigmoid stage of the Pre branch of the MhcPre operator and `hc_norm_eps` in the root mean square normalization stage.
 
-  5. Performs the RmsNorm operator function to perform root mean square normalization on the weighted merging result, referred to as the rms_norm_1 stage.
+  5. Performs the RmsNorm operator function on the weighted merging result and converts it to the data type of x, referred to as the rms_norm_1 stage.
 
      $$
      \begin{aligned}
      h\_in\_rms_{b,s} &= \operatorname{rsqrt}\left(\frac{1}{D}\sum_{i=0}^{D-1}\operatorname{FP32}(h\_in_{b,s,i})^{2}+rms\_norm\_eps\right), \\
      h\_in\_f32_{b,s,d} &= \operatorname{FP32}(h\_in_{b,s,d})\cdot h\_in\_rms_{b,s}\cdot \operatorname{FP32}(rms\_norm\_1\_weight_d)\cdot rms\_norm\_scale, \\
-     y &= \operatorname{Cast}_{dtype(x)}(h\_in\_f32).
+     y\_rms &= \operatorname{Cast}_{dtype(x)}(h\_in\_f32).
      \end{aligned}
      $$
 
-     The last dimension in the coefficient subscript `[b,s,n,0]` corresponds to a single mixing coefficient. None in the formula indicates that the corresponding optional tensor is not passed in.
+     $y\_rms$ is the original-precision normalized result used as the input to stage 6.
+
+  6. Selects the output format according to `output_mode`, referred to as the output stage. This mode does not change the residual update or mixing-coefficient calculations in the preceding stages.
+
+     When `output_mode=0`, the original-precision result is returned:
+
+     $$
+     y=y\_rms.
+     $$
+
+     When `output_mode=1`, $y\_rms$, already converted to `dtype(x)` in stage 5, is dynamically MX-quantized along D to produce `y_quant` and the quantization scales `y_scale`. The algorithm is fixed to OCP, the destination type is FLOAT8_E4M3FN, and the rounding mode is `rint`.
+
+     For each token, divide $y\_rms$ along the last axis into groups of $k=32$ consecutive elements. Each input group $\{V_i\}_{i=1}^{k}$ is quantized to $\{mxscale,\{P_i\}_{i=1}^{k}\}$. For nonzero finite groups away from the scale encoding limits, compute the shared exponent and quantization scale as follows:
+
+     $$
+     shared\_exp=\left\lfloor\log_2\left(\max_{1\leq i\leq k}|V_i|\right)\right\rfloor-emax,
+     $$
+
+     $$
+     mxscale=2^{shared\_exp}.
+     $$
+
+     $emax$ is the exponent of the largest normal value in the destination type; FLOAT8_E4M3FN uses $emax=8$. Divide each group element by the shared $mxscale$, then convert to the destination type using `rint` rounding and saturation:
+
+     $$
+     P_i=\operatorname{cast\_to\_dst\_type}\left(\frac{V_i}{mxscale},\mathrm{rint}\right),\qquad i=1,\ldots,k.
+     $$
+
+     The values $P_i$ from all groups form `y_quant` in their original order. Each group's $mxscale$ is encoded as FLOAT8_E8M0 in `y_scale`. All-zero groups and scale exponent limits follow the OCP quantization rules. For a quantization input group containing NaN, +Inf, or -Inf, the group's `y_scale` is encoded as `0xff`; in the default floating-point conversion mode, every `y_quant` element in that group is zero. Incomplete groups are padded with zeros, and only the valid D quantized elements are retained. Scales for adjacent groups are stored in pairs; any extra scale slot is filled with encoding 0. See the parameter descriptions for output shapes.
 
 ## Parameter Description
 
@@ -168,9 +198,9 @@ English | [简体中文](./README.md)
 | new_post_mix | Output | New coefficient of the coefficient generation stage of the Post branch of the MhcPre operator, corresponding to new_post_mix in the formula. The shape is [B,S,N,1] or [T,N,1]. | FLOAT32 | ND |
 | new_comb_res_mix | Output | New coefficient of the coefficient generation stage of the Res branch of the MhcPre operator, corresponding to new_comb_res_mix in the formula. Returns comb_logits when no Sinkhorn iterations are performed, and normalized coefficients after 20 Sinkhorn iterations. The shape is [B,S,N,N] or [T,N,N]. | FLOAT32 | ND |
 | new_prev_mix | Optional output | Required when `shifted_prev_mix` is supplied; returns the current `pre_mix` with the same shape as `post_mix`. When the input is empty, this output is absent. The current and external coefficients occupy separate UB regions and are used for output and weighted merging, respectively. | FLOAT32 | ND |
-| y | Optional output | Original-precision result of the weighted merging stage of MhcPre followed by the rms_norm_1 stage of RmsNorm, corresponding to y in the formula. The shape is [B,S,D] or [T,D]. Although optional in the interface prototype, this output is required in this version. | Same as x | ND |
-| y_quant | Optional output | Reserved parameter. It is not specified by default and is not output in this version. | FLOAT8_E4M3FN | ND |
-| y_scale | Optional output | Reserved parameter. It is not specified by default and is not output in this version. | FLOAT8_E8M0 | ND |
+| y | Optional output | Original-precision result of the weighted merging stage of MhcPre followed by the rms_norm_1 stage of RmsNorm, corresponding to y in the formula. The shape is [B,S,D] or [T,D]. Required when output_mode=0 and absent when output_mode=1. | Same as x | ND |
+| y_quant | Optional output | MXFP8 E4M3FN quantized result formed by each group's P_i in the original order, with the same shape as x. Required when output_mode=1 and absent when output_mode=0. | FLOAT8_E4M3FN | ND |
+| y_scale | Optional output | E8M0 encodings of the per-group mxscale, with shape [B,S,ceil(D/64),2] or [T,ceil(D/64),2]. Required when output_mode=1 and absent when output_mode=0. | FLOAT8_E8M0 | ND |
 | rms_norm_eps | Optional attribute | Default value: 1e-6. It applies to the rms_norm_0, rms_norm_mid, and rms_norm_1 stages of the RmsNorm operator, corresponding to rms_norm_eps in the formula. After conversion to FLOAT32, the value must be finite and greater than 0. | FLOAT | - |
 | hc_norm_eps | Optional attribute | Default value: 1e-6. Used to calculate the RMS of the complete N*D row of `x_2` and scale the projection result, corresponding to hc_norm_eps in the formula. After conversion to FLOAT32, the value must be finite and greater than 0. | FLOAT | - |
 | hc_pre_eps | Optional attribute | Default value: 1e-6. It is the additional output term of the Sigmoid stage of the Pre branch of the MhcPre operator, corresponding to hc_pre_eps in the formula. After conversion to FLOAT32, the value must be finite and greater than 0. | FLOAT | - |
@@ -180,11 +210,12 @@ English | [简体中文](./README.md)
 | sinkhorn_eps | Optional attribute | Sinkhorn epsilon. Default value: 1e-6. Must be finite and positive after conversion to FLOAT32. | FLOAT | - |
 | num_sinkhorn_iters | Optional attribute | Number of Sinkhorn iterations. Default value: 0. Currently supports only 0 or 20. A value of 0 skips Sinkhorn iterations and returns logits; a value of 20 performs 20 Sinkhorn iterations and returns normalized coefficients. | INT | - |
 | rms_norm_scale | Optional attribute | Reserved parameter. Default value: 1.0. Only 1.0 is supported in this version. | FLOAT | - |
-| output_mode | Optional attribute | Specifies the output mode. Default value: 0. 0: outputs the non-quantized result. 1: outputs the MX Quant quantized result. 2: outputs both the quantized and non-quantized results. Other values are not supported. 1 and 2 are reserved values, and only 0 is supported in this version. | INT | - |
+| output_mode | Optional attribute | Specifies the output mode. Default value: 0. 0: outputs only the original-precision y. 1: outputs only the MXFP8 y_quant and y_scale. 2 (both quantized and non-quantized results) is reserved and unsupported in this version. Other values are invalid. | INT | - |
 
 ## Constraints
 
 - Currently, N=4, Q=24, and K=4D. The value range of D is [16,16384], and D must be a multiple of 16.
+- Only `output_mode=0/1` is supported: mode 0 outputs `y`, and mode 1 outputs `y_quant` and `y_scale`. The two result formats are not returned together. Mode 2 is reserved.
 - Currently, only forward computation is provided, and backward gradients are not provided.
 
 ## Invocation Description

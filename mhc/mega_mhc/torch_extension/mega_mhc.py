@@ -16,6 +16,15 @@ from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
 
+# Public output contract, mirrored by the independently compiled ACLNN wrapper.
+_OUTPUT_MODE_UNQUANTIZED = 0
+_OUTPUT_MODE_MXFP8 = 1
+_OUTPUT_MODE_RESERVED = 2
+_QUANT_GROUP_ELEMENTS = 32
+_QUANT_SCALES_PER_PAIR = 2
+_QUANT_PAIR_ELEMENTS = _QUANT_GROUP_ELEMENTS * _QUANT_SCALES_PER_PAIR
+
+
 class MegaMhcOpBuilder(OpBuilder):
     """Build the repository-local ACLNN wrapper and register its Torch schema."""
 
@@ -60,11 +69,17 @@ class MegaMhcOpBuilder(OpBuilder):
             output_mode=0,
         ):
             torch._check(
-                output_mode in (0, 1, 2), lambda: "output_mode must be 0, 1 or 2"
+                output_mode
+                in (
+                    _OUTPUT_MODE_UNQUANTIZED,
+                    _OUTPUT_MODE_MXFP8,
+                    _OUTPUT_MODE_RESERVED,
+                ),
+                lambda: "output_mode must be 0, 1 or 2",
             )
             torch._check(
-                output_mode == 0,
-                lambda: "MX Quant output modes 1 and 2 are reserved in this version",
+                output_mode != _OUTPUT_MODE_RESERVED,
+                lambda: "output_mode=2 is reserved in this version",
             )
             torch._check(x.dim() in (2, 3), lambda: "x must be [T,D] or [B,S,D]")
             leading = x.shape[:-1]
@@ -75,9 +90,23 @@ class MegaMhcOpBuilder(OpBuilder):
                 None
                 if shifted_prev_mix is None
                 else x.new_empty((*leading, 4, 1), dtype=torch.float32),
-                x.new_empty(x.shape),
-                None,
-                None,
+                x.new_empty(x.shape)
+                if output_mode == _OUTPUT_MODE_UNQUANTIZED
+                else None,
+                x.new_empty(x.shape, dtype=torch.float8_e4m3fn)
+                if output_mode == _OUTPUT_MODE_MXFP8
+                else None,
+                x.new_empty(
+                    (
+                        *leading,
+                        (x.shape[-1] + _QUANT_PAIR_ELEMENTS - 1)
+                        // _QUANT_PAIR_ELEMENTS,
+                        _QUANT_SCALES_PER_PAIR,
+                    ),
+                    dtype=torch.float8_e8m0fnu,
+                )
+                if output_mode == _OUTPUT_MODE_MXFP8
+                else None,
             )
 
 
@@ -180,12 +209,19 @@ def mega_mhc(
     comb_res_mix must be provided in this version.
     rms_norm_0_weight=None skips RMSNorm_0 and sends x directly to Post.
     rms_norm_mid_weight=None skips Mid; the projection RMS scaling still runs.
-    hc_post_scale scales the post sigmoid. num_sinkhorn_iters is the Sinkhorn
-    iteration count: 0 preserves Res logits; 20 runs 20 normalization iterations.
-    Only output_mode=0 is supported; modes 1/2 are reserved for MX Quant outputs.
-    Returns (new_residual, new_post_mix, new_comb_res_mix, new_prev_mix, y, None, None).
+    hc_post_scale scales the post sigmoid.
+    num_sinkhorn_iters is the iteration count and supports 0 or 20:
+    0 returns Res logits without Sinkhorn iterations; 20 performs 20 Sinkhorn
+    iterations and returns normalized Res coefficients.
+    output_mode=0 returns y in the activation dtype, with y_quant and y_scale
+    both None. output_mode=1 returns MXFP8 E4M3FN y_quant and E8M0 y_scale,
+    with y=None; mode 2 is reserved and unsupported.
+    Quantization uses OCP scales per 32 values and rint rounding after the
+    final activation-dtype cast. y_scale has shape [..., ceil(D/64), 2].
+    Returns (new_residual, new_post_mix, new_comb_res_mix, new_prev_mix, y,
+    y_quant, y_scale).
     new_prev_mix contains the current pre_mix when shifted_prev_mix is provided;
-    otherwise it is None. The quantized outputs remain reserved and return None.
+    otherwise it is None.
     """
     return torch.ops.cann_ops_transformer.mega_mhc(
         x,

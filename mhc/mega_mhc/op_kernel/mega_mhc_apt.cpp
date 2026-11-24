@@ -56,6 +56,13 @@ __global__ __aicore__ void mega_mhc(GM_ADDR x, GM_ADDR residual, GM_ADDR postMix
         tensors.gamma0.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(rmsNorm0Weight));
     }
     tensors.hInPrime.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(y));
+    if (tilingData.outputMode == MegaMhc::Kernel::kOutputModeMxFp8) {
+        tensors.yQuant.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t*>(yQuant));
+        tensors.yScale.SetGlobalBuffer(reinterpret_cast<__gm__ uint8_t*>(yScale));
+        if (tilingData.rowTileMode != 0U) {
+            tensors.rms1Input.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(userWorkspace + tilingData.rms1InputOffset));
+        }
+    }
     tensors.hPostNew.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(newPostMix));
     tensors.hResNew.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(newCombResMix));
     tensors.x2Out.SetGlobalBuffer(reinterpret_cast<__gm__ T*>(newResidual));

@@ -35,13 +35,25 @@ constexpr size_t PRE_MIX_INDEX = 8;
 constexpr size_t RMS0_INDEX = 9;
 constexpr int64_t HEADS = 4;
 constexpr int64_t PROJECTION = 24;
+// OCP uses one scale per 32 values; the output stores two scales per pair.
+constexpr int64_t kQuantGroupElements = 32;
+constexpr int64_t kQuantScalesPerPair = 2;
+constexpr int64_t kQuantPairElements = kQuantGroupElements * kQuantScalesPerPair;
+constexpr int64_t kOutputModeUnquantized = 0;
+constexpr int64_t kOutputModeReserved = 2;
+constexpr size_t kNewResidualOutputIndex = 0;
+constexpr size_t kYOutputIndex = 4;
+constexpr size_t kYQuantOutputIndex = 5;
+constexpr size_t kYScaleOutputIndex = 6;
 using Inputs = std::array<const aclTensor*, INPUT_COUNT>;
 using Outputs = std::array<const aclTensor*, OUTPUT_COUNT>;
 
 /** External mixing also exposes this invocation's newly generated pre coefficients. */
-bool IsActiveOutput(size_t index, bool hasShiftedPrevMix)
+bool IsActiveOutput(size_t index, bool hasShiftedPrevMix, int64_t outputMode)
 {
-    return index < PRE_OUTPUT_INDEX || index == 4 || (index == PRE_OUTPUT_INDEX && hasShiftedPrevMix);
+    return index < PRE_OUTPUT_INDEX || (index == PRE_OUTPUT_INDEX && hasShiftedPrevMix) ||
+           (outputMode == kOutputModeUnquantized ? index == kYOutputIndex :
+                                                   index == kYQuantOutputIndex || index == kYScaleOutputIndex);
 }
 
 /** Format expected dimensions for diagnostics. */
@@ -96,13 +108,13 @@ aclnnStatus CheckContract(const Inputs& inputs, const Outputs& outputs, double n
                           double hcEps, int64_t mode, int64_t hcMult, double hcPostScale, double sinkhornEps,
                           int64_t numSinkhornIters, double rmsNormScale, int64_t outputMode)
 {
-    if (outputMode < 0 || outputMode > 2) {
+    if (outputMode < kOutputModeUnquantized || outputMode > kOutputModeReserved) {
         OP_LOGE_FOR_INVALID_VALUE(ACLNN_OP_NAME, "outputMode", std::to_string(outputMode).c_str(), "0, 1 or 2");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (outputMode != 0) {
+    if (outputMode == kOutputModeReserved) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "outputMode", std::to_string(outputMode).c_str(),
-                                              "MX Quant output modes 1 and 2 are reserved in this version");
+                                              "output mode 2 is reserved in this version");
         return ACLNN_ERR_PARAM_INVALID;
     }
     for (size_t i = 0; i < MID_INDEX; ++i) {
@@ -112,7 +124,7 @@ aclnnStatus CheckContract(const Inputs& inputs, const Outputs& outputs, double n
     }
     const bool hasShiftedPrevMix = inputs[PRE_MIX_INDEX] != nullptr;
     for (size_t index = 0; index < OUTPUT_COUNT; ++index) {
-        if (IsActiveOutput(index, hasShiftedPrevMix)) {
+        if (IsActiveOutput(index, hasShiftedPrevMix, outputMode)) {
             CHECK_RET(outputs[index] != nullptr, ACLNN_ERR_PARAM_NULLPTR);
         } else {
             CHECK_RET(outputs[index] == nullptr, ACLNN_ERR_PARAM_INVALID);
@@ -184,12 +196,19 @@ aclnnStatus CheckContract(const Inputs& inputs, const Outputs& outputs, double n
     const size_t outputSources[] = {1, 2, 7, 2, 0, 0, 0};
     const char* outputNames[] = {"new_residual", "new_post_mix", "new_comb_res_mix", "new_prev_mix", "y",
                                  "y_quant",      "y_scale"};
+    auto scaleShape = leading;
+    scaleShape.push_back((d + kQuantPairElements - 1) / kQuantPairElements);
+    scaleShape.push_back(kQuantScalesPerPair);
     for (size_t i = 0; i < OUTPUT_COUNT; ++i) {
         if (outputs[i] == nullptr) {
             continue;
         }
-        CHECK_RET(CheckTensor(outputs[i], outputNames[i], shapes[outputSources[i]],
-                              i == 0 || i == 4 ? dtype : op::DataType::DT_FLOAT),
+        const auto outputType = i == kYQuantOutputIndex                            ? op::DataType::DT_FLOAT8_E4M3FN :
+                                i == kYScaleOutputIndex                            ? op::DataType::DT_FLOAT8_E8M0 :
+                                i == kNewResidualOutputIndex || i == kYOutputIndex ? dtype :
+                                                                                     op::DataType::DT_FLOAT;
+        CHECK_RET(CheckTensor(outputs[i], outputNames[i],
+                              i == kYScaleOutputIndex ? scaleShape : shapes[outputSources[i]], outputType),
                   ACLNN_ERR_PARAM_INVALID);
     }
     return ACLNN_SUCCESS;
@@ -220,9 +239,10 @@ aclnnStatus BuildExecution(Inputs inputs, const Outputs& outputs, double normEps
                 owner->AllocTensor(outputs[i]->GetViewShape(), outputs[i]->GetDataType(), op::Format::FORMAT_ND);
         } else {
             // Preserve absent output slots with empty launcher tensors of their declared types.
-            const auto dtype = i == 5 ? op::DataType::DT_FLOAT8_E4M3FN :
-                               i == 6 ? op::DataType::DT_FLOAT8_E8M0 :
-                                        op::DataType::DT_FLOAT;
+            const auto dtype = i == kYQuantOutputIndex ? op::DataType::DT_FLOAT8_E4M3FN :
+                               i == kYScaleOutputIndex ? op::DataType::DT_FLOAT8_E8M0 :
+                               i == kYOutputIndex      ? inputs[0]->GetDataType() :
+                                                         op::DataType::DT_FLOAT;
             contiguousOutputs[i] = owner->AllocTensor(op::Shape{0}, dtype, op::Format::FORMAT_ND);
         }
         CHECK_RET(contiguousOutputs[i] != nullptr, ACLNN_ERR_INNER_NULLPTR);

@@ -23,11 +23,13 @@
 
 ## 功能说明
 
-- 接口功能：MegaMhc融合多阶段RmsNorm、MhcPost和MhcPre计算，支持可选的输入RmsNorm和中间RmsNorm，更新多路残差状态与Post/Res混合系数，并将各路残差加权合并、归一化为下一子层的输入。传入外部Pre混合系数时，还输出本次计算的Pre系数。
+- 接口功能：MegaMhc融合多阶段RmsNorm、MhcPost和MhcPre计算，支持可选的输入RmsNorm和中间RmsNorm，更新多路残差状态与Post/Res混合系数，并将各路残差加权合并、归一化为下一子层的输入。最终结果可按输出模式返回原精度结果或进行MXFP8量化。传入外部Pre混合系数时，还输出本次计算的Pre系数。
 
 - 计算公式：
 
-  以下公式从融合算子中RmsNorm、MhcPost和MhcPre各小算子的计算功能与执行顺序出发，分阶段说明算子功能。$B$为批大小，$S$为序列长度，$T=B\times S$为展平后的token数，$N$为残差head数，$D$为每个head的隐藏维度。使用BS布局时按下式计算；T布局等价于将$B$、$S$折叠为$T$。$\operatorname{FP32}$表示转换为float32，$\operatorname{Cast}_{dtype(x)}$表示转换为输入x的数据类型。
+  以下公式按照RmsNorm、MhcPost、MhcPre及可选MXFP8量化的计算顺序，分阶段说明算子功能。$B$为批大小，$S$为序列长度，$T=B\times S$为展平后的token数，$N$为残差head数，$D$为每个head的隐藏维度。使用BS布局时按下式计算；T布局等价于将$B$、$S$折叠为$T$。$\operatorname{FP32}$表示转换为float32，$\operatorname{Cast}_{dtype(x)}$表示转换为输入x的数据类型。
+
+  系数下标`[b,s,n,0]`中的最后一维对应单个混合系数，公式中的nullptr表示未传入对应可选Tensor。
 
   1. 可选执行RmsNorm算子功能，对输入x进行均方根归一化，简称rms_norm_0阶段。仅当`rms_norm_0_weight`非空时执行下式；为空时跳过本阶段，直接令$x\_1=x$。
 
@@ -113,7 +115,7 @@
      \end{aligned}
      $$
 
-     传入的`shifted_prev_mix`不再经过上述Pre分支的Sigmoid和`hc_pre_eps`处理；它仅替换加权合并所用的`pre_mix`，不改变Post、Res分支系数的生成。合并结果`h_in`仍在第5阶段执行`rms_norm_1`。本次`pre_mix`与外部`shifted_prev_mix`使用独立UB区域；外部系数可提前载入，本次系数写回后，其UB区域方可再次生成新值。
+     传入的`shifted_prev_mix`不再经过上述Pre分支的Sigmoid和`hc_pre_eps`处理；它仅替换加权合并所用的`pre_mix`，不改变Post、Res分支系数的生成。合并结果`h_in`仍在第5阶段执行`rms_norm_1`。
 
      MhcPre算子的Res分支Sinkhorn归一化阶段
 
@@ -144,17 +146,45 @@
 
      其中$i$为行索引，$j$为列索引；当前支持的非零迭代数为20。`sinkhorn_eps`仅用于上述Sinkhorn计算，与MhcPre算子的Pre分支Sigmoid阶段的`hc_pre_eps`及均方根归一化阶段的`hc_norm_eps`分别独立。
 
-  5. 执行RmsNorm算子功能，对加权合并结果进行均方根归一化，简称rms_norm_1阶段。
+  5. 执行RmsNorm算子功能，对加权合并结果进行均方根归一化，得到与x类型一致的结果，简称rms_norm_1阶段。
 
      $$
      \begin{aligned}
      h\_in\_rms_{b,s} &= \operatorname{rsqrt}\left(\frac{1}{D}\sum_{i=0}^{D-1}\operatorname{FP32}(h\_in_{b,s,i})^{2}+rms\_norm\_eps\right), \\
      h\_in\_f32_{b,s,d} &= \operatorname{FP32}(h\_in_{b,s,d})\cdot h\_in\_rms_{b,s}\cdot \operatorname{FP32}(rms\_norm\_1\_weight_d)\cdot rms\_norm\_scale, \\
-     y &= \operatorname{Cast}_{dtype(x)}(h\_in\_f32).
+     y\_rms &= \operatorname{Cast}_{dtype(x)}(h\_in\_f32).
      \end{aligned}
      $$
 
-     系数下标`[b,s,n,0]`中的最后一维对应单个混合系数，公式中的nullptr表示未传入对应可选Tensor。
+     $y\_rms$为原精度归一化结果，作为第6阶段的输入。
+
+  6. 根据`outputMode`选择输出形式，简称输出阶段。该模式不改变前述残差更新和混合系数计算。
+
+     当`outputMode=0`时，返回原精度结果：
+
+     $$
+     y=y\_rms.
+     $$
+
+     当`outputMode=1`时，对第5阶段已转换为`dtype(x)`的$y\_rms$沿D轴进行动态MX量化，返回量化结果`y_quant`和量化尺度`y_scale`。量化方式固定为OCP，目标类型为FLOAT8_E4M3FN，舍入方式为`rint`。
+
+     将每个token的$y\_rms$沿尾轴按$k=32$个连续元素分组，一组输入$\{V_i\}_{i=1}^{k}$量化为$\{mxscale,\{P_i\}_{i=1}^{k}\}$。对于最大绝对值非零、有限且未触及尺度编码边界的分组，共享指数与量化尺度计算如下：
+
+     $$
+     shared\_exp=\left\lfloor\log_2\left(\max_{1\leq i\leq k}|V_i|\right)\right\rfloor-emax,
+     $$
+
+     $$
+     mxscale=2^{shared\_exp}.
+     $$
+
+     $emax$为目标类型最大正规数的指数，FLOAT8_E4M3FN对应$emax=8$。组内每个元素除以共享的$mxscale$，再按`rint`舍入并饱和转换为目标类型：
+
+     $$
+     P_i=\operatorname{cast\_to\_dst\_type}\left(\frac{V_i}{mxscale},\mathrm{rint}\right),\qquad i=1,\ldots,k.
+     $$
+
+     各组的$P_i$按原顺序组成`y_quant`，每组的$mxscale$以FLOAT8_E8M0编码存入`y_scale`。全零分组及尺度指数边界按OCP量化规则处理。量化输入分组中含NaN、+Inf或-Inf时，该组的`y_scale`编码为`0xff`；默认浮点转换模式下，该组的`y_quant`元素均为0。尾组不足32个元素时补0，量化结果仅保留有效D个元素；相邻两组的scale成对存储，多出的scale槽位填入编码0。各输出的shape见参数说明。
 
 ## 函数原型
 
@@ -405,7 +435,7 @@ aclnnStatus aclnnMegaMhc(
     <td>numSinkhornIters（int64_t）</td>
     <td>输入</td>
     <td>Sinkhorn迭代次数。</td>
-    <td>默认值为0，仅支持0或20。0不执行Sinkhorn迭代并输出logits；20表示执行20次Sinkhorn迭代后输出归一化结果。</td>
+    <td>默认值为0，当前仅支持0或20。取0时不执行Sinkhorn迭代，直接输出logits；取20时执行20次Sinkhorn迭代并输出归一化结果。</td>
     <td>-</td>
     <td>-</td>
     <td>-</td>
@@ -424,8 +454,8 @@ aclnnStatus aclnnMegaMhc(
   <tr>
     <td>outputMode（int64_t）</td>
     <td>输入</td>
-    <td>指定输出模式。0：输出非量化结果；1：输出MX Quant量化结果；2：同时输出量化和非量化结果。</td>
-    <td>本版仅支持0；1、2为预留取值，不支持其他取值。</td>
+    <td>指定输出模式。0：仅输出原精度结果yOut；1：仅输出MXFP8量化结果yQuantOut及量化尺度yScaleOut。</td>
+    <td>本版仅支持0和1；2（同时输出量化和非量化结果）为预留取值；其他取值非法。</td>
     <td>-</td>
     <td>-</td>
     <td>-</td>
@@ -454,7 +484,7 @@ aclnnStatus aclnnMegaMhc(
   <tr>
     <td>newCombResMixOut（aclTensor*）</td>
     <td>输出</td>
-    <td>MhcPre算子的Res分支系数生成阶段的新系数，对应公式中的new_comb_res_mix；迭代次数为0时输出comb_logits，为20时输出执行20次Sinkhorn迭代后的归一化结果。</td>
+    <td>MhcPre算子的Res分支系数生成阶段的新系数，对应公式中的new_comb_res_mix；numSinkhornIters为0时输出comb_logits，为20时输出执行20次Sinkhorn迭代后的归一化结果。</td>
     <td>不支持空Tensor。</td>
     <td>FLOAT32</td>
     <td>ND</td>
@@ -464,7 +494,7 @@ aclnnStatus aclnnMegaMhc(
   <tr>
     <td>newPrevMixOut（aclTensor*）</td>
     <td>可选输出</td>
-    <td>本次MhcPre计算的pre_mix，与外部shifted_prev_mix分开存放于独立UB区域；该输出不回传外部输入。</td>
+    <td>本次MhcPre计算的pre_mix；该输出不回传外部输入shifted_prev_mix。</td>
     <td>shiftedPrevMixOptional非空时必须非空且形状与postMix相同；shiftedPrevMixOptional为nullptr时必须传入nullptr。不支持空Tensor。</td>
     <td>FLOAT32</td>
     <td>ND</td>
@@ -475,7 +505,7 @@ aclnnStatus aclnnMegaMhc(
     <td>yOut（aclTensor*）</td>
     <td>可选输出</td>
     <td>RmsNorm算子的rms_norm_1阶段计算并应用倍率后的原精度结果，对应公式中的y。</td>
-    <td>本版必须输出，不支持空Tensor。</td>
+    <td>outputMode=0时必须提供非空Tensor；outputMode=1时必须为nullptr。</td>
     <td>与x相同</td>
     <td>ND</td>
     <td>[B,S,D]或[T,D]</td>
@@ -484,21 +514,21 @@ aclnnStatus aclnnMegaMhc(
   <tr>
     <td>yQuantOut（aclTensor*）</td>
     <td>可选输出</td>
-    <td>预留参数。</td>
-    <td>本版仅支持nullptr。</td>
+    <td>MXFP8 E4M3FN量化结果，对应公式中的y_quant，由各组P_i按原顺序组成。</td>
+    <td>outputMode=1时必须提供非空Tensor；outputMode=0时必须为nullptr。</td>
     <td>FLOAT8_E4M3FN</td>
     <td>ND</td>
-    <td>-</td>
+    <td>[B,S,D]或[T,D]</td>
     <td>-</td>
   </tr>
   <tr>
     <td>yScaleOut（aclTensor*）</td>
     <td>可选输出</td>
-    <td>预留参数。</td>
-    <td>本版仅支持nullptr。</td>
+    <td>各32元素分组量化尺度mxscale的E8M0编码，对应公式中的y_scale；相邻两组的scale成对存储。</td>
+    <td>outputMode=1时必须提供非空Tensor；outputMode=0时必须为nullptr。</td>
     <td>FLOAT8_E8M0</td>
     <td>ND</td>
-    <td>-</td>
+    <td>[B,S,ceil(D/64),2]或[T,ceil(D/64),2]</td>
     <td>-</td>
   </tr>
   <tr>
@@ -541,12 +571,12 @@ aclnnStatus aclnnMegaMhc(
   <tr>
     <td>ACLNN_ERR_PARAM_NULLPTR</td>
     <td>161001</td>
-    <td>七个必选输入、combResMixOptional、三个必选输出、workspaceSize或executor存在空指针；yOut为空指针；shiftedPrevMixOptional非空时newPrevMixOut为空指针。</td>
+    <td>七个必选输入、combResMixOptional、三个必选输出、workspaceSize或executor存在空指针；outputMode=0时yOut为空指针，或outputMode=1时yQuantOut或yScaleOut为空指针；shiftedPrevMixOptional非空时newPrevMixOut为空指针。</td>
   </tr>
   <tr>
     <td>ACLNN_ERR_PARAM_INVALID</td>
     <td>161002</td>
-    <td>数据类型、格式、shape或输出布局不符合参数规格；系数最后一维不为1；hcMult不为4；opImplMode不为0或1；numSinkhornIters不为0或20；sinkhornEps转换为FLOAT32后非有限或不大于0；参与计算的epsilon转换为FLOAT32后非有限或不大于0；hcPostScale转换为FLOAT32后非有限；预留参数rmsNormScale不为1.0；outputMode不为0（1、2为预留取值，其他值非法）；yQuantOut或yScaleOut非空；shiftedPrevMixOptional为空时newPrevMixOut非空。</td>
+    <td>数据类型、格式、shape或输出布局不符合参数规格；系数最后一维不为1；hcMult不为4；opImplMode不为0或1；numSinkhornIters不为0或20；sinkhornEps转换为FLOAT32后非有限或不大于0；参与计算的epsilon转换为FLOAT32后非有限或不大于0；hcPostScale转换为FLOAT32后非有限；预留参数rmsNormScale不为1.0；outputMode不为0或1（2为预留取值）；输出指针组合与outputMode不匹配；shiftedPrevMixOptional为空时newPrevMixOut非空。</td>
   </tr>
   </tbody>
   </table>
@@ -565,8 +595,8 @@ aclnnStatus aclnnMegaMhc(
   <tbody>
   <tr><td>workspace</td><td>输入</td><td>在Device侧申请的workspace内存地址。</td></tr>
   <tr><td>workspaceSize </td><td>输入</td><td>在Device侧申请的workspace大小，由第一段接口aclnnMegaMhcGetWorkspaceSize获取。</td></tr>
-  <tr><td>executor</td><td>输入</td><td> op执行器，包含了算子计算流程。</td></tr>
-  <tr><td>stream </td><td>输入</td><td> 指定执行任务的Stream。</td></tr>
+  <tr><td>executor</td><td>输入</td><td> op执行器，包含了算子计算流程。 </td></tr>
+  <tr><td>stream </td><td>输入</td><td> 指定执行任务的Stream。 </td></tr>
   </tbody>
   </table>
 
@@ -582,6 +612,7 @@ aclnnStatus aclnnMegaMhc(
 - 输入均位于同一设备，带前导维的Tensor采用相同BS或T布局，不支持广播。
 - T、B、S须为正整数，T或B*S不超过UINT32_MAX。
 - N=4，Q=24，K=4D。D的取值范围为[16,16384]，且为16的倍数。
+- outputMode仅支持0和1。模式0要求yOut非空，yQuantOut和yScaleOut为nullptr；模式1要求yOut为nullptr，yQuantOut和yScaleOut非空。模式2为预留取值。
 
 ## 调用示例
 
@@ -735,7 +766,7 @@ int Run()
     auto* newCombResMixOut = CreateTensor(resources, {t, n, n}, ACL_FLOAT);
     auto* newResidualOut = CreateTensor(resources, {t, n, d}, ACL_FLOAT16);
     aclTensor* newPrevMixOut = nullptr;
-    // 输出原精度结果，预留量化输出必须传入nullptr。
+    // outputMode=0输出原精度结果，量化输出传入nullptr。
     aclTensor* yQuantOut = nullptr;
     aclTensor* yScaleOut = nullptr;
     if (x == nullptr || residual == nullptr || postMix == nullptr || fn == nullptr || mixScales == nullptr ||

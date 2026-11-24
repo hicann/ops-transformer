@@ -14,15 +14,18 @@
 #include "kernel_tiling/kernel_tiling.h"
 #include "mega_mhc_tiling_key.h"
 #include "compute/rms_norm_common.h"
+#include "mega_mhc_quant_output.h"
 
 namespace MegaMhc::Kernel {
+constexpr uint32_t kOutputModeUnquantized = 0U;
+constexpr uint32_t kOutputModeMxFp8 = 1U;
 constexpr uint32_t kUbAlignmentBytes = 256U;
 constexpr uint32_t kUbAlignmentRounding = 255U;
 constexpr uint32_t kFp32VectorElements = 64U;
 constexpr uint32_t kFp32VectorRounding = 63U;
 constexpr uint32_t kHeadCount = 4U;
 constexpr uint32_t kHeadMatrixElements = 16U;
-constexpr uint32_t kRowInputSlots = 2U;
+constexpr uint32_t kRowInputSlots = QuantOutput::kOutputSlots;
 constexpr uint32_t kRowHeadSlots = 8U;
 constexpr uint32_t kRowGammaSlots = 2U;
 constexpr uint32_t kCoefficientTileElements = 256U;
@@ -53,6 +56,10 @@ struct Tensors {
     GlobalTensor<float> gamma0;
     GlobalTensor<float> gamma2;
     GlobalTensor<T> hInPrime;
+    GlobalTensor<T> rms1Input;
+    GlobalTensor<uint8_t> yQuant;
+    GlobalTensor<uint8_t> yScale;
+    Compute::MxFp8Output<T> quantOutput;
     GlobalTensor<float> hPostNew;
     GlobalTensor<float> hResNew;
     GlobalTensor<T> x2Out;
@@ -100,6 +107,40 @@ __aicore__ inline void CopyUbToGlobal(const GlobalTensor<T>& destination, uint64
     DataCopyPad(destination[destinationOffset], source, copyParams);
     SetFlag<HardEvent::MTE3_V>(EVENT_ID0);
     WaitFlag<HardEvent::MTE3_V>(EVENT_ID0);
+}
+
+/** Write only the selected final output while RMS1's result is still resident in UB. */
+template <typename T>
+__aicore__ inline void WriteFinalOutput(Tensors<T>& tensors, const MegaMhcTilingData& tiling, uint64_t row,
+                                        uint32_t offset, const LocalTensor<T>& normalized, uint32_t count,
+                                        bool asyncOutput = false, uint32_t outputSlot = 0U)
+{
+    if (tiling.outputMode == kOutputModeMxFp8) {
+        const uint32_t scalesPerRow =
+            (tiling.d + QuantOutput::kPairElements - 1U) / QuantOutput::kPairElements * QuantOutput::kScalesPerPair;
+        tensors.quantOutput.Write(normalized, count, tensors.yQuant, row * tiling.d + offset, tensors.yScale,
+                                  row * scalesPerRow + offset / QuantOutput::kGroupElements, asyncOutput, outputSlot);
+    } else {
+        CopyUbToGlobal(tensors.hInPrime, row * tiling.d + offset, normalized, count);
+    }
+}
+
+/** One B16 compute buffer plus two FP8 destinations occupy the original two B16 allocations. */
+__aicore__ inline bool CanSeparateQuantOutput(const MegaMhcTilingData& tiling)
+{
+    return tiling.outputMode == kOutputModeMxFp8 && tiling.rowTileMode == 0U &&
+           tiling.d % Compute::kQuantTileElements == 0U;
+}
+
+/** The caller waits for this FP8/scale slot after RMS1, immediately before quantization. */
+template <typename T>
+__aicore__ inline void WriteSeparateQuantOutput(Tensors<T>& tensors, const MegaMhcTilingData& tiling, uint64_t row,
+                                                const LocalTensor<T>& normalized, const LocalTensor<uint8_t>& output,
+                                                uint32_t count, uint32_t outputSlot)
+{
+    const uint32_t scalesPerRow = tiling.d / QuantOutput::kGroupElements;
+    tensors.quantOutput.WriteSeparate(normalized, output, count, tensors.yQuant, row * tiling.d, tensors.yScale,
+                                      row * scalesPerRow, outputSlot);
 }
 
 /** Initialize one or more FP32 values before an ordered Vector reduction. */
@@ -194,7 +235,7 @@ __aicore__ inline uint32_t GetWaveRows(const MegaMhcTilingData& tiling, uint32_t
 
 /** Own two capacity-planned D slots shared by all row phases.
  * input[slot,D], heads[slot,4,D], gamma[slot,D] hold only one host-planned D tile.
- * MTE2 prefetches the alternate slot during VF work; reuse follows V and the synchronous output store.
+ * MTE2 prefetches the alternate slot during VF work; reuse waits for V and that slot's MTE3 read.
  */
 template <typename T>
 class TiledRowBuffers {
@@ -223,19 +264,19 @@ public:
     /** Input/output share a ping-pong slot; input may hold rounded x1 or hIn. */
     __aicore__ inline LocalTensor<T> Input(uint32_t tile)
     {
-        return inputBuffer_.template Get<T>()[(tile & 1U) * plan_->dTile];
+        return inputBuffer_.template Get<T>()[(tile & QuantOutput::kOutputSlotMask) * plan_->dTile];
     }
 
     /** Select the four-head slot, whose head stride stays dTile even in the final short tile. */
     __aicore__ inline LocalTensor<T> Heads(uint32_t tile)
     {
-        return headsBuffer_.template Get<T>()[(tile & 1U) * kHeadCount * plan_->dTile];
+        return headsBuffer_.template Get<T>()[(tile & QuantOutput::kOutputSlotMask) * kHeadCount * plan_->dTile];
     }
 
     /** Select the tile weight slot. */
     __aicore__ inline LocalTensor<float> Gamma(uint32_t tile)
     {
-        return gammaBuffer_.template Get<float>()[(tile & 1U) * plan_->dTile];
+        return gammaBuffer_.template Get<float>()[(tile & QuantOutput::kOutputSlotMask) * plan_->dTile];
     }
 
     /** Enqueue a normalization tile: input=source[base+offset], optionally gamma=weight[weightBase+offset]. */
@@ -245,6 +286,7 @@ public:
     {
         const event_t event = Event(tile);
         WaitFlag<HardEvent::V_MTE2>(event);
+        WaitOutput(tile);
         const uint64_t offset = static_cast<uint64_t>(tile) * plan_->dTile;
         Kernel::EnqueueGlobalToUb(Input(tile), source, base + offset, Count(tile));
         if constexpr (WITH_WEIGHT) {
@@ -259,6 +301,7 @@ public:
     {
         const event_t event = Event(tile);
         WaitFlag<HardEvent::V_MTE2>(event);
+        WaitOutput(tile);
         const uint64_t offset = static_cast<uint64_t>(tile) * plan_->dTile;
         if constexpr (POST) {
             Kernel::EnqueueGlobalToUb(Input(tile), tensors.hOut, row * plan_->d + offset, Count(tile));
@@ -280,10 +323,42 @@ public:
         WaitFlag<HardEvent::MTE2_V>(Event(tile));
     }
 
-    /** Return the slot after its VF and any CopyUbToGlobal store have completed. */
+    /** Return a tile that has no outstanding output read. */
     __aicore__ inline void Release(uint32_t tile)
     {
         SetFlag<HardEvent::V_MTE2>(Event(tile));
+    }
+
+    /** Store the input/output slot asynchronously; the alternate tile's Vector work can proceed. */
+    __aicore__ inline void Store(const GlobalTensor<T>& destination, uint64_t offset, uint32_t tile)
+    {
+        SetFlag<HardEvent::V_MTE3>(Event(tile));
+        WaitFlag<HardEvent::V_MTE3>(Event(tile));
+        DataCopyExtParams copy{1U, static_cast<uint32_t>(Count(tile) * sizeof(T)), 0U, 0U, 0U};
+        DataCopyPad(destination[offset], Input(tile), copy);
+        ReleaseOutput(tile);
+    }
+
+    /** Four heads retain dTile UB stride and D GM stride, including the short final tile. */
+    __aicore__ inline void StoreHeads(const GlobalTensor<T>& destination, uint64_t offset, uint32_t tile)
+    {
+        constexpr uint32_t dataBlockBytes = 32U;
+        const uint32_t count = Count(tile);
+        SetFlag<HardEvent::V_MTE3>(Event(tile));
+        WaitFlag<HardEvent::V_MTE3>(Event(tile));
+        DataCopyExtParams copy{static_cast<uint16_t>(kHeadCount), static_cast<uint32_t>(count * sizeof(T)),
+                               static_cast<uint32_t>((plan_->dTile - count) * sizeof(T) / dataBlockBytes),
+                               static_cast<uint32_t>((plan_->d - count) * sizeof(T)), 0U};
+        DataCopyPad(destination[offset], Heads(tile), copy);
+        ReleaseOutput(tile);
+    }
+
+    /** Publish a quantized or B16 output read; only the matching MTE2 slot reuse waits for it. */
+    __aicore__ inline void ReleaseOutput(uint32_t tile)
+    {
+        SetFlag<HardEvent::MTE3_MTE2>(Event(tile));
+        outputPending_[tile & QuantOutput::kOutputSlotMask] = true;
+        Release(tile);
     }
 
     /** Consume both credits, including an unused slot when there is only one tile or no owned rows. */
@@ -291,23 +366,37 @@ public:
     {
         WaitFlag<HardEvent::V_MTE2>(EVENT_ID2);
         WaitFlag<HardEvent::V_MTE2>(EVENT_ID3);
+        WaitOutput(0U);
+        WaitOutput(1U);
+        // The MTE3->MTE2 waits execute on MTE2. Do not release UB until they finish.
+        SetFlag<HardEvent::MTE2_S>(EVENT_ID6);
+        WaitFlag<HardEvent::MTE2_S>(EVENT_ID6);
     }
 
     LocalTensor<float> coefficients, stats;
 
 private:
+    __aicore__ inline void WaitOutput(uint32_t tile)
+    {
+        if (outputPending_[tile & QuantOutput::kOutputSlotMask]) {
+            WaitFlag<HardEvent::MTE3_MTE2>(Event(tile));
+            outputPending_[tile & QuantOutput::kOutputSlotMask] = false;
+        }
+    }
+
     /** Map the tile to its DMA/V event slot. */
     __aicore__ inline event_t Event(uint32_t tile) const
     {
-        return (tile & 1U) == 0U ? EVENT_ID2 : EVENT_ID3;
+        return (tile & QuantOutput::kOutputSlotMask) == 0U ? EVENT_ID2 : EVENT_ID3;
     }
     const MegaMhcTilingData* plan_;
+    bool outputPending_[QuantOutput::kOutputSlots] = {false, false};
     TBuf<TPosition::VECCALC> inputBuffer_, headsBuffer_, gammaBuffer_, coefficientBuffer_, statsBuffer_;
 };
 
 /** Apply a completed row statistic to consecutive D tiles and preserve the Cast<T> boundary.
  * Formula: destination[i]=Cast<T>(FP32(source[i])*inverse*weight[i]). Source and destination may alias in GM.
- * Only alternate tile loads overlap computation; each store completes before its slot is released.
+ * Alternate tile loads, Vector work and stores overlap; MTE3->MTE2 protects slot reuse and GM rereads.
  */
 template <typename T>
 __aicore__ inline void ApplyTiledNormalization(TiledRowBuffers<T>& buffer, const MegaMhcTilingData& tiling,
@@ -326,9 +415,7 @@ __aicore__ inline void ApplyTiledNormalization(TiledRowBuffers<T>& buffer, const
         Compute::ApplyRmsNorm<T>(reinterpret_cast<__ubuf__ T*>(input.GetPhyAddr()),
                                  reinterpret_cast<__ubuf__ float*>(gamma.GetPhyAddr()), buffer.Count(tile), inverse,
                                  reinterpret_cast<__ubuf__ T*>(input.GetPhyAddr()));
-        Kernel::CopyUbToGlobal(destination, base + static_cast<uint64_t>(tile) * tiling.dTile, input,
-                               buffer.Count(tile));
-        buffer.Release(tile);
+        buffer.Store(destination, base + static_cast<uint64_t>(tile) * tiling.dTile, tile);
     }
 }
 

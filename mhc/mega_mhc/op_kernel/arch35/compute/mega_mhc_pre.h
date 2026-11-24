@@ -226,7 +226,8 @@ __aicore__ inline void NormalizeProjectionRows(__ubuf__ float* partial, __ubuf__
  * pre=sigmoid(logits[0:4])+eps; post=hc_post_scale*sigmoid(logits[4:8]); res=logits[8:24].
  * This produces current pre coefficients; external shifted_prev_mix uses a separate caller-owned UB plane.
  * Keep separate Mul/Add rounding. Output planes are [pre:4*alignedRows, post:4*alignedRows, res:16*alignedRows].
- * Sinkhorn, when enabled, normalizes only the Res plane before the caller publishes the coefficients. */
+ * Apply sinkhornIters Sinkhorn iterations only to the Res plane before publishing the coefficients;
+ * zero iterations preserve the Res logits. */
 __aicore__ inline void ComputeGateRows(__ubuf__ float* normalized, __ubuf__ float* alpha, __ubuf__ float* bias,
                                        float eps, float hcPostScale, uint32_t rows, uint32_t rowStride,
                                        uint32_t alignedRows, __ubuf__ float* coefficients, float sinkhornEps = 1.0e-6f,
@@ -282,36 +283,79 @@ __aicore__ inline void ComputeGateRows(__ubuf__ float* normalized, __ubuf__ floa
  * Accumulate sumSquares from rounded hIn using independent even/odd 64-column chains. */
 template <typename T>
 __aicore__ inline void ComputeHInTile(__ubuf__ float* hPre, __ubuf__ T* x2, uint32_t d, uint32_t dStart,
-                                      uint32_t dCount, __ubuf__ T* hIn, __ubuf__ float* sumSquares)
+                                      uint32_t dCount, __ubuf__ T* hIn, __ubuf__ float* sumSquares,
+                                      uint32_t rowCount = 1U)
 {
     const uint16_t repeatTimes = static_cast<uint16_t>((dCount + kRegCastVectorLanes - 1U) / kRegCastVectorLanes);
     const uint16_t pairedRepeats = static_cast<uint16_t>(repeatTimes / kVectorSegmentsPerPair);
     const uint16_t tailStart = static_cast<uint16_t>(pairedRepeats * kVectorSegmentsPerPair);
     __VEC_SCOPE__
     {
-        Reg::MaskReg mask;
-        Reg::RegTensor<T> input;
-        Reg::RegTensor<float> value;
-        Reg::RegTensor<float> weight0, weight1, weight2, weight3;
-        Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(weight0, hPre);
-        Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(weight1, hPre + 1);
-        Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(weight2, hPre + 2);
-        Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(weight3, hPre + 3);
-        Reg::RegTensor<float> sum;
-        Reg::RegTensor<T> result;
-        Reg::RegTensor<float> squareSum, square;
-        Reg::MaskReg fullMask = Compute::MaskForCount(kRegFloatLanes);
-        Reg::Duplicate(squareSum, 0.0f, fullMask);
-        uint32_t remaining = dCount;
-        Reg::RegTensor<float> oddSquares;
-        Reg::Duplicate(oddSquares, 0.0f, fullMask);
-        auto x2Head0 = x2 + 0U * d + dStart;
-        auto x2Head1 = x2 + 1U * d + dStart;
-        auto x2Head2 = x2 + 2U * d + dStart;
-        auto x2Head3 = x2 + 3U * d + dStart;
-        for (uint16_t repeat = 0; repeat < pairedRepeats; ++repeat) {
-            {
-                const uint32_t tileOffset = (repeat * kVectorSegmentsPerPair + 0U) * kRegCastVectorLanes;
+        for (uint16_t row = 0U; row < static_cast<uint16_t>(rowCount); ++row) {
+            Reg::MaskReg mask;
+            Reg::RegTensor<T> input;
+            Reg::RegTensor<float> value;
+            Reg::RegTensor<float> weight0, weight1, weight2, weight3;
+            Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(weight0, hPre + row * kHeadCount);
+            Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(weight1, hPre + row * kHeadCount + 1);
+            Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(weight2, hPre + row * kHeadCount + 2);
+            Reg::DataCopy<float, Reg::LoadDist::DIST_BRC_B32>(weight3, hPre + row * kHeadCount + 3);
+            Reg::RegTensor<float> sum;
+            Reg::RegTensor<T> result;
+            Reg::RegTensor<float> squareSum, square;
+            Reg::MaskReg fullMask = Compute::MaskForCount(kRegFloatLanes);
+            Reg::Duplicate(squareSum, 0.0f, fullMask);
+            uint32_t remaining = dCount;
+            Reg::RegTensor<float> oddSquares;
+            Reg::Duplicate(oddSquares, 0.0f, fullMask);
+            auto x2Head0 = x2 + (row * kHeadCount + 0U) * d + dStart;
+            auto x2Head1 = x2 + (row * kHeadCount + 1U) * d + dStart;
+            auto x2Head2 = x2 + (row * kHeadCount + 2U) * d + dStart;
+            auto x2Head3 = x2 + (row * kHeadCount + 3U) * d + dStart;
+            for (uint16_t repeat = 0; repeat < pairedRepeats; ++repeat) {
+                {
+                    const uint32_t tileOffset = (repeat * kVectorSegmentsPerPair + 0U) * kRegCastVectorLanes;
+                    mask = Reg::UpdateMask<float>(remaining);
+                    Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head0 + tileOffset);
+                    Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
+                    Reg::Mul(sum, value, weight0, mask);
+                    Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head1 + tileOffset);
+                    Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
+                    Reg::MulAddDst(sum, value, weight1, mask);
+                    Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head2 + tileOffset);
+                    Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
+                    Reg::MulAddDst(sum, value, weight2, mask);
+                    Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head3 + tileOffset);
+                    Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
+                    Reg::MulAddDst(sum, value, weight3, mask);
+                    Reg::Cast<T, float, kCastFloatToInput>(result, sum, mask);
+                    Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(hIn + row * dCount + tileOffset, result, mask);
+                    Reg::Cast<float, T, kCastInputToFloat>(value, result, mask);
+                    Reg::MulAddDst(squareSum, value, value, fullMask);
+                }
+                {
+                    const uint32_t tileOffset = (repeat * kVectorSegmentsPerPair + 1U) * kRegCastVectorLanes;
+                    mask = Reg::UpdateMask<float>(remaining);
+                    Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head0 + tileOffset);
+                    Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
+                    Reg::Mul(sum, value, weight0, mask);
+                    Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head1 + tileOffset);
+                    Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
+                    Reg::MulAddDst(sum, value, weight1, mask);
+                    Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head2 + tileOffset);
+                    Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
+                    Reg::MulAddDst(sum, value, weight2, mask);
+                    Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head3 + tileOffset);
+                    Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
+                    Reg::MulAddDst(sum, value, weight3, mask);
+                    Reg::Cast<T, float, kCastFloatToInput>(result, sum, mask);
+                    Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(hIn + row * dCount + tileOffset, result, mask);
+                    Reg::Cast<float, T, kCastInputToFloat>(value, result, mask);
+                    Reg::MulAddDst(oddSquares, value, value, fullMask);
+                }
+            }
+            for (uint16_t repeat = tailStart; repeat < repeatTimes; ++repeat) {
+                const uint32_t tileOffset = repeat * kRegCastVectorLanes;
                 mask = Reg::UpdateMask<float>(remaining);
                 Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head0 + tileOffset);
                 Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
@@ -326,55 +370,15 @@ __aicore__ inline void ComputeHInTile(__ubuf__ float* hPre, __ubuf__ T* x2, uint
                 Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
                 Reg::MulAddDst(sum, value, weight3, mask);
                 Reg::Cast<T, float, kCastFloatToInput>(result, sum, mask);
-                Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(hIn + tileOffset, result, mask);
+                Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(hIn + row * dCount + tileOffset, result, mask);
                 Reg::Cast<float, T, kCastInputToFloat>(value, result, mask);
                 Reg::MulAddDst(squareSum, value, value, fullMask);
             }
-            {
-                const uint32_t tileOffset = (repeat * kVectorSegmentsPerPair + 1U) * kRegCastVectorLanes;
-                mask = Reg::UpdateMask<float>(remaining);
-                Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head0 + tileOffset);
-                Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
-                Reg::Mul(sum, value, weight0, mask);
-                Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head1 + tileOffset);
-                Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
-                Reg::MulAddDst(sum, value, weight1, mask);
-                Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head2 + tileOffset);
-                Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
-                Reg::MulAddDst(sum, value, weight2, mask);
-                Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head3 + tileOffset);
-                Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
-                Reg::MulAddDst(sum, value, weight3, mask);
-                Reg::Cast<T, float, kCastFloatToInput>(result, sum, mask);
-                Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(hIn + tileOffset, result, mask);
-                Reg::Cast<float, T, kCastInputToFloat>(value, result, mask);
-                Reg::MulAddDst(oddSquares, value, value, fullMask);
-            }
-        }
-        for (uint16_t repeat = tailStart; repeat < repeatTimes; ++repeat) {
-            const uint32_t tileOffset = repeat * kRegCastVectorLanes;
-            mask = Reg::UpdateMask<float>(remaining);
-            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head0 + tileOffset);
-            Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
-            Reg::Mul(sum, value, weight0, mask);
-            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head1 + tileOffset);
-            Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
-            Reg::MulAddDst(sum, value, weight1, mask);
-            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head2 + tileOffset);
-            Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
-            Reg::MulAddDst(sum, value, weight2, mask);
-            Reg::LoadAlign<T, Reg::LoadDist::DIST_UNPACK_B16>(input, x2Head3 + tileOffset);
-            Reg::Cast<float, T, kCastInputToFloat>(value, input, mask);
-            Reg::MulAddDst(sum, value, weight3, mask);
-            Reg::Cast<T, float, kCastFloatToInput>(result, sum, mask);
-            Reg::StoreAlign<T, Reg::StoreDist::DIST_PACK_B32>(hIn + tileOffset, result, mask);
-            Reg::Cast<float, T, kCastInputToFloat>(value, result, mask);
-            Reg::MulAddDst(squareSum, value, value, fullMask);
-        }
-        Reg::Add(squareSum, squareSum, oddSquares, fullMask);
+            Reg::Add(squareSum, squareSum, oddSquares, fullMask);
 
-        Reg::Reduce<Reg::ReduceType::SUM>(square, squareSum, fullMask);
-        Reg::Store<float>(sumSquares, square, 1U);
+            Reg::Reduce<Reg::ReduceType::SUM>(square, squareSum, fullMask);
+            Reg::Store<float>(sumSquares + row, square, 1U);
+        }
     }
 }
 

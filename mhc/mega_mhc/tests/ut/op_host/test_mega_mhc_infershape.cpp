@@ -102,3 +102,37 @@ TEST(MegaMhcInferShape, OutputDataTypes)
         }
     }
 }
+
+TEST(MegaMhcInferShape, QuantizedOutputsBothLayoutsAndPartialGroups)
+{
+    using Ops::Transformer::AnyValue;
+    for (const int64_t d : {16, 48, 80, 5120, 16384}) {
+        for (const bool bs : {false, true}) {
+            const std::vector<int64_t> x = bs ? std::vector<int64_t>{2, 3, d} : std::vector<int64_t>{6, d};
+            const std::vector<int64_t> residual = bs ? std::vector<int64_t>{2, 3, 4, d} : std::vector<int64_t>{6, 4, d};
+            const std::vector<int64_t> post = bs ? std::vector<int64_t>{2, 3, 4, 1} : std::vector<int64_t>{6, 4, 1};
+            const std::vector<int64_t> comb = bs ? std::vector<int64_t>{2, 3, 4, 4} : std::vector<int64_t>{6, 4, 4};
+            const std::vector<int64_t> scale =
+                bs ? std::vector<int64_t>{2, 3, (d + 63) / 64, 2} : std::vector<int64_t>{6, (d + 63) / 64, 2};
+            std::vector<gert::InfershapeContextPara::TensorDescription> inputs{
+                Tensor(x, ge::DT_FLOAT16),         Tensor(residual, ge::DT_FLOAT16), Tensor(post, ge::DT_FLOAT),
+                Tensor({24, 4 * d}, ge::DT_FLOAT), Tensor({3}, ge::DT_FLOAT),        Tensor({24}, ge::DT_FLOAT),
+                Tensor({d}, ge::DT_FLOAT),         Tensor(comb, ge::DT_FLOAT),       Tensor({}, ge::DT_FLOAT),
+                Tensor({}, ge::DT_FLOAT),          Tensor({}, ge::DT_FLOAT)};
+            std::vector<gert::InfershapeContextPara::TensorDescription> outputs(7, Tensor({}, ge::DT_FLOAT));
+            std::vector<gert::InfershapeContextPara::OpAttr> attrs{
+                {"rms_norm_eps", AnyValue::CreateFrom<float>(1e-6f)},
+                {"hc_norm_eps", AnyValue::CreateFrom<float>(1e-6f)},
+                {"hc_pre_eps", AnyValue::CreateFrom<float>(1e-6f)},
+                {"op_impl_mode", AnyValue::CreateFrom<int64_t>(0)},
+                {"hc_mult", AnyValue::CreateFrom<int64_t>(4)},
+                {"hc_post_scale", AnyValue::CreateFrom<float>(2.0f)},
+                {"sinkhorn_eps", AnyValue::CreateFrom<float>(1e-6f)},
+                {"num_sinkhorn_iters", AnyValue::CreateFrom<int64_t>(0)},
+                {"rms_norm_scale", AnyValue::CreateFrom<float>(1.0f)},
+                {"output_mode", AnyValue::CreateFrom<int64_t>(1)}};
+            gert::InfershapeContextPara para("MegaMhc", inputs, outputs, attrs);
+            ExecuteTestCase(para, ge::GRAPH_SUCCESS, {residual, post, comb, {0}, {0}, x, scale});
+        }
+    }
+}
