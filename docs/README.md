@@ -45,7 +45,7 @@ Docs目录结构说明如下：
 | [源码构建指南](zh/install/compile.md)                        | 介绍联网/未联网场景下不同的源码构建方式和验证方法。          |
 | [算子调用指南](zh/invocation/quick_op_invocation.md)         | 介绍调用算子样例方法和不同算子调用方式（如PyTorch/aclnn/图等）。 |
 | [标准算子开发指南](zh/develop/aicore_develop_guide.md)       | 介绍如何基于标准工程定义算子原型、实现Tiling和Kernel，此类算子称为“标准算子”。<br>标准算子支持aclnn和图模式调用。 |
-| [AI CPU算子开发指南](zh/develop/aicore_develop_guide.md)     | 介绍如何基于标准工程定义AI CPU算子原型、实现Kernel，此类算子称为“AI CPU算子”。<br>AI CPU算子支持aclnn和图模式调用。 |
+| [AI CPU算子开发指南](zh/develop/aicpu_develop_guide.md)     | 介绍如何基于标准工程定义AI CPU算子原型、实现Kernel，此类算子称为“AI CPU算子”。<br>AI CPU算子支持aclnn和图模式调用。 |
 | [Metadata算子开发指南](zh/develop/metadata_develop_guide.md) | 介绍metadata类前置分核算子（运行在AI CPU上）的开发方法，及其与主算子（metadata作为可选输入）的配合方式。 |
 | [简易算子开发指南](../examples/fast_kernel_launch_example/README.md) | 介绍如何基于简易工程实现fast_kernel_launch，即`<<<>>>`方式，此类算子称为“简易算子”。<br>简易算子仅支持PyTorch调用。 |
 | [算子调试调优](zh/debug/op_debug_prof.md)                    | 介绍常见的算子功能调试和性能调优方法（如数据采集和仿真流水等）。 |
