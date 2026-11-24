@@ -283,6 +283,9 @@ def _moe_init_routing_v3_numpy(
                 x.dtype == numpy_float8_e4m3fn()
                 or x.dtype == numpy_float8_e5m2()
                 or x.dtype == numpy_float4_e2m1()
+                # Golden inputs may be promoted to float32 by the test framework.
+                # A 3-D scale is the FP8/FP4 passthrough layout in this interface.
+                or numpy.asarray(scale).ndim == 3
             ):
                 scale = scale.astype(numpy_float8_e8m0())
                 expanded_scale = scale[
@@ -311,14 +314,6 @@ def _moe_init_routing_v3_numpy(
         expanded_x = numpy.clip(expanded_x, -128, 127)
         expanded_x = expanded_x.astype(numpy.int8)
 
-    elif quant_mode == 1 and h == 0:
-        # Zero-width inputs still route indices/counts, but the kernel skips
-        # quantization and leaves expanded_scale unwritten.
-        expanded_x = x[sorted_expert_indices[:actual_expert_total_num] // k, :].astype(
-            numpy.int8
-        )
-        expanded_scale = None
-
     elif quant_mode == 1:
         expanded_x = x[sorted_expert_indices // k, :]
         expanded_x = expanded_x.astype(numpy.float32)
@@ -340,6 +335,8 @@ def _moe_init_routing_v3_numpy(
             expanded_scale = x_max / 127
             expanded_x = expanded_x / expanded_scale
             expanded_x = numpy.round(expanded_x).astype(numpy.int8)
+        # The public expanded_scale output is one-dimensional.
+        expanded_scale = expanded_scale.reshape(-1)
 
     elif quant_mode == 2 or quant_mode == 3 or quant_mode == 16 or quant_mode == 17:
         expanded_x = x[sorted_expert_indices // k, :]
@@ -726,6 +723,36 @@ def _drop_rowidx_tail_len(npu_arr, golden_arr, golden0_arr, min_len):
     return min_len
 
 
+def _required_output_error(npu_arr, golden_arr, output_idx, quant_mode):
+    """Require the valid golden prefix while allowing device output tails.
+
+    Four-bit tensors can use packed storage; their physical element count is
+    not directly comparable to a logical golden element count.
+    """
+    npu_arr = numpy.asarray(npu_arr)
+    golden_arr = numpy.asarray(golden_arr)
+    dtype_names = (str(npu_arr.dtype).lower(), str(golden_arr.dtype).lower())
+    packed = any(
+        part in name
+        for name in dtype_names
+        for part in ("float4", "e2m1", "e1m2", "int4")
+    )
+    if not packed and npu_arr.size < golden_arr.size:
+        return (
+            f"output[{output_idx}] has {npu_arr.size} elements; "
+            f"need {golden_arr.size} valid elements"
+        )
+    # FP8/FP4 passthrough has a three-dimensional logical scale. Rows beyond
+    # the valid prefix may be padded, but its trailing dimensions must match.
+    if output_idx == 3 and quant_mode == -1 and golden_arr.ndim == 3:
+        if npu_arr.ndim != 3 or npu_arr.shape[1:] != golden_arr.shape[1:]:
+            return (
+                f"output[{output_idx}] scale shape {npu_arr.shape} does not match "
+                f"valid golden shape {golden_arr.shape}"
+            )
+    return None
+
+
 def _torch_to_numpy(tensor):
     if tensor is None:
         return None
@@ -962,7 +989,35 @@ class MoeInitRoutingV3KernelSpec:
             npu_arr = _torch_to_numpy(npu_out)
             golden_arr = _torch_to_numpy(golden_out)
             if is_non_quant and i in (0, 3):
-                golden_arr = _restore_fp8_golden_dtype(npu_arr, golden_arr)
+                dtype_ref = npu_arr
+                inputs = getattr(compare_context, "input_tensors", None)
+                source_idx = 0 if i == 0 else 2
+                if inputs is not None and len(inputs) > source_idx:
+                    source = inputs[source_idx]
+                    if any(
+                        name in str(getattr(source, "dtype", "")).lower()
+                        for name in ("e4m3", "e5m2", "e8m0")
+                    ):
+                        dtype_ref = source
+                golden_arr = _restore_fp8_golden_dtype(dtype_ref, golden_arr)
+                if any(
+                    name in str(golden_arr.dtype).lower()
+                    for name in ("e4m3", "e5m2", "e8m0")
+                ):
+                    if npu_arr.dtype.itemsize == 1 and npu_arr.dtype.kind in (
+                        "i",
+                        "u",
+                        "V",
+                    ):
+                        npu_arr = npu_arr.view(golden_arr.dtype)
+                    else:
+                        npu_arr = npu_arr.astype(golden_arr.dtype, copy=False)
+            layout_error = _required_output_error(npu_arr, golden_arr, i, quant_mode)
+            if layout_error:
+                results.append(
+                    {"pass": False, "precision": 0.0, "error_info": layout_error}
+                )
+                continue
             npu_flat = numpy.asarray(npu_arr).reshape(-1)
             golden_flat = numpy.asarray(golden_arr).reshape(-1)
             min_len = min(npu_flat.size, golden_flat.size)
@@ -1004,10 +1059,15 @@ class MoeInitRoutingV3KernelSpec:
                     results.append(_fp8_quant_ulp_result(npu_cmp, golden_cmp))
                     continue
 
+                is_4bit = any(
+                    name in dtype_name or name in str(npu_arr.dtype).lower()
+                    for name in ("float4", "e2m1", "e1m2", "int4")
+                )
+
                 def _to_raw_uint8(arr):
                     if arr.dtype.kind in ("i", "u"):
                         vals = arr.reshape(-1).astype(numpy.uint8)
-                        if vals.size > 0 and numpy.max(vals) <= 15:
+                        if is_4bit and vals.size > 0 and numpy.max(vals) <= 15:
                             n = vals.size - vals.size % 2
                             lo = vals[:n:2]
                             hi = vals[1:n:2]
@@ -1017,7 +1077,7 @@ class MoeInitRoutingV3KernelSpec:
                         raw = arr.view(numpy.uint8).reshape(-1).astype(numpy.uint8)
                     except (ValueError, TypeError):
                         raw = numpy.frombuffer(arr.tobytes(), dtype=numpy.uint8)
-                    if raw.size > 0 and numpy.max(raw) <= 15:
+                    if is_4bit and raw.size > 0 and numpy.max(raw) <= 15:
                         n = raw.size - raw.size % 2
                         lo = raw[:n:2]
                         hi = raw[1:n:2]
@@ -1040,7 +1100,9 @@ class MoeInitRoutingV3KernelSpec:
                     golden_i8 = numpy.asarray(golden_raw[:min_len_raw]).astype(
                         numpy.int8
                     )
-                    diff = numpy.abs(numpy.subtract(npu_i8, golden_i8))
+                    diff = numpy.abs(
+                        npu_i8.astype(numpy.int16) - golden_i8.astype(numpy.int16)
+                    )
                     npu_nan = numpy.isnan(npu_flat[:min_len].astype(numpy.float32))
                     golden_nan = numpy.isnan(
                         golden_flat[:min_len].astype(numpy.float32)
@@ -1264,6 +1326,12 @@ class E2eMoeInitRoutingV3Spec:
                         npu_arr = npu_arr.view(golden_arr.dtype)
                     else:
                         npu_arr = npu_arr.astype(golden_arr.dtype, copy=False)
+            layout_error = _required_output_error(npu_arr, golden_arr, i, quant_mode)
+            if layout_error:
+                results.append(
+                    {"pass": False, "precision": 0.0, "error_info": layout_error}
+                )
+                continue
             npu_flat = numpy.asarray(npu_arr).reshape(-1)
             golden_flat = numpy.asarray(golden_arr).reshape(-1)
             min_len = min(npu_flat.size, golden_flat.size)
@@ -1342,7 +1410,9 @@ class E2eMoeInitRoutingV3Spec:
                     golden_i8 = numpy.asarray(golden_raw[:min_len_raw]).astype(
                         numpy.int8
                     )
-                    diff = numpy.abs(numpy.subtract(npu_i8, golden_i8))
+                    diff = numpy.abs(
+                        npu_i8.astype(numpy.int16) - golden_i8.astype(numpy.int16)
+                    )
                     npu_nan = numpy.isnan(npu_flat[:min_len].astype(numpy.float32))
                     golden_nan = numpy.isnan(
                         golden_flat[:min_len].astype(numpy.float32)
@@ -1551,7 +1621,35 @@ class AclnnMoeInitRoutingV3Spec:
             npu_arr = _torch_to_numpy(npu_out)
             golden_arr = _torch_to_numpy(golden_out)
             if is_non_quant and i in (0, 3):
-                golden_arr = _restore_fp8_golden_dtype(npu_arr, golden_arr)
+                dtype_ref = npu_arr
+                inputs = getattr(compare_context, "input_tensors", None)
+                source_idx = 0 if i == 0 else 2
+                if inputs is not None and len(inputs) > source_idx:
+                    source = inputs[source_idx]
+                    if any(
+                        name in str(getattr(source, "dtype", "")).lower()
+                        for name in ("e4m3", "e5m2", "e8m0")
+                    ):
+                        dtype_ref = source
+                golden_arr = _restore_fp8_golden_dtype(dtype_ref, golden_arr)
+                if any(
+                    name in str(golden_arr.dtype).lower()
+                    for name in ("e4m3", "e5m2", "e8m0")
+                ):
+                    if npu_arr.dtype.itemsize == 1 and npu_arr.dtype.kind in (
+                        "i",
+                        "u",
+                        "V",
+                    ):
+                        npu_arr = npu_arr.view(golden_arr.dtype)
+                    else:
+                        npu_arr = npu_arr.astype(golden_arr.dtype, copy=False)
+            layout_error = _required_output_error(npu_arr, golden_arr, i, quant_mode)
+            if layout_error:
+                results.append(
+                    {"pass": False, "precision": 0.0, "error_info": layout_error}
+                )
+                continue
             npu_flat = numpy.asarray(npu_arr).reshape(-1)
             golden_flat = numpy.asarray(golden_arr).reshape(-1)
             min_len = min(npu_flat.size, golden_flat.size)
@@ -1596,10 +1694,15 @@ class AclnnMoeInitRoutingV3Spec:
                     or "hif8" in str(npu_arr.dtype).lower()
                 )
 
+                is_4bit = any(
+                    name in dtype_name or name in str(npu_arr.dtype).lower()
+                    for name in ("float4", "e2m1", "e1m2", "int4")
+                )
+
                 def _to_raw_uint8(arr):
                     if arr.dtype.kind in ("i", "u"):
                         vals = arr.reshape(-1).astype(numpy.uint8)
-                        if vals.size > 0 and numpy.max(vals) <= 15:
+                        if is_4bit and vals.size > 0 and numpy.max(vals) <= 15:
                             n = vals.size - vals.size % 2
                             lo = vals[:n:2]
                             hi = vals[1:n:2]
@@ -1609,7 +1712,7 @@ class AclnnMoeInitRoutingV3Spec:
                         raw = arr.view(numpy.uint8).reshape(-1).astype(numpy.uint8)
                     except (ValueError, TypeError):
                         raw = numpy.frombuffer(arr.tobytes(), dtype=numpy.uint8)
-                    if raw.size > 0 and numpy.max(raw) <= 15:
+                    if is_4bit and raw.size > 0 and numpy.max(raw) <= 15:
                         n = raw.size - raw.size % 2
                         lo = raw[:n:2]
                         hi = raw[1:n:2]
@@ -1625,7 +1728,9 @@ class AclnnMoeInitRoutingV3Spec:
                     golden_i8 = numpy.asarray(golden_raw[:min_len_raw]).astype(
                         numpy.int8
                     )
-                    diff = numpy.abs(numpy.subtract(npu_i8, golden_i8))
+                    diff = numpy.abs(
+                        npu_i8.astype(numpy.int16) - golden_i8.astype(numpy.int16)
+                    )
                     npu_nan = numpy.isnan(npu_flat[:min_len].astype(numpy.float32))
                     golden_nan = numpy.isnan(
                         golden_flat[:min_len].astype(numpy.float32)

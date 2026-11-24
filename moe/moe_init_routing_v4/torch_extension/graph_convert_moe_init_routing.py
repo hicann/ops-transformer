@@ -89,6 +89,15 @@ if _TORCHAIR_AVAILABLE:
         logical_shape = ge.Mul(ge.Shape(x), ge.Const([1] * (x.rank - 1) + [2]))
         return ge.Reshape(unpacked, logical_shape)
 
+    def is_hifloat8_passthrough_x(x: Tensor, x_dtype, quant_mode: int) -> bool:
+        """Identify HiFloat8 input carried by uint8 in the Torch interface."""
+        return (
+            quant_mode == UNQUANT_MODE
+            and x.dtype == DataType.DT_UINT8
+            and x_dtype is not None
+            and torch_dtype_value_to_ge_type(x_dtype) == DataType.DT_HIFLOAT8
+        )
+
     @auto_convert_to_tensor(
         [False, False, False, False, False, False],
         [False, False, True, True, True, True],
@@ -232,8 +241,12 @@ if _TORCHAIR_AVAILABLE:
     ):
         active_num_tensor = dtype_promote(active_num, target_dtype=DataType.DT_INT64)
         mxfp4_passthrough = is_mxfp4_passthrough_x(x, x_dtype, quant_mode)
+        hifloat8_passthrough = is_hifloat8_passthrough_x(x, x_dtype, quant_mode)
         if mxfp4_passthrough:
             x = unpack_mxfp4_x(x, x_dtype)
+        elif hifloat8_passthrough:
+            x = ge.Bitcast(x, type=DataType.DT_HIFLOAT8)
+            x.desc.dtype = torch_dtype_value_to_ge_proto_type(x_dtype)
 
         (
             expanded_x,
@@ -266,6 +279,8 @@ if _TORCHAIR_AVAILABLE:
             expanded_x = pack_4bit_to_uint8(expanded_x)
         elif mxfp4_passthrough:
             expanded_x = pack_4bit_to_uint8(expanded_x)
+        elif hifloat8_passthrough:
+            expanded_x = ge.Bitcast(expanded_x, type=DataType.DT_UINT8)
 
         return (
             expanded_x,
