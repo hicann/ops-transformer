@@ -17,6 +17,7 @@
 #include "status.h"
 #include <cstdio>
 #include <cmath>
+#include <vector>
 #include "quant_flash_attn_metadata_aicpu.h"
 #include "../../quant_flash_attn/op_host/qfa_adjust_sinner_souter.h"
 
@@ -355,7 +356,16 @@ bool QuantFlashAttnMetadataCpuKernel::ParamsInitMxfp8SoftmaxFp16()
     }
     param.mBaseSize = mBaseSize_;
     param.s2BaseSize = s2BaseSize_;
-    param.l2Byte = 0;
+    // L2 预切(预算 128 MiB): 仅 arch92 的 TND/NTD 连续 KV 开启; 分页 KV 重切开销大于复用收益
+    param.l2Byte = 0U;
+    if (socVersion_.find("Ascend960") != std::string::npos) {
+        const bool isTndLayout =
+            (baseInfo.layoutQuery == load_balance::Layout::TND || baseInfo.layoutQuery == load_balance::Layout::NTD);
+        const bool isPagedKv = layoutKv_.rfind("PA_", 0) == 0;
+        if (isTndLayout && !isPagedKv && baseInfo.batchSize * baseInfo.kvHeadNum >= 128U) {
+            param.l2Byte = 128U * 1024U * 1024U;
+        }
+    }
     param.fdTolerance = 300;
     param.fdOn = 0;
     param.kernelSplitMode = load_balance::KernelSplitMode::BN2_S1G_S2;
@@ -584,6 +594,175 @@ bool QuantFlashAttnMetadataCpuKernel::GenMetaDataDefault(SectionStreamKResult& s
     return true;
 }
 
+// causal 下每行可见块数随行号单调增, 且每行有固定流水开销; 按 "块 + 行" 重新切分 (bN2, m),
+// 让各核的预估时间接近. 仅 sectionNum==1 / gSize==1 / 行数不超过阈值时生效, 行不会被切开.
+bool QuantFlashAttnMetadataCpuKernel::RebalanceCausalFa(SectionStreamKResult& splitRes)
+{
+    // 仅 arch92 的 MxFP8 softmax fp16(mode3) causal 场景使用
+    constexpr int64_t REF_BLOCK = 115; // 基准块 128x512xD128 的成本(0.01us)
+    constexpr uint64_t REF_VOLUME = 128ULL * 512ULL * 128ULL * 2ULL;
+    constexpr int64_t ROW_RATIO_NUM = 4;
+    constexpr int64_t ROW_RATIO_DEN = 5;
+    constexpr uint32_t MAX_ROWS = 524288U; // 行数过大时不做重排, 控制 AICPU 开销
+
+    if (socVersion_.find("Ascend960") == std::string::npos || quantMode_ != QFA_QUANT_MODE_MXFP8_SOFTMAX_FP16 ||
+        maskMode_ != 3 || splitRes.sectionFaResult.empty()) {
+        return false;
+    }
+    const uint32_t coreNum = static_cast<uint32_t>(aicCoreNum_);
+    const uint32_t headNum = baseInfo.kvHeadNum;
+    const uint32_t bSize = baseInfo.batchSize;
+    if (coreNum < 2U || headNum == 0U || bSize == 0U || mBaseSize_ == 0U || s2BaseSize_ == 0U) {
+        return false;
+    }
+    if (headNum != static_cast<uint32_t>(numHeadsQ_)) { // gSize>1 时 M 轴为 S1*G, 不适用
+        return false;
+    }
+
+    std::vector<uint32_t> s1Of(bSize, 0U);
+    std::vector<uint32_t> s2Of(bSize, 0U);
+    uint64_t totalRows = 0U;
+    for (uint32_t bIdx = 0; bIdx < bSize; ++bIdx) {
+        s1Of[bIdx] = GetS1SeqSize(bIdx);
+        s2Of[bIdx] = GetS2SeqSize(bIdx);
+        totalRows += static_cast<uint64_t>((s1Of[bIdx] + mBaseSize_ - 1U) / mBaseSize_) * headNum;
+    }
+    if (totalRows < 2U || totalRows > MAX_ROWS) {
+        return false;
+    }
+
+    // 当前形状下每块与每行固定代价(0.01us)：按块体积相对基准缩放
+    const uint64_t dvDim = (headDimV_ > 0) ? static_cast<uint64_t>(headDimV_) : static_cast<uint64_t>(headDim_);
+    const uint64_t blockVolume =
+        static_cast<uint64_t>(mBaseSize_) * s2BaseSize_ * (static_cast<uint64_t>(headDim_) + dvDim);
+    const int64_t blockCost =
+        std::max<int64_t>(1, REF_BLOCK * static_cast<int64_t>(blockVolume) / static_cast<int64_t>(REF_VOLUME));
+    const int64_t rowCostFixed = std::max<int64_t>(1, blockCost * ROW_RATIO_NUM / ROW_RATIO_DEN);
+
+    auto rowCost = [&s1Of, &s2Of, blockCost, rowCostFixed, this](uint32_t bIdx, uint32_t mIdx) -> int64_t {
+        const int64_t s1 = static_cast<int64_t>(s1Of[bIdx]);
+        const int64_t s2 = static_cast<int64_t>(s2Of[bIdx]);
+        if (s1 <= 0 || s2 <= 0) {
+            return rowCostFixed;
+        }
+        const int64_t lastToken = std::min((static_cast<int64_t>(mIdx) + 1) * static_cast<int64_t>(mBaseSize_), s1) - 1;
+        const int64_t visEnd = lastToken + (s2 - s1);
+        const int64_t blocks = (visEnd < 0) ? 0 : (std::min(visEnd, s2 - 1) / static_cast<int64_t>(s2BaseSize_) + 1);
+        if (blocks == 0) {
+            return 0; // 空行不进循环(SkipEmptyRows O(1) 跳过), 不计成本
+        }
+        return blocks * blockCost + rowCostFixed;
+    };
+
+    // 每个 section 只重切自己的 (bN2, m) 区间 [start, end)，段边界取相邻 section 的末任务
+    const uint32_t totalBN = bSize * headNum;
+    bool rebalanced = false;
+    for (uint32_t sectionId = 0U; sectionId < splitRes.sectionNum; ++sectionId) {
+        SectionStreamKFaResult& fa = splitRes.sectionFaResult[sectionId];
+        if (fa.usedCoreNum == 0U || fa.bNEnd.size() < coreNum || fa.mEnd.size() < coreNum ||
+            fa.s2End.size() < coreNum) {
+            continue;
+        }
+        uint32_t startBN = 0U;
+        uint32_t startM = 0U;
+        if (sectionId > 0U) {
+            const SectionStreamKFaResult& prev = splitRes.sectionFaResult[sectionId - 1U];
+            if (prev.usedCoreNum == 0U) {
+                continue;
+            }
+            startBN = prev.bNEnd[prev.usedCoreNum - 1U];
+            startM = prev.mEnd[prev.usedCoreNum - 1U];
+        }
+        const uint32_t endBN = fa.bNEnd[fa.usedCoreNum - 1U];
+        const uint32_t endM = fa.mEnd[fa.usedCoreNum - 1U];
+
+        auto mBegin = [startBN, startM](uint32_t bN2) -> uint32_t { return (bN2 == startBN) ? startM : 0U; };
+        auto mLimit = [endBN, endM, &s1Of, headNum, this](uint32_t bN2) -> uint32_t {
+            if (bN2 == endBN) {
+                return endM;
+            }
+            return (s1Of[bN2 / headNum] + mBaseSize_ - 1U) / mBaseSize_;
+        };
+
+        int64_t totalCost = 0;
+        int64_t maxRowCost = 0;
+        uint32_t taskCount = 0U;
+        for (uint32_t bN2 = startBN; bN2 <= endBN && bN2 < totalBN; ++bN2) {
+            const uint32_t bIdx = bN2 / headNum;
+            for (uint32_t mIdx = mBegin(bN2); mIdx < mLimit(bN2); ++mIdx) {
+                const int64_t c = rowCost(bIdx, mIdx);
+                totalCost += c;
+                maxRowCost = std::max(maxRowCost, c);
+                ++taskCount;
+            }
+        }
+        if (taskCount == 0U || totalCost <= 0) {
+            continue;
+        }
+
+        // 二分最小单核上限, 使贪心打包后不超过 coreNum
+        auto packCores = [&](int64_t limit) -> uint32_t {
+            uint32_t cores = 1U;
+            int64_t load = 0;
+            for (uint32_t bN2 = startBN; bN2 <= endBN && bN2 < totalBN; ++bN2) {
+                const uint32_t bIdx = bN2 / headNum;
+                for (uint32_t mIdx = mBegin(bN2); mIdx < mLimit(bN2); ++mIdx) {
+                    const int64_t c = rowCost(bIdx, mIdx);
+                    if (load > 0 && load + c > limit) {
+                        ++cores;
+                        load = 0;
+                    }
+                    load += c;
+                }
+            }
+            return cores;
+        };
+
+        int64_t lo = maxRowCost;
+        int64_t hi = totalCost;
+        int64_t limit = totalCost;
+        while (lo <= hi) {
+            const int64_t mid = lo + (hi - lo) / 2;
+            if (packCores(mid) <= coreNum) {
+                limit = mid;
+                hi = mid - 1;
+            } else {
+                lo = mid + 1;
+            }
+        }
+
+        uint32_t core = 0U;
+        int64_t load = 0;
+        bool split = false;
+        for (uint32_t bN2 = startBN; bN2 <= endBN && bN2 < totalBN; ++bN2) {
+            const uint32_t bIdx = bN2 / headNum;
+            for (uint32_t mIdx = mBegin(bN2); mIdx < mLimit(bN2); ++mIdx) {
+                const int64_t c = rowCost(bIdx, mIdx);
+                if (load > 0 && load + c > limit && core + 1U < coreNum) {
+                    fa.bNEnd[core] = bN2;
+                    fa.mEnd[core] = mIdx;
+                    fa.s2End[core] = 0U;
+                    fa.firstFdDataWorkspaceIdx[core] = 0U;
+                    ++core;
+                    load = 0;
+                    split = true;
+                }
+                load += c;
+            }
+        }
+        if (!split) {
+            continue;
+        }
+        fa.bNEnd[core] = endBN;
+        fa.mEnd[core] = endM;
+        fa.s2End[core] = 0U;
+        fa.firstFdDataWorkspaceIdx[core] = 0U;
+        fa.usedCoreNum = core + 1U;
+        rebalanced = true;
+    }
+    return rebalanced;
+}
+
 // ---------- MxFP8 Softmax FP16（mode 3）路径 ----------
 bool QuantFlashAttnMetadataCpuKernel::GenMetaDataMxfp8SoftmaxFp16(SectionStreamKResult& splitRes)
 {
@@ -622,6 +801,7 @@ bool QuantFlashAttnMetadataCpuKernel::GenMetaDataMxfp8SoftmaxFp16(SectionStreamK
     detail::FaMetaData faMetadata(aicCoreNum_, aivCoreNum_, splitRes.sectionNum, metaData_->GetData());
     faMetadata.Clear(); // set to all 0
 
+    (void)RebalanceCausalFa(splitRes);
     SetMetadataHead(splitRes, faMetadata);
     SetMetadataFa(splitRes, faMetadata);
     SetMetadataFd(splitRes, faMetadata);

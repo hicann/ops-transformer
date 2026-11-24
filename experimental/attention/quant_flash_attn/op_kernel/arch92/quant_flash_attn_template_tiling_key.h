@@ -10,7 +10,7 @@
 
 /*!
  * \file quant_flash_attn_template_tiling_key.h
- * \brief QuantFlashAttn TilingKey定义（量化，MXFP8_FP32_PREFILL/DECODE）
+ * \brief QuantFlashAttn TilingKey定义（MXFP8_SOFTMAX_FP16）
  */
 
 #ifndef TEMPLATE_TILING_KEY_QUANT_FLASH_ATTN_H_
@@ -40,8 +40,6 @@ ASCENDC_TPL_ARGS_DECL(QuantFlashAttn,
                       //    8: Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128
                       ASCENDC_TPL_UINT_DECL(Config, ASCENDC_TPL_10_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 1023),
                       //    QuantMode (5-bit)
-                      //    1: QFA_MXFP8_FP32_PREFILL
-                      //    2: QFA_MXFP8_FP32_DECODE
                       //    3: QFA_MXFP8_SOFTMAX_FP16
                       ASCENDC_TPL_UINT_DECL(QuantMode, ASCENDC_TPL_5_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 31),
                       //    HasAttenMask
@@ -58,29 +56,13 @@ ASCENDC_TPL_ARGS_DECL(QuantFlashAttn,
                       ASCENDC_TPL_BOOL_DECL(IsFd, false, true));
 
 ASCENDC_TPL_SEL(
-    // MXFP8 FP32
+    // MXFP8 SOFTMAX_FP16: BNSD/TND x (NO_PA / PA_BNBD), mBase=128, s2Base=512, D=128; mask_mode=0 或 3
     ASCENDC_TPL_ARGS_SEL(
-        ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_TND_TND),
-        ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, Config_S1Aligned128_S2Aligned256_DAligned64_DVAligned64,
-                             Config_S1Aligned128_S2Aligned256_DAligned72_DVAligned72,
-                             Config_S1Aligned128_S2Aligned256_DAligned128_DVAligned128,
-                             Config_S1Aligned128_S2Aligned128_DAligned256_DVAligned256,
-                             Config_S1Aligned64_S2Aligned512_DAligned64_DVAligned64,
-                             Config_S1Aligned64_S2Aligned512_DAligned72_DVAligned72,
-                             Config_S1Aligned64_S2Aligned512_DAligned128_DVAligned128,
-                             Config_S1Aligned64_S2Aligned512_DAligned256_DVAligned256),
-        ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP8_FP32_PREFILL, QFA_MXFP8_FP32_DECODE),
+        ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BNSD_BNSD, InOutLayoutType_TND_TND),
+        ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128),
+        ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP8_SOFTMAX_FP16),
         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true),
-        ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA, KvLayoutType_PA_BBND,
-                             KvLayoutType_PA_BNBD, KvLayoutType_PA_NZ),
-        ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
-    // MXFP8 SOFTMAX_FP16: 仅 BNSD、无 mask、无 PA, 基本块 128*512, D=128
-    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BNSD_BNSD),
-                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST,
-                                              Config_S1Aligned128_S2Aligned512_DAligned128_DVAligned128),
-                         ASCENDC_TPL_UINT_SEL(QuantMode, ASCENDC_TPL_UI_LIST, QFA_MXFP8_SOFTMAX_FP16),
-                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false),
-                         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA),
-                         ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)));
+        ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA, KvLayoutType_PA_BNBD),
+        ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)));
 
 #endif // TEMPLATE_TILING_KEY_QUANT_FLASH_ATTN_H_

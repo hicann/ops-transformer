@@ -31,7 +31,9 @@ PARAM_MAP = {
     "enable_pa": "ENABLE_PA",
     "kv_cache_layout": "KV_CACHE_LAYOUT",
     "block_size": "BLOCK_SIZE",
+    "pa_shuffle_blocks": "PA_SHUFFLE_BLOCKS",
     "mask_mode": "SPARSE_MODE",
+    "input_layout": "INPUT_LAYOUT",
     "q_scale_layout": "Q_SCALE_LAYOUT",
     "p_scale": "P_SCALE",
     "softmax_scale": "SOFTMAX_SCALE",
@@ -48,6 +50,11 @@ PARAM_MAP = {
     "device_id": "DEVICE_ID",
     "is_contiguous": "IS_CONTIGUOUS",
 }
+
+
+def _input_cache_key(case_name):
+    """input.pt 的缓存键: PA 用例复用基准用例(分页在调用时生成, 输入数据本身相同)。"""
+    return case_name[:-3] if case_name.endswith("_PA") else case_name
 
 
 def apply_params(params):
@@ -81,7 +88,7 @@ def execute_test(params, mode, cdir=None):
                 block_table_torch,
             ) = data
             golden_cache.save_input(
-                case_name,
+                _input_cache_key(case_name),
                 golden_cache.build_input_dict(
                     q_fp8,
                     k_fp8,
@@ -115,7 +122,7 @@ def execute_test(params, mode, cdir=None):
             block_table_torch,
         ) = data
         golden_cache.save_input(
-            case_name,
+            _input_cache_key(case_name),
             golden_cache.build_input_dict(
                 q_fp8,
                 k_fp8,
@@ -131,7 +138,7 @@ def execute_test(params, mode, cdir=None):
             cache_dir=cdir,
         )
     else:
-        if not golden_cache.has_input(case_name, cache_dir=cdir):
+        if not golden_cache.has_input(_input_cache_key(case_name), cache_dir=cdir):
             raise FileNotFoundError(
                 f"input cache not found for {case_name!r}: run once with "
                 "--golden-mode=gen on NPU first, or add gen to this run "
@@ -148,7 +155,15 @@ def execute_test(params, mode, cdir=None):
             qr_bf16,
             kr_bf16,
             block_table_torch,
-        ) = golden_cache.load_input(case_name, cache_dir=cdir)
+        ) = golden_cache.load_input(_input_cache_key(case_name), cache_dir=cdir)
+        if case_name != _input_cache_key(case_name):
+            # PA 复用基准缓存, 形状不符时报错
+            _expect_b = len(params["seqused_kv"])
+            if int(q_fp8.shape[0]) != _expect_b:
+                raise RuntimeError(
+                    f"input cache mismatch for {case_name!r}: q.shape[0]={int(q_fp8.shape[0])}, "
+                    f"expected B={_expect_b}"
+                )
 
     cpu_out, cpu_lse = None, None
     if "cpu" in mode:
@@ -205,7 +220,8 @@ def execute_test(params, mode, cdir=None):
     if "npu" in mode and "compare" not in mode:
         return None, None
 
-    compare_layout = "TND" if golden.ENABLE_PA else golden.INPUT_LAYOUT
+    # PA 只改变 KV 物理寻址, 输出布局仍跟随 input_layout
+    compare_layout = golden.INPUT_LAYOUT
     act_seqused_q = golden._get_seqused_q()
     if compare_layout == "TND":
         cpu_cmp = golden.convert_q_bnsd_to_layout(
@@ -230,8 +246,10 @@ def execute_test(params, mode, cdir=None):
                 lse_cmp, act_seqused_q, golden.CU_SEQLENS_Q, fill_value=float("inf")
             )
             # NPU LSE 输出为 N-major 排布 (N, T): N 在外, T 在内
-            # CPU golden 经 convert 后是 [T, N, 1] (T-major), 需转成 [N, T] 对齐
-            lse_cmp = lse_cmp.squeeze(-1).permute(1, 0).contiguous()
+            # CPU golden 经 convert 后可能是 [T, N] 或 [T, N, 1], 统一成 [T, N] 再转 [N, T]
+            if lse_cmp.dim() == 3 and lse_cmp.shape[-1] == 1:
+                lse_cmp = lse_cmp.squeeze(-1)
+            lse_cmp = lse_cmp.permute(1, 0).contiguous()
         else:
             lse_cmp = golden.convert_q_bnsd_to_layout(
                 cpu_lse, act_seqused_q, compare_layout

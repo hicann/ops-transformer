@@ -42,6 +42,7 @@ PARAM_NAMES = [
     "quant_mode",
     "device_id",
     "is_contiguous",
+    "input_layout",
 ]
 
 TEST_PARAMS_DEFAULTS = {
@@ -59,6 +60,7 @@ TEST_PARAMS_DEFAULTS = {
     "quant_mode": [3],
     "device_id": [0],
     "is_contiguous": [True],
+    "input_layout": ["BNSD"],
 }
 
 

@@ -55,6 +55,7 @@ private:
     bool GenMetaData(SectionStreamKResult& splitRes);
     bool GenMetaDataDefault(SectionStreamKResult& splitRes);
     bool GenMetaDataMxfp8SoftmaxFp16(SectionStreamKResult& splitRes);
+    bool RebalanceCausalFa(SectionStreamKResult& splitRes);
     void SetMetadataHead(const SectionStreamKResult& splitRes, optiling::detail::FaMetaData& faMetadata);
     void SetMetadataFa(const SectionStreamKResult& splitRes, optiling::detail::FaMetaData& faMetadata);
     void SetMetadataFd(const SectionStreamKResult& splitRes, optiling::detail::FaMetaData& faMetadata);

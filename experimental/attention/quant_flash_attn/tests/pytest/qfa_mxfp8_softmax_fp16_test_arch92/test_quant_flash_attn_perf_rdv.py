@@ -19,7 +19,8 @@ import quant_flash_attn_paramset_perf_rdv as paramset
 
 CASES = paramset.CASES
 SKIP_CASES = getattr(paramset, "SKIP_CASES", set())
-CASE_IDS = [case["name"] for case in CASES]
+# sparse0/sparse3 同名(共用输入缓存)，pytest ID 追加 mask 后缀保证唯一
+CASE_IDS = [f"{case['name']}_SP{case['mask_mode']}" for case in CASES]
 
 
 def _build_parametrize_args():

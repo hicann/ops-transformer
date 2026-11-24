@@ -80,6 +80,10 @@ public:
     static constexpr GmFormat Q_SCALE_FORMAT = GetQueryScaleGmFormat<layout, true>();
     static constexpr GmFormat K_SCALE_FORMAT = GetKeyScaleGmFormat<layout, KvLayoutType>();
     static constexpr GmFormat V_SCALE_FORMAT = GetValueScaleGmFormat<layout, KvLayoutType>();
+    static constexpr bool PAGE_ATTENTION = (KvLayoutType > 0U);
+    // 只有连续 TND 的 KV 需要 cu_seqlens 前缀(WZH 变体); 分页 KV 由块表定位
+    static constexpr bool Q_NEEDS_WZH = (GmLayoutParams<Q_FORMAT>::CATEGORY == FormatCategory::GM_Q_OUT_TND);
+    static constexpr bool KV_NEEDS_WZH = (GmLayoutParams<KV_FORMAT>::CATEGORY == FormatCategory::GM_KV_TND);
 
     using Q_T = INPUT_T;
     using KV_T = INPUT_T;
@@ -101,17 +105,17 @@ public:
     using ValueScaleGmToL1Type = CopyValueScaleGmToL1<SCALE_T, V_SCALE_FORMAT, L1Format::NZ, ScaleTrans::ND2NZ>;
 
     static constexpr ActualSeqLensMode Q_PARSER_MODE = GetQActSeqMode<LAYOUT>();
-    static constexpr ActualSeqLensMode KV_PARSER_MODE = GetKvActSeqMode<LAYOUT, false>();
+    static constexpr ActualSeqLensMode KV_PARSER_MODE = GetKvActSeqMode<LAYOUT, PAGE_ATTENTION>();
 
-    using QSeqParserType = ActualSeqLensParser<Q_PARSER_MODE, int32_t>;
+    using QSeqParserType = ActualSeqLensParser<Q_PARSER_MODE, int32_t, Q_NEEDS_WZH>;
 
-    using KvSeqParserType = ActualSeqLensParser<KV_PARSER_MODE, int32_t>;
+    using KvSeqParserType = ActualSeqLensParser<KV_PARSER_MODE, int32_t, KV_NEEDS_WZH>;
 
-    using FaGmTensorQ = FaGmTensor<Q_T, Q_FORMAT, int32_t>;
-    using FaGmTensorKV = FaGmTensor<KV_T, KV_FORMAT, int32_t>;
-    using FaGmTensorQScale = FaGmTensor<SCALE_T, Q_SCALE_FORMAT, int32_t>;
-    using FaGmTensorKScale = FaGmTensor<SCALE_T, K_SCALE_FORMAT, int32_t>;
-    using FaGmTensorVScale = FaGmTensor<SCALE_T, V_SCALE_FORMAT, int32_t>;
+    using FaGmTensorQ = FaGmTensor<Q_T, Q_FORMAT, int32_t, Q_NEEDS_WZH>;
+    using FaGmTensorKV = FaGmTensor<KV_T, KV_FORMAT, int32_t, KV_NEEDS_WZH>;
+    using FaGmTensorQScale = FaGmTensor<SCALE_T, Q_SCALE_FORMAT, int32_t, Q_NEEDS_WZH>;
+    using FaGmTensorKScale = FaGmTensor<SCALE_T, K_SCALE_FORMAT, int32_t, KV_NEEDS_WZH>;
+    using FaGmTensorVScale = FaGmTensor<SCALE_T, V_SCALE_FORMAT, int32_t, KV_NEEDS_WZH>;
 
     using ConstInfoX = ConstInfo_t;
     TPipe* tPipe_ = nullptr;
@@ -122,11 +126,19 @@ public:
     FaGmTensorKScale keyScaleGm_;
     FaGmTensorVScale valueScaleGm_;
 
+    __gm__ uint8_t* qGmOrigin_ = nullptr;
+    __gm__ uint8_t* qScaleGmOrigin_ = nullptr;
+    __gm__ uint8_t* kGmOrigin_ = nullptr;
+    __gm__ uint8_t* kScaleGmOrigin_ = nullptr;
+    __gm__ uint8_t* vGmOrigin_ = nullptr;
+    __gm__ uint8_t* vScaleGmOrigin_ = nullptr;
+
     QSeqParserType* qSeqParserPtr_ = nullptr;
     KvSeqParserType* kvSeqParserPtr_ = nullptr;
 
     CopyQueryGmToL1<Q_T, Q_FORMAT, L1Format::NZ, Q_M_LAYOUT> copyQueryGmToL1_;
     CopyKvGmToL1<KV_T, KV_FORMAT> copyKvGmToL1_;
+    GlobalTensor<int32_t> blockTableGm_; // 分页 KV(PA_BNBD) 的块表
     CopyQueryScaleGmToL1<SCALE_T, Q_SCALE_FORMAT> copyQueryScaleGmToL1_;
     KeyScaleGmToL1Type copyKeyScaleGmToL1_;
     ValueScaleGmToL1Type copyValueScaleGmToL1_;
@@ -188,12 +200,22 @@ public:
                                          __gm__ uint8_t* blockTable, __gm__ uint8_t* dequantScaleQuery,
                                          __gm__ uint8_t* dequantScaleKey, __gm__ uint8_t* dequantScaleValue)
     {
+        qGmOrigin_ = query;
+        qScaleGmOrigin_ = dequantScaleQuery;
+        kGmOrigin_ = key;
+        kScaleGmOrigin_ = dequantScaleKey;
+        vGmOrigin_ = value;
+        vScaleGmOrigin_ = dequantScaleValue;
+
         InitQBuffer(constInfo_.bSize, constInfo_.realN2Size, constInfo_.realGSize, constInfo_.s1Size, constInfo_.dSize,
                     queryGm_, query);
 
         InitQScaleBuffer(constInfo_.bSize, constInfo_.realN2Size, constInfo_.realGSize, constInfo_.s1Size,
                          dBaseSize / MXFP_GROUP_SIZE, queryScaleGm_, dequantScaleQuery);
 
+        if constexpr (PAGE_ATTENTION) {
+            blockTableGm_.SetGlobalBuffer((__gm__ int32_t*)blockTable);
+        }
         InitKVBuffer(constInfo_.bSize, constInfo_.s2Size, constInfo_.n2Size, constInfo_.blockSize, constInfo_.dSize,
                      keyGm_, key, constInfo_.keyStrides.bnStride, constInfo_.keyStrides.n2Stride);
         InitKVBuffer(constInfo_.bSize, constInfo_.s2Size, constInfo_.n2Size, constInfo_.blockSize, constInfo_.dSizeV,
@@ -209,14 +231,22 @@ public:
                                        uint32_t headDim, FaGmTensorQ& qGmTensor, __gm__ uint8_t* gm)
     {
         qGmTensor.gmTensor.SetGlobalBuffer((__gm__ Q_T*)gm);
-        qGmTensor.offsetCalculator.Init(batchSize, n2Size, gSize, qSeqSize, headDim, *this->qSeqParserPtr_);
+        if constexpr (Q_NEEDS_WZH) {
+            qGmTensor.offsetCalculator.Init(n2Size, gSize, headDim, *this->qSeqParserPtr_);
+        } else {
+            qGmTensor.offsetCalculator.Init(batchSize, n2Size, gSize, qSeqSize, headDim, *this->qSeqParserPtr_);
+        }
     }
 
     __aicore__ inline void InitQScaleBuffer(uint32_t batchSize, uint32_t n2Size, uint32_t gSize, uint32_t qSeqSize,
                                             uint32_t headDim, FaGmTensorQScale& qScaleGmTensor, __gm__ uint8_t* gm)
     {
         qScaleGmTensor.gmTensor.SetGlobalBuffer((__gm__ SCALE_T*)gm);
-        qScaleGmTensor.offsetCalculator.Init(batchSize, n2Size, gSize, qSeqSize, headDim, *this->qSeqParserPtr_);
+        if constexpr (Q_NEEDS_WZH) {
+            qScaleGmTensor.offsetCalculator.Init(n2Size, gSize, headDim, *this->qSeqParserPtr_);
+        } else {
+            qScaleGmTensor.offsetCalculator.Init(batchSize, n2Size, gSize, qSeqSize, headDim, *this->qSeqParserPtr_);
+        }
     }
 
     __aicore__ inline void InitKVBuffer(uint32_t batchSize, uint32_t kvSeqSize, uint32_t n2Size,
@@ -224,8 +254,14 @@ public:
                                         __gm__ uint8_t* gm, uint64_t bnStride, uint64_t n2Stride)
     {
         kvGmTensor.gmTensor.SetGlobalBuffer((__gm__ KV_T*)gm);
-        kvGmTensor.offsetCalculator.Init(batchSize, n2Size, kvSeqSize, headDim);
-        kvGmTensor.offsetCalculator.Init(*this->kvSeqParserPtr_);
+        if constexpr (GmLayoutParams<KV_FORMAT>::CATEGORY == FormatCategory::GM_KV_PA_BNBD) {
+            kvGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, headDim, blockTableGm_,
+                                             constInfo_.maxBlockNumPerBatch, bnStride, n2Stride);
+        } else if constexpr (KV_NEEDS_WZH) {
+            kvGmTensor.offsetCalculator.Init(n2Size, headDim, *this->kvSeqParserPtr_);
+        } else {
+            kvGmTensor.offsetCalculator.Init(batchSize, n2Size, kvSeqSize, headDim, *this->kvSeqParserPtr_);
+        }
     }
 
     __aicore__ inline void InitKScaleBuffer(uint32_t batchSize, uint32_t kvSeqSize, uint32_t n2Size,
@@ -233,8 +269,15 @@ public:
                                             FaGmTensorKScale& kScaleGmTensor, __gm__ uint8_t* gm)
     {
         kScaleGmTensor.gmTensor.SetGlobalBuffer((__gm__ SCALE_T*)gm);
-        kScaleGmTensor.offsetCalculator.Init(batchSize, n2Size, kvSeqSize, headDim);
-        kScaleGmTensor.offsetCalculator.Init(*this->kvSeqParserPtr_);
+        if constexpr (GmLayoutParams<K_SCALE_FORMAT>::CATEGORY == FormatCategory::GM_KV_PA_BNBD) {
+            kScaleGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, headDim, blockTableGm_,
+                                                 constInfo_.maxBlockNumPerBatch, constInfo_.kDescaleStrides.bnStride,
+                                                 constInfo_.kDescaleStrides.n2Stride);
+        } else if constexpr (KV_NEEDS_WZH) {
+            kScaleGmTensor.offsetCalculator.Init(n2Size, headDim, *this->kvSeqParserPtr_);
+        } else {
+            kScaleGmTensor.offsetCalculator.Init(batchSize, n2Size, kvSeqSize, headDim, *this->kvSeqParserPtr_);
+        }
     }
 
     __aicore__ inline void InitVScaleBuffer(uint32_t batchSize, uint32_t kvSeqSize, uint32_t n2Size,
@@ -242,8 +285,15 @@ public:
                                             FaGmTensorVScale& vScaleGmTensor, __gm__ uint8_t* gm)
     {
         vScaleGmTensor.gmTensor.SetGlobalBuffer((__gm__ SCALE_T*)gm);
-        vScaleGmTensor.offsetCalculator.Init(batchSize, n2Size, kvSeqSize, headDim);
-        vScaleGmTensor.offsetCalculator.Init(*this->kvSeqParserPtr_);
+        if constexpr (GmLayoutParams<V_SCALE_FORMAT>::CATEGORY == FormatCategory::GM_KV_PA_BNBD) {
+            vScaleGmTensor.offsetCalculator.Init(n2Size, kvCacheBlockSize, headDim, blockTableGm_,
+                                                 constInfo_.maxBlockNumPerBatch, constInfo_.vDescaleStrides.bnStride,
+                                                 constInfo_.vDescaleStrides.n2Stride);
+        } else if constexpr (KV_NEEDS_WZH) {
+            vScaleGmTensor.offsetCalculator.Init(n2Size, headDim, *this->kvSeqParserPtr_);
+        } else {
+            vScaleGmTensor.offsetCalculator.Init(batchSize, n2Size, kvSeqSize, headDim, *this->kvSeqParserPtr_);
+        }
     }
 
     __aicore__ inline void AllocEventID()
@@ -266,7 +316,7 @@ public:
     {
         uint32_t dstStride = (runInfo.actMSize + 31) >> 5 << 5;
         FaL1Tensor<Q_T, L1Format::NZ> l1Tensor{.tensor = dstTensor, .rowCount = dstStride};
-        GmCoordS1Only gmCoord{.bIdx = runInfo.bIdx,
+        GmCoordS1Only gmCoord{.bIdx = Q_NEEDS_WZH ? 0U : runInfo.bIdx,
                               .n2Idx = runInfo.realN2Idx,
                               .gIdx = 0,
                               .s1Idx = runInfo.gS1Idx,
@@ -280,7 +330,7 @@ public:
     {
         uint32_t dstStride = (runInfo.actMSize + 31) >> 5 << 5;
         FaL1Tensor<SCALE_T, L1Format::NZ> l1Tensor{.tensor = dstTensor, .rowCount = dstStride};
-        GmCoordGs1Merge gmCoord{.bIdx = runInfo.bIdx,
+        GmCoordGs1Merge gmCoord{.bIdx = Q_NEEDS_WZH ? 0U : runInfo.bIdx,
                                 .n2Idx = runInfo.realN2Idx,
                                 .gS1Idx = runInfo.gS1Idx,
                                 .dIdx = 0,
@@ -295,7 +345,7 @@ public:
         uint32_t s2Offset = (subLoop % 2 == 0) ? runInfo.s2Idx : runInfo.s2Idx + s2BaseSize / 2;
         uint32_t dstStride = (s2RealSize + 31) >> 5 << 5;
         FaL1Tensor<KV_T, L1Format::NZ> l1Tensor{.tensor = dstTensor, .rowCount = dstStride};
-        GmKvCoord gmCoord{.bIdx = runInfo.bIdx,
+        GmKvCoord gmCoord{.bIdx = KV_NEEDS_WZH ? 0U : runInfo.bIdx,
                           .n2Idx = runInfo.n2Idx,
                           .s2Idx = s2Offset,
                           .dIdx = 0,
@@ -310,7 +360,7 @@ public:
         uint32_t s2Offset = subLoop % 2 == 0 ? runInfo.s2Idx : runInfo.s2Idx + s2BaseSize / 2;
         uint32_t dstStride = (s2RealSize + 31) >> 5 << 5;
         FaL1Tensor<SCALE_T, L1Format::NZ> l1Tensor{.tensor = dstTensor, .rowCount = dstStride};
-        GmKvCoord gmCoord{.bIdx = runInfo.bIdx,
+        GmKvCoord gmCoord{.bIdx = KV_NEEDS_WZH ? 0U : runInfo.bIdx,
                           .n2Idx = runInfo.n2Idx,
                           .s2Idx = s2Offset,
                           .dIdx = 0,
@@ -326,7 +376,7 @@ public:
     {
         uint32_t dstStride = mm2BaseK;
         FaL1Tensor<KV_T, L1Format::NZ> l1Tensor{.tensor = dstTensor, .rowCount = dstStride};
-        GmKvCoord gmCoord{.bIdx = runInfo.bIdx,
+        GmKvCoord gmCoord{.bIdx = KV_NEEDS_WZH ? 0U : runInfo.bIdx,
                           .n2Idx = runInfo.n2Idx,
                           .s2Idx = s2Offset,
                           .dIdx = 0U,
@@ -342,7 +392,7 @@ public:
     {
         uint32_t rowCount = mm2BaseK / MXFP_DIVISOR_SIZE;
         FaL1Tensor<SCALE_T, L1Format::NZ> l1Tensor{.tensor = dstTensor, .rowCount = rowCount};
-        GmKvCoord gmCoord{.bIdx = runInfo.bIdx,
+        GmKvCoord gmCoord{.bIdx = KV_NEEDS_WZH ? 0U : runInfo.bIdx,
                           .n2Idx = runInfo.n2Idx,
                           .s2Idx = s2Offset,
                           .dIdx = 0,
@@ -352,8 +402,46 @@ public:
     }
 
     /* MM1: K * Q^T, Q驻留L1(首个S2 loop搬入, isLastS2Loop释放), K按subLoop搬入 */
+    // 子环1整段不可见: 不做 C1(不搬 K/Q、不做 MMAD/FIXP), 只补齐 IterateBmm1 的两处手势:
+    //   1) Q 的 L1 buffer 只在该行最后一个子环释放, 漏了下一行 Wait 会永久阻塞;
+    //   2) bmm1 的跨核 Wait/Set 必须与 vec 侧一一对应。
+    __aicore__ inline void SkipBmm1(MM1_DBUF_T& outputBuf, const RunInfoX& runInfo)
+    {
+        if (unlikely(runInfo.isLastS2Loop)) {
+            Buffer<BufferType::L1> mm1B = l1QBuffers_.GetPre();
+            mm1B.Set<HardEvent::MTE1_MTE2>();
+        }
+        outputBuf.WaitCrossCore();
+        outputBuf.SetCrossCore();
+    }
+
+    // 每任务置一次 GM 基址：TND 跳过拷贝路径里的 cu_seqlens 解析
+    __aicore__ inline void UpdateGmBases(const RunInfoX& runInfo)
+    {
+        if constexpr (Q_NEEDS_WZH) {
+            const uint64_t qStrideT = queryGm_.offsetCalculator.GetStrideT();
+            const uint64_t qsStrideT = queryScaleGm_.offsetCalculator.GetStrideT();
+            queryGm_.gmTensor.SetGlobalBuffer((__gm__ Q_T*)(qGmOrigin_ + runInfo.qTBase * qStrideT * sizeof(Q_T)));
+            queryScaleGm_.gmTensor.SetGlobalBuffer(
+                (__gm__ SCALE_T*)(qScaleGmOrigin_ + runInfo.qTBase * qsStrideT * sizeof(SCALE_T)));
+        }
+        if constexpr (KV_NEEDS_WZH) {
+            const uint64_t kStrideT = keyGm_.offsetCalculator.GetStrideT();
+            const uint64_t vStrideT = valueGm_.offsetCalculator.GetStrideT();
+            const uint64_t ksStrideT = keyScaleGm_.offsetCalculator.GetStrideT();
+            const uint64_t vsStrideT = valueScaleGm_.offsetCalculator.GetStrideT();
+            keyGm_.gmTensor.SetGlobalBuffer((__gm__ KV_T*)(kGmOrigin_ + runInfo.kvTBase * kStrideT * sizeof(KV_T)));
+            valueGm_.gmTensor.SetGlobalBuffer((__gm__ KV_T*)(vGmOrigin_ + runInfo.kvTBase * vStrideT * sizeof(KV_T)));
+            keyScaleGm_.gmTensor.SetGlobalBuffer(
+                (__gm__ SCALE_T*)(kScaleGmOrigin_ + runInfo.kvTBase * ksStrideT * sizeof(SCALE_T)));
+            valueScaleGm_.gmTensor.SetGlobalBuffer(
+                (__gm__ SCALE_T*)(vScaleGmOrigin_ + runInfo.vScaleTBase * vsStrideT * sizeof(SCALE_T)));
+        }
+    }
+
     __aicore__ inline void IterateBmm1(MM1_DBUF_T& outputBuf, RunInfoX& runInfo, uint32_t subLoop)
     {
+        UpdateGmBases(runInfo);
         uint32_t s2CalcSize = s2SplitSize;
         if (unlikely(runInfo.actSingleLoopS2Size < s2BaseSize)) {
             if (subLoop == 0) {
@@ -446,6 +534,7 @@ public:
      */
     __aicore__ inline void IterateBmm2(MM2_DBUF_T& outputBuf, MM2_PBUF_POLICY_T& inputBuf, RunInfoX& runInfo)
     {
+        UpdateGmBases(runInfo);
         // 1. 等待P就绪
         MM2_PBUF_T mm2P = inputBuf.Get();
         mm2P.WaitCrossCore();
@@ -457,14 +546,21 @@ public:
         Buffer<BufferType::L0C> mm2ResL0C = mmL0CBuffers_.Get();
 
         uint32_t kLoops = (runInfo.actSingleLoopS2Size + mm2BaseK - 1) / mm2BaseK;
+        // 子环1整段不可见(P 全 0)时跳过第二个 K 段; 末段标记(unitFlag=3)随之后移到实际末段
+        const bool skipK1 = runInfo.skipSubLoop1 && (kLoops == 2U);
+        const uint32_t lastExecK = skipK1 ? 0U : (kLoops - 1U);
         for (uint32_t k = 0; k < kLoops; k++) {
-            uint32_t realK = (k == kLoops - 1U) ? (runInfo.actSingleLoopS2Size - k * mm2BaseK) : mm2BaseK;
+            if (unlikely(skipK1 && (k == 1U))) {
+                continue;
+            }
+            uint32_t remK = runInfo.actSingleLoopS2Size - k * mm2BaseK;
+            uint32_t realK = remK < mm2BaseK ? remK : mm2BaseK;
             Buffer<BufferType::L1>& vtBuf = l1VtBuffers_.Get();
             vtBuf.Wait<HardEvent::MTE1_MTE2>();
             CopyVtSegToL1(vtBuf, k, realK, runInfo);
             vtBuf.Set<HardEvent::MTE2_MTE1>();
             vtBuf.Wait<HardEvent::MTE2_MTE1>();
-            MmadBmm2Seg(vtBuf, mm2P, mm2ResL0C, k, (k + 1U == kLoops) ? 3U : 2U);
+            MmadBmm2Seg(vtBuf, mm2P, mm2ResL0C, k, (k == lastExecK) ? 3U : 2U);
             vtBuf.Set<HardEvent::MTE1_MTE2>();
         }
 
@@ -483,9 +579,11 @@ public:
         // 前半scale个数(subLoop0的k列对应区域)
         constexpr uint32_t halfScaleNum = mBaseSize * s2SplitSize / MXFP_GROUP_SIZE;
         constexpr uint32_t initBlockNum = halfScaleNum * sizeof(SCALE_T) / blockBytes; // 1KB=32块
-        uint32_t initOffsetInt16 = runInfo.actSingleLoopS2Size > s2SplitSize ?
-                                       pScaleOffset / sizeOfInt16 + halfScaleNum / sizeOfInt16 : // 后半起点
-                                       pScaleOffset / sizeOfInt16;                               // 前半起点
+        // 双子环且未跳过: vec 在 subLoop1 写前半(段0)的修正, 此处只初始化后半;
+        // 单子环, 或子环1 被整段跳过(vec 不写): 初始化前半。
+        uint32_t initOffsetInt16 = (runInfo.actSingleLoopS2Size > s2SplitSize && !runInfo.skipSubLoop1) ?
+                                       pScaleOffset / sizeOfInt16 + halfScaleNum / sizeOfInt16 :
+                                       pScaleOffset / sizeOfInt16;
         LocalTensor<int16_t> mm2PScaleTensor = mm2P.GetTensor<int16_t>(initOffsetInt16);
         InitConstValue(mm2PScaleTensor, {1, initBlockNum, 0, 0x7f7f});
     }
@@ -570,6 +668,13 @@ public:
     static constexpr uint32_t dBaseSize = (uint32_t)dTemplateType;
     static constexpr uint32_t dVBaseSize = (uint32_t)dVTemplateType;
     static constexpr LayOutTypeEnum LAYOUT = layout;
+    static constexpr GmFormat Q_FORMAT = GetQueryGmFormat<layout>();
+    static constexpr GmFormat KV_FORMAT = GetKVGmFormat<layout, KvLayoutType>();
+    static constexpr bool PAGE_ATTENTION = (KvLayoutType > 0U);
+    static constexpr bool Q_NEEDS_WZH = (GmLayoutParams<Q_FORMAT>::CATEGORY == FormatCategory::GM_Q_OUT_TND);
+    static constexpr bool KV_NEEDS_WZH = (GmLayoutParams<KV_FORMAT>::CATEGORY == FormatCategory::GM_KV_TND);
+    static constexpr ActualSeqLensMode Q_PARSER_MODE = GetQActSeqMode<layout>();
+    static constexpr ActualSeqLensMode KV_PARSER_MODE = GetKvActSeqMode<layout, PAGE_ATTENTION>();
 
     using Q_T = INPUT_T;
     using KV_T = INPUT_T;

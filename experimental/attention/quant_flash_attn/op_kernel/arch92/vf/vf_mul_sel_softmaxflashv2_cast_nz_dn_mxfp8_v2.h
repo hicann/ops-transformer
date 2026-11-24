@@ -54,13 +54,13 @@ static constexpr Reg::CastTrait castTraitU8One = {Reg::RegLayout::ONE, Reg::SatM
  * 子环0: 计算本块行max(ln2对齐)后存new_global_max, 以对齐max为基数量化P;
  * 子环1: 与子环0的max合并, 冻结的P0通过pScaleSubLoop0(E8M0)做scale修正。
  */
-template <typename T, typename T2, uint16_t ubN = 256>
+template <typename T, typename T2, uint16_t ubN = 256, bool NEED_MASK = false>
 __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubuf__ T* input_x_local_UB,
                                                        __ubuf__ T* new_global_max, __ubuf__ T* new_global_sum,
                                                        __ubuf__ uint8_t* indexesUb, __ubuf__ fp8_e8m0_t* pScaleSubLoop0,
                                                        const uint32_t m, const uint32_t originN, const float pScale,
                                                        const T minValue, const uint32_t blockStride,
-                                                       const uint32_t repeatStride, int32_t subLoop)
+                                                       const uint32_t repeatStride, int32_t subLoop, int64_t maskLine)
 {
     static_assert(ubN % 8 == 0, "ProcessVec1DnNoUpdateMxfp8V2VF ubN must be multiple of 8");
     RegTensor<T> src0, src1, src2, src3;
@@ -68,6 +68,8 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubu
     RegTensor<T> max01, max23; // 树形归约中间寄存器: max_01 = max(src0, src1), max_23 = max(src2, src3)
     RegTensor<T> vreg_x_max_b; // 子环1: 子环0存储的max及exp(旧max-新max)修正因子
     RegTensor<T> vreg_min;
+    // 全遮挡行的 max = minValue, 乘 INV_LN2 会溢出(-94439)成 -inf/NaN, 用有限下限兜底
+    RegTensor<T> vreg_clamp_floor;
     RegTensor<T> vreg_x_0, vreg_x_1, vreg_x_2, vreg_x_3;
     RegTensor<T> vreg_x_exp_0, vreg_x_exp_1, vreg_x_exp_2, vreg_x_exp_3;
     RegTensor<T> vreg_ln_p_scale; // ln(pScale)广播为整寄存器FP16
@@ -100,6 +102,7 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubu
 
     Duplicate(local_max, minValue);
     Duplicate(vreg_min, minValue);
+    Duplicate(vreg_clamp_floor, static_cast<T>(-46000.0f));
     Duplicate(sum_h, (T)0);
     Duplicate(sum_a, (T)0);
     Duplicate(sum_b, (T)0);
@@ -119,7 +122,25 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubu
     }
     mem_bar(VST_VLD);
 
-    for (uint16_t iter_m = 0; iter_m < uint16_t(ubN / 4); ++iter_m) {
+    // 4 列一组的行max; 需遮挡时前 floor(maskLine/4) 组整组可见, 单独走无遮挡循环,
+    // 其余组在 load 后按前缀 mask 写 minValue: 循环内无标量分支, 不打断 VF 流水
+    const uint16_t maxLoopNum = static_cast<uint16_t>(ubN / 4);
+    uint16_t plainIterEnd = maxLoopNum;
+    uint16_t partialIterEnd = maxLoopNum; // [plainIterEnd, partialIterEnd) 为部分遮挡列, 之后是全遮挡列
+    if constexpr (NEED_MASK) {
+        int64_t mLine = maskLine;
+        plainIterEnd = (mLine <= 0) ?
+                           static_cast<uint16_t>(0) :
+                           ((mLine >= static_cast<int64_t>(ubN)) ? maxLoopNum : static_cast<uint16_t>(mLine >> 2));
+        // 全遮挡组起点: 该组 4 列都满足 c - maskLine >= m, 只需把 minValue 写回, 不必 load/mask/select
+        int64_t fullIterStart = (mLine + static_cast<int64_t>(m) + 3) >> 2;
+        partialIterEnd =
+            (fullIterStart <= static_cast<int64_t>(plainIterEnd)) ?
+                plainIterEnd :
+                ((fullIterStart >= static_cast<int64_t>(maxLoopNum)) ? maxLoopNum :
+                                                                       static_cast<uint16_t>(fullIterStart));
+    }
+    for (uint16_t iter_m = 0; iter_m < plainIterEnd; ++iter_m) {
         LoadAlign(src0, src_ub0 + iter_m * m * 4);
         LoadAlign(src1, src_ub1 + iter_m * m * 4);
         LoadAlign(src2, src_ub2 + iter_m * m * 4);
@@ -129,10 +150,59 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubu
         Max(max01, max01, max23, preg_108);         // max_01 = max(max_01, max_23)
         Max(local_max, local_max, max01, preg_108); // running max = max(max_01, running max)
     }
+    if constexpr (NEED_MASK) {
+        // 本迭代 4 个自然顺序列 c = 4*iter_m + k 的不可见行数 = c - maskLine(夹到 [0, m]),
+        // 前缀 mask 命中后 Select 写成 minValue: 与尾部填充列同值, 行 max 与 exp 均不受影响;
+        // 遮挡与 load/max 共用一条流水, 不再额外遍历 S
+        const int32_t maskLineI32 = static_cast<int32_t>(maskLine);
+        const int32_t mLimit = static_cast<int32_t>(m);
+        for (uint16_t iter_m = plainIterEnd; iter_m < partialIterEnd; ++iter_m) {
+            LoadAlign(src0, src_ub0 + iter_m * m * 4);
+            LoadAlign(src1, src_ub1 + iter_m * m * 4);
+            LoadAlign(src2, src_ub2 + iter_m * m * 4);
+            LoadAlign(src3, src_ub3 + iter_m * m * 4);
+            int32_t k0 = static_cast<int32_t>(iter_m) * 4 - maskLineI32;
+            int32_t k1 = k0 + 1;
+            int32_t k2 = k0 + 2;
+            int32_t k3 = k0 + 3;
+            uint32_t c0 = k0 <= 0 ? 0U : (k0 >= mLimit ? static_cast<uint32_t>(mLimit) : static_cast<uint32_t>(k0));
+            uint32_t c1 = k1 <= 0 ? 0U : (k1 >= mLimit ? static_cast<uint32_t>(mLimit) : static_cast<uint32_t>(k1));
+            uint32_t c2 = k2 <= 0 ? 0U : (k2 >= mLimit ? static_cast<uint32_t>(mLimit) : static_cast<uint32_t>(k2));
+            uint32_t c3 = k3 >= mLimit ? static_cast<uint32_t>(mLimit) : static_cast<uint32_t>(k3);
+            MaskReg preg_mask0 = UpdateMask<uint16_t>(c0);
+            MaskReg preg_mask1 = UpdateMask<uint16_t>(c1);
+            MaskReg preg_mask2 = UpdateMask<uint16_t>(c2);
+            MaskReg preg_mask3 = UpdateMask<uint16_t>(c3);
+            Select(src0, vreg_min, src0, preg_mask0);
+            Select(src1, vreg_min, src1, preg_mask1);
+            Select(src2, vreg_min, src2, preg_mask2);
+            Select(src3, vreg_min, src3, preg_mask3);
+            // 写回 UB, 供 exp 循环读取已遮挡的 S
+            uint32_t colBase = static_cast<uint32_t>(iter_m) * 4U;
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)src_ub0 + colBase * m, src0, preg_135);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)src_ub1 + colBase * m, src1, preg_135);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)src_ub2 + colBase * m, src2, preg_135);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)src_ub3 + colBase * m, src3, preg_135);
+            Max(max01, src0, src1, preg_108);
+            Max(max23, src2, src3, preg_108);
+            Max(max01, max01, max23, preg_108);
+            Max(local_max, local_max, max01, preg_108);
+        }
+        // 全遮挡列: S 直接写 minValue, 省掉 load / UpdateMask / Select
+        for (uint16_t iter_m = partialIterEnd; iter_m < maxLoopNum; ++iter_m) {
+            uint32_t colBaseFull = static_cast<uint32_t>(iter_m) * 4U;
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)src_ub0 + colBaseFull * m, vreg_min, preg_135);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)src_ub1 + colBaseFull * m, vreg_min, preg_135);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)src_ub2 + colBaseFull * m, vreg_min, preg_135);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)src_ub3 + colBaseFull * m, vreg_min, preg_135);
+        }
+        mem_bar(VST_VLD); // 遮挡后的 S 已写回 UB, exp 循环按正常 load 读取
+    }
 
     // max 向上对齐到 k*LN2, 使 max 差值恰为 2 的幂
     // S 已由 C1 阶段 FIXPIPE 随路乘 softmaxscale, 此处直接使用
     Muls(local_max, local_max, static_cast<T>(INV_LN2), preg_108);
+    Max(local_max, local_max, vreg_clamp_floor, preg_108); // 防溢出: 全遮挡行保持有限值, exp 仍为 0
     Truncate<T, RoundMode::CAST_CEIL>(local_max, local_max, preg_108);
     Muls(local_max, local_max, static_cast<T>(LN2), preg_108);
 
@@ -219,13 +289,14 @@ __simd_vf__ inline void ProcessVec1DnNoUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubu
     }
 }
 
-template <typename T, typename T2, uint16_t ubN = 256>
+template <typename T, typename T2, uint16_t ubN = 256, bool NEED_MASK = false>
 __aicore__ inline void ProcessVec1DnNoUpdateMxfp8V2(const LocalTensor<T2>& dstTensor, const LocalTensor<T>& maxTensor,
                                                     const LocalTensor<T>& sumTensor, const LocalTensor<T>& srcTensor,
                                                     const LocalTensor<uint8_t>& vselrIndexesBuf, const uint32_t m,
                                                     const uint32_t originN, const float pScale, const T minValue,
                                                     int32_t subLoop,
-                                                    const LocalTensor<fp8_e8m0_t>& pScaleSubLoop0Tensor)
+                                                    const LocalTensor<fp8_e8m0_t>& pScaleSubLoop0Tensor,
+                                                    int64_t maskLine)
 {
     __ubuf__ T2* x_exp = (__ubuf__ T2*)dstTensor.GetPhyAddr();
     __ubuf__ T* input_x_local_UB = (__ubuf__ T*)srcTensor.GetPhyAddr();
@@ -238,9 +309,9 @@ __aicore__ inline void ProcessVec1DnNoUpdateMxfp8V2(const LocalTensor<T2>& dstTe
     const uint32_t blockStride = ubN >> 1 | 0x1;
     const uint32_t repeatStride = 2;
 
-    ProcessVec1DnNoUpdateMxfp8V2VF<T, T2, ubN>(x_exp, input_x_local_UB, new_global_max, new_global_sum, indexesUb,
-                                               pScaleSubLoop0Ub, m, originN, pScale, minValue, blockStride,
-                                               repeatStride, subLoop);
+    ProcessVec1DnNoUpdateMxfp8V2VF<T, T2, ubN, NEED_MASK>(x_exp, input_x_local_UB, new_global_max, new_global_sum,
+                                                          indexesUb, pScaleSubLoop0Ub, m, originN, pScale, minValue,
+                                                          blockStride, repeatStride, subLoop, maskLine);
 }
 
 /*
@@ -251,12 +322,15 @@ __aicore__ inline void ProcessVec1DnNoUpdateMxfp8V2(const LocalTensor<T2>& dstTe
  *   MM2读P0时随路乘。
  * 子环0: P0以max(本块, 历史)为基数量化; 子环1: P1以max(本块, 子环0, 历史)为基数量化。
  */
-template <typename T, typename T2, uint16_t ubN = 256>
-__simd_vf__ inline void ProcessVec1DnUpdateMxfp8V2VF(
-    __ubuf__ T2* x_exp, __ubuf__ T* input_x_local_UB, __ubuf__ T* exp_max, __ubuf__ T* new_global_max,
-    __ubuf__ T* new_global_sum, __ubuf__ T* pre_loop_sum, __ubuf__ T* first_loop_sum, __ubuf__ uint8_t* indexesUb,
-    __ubuf__ fp8_e8m0_t* pScaleSubLoop0, const uint32_t m, const uint32_t originN, const float pScale, const T minValue,
-    const uint32_t blockStride, const uint32_t repeatStride, __ubuf__ T* pre_loop_max, int32_t subLoop)
+template <typename T, typename T2, uint16_t ubN = 256, bool NEED_MASK = false>
+__simd_vf__ inline void ProcessVec1DnUpdateMxfp8V2VF(__ubuf__ T2* x_exp, __ubuf__ T* input_x_local_UB,
+                                                     __ubuf__ T* exp_max, __ubuf__ T* new_global_max,
+                                                     __ubuf__ T* new_global_sum, __ubuf__ T* pre_loop_sum,
+                                                     __ubuf__ T* first_loop_sum, __ubuf__ uint8_t* indexesUb,
+                                                     __ubuf__ fp8_e8m0_t* pScaleSubLoop0, const uint32_t m,
+                                                     const uint32_t originN, const float pScale, const T minValue,
+                                                     const uint32_t blockStride, const uint32_t repeatStride,
+                                                     __ubuf__ T* pre_loop_max, int32_t subLoop, int64_t maskLine)
 {
     static_assert(ubN % 8 == 0, "ProcessVec1DnUpdateMxfp8V2VF ubN must be multiple of 8");
     RegTensor<T> src0, src1, src2, src3;
@@ -265,6 +339,8 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8V2VF(
     RegTensor<T> vreg_x_max_b;        // 历史max/exp修正因子
     RegTensor<T> vreg_subloop_update; // 子环1: P0的scale修正因子exp(子环0合并max - 新max)
     RegTensor<T> vreg_min;
+    // 全遮挡行的 max = minValue, 乘 INV_LN2 会溢出(-94439)成 -inf/NaN, 用有限下限兜底
+    RegTensor<T> vreg_clamp_floor;
     RegTensor<T> vreg_x_0, vreg_x_1, vreg_x_2, vreg_x_3;
     RegTensor<T> vreg_x_exp_0, vreg_x_exp_1, vreg_x_exp_2, vreg_x_exp_3;
     RegTensor<T> vreg_ln_p_scale; // ln(pScale)广播为整寄存器FP16
@@ -298,6 +374,7 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8V2VF(
 
     Duplicate(local_max, minValue);
     Duplicate(vreg_min, minValue);
+    Duplicate(vreg_clamp_floor, static_cast<T>(-46000.0f));
     Duplicate(sum_h, (T)0);
     Duplicate(sum_a, (T)0);
     Duplicate(sum_b, (T)0);
@@ -317,7 +394,25 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8V2VF(
     }
     mem_bar(VST_VLD);
 
-    for (uint16_t iter_m = 0; iter_m < uint16_t(ubN / 4); ++iter_m) {
+    // 4 列一组的行max; 需遮挡时前 floor(maskLine/4) 组整组可见, 单独走无遮挡循环,
+    // 其余组在 load 后按前缀 mask 写 minValue: 循环内无标量分支, 不打断 VF 流水
+    const uint16_t maxLoopNum = static_cast<uint16_t>(ubN / 4);
+    uint16_t plainIterEnd = maxLoopNum;
+    uint16_t partialIterEnd = maxLoopNum; // [plainIterEnd, partialIterEnd) 为部分遮挡列, 之后是全遮挡列
+    if constexpr (NEED_MASK) {
+        int64_t mLine = maskLine;
+        plainIterEnd = (mLine <= 0) ?
+                           static_cast<uint16_t>(0) :
+                           ((mLine >= static_cast<int64_t>(ubN)) ? maxLoopNum : static_cast<uint16_t>(mLine >> 2));
+        // 全遮挡组起点: 该组 4 列都满足 c - maskLine >= m, 只需把 minValue 写回, 不必 load/mask/select
+        int64_t fullIterStart = (mLine + static_cast<int64_t>(m) + 3) >> 2;
+        partialIterEnd =
+            (fullIterStart <= static_cast<int64_t>(plainIterEnd)) ?
+                plainIterEnd :
+                ((fullIterStart >= static_cast<int64_t>(maxLoopNum)) ? maxLoopNum :
+                                                                       static_cast<uint16_t>(fullIterStart));
+    }
+    for (uint16_t iter_m = 0; iter_m < plainIterEnd; ++iter_m) {
         LoadAlign(src0, src_ub0 + iter_m * m * 4);
         LoadAlign(src1, src_ub1 + iter_m * m * 4);
         LoadAlign(src2, src_ub2 + iter_m * m * 4);
@@ -327,11 +422,60 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8V2VF(
         Max(max01, max01, max23, preg_108);         // max_01 = max(max_01, max_23)
         Max(local_max, local_max, max01, preg_108); // running max = max(max_01, running max)
     }
+    if constexpr (NEED_MASK) {
+        // 本迭代 4 个自然顺序列 c = 4*iter_m + k 的不可见行数 = c - maskLine(夹到 [0, m]),
+        // 前缀 mask 命中后 Select 写成 minValue: 与尾部填充列同值, 行 max 与 exp 均不受影响;
+        // 遮挡与 load/max 共用一条流水, 不再额外遍历 S
+        const int32_t maskLineI32 = static_cast<int32_t>(maskLine);
+        const int32_t mLimit = static_cast<int32_t>(m);
+        for (uint16_t iter_m = plainIterEnd; iter_m < partialIterEnd; ++iter_m) {
+            LoadAlign(src0, src_ub0 + iter_m * m * 4);
+            LoadAlign(src1, src_ub1 + iter_m * m * 4);
+            LoadAlign(src2, src_ub2 + iter_m * m * 4);
+            LoadAlign(src3, src_ub3 + iter_m * m * 4);
+            int32_t k0 = static_cast<int32_t>(iter_m) * 4 - maskLineI32;
+            int32_t k1 = k0 + 1;
+            int32_t k2 = k0 + 2;
+            int32_t k3 = k0 + 3;
+            uint32_t c0 = k0 <= 0 ? 0U : (k0 >= mLimit ? static_cast<uint32_t>(mLimit) : static_cast<uint32_t>(k0));
+            uint32_t c1 = k1 <= 0 ? 0U : (k1 >= mLimit ? static_cast<uint32_t>(mLimit) : static_cast<uint32_t>(k1));
+            uint32_t c2 = k2 <= 0 ? 0U : (k2 >= mLimit ? static_cast<uint32_t>(mLimit) : static_cast<uint32_t>(k2));
+            uint32_t c3 = k3 >= mLimit ? static_cast<uint32_t>(mLimit) : static_cast<uint32_t>(k3);
+            MaskReg preg_mask0 = UpdateMask<uint16_t>(c0);
+            MaskReg preg_mask1 = UpdateMask<uint16_t>(c1);
+            MaskReg preg_mask2 = UpdateMask<uint16_t>(c2);
+            MaskReg preg_mask3 = UpdateMask<uint16_t>(c3);
+            Select(src0, vreg_min, src0, preg_mask0);
+            Select(src1, vreg_min, src1, preg_mask1);
+            Select(src2, vreg_min, src2, preg_mask2);
+            Select(src3, vreg_min, src3, preg_mask3);
+            // 写回 UB, 供 exp 循环读取已遮挡的 S
+            uint32_t colBase = static_cast<uint32_t>(iter_m) * 4U;
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)src_ub0 + colBase * m, src0, preg_135);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)src_ub1 + colBase * m, src1, preg_135);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)src_ub2 + colBase * m, src2, preg_135);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)src_ub3 + colBase * m, src3, preg_135);
+            Max(max01, src0, src1, preg_108);
+            Max(max23, src2, src3, preg_108);
+            Max(max01, max01, max23, preg_108);
+            Max(local_max, local_max, max01, preg_108);
+        }
+        // 全遮挡列: S 直接写 minValue, 省掉 load / UpdateMask / Select
+        for (uint16_t iter_m = partialIterEnd; iter_m < maxLoopNum; ++iter_m) {
+            uint32_t colBaseFull = static_cast<uint32_t>(iter_m) * 4U;
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)src_ub0 + colBaseFull * m, vreg_min, preg_135);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)src_ub1 + colBaseFull * m, vreg_min, preg_135);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)src_ub2 + colBaseFull * m, vreg_min, preg_135);
+            StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)src_ub3 + colBaseFull * m, vreg_min, preg_135);
+        }
+        mem_bar(VST_VLD); // 遮挡后的 S 已写回 UB, exp 循环按正常 load 读取
+    }
 
     LoadAlign(vreg_x_max_b, new_global_max); // 历史全局 max(前序 mLoop 累积)
     // max 向上对齐到 k*LN2, 使 max 差值恰为 2 的幂
     // S 已由 C1 阶段 FIXPIPE 随路乘 softmaxscale, 此处直接使用
     Muls(local_max, local_max, static_cast<T>(INV_LN2), preg_108);
+    Max(local_max, local_max, vreg_clamp_floor, preg_108); // 防溢出: 全遮挡行保持有限值, exp 仍为 0
     Truncate<T, RoundMode::CAST_CEIL>(local_max, local_max, preg_108);
     Muls(local_max, local_max, static_cast<T>(LN2), preg_108);
     // 与历史 max 合并(两者都对齐到 ln2 倍数)
@@ -433,13 +577,16 @@ __simd_vf__ inline void ProcessVec1DnUpdateMxfp8V2VF(
     }
 }
 
-template <typename T, typename T2, uint16_t ubN = 256>
-__aicore__ inline void ProcessVec1DnUpdateMxfp8V2(
-    const LocalTensor<T2>& dstTensor, const LocalTensor<T>& maxTensor, const LocalTensor<T>& sumTensor,
-    const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor, const LocalTensor<uint8_t>& vselrIndexesBuf,
-    const uint32_t m, const uint32_t originN, const float pScale, const T minValue,
-    const LocalTensor<T>& preLoopMaxTensor, const LocalTensor<T>& preLoopSumTensor,
-    const LocalTensor<T>& firstLoopSumTensor, int32_t subLoop, const LocalTensor<fp8_e8m0_t>& pScaleSubLoop0Tensor)
+template <typename T, typename T2, uint16_t ubN = 256, bool NEED_MASK = false>
+__aicore__ inline void ProcessVec1DnUpdateMxfp8V2(const LocalTensor<T2>& dstTensor, const LocalTensor<T>& maxTensor,
+                                                  const LocalTensor<T>& sumTensor, const LocalTensor<T>& srcTensor,
+                                                  const LocalTensor<T>& expMaxTensor,
+                                                  const LocalTensor<uint8_t>& vselrIndexesBuf, const uint32_t m,
+                                                  const uint32_t originN, const float pScale, const T minValue,
+                                                  const LocalTensor<T>& preLoopMaxTensor,
+                                                  const LocalTensor<T>& preLoopSumTensor,
+                                                  const LocalTensor<T>& firstLoopSumTensor, int32_t subLoop,
+                                                  const LocalTensor<fp8_e8m0_t>& pScaleSubLoop0Tensor, int64_t maskLine)
 {
     __ubuf__ T2* x_exp = (__ubuf__ T2*)dstTensor.GetPhyAddr();
     __ubuf__ T* input_x_local_UB = (__ubuf__ T*)srcTensor.GetPhyAddr();
@@ -456,9 +603,9 @@ __aicore__ inline void ProcessVec1DnUpdateMxfp8V2(
     const uint32_t blockStride = ubN >> 1 | 0x1;
     const uint32_t repeatStride = 2;
 
-    ProcessVec1DnUpdateMxfp8V2VF<T, T2, ubN>(x_exp, input_x_local_UB, exp_max, new_global_max, new_global_sum,
-                                             pre_loop_sum, first_loop_sum, indexesUb, pScaleSubLoop0Ub, m, originN,
-                                             pScale, minValue, blockStride, repeatStride, pre_loop_max, subLoop);
+    ProcessVec1DnUpdateMxfp8V2VF<T, T2, ubN, NEED_MASK>(
+        x_exp, input_x_local_UB, exp_max, new_global_max, new_global_sum, pre_loop_sum, first_loop_sum, indexesUb,
+        pScaleSubLoop0Ub, m, originN, pScale, minValue, blockStride, repeatStride, pre_loop_max, subLoop, maskLine);
 }
 
 /*
@@ -476,27 +623,26 @@ __aicore__ inline void ProcessVec1DnUpdateMxfp8V2(
  * @param [in] preLoopMaxTensor, 历史max快照, 仅Update使用
  * @param [in] subLoop, 子环编号(0/1), 对应C1V1C1V1C2V2中的两次V1
  */
-template <typename T, typename T2, bool isUpdate = false, uint16_t ubN = 256>
-__aicore__ inline void ProcessVec1VfDnMxfp8V2(const LocalTensor<T2>& dstTensor, const LocalTensor<T>& maxTensor,
-                                              const LocalTensor<T>& sumTensor, const LocalTensor<T>& srcTensor,
-                                              const LocalTensor<T>& expMaxTensor, TBuf<>* vselrIndexesBuf,
-                                              const LocalTensor<fp8_e8m0_t>& pScaleSubLoop0Tensor, const uint32_t m,
-                                              const uint32_t originN, const float pScale, const T minValue,
-                                              const LocalTensor<T>& preLoopMaxTensor,
-                                              const LocalTensor<T>& preLoopSumTensor,
-                                              const LocalTensor<T>& firstLoopSumTensor, int32_t subLoop)
+template <typename T, typename T2, bool isUpdate = false, uint16_t ubN = 256, bool NEED_MASK = false>
+__aicore__ inline void ProcessVec1VfDnMxfp8V2(
+    const LocalTensor<T2>& dstTensor, const LocalTensor<T>& maxTensor, const LocalTensor<T>& sumTensor,
+    const LocalTensor<T>& srcTensor, const LocalTensor<T>& expMaxTensor, TBuf<>* vselrIndexesBuf,
+    const LocalTensor<fp8_e8m0_t>& pScaleSubLoop0Tensor, const uint32_t m, const uint32_t originN, const float pScale,
+    const T minValue, const LocalTensor<T>& preLoopMaxTensor, const LocalTensor<T>& preLoopSumTensor,
+    const LocalTensor<T>& firstLoopSumTensor, int32_t subLoop, int64_t maskLine = 0)
 {
     static_assert(IsSameType<T, half>::value, "ProcessVec1VfDnMxfp8V2, T must be half(FP16 softmax)");
     static_assert(IsSameType<T2, fp8_e4m3fn_t>::value, "ProcessVec1VfDnMxfp8V2, T2 must be fp8_e4m3fn(MXFP8)");
     LocalTensor<uint8_t> indexesTensor;
     indexesTensor = vselrIndexesBuf[static_cast<int>(VselrIndexEnum::DN_INDEX)].template Get<uint8_t>();
     if constexpr (!isUpdate) {
-        ProcessVec1DnNoUpdateMxfp8V2<T, T2, ubN>(dstTensor, maxTensor, sumTensor, srcTensor, indexesTensor, m, originN,
-                                                 pScale, minValue, subLoop, pScaleSubLoop0Tensor);
+        ProcessVec1DnNoUpdateMxfp8V2<T, T2, ubN, NEED_MASK>(dstTensor, maxTensor, sumTensor, srcTensor, indexesTensor,
+                                                            m, originN, pScale, minValue, subLoop, pScaleSubLoop0Tensor,
+                                                            maskLine);
     } else {
-        ProcessVec1DnUpdateMxfp8V2<T, T2, ubN>(dstTensor, maxTensor, sumTensor, srcTensor, expMaxTensor, indexesTensor,
-                                               m, originN, pScale, minValue, preLoopMaxTensor, preLoopSumTensor,
-                                               firstLoopSumTensor, subLoop, pScaleSubLoop0Tensor);
+        ProcessVec1DnUpdateMxfp8V2<T, T2, ubN, NEED_MASK>(
+            dstTensor, maxTensor, sumTensor, srcTensor, expMaxTensor, indexesTensor, m, originN, pScale, minValue,
+            preLoopMaxTensor, preLoopSumTensor, firstLoopSumTensor, subLoop, pScaleSubLoop0Tensor, maskLine);
     }
 }
 } // namespace FaVectorApi

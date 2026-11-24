@@ -20,7 +20,7 @@ _PERF_COMMON = {
     "enable_pa": [False],
     "kv_cache_layout": [None],
     "block_size": [None],
-    "mask_mode": [0],
+    "mask_mode": [0],  # 由下方 4 组合展开覆盖为 0/3
     "q_scale_layout": ["BNSD"],
     "p_scale": [1.0],
     "enable_lse": [True],
@@ -4410,5 +4410,38 @@ TEST_PARAMS = {
     },
 }
 
+# ===== 4 组合展开：{BNSD, TND} x {sparse0(mask 0), sparse3(mask 3)} =====
+# 用例名沿用旧规则（BNSD=<旧名>, TND=<旧名>_TND），sparse0/sparse3 共用同一份输入缓存；
+# pytest ID 由 test_quant_flash_attn_perf_rdv.py 追加 _SP<mask> 保证唯一。
+_COMBOS = [("BNSD", 0), ("BNSD", 3), ("TND", 0), ("TND", 3)]
+_COMBO_PARAMS = {}
+_COMBO_LAYOUT = {}
+for _name, _params in TEST_PARAMS.items():
+    for _layout, _mask in _COMBOS:
+        _key = f"{_name}__{_layout}_SP{_mask}"
+        _COMBO_PARAMS[_key] = {
+            **_params,
+            "input_layout": [_layout],
+            "mask_mode": [_mask],
+        }
+        _COMBO_LAYOUT[_key] = (_name if _layout == "BNSD" else _name + "_TND", _mask)
+TEST_PARAMS = _COMBO_PARAMS
+
 CASES = expand_paramset_to_cases(TEST_PARAMS)
+# 把内部唯一 key 换回旧用例名（sparse0/sparse3 同名共用缓存），mask 保留在 case 里
+for _case in CASES:
+    _legacy_name, _mask = _COMBO_LAYOUT[_case["name"]]
+    _case["name"] = _legacy_name
 SKIP_CASES = set()
+
+
+# PA_BNBD(分页 KV, block_size=512): 同形状追加一份, 名字加 _PA
+_PA_CASES = []
+for _case in CASES:
+    _pa = dict(_case)
+    _pa["name"] = _case["name"] + "_PA"
+    _pa["enable_pa"] = True
+    _pa["kv_cache_layout"] = "PA_BNBD"
+    _pa["block_size"] = 512
+    _PA_CASES.append(_pa)
+CASES = CASES + _PA_CASES

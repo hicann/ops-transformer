@@ -178,6 +178,7 @@ struct FDparamsX {
 };
 
 struct RunInfoX {
+    bool skipSubLoop1 = false; // 子环1整段不可见(P 全 0): MM2 跳过第二个 K 段
     uint32_t loop = 0;
     uint32_t mloop = 0;
     bool isValid = false;
@@ -210,6 +211,11 @@ struct RunInfoX {
 
     uint64_t qPaddingBeginOffset = 0;
     uint64_t kvPaddingBeginOffset = 0;
+
+    // 本批 GM 基址：TND 取 cu_seqlens 前缀，BNSD 为 b * 序列长度
+    uint64_t qTBase = 0;
+    uint64_t kvTBase = 0;
+    uint64_t vScaleTBase = 0;
 };
 
 struct StridesConstInfo {

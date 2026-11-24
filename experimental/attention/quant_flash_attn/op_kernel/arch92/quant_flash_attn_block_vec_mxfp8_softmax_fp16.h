@@ -50,13 +50,14 @@ public:
     static constexpr uint32_t MXFP_GROUP_SIZE = 32U;
 
     static constexpr bool FLASH_DECODE = isFd;
+    static constexpr bool HAS_MASK = hasAtten;
 
     static constexpr uint32_t initOutputEventId = 0U; // attenOut和lse刷无效行会用到剩余ub，需加同步
 
     static constexpr ActualSeqLensMode Q_MODE = GetQActSeqMode<layout>();
 
     using mm2ResPos = Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>;
-    using attenMaskGmType = int8_t; // 不支持mask, 仅占位保持类型接口
+    using attenMaskGmType = int8_t; // 占位: maskLine 方式不读 mask GM
     using quantGmType = GlobalTensor<float>;
 
     using ConstInfoX = ConstInfo_t;
@@ -69,7 +70,8 @@ public:
     GlobalTensor<OUTPUT_T> attentionOutGm_;
     GlobalTensor<float> softmaxLseGm_;
     GlobalTensor<int32_t> actualSeqLengthsGmQ_;
-    using QSeqParserType = ActualSeqLensParser<Q_MODE, int32_t>;
+    static constexpr bool Q_IS_TND = (layout == LayOutTypeEnum::LAYOUT_TND);
+    using QSeqParserType = ActualSeqLensParser<Q_MODE, int32_t, Q_IS_TND>;
     QSeqParserType* qActSeqLensParser_ = nullptr;
 
     __aicore__ inline void SetCuSeqLensParser(QSeqParserType& qParser)
@@ -190,7 +192,8 @@ public:
 
         if (singleInitOutputSize > 0) {
             WaitFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId);
-            matmul::InitOutput<float>(softmaxLseGm_[constInfo_.aivIdx * singleCoreSize], singleInitOutputSize, 0);
+            matmul::InitOutput<float>(softmaxLseGm_[constInfo_.aivIdx * singleCoreSize], singleInitOutputSize,
+                                      3e+99); // 无效批填 +inf
             SetFlag<AscendC::HardEvent::MTE3_V>(initOutputEventId);
         }
     }
@@ -215,10 +218,29 @@ public:
         this->softmaxLseQueue_.template FreeTensor(lseInfUb);
     }
 
+    // 块内遮挡线: maskLine = nextTokens + s1Start - s2Start
+    // 第 r 行可见列 c <= maskLine + r
+    __aicore__ inline int64_t ComputeMaskLineDN(const RunInfoX& runInfo, uint32_t subLoop)
+    {
+        constexpr uint32_t s2BaseSizeCur = s2BaseSize >> 1;
+        int64_t s1StartIdx = static_cast<int64_t>(runInfo.gS1Idx);
+        int64_t s2StartIdx =
+            static_cast<int64_t>(runInfo.s2Idx) + (subLoop == 0 ? 0 : static_cast<int64_t>(s2BaseSizeCur));
+        return runInfo.nextTokensLeftUp + s1StartIdx - s2StartIdx;
+    }
+
     __aicore__ inline void ProcessVec1Dn(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_FORWARD>& outputBuf,
                                          Buffer<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm1ResBuf,
                                          RunInfoX runInfo, uint32_t subLoop)
     {
+        if constexpr (HAS_MASK) {
+            if (unlikely(runInfo.skipSubLoop1 && (subLoop == 1U))) {
+                // 子环1 整段不可见: P 段跳过, 只补两处跨核手势
+                bmm1ResBuf.SetCrossCore();
+                outputBuf.SetCrossCore();
+                return;
+            }
+        }
         uint32_t softmaxBufIdx = runInfo.mloop % (PRELOAD_N + 1);
         uint32_t expBufIdx = runInfo.loop % (PRELOAD_N + 1);
         int64_t stage1Offset = subLoop % DB;
@@ -245,16 +267,47 @@ public:
         }
 
         constexpr uint32_t vfM = mBaseSize;
+        // 遮挡在 VF 内完成: 求行 max 前用前缀 mask 写 minValue
+        // maskLine >= 本子环列数时走无遮挡实例
+        int64_t maskLine = 0;
+        bool needMask = false;
+        uint32_t originNVf = s2CalcSize; // VF 尾部填充起点(0=整子环写 minValue)
+        if constexpr (HAS_MASK) {
+            maskLine = ComputeMaskLineDN(runInfo, subLoop);
+            // 全子环不可见: 从第 0 列起连续 StoreAlign 写 minValue
+            if (unlikely(maskLine <= -static_cast<int64_t>(vfM))) {
+                // 整段遮挡: 尾部填充从第 0 列开始, 整段写 minValue
+                originNVf = 0U;
+            } else {
+                needMask = maskLine < static_cast<int64_t>(s2CalcSize);
+            }
+        }
         if (unlikely(runInfo.isFirstS2Loop)) {
             // NoUpdate: 首个S2 loop无历史max
-            FaVectorApi::ProcessVec1VfDnMxfp8V2<half, INPUT_T, false, s2BaseSizeCur>(
-                stage1CastTensor, maxUb, sumUb, mmRes, expUb, this->vselrIndexesBuf_, pScaleSubLoop0Tensor, vfM,
-                s2CalcSize, pScaleValue_, negativeHalfScalar_, preLoopMaxUb, preLoopSumUb, firstLoopSumUb, subLoop);
+            if (unlikely(needMask)) {
+                FaVectorApi::ProcessVec1VfDnMxfp8V2<half, INPUT_T, false, s2BaseSizeCur, true>(
+                    stage1CastTensor, maxUb, sumUb, mmRes, expUb, this->vselrIndexesBuf_, pScaleSubLoop0Tensor, vfM,
+                    s2CalcSize, pScaleValue_, negativeHalfScalar_, preLoopMaxUb, preLoopSumUb, firstLoopSumUb, subLoop,
+                    maskLine);
+            } else {
+                FaVectorApi::ProcessVec1VfDnMxfp8V2<half, INPUT_T, false, s2BaseSizeCur, false>(
+                    stage1CastTensor, maxUb, sumUb, mmRes, expUb, this->vselrIndexesBuf_, pScaleSubLoop0Tensor, vfM,
+                    originNVf, pScaleValue_, negativeHalfScalar_, preLoopMaxUb, preLoopSumUb, firstLoopSumUb, subLoop,
+                    0);
+            }
         } else {
             // Update: 与历史 max 合并; expUb 输出 O 的重缩放因子(half)
-            FaVectorApi::ProcessVec1VfDnMxfp8V2<half, INPUT_T, true, s2BaseSizeCur>(
-                stage1CastTensor, maxUb, sumUb, mmRes, expUb, this->vselrIndexesBuf_, pScaleSubLoop0Tensor, vfM,
-                s2CalcSize, pScaleValue_, negativeHalfScalar_, preLoopMaxUb, preLoopSumUb, firstLoopSumUb, subLoop);
+            if (unlikely(needMask)) {
+                FaVectorApi::ProcessVec1VfDnMxfp8V2<half, INPUT_T, true, s2BaseSizeCur, true>(
+                    stage1CastTensor, maxUb, sumUb, mmRes, expUb, this->vselrIndexesBuf_, pScaleSubLoop0Tensor, vfM,
+                    s2CalcSize, pScaleValue_, negativeHalfScalar_, preLoopMaxUb, preLoopSumUb, firstLoopSumUb, subLoop,
+                    maskLine);
+            } else {
+                FaVectorApi::ProcessVec1VfDnMxfp8V2<half, INPUT_T, true, s2BaseSizeCur, false>(
+                    stage1CastTensor, maxUb, sumUb, mmRes, expUb, this->vselrIndexesBuf_, pScaleSubLoop0Tensor, vfM,
+                    originNVf, pScaleValue_, negativeHalfScalar_, preLoopMaxUb, preLoopSumUb, firstLoopSumUb, subLoop,
+                    0);
+            }
         }
         bmm1ResBuf.SetCrossCore();
 
@@ -336,18 +389,35 @@ public:
         Cast(maxF32Ub, maxUb, RoundMode::CAST_NONE, mBaseSize); // half->float无损
         LocalTensor<half> sumH = this->softmaxSumBuf_[runInfo.mloop % (PRELOAD_N + 1)].template Get<half>();
         LocalTensor<float> sumUb = this->sumF32Buf_.template Get<float>();
-        Cast(sumUb, sumH, RoundMode::CAST_NONE, mBaseSize); // fp16 存量 -> fp32 供 LSE
-        float pScaleRec = 1.0f / pScaleValue_;              // pScale默认1.0, lse = max + ln(rs/pScale)
-        float minValueF = *((float*)&minValue_);            // half域LN2对齐后的无效行max(float域)
+        Cast(sumUb, sumH, RoundMode::CAST_NONE, mBaseSize);        // fp16 存量 -> fp32 供 LSE
+        float pScaleRec = 1.0f / pScaleValue_;                     // pScale默认1.0, lse = max + ln(rs/pScale)
+        float minValueF = static_cast<float>(negativeHalfScalar_); // 无效行 max(float 域)
         // LSE 结果走 VECOUT 队列, 由 EnQue/DeQue/FreeTensor 管理同步
         // V 写 -> MTE3 读 的同步由 VECOUT 队列保证
         LocalTensor<float> lseUb = this->softmaxLseQueue_.template AllocTensor<float>();
         FaVectorApi::ComputeLseTrans<float>(lseUb, sumUb, maxF32Ub, vecMSize, pScaleRec, minValueF);
+        if constexpr (HAS_MASK) {
+            // s1 < -nextTokensLeftUp 的行无可见 key, 写 +inf
+            int64_t invalidRowCount = -runInfo.nextTokensLeftUp - static_cast<int64_t>(s1Start);
+            if (invalidRowCount > 0) {
+                uint32_t invalidRows = invalidRowCount >= static_cast<int64_t>(dealCount) ?
+                                           dealCount :
+                                           static_cast<uint32_t>(invalidRowCount);
+                Duplicate(lseUb, FLOAT_INF, invalidRows);
+            }
+        }
         this->softmaxLseQueue_.template EnQue(lseUb);
         this->softmaxLseQueue_.template DeQue<float>();
 
-        uint64_t gmOffset =
-            ((uint64_t)runInfo.bIdx * constInfo_.realN2Size + runInfo.realN2Idx) * constInfo_.s1Size + s1Start;
+        uint64_t gmOffset = 0;
+        if constexpr (layout == LayOutTypeEnum::LAYOUT_TND) {
+            // TND: LSE 为 [N1, T1], token 偏移取 cu_seqlens 前缀
+            const uint64_t qBase = runInfo.qTBase;
+            gmOffset = static_cast<uint64_t>(runInfo.realN2Idx) * constInfo_.t1Size + qBase + s1Start;
+        } else {
+            gmOffset =
+                ((uint64_t)runInfo.bIdx * constInfo_.realN2Size + runInfo.realN2Idx) * constInfo_.s1Size + s1Start;
+        }
         DataCopyExtParams lseCopyParams;
         lseCopyParams.blockCount = 1;
         lseCopyParams.blockLen = dealCount * sizeof(float);
@@ -355,6 +425,23 @@ public:
         lseCopyParams.dstStride = 0;
         DataCopyPad(softmaxLseGm_[gmOffset], lseUb, lseCopyParams);
         this->softmaxLseQueue_.template FreeTensor(lseUb);
+    }
+
+    // s1 < -nextTokensLeftUp 的行无可见 key: 输出清零, LSE 写 +inf
+    __aicore__ inline void ZeroInvalidRows(const LocalTensor<bfloat16_t>& outputT, const RunInfoX& runInfo,
+                                           uint32_t vecMSize)
+    {
+        int64_t invalidRowCount = -runInfo.nextTokensLeftUp - static_cast<int64_t>(runInfo.gS1Idx);
+        if (invalidRowCount <= 0) {
+            return;
+        }
+        uint32_t rows =
+            invalidRowCount >= static_cast<int64_t>(vecMSize) ? vecMSize : static_cast<uint32_t>(invalidRowCount);
+        constexpr uint32_t outRowStride = 144U;
+        LocalTensor<uint16_t> outU16 = outputT.template ReinterpretCast<uint16_t>();
+        for (uint32_t row = 0; row < rows; row++) {
+            Duplicate(outU16[row * outRowStride], static_cast<uint16_t>(0), static_cast<int32_t>(constInfo_.dSizeV));
+        }
     }
 
     __aicore__ inline void ProcessVec2(mm2ResPos& bmm2ResBuf, RunInfoX runInfo)
@@ -386,6 +473,9 @@ public:
             LocalTensor<float> sumUb = this->sumF32Buf_.template Get<float>();
             Cast(sumUb, sumH, RoundMode::CAST_NONE, mBaseSize); // fp16 存量 -> fp32 供除法
             FaVectorApi::VfDivAndCast(outputT, stage2OutUb, sumUb);
+            if constexpr (HAS_MASK) {
+                ZeroInvalidRows(outputT, runInfo, vecMSize);
+            }
             SetFlag<HardEvent::V_MTE3>(vToMte3Id_[0]);
             WaitFlag<HardEvent::V_MTE3>(vToMte3Id_[0]);
 
@@ -397,13 +487,24 @@ public:
                                   .dIdx = 0,
                                   .s1DealSize = vecMSize,
                                   .dDealSize = (uint32_t)constInfo_.dSizeV};
-            constexpr GmFormat OUT_FORMAT = GmFormat::BNGSD;
-            FaGmTensor<OUTPUT_T, OUT_FORMAT, int32_t> outGmTensor;
-            outGmTensor.gmTensor = attentionOutGm_;
-            outGmTensor.offsetCalculator.Init(constInfo_.bSize, constInfo_.realN2Size, constInfo_.realGSize,
-                                              constInfo_.s1Size, constInfo_.dSizeV, *qActSeqLensParser_);
-            CopyAttenOutUbToGm<OUTPUT_T, OUT_FORMAT, UbFormat::S1_ONLY> copyAttenOutUbToGm;
-            copyAttenOutUbToGm(outGmTensor, ubTensor, gmCoord);
+            if constexpr (outLayout == LayOutTypeEnum::LAYOUT_TND) {
+                // TND: token-major, 偏移按 cu_seqlens 前缀
+                constexpr GmFormat OUT_FORMAT = GmFormat::TNGD;
+                FaGmTensor<OUTPUT_T, OUT_FORMAT, int32_t, true> outGmTensor;
+                outGmTensor.gmTensor = attentionOutGm_;
+                outGmTensor.offsetCalculator.Init(constInfo_.realN2Size, constInfo_.realGSize, constInfo_.dSizeV,
+                                                  *qActSeqLensParser_);
+                CopyAttenOutUbToGm<OUTPUT_T, OUT_FORMAT, UbFormat::S1_ONLY> copyAttenOutUbToGm;
+                copyAttenOutUbToGm(outGmTensor, ubTensor, gmCoord);
+            } else {
+                constexpr GmFormat OUT_FORMAT = GmFormat::BNGSD;
+                FaGmTensor<OUTPUT_T, OUT_FORMAT, int32_t> outGmTensor;
+                outGmTensor.gmTensor = attentionOutGm_;
+                outGmTensor.offsetCalculator.Init(constInfo_.bSize, constInfo_.realN2Size, constInfo_.realGSize,
+                                                  constInfo_.s1Size, constInfo_.dSizeV, *qActSeqLensParser_);
+                CopyAttenOutUbToGm<OUTPUT_T, OUT_FORMAT, UbFormat::S1_ONLY> copyAttenOutUbToGm;
+                copyAttenOutUbToGm(outGmTensor, ubTensor, gmCoord);
+            }
 
             // LSE 在本任务(晚 PRELOAD_N 轮)写: 届时 max/row_sum 已写完且 slot 未被覆盖(ring=3)。
 
@@ -491,6 +592,7 @@ template <typename INPUT_T, typename T, typename OUTPUT_T, LayOutTypeEnum layout
           bool isFd = false, bool useDn = false>
 class QuantFlashAttnBlockVecMxfp8SoftmaxFp16Dummy {
 public:
+    static constexpr bool HAS_MASK = hasAtten;
     static constexpr bool FLASH_DECODE = isFd;
     using OUT_T = OUTPUT_T;
     using ConstInfoX = ConstInfo_t;
