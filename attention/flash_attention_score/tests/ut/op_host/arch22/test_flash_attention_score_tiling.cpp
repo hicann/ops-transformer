@@ -8,9 +8,11 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include <cstring>
 #include <gtest/gtest.h>
 #include "../flash_attention_score_param.h"
 #include "tiling_case_executor.h"
+#include "../../../../op_kernel/arch22/flash_attention_score_tiling.h"
 
 namespace FlashAttentionScoreUT {
 
@@ -56,6 +58,35 @@ TEST_P(FlashAttentionScoreArch22TilingTest, tiling)
             {"softmax_out_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>(param.softmax_out_layout)},
         },
         &compileInfo, "Ascend910B", 64, 262144, 8192);
+
+    if (param.case_name.find("_UnsplitK_") != std::string::npos) {
+        TilingInfo info;
+        ASSERT_TRUE(ExecuteTiling(tilingContextPara, info));
+        ASSERT_EQ(info.tilingDataSize, sizeof(FlashAttentionScoreGeneralTilingData));
+        FlashAttentionScoreGeneralTilingData data{};
+        std::memcpy(&data, info.tilingData.get(), sizeof(data));
+        EXPECT_EQ(info.tilingKey, param.expectTilingKey);
+        constexpr uint64_t MATMUL_POLICY_BIT = 36;
+        const bool unsplitK = (param.expectTilingKey >> MATMUL_POLICY_BIT) & 1;
+        // A fallback must regenerate the API tilings. Changing just the dispatch
+        // bit would retain BMM1's UNSPLITK-only baseK=96 and dbL0C=2.
+        EXPECT_EQ(data.bmm1TilingData.baseK, unsplitK ? 96 : 64);
+        EXPECT_EQ(data.bmm1TilingData.baseN, unsplitK ? 128 : 256);
+        EXPECT_EQ(data.bmm1TilingData.dbL0C, unsplitK ? 2 : 1);
+        EXPECT_EQ(data.bmm2TilingData.dbL0C, 1);
+        // Dense Dv=64 keeps its 64x64x256 Matmul API optimization after fallback.
+        // Sparse windows instead use K=128, preserving the supported UNSPLITK path.
+        if (param.case_name.find("UnalignedValue") != std::string::npos) {
+            EXPECT_EQ(data.bmm2TilingData.baseM, 128);
+            EXPECT_EQ(data.bmm2TilingData.baseN, 112);
+            EXPECT_EQ(data.bmm2TilingData.baseK, 128);
+        } else {
+            EXPECT_EQ(data.bmm2TilingData.baseM, param.sparse_mode == 0 ? 64 : (unsplitK ? 128 : 256));
+            EXPECT_EQ(data.bmm2TilingData.baseN, 64);
+            EXPECT_EQ(data.bmm2TilingData.baseK, param.sparse_mode == 0 ? 256 : (unsplitK ? 128 : 64));
+        }
+        return;
+    }
 
     ExecuteTestCase(tilingContextPara, param.expectResult, param.expectTilingKey, param.expectTilingData,
                     param.expectWorkspaces);

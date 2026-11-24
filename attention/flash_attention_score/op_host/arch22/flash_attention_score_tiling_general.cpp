@@ -3868,6 +3868,34 @@ protected:
         }
     }
 
+    bool HasUnsplitKEmptyTail() const
+    {
+        // The reported hang is in dense UNSPLITK: BMM2 waits for an event
+        // even when its aligned S2 tail is smaller than one baseK tile.
+        if (tilingData->inputParams.get_sparseType() != static_cast<uint8_t>(SparseEnum::ALL)) {
+            return false;
+        }
+        const int64_t s2BlockSize = s2BasicBlock * nRatio;
+        const int64_t baseK = tilingData->bmm2TilingData.baseK;
+        if (s2BlockSize <= 0 || baseK <= 0) {
+            return false;
+        }
+        const int64_t tailSize = CalcTailSize(s2Size, s2BlockSize);
+        return AlignUp(tailSize, FRACTAL_NUM) < baseK;
+    }
+
+    ge::graphStatus DoLibApiTiling() override
+    {
+        const auto ret = FlashAttentionScoreTilingBase::DoLibApiTiling();
+        if (ret != ge::GRAPH_SUCCESS || matmulPolicyType != MATMUL_POLICY_UNSPLITK || !HasUnsplitKEmptyTail()) {
+            return ret;
+        }
+        OP_LOGD(opName, "[%s] UNSPLITK BMM2 has an empty K tail; use the matmul API policy.", templateName);
+        matmulPolicyType = MATMUL_POLICY_NORMAL;
+        // Rebuild both GEMMs without UNSPLITK-only baseK/dbL0C settings.
+        return FlashAttentionScoreTilingBase::DoLibApiTiling();
+    }
+
     void GetBufferNum(BufferNum& bufferNum) const override
     {
         bufferNum.bufferS1S2Num = HIGH_PERF_BUFFER_NUM;
