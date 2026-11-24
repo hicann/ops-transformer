@@ -1324,7 +1324,13 @@ public:
 #endif
         {
             const uint32_t rowStride = numQHeads_ * kPanel;
-            uint32_t shape[2] = {numQHeads_, kPanel};
+#if defined(CONST_TILING)
+            // Keep the reduction extent dynamic for AscendC's RA loop generator.
+            const volatile uint32_t heads = numQHeads_;
+#else
+            const uint32_t heads = numQHeads_;
+#endif
+            uint32_t shape[2] = {heads, kPanel};
             auto tmp = ubT8_.template ReinterpretCast<uint8_t>();
             for (uint32_t p = 0; p < panels; ++p) {
                 auto panel = ub[p * panelRows_ * kPanel];

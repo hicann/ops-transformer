@@ -7,7 +7,7 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
-from typing import Optional
+from typing import List, Optional, Tuple, Union
 
 import torch
 from torch._subclasses.fake_tensor import is_fake
@@ -27,22 +27,98 @@ BLOCK16_TOPK = 128
 PA_BLOCK_SIZE = 128
 
 
-def _batch_key128_max_blocks(query, key, layout, actual_seq_klen, pool_block_size):
+LengthInput = Optional[Union[torch.Tensor, List[int], Tuple[int, ...]]]
+
+
+def _host_lengths(values, start_loc, data, layout, compress_factor=1, block_table=None):
+    if not isinstance(values, (list, tuple)):
+        return None
+    prefix = layout in SEQ_LAYOUT_KEYS
+    if len(values) != start_loc.numel() + int(prefix) or any(
+        type(v) is not int or not 0 <= v <= 2147483647 for v in values
+    ):
+        raise ValueError(
+            "Sequence lengths must match the batch and contain nonnegative int32 values"
+        )
+    if prefix:
+        if values[0] != 0 or any(r < l for l, r in zip(values, values[1:])):
+            raise ValueError(
+                "Sequence length prefixes must start at zero and be non-decreasing"
+            )
+        rows = [
+            (r - l + compress_factor - 1) // compress_factor
+            for l, r in zip(values, values[1:])
+        ]
+        fits = (
+            sum(rows) <= data.size(0)
+            if layout == "TND"
+            else all(r <= data.size(1 if layout == "BSND" else 2) for r in rows)
+        )
+    else:
+        if block_table is None:
+            raise ValueError("Paged key requires block_table")
+        capacity = (
+            block_table.size(1)
+            * data.size(1 if layout == "BBND" else 2)
+            * compress_factor
+        )
+        fits = all(v <= capacity for v in values)
+    if not fits:
+        raise ValueError(f"Sequence lengths exceed {layout} input capacity")
+    return list(values)
+
+
+def _length_tensor(tensor, host_lengths):
+    if host_lengths is None:
+        return tensor
+    return torch.tensor(host_lengths, dtype=torch.int32, device="cpu")
+
+
+def _length_values(lengths, name):
+    if isinstance(lengths, list):
+        return lengths
+    if is_fake(lengths) or lengths.is_meta:
+        raise RuntimeError(
+            f"The output shape depends on {name} values. Pass host integer lengths "
+            "as a list or tuple to msa_index_score_v2 for TorchAir, or use eager execution."
+        )
+    return lengths.tolist()
+
+
+def _seq_score_blocks(key, layout, lengths, blk, compress_factor=1):
+    seq_axis = {"TND": 0, "BSND": 1, "BNSD": 2}[layout]
+    # The aligned stride is always 16 if even the entire capacity fits.
+    shape_only = isinstance(lengths, torch.Tensor) and (
+        is_fake(lengths) or lengths.is_meta
+    )
+    if shape_only and key.size(seq_axis) * compress_factor <= SCORE_STRIDE_ALIGN * blk:
+        return 1
+    pref = _length_values(lengths, "actual_seq_klen")
+    return max(
+        1, max(((r - l + blk - 1) // blk for l, r in zip(pref, pref[1:])), default=0)
+    )
+
+
+def _batch_key128_max_blocks(
+    query, key, layout, actual_seq_klen, pool_block_size, query_scale
+):
     seq_cap = key.size(1) if layout == "BSND" else key.size(2)
     capacity_blocks = max(1, (seq_cap + pool_block_size - 1) // pool_block_size)
     mx_dtype = getattr(torch, "float4_e2m1fn_x2", None)
-    fake_lengths = is_fake(actual_seq_klen)
-    lengths_device = (
-        actual_seq_klen.fake_device if fake_lengths else actual_seq_klen.device
+    is_mxfp4 = query.dtype == mx_dtype or (
+        query.dtype == torch.uint8 and query_scale is not None
     )
-    if query.dtype == mx_dtype or lengths_device.type != "cpu":
+    if is_mxfp4:
         return capacity_blocks
-    if fake_lengths:
-        raise RuntimeError(
-            "native BSND/BNSD block128 output shape depends on CPU actual_seq_klen values; "
-            "these values are unavailable for FakeTensor graph tracing"
+    if isinstance(actual_seq_klen, torch.Tensor):
+        lengths_device = (
+            actual_seq_klen.fake_device
+            if is_fake(actual_seq_klen)
+            else actual_seq_klen.device
         )
-    pref = actual_seq_klen.tolist()
+        if lengths_device.type != "cpu":
+            return capacity_blocks
+    pref = _length_values(actual_seq_klen, "actual_seq_klen")
     max_blocks = 0
     for left, right in zip(pref, pref[1:]):
         kv = int(right) - int(left)
@@ -106,7 +182,7 @@ def _normalize_layout_query(layout_query: Optional[str]) -> str:
 
 
 def _packed_query_meta(
-    query: torch.Tensor, layout_query: str, actual_seq_qlen: Optional[torch.Tensor]
+    query: torch.Tensor, layout_query: str, actual_seq_qlen: LengthInput
 ):
     """score 的 T1 是 actual_seq_qlen 的有效 token 数，不是 BSND/BNSD 的 B*S。"""
     if layout_query == "BSND":
@@ -120,13 +196,14 @@ def _packed_query_meta(
     torch._check(
         actual_seq_qlen is not None, lambda: "BSND/BNSD requires actual_seq_qlen"
     )
-    pref = [int(v) for v in actual_seq_qlen.tolist()]
+    pref = _length_values(actual_seq_qlen, "actual_seq_qlen")
     for i in range(len(pref) - 1):
         qlen = pref[i + 1] - pref[i]
         torch._check(
             0 <= qlen <= seq_cap,
-            lambda qlen=qlen,
-            seq_cap=seq_cap: f"query length {qlen} exceeds layout S={seq_cap}",
+            lambda qlen=qlen, seq_cap=seq_cap: (
+                f"query length {qlen} exceeds layout S={seq_cap}"
+            ),
         )
     return int(pref[-1]) if pref else 0, num_q_heads
 
@@ -162,7 +239,8 @@ class MsaIndexScoreV2OpBuilder(OpBuilder):
             "Tensor? actual_seq_qlen=None, Tensor? actual_seq_klen=None, "
             '*, str layout_key="BBND", '
             'int sparse_mode=3, int init_blocks=0, int local_blocks=1, str layout_query="TND", '
-            "int pool_block_size=128, int return_choice=0, int topk=16, int compress_factor=1) -> Tensor"
+            "int pool_block_size=128, int return_choice=0, int topk=16, int compress_factor=1, "
+            "int[]? host_qlen=None, int[]? host_klen=None) -> Tensor"
         )
 
     def register_meta(self):
@@ -171,12 +249,12 @@ class MsaIndexScoreV2OpBuilder(OpBuilder):
             query: torch.Tensor,
             key: torch.Tensor,
             start_loc: torch.Tensor,
-            block_table: Optional[torch.Tensor],
-            query_scale: Optional[torch.Tensor],
-            key_scale: Optional[torch.Tensor],
-            atten_mask: Optional[torch.Tensor],
-            actual_seq_qlen: Optional[torch.Tensor],
-            actual_seq_klen: Optional[torch.Tensor],
+            block_table: Optional[torch.Tensor] = None,
+            query_scale: Optional[torch.Tensor] = None,
+            key_scale: Optional[torch.Tensor] = None,
+            atten_mask: Optional[torch.Tensor] = None,
+            actual_seq_qlen: LengthInput = None,
+            actual_seq_klen: LengthInput = None,
             *,
             layout_key: str = DEFAULT_LAYOUT_KEY,
             sparse_mode: int = DEFAULT_SPARSE_MODE,
@@ -187,7 +265,13 @@ class MsaIndexScoreV2OpBuilder(OpBuilder):
             return_choice: int = 0,
             topk: int = 16,
             compress_factor: int = 1,
+            host_qlen=None,
+            host_klen=None,
         ):
+            if host_qlen is not None:
+                actual_seq_qlen = host_qlen
+            if host_klen is not None:
+                actual_seq_klen = host_klen
             layout_query = _normalize_layout_query(layout_query)
             if (
                 _normalize_layout_key(layout_key) == "BBND"
@@ -242,21 +326,17 @@ class MsaIndexScoreV2OpBuilder(OpBuilder):
                 )
             else:
                 torch._check(
-                    actual_seq_klen is not None and actual_seq_klen.dim() == 1,
+                    isinstance(actual_seq_klen, list)
+                    or (actual_seq_klen is not None and actual_seq_klen.dim() == 1),
                     lambda: "non-paged key requires actual_seq_klen [B+1]",
                 )
                 if batch_key128:
                     max_blocks = _batch_key128_max_blocks(
-                        query, key, layout, actual_seq_klen, blk
+                        query, key, layout, actual_seq_klen, blk, query_scale
                     )
                 else:
-                    pref = [int(v) for v in actual_seq_klen.tolist()]
-                    max_blocks = max(
-                        1,
-                        max(
-                            ((r - l + blk - 1) // blk for l, r in zip(pref, pref[1:])),
-                            default=0,
-                        ),
+                    max_blocks = _seq_score_blocks(
+                        key, layout, actual_seq_klen, blk, compress_factor
                     )
             score_stride = _round_up(int(max_blocks), SCORE_STRIDE_ALIGN)
             score_heads = 1 if blk == BLOCK16_SIZE else num_q_heads
@@ -285,12 +365,12 @@ def _msa_index_score_v2(
     query: torch.Tensor,
     key: torch.Tensor,
     start_loc: torch.Tensor,
-    block_table: Optional[torch.Tensor],
-    query_scale: Optional[torch.Tensor],
-    key_scale: Optional[torch.Tensor],
-    atten_mask: Optional[torch.Tensor],
-    actual_seq_qlen: Optional[torch.Tensor],
-    actual_seq_klen: Optional[torch.Tensor],
+    block_table: Optional[torch.Tensor] = None,
+    query_scale: Optional[torch.Tensor] = None,
+    key_scale: Optional[torch.Tensor] = None,
+    atten_mask: Optional[torch.Tensor] = None,
+    actual_seq_qlen: LengthInput = None,
+    actual_seq_klen: LengthInput = None,
     *,
     layout_key: str = DEFAULT_LAYOUT_KEY,
     sparse_mode: int = DEFAULT_SPARSE_MODE,
@@ -301,6 +381,8 @@ def _msa_index_score_v2(
     return_choice: int = 0,
     topk: int = 16,
     compress_factor: int = 1,
+    host_qlen=None,
+    host_klen=None,
 ) -> torch.Tensor:
     layout = _normalize_layout_key(layout_key)
     layout_query = _normalize_layout_query(layout_query)
@@ -322,8 +404,8 @@ def _msa_index_score_v2(
         query_scale,
         key_scale,
         atten_mask,
-        actual_seq_qlen,
-        actual_seq_klen,
+        _length_tensor(actual_seq_qlen, host_qlen),
+        _length_tensor(actual_seq_klen, host_klen),
         layout,
         sparse_mode,
         init_blocks,
@@ -346,8 +428,8 @@ def msa_index_score_v2(
     query_scale: Optional[torch.Tensor] = None,
     key_scale: Optional[torch.Tensor] = None,
     atten_mask: Optional[torch.Tensor] = None,
-    actual_seq_qlen: Optional[torch.Tensor] = None,
-    actual_seq_klen: Optional[torch.Tensor] = None,
+    actual_seq_qlen: LengthInput = None,
+    actual_seq_klen: LengthInput = None,
     layout_key: str = DEFAULT_LAYOUT_KEY,
     sparse_mode: int = DEFAULT_SPARSE_MODE,
     init_blocks: int = DEFAULT_INIT_BLOCKS,
@@ -396,6 +478,10 @@ def msa_index_score_v2(
         layout_query,
         compress_factor=compress_factor,
     )
+    host_qlen = _host_lengths(actual_seq_qlen, start_loc, query, layout_query)
+    host_klen = _host_lengths(
+        actual_seq_klen, start_loc, key, layout_key, compress_factor, block_table
+    )
     if int(return_choice) == 2:
         _score, indices, values = _get_op_module().msa_index_score_v2(
             query,
@@ -405,8 +491,8 @@ def msa_index_score_v2(
             query_scale,
             key_scale,
             atten_mask,
-            actual_seq_qlen,
-            actual_seq_klen,
+            _length_tensor(actual_seq_qlen, host_qlen),
+            _length_tensor(actual_seq_klen, host_klen),
             layout_key,
             sparse_mode,
             init_blocks,
@@ -426,8 +512,8 @@ def msa_index_score_v2(
         query_scale,
         key_scale,
         atten_mask,
-        actual_seq_qlen,
-        actual_seq_klen,
+        actual_seq_qlen if host_qlen is None else None,
+        actual_seq_klen if host_klen is None else None,
         layout_key=layout_key,
         sparse_mode=sparse_mode,
         init_blocks=init_blocks,
@@ -437,4 +523,6 @@ def msa_index_score_v2(
         return_choice=int(return_choice),
         topk=int(topk),
         compress_factor=int(compress_factor),
+        host_qlen=host_qlen,
+        host_klen=host_klen,
     )

@@ -127,14 +127,14 @@ cann_ops_transformer.msa_index_score(
     <td>query_scale</td>
     <td>可选</td>
     <td>MXFP4的Q逐组系数，其他类型为None</td>
-    <td>float8_e8m0fnu</td>
+    <td>float8_e8m0fnu / uint8（E8M0 编码）</td>
     <td>Q形状前缀相同，末维D/32</td>
   </tr>
   <tr>
     <td>key_scale</td>
     <td>可选</td>
     <td>MXFP4的K逐组系数，原生浮点不传</td>
-    <td>float32 / float8_e8m0fnu</td>
+    <td>float32 / float8_e8m0fnu / uint8（E8M0 编码）</td>
     <td>MXFP4与K形状前缀相同，末维D/32</td>
   </tr>
   <tr>
@@ -280,3 +280,5 @@ score_bsnd = cann_ops_transformer.msa_index_score(
 ### MXFP4（A4C4）
 
 仅Ascend 950支持Q/K均为`float4_e2m1fn_x2`，逻辑D为64或128、N2=1。Torch每个元素打包两个FP4值，因此输入末维为D/2；两份独立`float8_e8m0fnu`系数的形状前缀与对应Q/K相同、末维D/32，按每32个元素分别缩放后再点积。
+
+也支持将 Q、K、`query_scale` 和 `key_scale` 均以 `torch.uint8` 传入，各张量沿用上述形状。Q/K 每字节存两个 E2M1 值，scale 每字节存一个 E8M0 编码。

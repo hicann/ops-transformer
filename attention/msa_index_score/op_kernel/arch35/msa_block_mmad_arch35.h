@@ -628,6 +628,30 @@ public:
         }
     }
 
+    __aicore__ inline void LoadStridedBPagesToL1(const AscendC::GlobalTensor<ElementB>& gmB,
+                                                 const AscendC::GlobalTensor<fp8_e8m0_t>& gmScaleB, uint32_t pages)
+    {
+        static_assert(IS_MXFP4 && sizeof(ElementB) == 1U, "strided copy uses packed MXFP4 bytes");
+        constexpr uint32_t packedHead = 64U;
+        constexpr uint32_t packedPageBytes = MSA_BLOCK_SIZE * packedHead;
+        constexpr uint32_t elementsPerC0 =
+            Catlass::BytesToBits(Catlass::BYTE_PER_C0) / Catlass::SizeOfBits<ElementB>::value;
+        constexpr auto layoutBInL1 = LayoutBInL1::template MakeLayout<ElementB>(L1_K, L1_N);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE1_MTE2>(l1BEventList_[l1ListId_]);
+        AscendC::Nd2NzParams params;
+        params.ndNum = pages;
+        params.nValue = MSA_BLOCK_SIZE;
+        params.dValue = packedHead;
+        params.srcNdMatrixStride = 2U * packedPageBytes;
+        params.srcDValue = packedHead;
+        params.dstNzC0Stride = layoutBInL1.stride(1) / elementsPerC0;
+        params.dstNzNStride = layoutBInL1.stride(Catlass::Gemm::Tile::DIM_IDX_2) / elementsPerC0;
+        params.dstNzMatrixStride = layoutBInL1.GetOffset(Catlass::MatrixCoord{0U, MSA_BLOCK_SIZE});
+        AscendC::DataCopy(l1BTensorList_[l1ListId_], gmB, params);
+        CopyScaleGmToL1(l1ScaleBList_[l1ListId_], gmScaleB, pages * MSA_BLOCK_SIZE, packedHead * 2U);
+        AscendC::SetFlag<AscendC::HardEvent::MTE2_MTE1>(l1BEventList_[l1ListId_]);
+    }
+
     __aicore__ inline void LoadBPageToL1(const AscendC::GlobalTensor<ElementB>& gmB, const LayoutB& layoutB,
                                          const AscendC::GlobalTensor<fp8_e8m0_t>& gmScaleB, uint32_t kActual,
                                          uint32_t nOffset, bool first, bool last, uint32_t rows = MSA_BLOCK_SIZE)

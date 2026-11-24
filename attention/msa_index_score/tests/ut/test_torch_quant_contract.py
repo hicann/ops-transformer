@@ -240,6 +240,12 @@ def test_graph_converter_preserves_master_ir_and_native_scales(
         captured.update(kwargs)
         return ["score"] * len(kwargs["outputs"])
 
+    def get_default_ge_graph():
+        return None
+
+    def ge_dtype_to_ge_proto_dtype(dtype):
+        return dtype
+
     stubs = {
         key: types.ModuleType(key)
         for key in (
@@ -258,8 +264,11 @@ def test_graph_converter_preserves_master_ir_and_native_scales(
     graph = stubs["torchair.ge._ge_graph"]
     graph.Tensor = object
     graph.TensorSpec = object
-    graph.DataType = types.SimpleNamespace(DT_INT8=2)
+    graph.DataType = types.SimpleNamespace(DT_INT8=2, DT_UINT8=4)
     graph.auto_convert_to_tensor = lambda *flags: lambda function: function
+    graph.get_default_ge_graph = get_default_ge_graph
+    graph._ge_dtype_to_ge_proto_dtype = ge_dtype_to_ge_proto_dtype
+    stubs["torchair._ge_concrete_graph"].ge_apis = types.SimpleNamespace()
     ir = stubs["torchair._ge_concrete_graph.compat_ir"]
     ir.ge_op, ir.IrDef = ge_op, IrDef
     stubs[
@@ -267,10 +276,18 @@ def test_graph_converter_preserves_master_ir_and_native_scales(
     ].register_fx_node_ge_converter = lambda operation: lambda function: function
     for key, value in stubs.items():
         monkeypatch.setitem(sys.modules, key, value)
-    path = Path(__file__).parents[2] / "torch_extension" / f"graph_convert_{name}.py"
-    spec = importlib.util.spec_from_file_location(f"graph_contract_{name}", path)
-    converter = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(converter)
+    extension = Path(__file__).parents[2] / "torch_extension"
+    package = modules[name].__package__
+    for converter_name in ("msa_index_score", "msa_index_score_v2"):
+        filename = f"graph_convert_{converter_name}"
+        spec = importlib.util.spec_from_file_location(
+            f"{package}.{filename}", extension / f"{filename}.py"
+        )
+        converter = importlib.util.module_from_spec(spec)
+        monkeypatch.setitem(sys.modules, spec.name, converter)
+        spec.loader.exec_module(converter)
+        if converter_name == name:
+            break
     args = inputs(dtype=torch.int8 if name == "msa_index_score_v2" else torch.bfloat16)
     convert = getattr(converter, f"convert_{name}")
     if name == "msa_index_score":

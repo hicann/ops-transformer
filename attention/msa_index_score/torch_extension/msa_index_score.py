@@ -11,6 +11,7 @@ from typing import Optional
 from .msa_index_score_v2 import (
     _packed_query_meta,
     _resolve_pool_block_size,
+    _seq_score_blocks,
     _batch_key128_max_blocks,
     PA_BLOCK_SIZE,
     BLOCK16_SIZE,
@@ -141,21 +142,17 @@ class MsaIndexScoreOpBuilder(OpBuilder):
                     and pool_block_size == PA_BLOCK_SIZE
                 ):
                     max_blocks = _batch_key128_max_blocks(
-                        query, key, layout, actual_seq_klen, pool_block_size
+                        query,
+                        key,
+                        layout,
+                        actual_seq_klen,
+                        pool_block_size,
+                        query_scale,
                     )
                 else:
-                    pref = [int(v) for v in actual_seq_klen.tolist()]
-                    blk = _resolve_pool_block_size(
-                        layout, key, pool_block_size, layout_query
+                    max_blocks = _seq_score_blocks(
+                        key, layout, actual_seq_klen, pool_block_size
                     )
-                    max_blocks = 0
-                    for i in range(len(pref) - 1):
-                        kv = pref[i + 1] - pref[i]
-                        blocks = 0 if kv <= 0 else (kv + blk - 1) // blk
-                        if blocks > max_blocks:
-                            max_blocks = blocks
-                    if max_blocks <= 0:
-                        max_blocks = 1
             score_stride = _round_up(int(max_blocks), SCORE_STRIDE_ALIGN)
             blk = _resolve_pool_block_size(layout, key, pool_block_size, layout_query)
             score_heads = 1 if blk == BLOCK16_SIZE else num_q_heads

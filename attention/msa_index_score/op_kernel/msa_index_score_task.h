@@ -26,12 +26,12 @@
 #include "kernel_operator.h"
 #include "msa_index_score_common.h"
 
-// Keep A8C8 request planning and packet accounting out of A2/A3 floating-point kernels.
-#if (__CCE_AICORE__ != 310) && defined(ORIG_DTYPE_QUERY) && \
-    (ORIG_DTYPE_QUERY == DT_FLOAT16 || ORIG_DTYPE_QUERY == DT_BF16)
-#define MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER 1
+// A8C8 request planning and packet accounting are used only on the non-floating-point A2/A3 paths.
+#if (__CCE_AICORE__ == 310) || \
+    (defined(ORIG_DTYPE_QUERY) && (ORIG_DTYPE_QUERY == DT_FLOAT16 || ORIG_DTYPE_QUERY == DT_BF16))
+#define MSA_TASK_USE_LEGACY_SCHEDULER 1
 #else
-#define MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER 0
+#define MSA_TASK_USE_LEGACY_SCHEDULER 0
 #endif
 
 namespace MsaIndexScoreNs {
@@ -123,7 +123,7 @@ struct MsaTask {
 /// BLOCK_SIZE 为逻辑 block 的 token 数，编译期常量。
 /// 128 路径（TND / BBND / BNBD）实例化 <MSA_BLOCK_SIZE>，除法仍折叠成移位，
 /// 与模板化之前的代码等价；BSND 实例化 <MSA_BLOCK16_SIZE>。
-template <uint32_t BLOCK_SIZE = MSA_BLOCK_SIZE>
+template <uint32_t BLOCK_SIZE = MSA_BLOCK_SIZE, bool SHORT_SCORE = false>
 class MsaTaskScheduler {
 public:
     __aicore__ inline MsaTaskScheduler() {}
@@ -131,14 +131,17 @@ public:
     // rotateChunk：A2/A3 把每个请求的 chunk 0 错开到不同核。950 保持 false。
     // nStiles 不能整除 chunks 时，多出来的 stile 否则会每个请求都落在核 0..extra-1 上。
     template <bool REQUEST_PLAN = false>
-    __aicore__ inline void Init(
-        uint32_t batch, uint32_t numQHeads, uint32_t maxBlocksPerBatch, uint32_t scoreBlockStride, uint32_t sparseMode,
-        uint32_t initBlocks, uint32_t localBlocks, uint32_t keyLayout, uint32_t kvChunks,
-        const AscendC::GlobalTensor<int32_t>& actualSeqQlen, const AscendC::GlobalTensor<int32_t>& actualSeqKlen,
-        const AscendC::GlobalTensor<int32_t>& startLoc, bool rotateChunk = false, uint32_t qMaxSeq = 0U,
-        uint32_t kMaxSeq = 0U, uint32_t tableWidth = 0U, uint32_t chunkBudget = 0U, uint32_t pageSize = MSA_BLOCK_SIZE,
-        uint32_t totalQ = ~0U, uint32_t compressFactor = 1U, uint32_t hostTotalTasks = 0U,
-        uint32_t requestPlanCores = 0U, uint32_t requestPlanTaskIdx = 0U, bool checkBatchPacketRows = false)
+    __aicore__ inline void Init(uint32_t batch, uint32_t numQHeads, uint32_t maxBlocksPerBatch,
+                                uint32_t scoreBlockStride, uint32_t sparseMode, uint32_t initBlocks,
+                                uint32_t localBlocks, uint32_t keyLayout, uint32_t kvChunks,
+                                const AscendC::GlobalTensor<int32_t>& actualSeqQlen,
+                                const AscendC::GlobalTensor<int32_t>& actualSeqKlen,
+                                const AscendC::GlobalTensor<int32_t>& startLoc, bool rotateChunk = false,
+                                uint32_t qMaxSeq = 0U, uint32_t kMaxSeq = 0U, uint32_t tableWidth = 0U,
+                                uint32_t chunkBudget = 0U, uint32_t pageSize = MSA_BLOCK_SIZE, uint32_t totalQ = ~0U,
+                                uint32_t compressFactor = 1U, uint32_t hostTotalTasks = 0U,
+                                uint32_t requestPlanCores = 0U, uint32_t requestPlanTaskIdx = 0U,
+                                bool checkBatchPacketRows = false, bool allowFixedSlots = false)
     {
         // actual_seq_klen 是压缩前的 token 数。compress_factor>1 时 key 行数 = ceil(token / cf)，
         // 一个逻辑 block 仍是 BLOCK_SIZE 个 token，落到 key 上是 rowsPerBlock_ 行。
@@ -171,6 +174,16 @@ public:
         gActualSeqKlen_ = actualSeqKlen;
         gStartLoc_ = startLoc;
 
+        if constexpr (SHORT_SCORE) {
+            // With at most 40 Q rows in the whole batch, each request fits in one M tile.
+            fixedSlots_ = allowFixedSlots && (batch == 4U || batch == 5U) && numQHeads == 1U && totalQ > 0U &&
+                          totalQ <= batch * 8U && kvChunks_ > 1U && maxBlocksPerBatch >= 32U &&
+                          maxBlocksPerBatch <= 128U && initBlocks == 0U && localBlocks == 0U;
+            if (fixedSlots_) {
+                totalTasks_ = batch * kvChunks_;
+                return;
+            }
+        }
         // host 已算好 totalTasks 时只拉 batch0 元数据，避免扫遍 batch 的 GetValue。
         if (BLOCK_SIZE == MSA_BLOCK16_SIZE && hostTotalTasks > 0U) {
             totalTasks_ = hostTotalTasks;
@@ -181,7 +194,7 @@ public:
             return;
         }
 
-#if !MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER
+#if !MSA_TASK_USE_LEGACY_SCHEDULER
         tailWaveFactor_ = 1U;
         tailWaveStart_ = 0U;
         useRequestPlan_ = false;
@@ -208,7 +221,7 @@ public:
         for (uint32_t b = 0; b < batch_; ++b) {
             LoadBatch(b);
             totalTasks_ += curTasks_;
-#if !MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER
+#if !MSA_TASK_USE_LEGACY_SCHEDULER
             AccumulateBatchPacketRows();
 #endif
         }
@@ -322,6 +335,25 @@ public:
         return kvLen_ < 0 ? 0 : kvLen_;
     }
 
+    __aicore__ inline bool DecodeScoreSlot(uint32_t slot, MsaTask& task)
+    {
+        if constexpr (SHORT_SCORE) {
+            if (fixedSlots_) {
+                curBatch_ = slot / kvChunks_;
+                const uint32_t chunk = slot - curBatch_ * kvChunks_;
+                LoadBatch(curBatch_);
+                // Empty Q owns no work. A nonempty Q with empty K keeps chunk 0 for its tail fill.
+                if (chunk >= curTasks_) {
+                    return false;
+                }
+                FillTask(task, 0U, curRows_, chunk, curTasks_);
+                return true;
+            }
+        }
+        Decode(slot, task);
+        return true;
+    }
+
     __aicore__ inline void Decode(uint32_t taskIdx, MsaTask& task)
     {
         if (BLOCK_SIZE == MSA_BLOCK16_SIZE && batch_ == 1U && kvChunks_ <= 1U && totalTasks_ == 1U) {
@@ -342,7 +374,13 @@ public:
         uint32_t mActual = 0;
         uint32_t sChunkIdx = 0;
         uint32_t sChunks = 1;
-#if !MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER
+        if constexpr (SHORT_SCORE) {
+            if (!rotateChunk_ && kvChunks_ > 1U && curRows_ <= MSA_ROW_TILE_M) {
+                FillTask(task, 0U, curRows_, local, curTasks_);
+                return;
+            }
+        }
+#if !MSA_TASK_USE_LEGACY_SCHEDULER
         if (useRequestPlan_) {
             mActual = curRows_;
             sChunkIdx = local;
@@ -599,6 +637,13 @@ private:
         if (kvChunks_ <= 1U) {
             return mTiles;
         }
+        if constexpr (SHORT_SCORE) {
+            if (mTiles == 1U) {
+                // The last query row of the complete M tile sees the whole KV sequence.
+                const uint32_t valid = kvLen_ > 0 ? static_cast<uint32_t>(kvLen_) : 0U;
+                return KvChunksOf(MsaMinU32(MsaCeilDiv(valid, BLOCK_SIZE), BlockCap()));
+            }
+        }
         uint32_t n = 0;
         uint32_t mStart = 0;
         uint32_t mActual = 0;
@@ -645,7 +690,7 @@ private:
         }
     }
 
-#if MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER
+#if MSA_TASK_USE_LEGACY_SCHEDULER
     __aicore__ inline void LoadBatchMeta(uint32_t b)
 #else
     __aicore__ inline void LoadBatchMeta(uint32_t b)
@@ -707,8 +752,13 @@ private:
         } else {
             LoadCompressedBatch(b);
         }
-#if MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER
-        startLoc_ = gStartLoc_.GetValue(b);
+#if MSA_TASK_USE_LEGACY_SCHEDULER
+        if constexpr (SHORT_SCORE) {
+            // The score epilogue uses startLoc only when an init or local mask is enabled.
+            startLoc_ = (initBlocks_ != 0U || localBlocks_ != 0U) ? gStartLoc_.GetValue(b) : 0;
+        } else {
+            startLoc_ = gStartLoc_.GetValue(b);
+        }
 #else
         if (loadStart) {
             startLoc_ = gStartLoc_.GetValue(b);
@@ -716,14 +766,14 @@ private:
 #endif
     }
 
-#if MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER
+#if MSA_TASK_USE_LEGACY_SCHEDULER
     __aicore__ inline void LoadBatchMetadata(uint32_t b, bool /* loadStart */)
     {
         LoadBatchMeta(b);
     }
 #endif
 
-#if MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER
+#if MSA_TASK_USE_LEGACY_SCHEDULER
     __aicore__ inline void LoadBatch(uint32_t b)
     {
         if (b >= batch_) {
@@ -757,6 +807,7 @@ private:
     uint32_t keyLayout_ = MSA_KEY_LAYOUT_BBND;
     uint32_t kvChunks_ = 1;
     bool rotateChunk_ = false;
+    bool fixedSlots_ = false;
     uint32_t qMaxSeq_ = 0;
     uint32_t kMaxSeq_ = 0;
     uint32_t tableWidth_ = 0;
@@ -784,6 +835,6 @@ private:
 
 } // namespace MsaIndexScoreNs
 
-#undef MSA_TASK_USE_LEGACY_FLOAT_SCHEDULER
+#undef MSA_TASK_USE_LEGACY_SCHEDULER
 
 #endif // MSA_INDEX_SCORE_TASK_H

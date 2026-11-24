@@ -21,6 +21,9 @@ try:
         register_fx_node_ge_converter,
     )
     from torchair.ge import attr
+    from torchair._ge_concrete_graph import ge_apis as ge
+    from torchair.ge._ge_graph import DataType
+    from .graph_convert_msa_index_score import _unpack_mxfp4_inputs
 
     _TORCHAIR_AVAILABLE = True
 except ImportError:
@@ -58,6 +61,9 @@ if _TORCHAIR_AVAILABLE:
         if dependencies is None:
             dependencies = []
 
+        query, key, query_scale, key_scale = _unpack_mxfp4_inputs(
+            query, key, query_scale, key_scale
+        )
         inputs = {
             "query": query,
             "key": key,
@@ -80,7 +86,13 @@ if _TORCHAIR_AVAILABLE:
             "topk": attr.Int(topk),
             "compress_factor": attr.Int(compress_factor),
         }
-        outputs = ["score", "sparse_indices", "sparse_values"]
+        # GE binds the sole index buffer to physical output 0 for this mode.
+        indices_only = return_choice == 1
+        outputs = (
+            ["sparse_indices"]
+            if indices_only
+            else ["score", "sparse_indices", "sparse_values"]
+        )
         result = ge_op(
             op_type="MsaIndexScore",
             inputs=inputs,
@@ -116,14 +128,10 @@ if _TORCHAIR_AVAILABLE:
             .output("sparse_indices", "DT_INT32")
             .output("sparse_values", "DT_FLOAT"),
         )
-        if (
-            int(return_choice) in (1, 2)
-            and isinstance(result, (list, tuple))
-            and len(result) > 1
-        ):
-            if int(return_choice) == 2 and len(result) > 2:
-                return result[1], result[2]
-            return result[1]
+        if indices_only:
+            return result
+        if return_choice == 2:
+            return result[1], result[2]
         return result[0] if isinstance(result, (list, tuple)) else result
 
     @register_fx_node_ge_converter(
@@ -133,12 +141,12 @@ if _TORCHAIR_AVAILABLE:
         query: Tensor,
         key: Tensor,
         start_loc: Tensor,
-        block_table: Optional[Tensor],
-        query_scale: Optional[Tensor],
-        key_scale: Optional[Tensor],
-        atten_mask: Optional[Tensor],
-        actual_seq_qlen: Optional[Tensor],
-        actual_seq_klen: Optional[Tensor],
+        block_table: Optional[Tensor] = None,
+        query_scale: Optional[Tensor] = None,
+        key_scale: Optional[Tensor] = None,
+        atten_mask: Optional[Tensor] = None,
+        actual_seq_qlen: Optional[Tensor] = None,
+        actual_seq_klen: Optional[Tensor] = None,
         *,
         layout_key: str = "BBND",
         sparse_mode: int = 3,
@@ -149,9 +157,15 @@ if _TORCHAIR_AVAILABLE:
         return_choice: int = 0,
         topk: int = 16,
         compress_factor: int = 1,
+        host_qlen=None,
+        host_klen=None,
         meta_outputs: TensorSpec = None,
     ):
-        return MsaIndexScoreV2(
+        if host_qlen is not None:
+            actual_seq_qlen = ge.Const(host_qlen, dtype=DataType.DT_INT32)
+        if host_klen is not None:
+            actual_seq_klen = ge.Const(host_klen, dtype=DataType.DT_INT32)
+        result = MsaIndexScoreV2(
             query=query,
             key=key,
             block_table=block_table,
@@ -171,6 +185,16 @@ if _TORCHAIR_AVAILABLE:
             topk=topk,
             compress_factor=compress_factor,
         )
+        # GE may allocate capacity when it cannot read prefixes during shape inference.
+        trim_query_rows = host_qlen is not None and layout_query != "TND"
+        trim_score_columns = (
+            host_klen is not None
+            and return_choice == 0
+            and layout_key in ("TND", "BSND", "BNSD")
+        )
+        if trim_query_rows or trim_score_columns:
+            return ge.Slice(result, [0, 0, 0], meta_outputs.size)
+        return result
 
 else:
 

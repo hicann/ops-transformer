@@ -77,11 +77,11 @@ cann_ops_transformer.msa_index_score_v2(
 | key | 必选 | $K_{idx}$。布局由 `layout_key` 指定。分页允许物理页轴非连续，其余长度大于 1 的轴须为紧凑步长。非分页须连续。 | 与 query 同型 | TND `[T2, N2, D]`；BSND `[B, S2, N2, D]`；BNSD `[B, N2, S2, D]`；BBND `[NP, P, N2, D]`；BNBD `[NP, N2, P, D]` |
 | start_loc | 必选 | 每条请求当前 query 所在的逻辑打分块号。token 位置129、块长128时传入1。块长 128 用它定位局部窗口。 | int32 | `[B]` |
 | block_table | 分页必选 | 逻辑页到物理页的映射，值为 key 第 0 维的下标。非分页传 `None`。 | int32 | `[B, MB]` |
-| query_scale | A8C8、MXFP4 必选 | A8C8 为逐 token、逐 head 的 Q 反量化系数，MXFP4 为每 32 个元素一组的缩放系数，其他类型传 `None`。 | A8C8 为 float32，MXFP4 为 `torch.float8_e8m0fnu` | A8C8 为 `[Tq,Hq]`；MXFP4 与 query 同布局，末维为 `D/32` |
-| key_scale | A8C8、MXFP4 必选 | A8C8 为逐 K token 的反量化系数，MXFP4 为每 32 个元素一组的缩放系数，其他类型传 `None`。分页时按物理页紧凑存储。 | A8C8 为 float32，MXFP4 为 `torch.float8_e8m0fnu` | A8C8 分页为 `[NP,1,128]`，TND 为 `[Tk,1]` 或 `[Tk]`；MXFP4 与 key 同布局，末维为 `D/32` |
+| query_scale | A8C8、MXFP4 必选 | A8C8 为逐 token、逐 head 的 Q 反量化系数，MXFP4 为每 32 个元素一组的缩放系数，其他类型传 `None`。 | A8C8 为 float32，MXFP4 为 `torch.float8_e8m0fnu` 或 `torch.uint8`（E8M0 编码） | A8C8 为 `[Tq,Hq]`；MXFP4 与 query 同布局，末维为 `D/32` |
+| key_scale | A8C8、MXFP4 必选 | A8C8 为逐 K token 的反量化系数，MXFP4 为每 32 个元素一组的缩放系数，其他类型传 `None`。分页时按物理页紧凑存储。 | A8C8 为 float32，MXFP4 为 `torch.float8_e8m0fnu` 或 `torch.uint8`（E8M0 编码） | A8C8 分页为 `[NP,1,128]`，TND 为 `[Tk,1]` 或 `[Tk]`；MXFP4 与 key 同布局，末维为 `D/32` |
 | atten_mask | `sparse_mode=3` 必选 | 因果模板，0 表示可见，1 表示屏蔽。取 `sparse_mode=0` 时传 `None`。 | int8 | `[2048, 2048]` |
-| actual_seq_qlen | 必选 | query 有效长度的前缀和，从 0 开始，单调不减。 | int32 | `[B+1]` |
-| actual_seq_klen | 必选 | 按压缩前的 KV token 数计。分页传各请求的可见长度，非分页传从 0 开始且单调不减的前缀和。 | int32 | 分页 `[B]`；非分页 `[B+1]` |
+| actual_seq_qlen | 必选 | query 有效长度的前缀和，从 0 开始，单调不减。 | int32 张量或 Python 整数列表、元组 | `[B+1]` |
+| actual_seq_klen | 必选 | 按压缩前的 KV token 数计。分页传各请求的可见长度，非分页传从 0 开始且单调不减的前缀和。 | int32 张量或 Python 整数列表、元组 | 分页 `[B]`；非分页 `[B+1]` |
 | layout_key | 可选 | 支持 `TND` / `BSND` / `BNSD` / `BBND` / `BNBD`，默认 `BBND`。 | str | - |
 | sparse_mode | 可选 | 支持 0 或 3，默认 3。 | int | - |
 | init_blocks | 可选 | 强制保留的前缀块数，默认 0。 | int | - |
@@ -122,6 +122,7 @@ cann_ops_transformer.msa_index_score_v2(
 ## 约束说明
 
 - `actual_seq_qlen` 和 `actual_seq_klen` 可在 CPU 或 query 所在的 NPU 上。CPU 长度会复制到设备，调用返回前等待当前 NPU 流完成。NPU 图捕获须使用设备侧长度。其余输入张量须位于 query 所在的 NPU。
+- TorchAir 构图时，若输出形状取决于长度值，请将对应长度作为 Python 整数列表或元组传入。长度值变化时可能重新编译。
 - TND key 只支持 TND query。BSND / BNSD key 在块长 128 时搭配 TND query，在块长 16 时搭配同布局的 query。分页 key 可搭配平台支持的任一种 query 布局。
 - 单条请求或整批的有效 query / KV 长度可以为 0。BSND / BNSD 的有效 query 长度不能超过 `S1`，每条请求的压缩 key 行数不能超过 `S2`。分页的物理页长须是 `pool_block_size / compress_factor` 的正整数倍。
 - `N2` 只支持 1。query 和 key 的逻辑 `D` 必须相同，支持 16 到 128 之间的 16 倍数。MXFP4 只支持 `D=64` 或 128。块长 16 要求 `N1` 整除 128。
@@ -211,3 +212,5 @@ indices, values = cann_ops_transformer.msa_index_score_v2(
 ### MXFP4（A4C4）
 
 仅 Ascend 950 支持。query 和 key 均为 `torch.float4_e2m1fn_x2`，每个元素打包两个 FP4 值，张量末维为逻辑 `D/2`。分别传入 `query_scale` 和 `key_scale`，两者的 dtype 均为 `torch.float8_e8m0fnu`，shape 前缀与对应输入相同，末维为 `D/32`。
+
+也支持将 Q、K、`query_scale` 和 `key_scale` 均以 `torch.uint8` 传入，各张量沿用上述形状。Q/K 每字节存两个 E2M1 值，scale 每字节存一个 E8M0 编码。

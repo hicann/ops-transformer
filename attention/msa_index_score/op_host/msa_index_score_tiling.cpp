@@ -254,10 +254,24 @@ struct MsaIrOutput {
     const gert::CompileTimeTensorDesc* desc = nullptr;
 };
 
-inline MsaIrOutput IrOutputAt(gert::TilingContext* context, size_t irIndex)
+inline bool HasCompactTopkOutputs(const gert::TilingContext* context, uint32_t returnChoice)
+{
+    const auto* node = context->GetComputeNodeInfo();
+    const size_t topkOutputs = returnChoice == MSA_RETURN_INDICES_VALUES ? 2U : 1U;
+    return returnChoice != MSA_RETURN_SCORE && node != nullptr && node->GetOutputsNum() == topkOutputs &&
+           node->GetIrOutputsNum() <= topkOutputs;
+}
+
+inline MsaIrOutput IrOutputAt(gert::TilingContext* context, size_t irIndex, uint32_t returnChoice)
 {
     MsaIrOutput out;
-    const size_t runtime = MsaIndexScoreOutput::RuntimeIndex(context, irIndex);
+    size_t runtime = MsaIndexScoreOutput::RuntimeIndex(context, irIndex);
+    // GE compile-time tiling can omit disabled outputs and renumber the remaining IR slots.
+    if (HasCompactTopkOutputs(context, returnChoice)) {
+        const bool enabled = irIndex == MsaIndexScoreOutput::INDICES ||
+                             (irIndex == MsaIndexScoreOutput::VALUES && returnChoice == MSA_RETURN_INDICES_VALUES);
+        runtime = enabled ? irIndex - MsaIndexScoreOutput::INDICES : MsaIndexScoreOutput::ABSENT;
+    }
     if (runtime == MsaIndexScoreOutput::ABSENT) {
         return out;
     }
@@ -1024,7 +1038,7 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
         // score 的 T1 决定 head 步长。return_choice!=0 时没有 score，totalQ 保持前缀和或 B*S。
         if (info.returnChoice != MSA_RETURN_SCORE) {
             if (logicalBlock16 && !qPrefixApplied) {
-                const auto* indices = IrOutputAt(context, MsaIndexScoreOutput::INDICES).shape;
+                const auto* indices = IrOutputAt(context, MsaIndexScoreOutput::INDICES, info.returnChoice).shape;
                 if (indices != nullptr && indices->GetStorageShape().GetDimNum() == MSA_QUERY_DIM_NUM) {
                     const int64_t tokens = indices->GetStorageShape().GetDim(MSA_DIM_1);
                     OP_CHECK_IF(tokens < 0 || tokens > info.totalQ,
@@ -1034,7 +1048,8 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
                 }
             }
         } else {
-            const gert::StorageShape* scoreShapeEarly = IrOutputAt(context, MsaIndexScoreOutput::SCORE).shape;
+            const gert::StorageShape* scoreShapeEarly =
+                IrOutputAt(context, MsaIndexScoreOutput::SCORE, info.returnChoice).shape;
             OP_CHECK_NULL_WITH_CONTEXT(context, scoreShapeEarly);
             const gert::Shape& scoreEarly = scoreShapeEarly->GetStorageShape();
             OP_CHECK_IF(scoreEarly.GetDimNum() != MSA_QUERY_DIM_NUM,
@@ -1203,9 +1218,9 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
     }
 
     // score 末维 = 打分块数（16 对齐）。return_choice=0 时取自用户 score；否则按输入推导，与 InferShape 一致。
-    const MsaIrOutput scoreOutIr = IrOutputAt(context, 0);
-    const MsaIrOutput indicesOutIr = IrOutputAt(context, 1);
-    const MsaIrOutput valuesOutIr = IrOutputAt(context, 2);
+    const MsaIrOutput scoreOutIr = IrOutputAt(context, MsaIndexScoreOutput::SCORE, info.returnChoice);
+    const MsaIrOutput indicesOutIr = IrOutputAt(context, MsaIndexScoreOutput::INDICES, info.returnChoice);
+    const MsaIrOutput valuesOutIr = IrOutputAt(context, MsaIndexScoreOutput::VALUES, info.returnChoice);
     const gert::StorageShape* scoreShape = scoreOutIr.shape;
     const gert::StorageShape* indicesShape = indicesOutIr.shape;
     const gert::StorageShape* valuesShape = valuesOutIr.shape;
@@ -1262,12 +1277,14 @@ ge::graphStatus ParseAndCheck(gert::TilingContext* context, MsaIndexScoreInfo& i
         const auto* idxDesc = indicesOutIr.desc;
         OP_CHECK_NULL_WITH_CONTEXT(context, idxDesc);
         const uint32_t outputHeads = logicalBlock16 ? 1U : info.numQHeads;
-        const bool idxOk =
-            idxOut.GetDimNum() == MSA_QUERY_DIM_NUM && idxDesc->GetDataType() == ge::DT_INT32 &&
-            static_cast<ge::Format>(ge::GetPrimaryFormat(idxDesc->GetStorageFormat())) == ge::FORMAT_ND &&
-            static_cast<uint32_t>(idxOut.GetDim(MSA_DIM_0)) == outputHeads &&
-            static_cast<uint32_t>(idxOut.GetDim(MSA_DIM_1)) == info.totalQ &&
-            static_cast<uint32_t>(idxOut.GetDim(MSA_DIM_2)) == info.topk;
+        const auto idxFormat = static_cast<ge::Format>(ge::GetPrimaryFormat(idxDesc->GetStorageFormat()));
+        // GE may label the compact rank-3 output NCHW. It has the same dense storage as ND.
+        const bool idxFormatOk = idxFormat == ge::FORMAT_ND ||
+                                 (idxFormat == ge::FORMAT_NCHW && HasCompactTopkOutputs(context, info.returnChoice));
+        const bool idxOk = idxOut.GetDimNum() == MSA_QUERY_DIM_NUM && idxDesc->GetDataType() == ge::DT_INT32 &&
+                           idxFormatOk && static_cast<uint32_t>(idxOut.GetDim(MSA_DIM_0)) == outputHeads &&
+                           static_cast<uint32_t>(idxOut.GetDim(MSA_DIM_1)) == info.totalQ &&
+                           static_cast<uint32_t>(idxOut.GetDim(MSA_DIM_2)) == info.topk;
         if (!idxOk) {
             const int dtype = (idxDesc == nullptr) ? -1 : static_cast<int>(idxDesc->GetDataType());
             const int fmt =
@@ -1638,7 +1655,35 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
             kvChunks = info.isMxFp4 ? EstMxFp4KvChunks(info, aicNum, packedM, visBlocks) :
                                       EstKvChunks(info, aicNum, packedM, visBlocks);
         }
-        launchAic = EstLaunchAic(aicNum, packedM, kvChunks);
+        uint32_t launchMTiles = packedM;
+        const bool shortMxDecode = info.isAscend950 && info.isMxFp4 && info.returnChoice == MSA_RETURN_SCORE &&
+                                   info.poolBlockSize == MSA_BLOCK_SIZE && info.numQHeads == 1U &&
+                                   info.numKvHeads == 1U && info.headDim == 128U &&
+                                   (info.batch == 4U || info.batch == 5U) && info.totalQ <= info.batch * 8U;
+        if (shortMxDecode && packedM > 0U && packedM < aicNum) {
+            const uint32_t nStiles = (visBlocks + MSA_BLOCKS_PER_STILE - 1U) / MSA_BLOCKS_PER_STILE;
+            const uint32_t tokensPerStile = MSA_BLOCK_SIZE * MSA_BLOCKS_PER_STILE;
+            const bool multipleStiles =
+                MsaIsPaKeyLayout(info.keyLayout) ?
+                    static_cast<uint64_t>(info.tableWidth) * info.pageSize > tokensPerStile :
+                    static_cast<uint64_t>(info.totalK) > static_cast<uint64_t>(info.batch) * tokensPerStile;
+            if (multipleStiles && nStiles <= aicNum) {
+                // Spread work over one core wave, leaving at least two stiles per chunk for longer KV.
+                const uint32_t reuseLimit = nStiles >= MSA_FD_LEAST_STILE * 2U ? nStiles / 2U : nStiles;
+                const uint32_t splitLimit = std::min(aicNum / packedM, reuseLimit);
+                kvChunks = std::max(kvChunks, std::min(EstKvChunks(info, aicNum, packedM, visBlocks), splitLimit));
+            }
+            if (info.queryLayout == MSA_QUERY_LAYOUT_TND && (nStiles == 4U || nStiles == 16U)) {
+                // At Hq=1 the total Q bound fits a single M tile per request, even for ragged Q lengths.
+                launchMTiles = std::min(aicNum, std::min(info.totalQ, info.batch));
+                if (nStiles == 16U) {
+                    const uint32_t chunks = std::min(nStiles / 2U, aicNum / launchMTiles);
+                    if (chunks > kvChunks && (nStiles + chunks - 1U) / chunks < (nStiles + kvChunks - 1U) / kvChunks) {
+                        kvChunks = chunks;
+                    }
+                }
+            }
+        }
         // Use the shape-level average to identify small batched requests.
         // Device-only per-request lengths can still differ within that bound.
         const uint64_t packedRows = static_cast<uint64_t>(info.totalQ) * info.numQHeads;
@@ -1646,8 +1691,8 @@ ge::graphStatus DoTiling(gert::TilingContext* context, const MsaIndexScoreInfo& 
             packedRows <= static_cast<uint64_t>(info.batch) * 32U) {
             const uint32_t nStiles = (visBlocks + MSA_BLOCKS_PER_STILE - 1U) / MSA_BLOCKS_PER_STILE;
             kvChunks = EstStartupAwareKvChunks(aicNum, info.batch, nStiles);
-            launchAic = EstLaunchAic(aicNum, packedM, kvChunks);
         }
+        launchAic = EstLaunchAic(aicNum, launchMTiles, kvChunks);
     }
 
     const bool fixedPagedScore = fixedScale && info.numKvHeads == 1U && info.queryLayout == MSA_QUERY_LAYOUT_TND &&

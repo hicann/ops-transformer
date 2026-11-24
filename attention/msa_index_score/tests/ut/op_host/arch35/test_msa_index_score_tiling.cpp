@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 #include <gtest/gtest.h>
+#include "attention/msa_index_score/op_kernel/msa_index_score_common.h"
 #include "tiling_context_faker.h"
 #include "tiling_case_executor.h"
 
@@ -337,7 +338,7 @@ TEST_P(MsaIndexScoreTilingArch35, bsnd_pool16_v2_success)
     spec.klenShape = {2};
     // 块长16跨head归约。K仅64行，选择上游 FP16 DirectFloat 路径。
     spec.scoreShape = {1, 32, 16};
-    RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, 67);
+    RunTiling(spec, GetParam(), ge::GRAPH_SUCCESS, MSA_TILING_KEY_FP16_DIRECT_FLOAT);
 }
 
 TEST_P(MsaIndexScoreTilingArch35, causal_without_mask_fail)

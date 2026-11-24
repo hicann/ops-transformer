@@ -60,6 +60,13 @@ inline int64_t RoundUpTo(int64_t value, int64_t align)
     return (value + align - 1) / align * align;
 }
 
+bool IsSingleIndexOutput(const gert::ExtendedKernelContext* context, int64_t returnChoice)
+{
+    const auto* node = context->GetComputeNodeInfo();
+    // The GE converter can emit just the index tensor in physical output slot 0.
+    return returnChoice == MSA_RETURN_INDICES && node != nullptr && node->GetOutputsNum() == 1U;
+}
+
 } // namespace
 
 static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
@@ -72,11 +79,6 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
     const gert::Shape* keyShape = context->GetInputShape(MSA_KEY_INDEX);
     OP_CHECK_NULL_WITH_CONTEXT(context, keyShape);
     const gert::Shape* blockTableShape = context->GetOptionalInputShape(MSA_BLOCK_TABLE_INDEX);
-    using namespace MsaIndexScoreOutput;
-    auto* scoreShape = context->GetOutputShape(RuntimeIndex(context, SCORE));
-    auto* indicesShape = context->GetOutputShape(RuntimeIndex(context, INDICES));
-    auto* valuesShape = context->GetOutputShape(RuntimeIndex(context, VALUES));
-
     auto attrs = context->GetAttrs();
     const char* layoutKeyPtr = (attrs != nullptr) ? attrs->GetStr(MSA_ATTR_LAYOUT_KEY) : nullptr;
     const char* layoutKey = (layoutKeyPtr == nullptr || layoutKeyPtr[0] == '\0') ? "BBND" : layoutKeyPtr;
@@ -88,6 +90,11 @@ static ge::graphStatus InferShapeMsaIndexScore(gert::InferShapeContext* context)
     const int64_t returnChoice = (returnChoicePtr == nullptr) ? 0 : *returnChoicePtr;
     OP_CHECK_IF(returnChoice != 0 && returnChoice != 1 && returnChoice != 2,
                 OP_LOGE(context, "return_choice must be 0, 1 or 2, got %ld.", returnChoice), return ge::GRAPH_FAILED);
+    using namespace MsaIndexScoreOutput;
+    const bool indicesOnly = IsSingleIndexOutput(context, returnChoice);
+    auto* scoreShape = indicesOnly ? nullptr : context->GetOutputShape(RuntimeIndex(context, SCORE));
+    auto* indicesShape = context->GetOutputShape(indicesOnly ? 0 : RuntimeIndex(context, INDICES));
+    auto* valuesShape = indicesOnly ? nullptr : context->GetOutputShape(RuntimeIndex(context, VALUES));
     const int64_t* topkPtr = (attrs != nullptr) ? attrs->GetInt(MSA_ATTR_TOPK) : nullptr;
     const int64_t topk = topkPtr == nullptr ? MSA_TOPK_DEFAULT : *topkPtr;
     const bool topkOut = returnChoice != MSA_RETURN_SCORE;
@@ -307,6 +314,10 @@ static ge::graphStatus InferDataTypeMsaIndexScore(gert::InferDataTypeContext* co
     ge::DataType scoreType = ge::DT_FLOAT;
     const auto* attrs = context->GetAttrs();
     if (attrs != nullptr) {
+        const int64_t* choice = attrs->GetInt(MSA_ATTR_RETURN_CHOICE);
+        if (choice != nullptr && IsSingleIndexOutput(context, *choice)) {
+            return context->SetOutputDataType(0, ge::DT_INT32);
+        }
         const int64_t* pool = attrs->GetInt(MSA_ATTR_POOL_BLOCK_SIZE);
         if (pool != nullptr && *pool == static_cast<int64_t>(MSA_BLOCK16_SIZE)) {
             scoreType = ge::DT_FLOAT16;

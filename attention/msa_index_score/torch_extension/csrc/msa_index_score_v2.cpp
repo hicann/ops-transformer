@@ -42,6 +42,9 @@ constexpr int64_t BLOCK16_SIZE = 16; // BSND/BNSD，以及 BBND/BNBD 页长 16�
 constexpr int64_t BLOCK16_TOPK = 128;
 constexpr int64_t HEAD_DIM_ALIGN = 16;
 constexpr int64_t MAX_HEAD_DIM = 128;
+constexpr int64_t MXFP4_PACKED_HEAD_DIM_FOR_D64 = 32;
+constexpr int64_t MXFP4_PACKED_HEAD_DIM_FOR_D128 = 64;
+constexpr int64_t MX_GROUP_BYTES = 16; // Two FP4 values per byte, 32 values per E8M0 scale.
 constexpr int64_t ATTEN_MASK_SIZE = 2048;
 constexpr int64_t SPARSE_MODE_DEFAULT = 0;
 constexpr int64_t SPARSE_MODE_RIGHT_DOWN = 3;
@@ -122,9 +125,21 @@ void CheckMsaLayoutRanks(const at::Tensor& query, const at::Tensor& key, const c
     TORCH_CHECK(start_loc.dim() == START_LOC_DIM, "start_loc must be 1D [B], but got dim=", start_loc.dim());
 }
 
+void CheckMxScale(const at::Tensor& input, const c10::optional<at::Tensor>& scale, aclDataType dtype, const char* name)
+{
+    TORCH_CHECK(scale.has_value() && scale->defined() && ConvertToAclDataType(scale->scalar_type()) == dtype,
+                "MXFP4 requires E8M0 ", name, " in the same storage format as query.");
+    const auto prefixDims = input.dim() - 1;
+    TORCH_CHECK(scale->dim() == input.dim() &&
+                    scale->sizes().slice(0, prefixDims) == input.sizes().slice(0, prefixDims) &&
+                    scale->size(-1) == input.size(-1) / MX_GROUP_BYTES,
+                name, " must mirror its input layout with last dim D/32.");
+}
+
 void CheckMsaSparseAndDtypes(const at::Tensor& query, const at::Tensor& key, const c10::optional<at::Tensor>& key_scale,
                              const c10::optional<at::Tensor>& atten_mask, const at::Tensor& cu_q,
-                             const at::Tensor& kv_len, const at::Tensor& start_loc, int64_t sparse_mode, bool is_tnd)
+                             const at::Tensor& kv_len, const at::Tensor& start_loc, int64_t sparse_mode, bool is_tnd,
+                             bool is_mxfp4, aclDataType scaleDtype)
 {
     TORCH_CHECK(sparse_mode == SPARSE_MODE_DEFAULT || sparse_mode == SPARSE_MODE_RIGHT_DOWN,
                 "sparse_mode must be 0 or 3, but got ", sparse_mode);
@@ -144,7 +159,6 @@ void CheckMsaSparseAndDtypes(const at::Tensor& query, const at::Tensor& key, con
         const char* name = c10::toString(t);
         return name != nullptr && (std::string(name) == "hifloat8" || std::string(name) == "HiFloat8");
     };
-    const bool is_mxfp4 = query.scalar_type() == at::kFloat4_e2m1fn_x2;
     const bool q_ok = query.scalar_type() == at::kChar || query.scalar_type() == at::kHalf ||
                       query.scalar_type() == at::kBFloat16 || query.scalar_type() == at::kFloat8_e5m2 ||
                       query.scalar_type() == at::kFloat8_e4m3fn || is_hifloat8(query.scalar_type()) || is_mxfp4;
@@ -156,11 +170,8 @@ void CheckMsaSparseAndDtypes(const at::Tensor& query, const at::Tensor& key, con
                         is_hifloat8(query.scalar_type());
     const bool is_quant = (key.scalar_type() == at::kChar);
     if (is_mxfp4) {
-        TORCH_CHECK(key.scalar_type() == at::kFloat4_e2m1fn_x2, "MXFP4 key dtype must be float4_e2m1fn_x2.");
-        TORCH_CHECK(key_scale.has_value() && key_scale.value().defined() && key_scale.value().numel() > 0,
-                    "MXFP4 requires key key_scale.");
-        TORCH_CHECK(key_scale.value().scalar_type() == at::kFloat8_e8m0fnu,
-                    "MXFP4 key key_scale dtype must be float8_e8m0fnu, got ", key_scale.value().scalar_type());
+        TORCH_CHECK(key.scalar_type() == query.scalar_type(), "MXFP4 key must use the same dtype as query.");
+        CheckMxScale(key, key_scale, scaleDtype, "key_scale");
     } else if (is_quant) {
         TORCH_CHECK(query.scalar_type() == at::kChar, "int8 key requires native int8 query; float16/int8 is reserved.");
         TORCH_CHECK(key_scale.has_value() && key_scale.value().defined(), "int8 key requires dequant key_scale.");
@@ -193,7 +204,7 @@ MsaKeyMeta ResolveTndKeyMeta(const at::Tensor& key, const at::Tensor& cu_q, cons
     TORCH_CHECK(start_loc.size(0) + 1 == kv_len.size(0), "start_loc size must equal batch.");
     TORCH_CHECK(init_blocks >= 0 && local_blocks >= 0, "init_blocks/local_blocks must be >= 0.");
     auto kv_host = kv_len.cpu();
-    const int32_t* pref = kv_host.data_ptr<int32_t>();
+    const auto pref = kv_host.accessor<int32_t, 1>();
     const int64_t npref = kv_host.size(0);
     for (int64_t i = 0; i + 1 < npref; ++i) {
         const int64_t kv = static_cast<int64_t>(pref[i + 1]) - static_cast<int64_t>(pref[i]);
@@ -305,13 +316,17 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> msa_index_score_v2(
     const at::Tensor& cu_q = actual_seq_qlen.value();
     const at::Tensor& kv_len = actual_seq_klen.value();
     CheckMsaLayoutRanks(query, key, block_table, layoutKeyStr, layoutQueryStr, cu_q, kv_len, start_loc);
-    CheckMsaSparseAndDtypes(query, key, key_scale, atten_mask, cu_q, kv_len, start_loc, sparse_mode, seq_key);
-    const bool is_mxfp4 = query.scalar_type() == at::kFloat4_e2m1fn_x2;
+    const auto queryDtype = ConvertToAclDataType(query.scalar_type());
+    const bool isPackedMx = queryDtype == ACL_UINT8;
+    const bool is_mxfp4 = isPackedMx || queryDtype == ACL_FLOAT4_E2M1;
+    const auto scaleDtype = isPackedMx ? ACL_UINT8 : ACL_FLOAT8_E8M0;
+    CheckMsaSparseAndDtypes(query, key, key_scale, atten_mask, cu_q, kv_len, start_loc, sparse_mode, seq_key, is_mxfp4,
+                            scaleDtype);
     if (is_mxfp4) {
-        TORCH_CHECK(query_scale.has_value() && query_scale.value().defined() && query_scale.value().numel() > 0,
-                    "MXFP4 requires query_scale.");
-        TORCH_CHECK(query_scale.value().scalar_type() == at::kFloat8_e8m0fnu,
-                    "MXFP4 query_scale dtype must be float8_e8m0fnu, got ", query_scale.value().scalar_type());
+        const int64_t packedHeadDim = query.size(-1);
+        TORCH_CHECK(packedHeadDim == MXFP4_PACKED_HEAD_DIM_FOR_D64 || packedHeadDim == MXFP4_PACKED_HEAD_DIM_FOR_D128,
+                    "MXFP4 logical D must be 64 or 128.");
+        CheckMxScale(query, query_scale, scaleDtype, "query_scale");
     } else if (query.scalar_type() != at::kChar) {
         TORCH_CHECK(!query_scale.has_value() || !query_scale.value().defined(),
                     "query_scale is only supported for MXFP4 and int8 query.");
@@ -360,8 +375,8 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> msa_index_score_v2(
         const int64_t seqCap = (layoutQueryStr == "BSND") ? query.size(1) : query.size(2);
         num_q_heads = (layoutQueryStr == "BSND") ? query.size(2) : query.size(1);
         auto q_host = cu_q.to(at::kCPU);
-        const int32_t* qPref = q_host.data_ptr<int32_t>();
-        TORCH_CHECK(qPref != nullptr && q_host.size(0) >= 2, "actual_seq_qlen must be [B+1].");
+        const auto qPref = q_host.accessor<int32_t, 1>();
+        TORCH_CHECK(qPref.data() != nullptr && q_host.size(0) >= 2, "actual_seq_qlen must be [B+1].");
         const int64_t nPref = q_host.size(0);
         for (int64_t i = 0; i + 1 < nPref; ++i) {
             const int64_t qlenB = static_cast<int64_t>(qPref[i + 1]) - static_cast<int64_t>(qPref[i]);
@@ -374,7 +389,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> msa_index_score_v2(
     if (m3Layout && poolBlockSize == BLOCK16_SIZE) {
         TORCH_CHECK(query.scalar_type() == at::kHalf || query.scalar_type() == at::kBFloat16 ||
                         query.scalar_type() == at::kFloat8_e4m3fn || query.scalar_type() == at::kFloat8_e5m2 ||
-                        query.scalar_type() == at::kFloat4_e2m1fn_x2,
+                        is_mxfp4,
                     "BSND/BNSD supports float16 / bfloat16 / float8_e4m3fn / float8_e5m2 / MXFP4.");
         TORCH_CHECK(key.scalar_type() == query.scalar_type(), "BSND/BNSD key dtype must match query.");
     }
@@ -408,9 +423,27 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> msa_index_score_v2(
     }
     c10::optional<at::Tensor> device_qlen = actual_seq_qlen.value().to(query.device());
     c10::optional<at::Tensor> device_klen = actual_seq_klen.value().to(query.device());
-    ACLNN_CMD(aclnnMsaIndexScoreV2, query, key, start_loc, block_table, query_scale, key_scale, atten_mask, device_qlen,
-              device_klen, layoutKeyStr, sparse_mode, init_blocks, local_blocks, layoutQueryStr, poolBlockSize,
-              return_choice, topk_count, compress_factor, score, sparse_indices, sparse_values);
+    // Packed FP4 and E8M0 use the original storage with logical dtypes in the ACL descriptors.
+    auto packedView = [is_mxfp4](const at::Tensor& tensor) {
+        // MSA packs D. Give an adjacent singleton axis its canonical stride so ACL expands D.
+        if (is_mxfp4 && tensor.size(-2) == 1 && tensor.stride(-2) == 1 && tensor.stride(-1) == 1) {
+            return tensor.squeeze(-2).unsqueeze(-2);
+        }
+        return tensor;
+    };
+    const auto queryView = packedView(query);
+    const auto keyView = packedView(key);
+    TensorWrapper queryArg{queryView, is_mxfp4 ? ACL_FLOAT4_E2M1 : queryDtype};
+    TensorWrapper keyArg{keyView, is_mxfp4 ? ACL_FLOAT4_E2M1 : ConvertToAclDataType(key.scalar_type())};
+    const auto queryScale = query_scale.value_or(at::Tensor());
+    const auto keyScale = key_scale.value_or(at::Tensor());
+    const auto queryScaleDtype =
+        !is_mxfp4 && queryScale.defined() ? ConvertToAclDataType(queryScale.scalar_type()) : ACL_FLOAT8_E8M0;
+    TensorWrapper queryScaleArg{queryScale, queryScaleDtype};
+    TensorWrapper keyScaleArg{keyScale, is_mxfp4 ? ACL_FLOAT8_E8M0 : ACL_FLOAT};
+    ACLNN_CMD(aclnnMsaIndexScoreV2, queryArg, keyArg, start_loc, block_table, queryScaleArg, keyScaleArg, atten_mask,
+              device_qlen, device_klen, layoutKeyStr, sparse_mode, init_blocks, local_blocks, layoutQueryStr,
+              poolBlockSize, return_choice, topk_count, compress_factor, score, sparse_indices, sparse_values);
     if (host_lengths) {
         c10_npu::getCurrentNPUStream(query.device().index()).synchronize();
     }

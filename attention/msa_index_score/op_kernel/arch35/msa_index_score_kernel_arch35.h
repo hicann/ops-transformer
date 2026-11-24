@@ -226,7 +226,8 @@ public:
                         tiling_->sparseMode, tiling_->initBlocks, tiling_->localBlocks,
                         IS_TND_TND ? MSA_KEY_LAYOUT_TND : tiling_->keyLayout, tiling_->kvChunks, gActualSeqQlen_,
                         gActualSeqKlen_, gStartLoc_, false, IS_TND_TND ? 0U : tiling_->qMaxSeq, tiling_->kMaxSeq,
-                        tiling_->tableWidth, tiling_->chunkBudget, tiling_->pageSize, tiling_->totalQ);
+                        tiling_->tableWidth, tiling_->chunkBudget, tiling_->pageSize, tiling_->totalQ, 1U, 0U, 0U, 0U,
+                        false, USE_C2UB && !MX_FUSED_STAGE && tiling_->headDim == 128U && tiling_->numKvHeads == 1U);
         gQueryScaleMx_.SetGlobalBuffer(reinterpret_cast<__gm__ fp8_e8m0_t*>(queryScale));
         gKeyScaleMx_.SetGlobalBuffer(reinterpret_cast<__gm__ fp8_e8m0_t*>(keyScale));
     }
@@ -482,8 +483,8 @@ private:
                 if (!DecodeBalancedTask(taskIdx, coreNum, task)) {
                     continue;
                 }
-            } else {
-                scheduler_.Decode(taskIdx, task);
+            } else if (!scheduler_.DecodeScoreSlot(taskIdx, task)) {
+                continue;
             }
             if constexpr (IS_MXFP4 && MX_FUSED_STAGE && !IS_BLOCK16 && USE_C2UB) {
                 // Wave zero is always the identity mapping. Reuse its decoded
@@ -1903,6 +1904,27 @@ private:
             const uint32_t pages = nCols / MSA_BLOCK_SIZE;
             if (MsaIsPaKeyLayout(tiling_->keyLayout) && tiling_->pageSize == MSA_BLOCK_SIZE &&
                 tiling_->poolBlockSize == MSA_BLOCK_SIZE && pages > 1U && DirectPageRun(task, blk, pages) < pages) {
+                if constexpr (!ENABLE_TOPK) {
+                    constexpr uint32_t compactPageElems = MSA_BLOCK_SIZE * 128U;
+                    constexpr int32_t maxStridedCopyKvTokens = 131072;
+                    if (headDim == 128U && strideKvToken == 128U && tiling_->numQHeads == 1U &&
+                        tiling_->numKvHeads == 1U && task.kvLen <= maxStridedCopyKvTokens && nLoad == nCols &&
+                        tiling_->strideKvBlock == 2U * compactPageElems) {
+                        const int32_t page = PhysicalPageOfBlock(task, blk);
+                        uint32_t run = 1U;
+                        for (; run < pages; ++run) {
+                            if (PhysicalPageOfBlock(task, blk + run) != static_cast<int64_t>(page) + run) {
+                                break;
+                            }
+                        }
+                        if (run == pages) {
+                            const uint64_t compactKey = static_cast<uint64_t>(page) * compactPageElems;
+                            blockMmad.LoadStridedBPagesToL1(gKeyFp_[compactKey],
+                                                            gKeyScaleMx_[compactKey / MSA_MX_GROUP], pages);
+                            return;
+                        }
+                    }
+                }
                 const LayoutK layoutPage(kGemm, MSA_BLOCK_SIZE, strideK);
                 for (uint32_t i = 0U; i < pages; ++i) {
                     const uint64_t pageKey = KeyBlockGmOffset(task, blk + i);
@@ -2273,8 +2295,8 @@ private:
                 if (!DecodeBalancedTask(taskIdx, coreNum, task)) {
                     continue;
                 }
-            } else {
-                scheduler_.Decode(taskIdx, task);
+            } else if (!scheduler_.DecodeScoreSlot(taskIdx, task)) {
+                continue;
             }
             if constexpr (IS_MXFP4 && MX_FUSED_STAGE && !IS_BLOCK16 && USE_C2UB) {
                 // Wave zero is always the identity mapping. Reuse its decoded
@@ -2470,7 +2492,7 @@ private:
     }
 
     const MsaIndexScoreTilingData* __restrict tiling_ = nullptr;
-    MsaTaskScheduler<LOGICAL_BLOCK_SIZE> scheduler_;
+    MsaTaskScheduler<LOGICAL_BLOCK_SIZE, IS_MXFP4 && !IS_BLOCK16 && !ENABLE_TOPK && !MX_LATENCY_TND> scheduler_;
 
     AscendC::GlobalTensor<ElementQ> gQuery_;
     AscendC::GlobalTensor<ElementQ> gQScratch_;

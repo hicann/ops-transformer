@@ -102,7 +102,8 @@ void CheckMsaLayoutRanks(const at::Tensor& query, const at::Tensor& key, const c
 
 void CheckMsaSparseAndDtypes(const at::Tensor& query, const at::Tensor& key, const c10::optional<at::Tensor>& key_scale,
                              const c10::optional<at::Tensor>& atten_mask, const at::Tensor& cu_q,
-                             const at::Tensor& kv_len, const at::Tensor& start_loc, int64_t sparse_mode, bool is_tnd)
+                             const at::Tensor& kv_len, const at::Tensor& start_loc, int64_t sparse_mode, bool is_tnd,
+                             bool is_mx, aclDataType scaleDtype)
 {
     TORCH_CHECK(sparse_mode == SPARSE_MODE_DEFAULT || sparse_mode == SPARSE_MODE_RIGHT_DOWN,
                 "sparse_mode must be 0 or 3, but got ", sparse_mode);
@@ -122,8 +123,6 @@ void CheckMsaSparseAndDtypes(const at::Tensor& query, const at::Tensor& key, con
         const char* name = c10::toString(t);
         return name != nullptr && (std::string(name) == "hifloat8" || std::string(name) == "HiFloat8");
     };
-    const bool is_mx = query.scalar_type() == at::ScalarType::Float4_e2m1fn_x2 &&
-                       key.scalar_type() == at::ScalarType::Float4_e2m1fn_x2;
     const bool q_ok = is_mx || query.scalar_type() == at::kHalf || query.scalar_type() == at::kBFloat16 ||
                       query.scalar_type() == at::kFloat8_e5m2 || query.scalar_type() == at::kFloat8_e4m3fn ||
                       is_hifloat8(query.scalar_type());
@@ -133,9 +132,10 @@ void CheckMsaSparseAndDtypes(const at::Tensor& query, const at::Tensor& key, con
                         is_hifloat8(query.scalar_type());
     const bool is_quant = (key.scalar_type() == at::kChar);
     if (is_mx) {
+        TORCH_CHECK(key.scalar_type() == query.scalar_type(), "MXFP4 key must use the same dtype as query.");
         TORCH_CHECK(key_scale.has_value() && key_scale.value().defined() &&
-                        key_scale.value().scalar_type() == at::ScalarType::Float8_e8m0fnu,
-                    "MXFP4 requires E8M0 key_scale");
+                        ConvertToAclDataType(key_scale->scalar_type()) == scaleDtype,
+                    "MXFP4 requires E8M0 key_scale in the same storage format as query.");
     } else if (is_quant) {
         TORCH_CHECK(query.scalar_type() == at::kHalf, "int8 key requires float16 query.");
         TORCH_CHECK(key_scale.has_value() && key_scale.value().defined() && key_scale.value().numel() > 0,
@@ -168,11 +168,12 @@ MsaKeyMeta ResolveTndKeyMeta(const at::Tensor& key, const at::Tensor& cu_q, cons
     TORCH_CHECK(start_loc.size(0) + 1 == kv_len.size(0), "start_loc size must equal batch.");
     TORCH_CHECK(init_blocks >= 0 && local_blocks >= 0, "init_blocks/local_blocks must be >= 0.");
     auto kv_host = kv_len.cpu();
-    const int32_t* pref = kv_host.data_ptr<int32_t>();
+    const auto pref = kv_host.accessor<int32_t, 1>();
     const int64_t npref = kv_host.size(0);
     for (int64_t i = 0; i + 1 < npref; ++i) {
         const int64_t kv = static_cast<int64_t>(pref[i + 1]) - static_cast<int64_t>(pref[i]);
-        const int64_t blocks = (kv <= 0) ? 0 : ((kv + SUPPORTED_BLOCK_SIZE - 1) / SUPPORTED_BLOCK_SIZE);
+        TORCH_CHECK(kv >= 0, "TND actual_seq_klen must be a non-decreasing prefix sum.");
+        const int64_t blocks = (kv + SUPPORTED_BLOCK_SIZE - 1) / SUPPORTED_BLOCK_SIZE;
         if (blocks > meta.maxBlocks) {
             meta.maxBlocks = blocks;
         }
@@ -232,7 +233,7 @@ MsaKeyMeta ResolveBatchKeyMeta(const at::Tensor& key, const std::string& layoutK
     TORCH_CHECK(init_blocks >= 0 && local_blocks >= 0, "init_blocks/local_blocks must be >= 0.");
     // device tensor 上 .cpu() 会同步。只在已经位于 CPU 时核对每条 klen。
     if (kv_len.device().is_cpu()) {
-        const int32_t* lens = kv_len.data_ptr<int32_t>();
+        const auto lens = kv_len.accessor<int32_t, 1>();
         for (int64_t b = 0; b < batch; ++b) {
             const int64_t kv = static_cast<int64_t>(lens[b + 1]) - static_cast<int64_t>(lens[b]);
             TORCH_CHECK(kv >= 0 && kv <= s2, "BSND/BNSD kv length ", kv, " exceeds S2=", s2);
@@ -301,12 +302,16 @@ std::vector<at::Tensor> msa_index_score_impl(
     const at::Tensor& cu_q = actual_seq_qlen.value();
     const at::Tensor& kv_len = actual_seq_klen.value();
     CheckMsaLayoutRanks(query, key, block_table, layoutKeyStr, is_tnd, is_batch, cu_q, kv_len, start_loc);
-    CheckMsaSparseAndDtypes(query, key, key_scale, atten_mask, cu_q, kv_len, start_loc, sparse_mode, is_tnd);
-    const bool is_mx = query.scalar_type() == at::ScalarType::Float4_e2m1fn_x2;
+    const auto queryDtype = ConvertToAclDataType(query.scalar_type());
+    const bool isPackedMx = queryDtype == ACL_UINT8;
+    const bool is_mx = isPackedMx || queryDtype == ACL_FLOAT4_E2M1;
+    const auto scaleDtype = isPackedMx ? ACL_UINT8 : ACL_FLOAT8_E8M0;
+    CheckMsaSparseAndDtypes(query, key, key_scale, atten_mask, cu_q, kv_len, start_loc, sparse_mode, is_tnd, is_mx,
+                            scaleDtype);
     if (is_mx) {
         TORCH_CHECK(query_scale.has_value() && query_scale.value().defined() &&
-                        query_scale.value().scalar_type() == at::ScalarType::Float8_e8m0fnu,
-                    "MXFP4 requires E8M0 query_scale");
+                        ConvertToAclDataType(query_scale->scalar_type()) == scaleDtype,
+                    "MXFP4 requires E8M0 query_scale in the same storage format as query.");
         TORCH_CHECK(query.size(DIM_2) == 32 || query.size(DIM_2) == 64, "MXFP4 logical D must be 64 or 128");
     } else {
         TORCH_CHECK(!query_scale.has_value() || !query_scale.value().defined(),
@@ -341,12 +346,28 @@ std::vector<at::Tensor> msa_index_score_impl(
     }
     c10::optional<at::Tensor> device_qlen = actual_seq_qlen.value().to(query.device());
     c10::optional<at::Tensor> device_klen = actual_seq_klen.value().to(query.device());
+    // Packed FP4 and E8M0 use the original storage with logical dtypes in the ACL descriptors.
+    auto packedView = [is_mx](const at::Tensor& tensor) {
+        // MSA packs D. Give an adjacent singleton axis its canonical stride so ACL expands D.
+        if (is_mx && tensor.size(-2) == 1 && tensor.stride(-2) == 1 && tensor.stride(-1) == 1) {
+            return tensor.squeeze(-2).unsqueeze(-2);
+        }
+        return tensor;
+    };
+    const auto queryView = packedView(query);
+    const auto keyView = packedView(key);
+    TensorWrapper queryArg{queryView, is_mx ? ACL_FLOAT4_E2M1 : queryDtype};
+    TensorWrapper keyArg{keyView, is_mx ? ACL_FLOAT4_E2M1 : ConvertToAclDataType(key.scalar_type())};
+    const auto queryScale = query_scale.value_or(at::Tensor());
+    const auto keyScale = key_scale.value_or(at::Tensor());
+    TensorWrapper queryScaleArg{queryScale, ACL_FLOAT8_E8M0};
+    TensorWrapper keyScaleArg{keyScale, is_mx ? ACL_FLOAT8_E8M0 : ACL_FLOAT};
     if (return_choice == 0) {
         at::Tensor score = AllocMsaScore(query, meta.maxBlocks);
         // ACLNN_CMD binds every argument as a non-const lvalue reference.
         c10::optional<at::Tensor> noIndices;
         c10::optional<at::Tensor> noValues;
-        ACLNN_CMD(aclnnMsaIndexScore, query, key, start_loc, block_table, query_scale, key_scale, atten_mask,
+        ACLNN_CMD(aclnnMsaIndexScore, queryArg, keyArg, start_loc, block_table, queryScaleArg, keyScaleArg, atten_mask,
                   device_qlen, device_klen, layoutKeyStr, sparse_mode, init_blocks, local_blocks, return_choice, topk,
                   compress_factor, score, noIndices, noValues);
         if (host_lengths) {
@@ -367,9 +388,9 @@ std::vector<at::Tensor> msa_index_score_impl(
     if (return_choice == 2) {
         valuesArg = values;
     }
-    ACLNN_CMD(aclnnMsaIndexScore, query, key, start_loc, block_table, query_scale, key_scale, atten_mask, device_qlen,
-              device_klen, layoutKeyStr, sparse_mode, init_blocks, local_blocks, return_choice, topk, compress_factor,
-              noScore, indices, valuesArg);
+    ACLNN_CMD(aclnnMsaIndexScore, queryArg, keyArg, start_loc, block_table, queryScaleArg, keyScaleArg, atten_mask,
+              device_qlen, device_klen, layoutKeyStr, sparse_mode, init_blocks, local_blocks, return_choice, topk,
+              compress_factor, noScore, indices, valuesArg);
     if (host_lengths) {
         c10_npu::getCurrentNPUStream(query.device().index()).synchronize();
     }
