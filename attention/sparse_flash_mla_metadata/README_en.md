@@ -231,7 +231,7 @@ English | [简体中文](./README.md)
     <tr>
       <td>metadata</td>
       <td>Output</td>
-      <td>Task partitioning result used by the `SparseFlashMla` main operator. The shape is fixed to (2048, ).</td>
+      <td>Task partitioning result used by the `SparseFlashMla` main operator. The shape is (ceil((9 × AIC + 8 × AIV) / 1024) × 1024,).</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>

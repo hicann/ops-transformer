@@ -233,7 +233,7 @@
     <tr>
       <td>metadata</td>
       <td>输出</td>
-      <td>表示负载均衡结果输出，shape固定为[2048]。</td>
+      <td>表示负载均衡结果输出，shape为(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>

@@ -38,7 +38,7 @@ struct SMLACompileInfo {
 namespace {
 constexpr int64_t kBatchSize = 4;
 constexpr int64_t kNumHeadsKv = 1;
-constexpr int64_t kMetadataSize = optiling::SMLA_META_SIZE;
+constexpr int64_t kMetadataSize = optiling::GetSmlaMetadataSize(80, 80);
 
 void FillMockSmlaMetadata(int64_t* metadataData)
 {
@@ -1021,7 +1021,7 @@ TEST_F(SparseFlashMlaTiling, test_tiling_mock_950_swa_only_ori_kv_fp16_tnd_pa_bb
     } compileInfo;
     int64_t cuSeqLensQData[] = {0, 128, 256, 384, 512};
     int64_t seqUsedOriKvData[] = {4096, 4096, 4096, 4096};
-    constexpr int64_t kMetadataSize = optiling::SMLA_META_SIZE;
+    constexpr int64_t kMetadataSize = optiling::GetSmlaMetadataSize(80, 80);
     int64_t metadataData[kMetadataSize] = {0};
     smla_ut::InitMetadataGm(reinterpret_cast<int32_t*>(metadataData), 4, 1);
     gert::TilingContextPara tilingContextPara(

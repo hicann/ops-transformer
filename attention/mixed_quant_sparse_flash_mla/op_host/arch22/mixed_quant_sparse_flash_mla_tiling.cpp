@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include "../../../sparse_flash_mla/op_kernel/smla_metadata_common.h"
 #include "../mixed_quant_sparse_flash_mla_tiling.h"
 #include "../../op_kernel/arch22/mixed_quant_sparse_flash_mla_tiling_data_arch22.h"
 #include "../../op_kernel/arch22/mixed_quant_sparse_flash_mla_template_tiling_key_arch22.h"
@@ -75,9 +76,12 @@ ge::graphStatus MixedQuantSparseFlashMlaTiling::DoTurboQuantTiling(MQSMLATilingI
     auto align = [](uint32_t value, uint32_t alignment) { return (value + alignment - 1) / alignment * alignment; };
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo->platformInfo);
-    const uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
-    const uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
-    context_->SetBlockDim(ascendcPlatform.CalcTschBlockDim(aivNum, aicNum, aivNum));
+    const uint32_t vectorsPerBlock = 2U;
+    const uint32_t aicNum =
+        GetSmlaBlockNum(ascendcPlatform.GetCoreNumAic(), ascendcPlatform.GetCoreNumAiv(), vectorsPerBlock);
+    OP_CHECK_IF(aicNum == 0, OP_LOGE(tilingInfo->opName, "Insufficient cores for one MIX block."),
+                return ge::GRAPH_FAILED);
+    context_->SetBlockDim(aicNum);
 
     const uint32_t mBaseSize = tilingInfo->gSize;
     const uint32_t s2BaseSizeAlign = align(S2_BASE_SIZE, BYTE_BLOCK);

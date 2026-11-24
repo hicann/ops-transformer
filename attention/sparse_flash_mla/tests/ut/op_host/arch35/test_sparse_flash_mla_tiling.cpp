@@ -35,7 +35,7 @@ constexpr uint64_t SKIP_TILING_KEY = UINT64_MAX;
 constexpr uint64_t TOPK_OFFSET_ORI_CMP_SPARSE_TILING_KEY = 133186U;
 constexpr int64_t kBatchSize = 4;
 constexpr int64_t kNumHeadsKv = 1;
-constexpr int64_t kMetadataSize = optiling::SMLA_META_SIZE;
+constexpr int64_t kMetadataSize = optiling::GetSmlaMetadataSize(80, 80);
 
 struct SmlaCase {
     std::string soc = "Ascend950";
@@ -391,7 +391,19 @@ TEST_F(SparseFlashMlaTilingArch35, test_tiling_950_sinks_dim_failed)
     RunSmlaTilingCase(c, ge::GRAPH_FAILED);
 }
 
-// metadata size must be 2048 on Ascend950
+TEST_F(SparseFlashMlaTilingArch35, test_tiling_950_metadata_minimum_and_larger_capacity)
+{
+    SmlaCase c;
+    c.coreNum = 32;
+    c.metadataShape = {1024};
+    RunSmlaTilingCase(c, ge::GRAPH_SUCCESS);
+    c.metadataShape = {1025};
+    RunSmlaTilingCase(c, ge::GRAPH_SUCCESS);
+    c.metadataShape = {1023};
+    RunSmlaTilingCase(c, ge::GRAPH_FAILED);
+}
+
+// A buffer smaller than one alignment unit cannot hold metadata.
 TEST_F(SparseFlashMlaTilingArch35, test_tiling_950_metadata_size_failed)
 {
     SmlaCase c;
@@ -786,7 +798,7 @@ TEST_F(SparseFlashMlaTilingArch35, test_tiling_910b_sinks_dtype_failed)
     RunSmlaTilingCase(c, ge::GRAPH_FAILED);
 }
 
-// 910B SWA: metadata size must be 2048
+// 910B SWA also rejects undersized buffers.
 TEST_F(SparseFlashMlaTilingArch35, test_tiling_910b_metadata_size_failed)
 {
     SmlaCase c = Make910bCase();

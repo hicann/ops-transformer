@@ -235,7 +235,7 @@ English | [简体中文](./README.md)
     <tr>
       <td>metadata</td>
       <td>Output</td>
-      <td>Indicates the output of the load balancing result. The shape is fixed to [2048].</td>
+      <td>Indicates the output of the load balancing result. The shape is (ceil((9 × AIC + 8 × AIV) / 1024) × 1024,).</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>

@@ -23,7 +23,7 @@
 #include "../sparse_flash_mla_common_arch35.h"
 #include "../sparse_flash_mla_kvcache.h"
 #include "../util_regbase.h"
-#include "smla_metadata_common.h"
+#include "../../smla_metadata_common.h"
 #include "static_buffer.h"
 #include "flash_decode.h"
 #include "../../../../common/op_kernel/attn_buffer.h"
@@ -147,16 +147,17 @@ __aicore__ inline void ParseFdRunInfo(FdRunInfo& fdRunInfo, const ConstInfo& con
                                       GlobalTensor<uint32_t>& metadataGm)
 {
     uint32_t aivIdx = static_cast<uint32_t>(constInfo.aivIdx);
-    fdRunInfo.coreEnable = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_CORE_ENABLE_INDEX, true)) != 0;
+    const uint64_t fdOffset = GetFdRecordOffset(GetBlockNum(), aivIdx);
+    fdRunInfo.coreEnable = metadataGm.GetValue(fdOffset + FD_CORE_ENABLE_INDEX) != 0;
     if (!fdRunInfo.coreEnable) {
         return;
     }
-    fdRunInfo.bn2Idx = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_BN2_IDX_INDEX, true));
-    fdRunInfo.mIdx = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_M_IDX_INDEX, true));
-    fdRunInfo.workspaceIdx = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_WORKSPACE_IDX_INDEX, true));
-    fdRunInfo.workspaceNum = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_WORKSPACE_NUM_INDEX, true));
-    fdRunInfo.mStartIdx = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_M_START_INDEX, true));
-    fdRunInfo.mNum = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_M_NUM_INDEX, true));
+    fdRunInfo.bn2Idx = metadataGm.GetValue(fdOffset + FD_BN2_IDX_INDEX);
+    fdRunInfo.mIdx = metadataGm.GetValue(fdOffset + FD_M_IDX_INDEX);
+    fdRunInfo.workspaceIdx = metadataGm.GetValue(fdOffset + FD_WORKSPACE_IDX_INDEX);
+    fdRunInfo.workspaceNum = metadataGm.GetValue(fdOffset + FD_WORKSPACE_NUM_INDEX);
+    fdRunInfo.mStartIdx = metadataGm.GetValue(fdOffset + FD_M_START_INDEX);
+    fdRunInfo.mNum = metadataGm.GetValue(fdOffset + FD_M_NUM_INDEX);
 }
 
 // ===================== 需要 TEMPLATE_INTF 的公共函数 =====================

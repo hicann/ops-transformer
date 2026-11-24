@@ -206,7 +206,7 @@ cann_ops_transformer.quant_sparse_flash_mla(
 | ori_topk_length | tensor | 可选 | 表示ori_sparse_indices实际参与计算的长度 | int32 | ND | <ul><li>(b, q_s, kv_n)</li><li>(q_t, kv_n)</li></ul>|
 | cmp_topk_length | tensor | 可选 | 表示cmp_sparse_indices实际参与计算的长度 | int32 | ND | <ul><li>(b, q_s, kv_n)</li><li>(q_t, kv_n)</li></ul>|
 | sinks | tensor | 可选 | 表示各注意力头设置独立可学习虚拟偏移项，用于维持长文本推理时的稳定性 | float32 | ND | <ul><li>(q_n,)</li></ul>|
-| metadata | tensor | 可选 | 表示quant_sparse_flash_mla_metadata生成的分核信息 | int32 | ND | <ul><li>(2048,)</li></ul>|
+| metadata | tensor | 可选 | 表示quant_sparse_flash_mla_metadata生成的分核信息 | int32 | ND | <ul><li>(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)</li></ul>|
 | softmax_scale | float | 可选 | 表示可显式设置缩放因子。默认值为None | float32 | - | - |
 | cmp_ratio | int | 可选 | 表示cmp_kv相对于压缩前KV长度的压缩倍率，可恢复cmp侧mask使用的压缩前KV长度。默认值为1，取值范围1-128 | int32 | - | - |
 | ori_mask_mode | int | 可选 | 表示q和ori_kv计算的mask模式。0：No mask。3：rightDownCausal模式。4：sliding window模式。默认值为0 | int32 | - | - |
@@ -224,7 +224,7 @@ cann_ops_transformer.quant_sparse_flash_mla(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度|
 | :--- | :--- | :--- | :--- | :--- | :--- | :---|
-| metadata | tensor | 必选 | quant_sparse_flash_mla的分核信息 | int32 | ND | <ul><li>(2048,)</li></ul>|
+| metadata | tensor | 必选 | quant_sparse_flash_mla的分核信息 | int32 | ND | <ul><li>(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)</li></ul>|
 
 ### quant_sparse_flash_mla
 

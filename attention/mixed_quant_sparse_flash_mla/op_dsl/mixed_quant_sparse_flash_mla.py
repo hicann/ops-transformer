@@ -11,6 +11,7 @@ import os
 import threading
 from itertools import product
 from types import SimpleNamespace
+
 import cannbotdsl
 import torch
 from cannbotdsl import aot
@@ -49,13 +50,16 @@ from cannbotdsl.ops.sync import (
 from cannbotdsl.ops.sync import onchip_rewind
 from cannbotdsl.ops import reg as rr
 
+from ..mixed_quant_sparse_flash_mla import (
+    _get_available_core_counts,
+    _get_smla_metadata_size,
+)
+
 # Consume the existing library metadata layout (smla_metadata_common.h).
 # The serialized capacity is independent of the 36-core DSL launch limit.
 AIC_CORE_MAX_NUM = 36
-MQSMLA_METADATA_TOTAL_SIZE = 2048
 FA_METADATA_SIZE = 9
 FD_METADATA_SIZE = 8
-FD_METADATA_BASE = 80 * FA_METADATA_SIZE
 
 FA_BN2_START_INDEX = 1
 FA_M_START_INDEX = 2
@@ -111,10 +115,9 @@ def _default_topk_length(indices):
 
 
 def _get_cube_core_num(device=None):
-    """Return the cube-core count of the active NPU (same source as the consumer)."""
-    import torch
-
-    return int(torch.npu.get_device_properties(device).cube_core_num)
+    """Number of complete 1:2 MIX blocks available to the Ascend 950 kernel."""
+    cubes, vectors = _get_available_core_counts(device)
+    return min(cubes, max(1, vectors // 2))
 
 
 def _bsnd_query_spans(batch, seq, device):
@@ -1827,14 +1830,15 @@ class MqsmlaKernel:
 
         # The library packs active FD entries from index zero. Its first
         # enable bit is the uniform gate; metadata remains read-only.
-        fd_any = _i64(metadata_gm, FD_METADATA_BASE + FD_CORE_ENABLE_INDEX)
+        fd_base = blocks * FA_METADATA_SIZE
+        fd_any = _i64(metadata_gm, fd_base + FD_CORE_ENABLE_INDEX)
         if fd_any != 0:
             global_sync_all()
             # After the barrier, reclaim main-loop UB for the full (32,512) FP32 reduction landing.
             onchip_rewind(reset_sync_id=False)
             self.vector._setup_fd_reduce_buffers()
             aiv_idx = self.block_idx * get_subblock_dim() + self.subblock_idx
-            fd_metadata_base = FD_METADATA_BASE + aiv_idx * FD_METADATA_SIZE
+            fd_metadata_base = fd_base + aiv_idx * FD_METADATA_SIZE
             fd_enable = _i64(metadata_gm, fd_metadata_base + FD_CORE_ENABLE_INDEX)
             if fd_enable != 0:
                 fd_bn2 = _i64(metadata_gm, fd_metadata_base + FD_BN2_IDX_INDEX)
@@ -4101,11 +4105,10 @@ def _validate_inputs(
     if (
         metadata.dtype != torch.int32
         or metadata.dim() != _TENSOR_RANK_1D
-        or metadata.numel() != MQSMLA_METADATA_TOTAL_SIZE
+        or metadata.numel() < _get_smla_metadata_size(metadata.device)
     ):
         raise ValueError(
-            f"Invalid input: metadata must be a 1-D int32 tensor with exactly "
-            f"{MQSMLA_METADATA_TOTAL_SIZE} elements (fixed shape)"
+            "Invalid input: metadata must be a 1-D int32 tensor large enough for the available cores"
         )
 
     for name, tensor in (
@@ -4681,7 +4684,7 @@ def _compile_mqsmla(
         TensorSpec((rows, heads, D), dtypes.bfloat16),
         TensorSpec((heads,), dtypes.float32),
         TensorSpec((query_boundaries,), i32),
-        TensorSpec((MQSMLA_METADATA_TOTAL_SIZE,), i32),
+        TensorSpec((Dim("METADATA_SIZE", min=1024),), i32),
         TensorSpec((workspace_bytes,), dtypes.uint8),
         TensorSpec(
             (

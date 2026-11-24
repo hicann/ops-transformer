@@ -13,6 +13,7 @@
  * \brief
  */
 
+#include "../op_kernel/smla_metadata_common.h"
 #include "log/log.h"
 #include <string>
 #include <vector>
@@ -1749,10 +1750,12 @@ ge::graphStatus SMLATilingCheck::CheckSingleParaMetadata() const
     if (ge::GRAPH_SUCCESS != CheckDimNumSupport(&opParamInfo_.metadata.tensor->GetShape(), dimNumList, METADATA_NAME)) {
         return ge::GRAPH_FAILED;
     }
-    OP_CHECK_IF((opParamInfo_.metadata.tensor->GetShapeSize() != METADATA_LIMIT),
-                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(opName_, "metadata",
-                                                      ToStringRaw(opParamInfo_.metadata.tensor->GetStorageShape()),
-                                                      "metadata dim 0 must be" + std::to_string(METADATA_LIMIT)),
+    auto platform = platform_ascendc::PlatformAscendC(platformInfo_);
+    const auto requiredSize = GetSmlaMetadataSize(platform.GetCoreNumAic(), platform.GetCoreNumAiv());
+    OP_CHECK_IF((opParamInfo_.metadata.tensor->GetShapeSize() < requiredSize),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    opName_, "metadata", ToStringRaw(opParamInfo_.metadata.tensor->GetStorageShape()),
+                    "metadata dim 0 must be at least " + std::to_string(requiredSize)),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(opParamInfo_.metadata.desc->GetDataType() != ge::DT_INT32,
                 OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
@@ -2525,11 +2528,14 @@ uint64_t SparseFlashMlaTiling::CalcVectorizeKvPhyAddrWorkspaceSize(const SMLATil
 ge::graphStatus SparseFlashMlaTiling::DoOpTiling(SMLATilingInfo* tilingInfo)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo->platformInfo);
-    uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
-    uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
-    uint32_t blockDim = ascendcPlatform.CalcTschBlockDim(aivNum, aicNum, aivNum);
-    context_->SetBlockDim(blockDim);
-    OP_LOGI(tilingInfo->opName, "SMLA block dim: %u aiv Num: %u aic Num: %u.", blockDim, aivNum, aicNum);
+    const uint32_t vectorsPerBlock = IsA6Arch(tilingInfo->npuArch) ? 1U : 2U;
+    const uint32_t aicNum =
+        GetSmlaBlockNum(ascendcPlatform.GetCoreNumAic(), ascendcPlatform.GetCoreNumAiv(), vectorsPerBlock);
+    OP_CHECK_IF(aicNum == 0, OP_LOGE(tilingInfo->opName, "Insufficient cores for one MIX block."),
+                return ge::GRAPH_FAILED);
+    context_->SetBlockDim(aicNum);
+    const uint32_t aivNum = aicNum * vectorsPerBlock;
+    OP_LOGI(tilingInfo->opName, "SMLA block dim: %u aiv Num: %u aic Num: %u.", aicNum, aivNum, aicNum);
 
     SplitBalanced(tilingInfo);
 

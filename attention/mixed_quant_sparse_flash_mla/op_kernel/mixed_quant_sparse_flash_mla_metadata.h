@@ -17,22 +17,12 @@
 #define MIXED_QUANT_SPARSE_FLASH_MLA_METADATA_H
 
 #include <cstdint>
-#include "../../sparse_flash_mla/op_kernel/arch35/common/smla_metadata_common.h"
+#include "../../sparse_flash_mla/op_kernel/smla_metadata_common.h"
 
 namespace optiling {
 
-constexpr uint32_t MQSMLA_METADATA_TOTAL_SIZE = 2048;
-
 using MQSMLA_METADATA_T = int32_t;
 
-namespace detail {
-struct MqsmlaMetadata {
-    uint32_t faMetadata[AIC_CORE_MAX_NUM][FA_METADATA_SIZE];
-    uint32_t fdMetadata[AIV_CORE_MAX_NUM][FD_METADATA_SIZE];
-};
-}; // namespace detail
-
-static_assert(MQSMLA_METADATA_TOTAL_SIZE * sizeof(MQSMLA_METADATA_T) >= sizeof(detail::MqsmlaMetadata));
 }; // namespace optiling
 
 #endif // MIXED_QUANT_SPARSE_FLASH_MLA_METADATA_H

@@ -26,8 +26,6 @@ const int DIM_2 = 2;
 const int DIM_3 = 3;
 const int DIM_4 = 4;
 
-constexpr int64_t QSMLA_METADATA_SIZE = 2048;
-
 inline TensorWrapper QsmlaMakeWrapper(const at::Tensor& tensor, aclDataType tensorAcltype)
 {
     return {tensor, tensorAcltype};
@@ -42,7 +40,7 @@ at::Tensor QuantSparseFlashMlaMetadata(
     const c10::optional<at::Tensor>& cmpTopkLength, int64_t batchSize, int64_t maxSeqlenQ, int64_t maxSeqlenOriKv,
     int64_t maxSeqlenCmpKv, int64_t oriTopk, int64_t cmpTopk, int64_t cmpRatio, int64_t oriMaskMode,
     int64_t cmpMaskMode, int64_t oriWinLeft, int64_t oriWinRight, c10::string_view layoutQ, c10::string_view layoutKv,
-    bool hasOriKv, bool hasCmpKv)
+    bool hasOriKv, bool hasCmpKv, int64_t metadataSize)
 {
     at::Device outputDevice = at::Device(std::string("npu"));
     if (cuSeqlensQ.has_value()) {
@@ -65,7 +63,7 @@ at::Tensor QuantSparseFlashMlaMetadata(
         outputDevice = cmpTopkLength.value().device();
     }
 
-    at::Tensor output = torch::empty({QSMLA_METADATA_SIZE}, torch::dtype(torch::kInt32).device(outputDevice));
+    at::Tensor output = torch::empty({metadataSize}, torch::dtype(torch::kInt32).device(outputDevice));
     auto cuSeqlensQVal = get_valid_tensor(cuSeqlensQ, outputDevice);
     auto cuSeqlensOriKvVal = get_valid_tensor(cuSeqlensOriKv, outputDevice);
     auto cuSeqlensCmpKvVal = get_valid_tensor(cuSeqlensCmpKv, outputDevice);

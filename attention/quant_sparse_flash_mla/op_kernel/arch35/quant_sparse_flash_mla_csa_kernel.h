@@ -187,13 +187,13 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Init
     this->metadataGm.SetGlobalBuffer((__gm__ uint32_t*)metadata);
 
     // 从meta data解析分核信息
-    bN2StartIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_BN2_START_INDEX, false));
-    gS1StartIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_M_START_INDEX, false));
-    s2StartIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_S2_START_INDEX, false));
-    bN2EndIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_BN2_END_INDEX, false));
-    nextGs1Idx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_M_END_INDEX, false));
-    s2EndIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_S2_END_INDEX, false));
-    hasLoad = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_CORE_ENABLE_INDEX, false));
+    bN2StartIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_BN2_START_INDEX));
+    gS1StartIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_M_START_INDEX));
+    s2StartIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_S2_START_INDEX));
+    bN2EndIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_BN2_END_INDEX));
+    nextGs1Idx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_M_END_INDEX));
+    s2EndIdx = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_S2_END_INDEX));
+    hasLoad = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_CORE_ENABLE_INDEX));
     if (nextGs1Idx != 0 || s2EndIdx != 0) {
         bN2EndIdx++;
     }
@@ -541,10 +541,10 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Proc
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ProcessMainLoop()
 {
-    uint32_t hasLoad = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_CORE_ENABLE_INDEX, false));
+    uint32_t hasLoad = metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_CORE_ENABLE_INDEX));
     int64_t qsmlaMaxS2LoopCnt = 0;
     if constexpr (IS_SPLIT_G) {
-        qsmlaMaxS2LoopCnt = static_cast<int64_t>(metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_S2_MAX_NUM, false)));
+        qsmlaMaxS2LoopCnt = static_cast<int64_t>(metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_S2_MAX_NUM)));
     }
     if (hasLoad == 0) {
         if ASCEND_IS_AIC {
@@ -567,7 +567,7 @@ __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::Proc
     RunInfo qs35RunInfo[4];
     RunParamStr qs35RunParam;
     qs35RunParam.firstFdDataWorkspaceIdx =
-        metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX, false));
+        metadataGm.GetValue(GetAttrAbsIndex(aicIdx, FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX));
     int64_t qsmlaMultiCoreInnerIdx = 1;
     int64_t s2SplitIdxCounter = 0;
     for (int64_t bnIdx = bN2StartIdx; bnIdx < bN2EndIdx; bnIdx++) {
@@ -804,16 +804,17 @@ template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void QuantSparseFlashMlaCsa<CubeBlockType, VecBlockType>::ParseFdRunInfo(FdRunInfo& fdRunInfo)
 {
     uint32_t aivIdx = static_cast<uint32_t>(this->constInfo.aivIdx);
-    fdRunInfo.coreEnable = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_CORE_ENABLE_INDEX, true)) != 0;
+    const uint64_t fdOffset = GetFdRecordOffset(GetBlockNum(), aivIdx);
+    fdRunInfo.coreEnable = metadataGm.GetValue(fdOffset + FD_CORE_ENABLE_INDEX) != 0;
     if (!fdRunInfo.coreEnable) {
         return;
     }
-    fdRunInfo.bn2Idx = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_BN2_IDX_INDEX, true));
-    fdRunInfo.mIdx = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_M_IDX_INDEX, true));
-    fdRunInfo.workspaceIdx = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_WORKSPACE_IDX_INDEX, true));
-    fdRunInfo.workspaceNum = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_WORKSPACE_NUM_INDEX, true));
-    fdRunInfo.mStartIdx = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_M_START_INDEX, true));
-    fdRunInfo.mNum = metadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_M_NUM_INDEX, true));
+    fdRunInfo.bn2Idx = metadataGm.GetValue(fdOffset + FD_BN2_IDX_INDEX);
+    fdRunInfo.mIdx = metadataGm.GetValue(fdOffset + FD_M_IDX_INDEX);
+    fdRunInfo.workspaceIdx = metadataGm.GetValue(fdOffset + FD_WORKSPACE_IDX_INDEX);
+    fdRunInfo.workspaceNum = metadataGm.GetValue(fdOffset + FD_WORKSPACE_NUM_INDEX);
+    fdRunInfo.mStartIdx = metadataGm.GetValue(fdOffset + FD_M_START_INDEX);
+    fdRunInfo.mNum = metadataGm.GetValue(fdOffset + FD_M_NUM_INDEX);
 }
 
 template <typename CubeBlockType, typename VecBlockType>

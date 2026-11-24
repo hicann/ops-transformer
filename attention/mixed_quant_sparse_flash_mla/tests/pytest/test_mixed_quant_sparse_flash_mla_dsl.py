@@ -24,6 +24,9 @@ from mixed_quant_sparse_flash_mla_golden import (
 )
 
 OPS = import_module(os.environ.get("MQSMLA_PACKAGE", "cann_ops_transformer"))
+_mixed_mla = import_module(
+    f"{OPS.__name__}.ops.attention.mixed_quant_sparse_flash_mla.mixed_quant_sparse_flash_mla"
+)
 
 
 _BASE = dict(
@@ -363,7 +366,7 @@ def _call_public(
     if omit_cmp_length:
         kwargs.pop("cmp_topk_length")
     kwargs["metadata"] = _library_metadata(kwargs, api)
-    assert kwargs["metadata"].shape == (2048,)
+    assert kwargs["metadata"].shape == (_mixed_mla._get_smla_metadata_size(None),)
     frontend = import_module(
         f"{api.__name__}.ops.attention.mixed_quant_sparse_flash_mla.mixed_quant_sparse_flash_mla"
     )
@@ -1089,12 +1092,14 @@ def _split_test_row_metadata(kwargs, case):
     row = int(candidates[0])
     batch = next(b for b in range(len(cu) - 1) if cu[b] <= row < cu[b + 1])
     local_row = row - cu[batch]
-    metadata = torch.zeros(2048, dtype=torch.int32)
+    cubes, vectors = _mixed_mla._get_available_core_counts(kwargs["q"].device)
+    fd_base = min(cubes, max(1, vectors // 2)) * 9
+    metadata = torch.zeros_like(kwargs["metadata"], device="cpu")
     # Core 0 ends after the first tile of the selected row, in slot 0.
     metadata[:9] = torch.tensor([1, 0, 0, 0, batch, local_row, 1, 0, 0])
     # Core 1 continues that row in slot 1 and owns the remaining full rows.
     metadata[9:18] = torch.tensor([1, batch, local_row, 1, len(cu) - 1, 0, 0, 1, 0])
-    metadata[720:728] = torch.tensor(
+    metadata[fd_base : fd_base + 8] = torch.tensor(
         [1, batch, local_row, 0, 2, 0, kwargs["q"].shape[-2], 0]
     )
     return metadata.to(kwargs["q"].device)
@@ -1250,11 +1255,20 @@ def _check_layout(
     kwargs["metadata"] = _library_metadata(kwargs)
     if require_fd:
         metadata = kwargs["metadata"].cpu()
-        vector_cores = int(torch.npu.get_device_properties().vector_core_num)
-        fd = metadata[80 * 9 : 80 * 9 + vector_cores * 8].view(-1, 8)
+        cube_cores, vector_cores = _mixed_mla._get_available_core_counts(
+            kwargs["q"].device
+        )
+        cube_cores = min(cube_cores, max(1, vector_cores // 2))
+        vector_cores = min(vector_cores, 2 * cube_cores)
+        fd_base = cube_cores * 9
+        fd = metadata[fd_base : fd_base + vector_cores * 8].view(-1, 8)
         if not bool(((fd[:, 0] != 0) & (fd[:, 4] > 1)).any()):
             kwargs["metadata"] = _split_test_row_metadata(kwargs, case)
-            fd = kwargs["metadata"].cpu()[720 : 720 + vector_cores * 8].view(-1, 8)
+            fd = (
+                kwargs["metadata"]
+                .cpu()[fd_base : fd_base + vector_cores * 8]
+                .view(-1, 8)
+            )
         assert bool(((fd[:, 0] != 0) & (fd[:, 4] > 1)).any()), (
             "precision regression must exercise cross-core FD reduction"
         )
@@ -1351,7 +1365,10 @@ def test_dsl_metadata_fake_tensor():
         metadata = OPS.mixed_quant_sparse_flash_mla_metadata(
             17, 1, D, 1, cu_seqlens_q=cu, layout_q="TND", has_cmp_kv=False, ori_topk=128
         )
-        assert metadata.shape == (2048,) and metadata.dtype == torch.int32
+        assert (
+            metadata.shape == (_mixed_mla._get_smla_metadata_size(None),)
+            and metadata.dtype == torch.int32
+        )
         assert metadata.device == cu.device
 
 
@@ -1492,7 +1509,10 @@ def test_dsl_bsnd_library_metadata():
             metadata=metadata,
             return_softmax_lse=True,
         )
-    assert metadata.shape == (2048,) and torch.count_nonzero(out).item() == 0
+    assert (
+        metadata.shape == (_mixed_mla._get_smla_metadata_size(None),)
+        and torch.count_nonzero(out).item() == 0
+    )
     import math
 
     torch.testing.assert_close(

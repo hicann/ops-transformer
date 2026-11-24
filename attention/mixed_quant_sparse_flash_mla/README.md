@@ -349,7 +349,7 @@
 - PageAttention场景下，功能使用限制如下：
   - `ori_kv`和`cmp_kv`的shape分别为[ori_kv_block_nums, ori_kv_block_size, kv_n, kv_d]和[cmp_kv_block_nums, cmp_kv_block_size, kv_n, kv_d]，其中ori_kv_block_nums和cmp_kv_block_nums为PagedAttention场景下的block数量，ori_kv_block_size和cmp_kv_block_size为一个block的token数，取值为1到1024。
   - `ori_block_table`和`cmp_block_table`的shape为2维，其中第一维长度为b，第二维长度不小于所有batch中最大的ori_kv_s和cmp_kv_s对应的block数量，即ori_kv_s_max / ori_kv_block_size和cmp_kv_s_max / cmp_kv_block_size向上取整。
-- `metadata`为算子实际需要使用的分核结果，目前该参数必传，shape大小固定为[2048]。
+- `metadata`为算子实际需要使用的分核结果，目前该参数必传，shape为(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)。
 - `layout_kv`支持输入"BSND"、"TND"和"PA_BBND"，需满足上述`layout_q`和`layout_kv`组合约束。
   - 当输入为PA_BBND时，`seqused_ori_kv`和`ori_block_table`必须传入；当输入为BSND时，`seqused_ori_kv`可用于表达每个batch的`ori_kv`有效长度；当输入为TND时，`ori_kv`有效长度由`cu_seqlens_ori_kv`表达。
   - 当输入为BSND时，`ori_kv`和`cmp_kv`的layout都必须为BSND，ori_kv的shape为[b, ori_kv_s, kv_n, kv_d]，cmp_kv的shape为[b, cmp_kv_s, kv_n, kv_d]。
@@ -385,7 +385,7 @@
 | `cmp_ratio`、mask和窗口 | `cmp_ratio`为1到128，`ori_mask_mode`支持0/3/4，`cmp_mask_mode`支持0/3；`ori_mask_mode`非4时左右窗口均为-1 |
 | `cmp_residual_kv` | `cmp_mask_mode=3`且`cmp_ratio!=1`时必传；`cmp_mask_mode=0`或`cmp_ratio=1`时不传 |
 | `rope_head_dim`、`topk_value_mode` | 分别为64、1；量化group size固定64 |
-| `metadata` | 必传INT32，shape为`(2048,)`；由前置Metadata接口使用相同mode、布局、长度及属性生成 |
+| `metadata` | 必传INT32，shape为`(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)`；由前置Metadata接口使用相同mode、布局、长度及属性生成 |
 | `sinks`、`softmax_lse` | sinks沿用可选参数位置，但当前版本Host要求必传FLOAT、shape为`(q_n,)`；LSE为可选FLOAT输出，BSND下shape为`(b, 1, q_s, q_n)`、TND下为`(1, q_t, q_n)` |
 | 空有效KV | 物理KV Tensor不支持空维度；可通过有效长度0表达空KV。没有有效KV参与计算时，attn_out和有效LSE均为0，即使提供sinks；padding query也输出0 |
 | batch一致性 | 不支持 |
@@ -408,7 +408,7 @@
 | `ori_sparse_indices`、`ori_topk_length`、`cmp_topk_length`、`cu_seqlens_ori_kv`、`cu_seqlens_cmp_kv`、`seqused_q`、`seqused_cmp_kv`、`cmp_residual_kv` | 不支持传入，保留原有可选参数位置 |
 | `ori_mask_mode`、`cmp_mask_mode`、`ori_win_left`、`ori_win_right` | 分别为4、3、非负值、0 |
 | `cmp_ratio`、`rope_head_dim`、`topk_value_mode` | 分别支持4或128、64、1；算子的压缩倍率支持范围不代表框架会量化全部压缩KV |
-| `metadata` | 必传，由前置Metadata接口以相同`quant_mode=3`及相同输入属性生成，INT32、shape为`(2048,)` |
+| `metadata` | 必传，由前置Metadata接口以相同`quant_mode=3`及相同输入属性生成，INT32、shape为`(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)` |
 
 `sinks`和Softmax LSE继续使用原有参数及返回形式。
 

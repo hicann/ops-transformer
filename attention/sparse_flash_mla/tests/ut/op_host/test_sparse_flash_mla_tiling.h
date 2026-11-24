@@ -30,13 +30,12 @@ constexpr uint32_t kTndPaBnbdCsaTilingKey = 1090U;
 
 inline void InitMetadataGm(int32_t* metadata, uint32_t batchSize, uint32_t kvHeadNum)
 {
-    optiling::detail::SasMetadata* meta = reinterpret_cast<optiling::detail::SasMetadata*>(metadata);
-    std::memset(meta, 0, optiling::SMLA_META_SIZE * sizeof(int32_t));
+    std::memset(metadata, 0, optiling::GetSmlaMetadataSize(80, 80) * sizeof(int32_t));
     const uint32_t bn2End = batchSize * kvHeadNum;
-    meta->faMetadata[0][optiling::FA_CORE_ENABLE_INDEX] = 1U;
-    meta->faMetadata[0][optiling::FA_BN2_END_INDEX] = bn2End;
-    meta->faMetadata[0][optiling::FA_M_END_INDEX] = 1U;
-    meta->faMetadata[0][optiling::FA_S2_END_INDEX] = 1U;
+    metadata[optiling::FA_CORE_ENABLE_INDEX] = 1U;
+    metadata[optiling::FA_BN2_END_INDEX] = bn2End;
+    metadata[optiling::FA_M_END_INDEX] = 1U;
+    metadata[optiling::FA_S2_END_INDEX] = 1U;
 }
 
 inline void InitSwaTilingData(optiling::SparseFlashMlaTilingData& tiling, uint32_t tokenNum, uint32_t kvSeqLen,

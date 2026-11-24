@@ -11,7 +11,7 @@
 /*!
  * \file smla_metadata_common.h
  * \brief sparse_flash_mla / mixed_quant_sparse_flash_mla / quant_sparse_flash_mla 三个算子共用的
- *        metadata 常量与 GetAttrAbsIndex 定义。
+ *        metadata 常量与 分核记录的索引定义。
  */
 
 #ifndef SMLA_METADATA_COMMON_H
@@ -22,11 +22,28 @@
 namespace optiling {
 
 // Constants
-constexpr uint32_t AIC_CORE_MAX_NUM = 80;
-constexpr uint32_t AIV_CORE_MAX_NUM = 80;
-
 constexpr uint32_t FA_METADATA_SIZE = 9;
 constexpr uint32_t FD_METADATA_SIZE = 8;
+
+constexpr int64_t SMLA_METADATA_ALIGNMENT = 1024;
+
+inline constexpr int64_t GetSmlaMetadataSize(uint32_t aicNum, uint32_t aivNum)
+{
+    const int64_t elements = int64_t{aicNum} * FA_METADATA_SIZE + int64_t{aivNum} * FD_METADATA_SIZE;
+    return (elements + SMLA_METADATA_ALIGNMENT - 1) / SMLA_METADATA_ALIGNMENT * SMLA_METADATA_ALIGNMENT;
+}
+
+// A MIX block runs one cube with the vector lanes required by its kernel variant.
+inline constexpr uint32_t GetSmlaBlockNum(uint32_t cubes, uint32_t vectors, uint32_t vectorsPerBlock)
+{
+    const uint32_t vectorBlocks = vectors < vectorsPerBlock ? vectors : vectors / vectorsPerBlock;
+    return cubes < vectorBlocks ? cubes : vectorBlocks;
+}
+
+namespace detail {
+using FaMetadataRecord = uint32_t[FA_METADATA_SIZE];
+using FdMetadataRecord = uint32_t[FD_METADATA_SIZE];
+} // namespace detail
 
 // FA Metadata Index Definitions
 constexpr uint32_t FA_CORE_ENABLE_INDEX = 0;
@@ -48,21 +65,15 @@ constexpr uint32_t FD_WORKSPACE_NUM_INDEX = 4;
 constexpr uint32_t FD_M_START_INDEX = 5;
 constexpr uint32_t FD_M_NUM_INDEX = 6;
 
-/**
- * @brief 获取属性的绝对索引
- * @param coreIdx 核索引
- * @param metaIdx 元数据索引
- * @param isAIV 是否为AIV数据，默认为false
- * @return 返回属性的绝对索引
- */
 #ifdef __CCE_AICORE__
-__aicore__ inline uint32_t GetAttrAbsIndex(uint32_t coreIdx, uint32_t metaIdx, bool isAIV = false)
+__aicore__ inline uint64_t GetAttrAbsIndex(uint32_t coreIdx, uint32_t metaIdx)
 {
-    if (isAIV) {
-        return FA_METADATA_SIZE * AIC_CORE_MAX_NUM + FD_METADATA_SIZE * coreIdx + metaIdx;
-    } else {
-        return FA_METADATA_SIZE * coreIdx + metaIdx;
-    }
+    return uint64_t{coreIdx} * FA_METADATA_SIZE + metaIdx;
+}
+
+__aicore__ inline uint64_t GetFdRecordOffset(uint32_t aicNum, uint32_t coreIdx)
+{
+    return uint64_t{aicNum} * FA_METADATA_SIZE + uint64_t{coreIdx} * FD_METADATA_SIZE;
 }
 #endif
 

@@ -165,11 +165,11 @@ __aicore__ inline void SparseFlashMlaCsaKernel<CubeBlockType, VecBlockType>::Ini
     smlaCsaVecBlock.CleanOutput(attentionOut, softmaxLse, smlaCsaConstInfo);
 
     // 从meta data解析分核信息
-    bN2StartIdx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_BN2_START_INDEX, false));
-    gS1StartIdx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_M_START_INDEX, false));
-    bN2EndIdx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_BN2_END_INDEX, false));
-    nextGs1Idx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_M_END_INDEX, false));
-    hasLoad = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_CORE_ENABLE_INDEX, false));
+    bN2StartIdx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_BN2_START_INDEX));
+    gS1StartIdx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_M_START_INDEX));
+    bN2EndIdx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_BN2_END_INDEX));
+    nextGs1Idx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_M_END_INDEX));
+    hasLoad = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_CORE_ENABLE_INDEX));
     if (nextGs1Idx != 0) {
         bN2EndIdx++;
     }
@@ -464,11 +464,11 @@ __aicore__ inline void SparseFlashMlaCsaKernel<CubeBlockType, VecBlockType>::Pro
 template <typename CubeBlockType, typename VecBlockType>
 __aicore__ inline void SparseFlashMlaCsaKernel<CubeBlockType, VecBlockType>::ProcessMainLoop()
 {
-    uint32_t hasLoad = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_CORE_ENABLE_INDEX, false));
+    uint32_t hasLoad = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_CORE_ENABLE_INDEX));
     int64_t smlaMaxS2LoopCnt = 0;
     if constexpr (IS_SPLIT_G) {
         smlaMaxS2LoopCnt =
-            static_cast<int64_t>(smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_S2_MAX_NUM, false)));
+            static_cast<int64_t>(smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_S2_MAX_NUM)));
     }
     if (hasLoad == 0) {
         if ASCEND_IS_AIC {
@@ -483,14 +483,14 @@ __aicore__ inline void SparseFlashMlaCsaKernel<CubeBlockType, VecBlockType>::Pro
     }
 
     // 从meta data解析分核信息
-    uint32_t bN2StartIdx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_BN2_START_INDEX, false));
-    uint32_t gS1StartIdx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_M_START_INDEX, false));
-    uint32_t s2StartIdx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_S2_START_INDEX, false));
-    uint32_t bN2EndIdx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_BN2_END_INDEX, false));
-    uint32_t nextGs1Idx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_M_END_INDEX, false));
-    uint32_t s2EndIdx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_S2_END_INDEX, false));
+    uint32_t bN2StartIdx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_BN2_START_INDEX));
+    uint32_t gS1StartIdx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_M_START_INDEX));
+    uint32_t s2StartIdx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_S2_START_INDEX));
+    uint32_t bN2EndIdx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_BN2_END_INDEX));
+    uint32_t nextGs1Idx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_M_END_INDEX));
+    uint32_t s2EndIdx = smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_S2_END_INDEX));
     uint32_t firstFdDataWorkspaceIdx =
-        smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX, false));
+        smlaCsaMetadataGm.GetValue(GetAttrAbsIndex(smlaCsaAicIdx, FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX));
 
     uint32_t s2LoopLimit = 0;
 

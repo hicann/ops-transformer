@@ -393,23 +393,9 @@ aclnnStatus CheckSingleParamSmla(int64_t batchSize, int64_t maxSeqlenQ, int64_t 
                                               "The value of aic_core_num must be greater than 0");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (aicCoreNum > optiling::AIC_CORE_MAX_NUM) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLA_ACLNN_OP_NAME, "aic_core_num", std::to_string(aicCoreNum),
-                                              "The current value is not within the valid range. "
-                                              "The valid range is [1, " +
-                                                  std::to_string(optiling::AIC_CORE_MAX_NUM) + "]");
-        return ACLNN_ERR_PARAM_INVALID;
-    }
     if (aivCoreNum == 0) {
         OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLA_ACLNN_OP_NAME, "aiv_core_num", std::to_string(aivCoreNum),
                                               "The value of aiv_core_num must be greater than 0");
-        return ACLNN_ERR_PARAM_INVALID;
-    }
-    if (aivCoreNum > optiling::AIV_CORE_MAX_NUM) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(SMLA_ACLNN_OP_NAME, "aiv_core_num", std::to_string(aivCoreNum),
-                                              "The current value is not within the valid range. "
-                                              "The valid range is [1, " +
-                                                  std::to_string(optiling::AIV_CORE_MAX_NUM) + "]");
         return ACLNN_ERR_PARAM_INVALID;
     }
     // 校验切g模板核数
@@ -654,7 +640,8 @@ aclnnStatus CheckConsistencySmla(const aclTensor* cuSeqlensQOptional, const aclT
                                  const aclTensor* cmpTopkLengthOptional, int64_t batchSize, const char* layoutQOptional,
                                  const char* layoutKvOptional, bool hasOriKv, bool hasCmpKv, int64_t oriTopk,
                                  int64_t cmpTopk, int64_t oriMaskMode, int64_t cmpMaskMode, int64_t maxSeqlenQ,
-                                 int64_t numHeadsKv, const char* socVersion, const aclTensor* metadata)
+                                 int64_t numHeadsKv, const char* socVersion, uint32_t aicCoreNum, uint32_t aivCoreNum,
+                                 const aclTensor* metadata)
 {
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
     int64_t dimNum = -1;
@@ -861,10 +848,11 @@ aclnnStatus CheckConsistencySmla(const aclTensor* cuSeqlensQOptional, const aclT
             return ACLNN_ERR_PARAM_INVALID;
         }
         // 校验 metadata 元素数
-        if (metadata->GetViewShape().GetDim(0) != optiling::SMLA_METADATA_TOTAL_SIZE) {
+        const auto requiredSize = optiling::GetSmlaMetadataSize(aicCoreNum, aivCoreNum);
+        if (metadata->GetViewShape().GetDim(0) < requiredSize) {
             OP_LOGE_FOR_INVALID_SHAPESIZE(SMLA_ACLNN_OP_NAME, "metadata",
                                           std::to_string(metadata->GetViewShape().GetDim(0)),
-                                          std::to_string(optiling::SMLA_METADATA_TOTAL_SIZE));
+                                          "at least " + std::to_string(requiredSize));
             return ACLNN_ERR_PARAM_INVALID;
         }
         // 校验 metadata 数据类型
@@ -1084,8 +1072,8 @@ static aclnnStatus ParamsCheck(const aclTensor* cuSeqlensQOptional, const aclTen
         CheckConsistencySmla(cuSeqlensQOptional, cuSeqlensOriKvOptional, cuSeqlensCmpKvOptional, sequsedQOptional,
                              sequsedOriKvOptional, sequsedCmpKvOptional, cmpResidualKvOptional, oriTopkLengthOptional,
                              cmpTopkLengthOptional, batchSize, layoutQOptional, layoutKvOptional, hasOriKv, hasCmpKv,
-                             oriTopk, cmpTopk, oriMaskMode, cmpMaskMode, maxSeqlenQ, numHeadsKv, socVersion,
-                             metaData) == ACLNN_SUCCESS) {
+                             oriTopk, cmpTopk, oriMaskMode, cmpMaskMode, maxSeqlenQ, numHeadsKv, socVersion, aicCoreNum,
+                             aivCoreNum, metaData) == ACLNN_SUCCESS) {
         return ACLNN_SUCCESS;
     } else {
         return ACLNN_ERR_PARAM_INVALID;

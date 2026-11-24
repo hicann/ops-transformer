@@ -362,8 +362,10 @@ private:
     std::string layoutKv_ = "PA_BBND";
     bool hasOriKv_ = true;
     bool hasCmpKv_ = true;
-    uint32_t aicCoreNum_ = optiling::AIC_CORE_MAX_NUM;
-    uint32_t aivCoreNum_ = optiling::AIV_CORE_MAX_NUM;
+    int64_t metadataSize_ = 0;
+    uint32_t metadataAicNum_ = 0; // Number of launched MIX blocks before split-G pairing.
+    uint32_t aicCoreNum_ = 0;
+    uint32_t aivCoreNum_ = 0;
     bool isBatchConsistency_ = false;
 
     // attr

@@ -406,7 +406,7 @@ aclnnStatus aclnnMixedQuantSparseFlashMla(
       <td>必须传入。由aclnnMixedQuantSparseFlashMlaMetadata算子生成。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(2048,)</td>
+      <td>(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)</td>
       <td>×</td>
     </tr>
     <tr>
@@ -1465,7 +1465,7 @@ metadataOptional校验：
 
 - 支持layoutQOptional/layoutKvOptional为BSND/BSND、TND/TND、BSND/PA_BBND、TND/PA_BBND四种组合。
 - 每token记录依次为64个BFLOAT16 RoPE、448个signed INT8 nope、7个BFLOAT16 scale和18字节padding，共608B。每64维nope共用一个scale；scale内嵌于记录，没有独立scale参数，Q为FLOAT16时也不改变scale和RoPE的字段类型。量化端需按相同字节协议对接。
-- PA_BBND下两路blockTable和seqused均必传；记录内部连续，0轴stride须覆盖完整物理块并按32字节对齐；TND下需传对应cuSeqlens。metadataOptional为必传INT32 Tensor、shape为(2048,)，使用相同输入属性的前置Metadata接口生成。
+- PA_BBND下两路blockTable和seqused均必传；记录内部连续，0轴stride须覆盖完整物理块并按32字节对齐；TND下需传对应cuSeqlens。metadataOptional为必传INT32 Tensor、shape为(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)，使用相同输入属性的前置Metadata接口生成。
 - cmpMaskMode=3且cmpRatio!=1时必须传cmpResidualKvOptional；cmpMaskMode=0或cmpRatio=1时不传；cmpMaskMode=0时需传cmpTopkLengthOptional。
 - `sinksOptional`沿用可选参数位置，但当前版本Host要求必传FLOAT、shape为`(qN,)`，不能省略。
 - 本路径不支持batch一致性。空有效KV时attnOut和有效Softmax LSE均为0；padding query也输出0。物理Tensor仍需满足非空shape约束。
@@ -1490,7 +1490,7 @@ metadataOptional校验：
 | `oriSparseIndicesOptional`、`oriTopkLengthOptional`、`cmpTopkLengthOptional`、`cuSeqlensOriKvOptional`、`cuSeqlensCmpKvOptional`、`sequsedQOptional`、`sequsedCmpKvOptional`、`cmpResidualKvOptional` | 不支持传入，保留原有可选参数位置 |
 | `oriMaskMode`、`cmpMaskMode`、`oriWinLeft`、`oriWinRight` | 分别为4、3、非负值、0 |
 | `cmpRatio`、`ropeHeadDim`、`topkValueMode` | 分别支持4或128、64、1；算子的压缩倍率支持范围不代表框架会量化全部压缩KV |
-| metadataOptional | 必传，由前置Metadata接口以相同`quantMode=3`及相同输入属性生成，INT32、shape为`(2048,)` |
+| metadataOptional | 必传，由前置Metadata接口以相同`quantMode=3`及相同输入属性生成，INT32、shape为`(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)` |
 
 `sinksOptional`和Softmax LSE继续使用原有参数及返回形式。
 <!-- end id13 -->
@@ -1681,7 +1681,15 @@ int main()
   std::vector<int64_t> seqUsedCmpKvShape = {B};
   std::vector<int64_t> cmpResidualKvShape = {B};
   std::vector<int64_t> sinksShape = {N1};
-  std::vector<int64_t> metadataShape = {2048};
+  uint32_t aicNum = 0;
+  uint32_t aivNum = 0;
+  if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_CUBE_CORE, &aicNum) != ACL_SUCCESS ||
+      aclrtGetResInCurrentThread(ACL_RT_DEV_RES_VECTOR_CORE, &aivNum) != ACL_SUCCESS) {
+      return ACL_ERROR_INVALID_PARAM;
+  }
+  constexpr int64_t metadataAlignment = 1024;
+  const int64_t elements = 9LL * aicNum + 8LL * aivNum;
+  std::vector<int64_t> metadataShape = {(elements + metadataAlignment - 1) / metadataAlignment * metadataAlignment};
   std::vector<int64_t> attnOutShape = {T1, N1, D};
   std::vector<int64_t> softmaxLseShape = {T1, N1, 1};
   std::vector<int64_t> emptyShape = {0};
@@ -1751,7 +1759,7 @@ int main()
     cmpResidualKvHostData[i] = seqUsedOriKvHostData[i] % static_cast<int32_t>(cmpRatio);
   }
   std::vector<float> sinksHostData(N1, 1.0f);
-  std::vector<int32_t> metadataHostData(2048, 0);
+  std::vector<int32_t> metadataHostData(metadataShape[0], 0);
   std::vector<uint16_t> attnOutHostData = MakeBf16Data(attnOutSize, 0.0f);
   std::vector<float> softmaxLseHostData(softmaxLseSize, 0.0f);
 

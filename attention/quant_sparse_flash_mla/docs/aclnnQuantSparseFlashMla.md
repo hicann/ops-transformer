@@ -428,7 +428,7 @@ aclnnStatus aclnnQuantSparseFlashMla(
       <td>必须传入。由aclnnQuantSparseFlashMlaMetadata算子生成。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(2048,)</td>
+      <td>(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)</td>
       <td>×</td>
     </tr>
     <tr>
@@ -1640,7 +1640,15 @@ int main()
     std::vector<int64_t> seqUsedCmpKvShape = {B};
     std::vector<int64_t> cmpResidualKvShape = {B};
     std::vector<int64_t> sinksShape = {N1};
-    std::vector<int64_t> metadataShape = {2048};
+    uint32_t aicNum = 0;
+    uint32_t aivNum = 0;
+    if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_CUBE_CORE, &aicNum) != ACL_SUCCESS ||
+        aclrtGetResInCurrentThread(ACL_RT_DEV_RES_VECTOR_CORE, &aivNum) != ACL_SUCCESS) {
+        return ACL_ERROR_INVALID_PARAM;
+    }
+    constexpr int64_t metadataAlignment = 1024;
+    const int64_t elements = 9LL * aicNum + 8LL * aivNum;
+    std::vector<int64_t> metadataShape = {(elements + metadataAlignment - 1) / metadataAlignment * metadataAlignment};
     std::vector<int64_t> descaleShape = {1};
     std::vector<int64_t> attnOutShape = {T1, N1, D};
     std::vector<int64_t> softmaxLseShape = {T1, N1, 1};
@@ -1720,7 +1728,7 @@ int main()
         cmpResidualKvHostData[i] = seqUsedOriKvHostData[i] % static_cast<int32_t>(cmpRatio);
     }
     std::vector<float> sinksHostData(N1, 1.0f);
-    std::vector<int32_t> metadataHostData(2048, 0);
+    std::vector<int32_t> metadataHostData(metadataShape[0], 0);
     std::vector<uint16_t> attnOutHostData = MakeBf16Data(attnOutSize, 0.0f);
     std::vector<float> softmaxLseHostData(softmaxLseSize, 0.0f);
 

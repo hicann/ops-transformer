@@ -22,8 +22,6 @@ constexpr int64_t DIM_2 = 2;
 constexpr int64_t DIM_3 = 3;
 constexpr int64_t DIM_4 = 4;
 
-constexpr int64_t SMLA_METADATA_SIZE = 2048;
-
 at::Tensor SparseFlashMlaMetadata(
     int64_t numHeadsQ, int64_t numHeadsKv, int64_t headDim, const c10::optional<at::Tensor>& cuSeqlensQ,
     const c10::optional<at::Tensor>& cuSeqlensOriKv, const c10::optional<at::Tensor>& cuSeqlensCmpKv,
@@ -32,7 +30,7 @@ at::Tensor SparseFlashMlaMetadata(
     const c10::optional<at::Tensor>& oriTopkLength, const c10::optional<at::Tensor>& cmpTopkLength, int64_t batchSize,
     int64_t maxSeqlenQ, int64_t maxSeqlenOriKv, int64_t maxSeqlenCmpKv, int64_t oriTopk, int64_t cmpTopk,
     int64_t cmpRatio, int64_t oriMaskMode, int64_t cmpMaskMode, int64_t oriWinLeft, int64_t oriWinRight,
-    c10::string_view layoutQ, c10::string_view layoutKv, bool hasOriKv, bool hasCmpKv)
+    c10::string_view layoutQ, c10::string_view layoutKv, bool hasOriKv, bool hasCmpKv, int64_t metadataSize)
 {
     at::Device outputDevice = at::Device(std::string("npu"));
     if (cuSeqlensQ.has_value()) {
@@ -55,7 +53,7 @@ at::Tensor SparseFlashMlaMetadata(
         outputDevice = cmpTopkLength.value().device();
     }
 
-    at::Tensor output = torch::empty({SMLA_METADATA_SIZE}, torch::dtype(torch::kInt32).device(outputDevice));
+    at::Tensor output = torch::empty({metadataSize}, torch::dtype(torch::kInt32).device(outputDevice));
     auto cuSeqlensQVal = get_valid_tensor(cuSeqlensQ, outputDevice);
     auto cuSeqlensOriKvVal = get_valid_tensor(cuSeqlensOriKv, outputDevice);
     auto cuSeqlensCmpKvVal = get_valid_tensor(cuSeqlensCmpKv, outputDevice);

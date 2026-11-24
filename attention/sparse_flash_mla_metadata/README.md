@@ -229,7 +229,7 @@
     <tr>
       <td>metadata</td>
       <td>输出</td>
-      <td>表示`SparseFlashMla`主算子使用的任务切分结果，shape固定为(2048, )。</td>
+      <td>表示`SparseFlashMla`主算子使用的任务切分结果，shape为(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>

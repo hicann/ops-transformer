@@ -176,13 +176,13 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, Mqsml
         return;
     }
     this->mqsmlaCsaMetadataGm.SetGlobalBuffer((__gm__ uint32_t*)metadata);
-    bN2StartIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_BN2_START_INDEX, false));
-    gS1StartIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_M_START_INDEX, false));
-    s2StartIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_S2_START_INDEX, false));
-    bN2EndIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_BN2_END_INDEX, false));
-    nextGs1Idx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_M_END_INDEX, false));
-    s2EndIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_S2_END_INDEX, false));
-    hasLoad = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_CORE_ENABLE_INDEX, false));
+    bN2StartIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_BN2_START_INDEX));
+    gS1StartIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_M_START_INDEX));
+    s2StartIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_S2_START_INDEX));
+    bN2EndIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_BN2_END_INDEX));
+    nextGs1Idx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_M_END_INDEX));
+    s2EndIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_S2_END_INDEX));
+    hasLoad = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_CORE_ENABLE_INDEX));
     if (nextGs1Idx != 0 || s2EndIdx != 0) {
         bN2EndIdx++;
     }
@@ -540,7 +540,7 @@ MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::Proc
     int64_t mqsmlaMaxS2LoopCnt = 0;
     if constexpr (IS_SPLIT_G) {
         mqsmlaMaxS2LoopCnt =
-            static_cast<int64_t>(mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_S2_MAX_NUM, false)));
+            static_cast<int64_t>(mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_S2_MAX_NUM)));
     }
     if (hasLoad == 0) {
         if ASCEND_IS_AIC {
@@ -556,7 +556,7 @@ MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, MqsmlaCsaVecBlockType>::Proc
 
     // 从meta data解析分核信息
     uint32_t firstFdDataWorkspaceIdx =
-        mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX, false));
+        mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(mqsmlaCsaAicIdx, FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX));
     uint32_t s2LoopLimit = 0;
     int64_t taskId = 0;
     bool isFirstLoop = true;
@@ -817,17 +817,18 @@ __aicore__ inline void MixedQuantSparseFlashMlaCsa<MqsmlaCsaCubeBlockType, Mqsml
     FdRunInfo& fdRunInfo)
 {
     uint32_t aivIdx = static_cast<uint32_t>(this->mqsmlaCsaConstInfo.aivIdx);
-    fdRunInfo.coreEnable = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_CORE_ENABLE_INDEX, true)) != 0;
+    const uint64_t fdOffset = GetFdRecordOffset(GetBlockNum(), aivIdx);
+    fdRunInfo.coreEnable = mqsmlaCsaMetadataGm.GetValue(fdOffset + FD_CORE_ENABLE_INDEX) != 0;
     if (!fdRunInfo.coreEnable) {
         return;
     }
 
-    fdRunInfo.bn2Idx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_BN2_IDX_INDEX, true));
-    fdRunInfo.mIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_M_IDX_INDEX, true));
-    fdRunInfo.workspaceIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_WORKSPACE_IDX_INDEX, true));
-    fdRunInfo.workspaceNum = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_WORKSPACE_NUM_INDEX, true));
-    fdRunInfo.mStartIdx = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_M_START_INDEX, true));
-    fdRunInfo.mNum = mqsmlaCsaMetadataGm.GetValue(GetAttrAbsIndex(aivIdx, FD_M_NUM_INDEX, true));
+    fdRunInfo.bn2Idx = mqsmlaCsaMetadataGm.GetValue(fdOffset + FD_BN2_IDX_INDEX);
+    fdRunInfo.mIdx = mqsmlaCsaMetadataGm.GetValue(fdOffset + FD_M_IDX_INDEX);
+    fdRunInfo.workspaceIdx = mqsmlaCsaMetadataGm.GetValue(fdOffset + FD_WORKSPACE_IDX_INDEX);
+    fdRunInfo.workspaceNum = mqsmlaCsaMetadataGm.GetValue(fdOffset + FD_WORKSPACE_NUM_INDEX);
+    fdRunInfo.mStartIdx = mqsmlaCsaMetadataGm.GetValue(fdOffset + FD_M_START_INDEX);
+    fdRunInfo.mNum = mqsmlaCsaMetadataGm.GetValue(fdOffset + FD_M_NUM_INDEX);
 }
 
 template <typename MqsmlaCsaCubeBlockType, typename MqsmlaCsaVecBlockType>

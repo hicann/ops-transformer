@@ -31,7 +31,7 @@
 
   该算子为AI CPU调度算子，不涉及数值计算。核心流程为：解析各Batch的Q/KV序列长度 → 根据mask模式计算每个S1G块的有效S2范围 → 基于开销模型进行负载均衡分核 → 输出分核元数据。
 
-  输出metadata Tensor的shape为(2048,)，数据类型为INT32，内部结构如下：
+  输出metadata Tensor的shape为(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)，数据类型为INT32，内部结构如下：
 
   - FA Metadata区域（AIC_CORE_NUM × 9个INT32），每个AI Core的FA阶段任务信息：
 
@@ -418,7 +418,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
       <td>metaData（aclTensor*）</td>
       <td>输出</td>
       <td>分核元数据输出，供SparseFlashMla算子使用。</td>
-      <td>shape固定为(2048, )。</td>
+      <td>shape为(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维</td>
@@ -750,6 +750,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
 /**
  * @file test_aclnn_sparse_flash_mla_metadata.cpp
  */
+#include <algorithm>
 #include <iostream>
 #include <vector>
 #include <cmath>
@@ -769,9 +770,7 @@ aclnnStatus aclnnSparseFlashMlaMetadata(
     } while (0)
 
 // 参考 sparse_flash_mla_metadata.h
-constexpr uint32_t AIC_CORE_MAX_NUM = 80;
-constexpr uint32_t AIV_CORE_MAX_NUM = 80;
-constexpr uint32_t SMLA_METADATA_TOTAL_SIZE = 2048;
+constexpr int64_t METADATA_ALIGNMENT = 1024;
 constexpr uint32_t FA_METADATA_SIZE = 9;
 constexpr uint32_t FD_METADATA_SIZE = 8;
 
@@ -794,11 +793,6 @@ constexpr uint32_t FD_WORKSPACE_IDX_INDEX = 3;
 constexpr uint32_t FD_WORKSPACE_NUM_INDEX = 4;
 constexpr uint32_t FD_M_START_INDEX = 5;
 constexpr uint32_t FD_M_NUM_INDEX = 6;
-
-struct SmlaMetadata {
-    uint32_t faMetadata[AIC_CORE_MAX_NUM][FA_METADATA_SIZE];
-    uint32_t fdMetadata[AIV_CORE_MAX_NUM][FD_METADATA_SIZE];
-};
 
 struct ScopeGuard
 {
@@ -836,6 +830,9 @@ struct ArgScenario {
 };
 
 struct ArgContext {
+    uint32_t aicNum = 0;
+    uint32_t aivNum = 0;
+    int64_t metadataSize = 0;
     // required input
     int64_t numHeadsQ { 0 };
     int64_t numHeadsKv { 0 };
@@ -964,7 +961,13 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     context.numHeadsQ = 64;
     context.numHeadsKv = 1;
     context.headDim = 512;
-    ret = CreateTensor(aclDataType::ACL_INT32, { SMLA_METADATA_TOTAL_SIZE }, context.metadata);     // 2048: Fix size
+    ret = aclrtGetResInCurrentThread(ACL_RT_DEV_RES_CUBE_CORE, &context.aicNum);
+    CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Failed to query available AIC count");
+    ret = aclrtGetResInCurrentThread(ACL_RT_DEV_RES_VECTOR_CORE, &context.aivNum);
+    CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Failed to query available AIV count");
+    const int64_t elements = int64_t{context.aicNum} * FA_METADATA_SIZE + int64_t{context.aivNum} * FD_METADATA_SIZE;
+    context.metadataSize = (elements + METADATA_ALIGNMENT - 1) / METADATA_ALIGNMENT * METADATA_ALIGNMENT;
+    ret = CreateTensor(aclDataType::ACL_INT32, {context.metadataSize}, context.metadata);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create metadata failed. Error: %d", ret);
     context.oriTopk = 0;
     context.cmpTopk = 0;
@@ -1071,31 +1074,37 @@ int main() {
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtSynchronizeStream failed. ERROR: %d\n", ret);
 
     // 5. 打印输出
-    SmlaMetadata result {};
-    ret = aclrtMemcpy(&result, sizeof(result), context.metadata.deviceAddr, sizeof(result), ACL_MEMCPY_DEVICE_TO_HOST);
+    std::vector<uint32_t> result(context.metadataSize);
+    const size_t resultBytes = result.size() * sizeof(uint32_t);
+    ret = aclrtMemcpy(result.data(), resultBytes, context.metadata.deviceAddr, resultBytes, ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtMemcpy failed. ERROR: %d\n", ret);
 
-    for (uint32_t i = 0; i < AIC_CORE_MAX_NUM; ++i) {
+    const char* soc = aclrtGetSocName();
+    CHECK_LOG_RET(soc != nullptr, ACL_ERROR_FAILURE, "Failed to query SoC name");
+    const uint32_t vectorsPerBlock = std::strncmp(soc, "Ascend960", 9) == 0 ? 1U : 2U;
+    const uint32_t blocks = std::min(context.aicNum, std::max(1U, context.aivNum / vectorsPerBlock));
+    for (uint32_t i = 0; i < blocks; ++i) {
         printf("AIC Core%u\n", i);
-        printf("    Core Enable : %u\n", result.faMetadata[i][FA_CORE_ENABLE_INDEX]);
-        printf("    Start BN2   : %u\n", result.faMetadata[i][FA_BN2_START_INDEX]);
-        printf("    Start M     : %u\n", result.faMetadata[i][FA_M_START_INDEX]);
-        printf("    Start S2    : %u\n", result.faMetadata[i][FA_S2_START_INDEX]);
-        printf("    End BN2     : %u\n", result.faMetadata[i][FA_BN2_END_INDEX]);
-        printf("    End M       : %u\n", result.faMetadata[i][FA_M_END_INDEX]);
-        printf("    End S2      : %u\n", result.faMetadata[i][FA_S2_END_INDEX]);
-        printf("    First Workspace Index : %u\n", result.faMetadata[i][FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX]);
-        printf("    Max S2 Block Num : %u\n", result.faMetadata[i][FA_S2_MAX_NUM]);
+        printf("    Core Enable : %u\n", result[i * FA_METADATA_SIZE + FA_CORE_ENABLE_INDEX]);
+        printf("    Start BN2   : %u\n", result[i * FA_METADATA_SIZE + FA_BN2_START_INDEX]);
+        printf("    Start M     : %u\n", result[i * FA_METADATA_SIZE + FA_M_START_INDEX]);
+        printf("    Start S2    : %u\n", result[i * FA_METADATA_SIZE + FA_S2_START_INDEX]);
+        printf("    End BN2     : %u\n", result[i * FA_METADATA_SIZE + FA_BN2_END_INDEX]);
+        printf("    End M       : %u\n", result[i * FA_METADATA_SIZE + FA_M_END_INDEX]);
+        printf("    End S2      : %u\n", result[i * FA_METADATA_SIZE + FA_S2_END_INDEX]);
+        printf("    First Workspace Index : %u\n", result[i * FA_METADATA_SIZE + FA_FIRST_FD_DATA_WORKSPACE_IDX_INDEX]);
+        printf("    Max S2 Block Num : %u\n", result[i * FA_METADATA_SIZE + FA_S2_MAX_NUM]);
     }
-    for (uint32_t i = 0; i < AIV_CORE_MAX_NUM; ++i) {
+    const auto* fdRecords = result.data() + blocks * FA_METADATA_SIZE;
+    for (uint32_t i = 0; i < std::min(context.aivNum, blocks * vectorsPerBlock); ++i) {
         printf("AIV Core%u\n", i);
-        printf("    Core Enable             : %u\n", result.fdMetadata[i][FD_CORE_ENABLE_INDEX]);
-        printf("    FD Task BN2 Idx         : %u\n", result.fdMetadata[i][FD_BN2_IDX_INDEX]);
-        printf("    FD Task M Idx           : %u\n", result.fdMetadata[i][FD_M_IDX_INDEX]);
-        printf("    FD Task Workspace Idx   : %u\n", result.fdMetadata[i][FD_WORKSPACE_IDX_INDEX]);
-        printf("    FD Task Workspace Num   : %u\n", result.fdMetadata[i][FD_WORKSPACE_NUM_INDEX]);
-        printf("    FD Subtask M Start      : %u\n", result.fdMetadata[i][FD_M_START_INDEX]);
-        printf("    FD Subtask M Num        : %u\n", result.fdMetadata[i][FD_M_NUM_INDEX]);
+        printf("    Core Enable             : %u\n", fdRecords[i * FD_METADATA_SIZE + FD_CORE_ENABLE_INDEX]);
+        printf("    FD Task BN2 Idx         : %u\n", fdRecords[i * FD_METADATA_SIZE + FD_BN2_IDX_INDEX]);
+        printf("    FD Task M Idx           : %u\n", fdRecords[i * FD_METADATA_SIZE + FD_M_IDX_INDEX]);
+        printf("    FD Task Workspace Idx   : %u\n", fdRecords[i * FD_METADATA_SIZE + FD_WORKSPACE_IDX_INDEX]);
+        printf("    FD Task Workspace Num   : %u\n", fdRecords[i * FD_METADATA_SIZE + FD_WORKSPACE_NUM_INDEX]);
+        printf("    FD Subtask M Start      : %u\n", fdRecords[i * FD_METADATA_SIZE + FD_M_START_INDEX]);
+        printf("    FD Subtask M Num        : %u\n", fdRecords[i * FD_METADATA_SIZE + FD_M_NUM_INDEX]);
     }
 
     return 0;

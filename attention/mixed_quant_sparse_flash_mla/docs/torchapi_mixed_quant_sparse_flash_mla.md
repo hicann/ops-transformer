@@ -219,7 +219,7 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 | ori_topk_length | tensor | 可选 | 表示ori_sparse_indices实际参与计算的长度 | int32 | ND | <ul><li>(b, q_s, kv_n)</li><li>(q_t, kv_n)</li></ul> |
 | cmp_topk_length | tensor | 可选 | 表示cmp_sparse_indices实际参与计算的长度 | int32 | ND | <ul><li>(b, q_s, kv_n)</li><li>(q_t, kv_n)</li></ul> |
 | sinks | tensor | 可选 | 表示各注意力头设置独立可学习虚拟偏移项，用于维持长文本推理时的稳定性 | float32 | ND | <ul><li>(q_n,)</li></ul> |
-| metadata | tensor | 可选 | 表示mixed_quant_sparse_flash_mla_metadata生成的分核信息 | int32 | ND | <ul><li>(2048,)</li></ul> |
+| metadata | tensor | 可选 | 表示mixed_quant_sparse_flash_mla_metadata生成的分核信息 | int32 | ND | <ul><li>(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)</li></ul> |
 | rope_head_dim | int | 可选 | 表示rope头的维度。默认值为None | int32 | - | - |
 | softmax_scale | float | 可选 | 表示可显式设置缩放因子。默认值为None | float32 | - | - |
 | cmp_ratio | int | 可选 | 表示cmp_kv相对于压缩前KV长度的压缩倍率，可恢复cmp侧mask使用的压缩前KV长度。默认值为1，取值范围1-128。| int32 | - | - |
@@ -240,7 +240,7 @@ cann_ops_transformer.mixed_quant_sparse_flash_mla(
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 数据格式 | 维度 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| metadata | tensor | 必选 | mixed_quant_sparse_flash_mla的分核信息 | int32 | ND | <ul><li>(2048,)</li></ul> |
+| metadata | tensor | 必选 | mixed_quant_sparse_flash_mla的分核信息 | int32 | ND | <ul><li>(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)</li></ul> |
 
 ### mixed_quant_sparse_flash_mla
 
@@ -1041,7 +1041,7 @@ metadata校验：
 
 - 支持layout_q/layout_kv为BSND/BSND、TND/TND、BSND/PA_BBND、TND/PA_BBND四种组合。
 - 每token依次存储64个BFLOAT16 RoPE、448个signed INT8 nope、7个BFLOAT16 scale和18字节padding，共608B；每64维nope共用一个scale。scale在KV记录内部，无需新增scale Tensor；q为float16时，记录中的scale和RoPE仍为BFLOAT16。量化端需按相同字节协议对接。
-- PA_BBND下两路block_table和seqused均必传；记录内部连续，0轴stride须覆盖完整物理块并按32字节对齐；TND下需传对应cu_seqlens。metadata必传、类型int32、shape为(2048,)，需由属性一致的真实Metadata接口生成。
+- PA_BBND下两路block_table和seqused均必传；记录内部连续，0轴stride须覆盖完整物理块并按32字节对齐；TND下需传对应cu_seqlens。metadata必传、类型int32、shape为(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)，需由属性一致的真实Metadata接口生成。
 - cmp_mask_mode=3且cmp_ratio!=1时必须传cmp_residual_kv；cmp_mask_mode=0或cmp_ratio=1时不传；cmp_mask_mode=0时需传cmp_topk_length。
 - `sinks`沿用可选参数位置，但当前版本Host要求必传float32、shape为`(q_n,)`，不能省略。
 - 本路径不支持batch一致性。空有效KV时attention_out和有效Softmax LSE均为0；padding query也输出0。物理Tensor仍需满足非空shape约束。
@@ -1066,7 +1066,7 @@ metadata校验：
 | `ori_sparse_indices`、`ori_topk_length`、`cmp_topk_length`、`cu_seqlens_ori_kv`、`cu_seqlens_cmp_kv`、`seqused_q`、`seqused_cmp_kv`、`cmp_residual_kv` | 不支持传入，保留原有可选参数位置 |
 | `ori_mask_mode`、`cmp_mask_mode`、`ori_win_left`、`ori_win_right` | 分别为4、3、非负值、0 |
 | `cmp_ratio`、`rope_head_dim`、`topk_value_mode` | 分别支持4或128、64、1；算子的压缩倍率支持范围不代表框架会量化全部压缩KV |
-| `metadata` | 必传，由前置Metadata接口以相同`quant_mode=3`及相同输入属性生成，INT32、shape为`(2048,)` |
+| `metadata` | 必传，由前置Metadata接口以相同`quant_mode=3`及相同输入属性生成，INT32、shape为`(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)` |
 
 `sinks`和Softmax LSE继续使用原有参数及返回形式。调用时建议显式使用`quant_mode=3`。原有Torch实现还保留`key_dtype=None`、`value_dtype=None`两个参数；它们在TurboQuant适配前已存在。上文函数原型沿用基线文档，完整注册签名以`torch.ops.cann_ops_transformer.mixed_quant_sparse_flash_mla.default._schema`为准。
 <!-- end id13 -->

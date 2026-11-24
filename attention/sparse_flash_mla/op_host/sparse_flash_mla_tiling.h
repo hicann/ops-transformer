@@ -57,7 +57,6 @@ constexpr uint32_t ATTR_RETURN_SOFTMAX_LSE_INDEX = 9;
 constexpr uint32_t BYTE_BLOCK = 32;
 
 // 入参限制常量
-constexpr uint32_t METADATA_LIMIT = 2048;
 constexpr uint32_t DIM_LIMIT = 512;
 constexpr uint32_t TOPK_LIMIT = 8192;
 constexpr uint32_t BLOCK_SIZE_LIMIT = 1024;

@@ -13,6 +13,7 @@
  * \brief
  */
 
+#include "../../sparse_flash_mla/op_kernel/smla_metadata_common.h"
 #include "quant_sparse_flash_mla_check.h"
 #include "checkers/quant_sparse_flash_mla_checker.h"
 #include "../../sparse_flash_mla/op_host/checkers/checker_adapter.h"
@@ -643,11 +644,14 @@ ge::graphStatus QuantSparseFlashMlaTiling::DoOpTiling(QSMLATilingInfo* tilingInf
     }
     // -------------set blockdim-----------------
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(tilingInfo->platformInfo);
-    uint32_t aivNum = ascendcPlatform.GetCoreNumAiv();
-    uint32_t aicNum = ascendcPlatform.GetCoreNumAic();
-    uint32_t blockDim = ascendcPlatform.CalcTschBlockDim(aivNum, aicNum, aivNum);
-    context_->SetBlockDim(blockDim);
-    OP_LOGI(tilingInfo->opName, "QSMLA block dim: %u aiv Num: %u aic Num: %u.", blockDim, aivNum, aicNum);
+    const uint32_t vectorsPerBlock = IsA6Arch(tilingInfo->npuArch) ? 1U : 2U;
+    const uint32_t aicNum =
+        GetSmlaBlockNum(ascendcPlatform.GetCoreNumAic(), ascendcPlatform.GetCoreNumAiv(), vectorsPerBlock);
+    OP_CHECK_IF(aicNum == 0, OP_LOGE(tilingInfo->opName, "Insufficient cores for one MIX block."),
+                return ge::GRAPH_FAILED);
+    context_->SetBlockDim(aicNum);
+    const uint32_t aivNum = aicNum * vectorsPerBlock;
+    OP_LOGI(tilingInfo->opName, "QSMLA block dim: %u aiv Num: %u aic Num: %u.", aicNum, aivNum, aicNum);
 
     // -------------set workspacesize-----------------
     constexpr uint32_t TRIPLE_BUFFER_NUM = 3;

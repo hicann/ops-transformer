@@ -375,7 +375,7 @@ aclnnStatus aclnnSparseFlashMla(
       <td>必须传入。由aclnnSparseFlashMlaMetadata算子生成。</td>
       <td>INT32</td>
       <td>ND</td>
-      <td>(2048,)</td>
+      <td>(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)</td>
       <td>×</td>
     </tr>
     <tr>
@@ -692,7 +692,7 @@ aclnnStatus aclnnSparseFlashMla(
   - SWA稀疏oriKvOptional场景仅支持SWA模板，仅传入`oriKvOptional`，同时传入`oriSparseIndicesOptional`和`oriTopkLengthOptional`；配套Metadata接口的`oriTopk`为oriSparseIndicesOptional最后一维K，`oriMaskMode`为0/3/4，`oriWinLeft`和`oriWinRight`仅在`oriMaskMode`为4时取非负数，且`cmpKvOptional`不传入。
   - SWA稀疏oriKvOptional场景下，`oriTopkLengthOptional`的元素表示实际有效索引条目数，取值应在[0, K]范围内。对每个q token和KV head，`oriSparseIndicesOptional`的[0, oriTopkLengthOptional)区间为左对齐的有效索引条目，[oriTopkLengthOptional, K)区间为无效或填充条目，建议填-1；其他场景`oriTopkLengthOptional`传入nullptr或空Tensor。
   - 除`cmpTopkLengthOptional`等预留输入可传入nullptr或空Tensor外，其余已传入Tensor不支持为空。
-  - `metadataOptional`参数必须传入，由`aclnnSparseFlashMlaMetadata`算子生成，shape固定为(2048,)。
+  - `metadataOptional`参数必须传入，由`aclnnSparseFlashMlaMetadata`算子生成，shape为(ceil((9 × AIC + 8 × AIV) / 1024) × 1024,)。
   - `cmpResidualKvOptional`为主算子和`aclnnSparseFlashMlaMetadata`的可选入参；传入后用于按`cmp_len * cmpRatio + residual`恢复cmp侧mask使用的压缩前长度。主算子仅在cmpMaskMode为3且cmpRatio不等于1时允许传入，cmpMaskMode为0或cmpRatio等于1时不允许传入。
   - 当layoutKvOptional为PA_BBND时，oriKvOptional和cmpKvOptional支持0轴非连续，非连续Tensor的每一维的stride均不能为0，不支持其他非连续。
 
@@ -895,7 +895,15 @@ int main()
   std::vector<int64_t> seqUsedCmpKvShape = {B};
   std::vector<int64_t> cmpResidualKvShape = {B};
   std::vector<int64_t> sinksShape = {N1};
-  std::vector<int64_t> metadataShape = {2048};
+  uint32_t aicNum = 0;
+  uint32_t aivNum = 0;
+  if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_CUBE_CORE, &aicNum) != ACL_SUCCESS ||
+      aclrtGetResInCurrentThread(ACL_RT_DEV_RES_VECTOR_CORE, &aivNum) != ACL_SUCCESS) {
+      return ACL_ERROR_INVALID_PARAM;
+  }
+  constexpr int64_t metadataAlignment = 1024;
+  const int64_t elements = 9LL * aicNum + 8LL * aivNum;
+  std::vector<int64_t> metadataShape = {(elements + metadataAlignment - 1) / metadataAlignment * metadataAlignment};
   std::vector<int64_t> attnOutShape = {T1, N1, D};
   std::vector<int64_t> softmaxLseShape = {T1, N1, 1};
   // optional 输入传 shape 为 {0} 的空 tensor。
@@ -963,7 +971,7 @@ int main()
   std::vector<int32_t> seqUsedCmpKvHostData(B, static_cast<int32_t>(cmpKvLen));
   std::vector<int32_t> cmpResidualKvHostData(B, static_cast<int32_t>(s2Act % cmpRatio));
   std::vector<float> sinksHostData(N1, 1.0f);
-  std::vector<int32_t> metadataHostData(2048, 0);
+  std::vector<int32_t> metadataHostData(metadataShape[0], 0);
   std::vector<uint16_t> attnOutHostData = MakeFp16Data(attnOutSize, 0.0f);
   std::vector<float> softmaxLseHostData(softmaxLseSize, 0.0f);
 

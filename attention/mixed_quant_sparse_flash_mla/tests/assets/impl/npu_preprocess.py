@@ -289,7 +289,9 @@ def run_qm4_metadata(q, ori_kv, cmp_kv, metadata, kwargs):
         return None
     if str(dtypes[METADATA_INDEX]).removeprefix("torch.") != "int32":
         raise ValueError("MQSMLA quant_mode=4 dynamic metadata must declare int32")
-    import cann_ops_transformer  # noqa: F401
+    from cann_ops_transformer.ops.attention.mixed_quant_sparse_flash_mla.mixed_quant_sparse_flash_mla import (
+        _get_smla_metadata_size,
+    )
 
     layout_q, layout_kv = (
         kwargs.get("layout_q", "BSND"),
@@ -343,13 +345,14 @@ def run_qm4_metadata(q, ori_kv, cmp_kv, metadata, kwargs):
     generated = torch.ops.cann_ops_transformer.mixed_quant_sparse_flash_mla_metadata(
         q.shape[-2], 1, q.shape[-1], 1, **arguments
     )
+
     if (
         generated.dtype != torch.int32
-        or tuple(generated.shape) != (2048,)
+        or tuple(generated.shape) != (_get_smla_metadata_size(q.device),)
         or generated.device != q.device
     ):
         raise ValueError(
-            "MQSMLA quant_mode=4 requires metadata ABI int32[2048]; update the operator package"
+            "MQSMLA quant_mode=4 requires metadata sized for the available cores; update the operator package"
         )
     return {"metadata": generated}
 

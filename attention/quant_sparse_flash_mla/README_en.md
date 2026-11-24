@@ -323,7 +323,7 @@ English | [简体中文](./README.md)
 - In PageAttention scenarios, the function usage restrictions are as follows:
   - The shapes of `ori_kv` and `cmp_kv` are [ori\_block\_num, ori\_block\_size, KV\_N, D] and [cmp\_block\_num, cmp\_block\_size, KV\_N, D] respectively, where ori\_block\_num and cmp\_block\_num are the total number of blocks in PageAttention, and ori\_block\_size and cmp\_block\_size are the number of tokens in a block. ori\_block\_size and cmp\_block\_size range from 1 to 1024, and KV_N supports only 1.
   - The shapes of `ori_block_table` and `cmp_block_table` are 2-dimensional, where the length of the first dimension is B, and the length of the second dimension is not less than the number of blocks corresponding to the maximum S2 and S3 among all batches, that is, S2\_max / block\_size and S3\_max / block\_size rounded up.
-- `metadata` is the core partition result actually used by the operator. Currently, this parameter is required, and the shape size is fixed to [2048].
+- `metadata` is the core partition result actually used by the operator. Currently, this parameter is required, and the shape is (ceil((9 × AIC + 8 × AIV) / 1024) × 1024,).
 - `layout_kv` supports "BSND", "TND", and "PA_BBND" as inputs, which must satisfy the preceding combination constraints of `layout_q` and `layout_kv`.
   - When the input is PA_BBND, `seqused_ori_kv` and `ori_block_table` must be passed in. When the input is BSND, `seqused_ori_kv` can express the valid length of `ori_kv` in each batch. When the input is TND, the valid length of `ori_kv` is expressed by `cu_seqlens_ori_kv`.
   - When the input is BSND, the layouts of both `ori_kv` and `cmp_kv` must be BSND. The shape of ori_kv is [B, S2, N2,D], and the shape of cmp_kv is [B, S3, N2,D].

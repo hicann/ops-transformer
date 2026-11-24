@@ -69,6 +69,7 @@ struct CheckContext {
     TensorParam cmpTopkLength;
     TensorParam sinks;
     TensorParam metadata;
+    int64_t requiredMetadataSize = 0;
     TensorParam attentionOut;
     TensorParam softmaxLse;
 

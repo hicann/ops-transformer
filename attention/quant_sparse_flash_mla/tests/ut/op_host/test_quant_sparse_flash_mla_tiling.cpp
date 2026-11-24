@@ -35,7 +35,7 @@ constexpr uint64_t SKIP_TILING_KEY = UINT64_MAX;
 constexpr uint64_t TOPK_OFFSET_ORI_CMP_SPARSE_TILING_KEY = 1050626U;
 constexpr int64_t kBatchSize = 4;
 constexpr int64_t kNumHeadsKv = 1;
-constexpr int64_t kMetadataSize = optiling::SMLA_META_SIZE;
+constexpr int64_t kMetadataSize = optiling::GetSmlaMetadataSize(80, 80);
 
 struct QSmlaCase {
     std::vector<int64_t> qShape = {512, 64, 512};

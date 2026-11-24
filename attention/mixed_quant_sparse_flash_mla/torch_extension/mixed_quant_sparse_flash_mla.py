@@ -11,9 +11,38 @@ import torch
 from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
-MQSMLA_METADATA_SIZE = 2048
-
 MQSMLA_METADATA_OP_NAME = "mixed_quant_sparse_flash_mla_metadata"
+
+
+def _get_metadata_device(*tensors):
+    return next(
+        (tensor.device for tensor in tensors if tensor is not None), torch.device("npu")
+    )
+
+
+def _get_available_core_counts(device):
+    # Meta tensors carry no NPU index. Use the current device in shape-only execution.
+    if device is None or torch.device(device).type != "npu":
+        device = torch.device("npu")
+    try:
+        limits = torch.npu.get_stream_limit(torch.npu.current_stream(device))
+    except (AttributeError, RuntimeError):
+        # Older runtimes can report only the physical core counts.
+        limits = {}
+    cubes = limits.get("cube_core_num", 0)
+    vectors = limits.get("vector_core_num", 0)
+    if cubes > 0 and vectors > 0:
+        return cubes, vectors
+    properties = torch.npu.get_device_properties(device)
+    return (
+        cubes if cubes > 0 else properties.cube_core_num,
+        vectors if vectors > 0 else properties.vector_core_num,
+    )
+
+
+def _get_smla_metadata_size(device):
+    cubes, vectors = _get_available_core_counts(device)
+    return ((9 * cubes + 8 * vectors + 1023) // 1024) * 1024
 
 
 class MixedQuantSparseFlashMlaOpBuilder(OpBuilder):
@@ -95,11 +124,7 @@ class MixedQuantSparseFlashMlaOpBuilder(OpBuilder):
             has_ori_kv: Optional[bool] = None,
             has_cmp_kv: Optional[bool] = None,
         ):
-            if quant_mode != 3:
-                return torch.empty(
-                    (MQSMLA_METADATA_SIZE), dtype=torch.int32, device="npu"
-                )
-            inputs = (
+            device = _get_metadata_device(
                 cu_seqlens_q,
                 cu_seqlens_ori_kv,
                 cu_seqlens_cmp_kv,
@@ -110,11 +135,8 @@ class MixedQuantSparseFlashMlaOpBuilder(OpBuilder):
                 ori_topk_length,
                 cmp_topk_length,
             )
-            device = next(
-                (tensor.device for tensor in inputs if tensor is not None), "npu"
-            )
             return torch.empty(
-                (MQSMLA_METADATA_SIZE,), dtype=torch.int32, device=device
+                (_get_smla_metadata_size(device),), dtype=torch.int32, device=device
             )
 
         @impl(get_as_library(), self.name, "Meta")
@@ -265,6 +287,17 @@ def mixed_quant_sparse_flash_mla_metadata(
     has_ori_kv = True if has_ori_kv is None else has_ori_kv
     has_cmp_kv = True if has_cmp_kv is None else has_cmp_kv
 
+    device = _get_metadata_device(
+        cu_seqlens_q,
+        cu_seqlens_ori_kv,
+        cu_seqlens_cmp_kv,
+        seqused_q,
+        seqused_ori_kv,
+        seqused_cmp_kv,
+        cmp_residual_kv,
+        ori_topk_length,
+        cmp_topk_length,
+    )
     op_module = mixed_quant_sparse_flash_mla_op_builder.load()
     return op_module.mixed_quant_sparse_flash_mla_metadata(
         num_heads_q,
@@ -296,6 +329,7 @@ def mixed_quant_sparse_flash_mla_metadata(
         layout_kv,
         has_ori_kv,
         has_cmp_kv,
+        _get_smla_metadata_size(device),
     )
 
 

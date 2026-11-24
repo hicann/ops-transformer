@@ -12,6 +12,8 @@
 #define SPARSE_MLA_CHECKER_ADAPTER_H
 
 #include "checker_context.h"
+#include "tiling/platform/platform_ascendc.h"
+#include "../../op_kernel/smla_metadata_common.h"
 
 namespace optiling {
 namespace sparse_mla_checker {
@@ -52,6 +54,10 @@ void PopulateCommonContext(CheckContext& context, const TilingInfo& info)
 {
     const auto& param = info.opParamInfo;
     context.opName = info.opName;
+    if (info.platformInfo != nullptr) {
+        auto platform = platform_ascendc::PlatformAscendC(info.platformInfo);
+        context.requiredMetadataSize = GetSmlaMetadataSize(platform.GetCoreNumAic(), platform.GetCoreNumAiv());
+    }
     context.q = MakeRequiredTensor(param.q);
     context.oriKv = MakeOptionalTensor(param.oriKv);
     context.cmpKv = MakeOptionalTensor(param.cmpKv);

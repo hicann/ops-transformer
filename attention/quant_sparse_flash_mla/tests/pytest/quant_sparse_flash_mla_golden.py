@@ -27,13 +27,6 @@ DATA_RANGE_RIGHT = 2
 FP8_DATA_RANGE_LEFT = -5
 FP8_DATA_RANGE_RIGHT = 5
 
-# 与 quant_sparse_flash_mla_metadata.h / smla_metadata_common.h 的接口布局一致。
-QSMLA_METADATA_SIZE = 2048
-AIC_CORE_MAX_NUM = 80
-AIV_CORE_MAX_NUM = 80
-FA_METADATA_END = AIC_CORE_MAX_NUM * 9
-FD_METADATA_END = FA_METADATA_END + AIV_CORE_MAX_NUM * 8
-
 
 def _nonfinite_fill(shape, data_range):
     """Return a constant tensor for an INF/NAN range, or None for finite data."""
@@ -86,14 +79,10 @@ def prepare_fd_params(params):
 
 
 def _validate_fd_cores(aic_num, aiv_num, heads):
-    if type(aic_num) is not int or not 1 <= aic_num <= AIC_CORE_MAX_NUM:
-        raise ValueError(
-            f"fd_aic_core_num must be an integer in [1,{AIC_CORE_MAX_NUM}]"
-        )
-    if type(aiv_num) is not int or not 1 <= aiv_num <= AIV_CORE_MAX_NUM:
-        raise ValueError(
-            f"fd_aiv_core_num must be an integer in [1,{AIV_CORE_MAX_NUM}]"
-        )
+    if type(aic_num) is not int or aic_num <= 0:
+        raise ValueError("fd_aic_core_num must be a positive integer")
+    if type(aiv_num) is not int or aiv_num <= 0:
+        raise ValueError("fd_aiv_core_num must be a positive integer")
     if heads > 64 and (aic_num < 2 or aiv_num < 2):
         raise ValueError("split-G needs at least two AICs and two AIVs")
 
@@ -127,11 +116,10 @@ class _MetadataRowCosts:
 
 
 def generate_metadata_golden(meta, aic_num=32, aiv_num=None):
-    """用 Python 复现 Ascend950 的普通 FA/FD 自动调度，返回 int32[2048]。
+    """用 Python 复现 Ascend950 的普通 FA/FD 自动调度，返回长度向上取为 1024 的整数倍的 int32 metadata。
 
     对应 CalcS1GCache、AssignByBatch/Row/Block、RecordFDInfo 和 SplitFD 的调度逻辑。
-    FA/FD 存储区大小固定为 80*9 和 80*8，不随请求核数变化。
-    前 1360 个元素由 metadata 接口约定定义，其余填充为零。
+    每个可用 AIC 占 9 个元素，每个可用 AIV 占 8 个元素，末尾填零。
     """
     aiv_num = 2 * aic_num if aiv_num is None else aiv_num
     heads = int(meta["num_heads_q"])
@@ -284,9 +272,15 @@ def generate_metadata_golden(meta, aic_num=32, aiv_num=None):
             next((row[-1] - row[-2] for row in reversed(current) if len(row) > 1), 0)
         )
 
-    metadata = torch.zeros(QSMLA_METADATA_SIZE, dtype=torch.int32)
-    fa = metadata[:FA_METADATA_END].reshape(AIC_CORE_MAX_NUM, 9)
-    fd = metadata[FA_METADATA_END:FD_METADATA_END].reshape(AIV_CORE_MAX_NUM, 8)
+    elements = 9 * aic_num + 8 * aiv_num
+    metadata = torch.zeros((elements + 1023) // 1024 * 1024, dtype=torch.int32)
+    aic_num = min(aic_num, max(1, aiv_num // 2))
+    aiv_num = min(aiv_num, 2 * aic_num)
+    _validate_fd_cores(aic_num, aiv_num, heads)
+    fa_end = 9 * aic_num
+    fd_end = fa_end + 8 * aiv_num
+    fa = metadata[:fa_end].reshape(aic_num, 9)
+    fd = metadata[fa_end:fd_end].reshape(aiv_num, 8)
     split_g = heads > 64
     cores = aic_num // 2 if split_g else aic_num
     if not any(batch_blocks):
@@ -404,7 +398,7 @@ def generate_metadata_golden(meta, aic_num=32, aiv_num=None):
         if split_g:
             fa[2 * core + 1] = record
     if split_g:
-        fa[: 2 * cores, 8] = max_loops
+        fa[:, 8] = max_loops
     if tasks:
         load = sum(parts * m for _, _, _, parts, m in tasks)
         average = (load + aiv_num - 1) // aiv_num
@@ -433,13 +427,17 @@ def generate_metadata_golden(meta, aic_num=32, aiv_num=None):
     return metadata
 
 
-def metadata_fa_ranges(metadata):
-    if metadata.dtype != torch.int32 or metadata.numel() != QSMLA_METADATA_SIZE:
-        raise ValueError(f"metadata must be int32[{QSMLA_METADATA_SIZE}]")
+def metadata_fa_ranges(metadata, aic_num):
+    if (
+        metadata.dtype != torch.int32
+        or metadata.ndim != 1
+        or metadata.numel() < 9 * aic_num
+    ):
+        raise ValueError("metadata must contain one int32 FA record per available AIC")
     return sorted(
         {
             (tuple(map(int, row[1:4])), tuple(map(int, row[4:7])))
-            for row in metadata[:FA_METADATA_END].reshape(AIC_CORE_MAX_NUM, 9)
+            for row in metadata[: 9 * aic_num].reshape(aic_num, 9)
             if int(row[0])
         }
     )
@@ -2513,7 +2511,13 @@ def generate_cpu_golden(input_data):
     if state.get("fd_metadata") is not None:
         if state["batch_consistency"]:
             raise ValueError("FD reference cannot use batch-consistency mode")
-        test_qsmla.fd_ranges = metadata_fa_ranges(state["fd_metadata"])
+        test_qsmla.fd_ranges = metadata_fa_ranges(
+            state["fd_metadata"],
+            min(
+                input_data["params"]["fd_aic_core_num"],
+                max(1, input_data["params"]["fd_aiv_core_num"] // 2),
+            ),
+        )
         test_qsmla.fd_trace = []
     cpu_output, cpu_lse = test_qsmla.forward(
         state["q"],
@@ -2567,11 +2571,10 @@ def prepare_fd_data(data, generate_golden=True):
     if not prepare_fd_params(params):
         raise ValueError("ordinary FA/FD scheduling requires batch_consistency=False")
     metadata = _generate_fd_metadata(data)
-    actual_fd = bool(
-        metadata[FA_METADATA_END:FD_METADATA_END]
-        .reshape(AIV_CORE_MAX_NUM, 8)[:, 0]
-        .any()
-    )
+    blocks = min(params["fd_aic_core_num"], max(1, params["fd_aiv_core_num"] // 2))
+    fa_end = 9 * blocks
+    fd_end = fa_end + 8 * min(params["fd_aiv_core_num"], 2 * blocks)
+    actual_fd = bool(metadata[fa_end:fd_end].reshape(-1, 8)[:, 0].any())
     data["golden_metadata"] = metadata
     data["fd_actual_split"] = actual_fd
     data["fd_core_config"] = (params["fd_aic_core_num"], params["fd_aiv_core_num"])

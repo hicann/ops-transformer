@@ -41,7 +41,7 @@ struct TndC4aParams {
     std::unique_ptr<aclTensor, void (*)(aclTensor*)> cmpResidualKv =
         TensorDesc({2}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
     std::unique_ptr<aclTensor, void (*)(aclTensor*)> metadata =
-        TensorDesc({optiling::SMLA_METADATA_TOTAL_SIZE}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
+        TensorDesc({optiling::GetSmlaMetadataSize(AIC_CORE_NUM, AIV_CORE_NUM)}, ACL_INT32, ACL_FORMAT_ND).ToAclType();
 };
 
 aclnnStatus RunParamsCheck(const TndC4aParams& params, const aclTensor* cmpResidualKv)
