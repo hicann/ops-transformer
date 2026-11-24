@@ -1,7 +1,5 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # -----------------------------------------------------------------------------------------------------------
-# Copyright (c) 2025 Huawei Technologies Co., Ltd.
+# Copyright (c) 2026 Huawei Technologies Co., Ltd.
 # This program is free software, you can redistribute it and/or modify it under the terms and conditions of
 # CANN Open Software License Agreement Version 2.0 (the "License").
 # Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -10,114 +8,120 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # -----------------------------------------------------------------------------------------------------------
 
-import torch
-import torch.distributed as dist
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import ctypes
-from atk.configs.dataset_config import InputDataset
-from atk.configs.results_config import TaskResult
+
+import torch
+import torch.distributed as dist
+import torch_npu
+
 from atk.tasks.api_execute import register
 from atk.tasks.api_execute.base_api import BaseApi
 from atk.tasks.api_execute.aclnn_base_api import AclnnBaseApi
-from atk.tasks.dataset.base_dataset import OpsDataset
 from atk.tasks.backends.lib_interface.acl_wrapper import AclTensor
+from all_gather_matmul_test_options import OPTION_NAMES, OPTIONS
+
+SIGNATURE = """aclnnStatus aclnnAllGatherMatmulGetWorkspaceSize(
+    const aclTensor* x1, const aclTensor* x2, const aclTensor* bias, const char* group,
+    int64_t gatherIndex, int64_t commTurn, int64_t streamMode, const aclTensor* output,
+    const aclTensor* gatherOut, uint64_t* workspaceSize, aclOpExecutor** executor);"""
+
+INPUT_NAMES = ("x1", "x2", "bias", "group", "gatherIndex", "commTurn", "streamMode")
 
 
-@register("function_allgather_matmul")
-class AllGatherMatmul(BaseApi):
-    def __init__(self, task_result: TaskResult):
-        super(AllGatherMatmul, self).__init__(task_result)
-        self.dist_task_info = task_result.dist_task_info
+def rank_inputs(data, task_result, options):
+    data = dict(data)
+    info = task_result.dist_task_info
+    rows = data["x1"].shape[0] // info.world_size
+    start = info.rank * rows
+    data["x1"] = data["x1"][start : start + rows].contiguous()
+    if options["transpose_x2"]:
+        data["x2"] = data["x2"].T
+    return data
 
-    def __call__(self, input_data: InputDataset, with_output: bool = False):
-        rank_id = self.dist_task_info.rank
-        world_size = self.dist_task_info.world_size
-        input_chunk = input_data.kwargs["x1"]
-        weight_chunk = input_data.kwargs["x2"]
 
-        m_size = input_chunk.shape[0] // world_size
-        if m_size != 0:
-            start = self.dist_task_info.rank * m_size
-            end = start + m_size
-            input_chunk = input_chunk[start:end, :]
+def golden(data, options, info):
+    pieces = [torch.empty_like(data["x1"]) for _ in range(info.world_size)]
+    dist.all_gather(pieces, data["x1"])
+    gathered = torch.cat(pieces)
+    output = gathered.float() @ data["x2"].float()
+    if options["use_bias"] and data["bias"].numel():
+        output = output.double() + data["bias"].double()
+    return output, gathered if options["comm_output"] else None
 
-        if input_chunk.shape == []:
-            if self.name == "cpu" or self.dist_task_info.is_bm:
-                return torch.tensor([]), torch.tensor([])
 
-        if self.name == "cpu":
-            input_chunk = input_chunk.cpu().to(torch.float32)
-            weight_chunk = weight_chunk.cpu().to(torch.float32)
-            all_gather_out = [torch.zeros_like(input_chunk) for _ in range(world_size)]
-            dist.all_gather(all_gather_out, input_chunk)
-            all_gather_out = torch.cat(all_gather_out)
-            output = torch.matmul(all_gather_out, weight_chunk)
-            gather_output_cpu = all_gather_out
-            return output, gather_output_cpu
+def benchmark(data, options, info):
+    pieces = [torch.empty_like(data["x1"]) for _ in range(info.world_size)]
+    dist.all_gather(pieces, data["x1"])
+    gathered = torch.cat(pieces)
+    output = gathered @ data["x2"]
+    if options["use_bias"] and data["bias"].numel():
+        output = (output.float() + data["bias"].float()).to(output.dtype)
+    return output, gathered if options["comm_output"] else None
 
-        if self.dist_task_info.is_bm:
-            tensor_allgather_shape = [
-                input_chunk.shape[0] * world_size,
-                input_chunk.shape[1],
-            ]
-            all_gather_out = torch.zeros(
-                tensor_allgather_shape, dtype=input_chunk.dtype
-            ).npu()
-            dist._all_gather_base(all_gather_out, input_chunk)
-            output = torch.matmul(all_gather_out, weight_chunk)
-            gather_output_cpu = all_gather_out
-            return output, gather_output_cpu
 
-    def init_by_input_data(self, input_data: InputDataset):
-        OpsDataset.seed_everything()
-        input_chunk = input_data.kwargs["x1"]
-        weight_chunk = input_data.kwargs["x2"]
-
-        if (
-            weight_chunk.shape[0] != input_chunk.shape[1]
-            and weight_chunk.shape[1] == input_chunk.shape[1]
-        ):
-            input_data.kwargs["x2"] = input_data.kwargs["x2"].transpose(0, 1)
-
-        if self.device == "pyaclnn" and dist.is_available():
-            rank_id = self.dist_task_info.rank
-            input_data.kwargs["group"] = AllGatherMatmul.get_hcomm_info(rank_id)
-
+@register("all_gather_matmul_reference")
+class Reference(BaseApi):
     @staticmethod
-    def get_hcomm_info(rank_id):
-        from torch.distributed.distributed_c10d import _get_default_group
+    def get_cpp_func_signature_type():
+        return SIGNATURE
 
-        default_pg = _get_default_group()
-        if torch.__version__ > "2.0.1":
-            hcomm_info = default_pg._get_backend(
-                torch.device("npu")
-            ).get_hccl_comm_name(rank_id)
-        else:
-            hcomm_info = default_pg.get_hccl_comm_name(rank_id)
-        return hcomm_info
+    def __call__(self, input_data, with_output=False):
+        options = dict(zip(OPTION_NAMES, OPTIONS[input_data.kwargs["test_options"]]))
+        data = rank_inputs(input_data.kwargs, self.task_result, options)
+        reference = golden if self.name == "cpu" else benchmark
+        return reference(data, options, self.task_result.dist_task_info)
 
 
-@register("aclnn_allgather_matmul")
-class AclnnAllGatherMatmul(AclnnBaseApi):
-    def __init__(self, task_result: TaskResult, backend):
-        super(AclnnAllGatherMatmul, self).__init__(task_result, backend)
-        self.dist_task_info = task_result.dist_task_info
+@register("all_gather_matmul_aclnn")
+class AclnnExecutor(AclnnBaseApi):
+    @staticmethod
+    def get_cpp_func_signature_type():
+        return SIGNATURE
 
-    def init_by_input_data(self, input_data: InputDataset):
-        world_size = self.dist_task_info.world_size
-        input_chunk = input_data.kwargs["x1"]
-        m_size = input_chunk.shape[0] // world_size
-        if m_size != 0:
-            start = self.dist_task_info.rank * m_size
-            end = start + m_size
-            input_data.kwargs["x1"] = input_data.kwargs["x1"][start:end, :]
+    def init_by_input_data(self, input_data):
+        data = dict(input_data.kwargs)
+        options = dict(zip(OPTION_NAMES, OPTIONS[data.pop("test_options")]))
+        data = rank_inputs(data, self.task_result, options)
+        info = self.task_result.dist_task_info
+        self.comm_output = options["comm_output"]
+        data["group"] = dist.group.WORLD._get_backend(
+            torch.device("npu")
+        ).get_hccl_comm_name(info.rank)
+        input_data.kwargs = {name: data[name] for name in INPUT_NAMES}
+        args, outputs = super().init_by_input_data(input_data)
+        if not options["use_bias"] or not data["bias"].numel():
+            args[2] = ctypes.POINTER(AclTensor)()
+        x, weight = data["x1"], data["x2"]
+        output = self.torch_tensor_to_acl(
+            torch.empty(
+                (x.shape[0] * info.world_size, weight.shape[1]),
+                dtype=x.dtype,
+                device=x.device,
+            )
+        )
+        # V1 documents an empty tensor to disable gatherOut; it is not a nullptr ABI.
+        gather_shape = (
+            (x.shape[0] * info.world_size, x.shape[1]) if self.comm_output else (0, 0)
+        )
+        gathered = self.torch_tensor_to_acl(
+            torch.empty(gather_shape, dtype=x.dtype, device=x.device)
+        )
+        args = args[: len(INPUT_NAMES)] + [output, gathered]
+        outputs[:] = [output, gathered] if self.comm_output else [output]
+        return args, outputs
 
-        input_args, output_packages = super().init_by_input_data(input_data)
+    def after_call(self, output_packages):
+        output = self.acl_tensor_to_torch(output_packages[0])
+        gathered = (
+            self.acl_tensor_to_torch(output_packages[1]) if self.comm_output else None
+        )
+        return output, gathered
 
-        return input_args, output_packages
-
-    def get_null_tensor_pte(self):
-        acl_tensor_ptr = ctypes.POINTER(AclTensor)
-        null_void_ptr = ctypes.c_void_p(None)
-        null_tensor_ptr = ctypes.cast(null_void_ptr, acl_tensor_ptr)
-        return null_tensor_ptr
+    def __call__(self):
+        self.backend.aclnn_x_get_workspace_size()
+        self.backend.aclnn_x()
