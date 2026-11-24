@@ -23,8 +23,13 @@ import logging
 import math
 from typing import Optional
 import torch
-import torch_npu
 import os as _os
+
+try:
+    # XPU 三方参考在 CPU 主机执行, 不要求安装 torch_npu
+    import torch_npu  # noqa: F401
+except ImportError:
+    torch_npu = None
 
 logging.basicConfig(level=logging.INFO, format="%(message)s", force=True)
 logger = logging.getLogger(__name__)
@@ -34,7 +39,7 @@ logger = logging.getLogger(__name__)
 try:
     from cann_ops_transformer.ops import quant_flash_attn_metadata
 
-    _HAS_NPU = bool(torch.npu.is_available())
+    _HAS_NPU = bool(torch_npu is not None and torch.npu.is_available())
     if not _HAS_NPU:
         logger.info(
             "[Section] NPU device unavailable: metadata section decode disabled"

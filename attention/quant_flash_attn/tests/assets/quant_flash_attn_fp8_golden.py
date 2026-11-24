@@ -26,7 +26,12 @@ import logging
 import math
 import os
 import torch
-import torch_npu
+
+try:
+    # XPU 三方参考在 CPU 主机执行, 不要求安装 torch_npu
+    import torch_npu  # noqa: F401
+except ImportError:
+    torch_npu = None
 
 try:
     # 优先custom单算子包(18输入schema含v_tail三件套);
@@ -606,6 +611,171 @@ def cpu_fp8_fullquant_golden(
     ).contiguous()
     result = torch.where(valid_rows, result, torch.zeros_like(result))
     return result, lse
+
+
+def cpu_fp8_fullquant_bench(
+    q_fp8,
+    k_fp8,
+    v_fp8,
+    deq_q,
+    deq_k,
+    deq_v,
+    p_scale,
+    actual_seq_q,
+    actual_seq_kv,
+    softmax_scale=None,
+    sectioned=False,
+):
+    """三方参考: bench(全局 fp64) / sectioned(固定 KV 分块量化).
+
+    与 cpu_fp8_fullquant_golden 的差异:
+      - bench 全程 float64 累加, running max 跨整个 KV 单调累积;
+      - sectioned 每个 KV 基本块独立取 max 后按 FD 语义合并, float32 累加,
+        复刻算子分段 P 量化行为, 作为 third_party 噪声地板;
+      - P 的 FP8 量化与 sink 前置注入语义保持不变.
+    """
+    ss = get_softmax_scale(
+        softmax_scale if softmax_scale is not None else SOFTMAX_SCALE, D
+    )
+    acc = torch.float32 if sectioned else torch.float64
+    q_tensor = q_fp8.cpu().to(torch.float32).to(acc).contiguous()
+    k_tensor = k_fp8.cpu().to(torch.float32).to(acc).contiguous()
+    v_tensor = v_fp8.cpu().to(torch.float32).to(acc).contiguous()
+    deq_q = deq_q.cpu().to(acc).contiguous()
+    deq_k = deq_k.cpu().to(acc).contiguous()
+    deq_v = deq_v.cpu().to(acc).contiguous()
+
+    # GQA broadcast (若 N_q != N_kv, 调用方应已 broadcast; 这里再保险一次)
+    if N_q != N_kv and k_tensor.shape[1] == N_kv:
+        k_tensor = broadcast_kv(N_q, N_kv, k_tensor)
+        v_tensor = broadcast_kv(N_q, N_kv, v_tensor)
+        deq_k = broadcast_kv(N_q, N_kv, deq_k)
+        deq_v = broadcast_kv(N_q, N_kv, deq_v)
+
+    batch, heads, q_seq, _ = q_tensor.shape
+    v_dim = v_tensor.shape[-1]
+    p_scale_value = (
+        float(p_scale.item()) if torch.is_tensor(p_scale) else float(p_scale)
+    )
+
+    if k_tensor.shape[2] == 0:
+        result = torch.zeros(
+            (batch, heads, q_seq, v_dim), dtype=torch.float32
+        ).contiguous()
+        if SINKS is not None:
+            sink_t = torch.as_tensor(SINKS, dtype=torch.float32).reshape(1, -1, 1, 1)
+            lse = sink_t.expand(batch, heads, q_seq, 1).clone().contiguous()
+        else:
+            lse = torch.full(
+                (batch, heads, q_seq, 1), float("inf"), dtype=torch.float32
+            ).contiguous()
+        return result, lse
+
+    out = torch.zeros((batch, heads, q_seq, v_dim), dtype=acc).contiguous()
+    o_sum = torch.zeros(q_tensor.shape[:-1], dtype=acc)[..., None].contiguous()
+    # 0xFF7FFFFF = FP32 最小有限值 = -3.402823466e38
+    minValue = torch.tensor(-3.402823466e38, dtype=acc)
+    o_max = torch.full(q_tensor.shape[:-1], minValue.item(), dtype=acc)[
+        ..., None
+    ].contiguous()
+
+    # attention sink 前置注入(与 kernel prologue 同域):
+    #   max0 = sink - ln(pScale), sum0 = pScale
+    if SINKS is not None:
+        sink_t = torch.as_tensor(SINKS, dtype=acc).reshape(1, -1, 1, 1)
+        ln_ps = torch.tensor([math.log(p_scale_value)], dtype=acc)
+        o_max = (sink_t - ln_ps).expand_as(o_max).clone().contiguous()
+        o_sum = torch.full_like(o_sum, p_scale_value)
+
+    q_lens_t = torch.tensor(actual_seq_q, dtype=torch.int32).contiguous()
+    k_lens_t = torch.tensor(actual_seq_kv, dtype=torch.int32).contiguous()
+    q_lens_acl = q_lens_t.view(batch, 1, 1, 1).contiguous()
+    k_lens_acl = k_lens_t.view(batch, 1, 1, 1).contiguous()
+
+    Sq, Skv = q_tensor.shape[2], k_tensor.shape[2]
+    q_range = torch.arange(Sq).view(1, 1, -1, 1).contiguous()
+    k_range = torch.arange(Skv).view(1, 1, 1, -1).contiguous()
+    q_padding_mask = q_range >= q_lens_acl
+    k_padding_mask = k_range >= k_lens_acl
+
+    if SPARSE_MODE == 3:
+        delta = k_lens_acl - q_lens_acl
+        causal_mask = k_range > (q_range + delta)
+        mask_global = causal_mask | q_padding_mask | k_padding_mask
+    else:
+        mask_global = q_padding_mask | k_padding_mask
+    mask_global = mask_global.contiguous()
+
+    mask_q_blocks = list(torch.split(mask_global, Q_BLOCK_SIZE, dim=2))
+    mask_blocks = []
+    for mask_q_block in mask_q_blocks:
+        mask_blocks.append(list(torch.split(mask_q_block, KV_BLOCK_SIZE, dim=3)))
+
+    q_blocks = list(torch.split(q_tensor, Q_BLOCK_SIZE, dim=2))
+    k_blocks = list(torch.split(k_tensor, KV_BLOCK_SIZE, dim=2))
+    v_blocks = list(torch.split(v_tensor, KV_BLOCK_SIZE, dim=2))
+    o_blocks = list(torch.split(out, Q_BLOCK_SIZE, dim=2))
+    s_blocks = list(torch.split(o_sum, Q_BLOCK_SIZE, dim=2))
+    m_blocks = list(torch.split(o_max, Q_BLOCK_SIZE, dim=2))
+    deq_q_blocks = list(torch.split(deq_q, Q_BLOCK_SIZE, dim=2))
+    deq_k_blocks = list(torch.split(deq_k, KV_BLOCK_SIZE, dim=2))
+
+    ln_p_scale = torch.tensor([math.log(p_scale_value)], dtype=acc).contiguous()
+
+    for j, (kj, vj) in enumerate(zip(k_blocks, v_blocks)):
+        kj = kj.contiguous()
+        kj_T = kj.transpose(-1, -2).contiguous()
+        vj = vj.contiguous()
+        deq_kj = deq_k_blocks[j]
+        deq_kj_T = deq_kj.transpose(-1, -2).contiguous()
+
+        for i, qi in enumerate(q_blocks):
+            oi = o_blocks[i]
+            si = s_blocks[i]
+            mi = m_blocks[i]
+            deq_qi = deq_q_blocks[i]
+
+            sij = torch.matmul(qi, kj_T)
+            deq_qi = deq_qi * ss
+            sij = sij * deq_qi * deq_kj_T
+            causal_mask = mask_blocks[i][j].contiguous()
+            sij = sij.masked_fill(causal_mask, float("-inf"))
+
+            m_block, _ = torch.max(sij, dim=-1, keepdims=True)
+            m_block = m_block - ln_p_scale
+            m_new = torch.maximum(m_block, mi)
+            # sectioned: P 只对齐本段 max; 全局 bench: 用跨 KV 单调累积的 max
+            m_p = m_block if sectioned else m_new
+            pij = torch.exp(sij - m_p)
+            pij = torch.where(torch.isneginf(sij), torch.zeros_like(pij), pij)
+            s_block = torch.sum(pij, dim=-1, keepdims=True)
+            pij_drop = pij.to(FP8_DTYPE).to(acc)
+            pij_v = torch.matmul(pij_drop, vj) * deq_v
+
+            alpha = torch.exp(mi - m_new)
+            alpha = torch.where(torch.isnan(alpha), torch.zeros_like(alpha), alpha)
+            if sectioned:
+                # 段间按 FD 语义合并: 以段 max 为基准把段内结果折算到新 max
+                beta = torch.exp(m_block - m_new)
+                beta = torch.where(torch.isnan(beta), torch.zeros_like(beta), beta)
+                o_blocks[i] = alpha * oi + beta * pij_v
+                s_blocks[i] = alpha * si + beta * s_block
+            else:
+                o_blocks[i] = alpha * oi + pij_v
+                s_blocks[i] = alpha * si + s_block
+            m_blocks[i] = m_new
+
+    out = torch.cat(o_blocks, dim=2).contiguous()
+    out_sum = torch.cat(s_blocks, dim=2).contiguous()
+    out_max = torch.cat(m_blocks, dim=2).contiguous()
+
+    valid_rows = (~mask_global).any(dim=-1, keepdim=True)
+    result = out / (out_sum + EPSILON)
+    lse = out_max + torch.log(out_sum + EPSILON)
+    if SINKS is None:
+        lse = torch.where(valid_rows, lse, torch.full_like(out_max, float("inf")))
+    result = torch.where(valid_rows, result, torch.zeros_like(result))
+    return result.float().contiguous(), lse.float().contiguous()
 
 
 # ==============================================================================

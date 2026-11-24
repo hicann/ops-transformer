@@ -107,6 +107,18 @@ def hif8_cast_p(p_tensor):
     )
 
 
+def _as_fp32_scale(value):
+    """per-tensor descale/p_scale → 1 元素 float32 tensor。
+
+    TTK cross_check 的 Promote 会把 float32 输入槽抬成 float64；逐元素运算
+    可自动提升，但 matmul 要求两侧 dtype 一致（P 量化输出恒为 fp32），
+    必须在进入 golden 前归一，保持与两方路径相同的计算域。
+    """
+    if isinstance(value, torch.Tensor):
+        return value.detach().to(torch.float32).reshape(-1)[:1]
+    return torch.tensor([float(value)], dtype=torch.float32)
+
+
 def broadcast_kv(num_heads, num_kv_heads, kv_tensor):
     factor = num_heads // num_kv_heads
     B, _, S, D = kv_tensor.shape
@@ -257,6 +269,12 @@ def cpu_hif8_golden(
     K_BLOCK_SIZE = 256
     V_BLOCK_SIZE = 256
 
+    # Promote(cross_check) 会把 float32 scale 槽抬成 float64，而 P 量化输出
+    # 恒为 fp32，matmul 混 dtype 会直接报错；统一回 fp32 计算域。
+    dequant_scale_q = _as_fp32_scale(dequant_scale_q)
+    dequant_scale_k = _as_fp32_scale(dequant_scale_k)
+    v_descale = _as_fp32_scale(v_descale)
+
     q_tensor = hif8_per_tensor_dequant(q_fp8)
     k_tensor = hif8_per_tensor_dequant(k_fp8)
     v_tensor = hif8_per_tensor_dequant(v_fp8)
@@ -406,9 +424,9 @@ def cpu_hif8_scheduled_golden(
     q8 = q_fp8.detach().cpu() if torch.is_tensor(q_fp8) else torch.as_tensor(q_fp8)
     k8 = k_fp8.detach().cpu() if torch.is_tensor(k_fp8) else torch.as_tensor(k_fp8)
     v8 = v_fp8.detach().cpu() if torch.is_tensor(v_fp8) else torch.as_tensor(v_fp8)
-    dq = torch.as_tensor(dequant_scale_q).reshape(-1)[:1]
-    dk = torch.as_tensor(dequant_scale_k).reshape(-1)[:1]
-    dv = torch.as_tensor(v_descale).reshape(-1)[:1]
+    dq = _as_fp32_scale(dequant_scale_q)
+    dk = _as_fp32_scale(dequant_scale_k)
+    dv = _as_fp32_scale(v_descale)
 
     q = hif8_per_tensor_dequant(q8) * dq
     k = hif8_per_tensor_dequant(k8) * dk
@@ -691,14 +709,13 @@ def cpu_hif8_bench(
                 o_max[:, :, Sq_start:Sq_end, :] = m_block_j
 
     result = out / (o_sum + EPSILON)
-    # 无有效 key 的行保持 inf 哨兵(与主 golden / kernel 一致); 有 sink 时
-    # o_max 不再是 -inf, 必须用 mask 判定无效行。
+    # 无有效 key 的行: 未开 sink 时保持 inf 哨兵; 开 sink 时 sink 已折叠进
+    # online-softmax 初值, LSE = max + log(sum) 自然等于 sink[head], 与主
+    # golden / kernel 一致(不随基本块是否被跳过而变化)。
     valid_rows = (~mask_global).any(dim=-1, keepdim=True)
-    lse = torch.where(
-        valid_rows,
-        o_max + torch.log(o_sum + EPSILON),
-        torch.full_like(o_max, float("inf")),
-    )
+    lse = o_max + torch.log(o_sum + EPSILON)
+    if SINKS is None:
+        lse = torch.where(valid_rows, lse, torch.full_like(o_max, float("inf")))
     result = torch.where(valid_rows, result, torch.zeros_like(result))
     logger.info("[CPU Bench FP64] output=%s", result.shape)
     return result.float().contiguous(), lse.float().contiguous()

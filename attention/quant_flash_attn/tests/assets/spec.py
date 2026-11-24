@@ -17,7 +17,7 @@ from pathlib import Path
 
 try:
     from cann_ops_transformer.ops import quant_flash_attn_metadata, quant_flash_attn
-except ImportError as e:
+except Exception as e:  # noqa: BLE001 - XPU CPU 主机可能未装算子包
     logging.warning("Failed to import cann_ops_transformer.ops: %s", e)
 
 ASSET_IMPL_DIR = Path(__file__).with_name("impl")
@@ -94,6 +94,52 @@ def _inputs_dispatch(*args, **kwargs):
     return inputs_module.generate_qfa_mxfp8_inputs(*args, **kwargs)
 
 
+def _xpu_reference(*args, **kwargs):
+    """XPU 三方参考: 固定分段量化 golden (原生 bf16 输出, 不升档).
+
+    由远端 xpu_server 调用, 产出 cross_check 的 third_party. 必须与 NPU 的
+    P 量化噪声同量级: 全局精确参考会让 |third_party - bench| 趋零, 比值恒爆.
+    """
+    return load_impl_module("golden").qfa_sectioned_reference(*args, **kwargs)
+
+
+def _cross_check_active():
+    """CLI 是否启用三方比对 (--compare cross_check)."""
+    try:
+        from ttk.switches import get_global_storage
+    except Exception:  # pylint: disable=broad-except
+        return False
+    try:
+        method = getattr(get_global_storage(), "compare_method", None)
+    except Exception:  # pylint: disable=broad-except
+        return False
+    return method is not None and str(method).lower() == "cross_check"
+
+
+class _CompareHook:
+    """compare 钩子的动态解析.
+
+    TTK 的自定义 compare 只收到 outputs/goldens, 拿不到 third_parties.
+    三方比对时把 compare 解析成 None, 让框架退回标准 compare, 由
+    CrossCheckComparison 用 golden(升档真值) + third_party(XPU) 判定;
+    两方比对仍走 impl/compare.py.
+    """
+
+    def __init__(self, func):
+        self._func = func
+
+    def __get__(self, instance, owner):
+        return None if _cross_check_active() else self._func
+
+
+def _compare_dispatch(*outputs, compare_context=None, **kwargs):
+    testcase_name = getattr(compare_context, "testcase_name", None)
+    int8_impl = _impl_cache.get("int8")
+    if int8_impl is not None and int8_impl.has_reference(testcase_name):
+        return int8_impl.compare(*outputs, testcase_name=testcase_name)
+    return load_impl_module("compare").compare(*outputs, **kwargs)
+
+
 class QuantFlashAttnSpec:
     """quant_flash_attn 测试规范，按 quant_mode 派发。
 
@@ -112,23 +158,11 @@ class QuantFlashAttnSpec:
     golden = staticmethod(_golden_dispatch)
     customize_inputs = staticmethod(_inputs_dispatch)
 
-    @staticmethod
-    def compare(*outputs, compare_context=None, **kwargs):
-        testcase_name = getattr(compare_context, "testcase_name", None)
-        int8_impl = _impl_cache.get("int8")
-        if int8_impl is not None and int8_impl.has_reference(testcase_name):
-            return int8_impl.compare(*outputs, testcase_name=testcase_name)
-        impl = load_impl_module("compare")
-        if impl.cross_check_enabled():
-            golden_impl = load_impl_module("golden")
-            return impl.compare(
-                *outputs,
-                bench_outputs=golden_impl.peek_bench(testcase_name),
-                third_party_outputs=golden_impl.peek_sectioned_ref(testcase_name),
-                spec_tolerance=impl.CROSS_CHECK_TOLERANCE,
-                **kwargs,
-            )
-        return impl.compare(*outputs, **kwargs)
+    # 两方→impl/compare.py; 三方(--compare cross_check)→解析成 None, 走框架标准 compare.
+    compare = _CompareHook(_compare_dispatch)
+
+    # XPU 三方参考: 复用 CPU 分段量化实现, 输出原生精度(不升档).
+    third_party = {"torch": _xpu_reference}
 
     @staticmethod
     def npu_preprocess(*args, **kwargs):
@@ -136,18 +170,26 @@ class QuantFlashAttnSpec:
 
     torch_graph = load_impl_module("graph").QuantFlashAttnAclGraph
 
-    # 默认两方比较; 三方 cross_check 需显式 --compare cross_check 开启,
-    # 判据参数见 impl/compare.py 的 CROSS_CHECK_TOLERANCE。
+    # 两方走 impl/compare.py 的 CSV 容差; 三方由框架原生比对, 档位取 level.
+    # L2 = mare/mere/rmse 2.0/1.2/1.2 (与 quant_flash_mla 一致).
     tolerance = {
         "float16": {
             "rtol": 0.005,
             "ptol": 0.005,
             "atol": 0.000025,
+            "level": "L2",
         },
         "bfloat16": {
             "rtol": 0.0078125,
             "ptol": 0.005,
             "atol": 0.0001,
+            "level": "L2",
+        },
+        "float32": {
+            "rtol": 0.005,
+            "ptol": 0.005,
+            "atol": 0.000025,
+            "level": "L2",
         },
     }
 

@@ -40,7 +40,7 @@ qfa_mxfp8_test/
 │   ├── quant_flash_attn_golden.py              # CPU golden reference implementation + NPU operator invocation
 │   ├── golden_cache.py                         # .pt cache utility module
 │   ├── result_compare_method.py                # Accuracy comparison tool
-│   ├── precision_compare_v2.py                 # Three-way comparison tool (method=12 CV dual benchmark, see section 5.1)
+│   ├── precision_compare_v2.py                 # CV report utility (check_result / compute_cv_report)
 │   ├── perf_parser.py                          # msprof op_summary.csv parsing + baseline comparison
 │   └── test_runner.py                          # Shared test execution logic (apply_params / execute_test / check_results)
 ├── quant_flash_attn_paramset_common.py         # Common parameter expansion logic + default values
@@ -202,60 +202,11 @@ python quant_flash_attn_golden.py --mode npu,compare --case-name my_case
 python quant_flash_attn_golden.py --mode cpu --case-name my_case --cache-dir=/tmp/cache
 ```
 
-### 5.1 Three-Way Accuracy Comparison (bench golden | third_party sectional reference | NPU)
+### 5.1 Three-Way Accuracy Comparison
 
-When a case fails the accuracy check (especially in scenarios where the QKV input range is not [-1,1] (`DATA_RANGE_Q/K/V > 1.0`) and FD is enabled), you can use the three-way comparison to determine whether the NPU output deviation is within a reasonable range. The three roles are exactly the same as those of TTK `--compare cross_check`:
-
-- golden (ground truth/error denominator): `cpu_mxfp8_bench`, FP64 arithmetic with FP8 quantization that preserves P;
-- third_party (upper bound of competitor noise): `cpu_mxfp8_sectioned_golden`, sectional quantization reference;
-- actual: NPU output.
-
-The decision follows the TTK `CrossCheckComparison` criteria (`precision_compare_v2.cross_check_compare`): in the large domain, `mare/mere/rmse <= 10/2/2`; in the small domain, `err(actual)/err(third_party) <= 2`; NaN/Inf must be consistent with either golden or third_party.
-
-Usage: Edit the configuration area in `common/quant_flash_attn_golden.py`, align the case parameters (B/N_q/N_kv/D, `CU_SEQLENS_*`/`SEQUSED_*`, `ENABLE_PA`, `KV_CACHE_LAYOUT`, `BLOCK_SIZE`, `SPARSE_MODE`, `Q_SCALE_LAYOUT`, `P_SCALE`, `DATA_RANGE_Q/K/V`, `ENABLE_LSE`, and so on) with the failed case, and set:
-
-```python
-USE_FP64_GOLDEN = True   # Enable three-way cross_check
-DATA_RANGE_Q = 8.0       # Example: input range other than [-1,1]
-DATA_RANGE_K = 4.0
-DATA_RANGE_V = 2.0
-```
-
-Then run:
-
-```bash
-cd common/
-# Full flow: data generation → FP32 golden cache → NPU → three-way cross_check
-python quant_flash_attn_golden.py --mode all --case-name my_case
-# Step-by-step run (the NPU output and golden are both cached as .pt files, so the comparison can be rerun separately)
-python quant_flash_attn_golden.py --mode gen,cpu --case-name my_case
-python quant_flash_attn_golden.py --mode npu,compare --case-name my_case
-```
-
-Output description:
-- `[Compare] Atten OUT / LSE`: three-way cross_check result (status + ratio metrics)
-- LSE (when `ENABLE_LSE=True`): the same three-way comparison, aligned in N-major arrangement
-- When `USE_FP64_GOLDEN=False`, the original two-way simple comparison is used (`check_result`, FP32 golden vs NPU)
-
-Cache files: `{case_name}_input.pt`, `{case_name}_cpu_output.pt` (FP32 two-way baseline), and `{case_name}_npu_output.pt`. The bench and sectional reference used by the three-way comparison are computed on the fly in the compare stage and are not written to disk.
-
-### 5.2 Running the Three-Way Comparison through pytest debug
-
-The pytest path also supports the three-way comparison: directly add `use_fp64_golden: [True]` to the case parameters in `quant_flash_attn_paramset_debug.py`. The compare stage performs `cross_check_compare` with bench as golden and the sectional reference as third_party (including attention and LSE). For the case template, see the `PA_BnNBsD_B1_QS128_KVS1024_Nq64_Nkv8_D128_SP3_FP64CMP` example in that file (`data_range_q/k/v` already demonstrates the non-[-1,1] usage).
-
-```bash
-cd attention/quant_flash_attn/tests/pytest/qfa_mxfp8_test/
-# Run only the three-way comparison cases
-pytest test_quant_flash_attn_debug.py -k FP64CMP -v
-# Step-by-step rerun after failure (cached .pt files avoid rerunning golden/NPU)
-pytest test_quant_flash_attn_debug.py -k FP64CMP -v --golden-mode=npu,compare
-```
-
-When `use_fp64_golden=True`, the three-way `cross_check_compare` prints `[CROSS_CHECK]` metrics; the decision criteria use the **same ruler** as the two-way gating: the proportion of elements with `|x-golden| > atol + rtol*|golden|` is <= 0.5%, and the result is not worse than twice that of the independent reference (when the reference is cleaner, the 0.5% floor serves as the fallback). The out-of-tolerance rate, mare/mere/rmse, and small_err are also printed for attribution. Pass/fail is still determined by the two-way `check_result` — consistent with the semantics of the CV dual benchmark on master (`compute_cv_report` is display-only). Only `--compare cross_check` on the TTK side is an explicit gate.
-
-The tolerance tier is selected based on the **NPU output dtype** (consistent with the three-way criteria of `quant_flash_mla` / `flash_attn`): bf16 → `small_value=2^-8` and `small_value_atol=2^-16`; fp16/fp32 → `2^-10` / `2^-16`.
-
-Criteria description: the old criteria made the decision based on "the worst single-element ratio + zero tolerance" (mare<=10/mere<=2/rmse<=2 and `err_target/max(err_third,1)<=2`), while the measured number of out-of-tolerance elements in the small value range on the reference side is mostly 0, the denominator is raised to 1, and 3~5 near-zero outlier elements would flag the case as failed. 44 of the 252 full cases were once flagged as failed for this reason (39 of them had 0 out-of-tolerance elements on the reference side), which contradicts the two-way gating. Under the current criteria, the out-of-tolerance rate, mare/mere/rmse, and small_err are all retained as attribution metrics.
+The pytest path keeps only the two-way comparison (FP32 golden vs NPU, `result_compare_method.check_result`).
+The three-way cross_check (bench | third_party sectional reference | NPU) is maintained only in the TTK e2e assets;
+see [`tests/assets/README_cross_check.md`](../../assets/README_cross_check.md) for generation, replay, and thresholds.
 
 ---
 

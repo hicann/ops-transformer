@@ -55,10 +55,24 @@ def _to_torch_e8m0(t):
             return t
         if t.dtype == torch.uint8:
             return t.view(torch.float8_e8m0fnu)
+        if t.dtype in (torch.float32, torch.float64):
+            # --golden-mode Promote 会把 e8m0 数值抬成 float32; e8m0 值恒为
+            # 2 的幂, 按 log2 反算指数即可无损还原编码 (255 保留 NaN).
+            v = t.detach().to(torch.float32)
+            exp = torch.round(torch.log2(v))
+            codes = (exp + 127.0).clamp(0.0, 255.0).to(torch.uint8)
+            codes = torch.where(torch.isnan(v), torch.full_like(codes, 0xFF), codes)
+            return codes.view(torch.float8_e8m0fnu)
         raise ValueError(f"_to_torch_e8m0: unexpected torch dtype {t.dtype}")
     arr = numpy.asarray(t)
     if arr.dtype == numpy.uint8:
         return torch.from_numpy(arr).view(torch.float8_e8m0fnu)
+    if arr.dtype in (numpy.float32, numpy.float64):
+        v = arr.astype(numpy.float32)
+        exp = numpy.rint(numpy.log2(v))
+        codes = numpy.clip(exp + 127.0, 0.0, 255.0).astype(numpy.uint8)
+        codes = numpy.where(numpy.isnan(v), 255, codes).astype(numpy.uint8)
+        return torch.from_numpy(codes).view(torch.float8_e8m0fnu)
     return torch.from_numpy(arr.view(numpy.uint8)).view(torch.float8_e8m0fnu)
 
 
@@ -481,13 +495,14 @@ def _tolist_t(t):
 
 
 # ==============================================================================
-# 三方 cross_check 支撑: fp64 bench / 分段参考缓存
-# 仅 CLI 显式 --compare cross_check 时生成, 默认两方回归不额外计算。
+# 三方 cross_check 支撑: bench / sectioned 角色选择
+# bench 由 golden(Promote) 直接产出并落盘; sectioned 由 spec.third_party
+# 经 XPU 产出, 两者不同源。默认两方回归不额外计算。
 # ==============================================================================
 
 
 def _bench_enabled():
-    """是否生成三方 bench: 仅 CLI 显式 --compare cross_check 时生成。"""
+    """CLI 是否显式启用 --compare cross_check。"""
     try:
         from ttk.switches import get_global_storage
     except Exception:
@@ -502,137 +517,19 @@ def _bench_enabled():
     return method is not None and str(method).lower() == "cross_check"
 
 
-_BENCH_CACHE = {}
-_REF_CACHE = {}
-_LAST_BENCH = None
+def _resolve_reference_mode(kwargs):
+    """选择 golden 的计算角色: golden(两方) / bench(三方真值) / sectioned(XPU 参考).
 
-
-def peek_bench(testcase_name=None):
-    """取当前用例的 bench 输出; 未生成时返回 None。"""
-    if testcase_name is not None:
-        return _BENCH_CACHE.get(str(testcase_name))
-    return _LAST_BENCH
-
-
-def peek_sectioned_ref(testcase_name=None):
-    """取当前用例的分段量化参考; 未生成时返回 None。"""
-    return _REF_CACHE.get(str(testcase_name))
-
-
-def _convert_cross_check_output(
-    convert_mod,
-    out_bnsd,
-    lse_bnsd,
-    actual_seq_q,
-    compare_layout,
-    cu_out,
-    enable_lse,
-    to_bf16,
-    lse_non_tnd_layout=None,
-):
-    """把 BNSD 结果转换到算子输出布局(与 golden 转换语义保持一致)。
-
-    to_bf16=True 用于分段参考(对齐算子 bf16 输出); bench 保持 float32。
+    - `_reference` 由 spec.third_party 入口显式注入;
+    - 未显式指定时, cross_check 或 --golden-mode Promote 走 bench:
+      goldens 落盘后即三方基准, sectioned 由 XPU 另出, 两者不同源.
     """
-    out = convert_mod.convert_q_bnsd_to_layout(
-        out_bnsd, actual_seq_q, compare_layout, cu_seqlens=cu_out
-    )
-    if to_bf16:
-        out = out.to(torch.bfloat16)
-
-    lse = None
-    if enable_lse and lse_bnsd is not None:
-        if str(compare_layout).upper() == "TND":
-            lse = convert_mod.convert_q_bnsd_to_layout(
-                lse_bnsd, actual_seq_q, "TND", cu_seqlens=cu_out
-            )
-            if cu_out is not None:
-                lse = convert_mod.fill_tnd_padding(
-                    lse, actual_seq_q, cu_out, fill_value=float("inf")
-                )
-            if lse.ndim == 3 and lse.shape[-1] == 1:
-                lse = lse.squeeze(-1).contiguous()
-            if lse.ndim == 2:
-                lse = lse.permute(1, 0).contiguous()
-        elif lse_non_tnd_layout is None:
-            lse = lse_bnsd
-            if lse.ndim == 3 and lse.shape[-1] == 1:
-                lse = lse.squeeze(-1).contiguous()
-        else:
-            lse = convert_mod.convert_q_bnsd_to_layout(
-                lse_bnsd, actual_seq_q, lse_non_tnd_layout
-            )
-            if lse.ndim > 1 and lse.shape[-1] == 1:
-                lse = lse.squeeze(-1).contiguous()
-    return out, lse
-
-
-def _cache_cross_check(
-    testcase_name,
-    convert_mod,
-    bench_fn,
-    ref_fn,
-    golden_args,
-    golden_kwargs,
-    actual_seq_q,
-    compare_layout,
-    cu_out,
-    enable_lse,
-    lse_non_tnd_layout=None,
-):
-    """生成并缓存当前用例的 fp64 bench 与分段参考, 供 compare 侧三方比对读取。"""
-    global _LAST_BENCH
-    name = str(testcase_name)
-    _BENCH_CACHE.pop(name, None)
-    _REF_CACHE.pop(name, None)
-    _LAST_BENCH = None
-    if not _bench_enabled():
-        return
-    try:
-        bench_out, bench_lse = bench_fn(*golden_args, **golden_kwargs)
-    except Exception as exc:  # pylint: disable=broad-except
-        logger.warning("[%s] cross_check bench failed: %s", name, exc)
-        return
-    bench_res, bench_lse_c = _convert_cross_check_output(
-        convert_mod,
-        bench_out,
-        bench_lse,
-        actual_seq_q,
-        compare_layout,
-        cu_out,
-        enable_lse,
-        to_bf16=False,
-        lse_non_tnd_layout=lse_non_tnd_layout,
-    )
-    _LAST_BENCH = [bench_res, bench_lse_c]
-    _BENCH_CACHE[name] = _LAST_BENCH
-    logger.info(
-        "[%s] bench(fp64): result=%s lse=%s",
-        name,
-        tuple(bench_res.shape),
-        None if bench_lse_c is None else tuple(bench_lse_c.shape),
-    )
-
-    if ref_fn is None:
-        return
-    try:
-        ref_out, ref_lse = ref_fn(*golden_args, **golden_kwargs)
-    except Exception as exc:  # pylint: disable=broad-except
-        logger.warning("[%s] sectioned reference failed: %s", name, exc)
-        return
-    ref_res, ref_lse_c = _convert_cross_check_output(
-        convert_mod,
-        ref_out,
-        ref_lse,
-        actual_seq_q,
-        compare_layout,
-        cu_out,
-        enable_lse,
-        to_bf16=True,
-        lse_non_tnd_layout=lse_non_tnd_layout,
-    )
-    _REF_CACHE[name] = [ref_res, ref_lse_c]
-    logger.info("[%s] sectioned ref: result=%s", name, tuple(ref_res.shape))
+    mode = str(kwargs.get("_reference") or "").strip().lower()
+    if mode in ("golden", "bench", "sectioned"):
+        return mode
+    if str(kwargs.get("golden_mode") or "").strip().lower() == "promote":
+        return "bench"
+    return "bench" if _bench_enabled() else "golden"
 
 
 def _resolve_p_scale_value(p_scale):
@@ -1000,10 +897,11 @@ def cpu_qfa_mxfp8(
             *block_sizes,
         )
 
-    # ----- 调 cpu_mxfp8_golden (BNSD fp8 + group 维 fp32 scale) -----
-    # v_tail_bnsd: (B,N_kv,block_size,D) bf16 尾块原值, cpu_mxfp8_golden 内注入
-    # 尾段V原值(scale=1) + 尾列P直存bf16 (与 kernel 纯尾task VF bf16 直出对齐)
-    cpu_out, cpu_lse = mxfp8_golden_mod.cpu_mxfp8_golden(
+    # ----- 角色选择: golden(两方) / bench(三方真值) / sectioned(XPU 参考) -----
+    # bench 用全局 running max + fp64, sectioned 用固定 S2 分块量化;
+    # 两者不同源, 才能给三方比值提供有效分母.
+    reference = _resolve_reference_mode(kwargs)
+    golden_args = (
         q_fp8_bnsd,
         k_fp8_bnsd,
         v_fp8_bnsd,
@@ -1013,11 +911,27 @@ def cpu_qfa_mxfp8(
         p_scale_value,
         actual_seq_q,
         actual_seq_kv,
-        softmax_scale=softmax_scale,
-        v_tail_bnsd=vtail_bnsd,
-        tail_lens=vtail_tail_lens,
-        block_sizes=block_sizes,
     )
+    # v_tail_bnsd: (B,N_kv,block_size,D) bf16 尾块原值, golden 内注入
+    # 尾段V原值(scale=1) + 尾列P直存bf16 (与 kernel 纯尾task VF bf16 直出对齐)
+    golden_kwargs = {
+        "softmax_scale": softmax_scale,
+        "v_tail_bnsd": vtail_bnsd,
+        "tail_lens": vtail_tail_lens,
+        "block_sizes": block_sizes,
+    }
+    if reference == "bench":
+        cpu_out, cpu_lse = mxfp8_golden_mod.cpu_mxfp8_bench(
+            *golden_args, **golden_kwargs
+        )
+    elif reference == "sectioned":
+        cpu_out, cpu_lse = mxfp8_golden_mod.cpu_mxfp8_sectioned_golden(
+            *golden_args, **golden_kwargs
+        )
+    else:
+        cpu_out, cpu_lse = mxfp8_golden_mod.cpu_mxfp8_golden(
+            *golden_args, **golden_kwargs
+        )
 
     # 输出布局: 优先算子 layout_out 参数 (redline 用例 BNSD); 老 CSV layout_out
     # 恒为 "TND" 与原行为一致; 无有效值时回退旧逻辑 (PA→TND, 非PA→Q 布局)。
@@ -1036,6 +950,9 @@ def cpu_qfa_mxfp8(
         compare_layout,
         cu_seqlens=cu_seqlens_q_list,
     )
+    if reference == "sectioned":
+        # third_party 对齐算子原生输出 dtype; bench/golden 保持高精度
+        cpu_out_aligned = cpu_out_aligned.to(torch.bfloat16)
 
     if enable_lse:
         # NPU LSE 输出不跟随数据布局: kernel 仅对 TND 做 N-major 重排,
@@ -1070,39 +987,8 @@ def cpu_qfa_mxfp8(
         result = [cpu_out_aligned, cpu_lse_aligned]
 
     else:
-        # 未开 lse 时不返回 None 占位: TTK 的 compare_with_hooks 要求
-        # validate_outputs 全为 VALID 才会调用插件自定义 compare, 而 None golden
-        # 会被判为 SUPPRESSED 从而跳过钩子(回落 TTK 原生 cross_check, 无 XPU 即 FAIL)。
+        # 未开 lse 时省略该输出; third_party 入口会补空槽保证槽位数一致
         result = [cpu_out_aligned]
-
-    # ----- 三方 cross_check: 缓存 fp64 bench 与固定分段参考 -----
-    _cache_cross_check(
-        kwargs.get("testcase_name", "unknown"),
-        mxfp8_golden_mod,
-        mxfp8_golden_mod.cpu_mxfp8_bench,
-        mxfp8_golden_mod.cpu_mxfp8_sectioned_golden,
-        (
-            q_fp8_bnsd,
-            k_fp8_bnsd,
-            v_fp8_bnsd,
-            dq_bnsd_grouped,
-            dk_bnsd_grouped,
-            dv_bnsd_grouped,
-            p_scale_value,
-            actual_seq_q,
-            actual_seq_kv,
-        ),
-        {
-            "softmax_scale": softmax_scale,
-            "v_tail_bnsd": vtail_bnsd,
-            "tail_lens": vtail_tail_lens,
-            "block_sizes": block_sizes,
-        },
-        actual_seq_q,
-        compare_layout,
-        cu_seqlens_q_list,
-        enable_lse,
-    )
 
     return result
 
@@ -1271,8 +1157,9 @@ def cpu_qfa_gqa_fp8(
     # deq_v: [N_kv] -> [1,N_kv,1,1] FP32 (cpu golden 内部按 GQA 广播)
     deq_v_bnsd = dequant_scale_v.float().view(1, N_kv, 1, 1).contiguous()
 
-    # 调 cpu_fp8_fullquant_golden (descale 不做 group 维扩展, 内部按 GQA 广播)
-    cpu_out, cpu_lse = fp8_golden_mod.cpu_fp8_fullquant_golden(
+    # ----- 角色选择: golden(两方) / bench(全局 fp64) / sectioned(固定 KV 分块) -----
+    reference = _resolve_reference_mode(kwargs)
+    fp8_args = (
         q_fp8_bnsd,
         k_fp8_bnsd,
         v_fp8_bnsd,
@@ -1282,8 +1169,19 @@ def cpu_qfa_gqa_fp8(
         torch.tensor([p_scale_value], dtype=torch.float32),
         actual_seq_q,
         actual_seq_kv,
-        softmax_scale=softmax_scale,
     )
+    if reference == "bench":
+        cpu_out, cpu_lse = fp8_golden_mod.cpu_fp8_fullquant_bench(
+            *fp8_args, softmax_scale=softmax_scale, sectioned=False
+        )
+    elif reference == "sectioned":
+        cpu_out, cpu_lse = fp8_golden_mod.cpu_fp8_fullquant_bench(
+            *fp8_args, softmax_scale=softmax_scale, sectioned=True
+        )
+    else:
+        cpu_out, cpu_lse = fp8_golden_mod.cpu_fp8_fullquant_golden(
+            *fp8_args, softmax_scale=softmax_scale
+        )
 
     # golden 输出 BNSD -> TND (对齐 NPU layout_out=TND)
     cpu_out_aligned = fp8_golden_mod.convert_q_bnsd_to_layout(
@@ -1292,6 +1190,9 @@ def cpu_qfa_gqa_fp8(
         "TND",
         cu_seqlens=cu_seqlens_q_list,
     )
+    if reference == "sectioned":
+        # third_party 对齐算子原生输出 dtype; bench/golden 保持高精度
+        cpu_out_aligned = cpu_out_aligned.to(torch.bfloat16)
 
     if enable_lse:
         cpu_lse_aligned = fp8_golden_mod.convert_q_bnsd_to_layout(
@@ -1314,7 +1215,7 @@ def cpu_qfa_gqa_fp8(
             cpu_lse_aligned = cpu_lse_aligned.permute(1, 0).contiguous()
         result = [cpu_out_aligned, cpu_lse_aligned]
     else:
-        # 未开 lse 时省略该输出(不返回 None), 保证 TTK 插件 compare 钩子可被调用
+        # 未开 lse 时省略该输出; third_party 入口会补空槽保证槽位数一致
         result = [cpu_out_aligned]
 
     return result
@@ -1571,65 +1472,71 @@ def cpu_qfa_hif8(
             cu_seqlens_kv_list if len(cu_seqlens_kv_list) > 1 else None,
         )
 
-    # FD 打开时 kernel 会把 KV 切成多段，每段 online max 重置，HIF8 的 P 量化
-    # 舍入随之变化，串行 golden 必然对不上（与 pytest 侧 cpu_hif8_scheduled_golden
-    # 同因）。这里复用设备侧 AICPU metadata 的 FA 分片范围复算。
-    schedule = None
-    if bool(getattr(hif8_golden_mod, "_HAS_NPU", False)):
-        try:
-            schedule = _hif8_fd_schedule(
-                cu_seqlens_q_list if len(cu_seqlens_q_list) > 1 else None,
-                cu_seqlens_kv_list if len(cu_seqlens_kv_list) > 1 else None,
-                actual_seq_q,
-                actual_seq_kv,
-                num_heads_q=int(q_bnsd.shape[1]),
-                num_heads_kv=int(v_bnsd.shape[1]),
-                head_dim=int(q_bnsd.shape[-1]),
-                head_dim_v=int(v_bnsd.shape[-1]),
-                batch_size=int(B),
-                max_seqlen_q=int(max_seqlen_q),
-                max_seqlen_kv=int(max_seqlen_kv),
-                mask_mode=int(mask_mode),
-                layout_q=str(layout_q),
-                layout_q_descale=str(q_scale_layout),
-                layout_kv=str(layout_kv),
-                layout_out=str(layout_out),
-            )
-        except Exception as exc:  # noqa: BLE001 - 拿不到调度就退回串行 golden
-            logger.warning(
-                "[GOLDEN] FD schedule unavailable (%s), use serial golden", exc
-            )
-            schedule = None
+    reference = _resolve_reference_mode(kwargs)
+    hif8_args = (
+        q_bnsd,
+        k_bnsd,
+        v_bnsd,
+        deq_q,
+        deq_k,
+        deq_v,
+        p_scale_t,
+        actual_seq_q,
+        actual_seq_kv,
+    )
+    if reference == "bench":
+        # 三方真值: 全局 running max + fp64, 不复现 FD/metadata 分核
+        cpu_out, cpu_lse = hif8_golden_mod.cpu_hif8_bench(
+            *hif8_args, softmax_scale=softmax_scale, sectioned=False
+        )
+    elif reference == "sectioned":
+        # XPU 参考: 固定 KV 分块独立取 max, 复刻算子 P 量化噪声
+        cpu_out, cpu_lse = hif8_golden_mod.cpu_hif8_sectioned_golden(
+            *hif8_args, softmax_scale=softmax_scale
+        )
+    else:
+        # FD 打开时 kernel 会把 KV 切成多段，每段 online max 重置，HIF8 的 P 量化
+        # 舍入随之变化，串行 golden 必然对不上（与 pytest 侧 cpu_hif8_scheduled_golden
+        # 同因）。这里复用设备侧 AICPU metadata 的 FA 分片范围复算。
+        schedule = None
+        if bool(getattr(hif8_golden_mod, "_HAS_NPU", False)):
+            try:
+                schedule = _hif8_fd_schedule(
+                    cu_seqlens_q_list if len(cu_seqlens_q_list) > 1 else None,
+                    cu_seqlens_kv_list if len(cu_seqlens_kv_list) > 1 else None,
+                    actual_seq_q,
+                    actual_seq_kv,
+                    num_heads_q=int(q_bnsd.shape[1]),
+                    num_heads_kv=int(v_bnsd.shape[1]),
+                    head_dim=int(q_bnsd.shape[-1]),
+                    head_dim_v=int(v_bnsd.shape[-1]),
+                    batch_size=int(B),
+                    max_seqlen_q=int(max_seqlen_q),
+                    max_seqlen_kv=int(max_seqlen_kv),
+                    mask_mode=int(mask_mode),
+                    layout_q=str(layout_q),
+                    layout_q_descale=str(q_scale_layout),
+                    layout_kv=str(layout_kv),
+                    layout_out=str(layout_out),
+                )
+            except Exception as exc:  # noqa: BLE001 - 拿不到调度就退回串行 golden
+                logger.warning(
+                    "[GOLDEN] FD schedule unavailable (%s), use serial golden", exc
+                )
+                schedule = None
 
-    cpu_out, cpu_lse = None, None
-    if schedule is not None and int(schedule[1]) != 0 and int(mask_mode) in (0, 3):
-        cpu_out, cpu_lse = hif8_golden_mod.cpu_hif8_scheduled_golden(
-            q_bnsd,
-            k_bnsd,
-            v_bnsd,
-            deq_q,
-            deq_k,
-            deq_v,
-            p_scale_t,
-            actual_seq_q,
-            actual_seq_kv,
-            schedule,
-            softmax_scale=softmax_scale,
-            sparse_mode=int(mask_mode),
-        )
-    if cpu_out is None:
-        cpu_out, cpu_lse = hif8_golden_mod.cpu_hif8_golden(
-            q_bnsd,
-            k_bnsd,
-            v_bnsd,
-            deq_q,
-            deq_k,
-            deq_v,
-            p_scale_t,
-            actual_seq_q,
-            actual_seq_kv,
-            softmax_scale=softmax_scale,
-        )
+        cpu_out, cpu_lse = None, None
+        if schedule is not None and int(schedule[1]) != 0 and int(mask_mode) in (0, 3):
+            cpu_out, cpu_lse = hif8_golden_mod.cpu_hif8_scheduled_golden(
+                *hif8_args,
+                schedule,
+                softmax_scale=softmax_scale,
+                sparse_mode=int(mask_mode),
+            )
+        if cpu_out is None:
+            cpu_out, cpu_lse = hif8_golden_mod.cpu_hif8_golden(
+                *hif8_args, softmax_scale=softmax_scale
+            )
 
     compare_layout = input_layout
     cu_q_for_convert = (
@@ -1650,6 +1557,9 @@ def cpu_qfa_hif8(
         cpu_out_aligned = _pad_seq_dim_to(
             cpu_out_aligned, int(q.shape[_dim]), _dim, 0.0
         )
+    if reference == "sectioned":
+        # third_party 对齐算子原生输出 dtype; bench/golden 保持高精度
+        cpu_out_aligned = cpu_out_aligned.to(torch.bfloat16)
 
     if enable_lse:
         lse_compare_layout = "TND" if str(compare_layout).upper() == "TND" else "BNSD"
@@ -1692,34 +1602,105 @@ def cpu_qfa_hif8(
             )
         result = [cpu_out_aligned, cpu_lse_aligned]
     else:
-        # 未开 lse 时省略该输出(不返回 None), 保证 TTK 插件 compare 钩子可被调用
+        # 未开 lse 时省略该输出; third_party 入口会补空槽保证槽位数一致
         result = [cpu_out_aligned]
 
-    # ----- 三方 cross_check: 缓存 fp64 bench + 分段量化参考 -----
-    _cache_cross_check(
-        kwargs.get("testcase_name", "unknown"),
-        hif8_golden_mod,
-        hif8_golden_mod.cpu_hif8_bench,
-        hif8_golden_mod.cpu_hif8_sectioned_golden,
-        (
-            q_bnsd,
-            k_bnsd,
-            v_bnsd,
-            deq_q,
-            deq_k,
-            deq_v,
-            p_scale_t,
-            actual_seq_q,
-            actual_seq_kv,
-        ),
-        {"softmax_scale": softmax_scale},
-        actual_seq_q,
-        compare_layout,
-        cu_q_for_convert,
-        enable_lse,
-        lse_non_tnd_layout="BNSD",
-    )
+    return result
 
+
+def qfa_sectioned_reference(
+    q,
+    k,
+    v,
+    q_descale,
+    k_descale,
+    v_descale,
+    quant_mode,
+    block_table=None,
+    p_scale=None,
+    cu_seqlens_q=None,
+    cu_seqlens_kv=None,
+    seqused_q=None,
+    seqused_kv=None,
+    sinks=None,
+    attn_mask=None,
+    metadata=None,
+    v_tail=None,
+    block_table_tail=None,
+    seqused_v_tail=None,
+    softmax_scale=1.0,
+    mask_mode=0,
+    win_left=-1,
+    win_right=-1,
+    max_seqlen_q=-1,
+    max_seqlen_kv=-1,
+    layout_q="BSND",
+    layout_q_descale="BSND",
+    layout_kv="BSND",
+    layout_out="BSND",
+    return_softmax_lse=False,
+    **kwargs,
+):
+    """XPU 三方参考入口: 按 quant_mode 走固定分段量化 golden.
+
+    参数名与 torch op schema 一致（远端按名注入）；内部转成 golden 的
+    位置参数顺序。输出固定补齐到 2 个槽位（LSE 未开时为空 tensor），
+    保证 --dump xpu / manual 回放时 third_party 槽位数与算子输出一致。
+    """
+    qm = int(quant_mode)
+    common = dict(kwargs)
+    common.update(
+        {
+            "softmax_scale": softmax_scale,
+            "mask_mode": mask_mode,
+            "win_left": win_left,
+            "win_right": win_right,
+            "max_seqlen_q": max_seqlen_q,
+            "max_seqlen_kv": max_seqlen_kv,
+            "layout_q": layout_q,
+            "layout_q_descale": layout_q_descale,
+            "layout_kv": layout_kv,
+            "layout_out": layout_out,
+            "return_softmax_lse": return_softmax_lse,
+            "_reference": "sectioned",
+        }
+    )
+    op_args = (
+        q,
+        k,
+        v,
+        q_descale,
+        k_descale,
+        v_descale,
+        qm,
+        block_table,
+        p_scale,
+        cu_seqlens_q,
+        cu_seqlens_kv,
+        seqused_q,
+        seqused_kv,
+        sinks,
+        attn_mask,
+        metadata,
+        v_tail,
+        block_table_tail,
+        seqused_v_tail,
+    )
+    if qm == 6:
+        result = cpu_qfa_gqa_fp8(*op_args, **common)
+    elif qm == 0:
+        result = cpu_qfa_hif8(*op_args, **common)
+    elif qm in (10, 12):
+        raise NotImplementedError(
+            f"quant_mode={qm} does not support three-way cross_check"
+        )
+    else:
+        result = cpu_qfa_mxfp8(*op_args, **common)
+
+    result = list(result) if isinstance(result, (list, tuple)) else [result]
+    if len(result) == 1:
+        # LSE 未开: 空槽占位, 避免 manual 回放时 third_party 数量少一
+        result.append(torch.zeros(0, dtype=torch.float32))
     return result
 
 
