@@ -414,15 +414,19 @@ class SymmBuffer:
                     f"got {self.dispatch_quant_mode!r} (type: {type(self.dispatch_quant_mode).__name__})."
                 )
             quant_dtype = _dtype_to_int(self.dispatch_quant_out_dtype)
-            if quant_dtype not in (
-                _BF16_DTYPE_VALUE,
+            if quant_dtype is None:
+                if self.dispatch_quant_mode != 0:
+                    raise ValueError(
+                        "dispatch_quant_out_dtype must be specified when dispatch_quant_mode=4."
+                    )
+            elif quant_dtype not in (
                 _FLOAT8_E5M2_DTYPE_VALUE,
                 _FLOAT8_E4M3FN_DTYPE_VALUE,
                 _FLOAT4_E2M1_DTYPE_VALUE,
             ):
                 raise ValueError(
-                    "dispatch_quant_out_dtype only supports bfloat16 (15), float8_e5m2 (23), "
-                    f"float8_e4m3fn (24) and float4_e2m1 (296) on {soc_name}, "
+                    "dispatch_quant_out_dtype only supports float8_e5m2 (23), float8_e4m3fn (24), "
+                    f"float4_e2m1 (296), or None for BF16 passthrough on {soc_name}, "
                     f"got {self.dispatch_quant_out_dtype!r} (type: {type(self.dispatch_quant_out_dtype).__name__})."
                 )
             _check_int_type(self.combine_quant_mode, "combine_quant_mode")
@@ -712,12 +716,7 @@ def mega_moe(
         activation=activation,
         activation_clamp=activation_clamp,
         activation_params=activation_params,
-        # BF16 直通从 x 推导类型；通信容量查询仍保留 BF16 类型信息。
-        dispatch_quant_out_dtype=(
-            None
-            if sym_buffer.dispatch_quant_mode == 0 and x.dtype == torch.bfloat16
-            else sym_buffer.dispatch_quant_out_dtype
-        ),
+        dispatch_quant_out_dtype=sym_buffer.dispatch_quant_out_dtype,
         shared_expert_quant_out_dtype=shared_quant_dtype_int,
         weight1_type=weight1_type,
         weight2_type=weight2_type,

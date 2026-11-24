@@ -1056,8 +1056,9 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
     }
     const bool hasDispatchQuantOutDtype =
         dispatchQuantOutDtype.has_value() && dispatchQuantOutDtype.value() != GE_DTYPE_UNDEFINED;
+    // 缺省类型仅在容量查询中按 BF16 预算，实际算子属性仍保持缺省。
     const aclDataType quantOutDtype =
-        hasDispatchQuantOutDtype ? GetAclDataType(dispatchQuantOutDtype.value()) : ACL_DT_UNDEFINED;
+        hasDispatchQuantOutDtype ? GetAclDataType(dispatchQuantOutDtype.value()) : ACL_BF16;
     if (quantOutDtype == ACL_BF16) {
         // 当前 BF16 容量估算仅覆盖 Arch35 的 MTE 无量化通信路径。
         const bool isArch35 = socName != nullptr && std::strstr(socName, "Ascend950") != nullptr;
