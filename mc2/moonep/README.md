@@ -107,7 +107,7 @@ grad_expert_output_nvsh, _, _, _ = dispatch(grad_output_sh, plan=plan)
 
 - 前向须传 `topk_experts_sk` 与 `tokens_per_expert`，`route_weights_sk` 可选；反向必须传 `plan=` 且路由参数为空。
 - `hidden_sh` 严格为 `(S, H)`；`route_weights_sk` / `topk_experts_sk` 严格为 `(S, K)`；张量须在 NPU 上。
-- 内部用 `plan.vtopk.view(S, K)` 作为 `topk_idx`、`num_experts = 2E`、每 rank 容量 `nmtr = S`。
+- 内部用 `plan.vtopk` 作为 `topk_idx`、`num_experts = 2E`、每 rank 容量 `nmtr = S`。
 
 ### MoonepPlan 结构
 
@@ -119,11 +119,11 @@ grad_expert_output_nvsh, _, _, _ = dispatch(grad_output_sh, plan=plan)
 | `cu_seqlens` | `(2*epn,)` | INT32 | 各 rank 的分段偏移，GMM 按此切分专家段 |
 | `experts_to_copy` | `(R, epn)` | INT32 | 副本清单：第 `r` 行第 `s` 列是 rank `r` 第 `s` 个专家槽位的源专家 id（取值 `[0, E)`）；`-1` 表示该槽位没有远程副本 |
 | `src_n` | `(N,)` | INT32 | 零占位，同 `dst_n` |
-| `vtopk` | `(N,)` | INT32 | 虚拟专家 id（扩展空间 `2E`），dispatch / combine 的路由依据 |
+| `vtopk` | `(S, K)` | INT32 | 虚拟专家 id（扩展空间 `2E`），dispatch / combine 的路由依据 |
 
 其中 `N = S × K`、`epn = E / R`、`R = num_ep_ranks`。
 
-- `experts_to_copy` 同时是 `prefetch_weight` 与 `reduce_grad` 的输入；`vtopk.view(S, K)` 作为 `dispatch` 的 `topk_idx`。
+- `experts_to_copy` 同时是 `prefetch_weight` 与 `reduce_grad` 的输入；`vtopk` 直接作为 `dispatch` 的 `topk_idx`。
 - 返回路径不做 host 同步：溢出与布局不变量延迟到下一个 MoonEP 算子尾部校验。
 - `plan` 可跨调用、跨前向/反向复用；同方向 `dispatch → combine` 之间不能再插一次同方向 `dispatch`。
 

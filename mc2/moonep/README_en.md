@@ -113,7 +113,7 @@ Interface constraints:
 
 - The forward pass must pass `topk_experts_sk` and `tokens_per_expert`; `route_weights_sk` is optional. The backward pass must pass `plan=` and no routing arguments.
 - `hidden_sh` must be exactly `(S, H)`; `route_weights_sk` / `topk_experts_sk` must be exactly `(S, K)`; tensors must reside on the NPU.
-- Internally `plan.vtopk.view(S, K)` is used as `topk_idx`, with `num_experts = 2E` and per-rank capacity `nmtr = S`.
+- Internally `plan.vtopk` is used as `topk_idx`, with `num_experts = 2E` and per-rank capacity `nmtr = S`.
 
 ### MoonepPlan Structure
 
@@ -125,11 +125,11 @@ Interface constraints:
 | `cu_seqlens` | `(2*epn,)` | INT32 | Per-rank segment offsets; GMM splits expert segments by this |
 | `experts_to_copy` | `(R, epn)` | INT32 | Replica list: row `r`, column `s` is the source expert id (range `[0, E)`) for rank `r`'s expert slot `s`; `-1` means the slot has no remote replica |
 | `src_n` | `(N,)` | INT32 | Zero placeholder, same as `dst_n` |
-| `vtopk` | `(N,)` | INT32 | Virtual expert id (extended space `2E`), the routing basis for dispatch / combine |
+| `vtopk` | `(S, K)` | INT32 | Virtual expert id (extended space `2E`), the routing basis for dispatch / combine |
 
 Here `N = S × K`, `epn = E / R`, and `R = num_ep_ranks`.
 
-- `experts_to_copy` is also the input of `prefetch_weight` and `reduce_grad`; `vtopk.view(S, K)` is the `topk_idx` used by `dispatch`.
+- `experts_to_copy` is also the input of `prefetch_weight` and `reduce_grad`; `vtopk` is used directly as the `topk_idx` by `dispatch`.
 - The return path performs no host synchronization: overflow and layout invariants are checked at the tail of the next MoonEP operator.
 - `plan` can be reused across calls and between forward and backward; no additional same-direction `dispatch` may be inserted between a `dispatch` and its `combine`.
 

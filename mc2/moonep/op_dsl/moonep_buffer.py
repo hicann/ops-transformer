@@ -450,6 +450,11 @@ class Buffer:
 
     def _dispatch_and_return(self, x, plan, do_cpu_sync, topk_weights, forward):
         self._ensure_eb()
+        if tuple(plan.vtopk.shape) != (self._S, self._K):
+            raise ValueError(
+                f"plan.vtopk.shape={tuple(plan.vtopk.shape)} "
+                f"!= 构造期 (S, K)=({self._S}, {self._K})"
+            )
         dispatch_kwargs = {
             "topk_weights": (
                 topk_weights.float() if topk_weights is not None else None
@@ -458,7 +463,7 @@ class Buffer:
         }
         dispatch_kwargs.update(
             {
-                "topk_idx": plan.vtopk.view(self._S, self._K),
+                "topk_idx": plan.vtopk,
                 "num_experts": 2 * self._E,
                 "num_max_tokens_per_rank": self._nmtr,
             }

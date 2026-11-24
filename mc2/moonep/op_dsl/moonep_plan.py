@@ -13,7 +13,7 @@
     dst_n[N] / src_n[N]         零占位（vtopk-only 快路径不计算）
     cu_seqlens[2*epn]           本 rank 接收区各槽位累计行数
     experts_to_copy[R, epn]     各 rank 的副本清单（-1 填充，单源）
-    vtopk[N]                    虚拟专家 id（扩展空间 2E）
+    vtopk[S,K]                  虚拟专家 id（扩展空间 2E）
 
 约束：E <= 1024、R <= MAX_R（128）、E % R == 0；N = S*K 任意规模。
 
@@ -1280,7 +1280,7 @@ class MoonepPlan(NamedTuple):
         experts_to_copy: [R, epn] int32 副本清单（-1 填充；每行至多一个
             远程 home rank），prefetch/reduce 共用。
         src_n: [N] int32 零占位（vtopk-only 快路径不计算）。
-        vtopk: [N] int32 虚拟专家 id（扩展空间 2E，供 moe_ep dispatch 路由）。
+        vtopk: [S, K] int32 虚拟专家 id（扩展空间 2E，供 moe_ep dispatch 路由）。
     """
 
     dst_n: torch.Tensor
@@ -1301,7 +1301,7 @@ def moonep_plan(context, tokens_per_expert, topk_experts_sk):
     Returns:
         MoonepPlan（NamedTuple，可按 5-tuple 解包）：
         dst_n[N] / src_n[N] 为零占位；cu_seqlens[2*epn]、experts_to_copy[R,epn]
-        与 vtopk[N] 由 kernel 全量产出。
+        与 vtopk[S,K] 由 kernel 全量产出。
 
     Notes:
         - 返回路径零同步：溢出与布局不变量延迟到下一个 moonep 算子尾部校验。
@@ -1354,7 +1354,7 @@ def moonep_plan(context, tokens_per_expert, topk_experts_sk):
     etc_end = cu_elems + etc_elems
     experts_to_copy = gm_io[cu_elems:etc_end].view(world_size, epn)
     src_n = _zero_placeholder(num_rows)
-    vtopk = gm_io[etc_end:]
+    vtopk = gm_io[etc_end:].view(num_tokens, top_k)
     # epoch 全算子共用一个单调计数器（跨算子单调，哨兵不串轮）
     gm_flag = next_barrier_epoch(context)
     # workspace 单槽缓存：同 shape 复用，shape 变化时按新布局重分配。
