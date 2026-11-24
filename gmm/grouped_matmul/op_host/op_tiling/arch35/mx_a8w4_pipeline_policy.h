@@ -30,26 +30,29 @@ constexpr bool IsEligible(const Eligibility& p, uint64_t originalMxKey)
 }
 constexpr uint64_t MIN_OPTIMIZED_N = 2048UL;
 constexpr uint64_t MIN_ALIGNED_CORE_WAVES = 2UL;
+// Measured pipeline startup floor; shorter K retains the original implementation.
+constexpr uint64_t MIN_ALIGNED_K = 2048UL;
 constexpr uint64_t MIN_BUFFERED_AVERAGE_ROWS = MxBuffered::REUSE_MIN_ROWS + MxBuffered::CUBE_ALIGNMENT;
 // Conservative measured performance limit for Buffered only; Aligned is selected independently above.
 constexpr uint64_t MAX_BUFFERED_GROUPS = 128UL;
+constexpr uint64_t SINGLE_BUFFERED_N_WAVE = ALIGNED_CORE_COUNT * MxBuffered::MAX_N_WIDTH;
 constexpr Route Select(uint64_t m, uint64_t e, uint64_t k, uint64_t n)
 {
     if (e == 0 || n < MIN_OPTIMIZED_N || m / e <= MxBuffered::REUSE_MIN_ROWS) {
         return Route::Original;
     }
-    if (k != 0 && k % ALIGNED_TILE_SIZE == 0 && n % ALIGNED_TILE_SIZE == 0) {
+    if (k >= MIN_ALIGNED_K && k % ALIGNED_TILE_SIZE == 0 && n % ALIGNED_TILE_SIZE == 0) {
         const uint64_t nTiles = n / ALIGNED_TILE_SIZE;
         const uint64_t rowsPerWave = (ALIGNED_CORE_COUNT + nTiles - 1) / nTiles;
         const uint64_t completeWaves = m / e / ALIGNED_TILE_SIZE / rowsPerWave;
-        // Short K needs more independent work to amortize pipeline startup and draining.
-        if (completeWaves >= MIN_ALIGNED_CORE_WAVES || (completeWaves != 0 && k >= MxBuffered::MX_SCALE_K_WINDOW)) {
+        // Require enough full waves to amortize pipeline startup and draining.
+        if (completeWaves >= MIN_ALIGNED_CORE_WAVES) {
             return Route::DynamicAligned;
         }
     }
-    if (e <= MAX_BUFFERED_GROUPS && m / e > MIN_BUFFERED_AVERAGE_ROWS && m / e < MxBuffered::MAX_GROUP_ROWS &&
-        k % MxBuffered::K_TILE == 0 && k / MxBuffered::K_TILE > MxBuffered::OPERAND_PIPELINE_STAGES &&
-        n % MxBuffered::N_ALIGNMENT == 0) {
+    if ((n <= SINGLE_BUFFERED_N_WAVE || k >= MxBuffered::MX_SCALE_K_WINDOW) && e <= MAX_BUFFERED_GROUPS &&
+        m / e > MIN_BUFFERED_AVERAGE_ROWS && m / e < MxBuffered::MAX_GROUP_ROWS && k % MxBuffered::K_TILE == 0 &&
+        k / MxBuffered::K_TILE > MxBuffered::OPERAND_PIPELINE_STAGES && n % MxBuffered::N_ALIGNMENT == 0) {
         return Route::DynamicBuffered;
     }
     return Route::Original;

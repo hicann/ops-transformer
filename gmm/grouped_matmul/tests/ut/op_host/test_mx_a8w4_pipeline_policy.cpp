@@ -52,8 +52,9 @@ TEST(GroupedMatmulMxPipelinePolicy, EligibilityAndCompactLayout)
 TEST(GroupedMatmulMxPipelinePolicy, AlignedWaveBoundaries)
 {
     EXPECT_EQ(Host::Select(1024, 1, 1024, 2048), Host::Route::Original);
-    EXPECT_EQ(Host::Select(1024, 1, 4096, 2048), Host::Route::DynamicAligned);
-    EXPECT_EQ(Host::Select(2048, 1, 1024, 2048), Host::Route::DynamicAligned);
+    EXPECT_EQ(Host::Select(1024, 1, 4096, 2048), Host::Route::Original);
+    EXPECT_EQ(Host::Select(2048, 1, 1024, 2048), Host::Route::Original);
+    EXPECT_EQ(Host::Select(2048, 1, 2048, 2048), Host::Route::DynamicAligned);
     EXPECT_EQ(Host::Select(32768, 4, 7168, 6144), Host::Route::DynamicAligned);
     EXPECT_EQ(Host::Select(32768, 4, 7167, 6144), Host::Route::Original);
     EXPECT_EQ(Host::Select(32768, 4, 7168, 6145), Host::Route::Original);
@@ -69,7 +70,20 @@ TEST(GroupedMatmulMxPipelinePolicy, BufferedRowsAndExpertLimit)
     }
     EXPECT_EQ(Host::Select(128 * 160, 128, 3072, 2112), Host::Route::DynamicBuffered);
     EXPECT_EQ(Host::Select(129 * 160, 129, 3072, 2112), Host::Route::Original);
-    EXPECT_EQ(Host::Select(129 * 2048, 129, 1024, 2048), Host::Route::DynamicAligned);
+    EXPECT_EQ(Host::Select(129 * 2048, 129, 2048, 2048), Host::Route::DynamicAligned);
+}
+
+TEST(GroupedMatmulMxPipelinePolicy, ShortKAndWideNStartupBoundaries)
+{
+    for (uint64_t k : {1024UL, 1792UL, 1920UL, 2176UL}) {
+        EXPECT_EQ(Host::Select(4096, 1, k, 8192), Host::Route::Original);
+    }
+    for (uint64_t k : {2048UL, 2304UL}) {
+        EXPECT_EQ(Host::Select(4096, 1, k, 8192), Host::Route::DynamicAligned);
+    }
+    EXPECT_EQ(Host::Select(160, 1, 3072, 8192), Host::Route::DynamicBuffered);
+    EXPECT_EQ(Host::Select(160, 1, 3072, 8256), Host::Route::Original);
+    EXPECT_EQ(Host::Select(160, 1, 4096, 8256), Host::Route::DynamicBuffered);
 }
 
 TEST(GroupedMatmulMxPipelinePolicy, SteadyStateAndNPartition)
