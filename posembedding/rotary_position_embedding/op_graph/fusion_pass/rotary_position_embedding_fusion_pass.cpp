@@ -38,10 +38,10 @@ constexpr size_t kXIdx = 0;
 constexpr size_t kCosIdx = 1;
 constexpr size_t kSinIdx = 2;
 
-// Same gating as the built-in pass: fuse only on regbase platforms (NpuArch DAV_3510/DAV_9201/DAV_5102).
-// Gating on NpuArch instead of a short_soc_version string list: one arch covers multiple SoCs
-// (DAV_3510: Ascend950/Ascend350, DAV_9201/DAV_9202: Ascend960DT/Ascend960PR, DAV_5102: MC62CM12A), so SoCs sharing the
-// regbase arch are covered without maintaining the soc list.
+// Same gating as the built-in pass: fuse only on regbase platforms (NpuArch
+// DAV_3510/DAV_9201/DAV_9202/DAV_5102/DAV_5162). Gating on NpuArch instead of a short_soc_version string list: one arch
+// covers multiple SoCs (DAV_3510: Ascend950/Ascend350, DAV_9201/DAV_9202: Ascend960DT/Ascend960PR, DAV_5102: MC62CM12A,
+// DAV_5162: Ascend5162A), so SoCs sharing the regbase arch are covered without maintaining the soc list.
 bool IsRegBasePlatform()
 {
     char npuArchVal[16] = {0};
@@ -54,7 +54,8 @@ bool IsRegBasePlatform()
     return npuArch == std::to_string(static_cast<uint32_t>(Ops::Base::DAV_3510)) ||
            npuArch == std::to_string(static_cast<uint32_t>(Ops::Base::DAV_9201)) ||
            npuArch == std::to_string(static_cast<uint32_t>(Ops::Base::DAV_9202)) ||
-           npuArch == std::to_string(static_cast<uint32_t>(Ops::Base::DAV_5102));
+           npuArch == std::to_string(static_cast<uint32_t>(Ops::Base::DAV_5102)) ||
+           npuArch == std::to_string(static_cast<uint32_t>(Ops::Base::DAV_5162));
 }
 
 void GetInputsInfo(const std::vector<ge::fusion::SubgraphInput>& subgraphInputs, std::vector<ge::Shape>& inputShapes,
