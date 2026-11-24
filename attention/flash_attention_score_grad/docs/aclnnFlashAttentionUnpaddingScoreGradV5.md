@@ -320,7 +320,7 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV5(
       <tr>
         <td>attenMaskOptional</td>
         <td>可选输入</td>
-        <td>公式中的atten_mask。</td>
+        <td>公式中的atten_mask。当queryRope或keyInRope不为空时，该参数不能为空。</td>
         <td>取值为1代表该位不参与计算，为0代表该位参与计算。</td>
         <td>BOOL、UINT8</td>
         <td>ND</td>
