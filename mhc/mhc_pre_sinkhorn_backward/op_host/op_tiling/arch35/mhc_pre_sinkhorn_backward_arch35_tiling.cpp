@@ -394,10 +394,11 @@ ge::graphStatus MhcPreSinkhornBackwardArch35Tiling::GetShapeAttrsInfo()
         }
     }
 
-    // Validate the optional output whenever the graph supplies its
-    // placeholder descriptor.  Its logical shape is always h_pre's shape.
+    // 可选输出 grad_pre_mix 仅在 premix 在场时校验 shape(须为 h_pre 同形状):
+    // premix 缺省时该输出为无效占位(kernel 不写入), 调用方可给任意占位形状
+    // (如空张量), 不做校验。
     auto gradPreMixShapePtr = context_->GetOutputShape(OUTPUT_GRAD_PRE_MIX);
-    if (gradPreMixShapePtr != nullptr) {
+    if (gradPreMixShapePtr != nullptr && preMixShapePtr != nullptr) {
         if (xRank_ == 3) {
             int64_t preMixDims[2] = {batchDims[0], n};
             OP_CHECK_IF(!CheckOutputShape(OUTPUT_GRAD_PRE_MIX, "grad_pre_mix", preMixDims, dataRank),
