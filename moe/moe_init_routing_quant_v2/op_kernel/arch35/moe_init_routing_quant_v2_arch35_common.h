@@ -28,6 +28,8 @@ constexpr int64_t SPLIT_N = 0;
 constexpr int64_t SPLIT_K = 1;
 constexpr float MIN_FP32 = -3.4e38f;
 constexpr float MAX_INT8 = 127.0f;
+constexpr float MIN_NORMAL_FP32 = 1.1754943508e-38f;
+constexpr float DENORM_LIFT_SCALE = 7.3786976e19f;
 constexpr uint32_t INF = 0xFF7FFFFF;
 constexpr int64_t ONE_REPEAT_SORT_NUM = 32;
 constexpr int64_t BLOCK_BYTES = 32;
@@ -111,6 +113,11 @@ __aicore__ inline void SetWaitFlag(HardEvent evt)
     event_t eventId = static_cast<event_t>(GetTPipePtr()->FetchEventID(evt));
     SetFlag<event>(eventId);
     WaitFlag<event>(eventId);
+}
+
+__aicore__ inline bool NeedDenormLift(float maxAbs)
+{
+    return (maxAbs > 0.0f && maxAbs < MIN_NORMAL_FP32);
 }
 
 __aicore__ inline void ArithProgressionPerf(const LocalTensor<int32_t>& dst, const int32_t firstValue,

@@ -43,8 +43,8 @@ private:
     __aicore__ inline float ComputeMax(LocalTensor<float>& inLocal, LocalTensor<float>& tempLocal,
                                        LocalTensor<float>& dynamicQuantLocal, int32_t srcIdx, int32_t expertIdx,
                                        int64_t j);
-    __aicore__ inline void ComputeScale(LocalTensor<float>& inLocal, LocalTensor<float>& tempLocal, float scaleTemp,
-                                        int64_t dstIndex, int64_t j);
+    __aicore__ inline void ComputeScale(LocalTensor<float>& inLocal, LocalTensor<float>& tempLocal, float maxAbs,
+                                        float scaleTemp, int64_t dstIndex, int64_t j);
     __aicore__ inline void PreClearOutput();
 
 private:
@@ -130,9 +130,16 @@ __aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::Compute(LocalTensor<fl
     }
     Abs(tempLocal, inLocal, cols_);
     ReduceMax(dynamicQuantLocal, tempLocal, tempLocal, cols_);
-    float maxValue = dynamicQuantLocal.GetValue(0) / 127.0f;
+    float maxAbs = dynamicQuantLocal.GetValue(0);
+    float maxValue = maxAbs / MAX_INT8;
+    bool needLift = NeedDenormLift(maxAbs) || NeedDenormLift(maxValue);
     Duplicate<float>(dynamicQuantLocal, maxValue, 8);
-    Duplicate<float>(tempLocal, maxValue, cols_);
+    float divScale = maxValue;
+    if (needLift) {
+        Muls(inLocal, inLocal, DENORM_LIFT_SCALE, cols_);
+        divScale = maxAbs * DENORM_LIFT_SCALE / MAX_INT8;
+    }
+    Duplicate<float>(tempLocal, divScale, cols_);
     AscendC::PipeBarrier<PIPE_V>();
     Div(tempLocal, inLocal, tempLocal, cols_);
     Cast(tempLocal.ReinterpretCast<half>(), tempLocal, RoundMode::CAST_TRUNC, cols_);
@@ -286,8 +293,8 @@ __aicore__ inline float MoeV2GatherDynamicQuantDroppad<T>::ComputeMax(LocalTenso
 
 template <typename T>
 __aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::ComputeScale(LocalTensor<float>& inLocal,
-                                                                       LocalTensor<float>& tempLocal, float scaleTemp,
-                                                                       int64_t dstIndex, int64_t j)
+                                                                       LocalTensor<float>& tempLocal, float maxAbs,
+                                                                       float scaleTemp, int64_t dstIndex, int64_t j)
 {
     DataCopyExtParams copyInParams{1, static_cast<uint32_t>(colsTileLength_ * sizeof(float)), 0, 0, 0};
     DataCopyExtParams copyOutParams{1, static_cast<uint32_t>(colsTileLength_ * sizeof(int8_t)), 0, 0, 0};
@@ -298,7 +305,12 @@ __aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::ComputeScale(LocalTens
     inputXInQueue_.EnQue<float>(inLocal);
     inLocal = inputXInQueue_.DeQue<float>();
 
-    Duplicate<float>(tempLocal, scaleTemp, colsTileLength_);
+    bool needLift = NeedDenormLift(maxAbs) || NeedDenormLift(scaleTemp);
+    if (needLift) {
+        Muls(inLocal, inLocal, DENORM_LIFT_SCALE, colsTileLength_);
+    }
+    float divScale = needLift ? maxAbs * DENORM_LIFT_SCALE / MAX_INT8 : scaleTemp;
+    Duplicate<float>(tempLocal, divScale, colsTileLength_);
     Div(tempLocal, inLocal, tempLocal, colsTileLength_);
     Cast(tempLocal.ReinterpretCast<half>(), tempLocal, RoundMode::CAST_TRUNC, colsTileLength_);
     Cast(outLocal, tempLocal.ReinterpretCast<half>(), RoundMode::CAST_ROUND, colsTileLength_);
@@ -355,7 +367,7 @@ __aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::CopyOutPartialXQuantEH
                 colsTileLength_ = lastLoopCols_;
             }
 
-            ComputeScale(inLocal, tempLocal, scaleTemp, outIndex, j);
+            ComputeScale(inLocal, tempLocal, reduceMax, scaleTemp, outIndex, j);
         }
 
         inputXInQueue_.FreeTensor(inLocal);
@@ -412,7 +424,7 @@ __aicore__ inline void MoeV2GatherDynamicQuantDroppad<T>::CopyOutPartialXQuant1H
                 if (j == colLoops_ - 1) {
                     colsTileLength_ = lastLoopCols_;
                 }
-                ComputeScale(inLocal, tempLocal, scaleTemp, outIndex, j);
+                ComputeScale(inLocal, tempLocal, reduceMax, scaleTemp, outIndex, j);
             }
         }
         inputXInQueue_.FreeTensor(inLocal);

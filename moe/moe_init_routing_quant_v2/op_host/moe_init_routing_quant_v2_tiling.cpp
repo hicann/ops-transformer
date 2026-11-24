@@ -43,6 +43,9 @@ const static int64_t DYNAMIC_QUANT_COLS_BUFFER = 21;
 const static int64_t DYNAMIC_QUANT_FULLLOAD_COLS_BUFFER = 13;
 const static int64_t DYNAMIC_QUANT_SCALE_SIZE_64 = 64;
 const static int64_t DYNAMIC_QUANT_SCALE_SIZE_128 = 128;
+// 动态量化按行切分建模的UB安全余量(B)：各队列按32B对齐取整的累计误差、TPipe队列管理开销、
+// ReduceMax/Div等向量指令执行时的临时空间等固定开销在tiling侧无法逐项精确建模，统一按8KB保守预留
+const static int64_t DYNAMIC_QUANT_UB_RESERVED = 8 * 1024;
 const static int64_t OUTOUT_DYNAMIC_QUANT_SCALE = 4;
 const static int64_t OUTOUT_EXPANDED_X = 0;
 const static int64_t FULLLOAD_H_LIMIT = 7168;
@@ -88,6 +91,7 @@ private:
                                  int64_t lastCoreRows, int64_t basePerLoopMaxRows);
     void Tiling4GatherQuant();
     void Tiling4GatherDynamicQuant();
+    int64_t CalcDqRowsPerLoop(int64_t loopCols);
     void Tiling4SrcToDstCapacityCompute() override;
     void Tiling4GatherOutCompute() override;
     void CopyGatherOutTiling(InnerMoeV2GatherOutComputeTilingData& dst, InnerMoeV2GatherOutComputeTilingData& src);
@@ -473,6 +477,32 @@ void MoeInitRoutingQuantV2TilingBase::Tiling4GatherQuant()
     }
 }
 
+int64_t MoeInitRoutingQuantV2TilingBase::CalcDqRowsPerLoop(int64_t loopCols)
+{
+    int64_t dtypeSize = inuptXDtypeSize_ > 0 ? inuptXDtypeSize_ : SIZE_INT32;
+    auto alignBytes = [](int64_t elems, int64_t esz) {
+        return (elems * esz + ONE_BLOCK_BYTE - 1) / ONE_BLOCK_BYTE * ONE_BLOCK_BYTE;
+    };
+    // 对应kernel侧inputXInQueue_单buffer大小：非fp32输入需原位Cast为fp32，为AlignBytes(cols, dtype) * 4 /
+    // dtype，最小2个block
+    int64_t inBufBytes =
+        std::max(alignBytes(loopCols, dtypeSize) * SIZE_INT32 / dtypeSize, ONE_BLOCK_BYTE + ONE_BLOCK_BYTE);
+    // 与kernel侧InitBuffer逐项对应的固定开销(B)：
+    // fixedBytes = 2 * inputXInQueue_ + 2 * smoothInQueue_ + calcQueue_ + inputXOutQueue_
+    //               + scaleOutQueue_(DYNAMIC_QUANT_SCALE_SIZE_64) + DYNAMIC_QUANT_UB_RESERVED
+    int64_t fixedBytes = NUM_TWO * inBufBytes + NUM_TWO * alignBytes(loopCols, SIZE_INT32) +
+                         alignBytes(loopCols, SIZE_INT32) + alignBytes(loopCols, SIZE_INT8) +
+                         DYNAMIC_QUANT_SCALE_SIZE_64 + DYNAMIC_QUANT_UB_RESERVED;
+    // expandRowIdxInQueue_每行开销(B)：dropless双buffer x 双int32索引数组(2*2*4)，droppad单buffer x
+    // 双int32索引数组(1*2*4)
+    int64_t rowBytes = dropPadMode == 0 ? NUM_TWO * NUM_TWO * SIZE_INT32 : NUM_TWO * SIZE_INT32;
+    int64_t ubSize = static_cast<int64_t>(aicoreParams_.ubSize);
+    int64_t rows = fixedBytes < ubSize ? (ubSize - fixedBytes) / rowBytes : 0;
+    int64_t alignRows = ONE_BLOCK_BYTE / SIZE_INT32;
+    rows = rows / alignRows * alignRows;
+    return rows > 0 ? rows : alignRows;
+}
+
 void MoeInitRoutingQuantV2TilingBase::Tiling4GatherDynamicQuant()
 {
     auto tilingData = &quantTilingData.gatherOutComputeParamsOp;
@@ -497,12 +527,16 @@ void MoeInitRoutingQuantV2TilingBase::Tiling4GatherDynamicQuant()
         ((static_cast<int64_t>(aicoreParams_.ubSize) > colSize + scaleSize + ONE_BLOCK_BYTE * NUM_FOUR * NUM_FOUR) &&
          quantTilingData.get_smoothType() == SMOOTH_NONE && cols == FULLLOAD_H_LIMIT) ||
         ifOneLoopInt4;
-    int64_t perCoreOnceRowSize = ifOneLoop ? std::min(onceRowSize, perCoreRows) : perCoreRows;
-    int64_t lastCoreOnceRowSize = ifOneLoop ? std::min(onceRowSize, lastCoreRows) : lastCoreRows;
-    int64_t perCoreLoops = ifOneLoop ? Ops::Base::CeilDiv(perCoreRows, perCoreOnceRowSize) : 1;
-    int64_t lastCoreLoops = ifOneLoop ? Ops::Base::CeilDiv(lastCoreRows, lastCoreOnceRowSize) : 1;
-    int64_t perCoreLastLoopRows = ifOneLoop ? GetPerOrLastValue(perCoreRows, perCoreOnceRowSize) : perCoreRows;
-    int64_t lastCoreLastLoopRows = ifOneLoop ? GetPerOrLastValue(lastCoreRows, lastCoreOnceRowSize) : lastCoreRows;
+    int64_t rowLoopCap = CalcDqRowsPerLoop(cols);
+    if (ifOneLoop && onceRowSize > 0) {
+        rowLoopCap = std::min(rowLoopCap, onceRowSize);
+    }
+    int64_t perCoreOnceRowSize = std::min(perCoreRows, rowLoopCap);
+    int64_t lastCoreOnceRowSize = std::min(lastCoreRows, rowLoopCap);
+    int64_t perCoreLoops = Ops::Base::CeilDiv(perCoreRows, perCoreOnceRowSize);
+    int64_t lastCoreLoops = Ops::Base::CeilDiv(lastCoreRows, lastCoreOnceRowSize);
+    int64_t perCoreLastLoopRows = perCoreRows - (perCoreLoops - 1) * perCoreOnceRowSize;
+    int64_t lastCoreLastLoopRows = lastCoreRows - (lastCoreLoops - 1) * lastCoreOnceRowSize;
     if (rowSize + colSize + scaleSize < static_cast<int64_t>(aicoreParams_.ubSize) || ifOneLoop) {
         GatherTilingDataParam gatherTilingDataParam;
         gatherTilingDataParam.perCorePerLoopRows = perCoreOnceRowSize;
