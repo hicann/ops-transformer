@@ -1027,11 +1027,14 @@ def cpu_qfa_mxfp8(
         if _lo_attr in _data_layouts
         else ("TND" if enable_pa else input_layout)
     )
+    # TND 输出物理长度由 cu_seqlens 决定（与 NPU 按 q slot 的 Q_T 输出一致）；
+    # seqused_q 可小于 cu_seqlens 差分，差额为 padding，convert 内部按 0 填充。
+    # 非 TND 布局下 convert 内部不使用 cu_seqlens。
     cpu_out_aligned = mxfp8_golden_mod.convert_q_bnsd_to_layout(
         cpu_out,
         actual_seq_q,
         compare_layout,
-        cu_seqlens=cu_seqlens_q_list if enable_pa else None,
+        cu_seqlens=cu_seqlens_q_list,
     )
 
     if enable_lse:
@@ -1043,10 +1046,10 @@ def cpu_qfa_mxfp8(
                 cpu_lse,
                 actual_seq_q,
                 "TND",
-                cu_seqlens=cu_seqlens_q_list if enable_pa else None,
+                cu_seqlens=cu_seqlens_q_list,
             )
             # TND padding 位置填 inf 以匹配 NPU 行为：NPU 对超出实际序列长度的 Q 位置输出 inf LSE
-            if enable_pa and cu_seqlens_q_list is not None:
+            if cu_seqlens_q_list is not None:
                 cpu_lse_aligned = mxfp8_golden_mod.fill_tnd_padding(
                     cpu_lse_aligned,
                     actual_seq_q,
@@ -1097,7 +1100,7 @@ def cpu_qfa_mxfp8(
         },
         actual_seq_q,
         compare_layout,
-        cu_seqlens_q_list if enable_pa else None,
+        cu_seqlens_q_list,
         enable_lse,
     )
 
