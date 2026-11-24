@@ -151,8 +151,15 @@ def validate_sizes(batch, n_qk, n_v, length):
 
 
 def validate_length_specs(cu_seqlens, seqused, spec):
+    # 长度参数按布局互斥，metadata 生成和前向入口共用此校验。
     if spec.layout == "TND":
         require(cu_seqlens is not None, "cu_seqlens is required for TND")
+        require(seqused is None, "seqused must be None for TND; use cu_seqlens")
+    else:
+        require(
+            cu_seqlens is None, "cu_seqlens must be None for BNSD/BSND; use seqused"
+        )
+        require(seqused is not None, "seqused is required for BNSD/BSND")
     for name, value, size in (
         ("cu_seqlens", cu_seqlens, spec.batch + 1),
         ("seqused", seqused, spec.batch),

@@ -78,6 +78,23 @@ def dut_call(kwargs):
 
 
 def rejection_target(kwargs, config):
+    if config["test"].get("length_metadata_validation"):
+        params = {
+            key: config[key]
+            for key in ("batch_size", "nheads_qk", "nheads_v", "seqlens", "layout")
+        }
+        params.update(
+            cu_seqlens=kwargs.get("cu_seqlens"),
+            seqused=kwargs.get("seqused"),
+            enable_grad=not config["inference"],
+        )
+        if config["test"].get("python_validation"):
+            if runtime.selection()[0] != "source":
+                raise RuntimeError(
+                    "strict Python type validation requires KDA_DUT=source"
+                )
+            return dut_modules()[1].flash_kda_fwd_metadata(**params)
+        return runtime.public_api().flash_kda_metadata(**params)
     if config["test"].get("python_validation"):
         if runtime.selection()[0] != "source":
             raise RuntimeError("strict Python type validation requires KDA_DUT=source")
@@ -107,24 +124,32 @@ def reference(inputs, c, kind, *, forward=False):
     )
 
 
-def produce(inputs, c, *, template=None):
+def sequence_kwargs(inputs, c):
+    """按布局选择长度参数，供 metadata 生成和前向调用共同使用。"""
+    packed = c["layout"] == "TND"
+    return {
+        "cu_seqlens": input_tensor(inputs, "cu_seqlens") if packed else None,
+        "seqused": None if packed else input_tensor(inputs, "seqused"),
+    }
+
+
+def produce(inputs, c, *, template=None, length_overrides=None):
     """Use the scalar metadata interface specified in the detailed design."""
     _, producer, _ = dut_modules()
-    cu = (
-        input_tensor(inputs, "cu_seqlens").to("npu")
-        if c["cu_seqlens_value"] is not None
-        else None
-    )
+    lengths = sequence_kwargs(inputs, c)
+    # 负向用例显式注入非法长度参数，不能被布局选择逻辑过滤。
+    lengths.update(length_overrides or {})
+    lengths = {
+        name: value.to("npu") if value is not None else None
+        for name, value in lengths.items()
+    }
     build = runtime.public_api().flash_kda_metadata
     options = {}
     if template is not None:
         build = getattr(producer, "_build_flash_kda_fwd_arch92_metadata")
         options["template"] = template
     return build(
-        cu_seqlens=cu,
-        seqused=input_tensor(inputs, "seqused").to("npu")
-        if c["seqused_value"] is not None
-        else None,
+        **lengths,
         batch_size=c["batch_size"],
         nheads_qk=c["nheads_qk"],
         nheads_v=c["nheads_v"],
@@ -171,8 +196,7 @@ def call_kwargs(inputs, c, meta=None):
         kw.pop("dt_bias")
     elif c["dt_bias_mode"] == "none":
         kw["dt_bias"] = None
-    kw["cu_seqlens"] = kw["cu_seqlens"] if c["cu_seqlens_value"] is not None else None
-    kw["seqused"] = kw["seqused"] if c["seqused_value"] is not None else None
+    kw.update(sequence_kwargs(inputs, c))
     kw.update(c.get("ignored", {}))
     if meta is not None:
         kw["metadata"] = meta
@@ -392,7 +416,12 @@ def negative(inputs, c):
     snapshot = [x.clone() for x in inputs]
     md_snapshot = md.clone()
     mutation = c["test"]["mutation"]
-    missing_argument = mutation[0] == "missing" and mutation[2] == "omit"
+    # 长度参数在签名中仍有 None 默认值，缺省时由布局校验抛出 ValueError。
+    missing_argument = (
+        mutation[0] == "missing"
+        and mutation[2] == "omit"
+        and mutation[1] not in ("cu_seqlens", "seqused")
+    )
     with mode(c), guard(static=True):
         reject_call(
             lambda: rejection_target(kw, c),
@@ -409,7 +438,7 @@ def negative(inputs, c):
                 for key in ("batch_size", "nheads_qk", "nheads_v", "seqlens", "layout")
             }
             params.update(
-                cu_seqlens=input_tensor(inputs, "cu_seqlens"),
+                **sequence_kwargs(inputs, c),
                 enable_grad=not c["inference"],
             )
             del params[field]
@@ -436,12 +465,20 @@ def check_length_contents(inputs, c):
     bad = list(inputs)
     bad[index] = inputs[index].new_tensor(test["values"])
     kw = call_kwargs(bad, c, md)
+    kw[test["field"]] = bad[index]
+    forbidden = (c["layout"] == "TND" and test["field"] == "seqused") or (
+        c["layout"] != "TND" and test["field"] == "cu_seqlens"
+    )
+    message = "must be None" if forbidden else test["message"]
     with mode(c), guard(static=False):
-        for call in (lambda: produce(bad, c), lambda: dut_call(kw)):
+        for call in (
+            lambda: produce(bad, c, length_overrides={test["field"]: bad[index]}),
+            lambda: dut_call(kw),
+        ):
             try:
                 call()
             except ValueError as exc:
-                if test["message"] not in str(exc):
+                if message not in str(exc):
                     raise AssertionError(f"unexpected rejection: {exc}") from exc
             else:
                 raise AssertionError(f"accepted invalid {test['field']}")
@@ -634,6 +671,15 @@ def check_relations(inputs, c, out, md):
 
     kind = test["kind"]
     if kind == "equivalent":
+        if test.get("check_length_conversion"):
+            prefix = c["cu_seqlens_value"]
+            expected = [end - start for start, end in zip(prefix, prefix[1:])]
+            selected = sequence_kwargs(inputs, c)
+            if (
+                selected["cu_seqlens"] is not None
+                or selected["seqused"].cpu().tolist() != expected
+            ):
+                raise AssertionError("prefix-to-seqused conversion mismatch")
         run(other, inputs if test.get("reuse_inputs") else None)
     elif kind == "reconfigure":
         run(other, compare=test.get("compare_main", False))
@@ -648,6 +694,9 @@ def check_relations(inputs, c, out, md):
                 seqused_value=None,
             )
             xx = [x.clone() for x in inputs]
+            # 分段调用必须同步更新长度，不能继续使用完整序列的 seqused。
+            xx[9] = xx[9].new_tensor([b * length for b in range(c["batch_size"] + 1)])
+            xx[10] = xx[10].new_full((c["batch_size"],), length)
             axis = 2 if c["layout"] == "BNSD" else 1
             for i in range(5):
                 token_axis = 1 if i in (3, 4) else axis
@@ -706,6 +755,7 @@ def check_capacity(inputs, c):
 
     def produce_capacity():
         return producer.flash_kda_metadata(
+            seqused=input_tensor(inputs, "seqused")[:1],
             batch_size=1,
             nheads_qk=1,
             nheads_v=1,
@@ -716,7 +766,12 @@ def check_capacity(inputs, c):
             layout="BNSD",
         )
 
-    with patch.object(producer, "_device_block_num", stop), guard(static=True):
+    # 容量检查只关注标量上界，长度值由桩提供，避免新必填参数触发设备回读。
+    with (
+        patch.object(producer, "_device_block_num", stop),
+        patch.object(producer, "read_lengths", return_value=[length]),
+        guard(static=True),
+    ):
         if c["test"]["valid"]:
             try:
                 produce_capacity()

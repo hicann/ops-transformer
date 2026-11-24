@@ -228,8 +228,18 @@ def make(c, input_ranges=()):
     values = [to_layout(x, c["layout"], lengths) for x in (q, k, v)]
     gate_layout = "TND" if c["layout"] == "TND" else "BSND"
     values += [to_layout(x, gate_layout, lengths) for x in (g, beta)]
-    cu = c["cu_seqlens_value"] or [0] + list(torch.tensor(lengths).cumsum(0).tolist())
-    used = c["seqused_value"] or lengths
+    cu = c["cu_seqlens_value"]
+    used = c["seqused_value"]
+    # 兼容旧定长用例的前缀和配置，实际调用只传 seqused。
+    if c["layout"] != "TND" and used is None and cu is not None:
+        used = [end - start for start, end in zip(cu, cu[1:])]
+    if cu is None:
+        cu = [0]
+        for length in lengths:
+            cu.append(cu[-1] + length)
+    if used is None:
+        used = lengths
+    # CSV 保留两个张量槽，调用适配层按布局将禁用的参数置为 None。
     inputs = values + [
         None,
         state,
