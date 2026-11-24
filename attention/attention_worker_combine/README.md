@@ -17,6 +17,8 @@
 
 ## 参数说明
 
+`R` 为 token 数，`K` 为每个 token 的路由专家数（不含共享专家），`H` 为隐藏维度大小，由 `hidden_size` 指定。
+
 <table class="tg"><thead>
   <tr>
     <th class="tg-0pky">参数名</th>
@@ -86,10 +88,12 @@
 
 ## 约束说明
 
-* 非量化场景expert_scales为FLOAT、2D Tensor，[BatchSize, K]，K范围为[1,64]。
-* MXFP反量化场景expert_scales为 E8M0、3D Tensor，shape 为 [BatchSize, K+1, S]，S = Ceil(H/32)，再将 S 向上取整到偶数。
-* MXFP反量化场景支持 token_dtype=2/3/4；R/H须为正，K范围为[1,64]，need_schedule为0或1。
-* y为2D的Tensor，[BatchSize, HiddenSize]，即第二维由属性hidden_size确定。
+* 所有输入和输出 Tensor 均不支持空 Tensor。
+* `R` 和 `H` 必须为正整数，`K` 的取值范围为 `[1, 64]`。
+* 非量化场景下，`expert_scales` 为 FLOAT 类型的二维 Tensor，shape 为 `(R, K)`。
+* MXFP 反量化场景下，`expert_scales` 为 FLOAT8_E8M0 类型的三维 Tensor，shape 为 `(R, K + 1, S)`。专家维的最后一项对应共享专家。`S` 为 `ceil(H / 32)` 向上对齐到偶数后的值。
+* MXFP 反量化场景下，`token_dtype` 取值为 2、3 或 4，`need_schedule` 取值为 0 或 1。
+* `y` 为二维 Tensor，shape 为 `(R, H)`。`token_dtype` 为 0 时，`y` 为 FLOAT16，其余支持的取值对应 BFLOAT16。
 
 ## 调用说明
 

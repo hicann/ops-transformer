@@ -33,14 +33,14 @@ cann_ops_transformer.attention_worker_combine(schedule_context, expert_scales, l
 
 ## 参数说明
 
-设R为token数，K为路由专家数（不含共享专家），H为hidden_size，其中R > 0，1 ≤ K ≤ 64，H > 0；S为Ceil(H/32)向上取整到偶数。
+`R` 为 token 数，`K` 为每个 token 的路由专家数（不含共享专家），`H` 为隐藏维度大小，由 `hidden_size` 指定。
 
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度(shape) |
 | --- | --- | --- | --- | --- | --- |
 | schedule_context | Tensor | 必选 | 调度上下文，保存有效的ScheduleContext结构体。 | int8 | (1024,) |
-| expert_scales | Tensor | 必选 | 非量化场景为专家权重；MXFP反量化场景为E8M0缩放因子，每32个H方向的元素共享一个缩放因子。uint8用于承载E8M0原始编码。 | 非量化：float32；MXFP反量化：uint8、float8_e8m0fnu | 非量化：(R, K)；MXFP反量化：(R, K+1, S)，其中K+1包含共享专家 |
+| expert_scales | Tensor | 必选 | 非量化场景为专家权重。MXFP 反量化场景为 E8M0 缩放因子，隐藏维度每 32 个元素共享一个缩放因子。uint8 用于承载 E8M0 原始编码。 | 非量化：float32；MXFP反量化：uint8、float8_e8m0fnu | 非量化场景为 `(R, K)`。MXFP 反量化场景为 `(R, K + 1, S)`，专家维的最后一项对应共享专家，`S` 为 `ceil(H / 32)` 向上对齐到偶数后的值。 |
 | layer_id | Tensor | 必选 | 当前层ID。 | int32 | (1,) |
-| hidden_size | int | 必选 | 每行token的元素数H，必须大于0。 | int | - |
+| hidden_size | int | 必选 | 隐藏维度大小 `H`。 | int | - |
 | token_dtype | int | 可选 | 默认值为0。0表示FP16，1表示BF16，2表示MXFP8_E5M2，3表示MXFP8_E4M3FN，4表示MXFP4_E2M1。 | int | - |
 | need_schedule | int | 可选 | 默认值为0。取值为0或1，0表示不等待token数据就绪，1表示等待token数据就绪。 | int | - |
 
@@ -55,7 +55,9 @@ cann_ops_transformer.attention_worker_combine(schedule_context, expert_scales, l
 
 - 该接口支持推理场景下使用。
 - 该接口支持单算子模式和TorchAir图模式调用，图模式支持静态shape和动态shape。
-- 所有输入须为同一NPU设备上的连续Tensor，数据格式为ND，不支持空Tensor。
+- 所有输入须为同一 NPU 设备上的连续 Tensor，数据格式为 ND。
+- 所有输入和输出 Tensor 均不支持空 Tensor。
+- `R` 和 `H` 必须为正整数，`K` 的取值范围为 `[1, 64]`。
 - `schedule_context`及其关联的token和就绪标志须由上游调度流程准备，关联缓冲区须保持有效直至执行完成。开启调度时会消费就绪标志，重复调用前须准备下一批数据。
 
 <!-- npu="A3,910b" id7 -->

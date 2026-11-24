@@ -5,7 +5,7 @@
 ## Applicable Products
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR&950DT products</term>: Not supported
+- <term>Ascend 950PR&950DT products</term>: Supported
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
 - <term>Atlas A3 products</term>: Supported
@@ -37,9 +37,21 @@
 
 - Formula:
 
-  $$
-  y[i] = \sum_{k=0}^{K-1} \text{expertScales}[i][k] \times \text{token\_data}[i][k]
-  $$
+  Let $i$ index tokens, $h$ index the hidden dimension, and $K$ be the number of routed experts per token. The last entry along the expert axis of `token_data` contains the shared expert result.
+
+  - In the non-quantized case (`tokenDtype` is 0 or 1):
+
+    $$
+    y[i,h] = \sum_{k=0}^{K-1} \text{expertScales}[i,k] \times \text{token\_data}[i,k,h] + \text{token\_data}[i,K,h]
+    $$
+
+  - In the MXFP dequantization case (`tokenDtype` is 2, 3, or 4), `dequant(x, s)` decodes the token value according to its data type and multiplies it by the decoded E8M0 scale.
+
+    $$
+    y[i,h] = \sum_{k=0}^{K} \operatorname{dequant}\!\left(\text{token\_data}[i,k,h],\ \text{expertScales}[i,k,\lfloor h/32 \rfloor]\right)
+    $$
+
+    Each scale covers a group of up to 32 elements along the hidden dimension. Any extra scale slot added for alignment is padding.
 
   $$
   \text{nextLayerId} = \text{layerId} + 1
@@ -74,6 +86,8 @@ aclnnStatus aclnnAttentionWorkerCombine(
 ## aclnnAttentionWorkerCombineGetWorkspaceSize
 
 - **Parameters**
+
+  `R` is the number of tokens, `K` is the number of routed experts per token (excluding the shared expert), and `H` is the hidden dimension size specified by `hiddenSize`.
 
   <table style="undefined;table-layout: fixed; width: 1540px"><colgroup>
   <col style="width: 210px">
@@ -110,18 +124,18 @@ aclnnStatus aclnnAttentionWorkerCombine(
     <tr>
       <td>expertScales</td>
       <td>Input</td>
-      <td>Expert weights, indicating the weight of each expert for each token.</td>
-      <td>-</td>
-      <td>FLOAT</td>
+      <td>Expert weights per token in the non-quantized case. In the MXFP dequantization case, each E8M0 scale covers a group of up to 32 elements along the hidden dimension.</td>
+      <td>Empty tensors are not supported. The type is FLOAT when tokenDtype is 0 or 1 and FLOAT8_E8M0 when it is 2, 3, or 4.</td>
+      <td>FLOAT, FLOAT8_E8M0</td>
       <td>ND</td>
-      <td>2 dimensions, (BS, K)</td>
+      <td>2D, (R, K) in the non-quantized case. 3D, (R, K + 1, S) in the MXFP dequantization case. The last entry along the expert axis corresponds to the shared expert, and S is ceil(H / 32) rounded up to an even number.</td>
       <td>×</td>
     </tr>
     <tr>
       <td>layerId</td>
       <td>Input</td>
       <td>Current model layer ID.</td>
-      <td>-</td>
+      <td>Empty tensors are not supported.</td>
       <td>INT32</td>
       <td>ND</td>
       <td>1-D, (1)</td>
@@ -140,8 +154,8 @@ aclnnStatus aclnnAttentionWorkerCombine(
     <tr>
       <td>tokenDtype</td>
       <td>Input</td>
-      <td>Specifies the original precision type of token data in scheduleContext. 0 indicates FLOAT16; 1 indicates BFLOAT16.</td>
-      <td>0 or 1</td>
+      <td>Specifies the original data type of the tokens in scheduleContext. The values 0, 1, 2, 3, and 4 denote FLOAT16, BFLOAT16, MXFP8_E5M2, MXFP8_E4M3FN, and MXFP4_E2M1, respectively.</td>
+      <td>Use 0 or 1 in the non-quantized case and 2, 3, or 4 in the MXFP dequantization case.</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -161,17 +175,17 @@ aclnnStatus aclnnAttentionWorkerCombine(
       <td>y</td>
       <td>Output</td>
       <td>Final attention merge result.</td>
-      <td>-</td>
-      <td>FP16, BF16</td>
+      <td>Empty tensors are not supported. The type is FLOAT16 when tokenDtype is 0 and BFLOAT16 for all other supported values.</td>
+      <td>FLOAT16, BFLOAT16</td>
       <td>ND</td>
-      <td>2D, (BS, hiddenSize)</td>
+      <td>2D, (R, H)</td>
       <td>×</td>
     </tr>
     <tr>
       <td>nextLayerId</td>
       <td>Output</td>
       <td>ID of the next layer to process.</td>
-      <td>-</td>
+      <td>Empty tensors are not supported.</td>
       <td>INT32</td>
       <td>ND</td>
       <td>1D, (1)</td>
@@ -275,7 +289,14 @@ aclnnStatus aclnnAttentionWorkerCombine(
 
 ## Constraints
 
-- The second dimension (K) of expertScales must be ≤ 64.
+<!-- npu="A3,910b" id7 -->
+- <term>Atlas A2 products</term> and <term>Atlas A3 products</term> support `tokenDtype` values 0 and 1 with FLOAT `expertScales`.
+<!-- end id7 -->
+<!-- npu="950" id8 -->
+- <term>Ascend 950PR&950DT products</term> support `tokenDtype` values 0 through 4. Use FLOAT `expertScales` for 0 or 1 and FLOAT8_E8M0 `expertScales` for 2, 3, or 4.
+<!-- end id8 -->
+
+- `R` and `H` must be positive integers, and `K` must be in `[1, 64]`.
 - Deterministic computation:
   - aclnnAttentionWorkerCombine defaults to a deterministic implementation.
 
@@ -426,9 +447,10 @@ int main() {
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
   // 2. Construct the input and output based on the API as required.
-  int64_t BS = 48;       // batch size
-  int64_t K = 8;         // expert num per token
-  int64_t hiddenSize = 20480;
+  int64_t R = 48;       // token count
+  int64_t K = 8;         // routed experts per token
+  const int64_t expertRows = K + 1;  // includes the shared expert
+  int64_t H = 20480;
   int64_t tokenDtype = 1;    // BF16
   int64_t needSchedule = 0;
 
@@ -436,8 +458,8 @@ int main() {
   ScheduleContext scheduleContext = {};
   scheduleContext.common.session_num = 1;
   scheduleContext.common.micro_batch_num = 1;
-  scheduleContext.common.micro_batch_size = BS;
-  scheduleContext.common.selected_expert_num = K;
+  scheduleContext.common.micro_batch_size = R;
+  scheduleContext.common.selected_expert_num = expertRows;
   scheduleContext.common.expert_num = 16;
   scheduleContext.common.attn_to_ffn_token_size = 512;
   scheduleContext.common.ffn_to_attn_token_size = 512;
@@ -446,26 +468,26 @@ int main() {
   scheduleContext.attention.micro_batch_id = 0;
 
   // Initialize the Attention token_info_buf (flag set to 1 indicates that the data is ready).
-  size_t perDataDescSize = sizeof(AttentionDataDesc) + sizeof(int32_t) * BS * K;
+  size_t perDataDescSize = sizeof(AttentionDataDesc) + sizeof(int32_t) * R * expertRows;
   size_t tokenInfoBufSize = static_cast<size_t>(scheduleContext.common.micro_batch_num) * perDataDescSize;
   void* tokenInfoBuf = nullptr;
   ret = aclrtMalloc(&tokenInfoBuf, tokenInfoBufSize, ACL_MEM_MALLOC_HUGE_FIRST);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("malloc token info buf failed. ERROR: %d\n", ret); return ret);
   scheduleContext.attention.token_info_buf = reinterpret_cast<uint64_t>(tokenInfoBuf);
   scheduleContext.attention.token_info_buf_size = tokenInfoBufSize;
-  std::vector<int32_t> hostFlags(static_cast<size_t>(BS) * K, 1);
+  std::vector<int32_t> hostFlags(static_cast<size_t>(R) * expertRows, 1);
   ret = aclrtMemcpy(tokenInfoBuf, tokenInfoBufSize, hostFlags.data(),
-                    static_cast<size_t>(BS) * K * sizeof(int32_t), ACL_MEMCPY_HOST_TO_DEVICE);
+                    static_cast<size_t>(R) * expertRows * sizeof(int32_t), ACL_MEMCPY_HOST_TO_DEVICE);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("cpy token info buf failed. ERROR: %d\n", ret); return ret);
 
   // Initialize the Attention token_data_buf.
-  uint64_t tokenDataSize = static_cast<uint64_t>(BS) * K * hiddenSize * sizeof(int16_t);
+  uint64_t tokenDataSize = static_cast<uint64_t>(R) * expertRows * H * sizeof(int16_t);
   void* tokenDataBuf = nullptr;
   ret = aclrtMalloc(&tokenDataBuf, tokenDataSize, ACL_MEM_MALLOC_HUGE_FIRST);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("malloc token data buf failed. ERROR: %d\n", ret); return ret);
   scheduleContext.attention.token_data_buf = reinterpret_cast<uint64_t>(tokenDataBuf);
   scheduleContext.attention.token_data_buf_size = tokenDataSize;
-  std::vector<int16_t> hostTokenData(static_cast<size_t>(BS) * K * hiddenSize, 1);
+  std::vector<int16_t> hostTokenData(static_cast<size_t>(R) * expertRows * H, 1);
   ret = aclrtMemcpy(tokenDataBuf, tokenDataSize, hostTokenData.data(), tokenDataSize, ACL_MEMCPY_HOST_TO_DEVICE);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("cpy token data buf failed. ERROR: %d\n", ret); return ret);
 
@@ -479,9 +501,9 @@ int main() {
                         &scheduleContextRef);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-  // Create the expert_scales aclTensor, shape (BS, K).
-  std::vector<int64_t> expertScalesShape = {BS, K};
-  std::vector<float> hostExpertScales(static_cast<size_t>(BS) * K, 0.125f);
+  // Create the expert_scales aclTensor, shape (R, K).
+  std::vector<int64_t> expertScalesShape = {R, K};
+  std::vector<float> hostExpertScales(static_cast<size_t>(R) * K, 0.125f);
   void* expertScalesDeviceAddr = nullptr;
   aclTensor* expertScalesRef = nullptr;
   ret = CreateAclTensor(hostExpertScales, expertScalesShape, &expertScalesDeviceAddr, aclDataType::ACL_FLOAT,
@@ -496,8 +518,8 @@ int main() {
   ret = CreateAclTensor(hostLayerId, layerIdShape, &layerIdDeviceAddr, aclDataType::ACL_INT32, &layerIdRef);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-  // Create the output y aclTensor, shape (BS, hiddenSize).
-  std::vector<int64_t> yShape = {BS, hiddenSize};
+  // Create the output y aclTensor, shape (R, H).
+  std::vector<int64_t> yShape = {R, H};
   void* yDeviceAddr = nullptr;
   aclTensor* yRef = nullptr;
   ret = CreateAclTensorNoData(yShape, &yDeviceAddr, aclDataType::ACL_BF16, &yRef);
@@ -513,7 +535,7 @@ int main() {
   // 3. Call the CANN operator library API.
   uint64_t workspaceSize = 0;
   aclOpExecutor* executor = nullptr;
-  ret = aclnnAttentionWorkerCombineGetWorkspaceSize(scheduleContextRef, expertScalesRef, layerIdRef, hiddenSize,
+  ret = aclnnAttentionWorkerCombineGetWorkspaceSize(scheduleContextRef, expertScalesRef, layerIdRef, H,
                                                     tokenDtype, needSchedule, yRef, nextLayerIdRef, &workspaceSize,
                                                     &executor);
   CHECK_RET(ret == ACL_SUCCESS,

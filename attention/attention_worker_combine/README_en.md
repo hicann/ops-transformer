@@ -19,6 +19,8 @@ English | [简体中文](./README.md)
 
 ## Parameter Description
 
+`R` is the number of tokens, `K` is the number of routed experts per token (excluding the shared expert), and `H` is the hidden dimension size specified by `hidden_size`.
+
 <table class="tg"><thead>
   <tr>
     <th class="tg-0pky">Parameter name</th>
@@ -88,10 +90,12 @@ English | [简体中文](./README.md)
 
 ## Constraint Description
 
-* In the non-quantized scenario, expert_scales is a FLOAT 2D tensor, [BatchSize, K], where K ranges from [1, 64].
-* In the MXFP dequantization scenario, expert_scales is an E8M0 3D tensor with the shape [BatchSize, K+1, S], where S = Ceil(H/32), and then S is rounded up to an even number.
-* In the MXFP dequantization scenario, token_dtype=2/3/4 is supported; R/H must be positive, K ranges from [1, 64], and need_schedule is 0 or 1.
-* y is a 2D tensor, [BatchSize, HiddenSize]. That is, the second dimension is determined by the attribute hidden_size.
+* All input and output tensors must be non-empty.
+* `R` and `H` must be positive integers, and `K` must be in `[1, 64]`.
+* In the non-quantized case, `expert_scales` is a 2D FLOAT tensor of shape `(R, K)`.
+* In the MXFP dequantization case, `expert_scales` is a 3D FLOAT8_E8M0 tensor of shape `(R, K + 1, S)`. The last entry along the expert axis corresponds to the shared expert. `S` is `ceil(H / 32)` rounded up to an even number.
+* In the MXFP dequantization case, `token_dtype` is 2, 3, or 4, and `need_schedule` is 0 or 1.
+* `y` is a 2D tensor of shape `(R, H)`. Its type is FLOAT16 when `token_dtype` is 0 and BFLOAT16 for all other supported values.
 
 ## Invocation Description
 

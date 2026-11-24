@@ -85,6 +85,8 @@ aclnnStatus aclnnAttentionWorkerCombine(
 
 - **参数说明**
 
+  `R` 为 token 数，`K` 为每个 token 的路由专家数（不含共享专家），`H` 为隐藏维度大小，由 `hiddenSize` 指定。
+
   <table style="undefined;table-layout: fixed; width: 1540px"><colgroup>
   <col style="width: 210px">
   <col style="width: 135px">
@@ -111,7 +113,7 @@ aclnnStatus aclnnAttentionWorkerCombine(
       <td>scheduleContext</td>
       <td>输入</td>
       <td>Attention侧接收的调度上下文，内含CommonArea、ControlArea、AttentionArea、FfnArea。算子从AttentionArea的token_data_buf中读取token数据。</td>
-      <td>不支持空Tensor。</td>
+      <td>不支持空 Tensor。</td>
       <td>INT8</td>
       <td>ND</td>
       <td>1维，shape固定为(1024)</td>
@@ -121,17 +123,17 @@ aclnnStatus aclnnAttentionWorkerCombine(
       <td>expertScales</td>
       <td>输入</td>
       <td>非量化场景表示每个token对应的专家权重；MXFP反量化场景表示token数据的E8M0缩放因子，每32个hiddenSize方向的元素共享一个缩放因子。</td>
-      <td>tokenDtype为0或1时为FLOAT，为2、3或4时为FLOAT8_E8M0。</td>
+      <td>不支持空 Tensor。tokenDtype 为 0 或 1 时为 FLOAT，为 2、3 或 4 时为 FLOAT8_E8M0。</td>
       <td>FLOAT、FLOAT8_E8M0</td>
       <td>ND</td>
-      <td>非量化场景为2维，shape为(BS, K)；MXFP反量化场景为3维，shape为(BS, K+1, S)，其中S为Ceil(hiddenSize/32)向上取整到偶数。</td>
+      <td>非量化场景为 2 维，shape 为 (R, K)。MXFP 反量化场景为 3 维，shape 为 (R, K + 1, S)，专家维的最后一项对应共享专家，S 为 ceil(H / 32) 向上对齐到偶数后的值。</td>
       <td>×</td>
     </tr>
     <tr>
       <td>layerId</td>
       <td>输入</td>
       <td>当前的模型层ID。</td>
-      <td>-</td>
+      <td>不支持空 Tensor。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，(1)</td>
@@ -171,17 +173,17 @@ aclnnStatus aclnnAttentionWorkerCombine(
       <td>y</td>
       <td>输出</td>
       <td>最终的注意力融合结果。</td>
-      <td>-</td>
-      <td>FP16、BF16</td>
+      <td>不支持空 Tensor。tokenDtype 为 0 时为 FLOAT16，其余支持的取值对应 BFLOAT16。</td>
+      <td>FLOAT16、BFLOAT16</td>
       <td>ND</td>
-      <td>2维，(BS, hiddenSize)</td>
+      <td>2 维，(R, H)</td>
       <td>×</td>
     </tr>
     <tr>
       <td>nextLayerId</td>
       <td>输出</td>
       <td>下一个要处理的层ID。</td>
-      <td>-</td>
+      <td>不支持空 Tensor。</td>
       <td>INT32</td>
       <td>ND</td>
       <td>1维，(1)</td>
@@ -294,7 +296,7 @@ aclnnStatus aclnnAttentionWorkerCombine(
 - <term>Ascend 950PR&950DT系列产品</term>：tokenDtype支持0～4；为0或1时，expertScales类型为FLOAT；为2、3或4时，支持MXFP反量化，expertScales类型为FLOAT8_E8M0。
 <!-- end id8 -->
 
-- K ≤ 64。非量化场景下，expertScales为FLOAT类型，shape为(BS, K)；MXFP反量化场景下，expertScales为FLOAT8_E8M0类型，shape为(BS, K+1, S)，S为Ceil(hiddenSize/32)向上取整到偶数。
+- `R` 和 `H` 必须为正整数，`K` 的取值范围为 `[1, 64]`。
 - 确定性计算：
   - aclnnAttentionWorkerCombine默认确定性实现。
 
@@ -445,9 +447,10 @@ int main() {
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
   // 2. 构造输入与输出，需要根据API的接口自定义构造
-  int64_t BS = 48;       // batch size
-  int64_t K = 8;         // expert num per token
-  int64_t hiddenSize = 20480;
+  int64_t R = 48;       // token count
+  int64_t K = 8;         // routed experts per token
+  const int64_t expertRows = K + 1;  // includes the shared expert
+  int64_t H = 20480;
   int64_t tokenDtype = 1;    // BF16
   int64_t needSchedule = 0;
 
@@ -455,8 +458,8 @@ int main() {
   ScheduleContext scheduleContext = {};
   scheduleContext.common.session_num = 1;
   scheduleContext.common.micro_batch_num = 1;
-  scheduleContext.common.micro_batch_size = BS;
-  scheduleContext.common.selected_expert_num = K;
+  scheduleContext.common.micro_batch_size = R;
+  scheduleContext.common.selected_expert_num = expertRows;
   scheduleContext.common.expert_num = 16;
   scheduleContext.common.attn_to_ffn_token_size = 512;
   scheduleContext.common.ffn_to_attn_token_size = 512;
@@ -465,26 +468,26 @@ int main() {
   scheduleContext.attention.micro_batch_id = 0;
 
   // 初始化Attention token_info_buf（flag置1表示数据就绪）
-  size_t perDataDescSize = sizeof(AttentionDataDesc) + sizeof(int32_t) * BS * K;
+  size_t perDataDescSize = sizeof(AttentionDataDesc) + sizeof(int32_t) * R * expertRows;
   size_t tokenInfoBufSize = static_cast<size_t>(scheduleContext.common.micro_batch_num) * perDataDescSize;
   void* tokenInfoBuf = nullptr;
   ret = aclrtMalloc(&tokenInfoBuf, tokenInfoBufSize, ACL_MEM_MALLOC_HUGE_FIRST);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("malloc token info buf failed. ERROR: %d\n", ret); return ret);
   scheduleContext.attention.token_info_buf = reinterpret_cast<uint64_t>(tokenInfoBuf);
   scheduleContext.attention.token_info_buf_size = tokenInfoBufSize;
-  std::vector<int32_t> hostFlags(static_cast<size_t>(BS) * K, 1);
+  std::vector<int32_t> hostFlags(static_cast<size_t>(R) * expertRows, 1);
   ret = aclrtMemcpy(tokenInfoBuf, tokenInfoBufSize, hostFlags.data(),
-                    static_cast<size_t>(BS) * K * sizeof(int32_t), ACL_MEMCPY_HOST_TO_DEVICE);
+                    static_cast<size_t>(R) * expertRows * sizeof(int32_t), ACL_MEMCPY_HOST_TO_DEVICE);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("cpy token info buf failed. ERROR: %d\n", ret); return ret);
 
   // 初始化Attention token_data_buf
-  uint64_t tokenDataSize = static_cast<uint64_t>(BS) * K * hiddenSize * sizeof(int16_t);
+  uint64_t tokenDataSize = static_cast<uint64_t>(R) * expertRows * H * sizeof(int16_t);
   void* tokenDataBuf = nullptr;
   ret = aclrtMalloc(&tokenDataBuf, tokenDataSize, ACL_MEM_MALLOC_HUGE_FIRST);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("malloc token data buf failed. ERROR: %d\n", ret); return ret);
   scheduleContext.attention.token_data_buf = reinterpret_cast<uint64_t>(tokenDataBuf);
   scheduleContext.attention.token_data_buf_size = tokenDataSize;
-  std::vector<int16_t> hostTokenData(static_cast<size_t>(BS) * K * hiddenSize, 1);
+  std::vector<int16_t> hostTokenData(static_cast<size_t>(R) * expertRows * H, 1);
   ret = aclrtMemcpy(tokenDataBuf, tokenDataSize, hostTokenData.data(), tokenDataSize, ACL_MEMCPY_HOST_TO_DEVICE);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("cpy token data buf failed. ERROR: %d\n", ret); return ret);
 
@@ -498,9 +501,9 @@ int main() {
                         &scheduleContextRef);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-  // 创建expert_scales aclTensor, shape (BS, K)
-  std::vector<int64_t> expertScalesShape = {BS, K};
-  std::vector<float> hostExpertScales(static_cast<size_t>(BS) * K, 0.125f);
+  // 创建expert_scales aclTensor, shape (R, K)
+  std::vector<int64_t> expertScalesShape = {R, K};
+  std::vector<float> hostExpertScales(static_cast<size_t>(R) * K, 0.125f);
   void* expertScalesDeviceAddr = nullptr;
   aclTensor* expertScalesRef = nullptr;
   ret = CreateAclTensor(hostExpertScales, expertScalesShape, &expertScalesDeviceAddr, aclDataType::ACL_FLOAT,
@@ -515,8 +518,8 @@ int main() {
   ret = CreateAclTensor(hostLayerId, layerIdShape, &layerIdDeviceAddr, aclDataType::ACL_INT32, &layerIdRef);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-  // 创建输出y aclTensor, shape (BS, hiddenSize)
-  std::vector<int64_t> yShape = {BS, hiddenSize};
+  // 创建输出y aclTensor, shape (R, H)
+  std::vector<int64_t> yShape = {R, H};
   void* yDeviceAddr = nullptr;
   aclTensor* yRef = nullptr;
   ret = CreateAclTensorNoData(yShape, &yDeviceAddr, aclDataType::ACL_BF16, &yRef);
@@ -532,7 +535,7 @@ int main() {
   // 3. 调用CANN算子库API
   uint64_t workspaceSize = 0;
   aclOpExecutor* executor = nullptr;
-  ret = aclnnAttentionWorkerCombineGetWorkspaceSize(scheduleContextRef, expertScalesRef, layerIdRef, hiddenSize,
+  ret = aclnnAttentionWorkerCombineGetWorkspaceSize(scheduleContextRef, expertScalesRef, layerIdRef, H,
                                                     tokenDtype, needSchedule, yRef, nextLayerIdRef, &workspaceSize,
                                                     &executor);
   CHECK_RET(ret == ACL_SUCCESS,
