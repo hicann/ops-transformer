@@ -190,7 +190,7 @@ Returns `(out, final_state, chunk_states)`. Unrequested optional outputs are `No
 
 ## Determinism and Batch Consistency
 
-- Deterministic computation is not supported by default. The interface provides no bitwise determinism guarantee and does not integrate with `torch.use_deterministic_algorithms`.
+- Deterministic computation is supported by default.
 - Batch consistency is not supported by default. Changing the batch or sequence grouping can change scheduling; bitwise equality across batch compositions is not guaranteed.
 
 ## Examples

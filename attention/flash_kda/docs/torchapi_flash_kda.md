@@ -190,7 +190,7 @@ cann_ops_transformer.flash_kda(
 
 ## 确定性/Batch一致性
 
-- 确定性说明：默认不支持确定性计算。当前接口未提供逐比特一致的确定性保证，也未对接`torch.use_deterministic_algorithms`开关。
+- 确定性说明：默认支持确定性计算。
 - Batch一致性说明：默认不支持Batch一致性。修改批量或序列分组可能改变调度方式，不保证同一序列在不同批量组合下逐比特一致。
 
 ## 调用示例
