@@ -264,7 +264,7 @@ protected:
 private:
     enum class DequantMode : uint8_t {
         SYMMETRIC_PER_GROUP = 0,
-        ASYMMETRIC_PER_CHANNEL = 1,
+        PER_CHANNEL = 1,
     };
 
     bool CheckTensorLists() const;

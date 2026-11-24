@@ -24,6 +24,38 @@
 #include "../int4_weight_to_int8_preprocess.h"
 #include "../../grouped_matmul_utils.h"
 
+__aicore__ inline void InitS4S4DefaultPerTokenScale(GM_ADDR workspace, uint64_t count, AscendC::TPipe* pipe)
+{
+    if ASCEND_IS_AIV {
+        constexpr uint32_t TILE_ELEMENTS = 256;
+        const uint64_t firstOffset = static_cast<uint64_t>(AscendC::GetBlockIdx()) * TILE_ELEMENTS;
+        if (firstOffset >= count) {
+            return;
+        }
+        const uint64_t stride =
+            static_cast<uint64_t>(AscendC::GetBlockNum()) * AscendC::GetTaskRation() * TILE_ELEMENTS;
+        AscendC::GlobalTensor<float> scaleGm;
+        scaleGm.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(workspace), count);
+        AscendC::TQue<AscendC::QuePosition::VECOUT, 1> queue;
+        pipe->InitBuffer(queue, 1, TILE_ELEMENTS * sizeof(float));
+        auto ones = queue.AllocTensor<float>();
+        AscendC::Duplicate(ones, 1.0f, TILE_ELEMENTS);
+        queue.EnQue(ones);
+        ones = queue.DeQue<float>();
+        for (uint64_t offset = firstOffset; offset < count; offset += stride) {
+            const uint64_t remaining = count - offset;
+            const uint32_t elements = remaining < TILE_ELEMENTS ? static_cast<uint32_t>(remaining) : TILE_ELEMENTS;
+            // The workspace holds exactly count floats, so copy only the valid tail bytes.
+            const AscendC::DataCopyExtParams copyParams{1, elements * static_cast<uint32_t>(sizeof(float)), 0, 0, 0};
+            AscendC::DataCopyPad(scaleGm[offset], ones, copyParams);
+        }
+        const auto event = pipe->FetchEventID(AscendC::HardEvent::MTE3_S);
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_S>(event);
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_S>(event);
+        queue.FreeTensor(ones);
+    }
+}
+
 template <class xType, class wType, class biasType, class scaleType, class ptScaleType, class yType, class xLayout,
           class wLayout, class yLayout, class l0cType>
 __aicore__ inline void GmmS4S4Kernel(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM_ADDR scale, GM_ADDR groupList,
@@ -131,6 +163,9 @@ __aicore__ inline void GmmS4S4Kernel(GM_ADDR x, GM_ADDR weight, GM_ADDR bias, GM
         weightPreprocess(weightPreprocessParams, que);
         XPreprocess xPreprocess;
         xPreprocess(xPreprocessParams, que);
+        if (gmmBaseParams->isPerTokenQuant == 0U) {
+            InitS4S4DefaultPerTokenScale(perTokenScaleFillWsAddr, gmmBaseParams->m, que);
+        }
         AscendC::SyncAll<false>();
         que->Reset();
     }

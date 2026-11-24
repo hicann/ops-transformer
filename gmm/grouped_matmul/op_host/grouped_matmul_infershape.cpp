@@ -485,34 +485,10 @@ static bool IsS8S4PseudoQuant(const gert::InferShapeContext* context)
            scaleDesc->GetDataType() == DT_UINT64;
 }
 
-static bool IsS8S4SpecialWeightFormat(const gert::InferShapeContext* context)
+// Special ENK-NZ changes physical storage only; logical weight axes remain EKN.
+static GMMWeightAxisInfo GetWeightAxisInfo(size_t weightDimNum, bool transposeWeight)
 {
-    const auto& platformInfo = GetGmmPlatformCache();
-    const auto ret = platformInfo.ret;
-    if (ret != GRAPH_SUCCESS || !IsGmmDavidSupportSoc(platformInfo.shortSocVersion)) {
-        return false;
-    }
-    if (!IsS8S4PseudoQuant(context)) {
-        return false;
-    }
-    const auto attrs = context->GetAttrs();
-    if (attrs == nullptr) {
-        return false;
-    }
-    const auto tuningConfigPtr =
-        attrs->GetAttrPointer<gert::TypedContinuousVector<int64_t>>(GMM_INDEX_ATTR_TUNING_CONFIG);
-    if (tuningConfigPtr == nullptr || tuningConfigPtr->GetSize() <= 1) {
-        return false;
-    }
-    const auto tuningConfig = tuningConfigPtr->GetData();
-    return tuningConfig[1] == 1;
-}
-
-static GMMWeightAxisInfo GetWeightAxisInfo(const gert::InferShapeContext* context, size_t weightDimNum,
-                                           bool transposeWeight)
-{
-    const bool logicalTransposeWeight = transposeWeight || IsS8S4SpecialWeightFormat(context);
-    return {weightDimNum - (logicalTransposeWeight ? 1UL : 2UL), weightDimNum - (logicalTransposeWeight ? 2UL : 1UL)};
+    return {weightDimNum - (transposeWeight ? 1UL : 2UL), weightDimNum - (transposeWeight ? 2UL : 1UL)};
 }
 
 static ge::graphStatus IsGmmAntiQuantEmpty(gert::InferShapeContext* context)
@@ -663,7 +639,7 @@ static ge::graphStatus CheckOptionalTensorList(gert::InferShapeContext* context,
     const int64_t& groupType = gmmAttrs.groupType;
     auto shape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, shape);
-    const auto weightAxis = GetWeightAxisInfo(context, shape->GetDimNum(), gmmAttrs.transposeWeight);
+    const auto weightAxis = GetWeightAxisInfo(shape->GetDimNum(), gmmAttrs.transposeWeight);
     uint64_t weightNDimIdx = weightAxis.n;
     auto tensor0Shape = context->GetDynamicInputShape(nodeIdx, 0);
     // tensorList size should equals with weight's size
@@ -834,7 +810,7 @@ static bool isA8W4AsymmetricQuant(const gert::InferShapeContext* context)
     if (weightShape->GetDimNum() < GMM_MIN_WEIGHT_DIM) {
         return false;
     }
-    const auto weightAxis = GetWeightAxisInfo(context, weightShape->GetDimNum(), false);
+    const auto weightAxis = GetWeightAxisInfo(weightShape->GetDimNum(), false);
     auto scaleShape = context->GetDynamicInputShape(GMM_INDEX_IN_SCALE, 0);
     if (scaleShape == nullptr || scaleShape->GetDimNum() != GMM_A8W4_OFFSET_DIM_NUM) {
         return false;
@@ -863,7 +839,7 @@ static ge::graphStatus CheckA8W4AsymQuantParams(gert::InferShapeContext* context
     size_t scaleDimNum = scaleShape->GetDimNum();
     int64_t e = weightShape->GetDim(0);
     int64_t k = xShape->GetDim(1);
-    const auto weightAxis = GetWeightAxisInfo(context, weightShape->GetDimNum(), false);
+    const auto weightAxis = GetWeightAxisInfo(weightShape->GetDimNum(), false);
     int64_t n = weightShape->GetDim(weightAxis.n);
     OP_CHECK_IF(
         IsGmmAntiQuantEmpty(context) != GRAPH_SUCCESS,
@@ -1471,17 +1447,14 @@ static ge::graphStatus SplitMSingleXSingleWeightSingleY(gert::InferShapeContext*
     int64_t innerAxisDimId = 1; // x always is not transposed, check K axis
     auto weightShape = context->GetDynamicInputShape(GMM_INDEX_IN_WEIGHT, 0);
     OP_CHECK_NULL_WITH_CONTEXT(context, weightShape);
-    const bool specialWeightFormat = IsS8S4SpecialWeightFormat(context);
-    const auto weightAxis = GetWeightAxisInfo(context, weightShape->GetDimNum(), transposeWeight);
+    const auto weightAxis = GetWeightAxisInfo(weightShape->GetDimNum(), transposeWeight);
     size_t kAxisOfWeight = weightAxis.k;
     OP_CHECK_IF(CheckShapeSameLengthTensorList(context, {1, kAxisOfWeight}, innerAxisDimId, tenorXAndWeight,
                                                paramsInfo.numX) != GRAPH_SUCCESS,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "weight",
                                                          "k dim value of x and weight is not matched"),
                 return GRAPH_FAILED);
-    innerAxisDimId = specialWeightFormat ?
-                         static_cast<int64_t>(weightAxis.n) :
-                         (!transposeWeight ? 2 : -1); // 非转置时 weight 内轴 N 位于第 3 维（索引 2），转置时置 -1 跳过
+    innerAxisDimId = !transposeWeight ? 2 : -1; // Skip the inner-axis limit for transposed weights.
     OP_CHECK_IF(
         CheckInnerAxisOfTensorList(context, GMM_INDEX_IN_WEIGHT, innerAxisDimId, paramsInfo.numWeight, "weight") !=
             GRAPH_SUCCESS,
@@ -1490,8 +1463,7 @@ static ge::graphStatus SplitMSingleXSingleWeightSingleY(gert::InferShapeContext*
             Ops::Transformer::Gmm::FormatString("inner axis size of weight is larger than %ld", GMM_MAX_INNER_AXIS)
                 .c_str()),
         return GRAPH_FAILED);
-    const int64_t weightInnerAxis = specialWeightFormat ? static_cast<int64_t>(weightAxis.n) : 2;
-    OP_CHECK_IF(CheckWeightShapeInnerAxisEven(context, paramsInfo.numWeight, weightInnerAxis) != GRAPH_SUCCESS,
+    OP_CHECK_IF(CheckWeightShapeInnerAxisEven(context, paramsInfo.numWeight, 2) != GRAPH_SUCCESS,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "weight",
                                                          "weight's N axis size should be even when it is int4 dtype"),
                 return GRAPH_FAILED);
@@ -2087,7 +2059,7 @@ static ge::graphStatus ComputeAndSetOutputShape(gert::InferShapeContext* context
     bool isSingleX = (numX == 1UL) && (gmmAttrs.groupType != GMM_NO_SPLIT);
     bool isSingleY = (numY == 1UL) && (gmmAttrs.groupType != GMM_NO_SPLIT);
     size_t xDimM = gmmAttrs.transposeX ? xDimNum - 1UL : xDimNum - 2UL;
-    size_t weightDimN = GetWeightAxisInfo(context, weightDimNum, gmmAttrs.transposeWeight).n;
+    size_t weightDimN = GetWeightAxisInfo(weightDimNum, gmmAttrs.transposeWeight).n;
 
     GMMSetOutputParams outputParams;
     outputParams.isSingleX = isSingleX;

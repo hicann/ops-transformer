@@ -125,9 +125,7 @@ gert::TilingContextPara MakeContext(const S8S4Case& param, optiling::GMMCompileI
         std::to_string(compileInfo->l0ASize) + R"(,"L0B_SIZE":)" + std::to_string(compileInfo->l0BSize) +
         R"(,"L0C_SIZE":)" + std::to_string(compileInfo->l0CSize) + R"(,"CORE_NUM":)" +
         std::to_string(compileInfo->aicNum) + R"(,"socVersion":"3510"}})";
-    std::vector<int64_t> weightOriginShape = param.specialWeightFormat ?
-                                                 std::vector<int64_t>{param.groupNum, param.n, param.k} :
-                                                 std::vector<int64_t>{param.groupNum, param.k, param.n};
+    std::vector<int64_t> weightOriginShape = {param.groupNum, param.k, param.n};
     std::vector<int64_t> weightStorageShape = weightOriginShape;
     if (param.weightFormat == ge::FORMAT_FRACTAL_NZ) {
         weightStorageShape =
@@ -671,7 +669,7 @@ TEST(GroupedS8S4BasicApiArch35Tiling, RejectsMalformedPackedInt32StorageShape)
     EXPECT_FALSE(ExecuteS8S4Tiling(param, tilingInfo));
 }
 
-TEST(GroupedS8S4BasicApiArch35Tiling, RejectsSpecialEnkNzWithoutOffset)
+TEST(GroupedS8S4BasicApiArch35Tiling, RejectsSpecialEnkNzWithPergroupScale)
 {
     S8S4Case param;
     param.k = 2048;
@@ -691,7 +689,7 @@ TEST(GroupedS8S4BasicApiArch35Tiling, PerchannelSpecialEnkUsesStandardW8NzWorksp
     param.k = 2050;
     param.n = 2040;
     param.scaleGroupNum = 1;
-    param.hasOffset = true;
+    param.hasOffset = false;
     param.outDtype = ge::DT_FLOAT16;
     param.weightFormat = ge::FORMAT_FRACTAL_NZ;
     param.specialWeightFormat = true;
@@ -703,6 +701,8 @@ TEST(GroupedS8S4BasicApiArch35Tiling, PerchannelSpecialEnkUsesStandardW8NzWorksp
     const auto* tilingData = GetTilingData(tilingInfo);
     ASSERT_NE(tilingData, nullptr);
     EXPECT_EQ(tilingData->s8s4Params.specialWeightFormat, 1U);
+    EXPECT_EQ(tilingData->s8s4Params.hasOffset, 0U);
+    EXPECT_EQ(tilingData->s8s4Params.quantGroupNum, 1U);
     auto compileInfo = MakeCompileInfo();
     const auto context = MakeContext(param, &compileInfo);
     const auto& storageShape = context.inputTensorDesc_[1].shape_.GetStorageShape();
@@ -876,3 +876,34 @@ TEST(GroupedS8S4BasicApiArch35Tiling, RejectsMultiOutputTensorList)
     EXPECT_FALSE(ExecuteS8S4Tiling(param, tilingInfo));
 }
 } // namespace
+
+TEST(GroupedS8S4BasicApiArch35Tiling, RejectsNormalNzStorageForSpecialEknView)
+{
+    S8S4Case param;
+    param.weightFormat = ge::FORMAT_FRACTAL_NZ;
+    param.outDtype = ge::DT_FLOAT16;
+    param.hasOffset = false;
+    param.scaleGroupNum = 1;
+    param.tuningConfig = {0, 1};
+    param.specialWeightFormat = true;
+
+    TilingInfo validTilingInfo;
+    ASSERT_TRUE(ExecuteS8S4Tiling(param, validTilingInfo));
+    // Keep the logical EKN view, but deliberately provide ordinary EKN-NZ blocks.
+    param.specialWeightFormat = false;
+    TilingInfo invalidTilingInfo;
+    EXPECT_FALSE(ExecuteS8S4Tiling(param, invalidTilingInfo));
+}
+
+TEST(GroupedS8S4BasicApiArch35Tiling, RejectsSpecialEnkNzWithOffset)
+{
+    S8S4Case param;
+    param.hasOffset = true;
+    param.scaleGroupNum = 1;
+    param.outDtype = ge::DT_FLOAT16;
+    param.weightFormat = ge::FORMAT_FRACTAL_NZ;
+    param.specialWeightFormat = true;
+    param.tuningConfig = {0, 1};
+    TilingInfo tilingInfo;
+    EXPECT_FALSE(ExecuteS8S4Tiling(param, tilingInfo));
+}

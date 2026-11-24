@@ -588,7 +588,7 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
         - 要求N为8的整数倍。
         - 不支持使能tuningConfigOptional第二位。
 
-      - tuningConfigOptional数组第二个元素可置1，以开启S8S4（A8W4）场景的weight特殊格式模板，仅支持perchannel量化。此时weight须按`[E,N,K]`排布后进行ND2NZ转换，再作为算子输入。性能优势的shape范围参考：K >= 2048且N >= 2048。
+      - tuningConfigOptional数组第二个元素可置1，以开启S8S4（A8W4）场景的weight特殊格式模板，仅支持perchannel量化。此时weight的物理数据须按`[E,N,K]`排布后进行ND2NZ转换，输入tensor的逻辑shape仍须为`[E,K,N]`（仅调整view，不再次转置数据）。性能优势的shape范围参考：K >= 2048且N >= 2048。
 
     - 伪量化场景下，若weight的类型为INT8，仅支持perchannel模式；若weight的类型为INT4，对称量化支持perchannel和pergroup两种模式。若为pergroup，pergroup数G或$G_i$必须要能整除对应的$k_i$。若weight为多tensor，定义pergroup长度$s_i = k_i / G_i$，要求所有$s_i(i=1,2,...g)$都相等。非对称量化支持perchannel模式。
 
@@ -651,7 +651,8 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
 
     | offsetOptional | 子场景 | scaleOptional shape | offsetOptional shape |
     |:---:|:---|:---|:---|
-    | null | pergroup 与 perchannel 离线融合 | `[E, K/256, N]` | - |
+    | null | 普通模板：pergroup与perchannel离线融合 | `[E, K/256, N]` | - |
+    | null | 特殊ENK-NZ模板：perchannel | `[E, 1, N]` | - |
     | 非空 | <abbr title="简称C量化，量化对象是右矩阵，每个channel分别使用独立的量化参数">perchannel</abbr> | `[E, 1, N]` | `[E, 1, N]`（FLOAT32） |
 
     - **约束说明**：
@@ -674,11 +675,11 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
 
       - biasOptional为必选输入，是INT4权重离线转换的校正量，按`8 × weight × scale`沿K轴规约得到。
       - 当weight传入数据类型为INT32时，会将每个INT32视为8个INT4。
-      - offsetOptional为空时，K不大于18432且必须是256的整数倍。
+      - 普通模板的offsetOptional为空时，K不大于18432且必须是256的整数倍；特殊ENK-NZ模板使用perchannel，scale为`[E,1,N]`、quantGroupSize为0。
 
     - tuningConfigOptional：可选调优参数。如不使用，传入nullptr即可。
       - 第一个元素（下标0）：支持0和正整数，取值范围为`[0, min(M, UINT32_MAX)]`，其中M为输入x的行数。0表示不指定预期值，正整数表示各个专家处理的token数的预期值，例如128表示预期每个专家处理128个token（要求M不小于128）。当前S8S4实现仅校验并保存该值，暂不参与实际调优计算。
-      - 第二个元素（下标1）：仅支持0或1，其他值不支持。设为0或不提供该元素时，不开启weight特殊格式，weight按常规`[E,K,N]`逻辑布局解析；设为1时，开启weight特殊格式，仅支持offsetOptional不为空的perchannel场景，weight须按`[E,N,K]`排布后转换为NZ，且weight TensorList长度为1。
+      - 第二个元素（下标1）：仅支持0或1，其他值不支持。设为0或不提供该元素时，不开启weight特殊格式，weight按常规`[E,K,N]`逻辑布局解析；设为1时，开启weight特殊格式，仅支持offsetOptional为nullptr的perchannel场景；offset非空时不支持开启第二位，weight的物理数据须按`[E,N,K]`排布后转换为NZ，输入tensor的逻辑shape仍为`[E,K,N]`，且weight TensorList长度为1。
       - 例如，传入`[0, 1]`表示不指定预期token数，并开启weight特殊格式。详见[S8S4场景约束](#ascend950-weightnz-s8s4场景约束)。
 
     **其他伪量化场景：**

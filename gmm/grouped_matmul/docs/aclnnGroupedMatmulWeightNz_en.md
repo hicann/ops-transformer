@@ -637,33 +637,40 @@ aclnnStatus aclnnGroupedMatmulWeightNz(
       |0|INT8|INT4|FLOAT|UINT64|null|FLOAT|INT64|BFLOAT16|
       |0|INT8|INT4|FLOAT|UINT64|FLOAT/null|FLOAT|INT64|FLOAT16|
 
-    - scaleOptional and offsetOptional must satisfy the following table (where E is the number of groups):
+    - scaleOptional and offsetOptional shapes (where E is the number of groups):
 
-      | Sub-Scenario | offsetOptional | scaleOptional shape | offsetOptional shape | quantGroupSize | out |
-      |:---:|:---:|:---:|:---:|:---:|:---:|
-      | Symmetric per-group | null | `[E, K/256, N]` | - | 256 | FLOAT16/BFLOAT16 |
-      | Asymmetric per-channel | FLOAT32 | `[E, 1, N]` | `[E, 1, N]` | 0 | FLOAT16 |
+      | offsetOptional | Sub-Scenario | scaleOptional shape | offsetOptional shape |
+      |:---:|:---|:---|:---|
+      | null | Ordinary template: offline fusion of per-group and per-channel quantization | `[E, K/256, N]` | - |
+      | null | Special ENK-NZ template: per-channel quantization | `[E, 1, N]` | - |
+      | Non-empty | Per-channel quantization | `[E, 1, N]` | `[E, 1, N]` (FLOAT32) |
 
     - Constraints:
 
       In addition to the common constraints, the other constraints of the S8S4 use case are as follows:
 
-      |groupType| splitItem | actType | groupListType |
+      | groupType | splitItem | actType | groupListType |
       |:---:|:---:|:---:|:---|
-      |0|2/3|0|1 (count)|
+      | 0 (grouping along the M axis) | 2/3 | 0 | 1 (count) |
+
+      - Currently, x, weight, biasOptional, scaleOptional, perTokenScaleOptional, and out must all be TensorLists of length 1. If offsetOptional is non-empty, its TensorList must also have length 1 (this requirement is omitted from the following table).
 
       | Input/Output | Sub-Scenario | Shape Constraint |
       |:---:|:---|:---|
       | x | single Tensor | 2D, shape `[M,K]`; does not support transposition. |
-      | weight | single Tensor | 3D, shape `[E,K,N]`; does not support transposition. |
-      | biasOptional | Required input | 2D, shape `[E,N]`, data type FLOAT32. |
+      | weight | single Tensor | 3D, default logical shape `[E,K,N]`; must be in NZ format; does not support transposition. |
+      | biasOptional | Required input | 2D, shape `[E,N]`. |
       | perTokenScaleOptional | single Tensor | 1D, shape `[M]`. |
       | out | single Tensor | - |
 
-      - x, weight, scaleOptional, biasOptional, perTokenScaleOptional, and out are all TensorLists of length 1.
       - biasOptional is a required input and is the correction value for offline conversion of INT4 weights. It is obtained by reducing `8 × weight × scale` along the K axis.
-      - In symmetric per-group scenarios, K must not be greater than 18432 and must be an integer multiple of 256.
-      - In the S8S4 per-channel scenario where offsetOptional is not empty, the second element of the tuningConfigOptional array can be set to 1. In this case, weight must be laid out in the `[E,N,K]` layout and converted to NZ. Only a weight TensorList of length 1 is supported.
+      - When weight is passed as INT32, each INT32 is interpreted as eight INT4 values.
+      - For the ordinary template with an empty offsetOptional, K must not be greater than 18432 and must be an integer multiple of 256. The special ENK-NZ template uses per-channel quantization, with scale shape `[E,1,N]` and quantGroupSize set to 0.
+
+    - tuningConfigOptional: Optional tuning parameters. Pass nullptr if not used.
+      - First element (index 0): Supports 0 and positive integers in the range `[0, min(M, UINT32_MAX)]`, where M is the number of rows in input x. A value of 0 means that no expected token count is specified. A positive value specifies the expected number of tokens processed by each expert. For example, 128 means that each expert is expected to process 128 tokens (M must be at least 128). The current S8S4 implementation only validates and stores this value; it does not yet use it for actual tuning.
+      - Second element (index 1): Only 0 and 1 are supported. If set to 0 or omitted, the special weight format is disabled, and weight is interpreted using the ordinary logical layout `[E,K,N]`. If set to 1, the special weight format is enabled only for per-channel scenarios where offsetOptional is nullptr. This element cannot be enabled when offset is non-empty. The physical weight data must be laid out as `[E,N,K]` and converted to NZ, while the input tensor retains logical shape `[E,K,N]`. The weight TensorList must have length 1.
+      - For example, `[0, 1]` specifies no expected token count and enables the special weight format. For details, see [S8S4 use case constraints](#ascend950-weightnz-s8s4-scenario-constraints).
 
     **Other pseudo-quantization scenarios:**
     - The following input parameters are empty: offsetOptional, antiquantOffsetOptional, activationInputOptional, activationQuantScaleOptional, activationQuantOffsetOptional, activationFeatureOutOptional

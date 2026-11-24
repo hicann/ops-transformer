@@ -3321,8 +3321,14 @@ static aclnnStatus PrepareGmmParams(gmm::GroupedMatmulParams& gmmParams, const a
             }
         }
     }
+    const auto* perTokenScaleInput = gmmParams.perTokenScaleOptional;
     ResetEmptyTensor(gmmParams); // make empty tensor/tensorList nullptr
-    CHECK_RET_CODE(CheckParam(gmmParams, opName), "CheckParam failed.");
+    auto checkerParams = gmmParams;
+    if (IsS8S4PseudoQuantDataFlow(gmmParams)) {
+        // Preserve the required S8S4 scale descriptor for validation, including empty tensors.
+        checkerParams.perTokenScaleOptional = perTokenScaleInput;
+    }
+    CHECK_RET_CODE(CheckParam(checkerParams, opName), "CheckParam failed.");
     gmmParams.splitItem = CorrectSplitItem(x, y, splitItem);
     return ACLNN_SUCCESS;
 }
@@ -3564,10 +3570,15 @@ aclnnStatus aclnnGroupedMatmulWeightNzGetWorkspaceSize(
             const op::Shape& offsetShape = (*offsetOptional)[0]->GetViewShape();
             hasOffset = !(offsetShape.GetDimNum() == 1 && offsetShape.GetDim(0) == 0);
         }
-        CHECK_COND((hasOffset && quantGroupSize == 0) || (!hasOffset && quantGroupSize == QUANT_GROUP_SIZE_S8S4),
+        const bool specialWeightFormat =
+            tuningConfigOptional != nullptr && tuningConfigOptional->Size() > 1 && (*tuningConfigOptional)[1] == 1;
+        CHECK_COND(!specialWeightFormat || offsetOptional == nullptr, ACLNN_ERR_PARAM_INVALID,
+                   "In S8S4, tuningConfig[1]=1 requires offsetOptional=nullptr.");
+        CHECK_COND(specialWeightFormat || (hasOffset && quantGroupSize == 0) ||
+                       (!hasOffset && quantGroupSize == QUANT_GROUP_SIZE_S8S4),
                    ACLNN_ERR_PARAM_INVALID,
                    "In op [%s], when S8S4 quant through the WeightNz interface, quantGroupSize must be 0 for "
-                   "per-channel offset mode or 256 for symmetric per-group mode.",
+                   "ordinary per-channel offset mode or 256 for ordinary symmetric per-group mode.",
                    opName);
     }
     // aclnnGroupedMatmulWeightNz dont support split K dim.

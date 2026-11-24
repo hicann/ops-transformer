@@ -30,6 +30,8 @@ static constexpr size_t S8S4_WEIGHT_DIM_NUM = 3UL;
 static constexpr size_t S8S4_OFFSET_DIM_NUM = 3UL;
 static constexpr size_t S8S4_WEIGHT_K_DIM = 1UL;
 static constexpr size_t S8S4_WEIGHT_N_DIM = 2UL;
+static constexpr int64_t S8S4_SPECIAL_NZ_K_BLOCK = 32L;
+static constexpr int64_t S8S4_SPECIAL_NZ_N_BLOCK = 16L;
 static constexpr size_t TUNING_CONFIG_WEIGHT_FORMAT_INDEX = 1UL;
 static constexpr int64_t TUNING_CONFIG_SPECIAL_WEIGHT_FORMAT = 1L;
 static constexpr int64_t GROUP_LIST_COUNT = 1L;
@@ -179,17 +181,19 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckS8S4ScaleShape() c
                "In op [%s], when S8S4, x, weight and out shapes must be [M,K], [E,K,N] and [M,N].", GetAclnnName());
 
     const bool specialWeightFormat = IsS8S4SpecialWeightFormat();
-    CHECK_COND(!specialWeightFormat || IsS8S4AsymmetricQuant(), ACLNN_ERR_PARAM_INVALID,
-               "In op [%s], the S8S4 special ENK-NZ template requires non-null offset per-channel mode.",
-               GetAclnnName());
+    CHECK_COND(!specialWeightFormat || gmmParams_.offsetOptional == nullptr, ACLNN_ERR_PARAM_INVALID,
+               "In op [%s], the S8S4 special ENK-NZ template requires null offset per-channel mode.", GetAclnnName());
     const int64_t e = weightShape.GetDim(0);
-    const int64_t k = weightShape.GetDim(specialWeightFormat ? S8S4_WEIGHT_N_DIM : S8S4_WEIGHT_K_DIM);
-    const int64_t n = weightShape.GetDim(specialWeightFormat ? S8S4_WEIGHT_K_DIM : S8S4_WEIGHT_N_DIM);
+    const int64_t k = weightShape.GetDim(S8S4_WEIGHT_K_DIM);
+    const int64_t n = weightShape.GetDim(S8S4_WEIGHT_N_DIM);
     const int64_t m = xShape.GetDim(0);
-    CHECK_COND(m > 0 && e > 0 && k > 0 && n > 0 && xShape.GetDim(S8S4_WEIGHT_K_DIM) == k && outShape.GetDim(0) == m &&
-                   outShape.GetDim(S8S4_WEIGHT_K_DIM) == n,
-               ACLNN_ERR_PARAM_INVALID, "In op [%s], when S8S4, M, E, K and N must be positive and compatible.",
+    CHECK_COND(m >= 0 && e > 0 && k >= 0 && n >= 0 && xShape.GetDim(S8S4_WEIGHT_K_DIM) == k &&
+                   outShape.GetDim(0) == m && outShape.GetDim(S8S4_WEIGHT_K_DIM) == n,
+               ACLNN_ERR_PARAM_INVALID,
+               "In op [%s], when S8S4, E must be positive; M, K and N must be nonnegative and compatible.",
                GetAclnnName());
+    CHECK_COND(m == 0 || n == 0 || k > 0, ACLNN_ERR_PARAM_INVALID,
+               "In op [%s], S8S4 split-M requires K to be positive when M and N are nonzero.", GetAclnnName());
 
     const op::Shape& scaleShape = scale->GetViewShape();
     const op::Shape& perTokenScaleShape = perTokenScale->GetViewShape();
@@ -199,7 +203,17 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckS8S4ScaleShape() c
                    scaleShape.GetDim(S8S4_WEIGHT_N_DIM) == n,
                ACLNN_ERR_PARAM_INVALID, "In op [%s], when S8S4, scale shape must be [E,Q,N].", GetAclnnName());
 
-    if (IsS8S4AsymmetricQuant()) {
+    if (specialWeightFormat) {
+        CHECK_COND(scaleShape.GetDim(S8S4_WEIGHT_K_DIM) == 1, ACLNN_ERR_PARAM_INVALID,
+                   "In op [%s], special S8S4 scale shape must be [E,1,N].", GetAclnnName());
+        // WeightNz has already normalized packed INT32 NZ descriptors to INT4.
+        const int64_t kBlocks = k / S8S4_SPECIAL_NZ_K_BLOCK + (k % S8S4_SPECIAL_NZ_K_BLOCK != 0);
+        const int64_t nBlocks = n / S8S4_SPECIAL_NZ_N_BLOCK + (n % S8S4_SPECIAL_NZ_N_BLOCK != 0);
+        const op::Shape expectedStorageShape{e, kBlocks, nBlocks, S8S4_SPECIAL_NZ_N_BLOCK, S8S4_SPECIAL_NZ_K_BLOCK};
+        CHECK_COND(weight->GetStorageShape() == expectedStorageShape, ACLNN_ERR_PARAM_INVALID,
+                   "In op [%s], special S8S4 weight storage shape must be [E,ceil(K/32),ceil(N/16),16,32].",
+                   GetAclnnName());
+    } else if (IsS8S4AsymmetricQuant()) {
         const aclTensor* offset = (*gmmParams_.offsetOptional)[0];
         const op::Shape& offsetShape = offset->GetViewShape();
         CHECK_COND(offsetShape.GetDimNum() == S8S4_OFFSET_DIM_NUM && offsetShape.GetDim(0) == e &&
@@ -347,7 +361,7 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckNDimConsistency(
     const AclnnGroupedMatmulWeightQuantDAV3510Checker& checker, const op::Shape& tensorShape,
     const op::Shape& weightShape, size_t tensorDimNum, const std::string& tensorType)
 {
-    uint64_t weightNDimIdx = checker.IsS8S4SpecialWeightFormat() ? S8S4_WEIGHT_K_DIM : weightShape.GetDimNum() - 1;
+    uint64_t weightNDimIdx = weightShape.GetDimNum() - 1;
     int64_t weightNDimValue = weightShape.GetDim(weightNDimIdx);
     int64_t tensorNDimValue;
     if ((checker.IsMxA8W4NZ() || checker.IsMxA8HiF4()) &&
@@ -679,13 +693,13 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckDimMatching(size_t
         return ACLNN_ERR_PARAM_INVALID;
     }
     size_t weightKDim = 0;
-    const size_t weightKPosFromEnd = IsS8S4SpecialWeightFormat() ? 1 : 2;
+    const size_t weightKPosFromEnd = 2;
     if (unlikely(GetDimFromEnd((*gmmParams_.weight)[wIdx], weightKPosFromEnd, weightKDim,
                                "weight[" + std::to_string(wIdx) + "]") != ACLNN_SUCCESS)) {
         return ACLNN_ERR_PARAM_INVALID;
     }
     size_t weightNDim = 0;
-    const size_t weightNPosFromEnd = IsS8S4SpecialWeightFormat() ? 2 : 1;
+    const size_t weightNPosFromEnd = 1;
     if (unlikely(GetDimFromEnd((*gmmParams_.weight)[wIdx], weightNPosFromEnd, weightNDim,
                                "weight[" + std::to_string(wIdx) + "]") != ACLNN_SUCCESS)) {
         return ACLNN_ERR_PARAM_INVALID;
@@ -1140,12 +1154,19 @@ aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckUnsupportedApi() c
 
 aclnnStatus AclnnGroupedMatmulWeightQuantDAV3510Checker::CheckS8S4GroupSize(size_t idx) const
 {
-    if (!IsS8S4AsymmetricQuant()) {
+    if (!IsS8S4AsymmetricQuant() && !IsS8S4SpecialWeightFormat()) {
         const op::Shape& weightShape = (*gmmParams_.weight)[idx]->GetViewShape();
         const op::Shape& scaleShape = (*gmmParams_.scaleOptional)[idx]->GetViewShape();
-        const size_t weightKDim = IsS8S4SpecialWeightFormat() ? S8S4_WEIGHT_N_DIM : S8S4_WEIGHT_K_DIM;
+        const size_t weightKDim = S8S4_WEIGHT_K_DIM;
         const int64_t kSize = weightShape.GetDim(weightKDim);
         const int64_t groupNum = scaleShape.GetDim(S8S4_WEIGHT_K_DIM);
+        if (kSize == 0) {
+            const int64_t m = (*gmmParams_.x)[0]->GetViewShape().GetDim(0);
+            const int64_t n = weightShape.GetDim(S8S4_WEIGHT_N_DIM);
+            CHECK_COND((m == 0 || n == 0) && groupNum == 0, ACLNN_ERR_PARAM_INVALID,
+                       "In op [%s], S8S4 K=0 requires an empty output and scale group number 0.", GetAclnnName());
+            return ACLNN_SUCCESS;
+        }
         CHECK_COND(groupNum > 0 && kSize % groupNum == 0, ACLNN_ERR_PARAM_INVALID,
                    "In op [%s], when per-group S8S4, K must be divisible by scale group number.", GetAclnnName());
         const int64_t groupSize = kSize / groupNum;

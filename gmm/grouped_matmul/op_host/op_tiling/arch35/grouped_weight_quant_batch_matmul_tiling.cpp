@@ -2286,7 +2286,7 @@ bool GroupedS8S4BasicApiTiling::AnalyzeBiasAndOffset()
         OP_CHECK_IF(offsetDesc == nullptr || offsetDesc->GetDataType() != ge::DT_FLOAT,
                     OP_LOGE(context_->GetNodeName(), "Asymmetric S8S4 BasicApi expects offset FLOAT."), return false);
     }
-    dequantMode_ = hasOffset_ ? DequantMode::ASYMMETRIC_PER_CHANNEL : DequantMode::SYMMETRIC_PER_GROUP;
+    dequantMode_ = hasOffset_ ? DequantMode::PER_CHANNEL : DequantMode::SYMMETRIC_PER_GROUP;
     OP_CHECK_IF(hasOffset_ && inputParams_.cDtype == ge::DT_BF16,
                 OP_LOGE(context_->GetNodeName(), "BF16 S8S4 BasicApi does not support a non-null offset."),
                 return false);
@@ -2345,6 +2345,8 @@ bool GroupedS8S4BasicApiTiling::AnalyzeAttrs()
                 tuningConfig[TUNING_CONFIG_WEIGHT_FORMAT_INDEX] == TUNING_CONFIG_SPECIAL_WEIGHT_FORMAT;
         }
     }
+    // Special ENK-NZ uses one scale per channel even without an offset.
+    dequantMode_ = (specialWeightFormat_ || hasOffset_) ? DequantMode::PER_CHANNEL : DequantMode::SYMMETRIC_PER_GROUP;
     inputParams_.isSingleX = context_->GetDynamicInputDesc(X_INDEX, 1) == nullptr;
     inputParams_.isSingleW = context_->GetDynamicInputDesc(WEIGHT_INDEX, 1) == nullptr;
     inputParams_.isSingleY = inputParams_.splitItem == X_SEPARATED || inputParams_.splitItem == NO_SEPARATED;
@@ -2357,8 +2359,8 @@ bool GroupedS8S4BasicApiTiling::AnalyzeAttrs()
                 OP_LOGE(context_->GetNodeName(), "tuningConfig[1]=1 expects [E,N,K] weight converted to FRACTAL_NZ."),
                 return false);
     OP_CHECK_IF(
-        specialWeightFormat_ && !hasOffset_,
-        OP_LOGE(context_->GetNodeName(), "tuningConfig[1]=1 is supported only by non-null offset per-channel mode."),
+        specialWeightFormat_ && hasOffset_,
+        OP_LOGE(context_->GetNodeName(), "tuningConfig[1]=1 is supported only by null offset per-channel mode."),
         return false);
     return true;
 }
@@ -2415,9 +2417,10 @@ bool GroupedS8S4BasicApiTiling::SetLogicalMKN(const gert::Shape& xShape, const g
     OP_CHECK_IF(static_cast<uint64_t>(outShape.GetDim(0)) != inputParams_.mSize,
                 OP_LOGE(context_->GetNodeName(), "out axis 0 must equal M."), return false);
 
-    // OriginShape remains the logical INT4 shape even when storage dtype is packed INT32.
-    const uint64_t logicalK = static_cast<uint64_t>(wShape.GetDim(specialWeightFormat_ ? 2 : 1));
-    const uint64_t logicalN = static_cast<uint64_t>(wShape.GetDim(specialWeightFormat_ ? 1 : 2));
+    // Logical shape is EKN for both layouts, including packed INT32 storage.
+    // specialWeightFormat_ selects ENK-NZ physical blocks, not logical axes.
+    const uint64_t logicalK = static_cast<uint64_t>(wShape.GetDim(1));
+    const uint64_t logicalN = static_cast<uint64_t>(wShape.GetDim(2));
     OP_CHECK_IF(logicalK != inputParams_.kSize || logicalN != inputParams_.nSize,
                 OP_LOGE(context_->GetNodeName(),
                         "weight logical shape mismatches x/out; expected K=%lu,N=%lu, actual K=%lu,N=%lu.",
@@ -2753,7 +2756,7 @@ ge::graphStatus GroupedS8S4BasicApiTiling::ComputeWorkspaceLayout()
                         !checkedAlign(tileBytes, tileStride) || !checkedMul(tileStride, aicoreParams_.aicNum, tileSize),
                     OP_LOGE(context_->GetNodeName(), "S8S4 per-core tile workspace overflow."),
                     return ge::GRAPH_FAILED);
-        const uint64_t rowSumElements = dequantMode_ == DequantMode::ASYMMETRIC_PER_CHANNEL ? inputParams_.mSize : 0UL;
+        const uint64_t rowSumElements = dequantMode_ == DequantMode::PER_CHANNEL ? inputParams_.mSize : 0UL;
         OP_CHECK_IF(!checkedMul(rowSumElements, sizeof(float), rowSumBytes) || !checkedAlign(rowSumBytes, rowSumSize) ||
                         !checkedAdd(expandedSize, tileSize, rowSumOffset) ||
                         !checkedAdd(rowSumOffset, rowSumSize, totalSize),

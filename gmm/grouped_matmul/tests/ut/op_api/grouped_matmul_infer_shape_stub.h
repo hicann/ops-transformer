@@ -37,10 +37,8 @@ inline aclnnStatus InferGroupedMatmulShapeForUt(const aclTensorList* x, const ac
     if (xShape.GetDimNum() != 2 || (weightRank != 2 && weightRank != 3)) {
         return ACLNN_SUCCESS;
     }
-    const bool specialS8S4 = (*x)[0]->GetDataType() == op::DataType::DT_INT8 &&
-                             (*weight)[0]->GetDataType() == op::DataType::DT_INT4 && tuningConfig != nullptr &&
-                             tuningConfig->Size() > 1 && (*tuningConfig)[1] == 1;
-    const op::Shape shape{xShape.GetDim(0), wShape.GetDim(weightRank - (transposeWeight || specialS8S4 ? 2 : 1))};
+    (void)tuningConfig;
+    const op::Shape shape{xShape.GetDim(0), wShape.GetDim(weightRank - (transposeWeight ? 2 : 1))};
     auto* output = const_cast<aclTensor*>((*out)[0]);
     output->SetViewShape(shape);
     output->SetStorageShape(shape);
