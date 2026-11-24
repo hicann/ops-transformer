@@ -9,6 +9,47 @@
  */
 
 #include "aclnn_sparse_flash_attention_grad.h"
+#include "opdev/op_executor.h"
+#include "opdev/op_log.h"
+#include "opdev/platform.h"
+#include "op_host/util/op_const_def.h"
+
+namespace sfag {
+aclnnStatus CheckOptionalOutputs(const aclTensor* value, const aclTensor* dValue, const aclTensor* queryRope,
+                                 const aclTensor* keyRope, const aclTensor* dQueryRope, const aclTensor* dKeyRope,
+                                 bool isArch35)
+{
+    if (queryRope != nullptr && keyRope != nullptr) {
+        if (dQueryRope == nullptr) {
+            OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "dQueryRopeOutOptional is required when RoPE is enabled.");
+            return ACLNN_ERR_PARAM_NULLPTR;
+        }
+        if (dKeyRope == nullptr) {
+            OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "dKeyRopeOutOptional is required when RoPE is enabled.");
+            return ACLNN_ERR_PARAM_NULLPTR;
+        }
+        if (isArch35 && (dQueryRope->GetDataType() != queryRope->GetDataType() ||
+                         dQueryRope->GetViewShape() != queryRope->GetViewShape())) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                    "queryRopeOptional and dQueryRopeOutOptional must match in dtype and shape.");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+        if (isArch35 && (dKeyRope->GetDataType() != keyRope->GetDataType() ||
+                         dKeyRope->GetViewShape() != keyRope->GetViewShape())) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "keyRopeOptional and dKeyRopeOutOptional must match in dtype and shape.");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
+    if (isArch35 && value != nullptr && dValue != nullptr) {
+        auto dtype = dValue->GetDataType();
+        if ((dtype != ge::DT_FLOAT16 && dtype != ge::DT_BF16) || dtype != value->GetDataType()) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "value and dValueOut must have the same FP16 or BF16 dtype.");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
+    return ACLNN_SUCCESS;
+}
+} // namespace sfag
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,6 +82,13 @@ aclnnStatus aclnnSparseFlashAttentionGradGetWorkspaceSize(
     const aclTensor* dQueryRopeOutOptional, const aclTensor* dKeyRopeOutOptional, uint64_t* workspaceSize,
     aclOpExecutor** executor)
 {
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+        auto status = sfag::CheckOptionalOutputs(value, dValueOut, queryRopeOptional, keyRopeOptional,
+                                                 dQueryRopeOutOptional, dKeyRopeOutOptional, true);
+        if (status != ACLNN_SUCCESS) {
+            return status;
+        }
+    }
     return aclnnInnerSparseFlashAttentionGradGetWorkspaceSize(
         query, key, sparseIndices, dOut, out, softmaxMax, softmaxSum, nullptr /*sinks*/, value,
         actualSeqLengthsQueryOptional, actualSeqLengthsKvOptional, queryRopeOptional, keyRopeOptional, scaleValue,

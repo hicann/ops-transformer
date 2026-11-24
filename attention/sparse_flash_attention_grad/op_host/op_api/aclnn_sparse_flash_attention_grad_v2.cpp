@@ -15,6 +15,12 @@
 #include "opdev/op_log.h"
 #include "op_host/util/op_const_def.h"
 
+namespace sfag {
+aclnnStatus CheckOptionalOutputs(const aclTensor* value, const aclTensor* dValue, const aclTensor* queryRope,
+                                 const aclTensor* keyRope, const aclTensor* dQueryRope, const aclTensor* dKeyRope,
+                                 bool isArch35);
+}
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -59,7 +65,8 @@ aclnnStatus aclnnSparseFlashAttentionGradV2GetWorkspaceSize(
                 "The sinks input of aclnnSparseFlashAttentionGradV2 requires a corresponding dSinks output.");
         return ACLNN_ERR_PARAM_INVALID;
     }
-    if (sinks != nullptr && op::GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_3510) {
+    const bool isArch35 = op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510;
+    if (sinks != nullptr && !isArch35) {
         REPORT_PREDEFINED_ERR_MSG(
             "EZ1009", (std::vector<const char*>{"opName", "reason"}),
             (std::vector<const char*>{
@@ -71,15 +78,10 @@ aclnnStatus aclnnSparseFlashAttentionGradV2GetWorkspaceSize(
         OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "dValueOut is required when value is provided.");
         return ACLNN_ERR_PARAM_NULLPTR;
     }
-    if (queryRopeOptional != nullptr && keyRopeOptional != nullptr) {
-        if (dQueryRopeOutOptional == nullptr) {
-            OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "dQueryRopeOutOptional is required when RoPE is enabled.");
-            return ACLNN_ERR_PARAM_NULLPTR;
-        }
-        if (dKeyRopeOutOptional == nullptr) {
-            OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "dKeyRopeOutOptional is required when RoPE is enabled.");
-            return ACLNN_ERR_PARAM_NULLPTR;
-        }
+    auto status = sfag::CheckOptionalOutputs(value, dValueOut, queryRopeOptional, keyRopeOptional,
+                                             dQueryRopeOutOptional, dKeyRopeOutOptional, isArch35);
+    if (status != ACLNN_SUCCESS) {
+        return status;
     }
     return aclnnInnerSparseFlashAttentionGradGetWorkspaceSize(
         query, key, sparseIndices, dOut, out, softmaxMax, softmaxSum, sinks, value, actualSeqLengthsQueryOptional,

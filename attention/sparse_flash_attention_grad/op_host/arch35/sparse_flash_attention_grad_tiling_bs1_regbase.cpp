@@ -28,7 +28,6 @@ constexpr uint32_t BASE_LEN_256 = 256;
 constexpr int64_t GM_ALIGN = 512;
 constexpr uint32_t PING_PONG_BUFFER = 2;
 constexpr uint32_t D_SIZE = 512;
-constexpr uint32_t DROPE_SIZE = 64;
 
 ge::graphStatus SparseFlashAttentionGradBs1Regbase::GetShapeAttrsInfo()
 {
@@ -398,6 +397,144 @@ ge::graphStatus SparseFlashAttentionGradBs1Regbase::CheckOutShapeInfo(const gert
     return ge::GRAPH_SUCCESS;
 }
 
+namespace {
+constexpr int64_t DROPE_SIZE = 64;
+
+ge::graphStatus CheckRopeShape(gert::TilingContext* context, const gert::Shape& ropeShape,
+                               const gert::Shape& inputShape, const char* name)
+{
+    const size_t rank = inputShape.GetDimNum();
+    OP_CHECK_IF(rank == 0 || ropeShape.GetDimNum() != rank,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), name,
+                                                         "RoPE rank must match the corresponding query or key."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(ropeShape.GetDim(rank - 1) != DROPE_SIZE,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), name, "RoPE headDim must be 64."),
+                return ge::GRAPH_FAILED);
+    for (size_t i = 0; i + 1 < rank; ++i) {
+        OP_CHECK_IF(ropeShape.GetDim(i) <= 0 || ropeShape.GetDim(i) != inputShape.GetDim(i),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), name,
+                                                             "RoPE dimensions before headDim must match query or key."),
+                    return ge::GRAPH_FAILED);
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus CheckAttentionGradShape(gert::TilingContext* context)
+{
+    auto gradShape = context->GetInputShape(static_cast<size_t>(InputIndex::ATTENTION_OUT_GRAD));
+    auto outShape = context->GetInputShape(static_cast<size_t>(InputIndex::ATTENTION_OUT));
+    OP_CHECK_IF(!IsSameShape(gradShape, outShape),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "d_out, out",
+                                                         "d_out shape must match out shape."),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus CheckRope(gert::TilingContext* context, int64_t& ropeDim)
+{
+    auto queryRope = context->GetOptionalInputTensor(static_cast<size_t>(InputIndex::Q_ROPE));
+    auto keyRope = context->GetOptionalInputTensor(static_cast<size_t>(InputIndex::K_ROPE));
+    OP_CHECK_IF((queryRope == nullptr) != (keyRope == nullptr),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "query_rope, key_rope",
+                                                         "query_rope and key_rope must be provided together."),
+                return ge::GRAPH_FAILED);
+    if (queryRope == nullptr) {
+        ropeDim = 0;
+        return ge::GRAPH_SUCCESS;
+    }
+
+    const auto& queryShape = context->GetInputShape(static_cast<size_t>(InputIndex::QUERY))->GetStorageShape();
+    const auto& keyShape = context->GetInputShape(static_cast<size_t>(InputIndex::KEY))->GetStorageShape();
+    const auto& queryRopeShape = queryRope->GetStorageShape();
+    const auto& keyRopeShape = keyRope->GetStorageShape();
+    if (CheckRopeShape(context, queryRopeShape, queryShape, "query_rope") != ge::GRAPH_SUCCESS ||
+        CheckRopeShape(context, keyRopeShape, keyShape, "key_rope") != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+
+    auto queryType = context->GetInputDesc(static_cast<size_t>(InputIndex::QUERY))->GetDataType();
+    auto keyType = context->GetInputDesc(static_cast<size_t>(InputIndex::KEY))->GetDataType();
+    auto queryRopeType = queryRope->GetDataType();
+    auto keyRopeType = keyRope->GetDataType();
+    OP_CHECK_IF((queryRopeType != ge::DT_FLOAT16 && queryRopeType != ge::DT_BF16) || queryRopeType != queryType,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "query_rope",
+                                                         "query_rope must have the same FP16 or BF16 dtype as query."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF((keyRopeType != ge::DT_FLOAT16 && keyRopeType != ge::DT_BF16) || keyRopeType != keyType,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "key_rope",
+                                                         "key_rope must have the same FP16 or BF16 dtype as key."),
+                return ge::GRAPH_FAILED);
+
+    auto dqRope = context->GetOutputShape(DIM_3);
+    auto dkRope = context->GetOutputShape(DIM_4);
+    OP_CHECK_IF(dqRope == nullptr || dqRope->GetStorageShape() != queryRopeShape,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "d_query_rope",
+                                                         "d_query_rope shape must match query_rope shape."),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(dkRope == nullptr || dkRope->GetStorageShape() != keyRopeShape,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "d_key_rope",
+                                                         "d_key_rope shape must match key_rope shape."),
+                return ge::GRAPH_FAILED);
+    ropeDim = DROPE_SIZE;
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus CheckActualSeqLength(gert::TilingContext* context, const gert::Tensor* seq, const char* name,
+                                     int64_t expectedBatch)
+{
+    if (seq == nullptr) {
+        return ge::GRAPH_SUCCESS;
+    }
+    OP_CHECK_IF(seq->GetDataType() != ge::DT_INT32,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), name,
+                                                         "Sequence lengths must have INT32 dtype."),
+                return ge::GRAPH_FAILED);
+    const auto& shape = seq->GetStorageShape();
+    OP_CHECK_IF(shape.GetDimNum() != 1 || shape.GetDim(DIM_0) <= 0 ||
+                    (expectedBatch >= 0 && shape.GetDim(DIM_0) != expectedBatch),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), name,
+                                                         "Sequence lengths must have non-empty [B] shape."),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus CheckActualSeqLengths(gert::TilingContext* context, bool isTnd, int64_t& batchSize)
+{
+    auto querySeq = context->GetOptionalInputTensor(static_cast<size_t>(InputIndex::ACTUAL_SEQ_Q_LEN));
+    auto kvSeq = context->GetOptionalInputTensor(static_cast<size_t>(InputIndex::ACTUAL_SEQ_KV_LEN));
+    OP_CHECK_IF(isTnd && (querySeq == nullptr || kvSeq == nullptr),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(),
+                                                         "actual_seq_lengths_query, actual_seq_lengths_kv",
+                                                         "Both sequence length tensors are required for TND."),
+                return ge::GRAPH_FAILED);
+    if (CheckActualSeqLength(context, querySeq, "actual_seq_lengths_query", isTnd ? -1 : batchSize) !=
+        ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (isTnd) {
+        batchSize = querySeq->GetStorageShape().GetDim(DIM_0);
+    }
+    return CheckActualSeqLength(context, kvSeq, "actual_seq_lengths_kv", batchSize);
+}
+
+ge::graphStatus CheckValueDtype(gert::TilingContext* context)
+{
+    auto valueDesc = context->GetOptionalInputDesc(static_cast<size_t>(InputIndex::VALUE));
+    auto queryDesc = context->GetInputDesc(static_cast<size_t>(InputIndex::QUERY));
+    OP_CHECK_IF(valueDesc == nullptr || queryDesc == nullptr,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "query, value",
+                                                         "Missing query or value descriptor."),
+                return ge::GRAPH_FAILED);
+    auto valueType = valueDesc->GetDataType();
+    OP_CHECK_IF((valueType != ge::DT_FLOAT16 && valueType != ge::DT_BF16) || valueType != queryDesc->GetDataType(),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(context->GetNodeName(), "value",
+                                                         "value must have the same FP16 or BF16 dtype as query."),
+                return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+} // namespace
+
 ge::graphStatus SparseFlashAttentionGradBs1Regbase::GetBaseShapeInfo()
 {
     OP_CHECK_IF(((context_->GetInputShape(static_cast<size_t>(InputIndex::QUERY)) == nullptr) ||
@@ -414,8 +551,6 @@ ge::graphStatus SparseFlashAttentionGradBs1Regbase::GetBaseShapeInfo()
     const gert::Shape& valueShape = tmpData.kvMerge ? keyShape : valueStorageShape->GetStorageShape();
     const gert::Shape& indicesShape =
         context_->GetInputShape(static_cast<size_t>(InputIndex::TOPK_INDICES))->GetStorageShape();
-    auto qRopeTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::Q_ROPE));
-    auto kRopeTensor = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::K_ROPE));
     // sinks 输入（OPTIONAL, FP32, [N1]）：判空只在这一处，编入 tiling key bit35 HasSinks
     // 空 tensor（shape [0]）与 nullptr 等价，均视为无 sink（对应文档"为空时 sink 路径编译期消除"），
     // 否则空 sinks 会因 shape [0] != [N1] 在校验处被拒。仅用于支持无 sink 性能/执行路径。
@@ -495,6 +630,9 @@ ge::graphStatus SparseFlashAttentionGradBs1Regbase::GetBaseShapeInfo()
         return ge::GRAPH_FAILED;
     }
     if (!tmpData.kvMerge) {
+        if (CheckValueDtype(context_) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
         OP_CHECK_IF(dvOutputShape == nullptr, OPS_REPORT_VECTOR_INNER_ERR(opName, "OutputShape of dv is nullptr."),
                     return ge::GRAPH_FAILED);
         const gert::Shape& dvShape = dvOutputShape->GetStorageShape();
@@ -515,57 +653,18 @@ ge::graphStatus SparseFlashAttentionGradBs1Regbase::GetBaseShapeInfo()
             return ge::GRAPH_FAILED;
         }
     }
-    if (qRopeTensor != nullptr && kRopeTensor != nullptr) {
-        OP_LOGD(context_, "SparseFlashAttentionGrad qRope and kRope is not nullptr, rope is enabled.");
-        tmpData.ropeEnable = true;
-        const gert::Shape& qRopeShape =
-            context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::Q_ROPE))->GetStorageShape();
-        const gert::Shape& kRopeShape =
-            context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::K_ROPE))->GetStorageShape();
-        OP_CHECK_IF(context_->GetOutputShape(DIM_3) == nullptr || context_->GetOutputShape(DIM_4) == nullptr,
-                    OPS_REPORT_VECTOR_INNER_ERR(opName, "OutputShape of dq_rope or dk_rope is nullptr."),
-                    return ge::GRAPH_FAILED);
-        const gert::Shape& dqRopeShape = context_->GetOutputShape(DIM_3)->GetStorageShape();
-        const gert::Shape& dkRopeShape = context_->GetOutputShape(DIM_4)->GetStorageShape();
-        auto qRopeDim = qRopeShape.GetDim(dimSize - 1);
-        auto kRopeDim = kRopeShape.GetDim(dimSize - 1);
-        if (qRopeDim != DROPE_SIZE || kRopeDim != DROPE_SIZE) {
-            OP_LOGE(context_,
-                    "SparseFlashAttentionGrad headDim of qRope and kRope should be 64, but qRope[%ld], kRope[%ld].",
-                    qRopeDim, kRopeDim);
-            return ge::GRAPH_FAILED;
-        }
-        if (qRopeDim != kRopeDim) {
-            OP_LOGE(context_, "SparseFlashAttentionGrad headDim of qRope and kRope should be equal.");
-            return ge::GRAPH_FAILED;
-        }
-        tmpData.ropeDim = kRopeDim;
-        status = CheckOutShapeInfo(qRopeShape, "query_rope", dqRopeShape, inputLayout);
-        if (status == ge::GRAPH_FAILED) {
-            return ge::GRAPH_FAILED;
-        }
-        status = CheckOutShapeInfo(kRopeShape, "key_rope", dkRopeShape, inputLayout);
-        if (status == ge::GRAPH_FAILED) {
-            return ge::GRAPH_FAILED;
-        }
-    } else {
-        tmpData.ropeEnable = false;
-        tmpData.ropeDim = 0;
+    if (CheckAttentionGradShape(context_) != ge::GRAPH_SUCCESS ||
+        CheckRope(context_, tmpData.ropeDim) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
+    tmpData.ropeEnable = tmpData.ropeDim != 0;
 
-    if (strcmp(inputLayout, TND_STR) == 0) {
-        auto actSeqQLen = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::ACTUAL_SEQ_Q_LEN));
-        auto actSeqKVLen = context_->GetOptionalInputTensor(static_cast<size_t>(InputIndex::ACTUAL_SEQ_KV_LEN));
-        OP_CHECK_IF(
-            actSeqQLen == nullptr || actSeqKVLen == nullptr,
-            OPS_REPORT_VECTOR_INNER_ERR(opName, "When layout is TND, actSeqQLen / actSeqKVLen can not be nullptr"),
-            return ge::GRAPH_FAILED);
-        const gert::Shape& actSeqQLenShape = actSeqQLen->GetStorageShape();
-        const gert::Shape& actSeqKVLenShape = actSeqKVLen->GetStorageShape();
-        tmpData.b = actSeqQLenShape.GetDim(DIM_0);
-        OP_CHECK_IF(tmpData.b == 0 || actSeqKVLenShape.GetDim(DIM_0) != tmpData.b,
-                    OPS_REPORT_VECTOR_INNER_ERR(opName, "actSeqQLen / actSeqKVLen shape is invalid for TND"),
-                    return ge::GRAPH_FAILED);
+    const bool isTnd = strcmp(inputLayout, TND_STR) == 0;
+    tmpData.b = isTnd ? 0 : queryShape.GetDim(DIM_0);
+    if (CheckActualSeqLengths(context_, isTnd, tmpData.b) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    if (isTnd) {
         tmpData.t1 = queryShape.GetDim(DIM_0);
         tmpData.t2 = keyShape.GetDim(DIM_0);
         tmpData.s1 = tmpData.t1;
@@ -575,7 +674,9 @@ ge::graphStatus SparseFlashAttentionGradBs1Regbase::GetBaseShapeInfo()
         tmpData.g = queryShape.GetDim(DIM_1) / tmpData.n2;
         tmpData.layout = static_cast<uint32_t>(InputLayout::TND);
     } else { // BSND
-        tmpData.b = queryShape.GetDim(DIM_0);
+        if (CheckAttentionInShape(context_) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
         tmpData.s1 = queryShape.GetDim(DIM_1);
         tmpData.s2 = keyShape.GetDim(DIM_1);
         tmpData.n2 = keyShape.GetDim(DIM_2);
