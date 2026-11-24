@@ -68,17 +68,16 @@ public:
         (void)tPipe;
 
         // 分核与 slow 模板一致：由 metadata AICPU 算子写入，本核按 groupIndex 读回。
-        // fast 分核数据位于扩展区（参考 A5，不占用分核记录区）：从头部读实际核数算出
+        // fast 分核数据位于扩展区（参考 A5，不占用分核记录区）：从 tiling 读可用核数算出
         // 扩展区基址，3 槽连续布局，每 group 依次为 enable、tile 起点、tile 终点（左闭右开）
         groupIndex = QLIV2Fast::GetMixGroupIndex();
         GlobalTensor<uint32_t> metadataGm;
         if (metadata != nullptr) {
             metadataGm.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(metadata));
-            const uint32_t metadataAicNum = metadataGm.GetValue(QLI_V2_METADATA_AIC_NUM_INDEX);
-            const uint32_t metadataAivNum = metadataGm.GetValue(QLI_V2_METADATA_AIV_NUM_INDEX);
-            // 扩展区偏移量级为头部8 + 核数×8（实际核数下远小于 2^32），收窄安全
-            const uint32_t extensionBase =
-                static_cast<uint32_t>(GetQliV2MetadataExtensionOffset(metadataAicNum, metadataAivNum));
+            const uint32_t aicNum = tiling->aicNum;
+            const uint32_t aivNum = tiling->aivNum;
+            // 扩展区偏移量级为核数×8（实际核数下远小于 2^32），收窄安全
+            const uint32_t extensionBase = static_cast<uint32_t>(GetQliV2MetadataExtensionOffset(aicNum, aivNum));
             const uint32_t groupBase = extensionBase + groupIndex * QLI_V2_A3_FAST_GROUP_SLOT_NUM;
             splitCore.coreEnable = metadataGm.GetValue(groupBase + QLI_V2_A3_FAST_ENABLE_SLOT);
             if (splitCore.coreEnable != 0U) {

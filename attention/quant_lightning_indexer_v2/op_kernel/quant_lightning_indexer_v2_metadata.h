@@ -21,11 +21,8 @@
 namespace optiling {
 
 // Constants
-inline constexpr uint32_t QLI_V2_METADATA_HEADER_SIZE = 8;
-// 动态分核记录之后统一保留256个int32元素，供fast标志及后续分核扩展使用
-inline constexpr uint32_t QLI_V2_METADATA_EXTENSION_SIZE = 256;
-inline constexpr uint32_t QLI_V2_METADATA_AIC_NUM_INDEX = 0;
-inline constexpr uint32_t QLI_V2_METADATA_AIV_NUM_INDEX = 1;
+// 总长度按1024个int32元素对齐，扩展区在动态分核信息之后。
+inline constexpr uint32_t QLI_V2_METADATA_ALIGNMENT = 1024;
 
 using QLI_V2_METADATA_T = int32_t;
 
@@ -39,8 +36,7 @@ __aicore__ inline constexpr uint64_t GetQliV2MetadataExtensionOffset(uint32_t ai
 inline constexpr uint64_t GetQliV2MetadataExtensionOffset(uint32_t aicNum, uint32_t aivNum)
 #endif
 {
-    return QLI_V2_METADATA_HEADER_SIZE + static_cast<uint64_t>(aicNum) * QLI_V2_METADATA_SIZE +
-           static_cast<uint64_t>(aivNum) * QLD_V2_METADATA_SIZE;
+    return static_cast<uint64_t>(aicNum) * QLI_V2_METADATA_SIZE + static_cast<uint64_t>(aivNum) * QLD_V2_METADATA_SIZE;
 }
 
 #ifdef __CCE_AICORE__
@@ -49,7 +45,8 @@ __aicore__ inline constexpr uint64_t GetQliV2MetadataSize(uint32_t aicNum, uint3
 inline constexpr uint64_t GetQliV2MetadataSize(uint32_t aicNum, uint32_t aivNum)
 #endif
 {
-    return GetQliV2MetadataExtensionOffset(aicNum, aivNum) + QLI_V2_METADATA_EXTENSION_SIZE;
+    const uint64_t coreSize = GetQliV2MetadataExtensionOffset(aicNum, aivNum);
+    return (coreSize + QLI_V2_METADATA_ALIGNMENT - 1) / QLI_V2_METADATA_ALIGNMENT * QLI_V2_METADATA_ALIGNMENT;
 }
 
 // LI Metadata Index Definitions
@@ -79,7 +76,7 @@ inline constexpr uint32_t QLI_V2_A5_FAST_ENABLE = 1;
 inline constexpr uint32_t QLI_V2_A5_FAST_SPARSE_CAPACITY = 2048U;
 
 // arch22 fast 分核记录（扩展区，3 槽连续）：每 group 依次为 enable、tile 起点与终点
-// （左闭右开）；每 group 占 3 槽，扩展区容量最多 85 group（256 int32），
+// （左闭右开）；每 group 占 3 槽，group数按对齐后剩余的扩展区容量截断
 // 当前 910B AIC 核数不超过 36，即最多 36 group（108 int32）
 inline constexpr uint32_t QLI_V2_A3_FAST_GROUP_SLOT_NUM = 3;
 inline constexpr uint32_t QLI_V2_A3_FAST_ENABLE_SLOT = 0;
@@ -97,9 +94,9 @@ inline constexpr uint32_t QLI_V2_A3_FAST_END_SLOT = 2;
 __aicore__ inline uint32_t GetAttrAbsIndex(uint32_t coreIdx, uint32_t metaIdx, uint32_t aicNum, bool isAIV = false)
 {
     if (isAIV) {
-        return QLI_V2_METADATA_HEADER_SIZE + QLI_V2_METADATA_SIZE * aicNum + QLD_V2_METADATA_SIZE * coreIdx + metaIdx;
+        return QLI_V2_METADATA_SIZE * aicNum + QLD_V2_METADATA_SIZE * coreIdx + metaIdx;
     } else {
-        return QLI_V2_METADATA_HEADER_SIZE + QLI_V2_METADATA_SIZE * coreIdx + metaIdx;
+        return QLI_V2_METADATA_SIZE * coreIdx + metaIdx;
     }
 }
 #endif

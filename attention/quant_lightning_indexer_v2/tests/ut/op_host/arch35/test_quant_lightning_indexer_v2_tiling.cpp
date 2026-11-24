@@ -1577,10 +1577,8 @@ TEST_F(QuantLightningIndexerV2TilingArch35, QuantLightningIndexerV2_960_tiling_m
 TEST_F(QuantLightningIndexerV2TilingArch35, QuantLightningIndexerV2_960_tiling_metadata_size_boundary)
 {
     qliv2_ut::CaseParam p = Make960TndPaFp8();
-    // The default AICore mock reports coreNum for both AIC and AIV.
-    const int64_t coreNum = static_cast<int64_t>(p.coreNum);
-    constexpr int64_t METADATA_EXTENSION_SIZE = 256; // 统一扩展区元素数
-    const int64_t requiredSize = 8 + 8 * coreNum + 8 * coreNum + METADATA_EXTENSION_SIZE;
+    // The mock has 56 AIC and 56 AIV cores: 8 int32 elements per core gives 896, rounded up to 1024.
+    constexpr int64_t requiredSize = 1024;
     p.metadata = {requiredSize - 1};
     qliv2_ut::RunTilingCase(p, ge::GRAPH_FAILED);
     p.metadata = {requiredSize};

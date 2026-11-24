@@ -420,51 +420,40 @@ __aicore__ inline uint32_t QLIV2Preload<QLIV2T>::GetTotalBaseBlockNum()
 template <typename QLIV2T>
 __aicore__ void inline QLIV2Preload<QLIV2T>::SplitCore()
 {
-    // metadata 为动态编码：头部记录实际 AIC/AIV 核数，后续索引必须携带 aicNum 计算偏移
-    const uint32_t metadataAicNum = metadataGm.GetValue(QLI_V2_METADATA_AIC_NUM_INDEX);
-    const uint32_t metadataAivNum = metadataGm.GetValue(QLI_V2_METADATA_AIV_NUM_INDEX);
-    if (aiCoreIdx >= metadataAicNum) {
-        constInfo.coreEnable = false;
-        ldInfo.isLdCoreEnable = false;
-        return;
-    }
-    constInfo.coreEnable =
-        metadataGm.GetValue(GetAttrAbsIndex(aiCoreIdx, QLI_V2_CORE_ENABLE_INDEX, metadataAicNum, false));
+    const uint32_t aicNum = GetBlockNum();
+    constInfo.coreEnable = metadataGm.GetValue(GetAttrAbsIndex(aiCoreIdx, QLI_V2_CORE_ENABLE_INDEX, aicNum, false));
     if (aiCoreIdx != 0) {
-        constInfo.bN2Start =
-            metadataGm.GetValue(GetAttrAbsIndex(aiCoreIdx, QLI_V2_BN2_START_INDEX, metadataAicNum, false));
-        constInfo.gS1Start =
-            metadataGm.GetValue(GetAttrAbsIndex(aiCoreIdx, QLI_V2_M_START_INDEX, metadataAicNum, false));
-        constInfo.s2Start =
-            metadataGm.GetValue(GetAttrAbsIndex(aiCoreIdx, QLI_V2_S2_START_INDEX, metadataAicNum, false));
+        constInfo.bN2Start = metadataGm.GetValue(GetAttrAbsIndex(aiCoreIdx, QLI_V2_BN2_START_INDEX, aicNum, false));
+        constInfo.gS1Start = metadataGm.GetValue(GetAttrAbsIndex(aiCoreIdx, QLI_V2_M_START_INDEX, aicNum, false));
+        constInfo.s2Start = metadataGm.GetValue(GetAttrAbsIndex(aiCoreIdx, QLI_V2_S2_START_INDEX, aicNum, false));
     }
-    constInfo.bN2End = metadataGm.GetValue(GetAttrAbsIndex(aiCoreIdx, QLI_V2_BN2_END_INDEX, metadataAicNum, false));
-    constInfo.gS1End = metadataGm.GetValue(GetAttrAbsIndex(aiCoreIdx, QLI_V2_M_END_INDEX, metadataAicNum, false));
-    constInfo.s2End = metadataGm.GetValue(GetAttrAbsIndex(aiCoreIdx, QLI_V2_S2_END_INDEX, metadataAicNum, false));
+    constInfo.bN2End = metadataGm.GetValue(GetAttrAbsIndex(aiCoreIdx, QLI_V2_BN2_END_INDEX, aicNum, false));
+    constInfo.gS1End = metadataGm.GetValue(GetAttrAbsIndex(aiCoreIdx, QLI_V2_M_END_INDEX, aicNum, false));
+    constInfo.s2End = metadataGm.GetValue(GetAttrAbsIndex(aiCoreIdx, QLI_V2_S2_END_INDEX, aicNum, false));
 
     // 如果0核都没有启动，说明所有核都没启动
-    coreZeroEnable = metadataGm.GetValue(GetAttrAbsIndex(0, QLI_V2_CORE_ENABLE_INDEX, metadataAicNum, false));
+    coreZeroEnable = metadataGm.GetValue(GetAttrAbsIndex(0, QLI_V2_CORE_ENABLE_INDEX, aicNum, false));
 
     // LD 第一个workspace的索引
     uint32_t ldFirstWorkSpaceIndex =
-        GetAttrAbsIndex(aiCoreIdx, QLI_V2_FIRST_QLD_V2_DATA_WORKSPACE_IDX_INDEX, metadataAicNum, false);
+        GetAttrAbsIndex(aiCoreIdx, QLI_V2_FIRST_QLD_V2_DATA_WORKSPACE_IDX_INDEX, aicNum, false);
     ldInfo.saveWorkSpaceIdx = metadataGm.GetValue(ldFirstWorkSpaceIndex);
     if ASCEND_IS_AIV {
         uint32_t vecCoreIdx = tmpBlockIdx; // 此时代表vectoe核数
-        uint32_t ldCoreEnableIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_CORE_ENABLE_INDEX, metadataAicNum, true);
-        ldInfo.isLdCoreEnable = vecCoreIdx < metadataAivNum && metadataGm.GetValue(ldCoreEnableIndex);
+        uint32_t ldCoreEnableIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_CORE_ENABLE_INDEX, aicNum, true);
+        ldInfo.isLdCoreEnable = metadataGm.GetValue(ldCoreEnableIndex);
 
         if (!ldInfo.isLdCoreEnable) {
             return;
         }
 
         // LD 参数信息
-        uint32_t ldBn2IdxIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_BN2_IDX_INDEX, metadataAicNum, true);
-        uint32_t ldMIdxIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_M_IDX_INDEX, metadataAicNum, true);
-        uint32_t ldWorkspaceIdxIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_WORKSPACE_IDX_INDEX, metadataAicNum, true);
-        uint32_t ldWorkspaceNumINDEX = GetAttrAbsIndex(vecCoreIdx, QLD_V2_WORKSPACE_NUM_INDEX, metadataAicNum, true);
-        uint32_t ldMstartIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_M_START_INDEX, metadataAicNum, true);
-        uint32_t ldMNumIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_M_NUM_INDEX, metadataAicNum, true);
+        uint32_t ldBn2IdxIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_BN2_IDX_INDEX, aicNum, true);
+        uint32_t ldMIdxIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_M_IDX_INDEX, aicNum, true);
+        uint32_t ldWorkspaceIdxIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_WORKSPACE_IDX_INDEX, aicNum, true);
+        uint32_t ldWorkspaceNumINDEX = GetAttrAbsIndex(vecCoreIdx, QLD_V2_WORKSPACE_NUM_INDEX, aicNum, true);
+        uint32_t ldMstartIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_M_START_INDEX, aicNum, true);
+        uint32_t ldMNumIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_M_NUM_INDEX, aicNum, true);
 
         ldInfo.bn2Idx = metadataGm.GetValue(ldBn2IdxIndex);
         ldInfo.bIdx = ldInfo.bn2Idx / constInfo.kHeadNum;

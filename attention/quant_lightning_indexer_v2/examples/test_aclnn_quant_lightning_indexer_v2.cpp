@@ -26,7 +26,7 @@ using namespace std;
 
 namespace {
 
-constexpr int64_t METADATA_EXTENSION_SIZE = 256; // 动态分核记录之后的扩展区元素数
+constexpr int64_t METADATA_ALIGNMENT = 1024; // int32元素数
 
 #define CHECK_RET(cond) ((cond) ? true : (false))
 
@@ -136,7 +136,9 @@ int InitializeTensors(TensorResources& resources)
         LOG_PRINT("Failed to query AIV count\n");
         return ACL_ERROR_INVALID_PARAM;
     }
-    std::vector<int64_t> metadataShape = {8LL * (1 + aicCoreNum + aivCoreNum) + METADATA_EXTENSION_SIZE};
+    const int64_t metadataCoreSize = 8LL * (aicCoreNum + aivCoreNum);
+    std::vector<int64_t> metadataShape = {(metadataCoreSize + METADATA_ALIGNMENT - 1) / METADATA_ALIGNMENT *
+                                          METADATA_ALIGNMENT};
     std::vector<int64_t> sparseIndicesShape = {B, S1, N2, topk};
     std::vector<int64_t> sparseValuesShape = {B, S1, N2, topk};
 

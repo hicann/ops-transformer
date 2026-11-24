@@ -397,7 +397,7 @@ class QLIV2FastDispatch {
 
         __aicore__ inline bool TryRun()
         {
-            if (!IsA5FastAuthorized(metadata) || outputIdxOffset != nullptr) {
+            if (!IsA5FastAuthorized(metadata, tilingData) || outputIdxOffset != nullptr) {
                 return false;
             }
             bool invalidScale = false;
@@ -431,18 +431,19 @@ class QLIV2FastDispatch {
         }
     };
 
-    __aicore__ static inline bool IsA5FastAuthorized(GM_ADDR metadata)
+    __aicore__ static inline bool IsA5FastAuthorized(GM_ADDR metadata, const TilingData* tilingData)
     {
         if (metadata == nullptr) {
             return false;
         }
         GlobalTensor<uint32_t> metadataGm;
         metadataGm.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(metadata));
-        const uint32_t metadataAicNum = metadataGm.GetValue(QLI_V2_METADATA_AIC_NUM_INDEX);
-        const uint32_t metadataAivNum = metadataGm.GetValue(QLI_V2_METADATA_AIV_NUM_INDEX);
-        const int64_t fastFlagOffset =
-            static_cast<int64_t>(GetQliV2MetadataExtensionOffset(metadataAicNum, metadataAivNum)) +
-            QLI_V2_A5_FAST_FLAG_OFFSET;
+        const uint32_t aicNum = tilingData->aicNum;
+        const uint32_t aivNum = tilingData->aivNum;
+        const uint64_t fastFlagOffset = GetQliV2MetadataExtensionOffset(aicNum, aivNum) + QLI_V2_A5_FAST_FLAG_OFFSET;
+        if (fastFlagOffset >= GetQliV2MetadataSize(aicNum, aivNum)) {
+            return false;
+        }
         return metadataGm.GetValue(fastFlagOffset) == QLI_V2_A5_FAST_ENABLE;
     }
 

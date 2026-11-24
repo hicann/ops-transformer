@@ -13,7 +13,7 @@ from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
 
-QLI_METADATA_EXTENSION_SIZE = 256
+QLI_METADATA_ALIGNMENT = 1024
 # V3 metadata（candidate 与 DCP 共用）固定输出 1024 个 int32
 QLI_V3_METADATA_SIZE = 1024
 KEY_HEAD_DIM_TND = 1
@@ -22,9 +22,12 @@ KEY_HEAD_DIM_BSND = 2
 
 def _calculate_metadata_size(device=None):
     properties = torch.npu.get_device_properties(device)
+    # Extension fields keep their offsets immediately after the core records.
+    core_size = 8 * (properties.cube_core_num + properties.vector_core_num)
     return (
-        8 * (1 + properties.cube_core_num + properties.vector_core_num)
-        + QLI_METADATA_EXTENSION_SIZE
+        (core_size + QLI_METADATA_ALIGNMENT - 1)
+        // QLI_METADATA_ALIGNMENT
+        * QLI_METADATA_ALIGNMENT
     )
 
 

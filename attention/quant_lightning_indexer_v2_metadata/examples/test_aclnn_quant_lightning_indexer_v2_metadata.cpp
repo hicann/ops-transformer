@@ -35,8 +35,7 @@ constexpr int64_t EXAMPLE_TOPK = 512;
 uint32_t aicCoreNum = 0;
 uint32_t aivCoreNum = 0;
 uint32_t metadataSize = 0;
-constexpr uint32_t QLI_V2_METADATA_HEADER_SIZE = 8;
-constexpr uint32_t QLI_V2_METADATA_EXTENSION_SIZE = 256; // 统一扩展区元素数
+constexpr uint32_t QLI_V2_METADATA_ALIGNMENT = 1024; // int32元素数
 constexpr uint32_t QLI_V2_METADATA_SIZE = 8;
 constexpr uint32_t QLD_V2_METADATA_SIZE = 8;
 
@@ -216,8 +215,9 @@ aclnnStatus CreateArgs(const ArgScenario& scenario, ArgContext& context)
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Failed to query AIC count\n");
     ret = aclrtGetResInCurrentThread(ACL_RT_DEV_RES_VECTOR_CORE, &aivCoreNum);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Failed to query AIV count\n");
-    metadataSize = QLI_V2_METADATA_HEADER_SIZE + aicCoreNum * QLI_V2_METADATA_SIZE + aivCoreNum * QLD_V2_METADATA_SIZE +
-                   QLI_V2_METADATA_EXTENSION_SIZE;
+    const uint32_t metadataCoreSize = aicCoreNum * QLI_V2_METADATA_SIZE + aivCoreNum * QLD_V2_METADATA_SIZE;
+    metadataSize =
+        (metadataCoreSize + QLI_V2_METADATA_ALIGNMENT - 1) / QLI_V2_METADATA_ALIGNMENT * QLI_V2_METADATA_ALIGNMENT;
     ret = CreateTensor(aclDataType::ACL_INT32, {metadataSize}, context.metadata);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create meta failed. Error: %d", ret);
 
@@ -309,11 +309,9 @@ int main()
                       result.size() * sizeof(uint32_t), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "aclrtMemcpy failed. ERROR: %d\n", ret);
 
-    CHECK_LOG_RET(result[0] == aicCoreNum && result[1] == aivCoreNum, 1,
-                  "Unexpected core counts in metadata: AIC=%u, AIV=%u", result[0], result[1]);
-    const auto* aicRecords = result.data() + QLI_V2_METADATA_HEADER_SIZE;
-    const auto* aivRecords = aicRecords + result[0] * QLI_V2_METADATA_SIZE;
-    for (uint32_t i = 0; i < result[0]; ++i) {
+    const auto* aicRecords = result.data();
+    const auto* aivRecords = aicRecords + aicCoreNum * QLI_V2_METADATA_SIZE;
+    for (uint32_t i = 0; i < aicCoreNum; ++i) {
         printf("AIC Core%u\n", i);
         printf("    Core Enable : %u\n", aicRecords[i * QLI_V2_METADATA_SIZE + QLI_V2_CORE_ENABLE_INDEX]);
         printf("    Start BN2   : %u\n", aicRecords[i * QLI_V2_METADATA_SIZE + QLI_V2_BN2_START_INDEX]);
@@ -325,7 +323,7 @@ int main()
         printf("    First Workspace Index : %u\n",
                aicRecords[i * QLI_V2_METADATA_SIZE + QLI_V2_FIRST_QLD_V2_DATA_WORKSPACE_IDX_INDEX]);
     }
-    for (uint32_t i = 0; i < result[1]; ++i) {
+    for (uint32_t i = 0; i < aivCoreNum; ++i) {
         printf("AIV Core%u\n", i);
         printf("    Core Enable             : %u\n", aivRecords[i * QLD_V2_METADATA_SIZE + QLD_V2_CORE_ENABLE_INDEX]);
         printf("    FD Task BN2 Idx         : %u\n", aivRecords[i * QLD_V2_METADATA_SIZE + QLD_V2_BN2_IDX_INDEX]);

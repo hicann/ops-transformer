@@ -85,6 +85,8 @@ bool QuantLightningIndexerV2MetadataCpuKernel::Prepare(CpuKernelContext& ctx)
     if (!requiredAttrs) {
         return false;
     }
+    KERNEL_LOG_INFO("QLI metadata Prepare: aic_core_num=%u, aiv_core_num=%u, soc_version=%s", aicCoreNum_, aivCoreNum_,
+                    socVersion_.c_str());
 
     // attributes optional
     GetAttrValueOpt(ctx, "batch_size", batchSize_);
@@ -1299,17 +1301,16 @@ bool QuantLightningIndexerV2MetadataCpuKernel::GenMetadata(SplitResult& splitRes
     }
     auto* metadataPtr = static_cast<uint32_t*>(metadata_->GetData());
     std::fill_n(metadataPtr, metadataSize, 0U);
-    metadataPtr[QLI_V2_METADATA_AIC_NUM_INDEX] = aicCoreNum_;
-    metadataPtr[QLI_V2_METADATA_AIV_NUM_INDEX] = aivCoreNum_;
     auto* extensionMetadata = metadataPtr + GetQliV2MetadataExtensionOffset(aicCoreNum_, aivCoreNum_);
 
     if (IsFastTemplate()) {
         // arch22 fast 分核数据写入扩展区（参考 A5：fast 专属信息不再占用分核记录区，
         // 记录区仅承载 slow 分核）。3 槽连续紧凑布局：每 group 依次为 enable、tile 起点、
         // tile 终点（左闭右开）；0 号 group 从 0 开始，后续 group 取前一 group 的 END。
-        // 每 group 占 3 槽，fastGroups 已按扩展区容量截断（256 int32 最多 85 group）；
+        // 每 group 占 3 槽，fastGroups 按对齐后的实际扩展区容量截断；
         // 未启用 group 保持 fill_n 的 0（disable）
-        constexpr uint32_t maxFastGroups = QLI_V2_METADATA_EXTENSION_SIZE / QLI_V2_A3_FAST_GROUP_SLOT_NUM;
+        const uint64_t extensionSize = metadataSize - GetQliV2MetadataExtensionOffset(aicCoreNum_, aivCoreNum_);
+        const uint32_t maxFastGroups = static_cast<uint32_t>(extensionSize / QLI_V2_A3_FAST_GROUP_SLOT_NUM);
         const uint32_t fastGroups = std::min<uint32_t>(splitRes.usedCoreNum, maxFastGroups);
         for (size_t i = 0; i < fastGroups; ++i) {
             const size_t groupBase = i * QLI_V2_A3_FAST_GROUP_SLOT_NUM;
@@ -1321,7 +1322,7 @@ bool QuantLightningIndexerV2MetadataCpuKernel::GenMetadata(SplitResult& splitRes
     }
 
     // LI Metadata Generate（slow：标准分核记录区）
-    auto* qliMetadata = metadataPtr + QLI_V2_METADATA_HEADER_SIZE;
+    auto* qliMetadata = metadataPtr;
     auto* qldMetadata = qliMetadata + static_cast<uint64_t>(aicCoreNum_) * QLI_V2_METADATA_SIZE;
     for (size_t i = 0; i < aicCoreNum_; ++i) {
         if (i >= splitRes.usedCoreNum) {
@@ -1357,7 +1358,8 @@ bool QuantLightningIndexerV2MetadataCpuKernel::GenMetadata(SplitResult& splitRes
         qldMetadata[i * QLD_V2_METADATA_SIZE + QLD_V2_M_NUM_INDEX] = splitRes.fdRes.fdMNum[i];
     }
     // 先生成完整的原模板调度信息再写入准入标志，供kernel检查失败时回退使用
-    if (ProcessSocVersion() == ValidSocVersion::ASCEND950) {
+    if (ProcessSocVersion() == ValidSocVersion::ASCEND950 &&
+        GetQliV2MetadataExtensionOffset(aicCoreNum_, aivCoreNum_) + QLI_V2_A5_FAST_FLAG_OFFSET < metadataSize) {
         extensionMetadata[QLI_V2_A5_FAST_FLAG_OFFSET] =
             IsA5FastEligible() ? QLI_V2_A5_FAST_ENABLE : QLI_V2_A5_FAST_DISABLE;
     }

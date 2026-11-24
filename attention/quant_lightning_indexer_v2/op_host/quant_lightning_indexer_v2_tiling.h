@@ -159,6 +159,8 @@ TILING_DATA_FIELD_DEF(uint32_t, cpInterleaveSize)
 // fast 模板专用字段，追加在末尾以保持既有字段的二进制布局不变
 TILING_DATA_FIELD_DEF(uint32_t, fastUsedCoreNum)
 TILING_DATA_FIELD_DEF(uint64_t, fastWorkspaceGroupStride)
+TILING_DATA_FIELD_DEF(uint32_t, aicNum)
+TILING_DATA_FIELD_DEF(uint32_t, aivNum)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(QuantLightningIndexerV2, QLIV2TilingData)
 

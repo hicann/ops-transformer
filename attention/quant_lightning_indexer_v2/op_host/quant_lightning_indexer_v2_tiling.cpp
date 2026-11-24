@@ -2241,6 +2241,8 @@ ge::graphStatus QuantLightningIndexerV2Tiling::DoTiling(QLIV2TilingInfo* tilingI
     // 仅承载 scale 粒度语义（per-token-head），无需向 kernel 暴露 7 的枚举差异
     tilingData_.set_quantMode(
         *tilingInfo->opParamInfo.quantMode == QUANT_MODE_INT4 ? QUANT_MODE_INT8 : *tilingInfo->opParamInfo.quantMode);
+    tilingData_.set_aicNum(aicNum);
+    tilingData_.set_aivNum(aivNum);
     tilingData_.set_usedCoreNum(fastTemplate ? fastTemplateAicNum : blockDim);
     // ---- fast 模板（arch22 g=24/32，candidate 关闭时生效）----
     tilingData_.set_fastUsedCoreNum(fastTemplate ? fastTemplateAicNum : 0U);

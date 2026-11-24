@@ -315,22 +315,16 @@ template <typename QLIV2T>
 __aicore__ inline void QLIV2Preload<QLIV2T>::SplitCoreByAICPU(uint32_t cubeCoreIdx, uint32_t vecCoreIdx,
                                                               GlobalTensor<uint32_t>& metadataGm)
 {
-    const uint32_t metadataAicNum = metadataGm.GetValue(QLI_V2_METADATA_AIC_NUM_INDEX);
-    const uint32_t metadataAivNum = metadataGm.GetValue(QLI_V2_METADATA_AIV_NUM_INDEX);
-    if (cubeCoreIdx >= metadataAicNum) {
-        qliV2SplitInfo.isCoreEnable = false;
-        qliV2LoadInfo.isLdCoreEnable = false;
-        return;
-    }
-    uint32_t qliV2CoreEnableIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_CORE_ENABLE_INDEX, metadataAicNum);
-    uint32_t qliV2BN2StartIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_BN2_START_INDEX, metadataAicNum);
-    uint32_t qliV2MStartIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_M_START_INDEX, metadataAicNum);
-    uint32_t qliV2S2StartIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_S2_START_INDEX, metadataAicNum);
-    uint32_t qliV2BN2EndIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_BN2_END_INDEX, metadataAicNum);
-    uint32_t qliV2MEndIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_M_END_INDEX, metadataAicNum);
-    uint32_t qliV2S2EndIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_S2_END_INDEX, metadataAicNum);
+    const uint32_t aicNum = GetBlockNum();
+    uint32_t qliV2CoreEnableIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_CORE_ENABLE_INDEX, aicNum);
+    uint32_t qliV2BN2StartIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_BN2_START_INDEX, aicNum);
+    uint32_t qliV2MStartIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_M_START_INDEX, aicNum);
+    uint32_t qliV2S2StartIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_S2_START_INDEX, aicNum);
+    uint32_t qliV2BN2EndIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_BN2_END_INDEX, aicNum);
+    uint32_t qliV2MEndIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_M_END_INDEX, aicNum);
+    uint32_t qliV2S2EndIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_S2_END_INDEX, aicNum);
 
-    uint32_t qliV2ZeroCoreEnableIndex = GetAttrAbsIndex(0, QLI_V2_CORE_ENABLE_INDEX, metadataAicNum);
+    uint32_t qliV2ZeroCoreEnableIndex = GetAttrAbsIndex(0, QLI_V2_CORE_ENABLE_INDEX, aicNum);
     if (metadataGm.GetValue(qliV2ZeroCoreEnableIndex) == 0) {
         isUsedCoreEqZero = true;
     }
@@ -392,24 +386,24 @@ __aicore__ inline void QLIV2Preload<QLIV2T>::SplitCoreByAICPU(uint32_t cubeCoreI
             qliV2SplitInfo.s2End = qliV2S2BaseNum - 1;
         }
     }
-    uint32_t ldFirstWorkSpaceIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_FIRST_QLD_V2_DATA_WORKSPACE_IDX_INDEX,
-                                                     metadataAicNum, false); // LD 第一个workspace的索引
+    uint32_t ldFirstWorkSpaceIndex = GetAttrAbsIndex(cubeCoreIdx, QLI_V2_FIRST_QLD_V2_DATA_WORKSPACE_IDX_INDEX, aicNum,
+                                                     false); // LD 第一个workspace的索引
     qliV2LoadInfo.saveWorkSpaceIdx = metadataGm.GetValue(ldFirstWorkSpaceIndex);
     if ASCEND_IS_AIV {
-        uint32_t ldCoreEnableIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_CORE_ENABLE_INDEX, metadataAicNum, true);
-        qliV2LoadInfo.isLdCoreEnable = vecCoreIdx < metadataAivNum && metadataGm.GetValue(ldCoreEnableIndex);
+        uint32_t ldCoreEnableIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_CORE_ENABLE_INDEX, aicNum, true);
+        qliV2LoadInfo.isLdCoreEnable = metadataGm.GetValue(ldCoreEnableIndex);
 
         if (!qliV2LoadInfo.isLdCoreEnable) {
             return;
         }
 
         // LD 参数信息
-        uint32_t ldBn2IdxIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_BN2_IDX_INDEX, metadataAicNum, true);
-        uint32_t ldMIdxIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_M_IDX_INDEX, metadataAicNum, true);
-        uint32_t ldWorkspaceIdxIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_WORKSPACE_IDX_INDEX, metadataAicNum, true);
-        uint32_t ldWorkspaceNumINDEX = GetAttrAbsIndex(vecCoreIdx, QLD_V2_WORKSPACE_NUM_INDEX, metadataAicNum, true);
-        uint32_t ldMstartIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_M_START_INDEX, metadataAicNum, true);
-        uint32_t ldMNumIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_M_NUM_INDEX, metadataAicNum, true);
+        uint32_t ldBn2IdxIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_BN2_IDX_INDEX, aicNum, true);
+        uint32_t ldMIdxIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_M_IDX_INDEX, aicNum, true);
+        uint32_t ldWorkspaceIdxIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_WORKSPACE_IDX_INDEX, aicNum, true);
+        uint32_t ldWorkspaceNumINDEX = GetAttrAbsIndex(vecCoreIdx, QLD_V2_WORKSPACE_NUM_INDEX, aicNum, true);
+        uint32_t ldMstartIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_M_START_INDEX, aicNum, true);
+        uint32_t ldMNumIndex = GetAttrAbsIndex(vecCoreIdx, QLD_V2_M_NUM_INDEX, aicNum, true);
 
         qliV2LoadInfo.bn2Idx = metadataGm.GetValue(ldBn2IdxIndex);
         qliV2LoadInfo.bIdx = qliV2LoadInfo.bn2Idx / qliV2KernelConstInfo.kHeadNum;
