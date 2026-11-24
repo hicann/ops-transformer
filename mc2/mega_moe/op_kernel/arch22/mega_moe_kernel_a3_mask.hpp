@@ -25,11 +25,11 @@ using namespace Mc2Tiling;
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
           class BlockEpilogue2_, class BlockEpilogue3_, class SharedBf16Mmad_, class SharedBf16Epilogue_,
           bool SharedGmm2Bf16_, class SharedBlockMmad_, class SharedBlockEpilogue1_, class SharedBlockEpilogue2_,
-          class BlockEpilogueDedup_, bool DedupOn_>
-CATLASS_DEVICE void
-MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_, BlockEpilogue3_,
-              SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_, SharedBlockMmad_, SharedBlockEpilogue1_,
-              SharedBlockEpilogue2_, BlockEpilogueDedup_, DedupOn_>::PublishMaskDataReady(Params const& p)
+          class BlockEpilogueDedup_, bool DedupOn_, bool BatchedDispatch>
+CATLASS_DEVICE void MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_,
+                                  BlockEpilogue3_, SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_,
+                                  SharedBlockMmad_, SharedBlockEpilogue1_, SharedBlockEpilogue2_, BlockEpilogueDedup_,
+                                  DedupOn_, BatchedDispatch>::PublishMaskDataReady(Params const& p)
 {
     auto flag = resource.ubBuf.template GetBufferByByte<int32_t>(0);
     constexpr uint32_t flagElements = BYTE_PER_BLK / sizeof(int32_t);
@@ -50,11 +50,11 @@ MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, B
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
           class BlockEpilogue2_, class BlockEpilogue3_, class SharedBf16Mmad_, class SharedBf16Epilogue_,
           bool SharedGmm2Bf16_, class SharedBlockMmad_, class SharedBlockEpilogue1_, class SharedBlockEpilogue2_,
-          class BlockEpilogueDedup_, bool DedupOn_>
+          class BlockEpilogueDedup_, bool DedupOn_, bool BatchedDispatch>
 CATLASS_DEVICE void
 MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_, BlockEpilogue3_,
               SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_, SharedBlockMmad_, SharedBlockEpilogue1_,
-              SharedBlockEpilogue2_, BlockEpilogueDedup_, DedupOn_>::WaitMaskDataReady(Params const& p)
+              SharedBlockEpilogue2_, BlockEpilogueDedup_, DedupOn_, BatchedDispatch>::WaitMaskDataReady(Params const& p)
 {
     for (uint32_t src = coreIdx; src < p.EP; src += coreNum) {
         if (!IsRankMasked(src)) {
@@ -69,11 +69,11 @@ MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, B
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
           class BlockEpilogue2_, class BlockEpilogue3_, class SharedBf16Mmad_, class SharedBf16Epilogue_,
           bool SharedGmm2Bf16_, class SharedBlockMmad_, class SharedBlockEpilogue1_, class SharedBlockEpilogue2_,
-          class BlockEpilogueDedup_, bool DedupOn_>
-CATLASS_DEVICE void
-MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_, BlockEpilogue3_,
-              SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_, SharedBlockMmad_, SharedBlockEpilogue1_,
-              SharedBlockEpilogue2_, BlockEpilogueDedup_, DedupOn_>::ResetMaskDataReady(Params const& p)
+          class BlockEpilogueDedup_, bool DedupOn_, bool BatchedDispatch>
+CATLASS_DEVICE void MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_,
+                                  BlockEpilogue3_, SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_,
+                                  SharedBlockMmad_, SharedBlockEpilogue1_, SharedBlockEpilogue2_, BlockEpilogueDedup_,
+                                  DedupOn_, BatchedDispatch>::ResetMaskDataReady(Params const& p)
 {
     if (coreIdx >= p.EP) {
         return;
@@ -95,14 +95,14 @@ MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, B
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
           class BlockEpilogue2_, class BlockEpilogue3_, class SharedBf16Mmad_, class SharedBf16Epilogue_,
           bool SharedGmm2Bf16_, class SharedBlockMmad_, class SharedBlockEpilogue1_, class SharedBlockEpilogue2_,
-          class BlockEpilogueDedup_, bool DedupOn_>
-CATLASS_DEVICE void
-MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_, BlockEpilogue3_,
-              SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_, SharedBlockMmad_, SharedBlockEpilogue1_,
-              SharedBlockEpilogue2_, BlockEpilogueDedup_, DedupOn_>::CopyMaskRows(Params const& p, uint32_t srcRank,
-                                                                                  uint32_t expert, uint32_t rows,
-                                                                                  uint32_t savedRow, uint64_t gmOffsetA,
-                                                                                  int32_t& pingpong)
+          class BlockEpilogueDedup_, bool DedupOn_, bool BatchedDispatch>
+CATLASS_DEVICE void MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_,
+                                  BlockEpilogue3_, SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_,
+                                  SharedBlockMmad_, SharedBlockEpilogue1_, SharedBlockEpilogue2_, BlockEpilogueDedup_,
+                                  DedupOn_, BatchedDispatch>::CopyMaskRows(Params const& p, uint32_t srcRank,
+                                                                           uint32_t expert, uint32_t rows,
+                                                                           uint32_t savedRow, uint64_t gmOffsetA,
+                                                                           int32_t& pingpong)
 {
     if (rows == 0) {
         return;
@@ -172,14 +172,14 @@ MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, B
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
           class BlockEpilogue2_, class BlockEpilogue3_, class SharedBf16Mmad_, class SharedBf16Epilogue_,
           bool SharedGmm2Bf16_, class SharedBlockMmad_, class SharedBlockEpilogue1_, class SharedBlockEpilogue2_,
-          class BlockEpilogueDedup_, bool DedupOn_>
-CATLASS_DEVICE void MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_,
-                                  BlockEpilogue3_, SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_,
-                                  SharedBlockMmad_, SharedBlockEpilogue1_, SharedBlockEpilogue2_, BlockEpilogueDedup_,
-                                  DedupOn_>::GetMaskCumsumForMMAIV(AscendC::GlobalTensor<int32_t>& tokenPerExpert,
-                                                                   AscendC::GlobalTensor<int32_t>& result,
-                                                                   uint32_t expertPerRank, uint32_t rankId, uint32_t EP,
-                                                                   GM_ADDR expertTokenNums)
+          class BlockEpilogueDedup_, bool DedupOn_, bool BatchedDispatch>
+CATLASS_DEVICE void
+MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_, BlockEpilogue3_,
+              SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_, SharedBlockMmad_, SharedBlockEpilogue1_,
+              SharedBlockEpilogue2_, BlockEpilogueDedup_, DedupOn_,
+              BatchedDispatch>::GetMaskCumsumForMMAIV(AscendC::GlobalTensor<int32_t>& tokenPerExpert,
+                                                      AscendC::GlobalTensor<int32_t>& result, uint32_t expertPerRank,
+                                                      uint32_t rankId, uint32_t EP, GM_ADDR expertTokenNums)
 {
     const uint32_t stride = AlignUp(expertPerRank, 8);
     const uint32_t elements = EP * stride;
@@ -211,12 +211,12 @@ CATLASS_DEVICE void MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
           class BlockEpilogue2_, class BlockEpilogue3_, class SharedBf16Mmad_, class SharedBf16Epilogue_,
           bool SharedGmm2Bf16_, class SharedBlockMmad_, class SharedBlockEpilogue1_, class SharedBlockEpilogue2_,
-          class BlockEpilogueDedup_, bool DedupOn_>
-CATLASS_DEVICE void
-MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_, BlockEpilogue3_,
-              SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_, SharedBlockMmad_, SharedBlockEpilogue1_,
-              SharedBlockEpilogue2_, BlockEpilogueDedup_, DedupOn_>::MaskPrologue(Params const& p, int64_t tokenBase,
-                                                                                  uint32_t tokens, int64_t countOffset)
+          class BlockEpilogueDedup_, bool DedupOn_, bool BatchedDispatch>
+CATLASS_DEVICE void MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_,
+                                  BlockEpilogue3_, SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_,
+                                  SharedBlockMmad_, SharedBlockEpilogue1_, SharedBlockEpilogue2_, BlockEpilogueDedup_,
+                                  DedupOn_, BatchedDispatch>::MaskPrologue(Params const& p, int64_t tokenBase,
+                                                                           uint32_t tokens, int64_t countOffset)
 {
     AscendC::GlobalTensor<int32_t> ids, counts, rowIndex;
     ids.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(p.expertIdx) + tokenBase * p.topK);
@@ -250,11 +250,11 @@ MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, B
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
           class BlockEpilogue2_, class BlockEpilogue3_, class SharedBf16Mmad_, class SharedBf16Epilogue_,
           bool SharedGmm2Bf16_, class SharedBlockMmad_, class SharedBlockEpilogue1_, class SharedBlockEpilogue2_,
-          class BlockEpilogueDedup_, bool DedupOn_>
+          class BlockEpilogueDedup_, bool DedupOn_, bool BatchedDispatch>
 CATLASS_DEVICE MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_,
                              BlockEpilogue3_, SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_, SharedBlockMmad_,
-                             SharedBlockEpilogue1_, SharedBlockEpilogue2_, BlockEpilogueDedup_,
-                             DedupOn_>::MaskWorkspaceInfo::MaskWorkspaceInfo(const Params& params)
+                             SharedBlockEpilogue1_, SharedBlockEpilogue2_, BlockEpilogueDedup_, DedupOn_,
+                             BatchedDispatch>::MaskWorkspaceInfo::MaskWorkspaceInfo(const Params& params)
     : WorkspaceInfo(params)
 {
     uint64_t workspaceOffset = reinterpret_cast<GM_ADDR>(this->ptrSoftFlagBase) - params.ptrWorkspace +
@@ -269,12 +269,12 @@ CATLASS_DEVICE MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, Blo
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
           class BlockEpilogue2_, class BlockEpilogue3_, class SharedBf16Mmad_, class SharedBf16Epilogue_,
           bool SharedGmm2Bf16_, class SharedBlockMmad_, class SharedBlockEpilogue1_, class SharedBlockEpilogue2_,
-          class BlockEpilogueDedup_, bool DedupOn_>
+          class BlockEpilogueDedup_, bool DedupOn_, bool BatchedDispatch>
 CATLASS_DEVICE MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_,
                              BlockEpilogue3_, SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_, SharedBlockMmad_,
-                             SharedBlockEpilogue1_, SharedBlockEpilogue2_, BlockEpilogueDedup_,
-                             DedupOn_>::MaskPeermemInfo::MaskPeermemInfo(const Params& params,
-                                                                         const HcclShmem<false>& shmem)
+                             SharedBlockEpilogue1_, SharedBlockEpilogue2_, BlockEpilogueDedup_, DedupOn_,
+                             BatchedDispatch>::MaskPeermemInfo::MaskPeermemInfo(const Params& params,
+                                                                                const HcclShmem<false>& shmem)
     : PeermemInfo(params, shmem)
 {
     if constexpr (BLOCKED_OUTPUT_) {

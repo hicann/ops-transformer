@@ -928,6 +928,7 @@ English | [简体中文](./README.md)
 
 - **Parameter constraints**:
   - **<term>Atlas A2 products</term> and <term>Atlas A3 products</term>**:
+    - `256 ≤ intermediateHidden ≤ 4096` and `intermediateHidden % 128 == 0`.
     - Scenario matching matrix:
 
       | Scenario | x | weight1 | weight2 | weightScales1 | weightScales2 | bias1 | bias2 | y | dispatchQuantMode | dispatchQuantOutDtype |

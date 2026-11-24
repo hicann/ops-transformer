@@ -27,13 +27,14 @@ using namespace Mc2Tiling;
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
           class BlockEpilogue2_, class BlockEpilogue3_, class SharedBf16Mmad_, class SharedBf16Epilogue_,
           bool SharedGmm2Bf16_, class SharedBlockMmad_, class SharedBlockEpilogue1_, class SharedBlockEpilogue2_,
-          class BlockEpilogueDedup_, bool DedupOn_>
+          class BlockEpilogueDedup_, bool DedupOn_, bool BatchedDispatch>
 CATLASS_DEVICE void MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_,
                                   BlockEpilogue3_, SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_,
                                   SharedBlockMmad_, SharedBlockEpilogue1_, SharedBlockEpilogue2_, BlockEpilogueDedup_,
-                                  DedupOn_>::ResetDistTokenFirstPosV2(GM_ADDR distTokenFirstPos,
-                                                                      GM_ADDR distTokenLastPos, int32_t num,
-                                                                      uint32_t coreIdx, uint32_t coreNum)
+                                  DedupOn_, BatchedDispatch>::ResetDistTokenFirstPosV2(GM_ADDR distTokenFirstPos,
+                                                                                       GM_ADDR distTokenLastPos,
+                                                                                       int32_t num, uint32_t coreIdx,
+                                                                                       uint32_t coreNum)
 {
     int32_t totalAlignBlocks = (num + DEDUP_ALIGN32_INT32S - 1) / DEDUP_ALIGN32_INT32S;
     int32_t blocksPerCore = totalAlignBlocks / coreNum;
@@ -81,12 +82,12 @@ CATLASS_DEVICE void MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
           class BlockEpilogue2_, class BlockEpilogue3_, class SharedBf16Mmad_, class SharedBf16Epilogue_,
           bool SharedGmm2Bf16_, class SharedBlockMmad_, class SharedBlockEpilogue1_, class SharedBlockEpilogue2_,
-          class BlockEpilogueDedup_, bool DedupOn_>
+          class BlockEpilogueDedup_, bool DedupOn_, bool BatchedDispatch>
 CATLASS_DEVICE int32_t
 MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_, BlockEpilogue3_,
               SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_, SharedBlockMmad_, SharedBlockEpilogue1_,
-              SharedBlockEpilogue2_, BlockEpilogueDedup_,
-              DedupOn_>::DedupGroupOf(int32_t row, const AscendC::LocalTensor<int32_t>& groupBase, int32_t er)
+              SharedBlockEpilogue2_, BlockEpilogueDedup_, DedupOn_,
+              BatchedDispatch>::DedupGroupOf(int32_t row, const AscendC::LocalTensor<int32_t>& groupBase, int32_t er)
 {
     int32_t lo = 0;
     int32_t hi = er;
@@ -110,12 +111,13 @@ MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, B
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
           class BlockEpilogue2_, class BlockEpilogue3_, class SharedBf16Mmad_, class SharedBf16Epilogue_,
           bool SharedGmm2Bf16_, class SharedBlockMmad_, class SharedBlockEpilogue1_, class SharedBlockEpilogue2_,
-          class BlockEpilogueDedup_, bool DedupOn_>
+          class BlockEpilogueDedup_, bool DedupOn_, bool BatchedDispatch>
 CATLASS_DEVICE void MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_,
                                   BlockEpilogue3_, SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_,
                                   SharedBlockMmad_, SharedBlockEpilogue1_, SharedBlockEpilogue2_, BlockEpilogueDedup_,
-                                  DedupOn_>::DedupTokenDispatchV2(Params const& params, uint16_t& syncgmm1Idx,
-                                                                  uint32_t& dequantSumTemp)
+                                  DedupOn_, BatchedDispatch>::DedupTokenDispatchV2(Params const& params,
+                                                                                   uint16_t& syncgmm1Idx,
+                                                                                   uint32_t& dequantSumTemp)
 {
     const int32_t k = static_cast<int32_t>(params.problemShape.k());
     const int32_t topK = static_cast<int32_t>(params.topK);
@@ -356,17 +358,17 @@ CATLASS_DEVICE void MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
           class BlockEpilogue2_, class BlockEpilogue3_, class SharedBf16Mmad_, class SharedBf16Epilogue_,
           bool SharedGmm2Bf16_, class SharedBlockMmad_, class SharedBlockEpilogue1_, class SharedBlockEpilogue2_,
-          class BlockEpilogueDedup_, bool DedupOn_>
-CATLASS_DEVICE void MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_,
-                                  BlockEpilogue3_, SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_,
-                                  SharedBlockMmad_, SharedBlockEpilogue1_, SharedBlockEpilogue2_, BlockEpilogueDedup_,
-                                  DedupOn_>::DedupIssueRowMetaSlice(AscendC::GlobalTensor<int32_t>& rowMetaGm,
-                                                                    int32_t preGroupSumG, uint32_t coreOffsetG,
-                                                                    uint32_t coreLenG, uint32_t sliceRows, uint32_t s,
-                                                                    AscendC::LocalTensor<int32_t> (&ubRowMetaSl)[2],
-                                                                    AscendC::LocalTensor<float> (&ubScale2Sl)[2],
-                                                                    AscendC::DataCopyExtParams& sliceParamsRM,
-                                                                    AscendC::DataCopyExtParams& sliceParamsS2)
+          class BlockEpilogueDedup_, bool DedupOn_, bool BatchedDispatch>
+CATLASS_DEVICE void
+MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_, BlockEpilogue3_,
+              SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_, SharedBlockMmad_, SharedBlockEpilogue1_,
+              SharedBlockEpilogue2_, BlockEpilogueDedup_, DedupOn_,
+              BatchedDispatch>::DedupIssueRowMetaSlice(AscendC::GlobalTensor<int32_t>& rowMetaGm, int32_t preGroupSumG,
+                                                       uint32_t coreOffsetG, uint32_t coreLenG, uint32_t sliceRows,
+                                                       uint32_t s, AscendC::LocalTensor<int32_t> (&ubRowMetaSl)[2],
+                                                       AscendC::LocalTensor<float> (&ubScale2Sl)[2],
+                                                       AscendC::DataCopyExtParams& sliceParamsRM,
+                                                       AscendC::DataCopyExtParams& sliceParamsS2)
 {
     const uint32_t rowLo = s * sliceRows;
     uint32_t nrows = coreLenG - rowLo;
@@ -389,20 +391,21 @@ CATLASS_DEVICE void MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
           class BlockEpilogue2_, class BlockEpilogue3_, class SharedBf16Mmad_, class SharedBf16Epilogue_,
           bool SharedGmm2Bf16_, class SharedBlockMmad_, class SharedBlockEpilogue1_, class SharedBlockEpilogue2_,
-          class BlockEpilogueDedup_, bool DedupOn_>
-CATLASS_DEVICE auto MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_,
-                                  BlockEpilogue3_, SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_,
-                                  SharedBlockMmad_, SharedBlockEpilogue1_, SharedBlockEpilogue2_, BlockEpilogueDedup_,
-                                  DedupOn_>::DedupDeriveRow(AscendC::GlobalTensor<int32_t>& rowMetaGm,
-                                                            AscendC::LocalTensor<int32_t> (&ubRowMetaSl)[2],
-                                                            AscendC::LocalTensor<float> (&ubRowMetaSlF)[2],
-                                                            AscendC::LocalTensor<float> (&ubScale2Sl)[2],
-                                                            AscendC::DataCopyExtParams& sliceParamsRM,
-                                                            AscendC::DataCopyExtParams& sliceParamsS2, uint32_t i,
-                                                            uint32_t coreOffsetG, uint32_t coreLenG,
-                                                            int32_t preGroupSumG, int32_t n2T,
-                                                            int32_t layoutChunkTokensT, uint32_t& issued,
-                                                            uint32_t totalSlices) -> typename BlockEpilogueDedup::RowCtx
+          class BlockEpilogueDedup_, bool DedupOn_, bool BatchedDispatch>
+CATLASS_DEVICE auto MegaMoeKernel<
+    BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_, BlockEpilogue3_, SharedBf16Mmad_,
+    SharedBf16Epilogue_, SharedGmm2Bf16_, SharedBlockMmad_, SharedBlockEpilogue1_, SharedBlockEpilogue2_,
+    BlockEpilogueDedup_, DedupOn_, BatchedDispatch>::DedupDeriveRow(AscendC::GlobalTensor<int32_t>& rowMetaGm,
+                                                                    AscendC::LocalTensor<int32_t> (&ubRowMetaSl)[2],
+                                                                    AscendC::LocalTensor<float> (&ubRowMetaSlF)[2],
+                                                                    AscendC::LocalTensor<float> (&ubScale2Sl)[2],
+                                                                    AscendC::DataCopyExtParams& sliceParamsRM,
+                                                                    AscendC::DataCopyExtParams& sliceParamsS2,
+                                                                    uint32_t i, uint32_t coreOffsetG, uint32_t coreLenG,
+                                                                    int32_t preGroupSumG, int32_t n2T,
+                                                                    int32_t layoutChunkTokensT, uint32_t& issued,
+                                                                    uint32_t totalSlices) ->
+    typename BlockEpilogueDedup::RowCtx
 {
     const uint32_t rowIdx = i - coreOffsetG;
     const uint32_t sliceIdx = rowIdx / DEDUP_COMBINE_SLICE_ROWS;
@@ -445,11 +448,11 @@ CATLASS_DEVICE auto MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
           class BlockEpilogue2_, class BlockEpilogue3_, class SharedBf16Mmad_, class SharedBf16Epilogue_,
           bool SharedGmm2Bf16_, class SharedBlockMmad_, class SharedBlockEpilogue1_, class SharedBlockEpilogue2_,
-          class BlockEpilogueDedup_, bool DedupOn_>
-CATLASS_DEVICE void
-MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_, BlockEpilogue3_,
-              SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_, SharedBlockMmad_, SharedBlockEpilogue1_,
-              SharedBlockEpilogue2_, BlockEpilogueDedup_, DedupOn_>::DedupCombineV2(Params const& params)
+          class BlockEpilogueDedup_, bool DedupOn_, bool BatchedDispatch>
+CATLASS_DEVICE void MegaMoeKernel<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_,
+                                  BlockEpilogue3_, SharedBf16Mmad_, SharedBf16Epilogue_, SharedGmm2Bf16_,
+                                  SharedBlockMmad_, SharedBlockEpilogue1_, SharedBlockEpilogue2_, BlockEpilogueDedup_,
+                                  DedupOn_, BatchedDispatch>::DedupCombineV2(Params const& params)
 {
     const int32_t n2 = static_cast<int32_t>(params.problemShape.k());
     const int32_t er = static_cast<int32_t>(params.expertPerRank);

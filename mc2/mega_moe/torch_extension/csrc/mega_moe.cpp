@@ -15,6 +15,13 @@
 #include <initializer_list>
 #include <limits>
 #include "aclnn_common.h"
+#if __has_include("aclnnop/mega_moe_tiling_a2a3.h")
+#include "aclnnop/mega_moe_tiling_a2a3.h"
+#elif __has_include("mega_moe_tiling_a2a3.h")
+#include "mega_moe_tiling_a2a3.h"
+#else
+#include "../../op_kernel/arch22/mega_moe_tiling_a2a3.h"
+#endif
 #if __has_include("aclnnop/mega_moe_layout_arch92.h")
 #include "aclnnop/mega_moe_layout_arch92.h"
 #else
@@ -523,7 +530,7 @@ int64_t CeilDiv(int64_t val, int64_t divisor)
 }
 
 int64_t CalcLeastCclBufferSizeA2(int64_t maxRecvTokenNum, int64_t h, int64_t epWorldSize, bool isQuantRouting,
-                                 int64_t bs, int64_t topK)
+                                 int64_t bs, int64_t topK, int64_t permuteChunk)
 {
     int64_t offsetTokenPerExpert = epWorldSize * CeilAlign(epWorldSize * MAX_EXPERTS_PER_RANK_A2A3 + 1, ALIGN_128) *
                                    static_cast<int64_t>(sizeof(int32_t));
@@ -535,7 +542,7 @@ int64_t CalcLeastCclBufferSizeA2(int64_t maxRecvTokenNum, int64_t h, int64_t epW
 
     // winOut A 区按单 chunk（不超过 bs）的 permute 输出分配，逐 chunk 复用，
     // 与 tiling_arch22.cpp CalcLeastCclBufferSize 的 A2 分支一致
-    const int64_t chunkTokensA2 = std::min(bs, MOE_PERMUTE_CHUNK);
+    const int64_t chunkTokensA2 = std::min(bs, permuteChunk);
     int64_t offsetA =
         chunkTokensA2 * topK * (!isQuantRouting ? h * static_cast<int64_t>(sizeof(int16_t)) : (h + ALIGN_512));
     int64_t offsetC = maxRecvTokenNum * h * static_cast<int64_t>(sizeof(int16_t));
@@ -552,12 +559,13 @@ int64_t CalcLeastCclBufferSizeA2(int64_t maxRecvTokenNum, int64_t h, int64_t epW
     return (offsetTokenPerExpert + offsetTensor + offsetFlag + RESERVED_SPACE_SIZE + MB_SIZE) / MB_SIZE;
 }
 
-int64_t CalcLeastCclBufferSizeA3(int64_t h, int64_t epWorldSize, bool isQuantRouting, int64_t bs, int64_t topK)
+int64_t CalcLeastCclBufferSizeA3(int64_t h, int64_t epWorldSize, bool isQuantRouting, int64_t bs, int64_t topK,
+                                 int64_t permuteChunk)
 {
     int64_t offsetTokenPerExpert = epWorldSize * CeilAlign(epWorldSize * MAX_EXPERTS_PER_RANK_A2A3 + 1, ALIGN_128) *
                                    static_cast<int64_t>(sizeof(int32_t));
 
-    const int64_t chunkTokens = std::min(bs, MOE_PERMUTE_CHUNK);
+    const int64_t chunkTokens = std::min(bs, permuteChunk);
     int64_t offsetAAfterDispatch =
         chunkTokens * topK * (isQuantRouting ? (h + ALIGN_512) : h * static_cast<int64_t>(sizeof(int16_t)));
     int64_t offsetD = chunkTokens * topK * h * static_cast<int64_t>(sizeof(int16_t));
@@ -987,20 +995,28 @@ int64_t GetMegaMoeCclBufferSize(int64_t epWorldSize, int64_t moeExpertNum, int64
             int64_t expertPerRank = moeExpertNum / epWorldSize;
             maxRecvTokenNum = numMaxTokensPerRank * epWorldSize * std::min(numTopk, expertPerRank);
         }
+        // The sizing API has no output dtype. Reserve the batch chunk only for matching shapes.
+        const auto platform = isA3 ? MegaMoeConfig::Platform::A3 : MegaMoeConfig::Platform::A2;
+        const bool matchesBatchShape = MegaMoeConfig::MatchesBatchedDispatchShape(
+            platform, hidden,
+            (intermediateHidden > 0 && intermediateHidden <= std::numeric_limits<int64_t>::max() / 2) ?
+                intermediateHidden * 2 :
+                0,
+            moeExpertNum, numTopk, epWorldSize);
+        const int64_t permuteChunk = MegaMoeConfig::GetPermuteChunk(matchesBatchShape);
         if (isA3) {
-            // 与 host tiling [DEDUP] 同源：combine_comm_mode=1 时 tiling 走 Dedup、被 G 收益门
-            // 静默关回基线或直接报错三种结局，两公式大小关系随 EP/topK 翻转，取 max 以
-            // 兼容可行性校验前的容量咨询；=0 或非量化 dispatch（无 Dedup 实例）→ 基线公式
-            int64_t masterMb =
-                CalcLeastCclBufferSizeA3(hidden, epWorldSize, isQuantRouting, numMaxTokensPerRank, numTopk);
-            if (dispatchQuantMode != 0 && combineCommMode == 1) {
+            // Batch shapes cover the 1024-token dedup window, including its alignment and guard row.
+            // Other shapes retain the larger of ordinary and dedup capacity to cover fallback.
+            int64_t masterMb = CalcLeastCclBufferSizeA3(hidden, epWorldSize, isQuantRouting, numMaxTokensPerRank,
+                                                        numTopk, permuteChunk);
+            if (!matchesBatchShape && dispatchQuantMode != 0 && combineCommMode == 1) {
                 return std::max(masterMb,
                                 CalcLeastCclBufferSizeDedupA3(hidden, epWorldSize, numMaxTokensPerRank, numTopk));
             }
             return masterMb;
         }
         return CalcLeastCclBufferSizeA2(maxRecvTokenNum, hidden, epWorldSize, isQuantRouting, numMaxTokensPerRank,
-                                        numTopk);
+                                        numTopk, permuteChunk);
     }
 
     TORCH_CHECK(!isArch92 || serverNum == 0, "Ascend960DT MegaMoe only supports the MTE topology (server_num=0)");

@@ -34,11 +34,27 @@
 #define NO_POST_PROCESS
 
 namespace Catlass::Epilogue::Block {
-template <uint32_t UB_STAGES_, class CType_, class LayoutPerTokenScale_, class DType_, class TileCopy_, bool IS_A2_>
-class BlockEpilogue<EpilogueAtlasA2W4A8PostPerTokenDequantV2<UB_STAGES_>, CType_,
-                    Gemm::GemmType<float, LayoutPerTokenScale_>, DType_, TileCopy_, IS_A2_T<IS_A2_>> {
+namespace detail {
+template <bool Enabled, uint32_t Stages>
+struct W4CombineBufferState {
+    AscendC::LocalTensor<float> ubFp32;
+    AscendC::LocalTensor<float> ubFp32L;
+};
+template <uint32_t Stages>
+struct W4CombineBufferState<true, Stages> {
+    AscendC::LocalTensor<float> ubFp32List[Stages];
+    AscendC::LocalTensor<float> ubFp32LList[Stages];
+    int32_t eventUbAuxVMTE2List[Stages];
+};
+} // namespace detail
+
+template <uint32_t UB_STAGES_, class CType_, class LayoutPerTokenScale_, class DType_, class TileCopy_, bool IS_A2_,
+          bool EnableBatched_>
+class BlockEpilogue<EpilogueAtlasA2W4A8PostPerTokenDequantV2<UB_STAGES_, EnableBatched_>, CType_,
+                    Gemm::GemmType<float, LayoutPerTokenScale_>, DType_, TileCopy_, IS_A2_T<IS_A2_>>
+    : private detail::W4CombineBufferState<EnableBatched_, UB_STAGES_> {
 public:
-    using DispatchPolicy = EpilogueAtlasA2W4A8PostPerTokenDequantV2<UB_STAGES_>;
+    using DispatchPolicy = EpilogueAtlasA2W4A8PostPerTokenDequantV2<UB_STAGES_, EnableBatched_>;
     using ArchTag = typename DispatchPolicy::ArchTag;
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
     static constexpr bool IS_A2 = IS_A2_T<IS_A2_>::Value;
@@ -125,16 +141,29 @@ public:
 
             eventUbTileCVMTE2List[i] = eventVMTE2++;
             eventUbScaleVMTE2List[i] = eventVMTE2++;
+            if constexpr (EnableBatched_) {
+                this->eventUbAuxVMTE2List[i] = eventVMTE2++;
+            }
             eventUbTileCMTE2VList[i] = eventMTE2V++;
             eventUbTileWMTE2VList[i] = eventMTE2V++;
             eventUbTileDVMTE3List[i] = eventVMTE3++;
             eventUbTileDMTE3VList[i] = eventMTE3V++;
         }
 
-        ubFp32 = resource.ubBuf.template GetBufferByByte<float>(ubOffset); // Upper 4 bits to fp32
-        ubOffset += max_len * sizeof(float);
-        ubFp32L = resource.ubBuf.template GetBufferByByte<float>(ubOffset); // Lower 4 bits to fp32
-        ubOffset += max_len * sizeof(float);
+        if constexpr (EnableBatched_) {
+            static_assert(UB_STAGES == 2, "Split FP32 layout requires two stages");
+            for (uint32_t stage = 0; stage < UB_STAGES; ++stage) {
+                this->ubFp32List[stage] = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
+                ubOffset += FP32_STAGE_CAPACITY * sizeof(float);
+                this->ubFp32LList[stage] = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
+                ubOffset += FP32_STAGE_CAPACITY * sizeof(float);
+            }
+        } else {
+            this->ubFp32 = resource.ubBuf.template GetBufferByByte<float>(ubOffset); // Upper 4 bits to fp32
+            ubOffset += max_len * sizeof(float);
+            this->ubFp32L = resource.ubBuf.template GetBufferByByte<float>(ubOffset); // Lower 4 bits to fp32
+            ubOffset += max_len * sizeof(float);
+        }
 
         tokenPerExpert.SetGlobalBuffer(reinterpret_cast<__gm__ int32_t*>(params.ptrTokenPerExpert));
         tokenPerExpertLayout = params.tokenPerExpertLayout;
@@ -149,6 +178,9 @@ public:
             AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbTileCVMTE2List[i]);
             AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(eventUbTileDVMTE3List[i]);
             AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbScaleVMTE2List[i]);
+            if constexpr (EnableBatched_) {
+                AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(this->eventUbAuxVMTE2List[i]);
+            }
         }
     }
 
@@ -159,6 +191,9 @@ public:
             AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbTileCVMTE2List[i]);
             AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(eventUbTileDVMTE3List[i]);
             AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbScaleVMTE2List[i]);
+            if constexpr (EnableBatched_) {
+                AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(this->eventUbAuxVMTE2List[i]);
+            }
         }
     }
     CATLASS_DEVICE
@@ -187,6 +222,9 @@ public:
         auto& ubD = ubDList[ubListId];
         auto& scaleUb = scaleUbList[ubListId];
         auto& ubweighAux = ubweighAuxList[ubListId];
+        auto& ubFp32 = GetFp32Buffer();
+        auto& ubFp32L = GetFp32LowBuffer();
+        const uint32_t elements = actualBlockShape.m() / 2 * n0;
         int64_t gmCOffsetH =
             (static_cast<int64_t>(preSrcExpertSum) * params.n2 + blockCoord.m() * params.n2) + blockCoord.n();
         int64_t gmCOffsetL = gmCOffsetH + params.n2;
@@ -213,13 +251,29 @@ public:
         AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(eventUbTileCMTE2VList[ubListId]);
         DataCopyExtParams copyParamsW{1, static_cast<uint32_t>(actualBlockShape.n() * sizeof(float)), 0, 0, 0};
         DataCopyPadExtParams<float> padParamsW{false, 0, 0, 0};
+        if constexpr (EnableBatched_) {
+            AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(this->eventUbAuxVMTE2List[ubListId]);
+        }
         AscendC::DataCopyPad(ubweighAux, gmWeighAux, copyParamsW, padParamsW);
         AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(eventUbTileWMTE2VList[ubListId]);
 
         AscendC::PipeBarrier<PIPE_V>();
-        AscendC::Cast<float, ElementC, false>(ubFp32, ubCH, AscendC::RoundMode::CAST_NONE, -1, repeat, {1, 1, 8, 4});
+        if constexpr (EnableBatched_) {
+            AscendC::Cast(ubFp32, ubCH, AscendC::RoundMode::CAST_NONE, elements);
+        } else {
+            AscendC::Cast<float, ElementC, false>(ubFp32, ubCH, AscendC::RoundMode::CAST_NONE, -1, repeat,
+                                                  {1, 1, 8, 4});
+        }
         PipeBarrier<PIPE_V>();
-        AscendC::Cast<float, ElementC, false>(ubFp32L, ubCL, AscendC::RoundMode::CAST_NONE, -1, repeat, {1, 1, 8, 4});
+        if constexpr (EnableBatched_) {
+            AscendC::Cast(ubFp32L, ubCL, AscendC::RoundMode::CAST_NONE, elements);
+        } else {
+            AscendC::Cast<float, ElementC, false>(ubFp32L, ubCL, AscendC::RoundMode::CAST_NONE, -1, repeat,
+                                                  {1, 1, 8, 4});
+        }
+        if constexpr (EnableBatched_) {
+            AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbTileCVMTE2List[ubListId]);
+        }
         PipeBarrier<PIPE_V>();
         ReconstructMsd(actualBlockShape.m() / 2, actualBlockShape.n());
         // Add W4A8 auxiliary matrix on UB
@@ -228,7 +282,11 @@ public:
         for (uint32_t i = 0; i < actualBlockShape.m() / 2; ++i) {
             AscendC::Add(ubFp32[i * n0], ubFp32[i * n0], ubweighAux, actualBlockShape.n());
         }
-        AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbTileCVMTE2List[ubListId]);
+        if constexpr (EnableBatched_) {
+            AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(this->eventUbAuxVMTE2List[ubListId]);
+        } else {
+            AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbTileCVMTE2List[ubListId]);
+        }
         AscendC::PipeBarrier<PIPE_V>();
 
         int32_t gmScaleOffset = (preSrcExpertSum + blockCoord.m()) / 2;
@@ -249,7 +307,11 @@ public:
         AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbScaleVMTE2List[ubListId]);
 
         AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(eventUbTileDVMTE3List[ubListId]);
-        AscendC::Cast<ElementD, float, false>(ubD, ubFp32, AscendC::RoundMode::CAST_RINT, -1, repeat, {1, 1, 4, 8});
+        if constexpr (EnableBatched_) {
+            AscendC::Cast(ubD, ubFp32, AscendC::RoundMode::CAST_RINT, elements);
+        } else {
+            AscendC::Cast<ElementD, float, false>(ubD, ubFp32, AscendC::RoundMode::CAST_RINT, -1, repeat, {1, 1, 4, 8});
+        }
         AscendC::PipeBarrier<PIPE_V>();
         AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(eventUbTileDMTE3VList[ubListId]);
         AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(eventUbTileDMTE3VList[ubListId]);
@@ -314,6 +376,7 @@ public:
                       AscendC::GlobalTensor<float> const& weightAux, AscendC::GlobalTensor<ElementD> const& gmD,
                       uint32_t blockM, uint32_t blockN, uint32_t epilogueCoreNum)
     {
+        static_assert(!EnableBatched_, "Shared output uses the dense epilogue, independently of routed batching");
         InitFlag();
         constexpr uint32_t ROW_TILE = 32U;
         const uint32_t rowTiles = (blockM + ROW_TILE - 1U) / ROW_TILE;
@@ -334,6 +397,8 @@ public:
             auto& ubD = ubDList[ubListId];
             auto& scaleUb = scaleUbList[ubListId];
             auto& ubweighAux = ubweighAuxList[ubListId];
+            auto& ubFp32 = GetFp32Buffer();
+            auto& ubFp32L = GetFp32LowBuffer();
             auto gmTileCH = gmC[(static_cast<uint64_t>(rowStart) * 2U) * blockN + colStart];
             auto gmTileCL = gmTileCH[blockN];
 
@@ -398,6 +463,8 @@ private:
     CATLASS_DEVICE
     void ReconstructMsd(uint32_t rows, uint32_t columns)
     {
+        auto& ubFp32 = GetFp32Buffer();
+        auto& ubFp32L = GetFp32LowBuffer();
         if (columns == static_cast<uint32_t>(n0)) {
             AscendC::Muls(ubFp32, ubFp32, 16.0F, rows * columns);
             AscendC::PipeBarrier<PIPE_V>();
@@ -413,13 +480,28 @@ private:
         }
     }
 
+    CATLASS_DEVICE AscendC::LocalTensor<float>& GetFp32Buffer()
+    {
+        if constexpr (EnableBatched_) {
+            return this->ubFp32List[ubListId];
+        } else {
+            return this->ubFp32;
+        }
+    }
+    CATLASS_DEVICE AscendC::LocalTensor<float>& GetFp32LowBuffer()
+    {
+        if constexpr (EnableBatched_) {
+            return this->ubFp32LList[ubListId];
+        } else {
+            return this->ubFp32L;
+        }
+    }
     Params params;
     AscendC::LocalTensor<ElementC> ubCHList[UB_STAGES];
     AscendC::LocalTensor<ElementC> ubCLList[UB_STAGES];
     AscendC::LocalTensor<float> ubweighAuxList[UB_STAGES];
     AscendC::LocalTensor<ElementD> ubDList[UB_STAGES];
-    AscendC::LocalTensor<float> ubFp32;
-    AscendC::LocalTensor<float> ubFp32L;
+    static constexpr uint32_t FP32_STAGE_CAPACITY = 16 * 256;
     AscendC::LocalTensor<float> scaleUbList[UB_STAGES];
 
     int32_t max_len = 32 * 256;

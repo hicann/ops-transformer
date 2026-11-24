@@ -25,13 +25,35 @@
 #include "get_tensor_addr.hpp"
 
 namespace Catlass::Epilogue::Block {
+namespace detail {
+template <bool Enabled, uint32_t UB_STAGES, uint32_t TILE_LENGTH>
+struct W4SwigluBatchState {};
+template <uint32_t UB_STAGES, uint32_t TILE_LENGTH>
+struct W4SwigluBatchState<true, UB_STAGES, TILE_LENGTH> {
+    bool auxCacheValid_[UB_STAGES]{};
+    uint64_t auxCacheAddress_[UB_STAGES]{};
+    uint32_t auxCacheGroup_[UB_STAGES]{};
+    uint32_t auxCacheWidth_[UB_STAGES]{};
+    uint32_t batchTileLength_{TILE_LENGTH};
+    uint32_t batchAuxStride_{TILE_LENGTH};
+    bool eightRowsEnabled_{true};
+    bool eightRowConfigured_{false};
+};
+} // namespace detail
 
 template <uint32_t UB_STAGES_, class CType_, class LayoutPerTokenScale_, class DType_, class TileElemWiseMuls_,
-          class TileCopy_>
-class BlockEpilogue<EpilogueAtlasA2W4A8PostPerTokenDequantSwigluQuant<UB_STAGES_>, CType_,
-                    Gemm::GemmType<float, LayoutPerTokenScale_>, DType_, TileElemWiseMuls_, TileCopy_> {
+          class TileCopy_, bool EnableBatched_>
+class BlockEpilogue<EpilogueAtlasA2W4A8PostPerTokenDequantSwigluQuant<UB_STAGES_, EnableBatched_>, CType_,
+                    Gemm::GemmType<float, LayoutPerTokenScale_>, DType_, TileElemWiseMuls_, TileCopy_>
+    : private detail::W4SwigluBatchState<
+          EnableBatched_, UB_STAGES_,
+          EpilogueAtlasA2W4A8PostPerTokenDequantSwigluQuant<UB_STAGES_, EnableBatched_>::TILE_LENGTH> {
 public:
-    using DispatchPolicy = EpilogueAtlasA2W4A8PostPerTokenDequantSwigluQuant<UB_STAGES_>;
+    CATLASS_DEVICE void EnableEightRows(bool enabled)
+    {
+        this->eightRowsEnabled_ = enabled;
+    }
+    using DispatchPolicy = EpilogueAtlasA2W4A8PostPerTokenDequantSwigluQuant<UB_STAGES_, EnableBatched_>;
     using ArchTag = typename DispatchPolicy::ArchTag;
     using Activation = typename DispatchPolicy::Activation;
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
@@ -196,6 +218,18 @@ public:
         uint32_t tasksForIdx = 0;
         if (!GetTaskRange(blockM, epilogueCoreNum, loopStartIdx, tasksForIdx)) {
             return;
+        }
+        if constexpr (EnableBatched_) {
+            if ((branchLength == 512 || branchLength == 640)) {
+                if (branchLength == 512 && this->eightRowsEnabled_ && !this->eightRowConfigured_) {
+                    ConfigureEightRows(resource);
+                }
+                RunFourRows(gmC, gmPerTokenScale1, gmWeightAux, gmD, cumsumMM, MOffset, gmPerTokenScale2, expertPerRank,
+                            EP, listLen, loopStartIdx, tasksForIdx, branchLength, gmmOutPreRowStride, activationClamp);
+                return;
+            }
+            for (uint32_t stage = 0; stage < UB_STAGES; ++stage)
+                this->auxCacheValid_[stage] = false;
         }
         uint32_t scaleBatchStart = loopStartIdx;
         uint32_t scaleBatchCount = 0;
@@ -513,6 +547,280 @@ private:
         AscendC::PipeBarrier<PIPE_V>();
         Activation::Compute(ubActivation, ubGateFp32, ubUpFp32, sharedTmpBuffer, tileLength, activationClamp,
                             activationCode_, activationParams1_, activationParams2_);
+    }
+
+    CATLASS_DEVICE
+    void ConfigureEightRows(Arch::Resource<ArchTag> const& resource)
+    {
+        static constexpr uint32_t BATCH = 4096;
+        static constexpr size_t EIGHT_BUFFER_BYTES =
+            UB_STAGES * (4 * BATCH * sizeof(ElementC) + 2 * 512 * sizeof(float) + BATCH) +
+            (3 * BATCH + 64) * sizeof(float) + BATCH * sizeof(ElementD) + 128 * sizeof(int16_t) +
+            SCALE_BUFFER_COUNT * SCALE_BUFFER_BYTES + ROW_MAX_BYTES + SCALE_INPUT_BYTES;
+        static_assert(EIGHT_BUFFER_BYTES + Activation::MIN_SHARED_TMP_BYTES <= ArchTag::UB_SIZE,
+                      "Eight-row double buffers exceed UB");
+        size_t offset = 0;
+        for (uint32_t stage = 0; stage < UB_STAGES; ++stage) {
+            ubCList[stage] = resource.ubBuf.template GetBufferByByte<ElementC>(offset);
+            offset += 4 * BATCH * sizeof(ElementC);
+            ubWeightAuxList[stage] = resource.ubBuf.template GetBufferByByte<float>(offset);
+            offset += 2 * 512 * sizeof(float);
+            xHighI4TensorList[stage] = resource.ubBuf.template GetBufferByByte<int4b_t>(offset);
+            offset += BATCH / 2;
+            xLowI4TensorList[stage] = resource.ubBuf.template GetBufferByByte<int4b_t>(offset);
+            offset += BATCH / 2;
+            this->auxCacheValid_[stage] = false;
+        }
+        ubGateFp32 = resource.ubBuf.template GetBufferByByte<float>(offset);
+        offset += BATCH * sizeof(float);
+        ubUpFp32 = resource.ubBuf.template GetBufferByByte<float>(offset);
+        offset += (BATCH + 64) * sizeof(float);
+        ubActivation = resource.ubBuf.template GetBufferByByte<float>(offset);
+        offset += BATCH * sizeof(float);
+        ubD = resource.ubBuf.template GetBufferByByte<ElementD>(offset);
+        offset += BATCH * sizeof(ElementD);
+        xLowI16Tensor = resource.ubBuf.template GetBufferByByte<int16_t>(offset);
+        offset += 128 * sizeof(int16_t);
+        for (uint32_t stage = 0; stage < SCALE_BUFFER_COUNT; ++stage) {
+            ubPerTokenScaleOutputList[stage] = resource.ubBuf.template GetBufferByByte<float>(offset);
+            offset += SCALE_BUFFER_BYTES;
+        }
+        ubRowAbsMax = resource.ubBuf.template GetBufferByByte<float>(offset);
+        offset += ROW_MAX_BYTES;
+        ubPerTokenScaleInput = resource.ubBuf.template GetBufferByByte<float>(offset);
+        offset += SCALE_INPUT_BYTES;
+        sharedTmpBuffer = resource.ubBuf.template GetBufferByByte<uint8_t>(offset);
+        Duplicate(xLowI16Tensor, static_cast<int16_t>(0x0F0F), 128);
+        AscendC::PipeBarrier<PIPE_V>();
+        this->batchTileLength_ = BATCH;
+        this->batchAuxStride_ = 512;
+        this->eightRowConfigured_ = true;
+    }
+
+    CATLASS_DEVICE
+    void ComputeLoadedFourRows(uint32_t stageId, uint32_t tileLength, float const* scales, uint32_t rows,
+                               uint32_t width, float activationClamp, float reconstructScale)
+    {
+        auto& ubC = ubCList[stageId];
+        auto& ubWeightAux = ubWeightAuxList[stageId];
+
+        AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(eventUbCMTE2VList[stageId]);
+        AscendC::Cast(ubGateFp32, ubC, AscendC::RoundMode::CAST_NONE, tileLength);
+        AscendC::Cast(ubActivation, ubC[2 * this->batchTileLength_], AscendC::RoundMode::CAST_NONE, tileLength);
+        AscendC::PipeBarrier<PIPE_V>();
+        AscendC::Muls(ubGateFp32, ubGateFp32, reconstructScale, tileLength);
+        AscendC::PipeBarrier<PIPE_V>();
+        AscendC::Add(ubGateFp32, ubGateFp32, ubActivation, tileLength);
+        AscendC::PipeBarrier<PIPE_V>();
+        AscendC::Cast(ubUpFp32, ubC[this->batchTileLength_], AscendC::RoundMode::CAST_NONE, tileLength);
+        AscendC::Cast(ubActivation, ubC[3 * this->batchTileLength_], AscendC::RoundMode::CAST_NONE, tileLength);
+        AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[stageId]);
+        AscendC::PipeBarrier<PIPE_V>();
+        AscendC::Muls(ubUpFp32, ubUpFp32, reconstructScale, tileLength);
+        AscendC::PipeBarrier<PIPE_V>();
+        AscendC::Add(ubUpFp32, ubUpFp32, ubActivation, tileLength);
+
+        AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(eventUbWAMTE2VList[stageId]);
+        AscendC::PipeBarrier<PIPE_V>();
+        for (uint32_t row = 0; row < rows; ++row) {
+            AscendC::Add(ubGateFp32[row * width], ubGateFp32[row * width], ubWeightAux, width);
+            AscendC::Add(ubUpFp32[row * width], ubUpFp32[row * width], ubWeightAux[this->batchAuxStride_], width);
+        }
+        AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbWAVMTE2List[stageId]);
+
+        AscendC::SetFlag<AscendC::HardEvent::S_V>(0);
+        AscendC::WaitFlag<AscendC::HardEvent::S_V>(0);
+        AscendC::PipeBarrier<PIPE_V>();
+        for (uint32_t row = 0; row < rows; ++row) {
+            AscendC::Muls(ubGateFp32[row * width], ubGateFp32[row * width], scales[row], width);
+            AscendC::Muls(ubUpFp32[row * width], ubUpFp32[row * width], scales[row], width);
+        }
+        AscendC::PipeBarrier<PIPE_V>();
+        Activation::Compute(ubActivation, ubGateFp32, ubUpFp32, sharedTmpBuffer, tileLength, activationClamp,
+                            activationCode_, activationParams1_, activationParams2_);
+    }
+
+    CATLASS_DEVICE
+    uint32_t FourRowCount(AscendC::GlobalTensor<int32_t> const& sums, uint32_t offset, uint32_t row, uint32_t end,
+                          uint32_t epr, uint32_t ep)
+    {
+        const uint32_t group = GetGroupIndex(sums, offset + row, epr, ep);
+        uint32_t rows = 1;
+        while (rows < (this->batchTileLength_ == 4096 ? 8u : 4u) && row + rows < end &&
+               GetGroupIndex(sums, offset + row + rows, epr, ep) == group)
+            ++rows;
+        return rows;
+    }
+
+    CATLASS_DEVICE
+    void LoadFourRows(AscendC::GlobalTensor<ElementC> const& input, __gm__ float* aux, uint32_t group, int32_t listLen,
+                      uint32_t row, uint32_t rows, uint32_t width, uint32_t stride, uint32_t stage)
+    {
+        AscendC::GlobalTensor<float> weights;
+        weights.SetGlobalBuffer(reinterpret_cast<__gm__ float*>(
+            GetTensorAddr<float>(listLen == 1 ? 0 : group, reinterpret_cast<GM_ADDR>(aux))));
+        const uint32_t base = listLen == 1 ? group * 2 * width : 0;
+        const uint64_t auxAddress =
+            reinterpret_cast<uint64_t>(weights.GetPhyAddr()) + static_cast<uint64_t>(base) * sizeof(float);
+        const bool auxHit = this->auxCacheValid_[stage] && this->auxCacheAddress_[stage] == auxAddress &&
+                            this->auxCacheGroup_[stage] == group && this->auxCacheWidth_[stage] == width;
+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[stage]);
+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbWAVMTE2List[stage]);
+        const uint64_t source = static_cast<uint64_t>(row) * stride * 2;
+        LayoutC ubLayout{rows, width};
+        LayoutC gmLayout{rows, width, stride * 2};
+        copyGmToUbC(ubCList[stage], input[source], ubLayout, gmLayout);
+        copyGmToUbC(ubCList[stage][this->batchTileLength_], input[source + width], ubLayout, gmLayout);
+        copyGmToUbC(ubCList[stage][2 * this->batchTileLength_], input[source + stride], ubLayout, gmLayout);
+        copyGmToUbC(ubCList[stage][3 * this->batchTileLength_], input[source + stride + width], ubLayout, gmLayout);
+        if (!auxHit) {
+            DataCopyExtParams cp{1, static_cast<uint32_t>(width * sizeof(float)), 0, 0, 0};
+            DataCopyPadExtParams<float> pad{false, 0, 0, 0};
+            DataCopyPad(ubWeightAuxList[stage], weights[base], cp, pad);
+            DataCopyPad(ubWeightAuxList[stage][this->batchAuxStride_], weights[base + width], cp, pad);
+        }
+        this->auxCacheValid_[stage] = true;
+        this->auxCacheAddress_[stage] = auxAddress;
+        this->auxCacheGroup_[stage] = group;
+        this->auxCacheWidth_[stage] = width;
+        AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(eventUbCMTE2VList[stage]);
+        AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(eventUbWAMTE2VList[stage]);
+    }
+
+    CATLASS_DEVICE
+    void RunFourRows(AscendC::GlobalTensor<ElementC> const& input, AscendC::GlobalTensor<float> const& inputScale,
+                     __gm__ float* aux, AscendC::GlobalTensor<ElementD> const& output,
+                     AscendC::GlobalTensor<int32_t> const& sums, uint32_t offset,
+                     AscendC::GlobalTensor<float> const& outputScale, uint32_t epr, uint32_t ep, int32_t listLen,
+                     uint32_t first, uint32_t count, uint32_t width, uint32_t stride, float clamp)
+    {
+        if (count == 0)
+            return;
+        uint32_t row = first, end = first + count, stage = 0;
+        uint32_t rows = FourRowCount(sums, offset, row, end, epr, ep);
+        LoadFourRows(input, aux, GetGroupIndex(sums, offset + row, epr, ep), listLen, row, rows, width, stride, stage);
+        uint32_t scaleStart = first, scaleCount = 0, scaleIndex = 0;
+        Duplicate(xLowI16Tensor, static_cast<int16_t>(0x0F0F), 128);
+        PipeBarrier<PIPE_V>();
+        while (row < end) {
+            float scales[8];
+            for (uint32_t j = 0; j < rows; ++j)
+                scales[j] = ::Catlass::Epilogue::Block::detail::ReadSwigluInputScale<SCALE_INPUT_COUNT>(
+                    ubPerTokenScaleInput, inputScale, row + j, first, count);
+            const uint32_t next = row + rows, nextStage = NextStage(stage);
+            uint32_t nextRows = 0;
+            if (next < end) {
+                nextRows = FourRowCount(sums, offset, next, end, epr, ep);
+                LoadFourRows(input, aux, GetGroupIndex(sums, offset + next, epr, ep), listLen, next, nextRows, width,
+                             stride, nextStage);
+            }
+            ComputeLoadedFourRows(stage, rows * width, scales, rows, width, clamp, 16.0f);
+            // One Abs over the batch, with an independent aligned result and scratch per row.
+            static_assert(64 + 8 * 512 <= 4096 + 64, "Eight-row reduction scratch bound");
+            AscendC::Abs(ubGateFp32, ubActivation, rows * width);
+            AscendC::PipeBarrier<PIPE_V>();
+            if (width == 512) {
+                // Eight 64-element partial maxima per token, then one maximum per token.
+                AscendC::WholeReduceMax(ubUpFp32[64], ubGateFp32, 64, rows * 8, 1, 1, 8,
+                                        AscendC::ReduceOrder::ORDER_ONLY_VALUE);
+                AscendC::PipeBarrier<PIPE_V>();
+                AscendC::WholeReduceMax(ubUpFp32, ubUpFp32[64], 8, rows, 1, 1, 1,
+                                        AscendC::ReduceOrder::ORDER_ONLY_VALUE);
+                AscendC::PipeBarrier<PIPE_V>();
+            } else {
+                for (uint32_t j = 0; j < rows; ++j) {
+                    AscendC::ReduceMax<float>(ubUpFp32[j * 8], ubGateFp32[j * width], ubUpFp32[64 + j * width], width,
+                                              false);
+                }
+            }
+            AscendC::SetFlag<AscendC::HardEvent::V_S>(0);
+            AscendC::WaitFlag<AscendC::HardEvent::V_S>(0);
+            float quantMultipliers[8];
+            for (uint32_t j = 0; j < rows; ++j) {
+                const float maximum = ubUpFp32.GetValue(width == 512 ? j : j * 8);
+                const uint32_t scaleStage = scaleIndex % SCALE_BUFFER_COUNT;
+                if (scaleCount == 0 && scaleIndex >= SCALE_BUFFER_COUNT)
+                    WaitScaleBuffer(scaleStage);
+                ubPerTokenScaleOutputList[scaleStage].SetValue(scaleCount, maximum / 127.0f);
+                quantMultipliers[j] = maximum > 0.0f ? 127.0f / maximum : 0.0f;
+                if (++scaleCount == SCALE_BATCH_COUNT) {
+                    FlushScaleBatch(outputScale, scaleStart, scaleCount, scaleStage);
+                    scaleStart += scaleCount;
+                    scaleCount = 0;
+                    ++scaleIndex;
+                }
+            }
+            QuantizeAndCopyFourRows(stage, output[row * width], width, rows, quantMultipliers);
+            row = next;
+            rows = nextRows;
+            stage = nextStage;
+        }
+        if (scaleCount > 0) {
+            FlushScaleBatch(outputScale, scaleStart, scaleCount, scaleIndex % SCALE_BUFFER_COUNT);
+            ++scaleIndex;
+        }
+        DrainScaleBuffers(scaleIndex);
+    }
+
+    CATLASS_DEVICE
+    void QuantizeAndCopyFourRows(uint32_t stageId, AscendC::GlobalTensor<ElementD> const& gmTileD, uint32_t width,
+                                 uint32_t rows, float const* multipliers)
+    {
+        const uint32_t tileLength = rows * width;
+        auto ubQuantS32 = ubGateFp32.template ReinterpretCast<int32_t>();
+        auto ubQuantF16 = ubGateFp32.template ReinterpretCast<half>();
+        for (uint32_t row = 0; row < rows; ++row) {
+            AscendC::Muls(ubGateFp32[row * width], ubActivation[row * width], multipliers[row], width);
+        }
+        AscendC::PipeBarrier<PIPE_V>();
+        AscendC::Cast(ubQuantS32, ubGateFp32, AscendC::RoundMode::CAST_RINT, tileLength);
+        AscendC::PipeBarrier<PIPE_V>();
+        AscendC::SetDeqScale(static_cast<half>(1.0));
+        AscendC::Cast(ubQuantF16, ubQuantS32, AscendC::RoundMode::CAST_RINT, tileLength);
+        AscendC::PipeBarrier<PIPE_V>();
+        AscendC::Cast(ubD, ubQuantF16, AscendC::RoundMode::CAST_RINT, tileLength);
+        AscendC::PipeBarrier<PIPE_V>();
+
+        auto& xHighI4Tensor = xHighI4TensorList[stageId];
+        auto& xLowI4Tensor = xLowI4TensorList[stageId];
+        Cast(ubQuantF16, ubD, AscendC::RoundMode::CAST_NONE, tileLength);
+        PipeBarrier<PIPE_V>();
+        Muls(ubQuantF16, ubQuantF16, static_cast<half>(0.0625f), tileLength);
+        PipeBarrier<PIPE_V>();
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(eventxHighMTE3VList[stageId]);
+        Cast(xHighI4Tensor, ubQuantF16, AscendC::RoundMode::CAST_FLOOR, tileLength);
+        AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(eventxHighVMTE3List[stageId]);
+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(eventxHighVMTE3List[stageId]);
+        DataCopyExtParams outputCopy{static_cast<uint16_t>(rows), width / 2, 0, width / 2, 0};
+        DataCopyPad(gmTileD, xHighI4Tensor.template ReinterpretCast<int8_t>(), outputCopy);
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(eventxHighMTE3VList[stageId]);
+
+        auto xLowHalfTensor = ubUpFp32.template ReinterpretCast<half>();
+        auto xLowHalfTensor2 = xLowHalfTensor[this->batchTileLength_];
+        uint32_t lenVk = (tileLength / 2) / 128;
+        uint32_t lastLenVk = (tileLength % 256) / 2;
+        // A 128-element activation tail has no full 256-element group.
+        // Avoid issuing a vector instruction with a zero repeat count.
+        if (lenVk > 0) {
+            And(xLowHalfTensor.template ReinterpretCast<int16_t>(), ubD.template ReinterpretCast<int16_t>(),
+                xLowI16Tensor, 128, lenVk, {1, 1, 1, 8, 8, 0});
+        }
+        if (lastLenVk > 0) {
+            And(xLowHalfTensor[lenVk * 128].template ReinterpretCast<int16_t>(),
+                ubD[lenVk * 256].template ReinterpretCast<int16_t>(), xLowI16Tensor, lastLenVk, 1, {1, 1, 1, 8, 8, 0});
+        }
+        PipeBarrier<PIPE_V>();
+        Cast(xLowHalfTensor2, xLowHalfTensor.template ReinterpretCast<int8_t>(), AscendC::RoundMode::CAST_NONE,
+             tileLength);
+        PipeBarrier<PIPE_V>();
+        Adds(ubQuantF16, xLowHalfTensor2, static_cast<half>(-8), tileLength);
+        PipeBarrier<PIPE_V>();
+        AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(eventxLowMTE3VList[stageId]);
+        Cast(xLowI4Tensor, ubQuantF16, AscendC::RoundMode::CAST_NONE, tileLength);
+        AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(eventxLowVMTE3List[stageId]);
+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(eventxLowVMTE3List[stageId]);
+        DataCopyPad(gmTileD[width / 2], xLowI4Tensor.template ReinterpretCast<int8_t>(), outputCopy);
+        AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(eventxLowMTE3VList[stageId]);
     }
 
     CATLASS_DEVICE

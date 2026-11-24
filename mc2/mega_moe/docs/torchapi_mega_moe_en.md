@@ -719,7 +719,7 @@ By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all produc
         <td>intermediate_hidden</td>
         <td>int</td>
         <td>Required</td>
-        <td>Intermediate feature dimension after activation. Linear1 generates both the gate and up branches, so the full output width of Linear1 is 2 × intermediate_hidden. Currently not used and not involved in communication buffer size calculation.</td>
+        <td>Intermediate feature dimension after activation. The Linear1 output width is 2 × intermediate_hidden for all activations. Gated activations split it into gate and up branches of equal width. GELU operates elementwise and retains the full width. This parameter is used to size the communication buffer and must match the actual shapes of l1_weights and l2_weights. An underestimated value can result in an insufficient buffer and a tiling error. On Atlas A2/A3 products, the value must be in [256, 4096] and divisible by 128.</td>
     </tr>
     <tr>
         <td>max_recv_token_num</td>
@@ -1340,7 +1340,7 @@ By default, `SymmBuffer` does not create `mask_buffer`. Therefore, in all produc
     - `max_recv_token_num` must be greater than 0. A value of 0 indicates automatic computation, using the formula `num_tokens × ep_world_size × min(num_topk, local_moe_expert_num)`.
     - `num_topk`: value range `1 ≤ num_topk ≤ 16`.
     - `hidden`: value range `1024 ≤ hidden ≤ 8192`, and `hidden % 512 == 0`.
-    - `intermediate_hidden`: value range `512 ≤ intermediate_hidden ≤ 3072`, and `intermediate_hidden % 512 == 0`.
+    - `intermediate_hidden`: value range `256 ≤ intermediate_hidden ≤ 4096`, and `intermediate_hidden % 128 == 0`.
     - `dispatch_quant_mode`: The value range is `0` (no quantization) and `2` (pertoken quantization).
     - `dispatch_quant_out_dtype`: The value is `torch.int8`.
     - Three computation use cases are supported (A16W16, A8W8-INT, A8W4-INT). For each use case, the required status and data types of optional input parameters (scale factors, biases, etc.) are strictly matched. When calling the API, provide all corresponding parameters based on the selected use case. Do not mix or omit parameters. See the following table for the pairing relationships.

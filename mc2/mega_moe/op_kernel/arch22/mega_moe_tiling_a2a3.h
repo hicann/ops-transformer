@@ -17,6 +17,58 @@
 #define ASCENDC_MEGA_MOE_TILING_H
 
 #include "moe_permute_prologue/moe_permute_prologue_tiling.h"
+#include <cstdint>
+
+#ifdef __CCE__
+#define MEGA_MOE_POLICY_HOST_DEVICE __forceinline__[host, aicore]
+#else
+#define MEGA_MOE_POLICY_HOST_DEVICE
+#endif
+
+namespace MegaMoeConfig {
+constexpr int64_t DEFAULT_PERMUTE_CHUNK_TOKENS = 1024;
+constexpr int64_t BATCHED_PERMUTE_CHUNK_TOKENS = 8192;
+
+enum class Platform : uint32_t {
+    A2,
+    A3
+};
+
+// The operator input checker validates BF16 input before either host or kernel uses this policy.
+// firstProjectionWidth is the gate/up output width (2 * intermediate size).
+MEGA_MOE_POLICY_HOST_DEVICE constexpr bool MatchesBatchedDispatchShape(Platform platform, int64_t hiddenSize,
+                                                                       int64_t firstProjectionWidth,
+                                                                       int64_t expertCount, int64_t topK,
+                                                                       int64_t epSize)
+{
+    const bool small = hiddenSize == 2048 && firstProjectionWidth == 1024 && expertCount == 256 && topK == 8 &&
+                       (epSize == 2 || epSize == 4 || epSize == 8);
+    const bool large = hiddenSize == 2560 && firstProjectionWidth == 1280 && expertCount == 512 && topK == 10 &&
+                       (epSize == 8 || (platform == Platform::A3 && epSize == 16));
+    return small || large;
+}
+
+MEGA_MOE_POLICY_HOST_DEVICE constexpr bool SupportsBatchedDispatch(Platform platform, int64_t hiddenSize,
+                                                                   int64_t firstProjectionWidth, int64_t expertCount,
+                                                                   int64_t topK, int64_t epSize, bool bf16Output)
+{
+    return bf16Output &&
+           MatchesBatchedDispatchShape(platform, hiddenSize, firstProjectionWidth, expertCount, topK, epSize);
+}
+
+MEGA_MOE_POLICY_HOST_DEVICE constexpr int64_t GetPermuteChunk(bool useBatchedDispatch)
+{
+    return useBatchedDispatch ? BATCHED_PERMUTE_CHUNK_TOKENS : DEFAULT_PERMUTE_CHUNK_TOKENS;
+}
+constexpr uint32_t SMALL_DISPATCH_EXPERTS = 16;
+constexpr uint32_t DEFAULT_DISPATCH_EXPERTS = 8;
+constexpr uint32_t FAST_PATH_MAX_BS = 64;
+constexpr uint32_t SMALL_DISPATCH_MAX_BS = 1024;
+constexpr uint32_t A2_DISPATCH_PEER_WORKERS = 4;
+
+} // namespace MegaMoeConfig
+
+#undef MEGA_MOE_POLICY_HOST_DEVICE
 
 using namespace Mc2Tiling;
 
@@ -96,6 +148,7 @@ struct MegaMoeA2A3TilingData {
     int64_t dedupRowMetaSize;          // workspace rowMeta 段字节数
     // Independent shared intermediate width (2 * I_s).
     uint32_t sharedN;
+    uint32_t useBatchedDispatch; // Final host-selected execution policy.
 };
 
 struct MegaMoeTilingDataQuant {

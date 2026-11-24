@@ -59,3 +59,9 @@ endif()
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../op_kernel/arch35_92/common/mega_moe_gm_layout.h
         ${CMAKE_CURRENT_SOURCE_DIR}/../op_kernel/arch92/common/mega_moe_layout_arch92.h
         DESTINATION ${MEGA_MOE_LAYOUT_INC_INSTALL_DIR})
+
+# Share A2/A3 batch shape selection with the Torch capacity query.
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../op_kernel/arch22/mega_moe_tiling_a2a3.h
+        DESTINATION ${MEGA_MOE_LAYOUT_INC_INSTALL_DIR})
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../op_kernel/arch22/moe_permute_prologue/moe_permute_prologue_tiling.h
+        DESTINATION ${MEGA_MOE_LAYOUT_INC_INSTALL_DIR}/moe_permute_prologue)

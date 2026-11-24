@@ -926,6 +926,7 @@
 
 - **参数约束**：
   - **<term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>**：
+    - `256 ≤ intermediateHidden ≤ 4096`，且 `intermediateHidden % 128 == 0`。
     - 场景配套矩阵：
 
       | 场景 | x | weight1 | weight2 | weightScales1 | weightScales2 | bias1 | bias2 | y | dispatchQuantMode | dispatchQuantOutDtype |

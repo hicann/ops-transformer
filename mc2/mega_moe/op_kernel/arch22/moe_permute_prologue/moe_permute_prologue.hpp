@@ -49,7 +49,8 @@ struct MoeTokenCoreParams<true> {
     uint32_t reservedTokenCores{0};
 };
 
-template <uint32_t UB_STAGES_, class DispatchPolicy_, class ElementSrc_, class ElementDst_, bool TOKEN_MAJOR = false>
+template <uint32_t UB_STAGES_, class DispatchPolicy_, class ElementSrc_, class ElementDst_, bool TOKEN_MAJOR = false,
+          uint32_t TokenCapacity_ = 1024, uint32_t Int8RowTailBytes_ = 512>
 class MoePermutePrologue {
 public:
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
@@ -59,7 +60,7 @@ public:
     using ElementDst = ElementDst_;
     static constexpr MoeQuantMode QUANT_MODE = DispatchPolicy_::quantmode;
 
-    static constexpr uint32_t MAX_TOKENS = 1024;
+    static constexpr uint32_t TOKEN_CAPACITY = TokenCapacity_;
     static constexpr uint32_t MAX_TOPK = 32;
     static constexpr uint32_t MAX_HIDDEN = 10240;
     static constexpr uint32_t MAX_EXPERTS = 1024;
@@ -71,7 +72,8 @@ public:
         int64_t numExperts;
         int64_t alignedNumExperts;
         uint32_t alignedNumExpertsBytes;
-        // expandedX 行步长（元素）：量化（int8）行尾含 per-token scale，取 hidden+512；非量化取 hidden
+        // Int8RowTailBytes_ reserves bytes for the per-token scale and alignment padding; non-quantized rows are
+        // packed.
         uint32_t rowStride;
 
         CATLASS_DEVICE
@@ -86,12 +88,12 @@ public:
         {}
 
     private:
-        // 行步长内部固定：量化（int8）场景 expandedX 行尾含 per-token scale，取 hidden+512；非量化取 hidden
+        // INT8 行尾默认预留 512 字节，调用方可通过模板参数指定 padding。
         CATLASS_DEVICE
         static constexpr uint32_t CalcRowStride(int64_t hidden_)
         {
             if constexpr (std::is_same_v<ElementDst, int8_t>) {
-                return static_cast<uint32_t>(hidden_) + 512;
+                return static_cast<uint32_t>(hidden_) + Int8RowTailBytes_;
             } else {
                 return static_cast<uint32_t>(hidden_);
             }
@@ -110,7 +112,7 @@ public:
         int64_t tokenStartIdx = 0;
         int64_t tokenEndIdx = 0;
         int64_t numTokensCurCore = 0;
-        SplitCore(MAX_TOKENS, tokenStartIdx, tokenEndIdx, numTokensCurCore);
+        SplitCore(TOKEN_CAPACITY, tokenStartIdx, tokenEndIdx, numTokensCurCore);
 
         uint32_t ubOffset = 0;
         coreExpertCount = resource.ubBuf.template GetBufferByByte<int32_t>(ubOffset);
@@ -328,7 +330,7 @@ private:
     {
         const int64_t hidden = params_.hidden;
         const int64_t numTopk = params_.numTopk;
-        // expandedX 行步长（元素）：quant=hidden+512（行尾含 scale），非quant=hidden
+        // expandedX 使用所选行距，INT8 的 per-token scale 仍放在 hidden 偏移处。
         const int64_t rowStride = params_.rowStride;
         // 单行实际拷贝元素数：quant 需要把行尾 scale 一并拷出
         const int64_t outLen = hidden + (QUANT ? static_cast<int64_t>(Catlass::BYTE_PER_BLK) : 0);

@@ -113,13 +113,14 @@ constexpr int64_t SYNC_STATE_RESERVED_SIZE = 512 * 1024LL;
 constexpr int64_t MIN_BS = 1;
 constexpr int64_t MIN_HIDDEN_SIZE = 1024;
 constexpr int64_t MAX_HIDDEN_SIZE = 8192;
-constexpr int64_t MIN_INTERMEDIATE_HIDDEN = 512;
+constexpr int64_t MIN_INTERMEDIATE_HIDDEN = 256;
+constexpr int64_t MAX_INTERMEDIATE_HIDDEN = 4096;
 constexpr int64_t MIN_TOPK = 1;
 constexpr int64_t MAX_TOPK = 16;
 constexpr int64_t MIN_EXPERT_PER_RANK = 1;
 constexpr int64_t MAX_EXPERT_PER_RANK = 128;
 constexpr int64_t HIDDEN_SIZE_ALIGN = 512;
-constexpr int64_t INTERMEDIATE_HIDDEN_ALIGN = 256;
+constexpr int64_t INTERMEDIATE_HIDDEN_ALIGN = 128;
 
 // 属性范围限制
 constexpr int64_t MIN_MOE_EXPERT_NUM = 1;
@@ -135,6 +136,25 @@ constexpr int64_t DISPATCH_QUANT_MODE_PASSTHROUGH = 0;
 constexpr int64_t DISPATCH_QUANT_MODE_PER_TENSOR = 2;
 
 constexpr int64_t MOE_PERMUTE_CHUNK = Mc2Tiling::MEGA_MOE_PERMUTE_CHUNK;
+
+// Convert host descriptors to the scalar policy shared with the device kernels.
+static bool CanUseBatchedDispatch(const gert::TilingContext* context, const MegaMoeA2A3TilingData& info,
+                                  uint32_t archCode)
+{
+    if (archCode != SOC_ASCEND910B && archCode != SOC_ASCEND910_93) {
+        return false;
+    }
+    const auto* xDesc = context->GetInputDesc(X_INDEX);
+    const auto* yDesc = context->GetOutputDesc(OUTPUT_Y_INDEX);
+    if (archCode == SOC_ASCEND910B && (xDesc == nullptr || xDesc->GetDataType() != ge::DT_BF16)) {
+        return false;
+    }
+    return MegaMoeConfig::SupportsBatchedDispatch(
+        archCode == SOC_ASCEND910B ? MegaMoeConfig::Platform::A2 : MegaMoeConfig::Platform::A3, info.K, info.N,
+        info.epWorldSize * info.expertPerRank, info.topK, info.epWorldSize,
+        yDesc != nullptr && yDesc->GetDataType() == ge::DT_BF16);
+}
+
 // prologue 每核计数区的核数上限（与 kernel 侧 const_args.hpp PERMUTE_MAX_CORES=128 一致）
 constexpr int64_t PERMUTE_MAX_CORES = 128;
 
@@ -161,7 +181,8 @@ static uint64_t CalcMaskWorkspaceAddon(uint64_t bs, uint64_t topK, uint64_t worl
 }
 
 static int64_t CalcLeastCclBufferSize(int64_t maxRecvTokenNum, int64_t h, int64_t epWorldSize, int64_t expertPerRank,
-                                      bool isQuantRouting, bool isW4A8, bool isA3, int64_t bs, int64_t topK)
+                                      bool isQuantRouting, bool isW4A8, bool isA3, int64_t bs, int64_t topK,
+                                      int64_t permuteChunk)
 {
     // ccl buff的承载的数据块 1（winIn）：
     // TPE = epWorldSize × CeilAlign(epWorldSize × MAX_EXPERT_PER_RANK + 1, 128) × 4B
@@ -173,7 +194,7 @@ static int64_t CalcLeastCclBufferSize(int64_t maxRecvTokenNum, int64_t h, int64_
     // FFN的左矩阵：量化行步长 = h + 512（行尾含 per-token scale），非量化行步长 = h（密排）
     // 量化 ElementABefore = int8 (sizeof=1)，非量化 ElementABefore = bf16/fp16 (sizeof=2)
     // 发送侧逐 chunk 处理，A3/A2 的窗口 A/D 区均按单 chunk（不超过 bs）行数分配
-    const int64_t chunkTokens = std::min(bs, MOE_PERMUTE_CHUNK);
+    const int64_t chunkTokens = std::min(bs, permuteChunk);
     int64_t offsetAAfterDispatch = 0;
     int64_t offsetD = 0;
     if (isA3) { // A3打包发送：窗口布局与 kernel PeermemInfo 一致
@@ -231,8 +252,9 @@ static bool CanUseA3MaskRouting(const MegaMoeA2A3TilingData& info)
         return false;
     }
     const int64_t expertPerRank = info.moeExpertNum / info.epWorldSize;
-    const int64_t baseSize = CalcLeastCclBufferSize(info.maxRecvTokenNum, info.K, info.epWorldSize, expertPerRank,
-                                                    info.isQuantRouting, info.isW4A8, true, info.M, info.topK);
+    const int64_t baseSize =
+        CalcLeastCclBufferSize(info.maxRecvTokenNum, info.K, info.epWorldSize, expertPerRank, info.isQuantRouting,
+                               info.isW4A8, true, info.M, info.topK, MOE_PERMUTE_CHUNK);
     const int64_t chunkTokens = std::min<int64_t>(info.M, MOE_PERMUTE_CHUNK);
     const int64_t maskSize = CalcMaskMetadataSize(chunkTokens, info.epWorldSize, expertPerRank);
     const int64_t available = info.cclBufferSize / 2 - baseSize;
@@ -670,7 +692,7 @@ static ge::graphStatus CheckActivationAndWeightAttrs(gert::TilingContext* contex
     return ge::GRAPH_SUCCESS;
 }
 
-static void SetRecvRoundBudget(MegaMoeA2A3TilingData& info, const std::string& socVersion)
+static void SetRecvRoundBudget(MegaMoeA2A3TilingData& info, const std::string& socVersion, int64_t permuteChunk)
 {
     // 接收侧轮次预算（route 行粒度）：
     // A3: B = min(chunk_recv_max, max_recv_token_num)，
@@ -678,13 +700,11 @@ static void SetRecvRoundBudget(MegaMoeA2A3TilingData& info, const std::string& s
     //     recvRoundsMax = ceil(chunk_recv_max / B)，host 用于按 (chunk, round) 分配轮表。
     //     B 生效后 workspace 接收侧各区由 B 驱动（见 workspace 公式），kernel 侧 maxOutputSize
     //     语义同步变为"单轮接收预算"，超出部分由接收端轮次切分串行处理。
-    // A2: 发送侧 chunk（逐 PERMUTE_CHUNK token 一条完整 dispatch/GMM/combine 流水）。
-    //     B = min(chunk_recv_max, max_recv_token_num / numChunks)，作为 winIn A 区按 chunk
-    //     分段的段宽与 workspace 接收侧缓冲（GMM In/Out 等）的分配粒度，
-    //     保证 numChunks * B <= max_recv_token_num（winIn A 区容量不变）。
+    // A2: 发送侧逐 chunk 执行完整 dispatch/GMM/combine 流水。
+    //     B = max_recv_token_num，覆盖任意单 chunk 的路由倾斜；窗口和 workspace 逐 chunk 复用。
     //     recvRoundsMax = 1（A2 push 模型无接收侧轮次切分）。
     if (socVersion == "Ascend910_93") {
-        uint64_t chunkRecvMax = static_cast<uint64_t>(MOE_PERMUTE_CHUNK) * info.epWorldSize *
+        uint64_t chunkRecvMax = static_cast<uint64_t>(permuteChunk) * info.epWorldSize *
                                 static_cast<uint64_t>(std::min(info.topK, info.expertPerRank));
         info.recvRoundBudget = std::min(chunkRecvMax, info.maxRecvTokenNum);
         if (info.recvRoundBudget == 0U) {
@@ -772,8 +792,6 @@ static ge::graphStatus MegaMoeA2A3CheckAttrAndSetTiling(gert::TilingContext* con
                                       weight1InterleavePtr) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-
-    SetRecvRoundBudget(info, socVersion);
 
     info.worldSize = info.epWorldSize;
 
@@ -1145,13 +1163,13 @@ static ge::graphStatus CheckWeight2Input(gert::TilingContext* context, int64_t h
     OP_TILING_CHECK(n2 % INTERMEDIATE_HIDDEN_ALIGN != 0,
                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(K_OP_NAME, "weight2",
                                                           Ops::Base::ToString(w2Tensor->GetStorageShape()).c_str(),
-                                                          "dim0 (intermediate_hidden) must be aligned to 256"),
+                                                          "dim0 (intermediate_hidden) must be aligned to 128"),
                     return GRAPH_FAILED);
 
-    OP_TILING_CHECK(n2 < MIN_INTERMEDIATE_HIDDEN,
+    OP_TILING_CHECK(n2 < MIN_INTERMEDIATE_HIDDEN || n2 > MAX_INTERMEDIATE_HIDDEN,
                     OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(K_OP_NAME, "weight2",
                                                           Ops::Base::ToString(w2Tensor->GetStorageShape()).c_str(),
-                                                          "dim0 (intermediate_hidden) must be >= 512"),
+                                                          "dim0 (intermediate_hidden) must be in [256, 4096]"),
                     return GRAPH_FAILED);
 
     status = CheckWeight2TensorShapes(context, hiddenSize, n2, expertPerRank);
@@ -1347,7 +1365,7 @@ static ge::graphStatus CheckSharedExpertInputs(gert::TilingContext* context, int
                     return GRAPH_FAILED);
     const int64_t sharedN = sharedW1Shape->GetStorageShape().GetDim(1);
     OP_TILING_CHECK(sharedN < 2 * MIN_INTERMEDIATE_HIDDEN || sharedN % (2 * INTERMEDIATE_HIDDEN_ALIGN) != 0,
-                    OP_LOGE(K_OP_NAME, "Shared I must be >= 512 and aligned to 256."), return GRAPH_FAILED);
+                    OP_LOGE(K_OP_NAME, "Shared I must be >= 256 and aligned to 128."), return GRAPH_FAILED);
     OP_TILING_CHECK(mc2tiling::GetSocVersion(context) != "Ascend910_93" &&
                         (sharedN != n || weightDataType != routedWeightDataType || weightFormat != routedWeightFormat),
                     OP_LOGE(K_OP_NAME, "Independent shared dtype/I requires A3."), return GRAPH_FAILED);
@@ -1673,10 +1691,13 @@ static ge::graphStatus MegaMoeA2A3CheckHcclBuffSize(const gert::TilingContext* c
 
     std::string socVersion = mc2tiling::GetSocVersion(context);
     bool isA3 = (socVersion == "Ascend910_93");
+    info.useBatchedDispatch = CanUseBatchedDispatch(context, info, isA3 ? SOC_ASCEND910_93 : SOC_ASCEND910B) ? 1U : 0U;
+    const int64_t permuteChunk = MegaMoeConfig::GetPermuteChunk(info.useBatchedDispatch != 0U);
+    SetRecvRoundBudget(info, socVersion, permuteChunk);
 
     int64_t leastCclBufferSize =
         CalcLeastCclBufferSize(maxRecvTokenNum, h, epWorldSize, expertPerRank, isQuantRouting, isW4A8, isA3,
-                               static_cast<int64_t>(info.M), static_cast<int64_t>(info.topK));
+                               static_cast<int64_t>(info.M), static_cast<int64_t>(info.topK), permuteChunk);
 
     int64_t leastTotalCclBufferSize = leastCclBufferSize * 2;
     OP_TILING_CHECK(cclBufferSize < leastCclBufferSize,
@@ -1846,7 +1867,8 @@ static ge::graphStatus SetMegaMoeTilingKey(gert::TilingContext* context, MegaMoe
     return ge::GRAPH_SUCCESS;
 }
 
-static void SetA3WorkspaceSize(const MegaMoeA2A3TilingData& info, uint32_t n2, uint32_t k2, uint64_t& megeMoeWorkspace)
+static void SetA3WorkspaceSize(const MegaMoeA2A3TilingData& info, uint32_t n2, uint32_t k2, uint64_t& megeMoeWorkspace,
+                               int64_t permuteChunk)
 {
     // 接收侧轮次预算 B（route 行）：GMM In/Out/perTokenScale/W4A8 各区从 B 驱动分配，
     // 超出 B 的接收行由 kernel 侧接收端轮次切分串行复用 workspace
@@ -1854,18 +1876,24 @@ static void SetA3WorkspaceSize(const MegaMoeA2A3TilingData& info, uint32_t n2, u
     // prologue 每核计数区（尺寸必须与 kernel 侧 PERMUTE_MAX_CORES=128 一致，避免后续区域偏移错位）
     int64_t alignedExpertNum = (info.expertPerRank * info.worldSize + 7) / 8 * 8;
     int64_t permuteCountsSize = 128 * alignedExpertNum * sizeof(int32_t);
-    int64_t numChunks = (info.M + MOE_PERMUTE_CHUNK - 1) / MOE_PERMUTE_CHUNK;
+    int64_t numChunks = (info.M + permuteChunk - 1) / permuteChunk;
+    // Must match A3 ChunkCumsumStride/RoundTableSegmentBytes (AIC scalar cache lines).
+    constexpr uint64_t routeTableAlignment = 512;
+    const uint64_t cumsumBytes = info.worldSize * info.worldSize * info.expertPerRank * sizeof(int32_t);
+    const uint64_t roundSegmentBytes = info.worldSize * info.expertPerRank * sizeof(int32_t);
+    const uint64_t cumsumStride =
+        info.useBatchedDispatch ? (cumsumBytes + routeTableAlignment - 1) / routeTableAlignment * routeTableAlignment :
+                                  ops::CeilAlign(cumsumBytes, 64UL);
+    const uint64_t roundSegmentStride = info.useBatchedDispatch ? (roundSegmentBytes + routeTableAlignment - 1) /
+                                                                      routeTableAlignment * routeTableAlignment :
+                                                                  ops::CeilAlign(roundSegmentBytes, 64UL);
     megeMoeWorkspace =
-        permuteCountsSize +                               // prologue 每核计数区
-        MOE_PERMUTE_CHUNK * info.topK * sizeof(int32_t) + // expandedRowIdx（单 chunk，逐 chunk 复用）
-        // GetValue caches 64 bytes: never share a line across chunk generations.
-        numChunks *
-            ops::CeilAlign(
-                static_cast<uint64_t>(info.worldSize) * info.worldSize * info.expertPerRank * sizeof(int32_t), 64UL) +
+        permuteCountsSize +                          // prologue 每核计数区
+        permuteChunk * info.topK * sizeof(int32_t) + // expandedRowIdx（单 chunk，逐 chunk 复用）
+        numChunks * cumsumStride +                   // 每 chunk 按缓存行隔离
         // 接收侧轮表区：每 (chunk, round) 独立一份 [cumsumMM_r | tokenPerExpert_r | preSumBeforeRank_r]，
         // 各 EP*expertPerRank int32（cumsumMM_r 与 GetCumsumForMMAIV 输出同紧凑布局）
-        numChunks * info.recvRoundsMax * 3UL *
-            ops::CeilAlign(static_cast<uint64_t>(info.worldSize) * info.expertPerRank * sizeof(int32_t), 64UL) +
+        numChunks * info.recvRoundsMax * 3UL * roundSegmentStride +
         recvBudget * std::max(info.N, n2) * sizeof(int16_t) +                          // GMM1&2 Out
         recvBudget * std::max(info.K, k2) * sizeof(int16_t) +                          // GMM1&2 input
         (info.worldSize * (info.expertPerRank + 16 - 1) / 16 * 16 * sizeof(int32_t)) + // SumBeforeRank
@@ -1879,7 +1907,8 @@ static void SetA3WorkspaceSize(const MegaMoeA2A3TilingData& info, uint32_t n2, u
     }
 }
 
-static void SetA2WorkspaceSize(const MegaMoeA2A3TilingData& info, uint32_t n2, uint32_t k2, uint64_t& megeMoeWorkspace)
+static void SetA2WorkspaceSize(const MegaMoeA2A3TilingData& info, uint32_t n2, uint32_t k2, uint64_t& megeMoeWorkspace,
+                               int64_t permuteChunk)
 {
     // A2 发送侧 chunk：逐 PERMUTE_CHUNK token 一条完整 dispatch/GMM/combine 流水，逐 chunk 复用。
     // 接收行按 chunk 本地化（rowStart 基于单 chunk cumsum），winIn A/D 区容量仍由 max_recv_token_num
@@ -1887,13 +1916,13 @@ static void SetA2WorkspaceSize(const MegaMoeA2A3TilingData& info, uint32_t n2, u
     // cumsum 按 chunk 独立多份（不复用，规避 AIC/AIV 跨 chunk cache 陈旧读）。
     uint64_t swigluSize = info.isQuantRouting ? 1UL : 2UL;
     uint64_t paddedExpertNumAligned = (info.worldSize * info.expertPerRank + 1 + 128 - 1) / 128 * 128;
-    const int64_t numChunks = (info.M + MOE_PERMUTE_CHUNK - 1) / MOE_PERMUTE_CHUNK;
+    const int64_t numChunks = (info.M + permuteChunk - 1) / permuteChunk;
     const int64_t alignedExpertNum =
         ops::CeilAlign(static_cast<int64_t>(info.expertPerRank) * info.worldSize, static_cast<int64_t>(8));
     const uint64_t recvBudget = info.recvRoundBudget;
     megeMoeWorkspace =
         PERMUTE_MAX_CORES * alignedExpertNum * sizeof(int32_t) + // prologue 每核计数区（独立）
-        ops::CeilAlign(std::min<int64_t>(info.M, MOE_PERMUTE_CHUNK), static_cast<int64_t>(256)) * info.topK *
+        ops::CeilAlign(std::min<int64_t>(info.M, permuteChunk), static_cast<int64_t>(256)) * info.topK *
             sizeof(int32_t) + // expandedRowIdx（单 chunk，逐 chunk 复用）
         numChunks * paddedExpertNumAligned * info.worldSize * sizeof(int32_t) + // cumsum（按 chunk 独立，不复用）
         paddedExpertNumAligned * 2UL * sizeof(int32_t) +                        // SumBeforeRank ForDispatch/ForCombine
@@ -1979,13 +2008,15 @@ static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext* context)
     uint32_t k2 = info.N / 2;
     uint64_t megeMoeWorkspace = 0;
     if (archCode == SOC_ASCEND910_93) {
-        SetA3WorkspaceSize(info, n2, k2, megeMoeWorkspace);
+        SetA3WorkspaceSize(info, n2, k2, megeMoeWorkspace,
+                           MegaMoeConfig::GetPermuteChunk(info.useBatchedDispatch != 0U));
     } else if (archCode == SOC_ASCEND910B) {
-        SetA2WorkspaceSize(info, n2, k2, megeMoeWorkspace);
+        SetA2WorkspaceSize(info, n2, k2, megeMoeWorkspace,
+                           MegaMoeConfig::GetPermuteChunk(info.useBatchedDispatch != 0U));
     }
 
     // ===== Mask 路由 =====
-    if (archCode == SOC_ASCEND910_93 && CanUseA3MaskRouting(info)) {
+    if (!info.useBatchedDispatch && archCode == SOC_ASCEND910_93 && CanUseA3MaskRouting(info)) {
         const bool blockedOutput = info.M >= MaskLayout::L1_TILE_M && info.K % MaskLayout::L1_TILE_N == 0 &&
                                    info.recvRoundBudget >= std::min<uint64_t>(info.M, MOE_PERMUTE_CHUNK) * info.topK;
         // 覆盖默认 key，最后两个字段分别控制 Mask 路由和列块输出。
@@ -2003,7 +2034,7 @@ static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext* context)
     // winIn ≥ Dedup least && G > 门限（收益门控，常数见 mega_moe_dedup_layout.h）。门序：客观门
     // fail-fast 在前（显式请求撞物理约束必报错），收益门控静默在后——可行但无收益时回基线 +
     // decision 日志（阈值判断非正确性，不报错；回基线亦可显式设 combine_comm_mode=0）。
-    // 支持范围仅 A3 + W4A8 量化路径，其它路径显式请求 combine_comm_mode=1 直接报错。
+    // 先执行 A3 + W4A8、容量、单轮和收益校验，通过后再判断是否使用批量 Dispatch。
     // dedupOn=0 时 Dedup 字段全 0、kernel 走基线布局（逐位一致）；=1 时偏移由
     // dedup_layout 单一口径透传。
     info.dedupOn = 0U;
@@ -2033,10 +2064,16 @@ static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext* context)
                                                               "supported; set combine_comm_mode=0"),
                         return ge::GRAPH_FAILED);
         if (combineCommMode == 1) {
-            const int64_t chunkTokens = std::min(static_cast<int64_t>(info.M), MOE_PERMUTE_CHUNK);
+            const int64_t chunkTokens = std::min<int64_t>(info.M, MOE_PERMUTE_CHUNK);
+            uint64_t dedupRecvBudget = info.recvRoundBudget;
+            if (info.useBatchedDispatch) {
+                const uint64_t chunkRecvMax = static_cast<uint64_t>(MOE_PERMUTE_CHUNK) * info.epWorldSize *
+                                              std::min(info.topK, info.expertPerRank);
+                dedupRecvBudget = std::max<uint64_t>(1, std::min(chunkRecvMax, info.maxRecvTokenNum));
+            }
             const MegaMoeDedup::DedupFeasibility feasibility = MegaMoeDedup::CheckDedupFeasible(
                 chunkTokens, info.K, info.topK, info.worldSize, static_cast<int64_t>(info.expertPerRank),
-                static_cast<int64_t>(info.recvRoundBudget), info.cclBufferSize);
+                static_cast<int64_t>(dedupRecvBudget), info.cclBufferSize);
             // 配置须人工调整的不可行（路径/位宽/窗口）→ fail-fast（原因见上方 [DEDUP] infeasible
             // 日志；回基线须显式设 combine_comm_mode=0）
             OP_TILING_CHECK(
@@ -2060,22 +2097,24 @@ static ge::graphStatus MegaMoeA2A3TilingFuncImpl(gert::TilingContext* context)
                 } else {
                     MegaMoeDedup::DedupTilingOutput dedupOut;
                     OP_TILING_CHECK(MegaMoeDedup::CalcDedupTiling(chunkTokens, info.K, info.topK, info.worldSize,
-                                                                  static_cast<int64_t>(info.recvRoundBudget),
+                                                                  static_cast<int64_t>(dedupRecvBudget),
                                                                   dedupOut) != ge::GRAPH_SUCCESS,
                                     OP_LOGE_WITHOUT_REPORT(K_INNER_DEBUG, "[DEDUP] CalcDedupTiling failed"),
                                     return ge::GRAPH_FAILED);
-                    info.dedupOn = 1U;
-                    info.offsetExpandedDstToSrcRow = dedupOut.offsetExpandedDstToSrcRow;
-                    info.dedupOffsetD = dedupOut.offsetD;
-                    info.distTokenFirstPosSize = dedupOut.distTokenFirstPosSize;
-                    info.distTokenLastPosSize = dedupOut.distTokenLastPosSize;
-                    info.dedupRowMetaSize = dedupOut.rowMetaSize;
-                    // workspace Dedup 增量段：FP → LP → rowMeta（段序与 kernel 侧 WorkspaceInfo 一致）
-                    megeMoeWorkspace += static_cast<uint64_t>(dedupOut.distTokenFirstPosSize) +
-                                        static_cast<uint64_t>(dedupOut.distTokenLastPosSize) +
-                                        static_cast<uint64_t>(dedupOut.rowMetaSize);
-                    OP_LOGI(K_INNER_DEBUG, "[DEDUP] enabled: m=%u G=%ldB (combine_comm_mode=1)", info.M,
-                            static_cast<long>(dedupGateG));
+                    if (!info.useBatchedDispatch) {
+                        info.dedupOn = 1U;
+                        info.offsetExpandedDstToSrcRow = dedupOut.offsetExpandedDstToSrcRow;
+                        info.dedupOffsetD = dedupOut.offsetD;
+                        info.distTokenFirstPosSize = dedupOut.distTokenFirstPosSize;
+                        info.distTokenLastPosSize = dedupOut.distTokenLastPosSize;
+                        info.dedupRowMetaSize = dedupOut.rowMetaSize;
+                        // workspace Dedup 增量段：FP → LP → rowMeta（段序与 kernel 侧 WorkspaceInfo 一致）
+                        megeMoeWorkspace += static_cast<uint64_t>(dedupOut.distTokenFirstPosSize) +
+                                            static_cast<uint64_t>(dedupOut.distTokenLastPosSize) +
+                                            static_cast<uint64_t>(dedupOut.rowMetaSize);
+                        OP_LOGI(K_INNER_DEBUG, "[DEDUP] enabled: m=%u G=%ldB (combine_comm_mode=1)", info.M,
+                                static_cast<long>(dedupGateG));
+                    }
                 }
             }
         }

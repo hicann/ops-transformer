@@ -103,16 +103,22 @@ struct EpilogueAtlasA2PerTokenDequantQuant {
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
 };
 
-template <uint32_t UB_STAGES_>
+template <uint32_t UB_STAGES_, bool EnableBatched_ = false>
 struct EpilogueAtlasA2PerTokenDequantSwigluQuant {
+    static constexpr bool ENABLE_BATCHED = EnableBatched_;
+    template <bool Enabled>
+    using WithBatched = EpilogueAtlasA2PerTokenDequantSwigluQuant<UB_STAGES_, Enabled>;
     using ArchTag = Arch::AtlasA2;
     using Activation = Catlass::Epilogue::GatedActivation;
     static constexpr uint32_t TILE_LENGTH = Activation::PREFERRED_TILE_LENGTH;
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
 };
 
-template <uint32_t UB_STAGES_>
+template <uint32_t UB_STAGES_, bool EnableBatched_ = false>
 struct EpilogueAtlasA2W4A8PostPerTokenDequantSwigluQuant {
+    static constexpr bool ENABLE_BATCHED = EnableBatched_;
+    template <bool Enabled>
+    using WithBatched = EpilogueAtlasA2W4A8PostPerTokenDequantSwigluQuant<UB_STAGES_, Enabled>;
     using ArchTag = Arch::AtlasA2;
     using Activation = Catlass::Epilogue::GatedActivation;
     static constexpr uint32_t TILE_LENGTH = Activation::PREFERRED_TILE_LENGTH;
@@ -137,8 +143,11 @@ struct EpilogueAtlasA2PerTokenDequantBF16 {
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
 };
 
-template <uint32_t UB_STAGES_>
+template <uint32_t UB_STAGES_, bool EnableBatched_ = false>
 struct EpilogueAtlasA2PerTokenDequantSwigluQuantInt8 {
+    static constexpr bool ENABLE_BATCHED = EnableBatched_;
+    template <bool Enabled>
+    using WithBatched = EpilogueAtlasA2PerTokenDequantSwigluQuantInt8<UB_STAGES_, Enabled>;
     using ArchTag = Arch::AtlasA2;
     using Activation = Catlass::Epilogue::GatedActivation;
     static constexpr uint32_t TILE_LENGTH = Activation::PREFERRED_TILE_LENGTH;
@@ -148,8 +157,11 @@ struct EpilogueAtlasA2PerTokenDequantSwigluQuantInt8 {
 // A2-specific BF16 SwiGLU (non-quantized). Uses a distinct tag so the
 // A2 epilogue specialization does not conflict with the generic
 // EpilogueAtlasA2PerTokenDequantSwigluQuant specialization.
-template <uint32_t UB_STAGES_>
+template <uint32_t UB_STAGES_, bool EnableBatched_ = false>
 struct EpilogueAtlasA2PerTokenDequantSwigluQuantBF16 {
+    static constexpr bool ENABLE_BATCHED = EnableBatched_;
+    template <bool Enabled>
+    using WithBatched = EpilogueAtlasA2PerTokenDequantSwigluQuantBF16<UB_STAGES_, Enabled>;
     using ArchTag = Arch::AtlasA2;
     using Activation = Catlass::Epilogue::GatedActivation;
     static constexpr uint32_t TILE_LENGTH = Activation::PREFERRED_TILE_LENGTH;
@@ -168,8 +180,11 @@ struct EpilogueAtlasA2PerTokenDequantV2BF16 {
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
 };
 
-template <uint32_t UB_STAGES_>
+template <uint32_t UB_STAGES_, bool EnableBatched_ = false>
 struct EpilogueAtlasA2W4A8PostPerTokenDequantV2 {
+    static constexpr bool ENABLE_BATCHED = EnableBatched_;
+    template <bool Enabled>
+    using WithBatched = EpilogueAtlasA2W4A8PostPerTokenDequantV2<UB_STAGES_, Enabled>;
     using ArchTag = Arch::AtlasA2;
     static constexpr uint32_t UB_STAGES = UB_STAGES_;
 };
@@ -183,4 +198,14 @@ struct EpilogueAtlasA2W4A8PostPerTokenDedup {
 };
 
 } // namespace Catlass::Epilogue
+namespace Catlass::Epilogue::Block {
+template <class Epilogue, bool Enabled>
+struct SelectPostprocess {
+    using Type = Epilogue;
+};
+template <class Policy, class... Args>
+struct SelectPostprocess<BlockEpilogue<Policy, Args...>, true> {
+    using Type = BlockEpilogue<typename Policy::template WithBatched<true>, Args...>;
+};
+} // namespace Catlass::Epilogue::Block
 #endif // DISPATH_POLICY_CUSTOM_HPP

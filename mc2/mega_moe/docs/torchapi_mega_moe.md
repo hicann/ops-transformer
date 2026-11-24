@@ -724,7 +724,7 @@ sym_buffer.update_group(group) -> None
         <td>intermediate_hidden</td>
         <td>int</td>
         <td>必选</td>
-        <td>激活后的中间特征维度。l1_weights的Linear1输出宽度恒为2 × intermediate_hidden，与activation无关：门控激活下Linear1同时生成gate和up两个分支、各占intermediate_hidden；"gelu"为逐元素激活、不拆分，激活输出宽度即2 × intermediate_hidden。该值参与通信缓冲区大小计算，必须与l1_weights、l2_weights的实际shape一致，取值偏小会使申请的缓冲区不足并在tiling阶段报错。</td>
+        <td>激活后的中间特征维度。l1_weights的Linear1输出宽度恒为2 × intermediate_hidden，与activation无关：门控激活下Linear1同时生成gate和up两个分支、各占intermediate_hidden；"gelu"为逐元素激活、不拆分，激活输出宽度即2 × intermediate_hidden。该值参与通信缓冲区大小计算，必须与l1_weights、l2_weights的实际shape一致，取值偏小会使申请的缓冲区不足并在tiling阶段报错。Atlas A2/A3系列产品要求该值在[256, 4096]范围内，且必须128对齐。</td>
     </tr>
     <tr>
         <td>max_recv_token_num</td>
@@ -1396,7 +1396,7 @@ sym_buffer.update_group(group) -> None
     - `max_recv_token_num` 需大于0，输入0表示自动计算，公式为 `num_tokens × ep_world_size × min(num_topk, local_moe_expert_num)`。
     - `num_topk`：取值范围为 `1 ≤ num_topk ≤ 16`。
     - `hidden`：取值范围为 `1024 ≤ hidden ≤ 8192`，且 `hidden % 512 == 0`。
-    - `intermediate_hidden`：取值范围为 `512 ≤ intermediate_hidden ≤ 3072`，且 `intermediate_hidden % 256 == 0`。
+    - `intermediate_hidden`：取值范围为 `256 ≤ intermediate_hidden ≤ 4096`，且 `intermediate_hidden % 128 == 0`。
     - `dispatch_quant_mode`：取值范围为 `0`（非量化）、`2`（pertoken量化）。
     - `dispatch_quant_out_dtype`：取值为 `torch.int8`。
     - 支持三种计算场景（A16W16、A8W8-INT、A8W4-INT），不同场景下可选入参（缩放因子、偏置等）的必需性及数据类型有严格配套要求。调用时必须根据所选场景完整提供对应参数，不可混用或遗漏，配套关系见下表。

@@ -25,6 +25,7 @@
 #include "mc2_tiling_case_executor.h"
 
 #include "../../../../op_kernel/arch22/mega_moe_tiling_a2a3.h"
+#include "../../../../op_kernel/arch22/mega_moe_shared_schedule.h"
 
 namespace MegaMoeUT {
 
@@ -222,6 +223,102 @@ static void RunQuantSharedExpertCase(
     }
 }
 
+TEST_F(MegaMoeArch22TilingTest, BatchedDispatchRetainedWithSharedExperts)
+{
+    constexpr int64_t cclBytes = 64LL * 1024 * 1024 * 1024;
+    constexpr uint64_t systemBytes = 16U * 1024U * 1024U;
+    for (auto routed : {ge::DT_INT8, ge::DT_INT4}) {
+        for (uint32_t sharedCount : {1U, 2U}) {
+            for (int64_t sharedIntermediate : {512, 768}) {
+                for (bool mixedDown : {false, true}) {
+                    if (mixedDown && routed != ge::DT_INT8) {
+                        continue; // The upstream INT8/BF16 pair requires INT8 routing.
+                    }
+                    // Covers fused and independent shared FFNs, including a tail chunk
+                    // and a budget that forces multiple routed receive rounds.
+                    for (int64_t budget : {4096, 131072}) {
+                        SCOPED_TRACE(testing::Message()
+                                     << "route=" << routed << " shared=" << sharedCount << " I_s=" << sharedIntermediate
+                                     << " mixed=" << mixedDown << " budget=" << budget);
+                        TilingInfo info;
+                        RunQuantSharedExpertCase(routed, true, false, ge::GRAPH_SUCCESS, 2 * sharedIntermediate, 2048,
+                                                 mixedDown, false, false, ge::FORMAT_FRACTAL_NZ, "Ascend910_93", 8193,
+                                                 false, 2048, 512, 8, 2, 128, sharedCount, ge::DT_INT8,
+                                                 sharedIntermediate, false, false, 0, ge::DT_FLOAT, &info, cclBytes,
+                                                 budget);
+                        ASSERT_NE(info.tilingData.get(), nullptr);
+                        ASSERT_EQ(info.tilingDataSize, sizeof(MegaMoeTilingDataQuant));
+                        const auto& common =
+                            reinterpret_cast<const MegaMoeTilingDataQuant*>(info.tilingData.get())->common;
+                        EXPECT_EQ(common.useBatchedDispatch, 1U);
+                        EXPECT_EQ(common.sharedExpertNum, sharedCount);
+                        EXPECT_EQ(common.sharedN, 2U * sharedIntermediate);
+                        EXPECT_EQ(common.sharedGmm2Bf16, mixedDown ? 1U : 0U);
+                        EXPECT_EQ(common.recvRoundBudget, static_cast<uint64_t>(budget));
+                        EXPECT_EQ(common.recvRoundsMax, (131072U + budget - 1) / budget);
+                        EXPECT_EQ(common.sharedWorkspaceOffset % 512U, 0U);
+                        ASSERT_EQ(info.workspaceSizes.size(), 1U);
+                        EXPECT_GT(info.workspaceSizes[0], systemBytes + common.sharedWorkspaceOffset);
+                    }
+                }
+            }
+        }
+    }
+}
+
+TEST_F(MegaMoeArch22TilingTest, SharedGmm2SchedulingUsesRoutedChunk)
+{
+    using namespace MegaMoeSharedGmm2;
+    for (uint32_t chunkTokens : {1024U, 8192U}) {
+        for (uint32_t sharedCount : {1U, 2U}) {
+            const uint64_t required = static_cast<uint64_t>(chunkTokens) * 2U * 8U;
+            EXPECT_TRUE(CanOverlap(8193, sharedCount, true, false, 1, required, 2, 8, 128, chunkTokens));
+            EXPECT_FALSE(CanOverlap(8193, sharedCount, true, false, 1, required - 1, 2, 8, 128, chunkTokens));
+            EXPECT_FALSE(CanOverlap(8193, sharedCount, true, false, 2, required, 2, 8, 128, chunkTokens));
+            EXPECT_FALSE(CanOverlap(8193, sharedCount, true, true, 1, required, 2, 8, 128, chunkTokens));
+            EXPECT_FALSE(CanOverlap(8193, sharedCount, false, false, 1, required, 2, 8, 128, chunkTokens));
+            for (uint32_t m : {1U, 64U, 1024U, 1025U, 8192U, 8193U, 16385U}) {
+                uint32_t covered = 0;
+                uint32_t activations = 0;
+                uint32_t fullBatchRuns = 0;
+                const uint32_t chunks = (m + chunkTokens - 1U) / chunkTokens;
+                for (uint32_t chunk = 0; chunk < chunks; ++chunk) {
+                    const auto range = TokenRange(m, chunk, chunkTokens);
+                    EXPECT_EQ(range.base, covered);
+                    EXPECT_GT(range.rows, 0U);
+                    EXPECT_LE(range.rows, chunkTokens);
+                    covered += range.rows;
+                    for (uint64_t round = 0; round < 3; ++round) {
+                        const auto chunked = ForRound(sharedCount, true, chunk, round);
+                        activations += chunked.activation ? 1U : 0U;
+                        EXPECT_EQ(chunked.gmm2, round == 0);
+                        const auto full = ForRound(sharedCount, false, chunk, round);
+                        fullBatchRuns += full.gmm2 ? 1U : 0U;
+                    }
+                }
+                EXPECT_EQ(covered, m);
+                EXPECT_EQ(activations, 1U);
+                EXPECT_EQ(fullBatchRuns, 1U);
+                EXPECT_EQ(TokenRange(m, chunks, chunkTokens).rows, 0U);
+            }
+        }
+    }
+    EXPECT_FALSE(CanOverlap(8193, 0, true, false, 1, 131072, 2, 8, 128, 8192));
+    EXPECT_FALSE(CanOverlap(8193, 1, true, false, 1, 16384, 2, 8, 128, 8192));
+    EXPECT_FALSE(ForRound(0, true, 0, 0).activation);
+    EXPECT_FALSE(ForRound(0, true, 0, 0).gmm2);
+    EXPECT_EQ(ExpertOffset(1, 8193, 8192, 2048), (8193ULL + 8192ULL) * 2048ULL);
+}
+
+TEST_F(MegaMoeArch22TilingTest, A3AcceptsGeneralizedSharedIntermediate)
+{
+    for (int64_t sharedIntermediate : {256, 640}) {
+        RunQuantSharedExpertCase(ge::DT_INT8, true, false, ge::GRAPH_SUCCESS, 2 * sharedIntermediate, 2048, false,
+                                 false, false, ge::FORMAT_FRACTAL_NZ, "Ascend910_93", 1, false, 2048, 512, 8, 2, 128, 1,
+                                 ge::DT_INT8, sharedIntermediate);
+    }
+}
+
 TEST_F(MegaMoeArch22TilingTest, A3SharedWorkspaceAlignmentWithBf16TopkWeights)
 {
     TilingInfo info;
@@ -268,8 +365,8 @@ TEST_F(MegaMoeArch22TilingTest, Test0)
     uint64_t coreNum = 20;
     uint64_t ubSize = 196608;
     constexpr int64_t kHiddenSize = 7168;
-    constexpr int64_t kN = 28672;
-    constexpr int64_t kNHalf = 14336;
+    constexpr int64_t kN = 8192;
+    constexpr int64_t kNHalf = kN / 2;
     constexpr uint32_t kExpertPerRank = 8;
 
     std::vector<gert::TilingContextPara::TensorDescription> inputs;
@@ -338,7 +435,7 @@ TEST_F(MegaMoeArch22TilingTest, ActivationParamValidationWithLargeIntermediateHi
     constexpr uint64_t ubSize = 196608;
     constexpr int64_t kBs = 32;
     constexpr int64_t kHiddenSize = 7168;
-    constexpr int64_t kN = 28672;
+    constexpr int64_t kN = 8192;
     constexpr int64_t kIntermediateHidden = kN / 2;
     constexpr uint32_t kExpertPerRank = 8;
 
@@ -753,7 +850,7 @@ TEST_F(MegaMoeArch22TilingTest, FullRangeA3RejectsOutsideContract)
         RunQuantSharedExpertCase(ge::DT_INT8, true, false, ge::GRAPH_FAILED, 1024, badH, false, false, false,
                                  ge::FORMAT_FRACTAL_NZ, "Ascend910_93", 1, false, badH, 512, 2, 16, 4, 1);
     }
-    for (int64_t badI : {256, 640}) {
+    for (int64_t badI : {128, 320}) {
         RunQuantSharedExpertCase(ge::DT_INT8, true, false, ge::GRAPH_FAILED, 1024, 1024, false, false, false,
                                  ge::FORMAT_FRACTAL_NZ, "Ascend910_93", 1, false, 1024, badI, 2, 16, 4, 1);
         RunQuantSharedExpertCase(ge::DT_INT8, true, false, ge::GRAPH_FAILED, 2 * badI, 1024, false, false, false,
@@ -830,8 +927,8 @@ TEST_F(MegaMoeArch22TilingTest, CombineCommModeValidation)
     constexpr uint64_t ubSize = 196608;
     constexpr int64_t kBs = 32;
     constexpr int64_t kHiddenSize = 7168;
-    constexpr int64_t kN = 28672;
-    constexpr int64_t kNHalf = 14336;
+    constexpr int64_t kN = 8192;
+    constexpr int64_t kNHalf = kN / 2;
     constexpr uint32_t kExpertPerRank = 8;
     constexpr int64_t kEpWorldSize = 8;
     constexpr int64_t kTopK = 8;
@@ -946,8 +1043,8 @@ TEST_F(MegaMoeArch22TilingTest, CombineCommModeDedupTilingEffect)
     constexpr uint64_t ubSize = 196608;
     constexpr int64_t kBs = 49; // EP·bs=98 非 8 倍数，覆盖 32B 对齐垫量
     constexpr int64_t kHiddenSize = 7168;
-    constexpr int64_t kN = 28672;
-    constexpr int64_t kNHalf = 14336;
+    constexpr int64_t kN = 8192;
+    constexpr int64_t kNHalf = kN / 2;
     constexpr uint32_t kExpertPerRank = 8;
     constexpr int64_t kEpWorldSize = 2;
     constexpr int64_t kTopK = 8;
@@ -1077,17 +1174,130 @@ TEST_F(MegaMoeArch22TilingTest, SharedExpertsRejectDedupRequest)
     }
 }
 
+static bool ExecuteW4A8Tiling(TilingInfo& info, const char* socVersion, int64_t hiddenSize, int64_t intermediateHidden,
+                              uint32_t expertsPerRank, int64_t epWorldSize, int64_t topK, const std::string& activation,
+                              const std::vector<float>& activationParams, int64_t combineCommMode = 0)
+{
+    struct MegaMoeCompileInfo {};
+    MegaMoeCompileInfo compileInfo;
+    constexpr int64_t bs = 8193;
+    constexpr uint64_t coreNum = 32;
+    constexpr uint64_t ubSize = 196608;
+    constexpr int64_t kSufficientCclBuffer = 64LL * 1024 * 1024 * 1024;
+    const int64_t n = 2 * intermediateHidden;
+    using Tensor = gert::TilingContextPara::TensorDescription;
+    std::vector<Tensor> inputs{
+        {{{64}, {64}}, ge::DT_INT32, ge::FORMAT_ND},
+        {{{bs, hiddenSize}, {bs, hiddenSize}}, ge::DT_BF16, ge::FORMAT_ND},
+        {{{bs, topK}, {bs, topK}}, ge::DT_INT32, ge::FORMAT_ND},
+        {{{bs, topK}, {bs, topK}}, ge::DT_FLOAT, ge::FORMAT_ND},
+    };
+    inputs.insert(inputs.end(), expertsPerRank,
+                  Tensor{{{hiddenSize, n}, {hiddenSize, n}}, ge::DT_INT4, ge::FORMAT_FRACTAL_NZ});
+    inputs.insert(
+        inputs.end(), expertsPerRank,
+        Tensor{
+            {{intermediateHidden, hiddenSize}, {intermediateHidden, hiddenSize}}, ge::DT_INT4, ge::FORMAT_FRACTAL_NZ});
+    for (const auto dtype : {ge::DT_UINT64, ge::DT_FLOAT}) {
+        inputs.insert(inputs.end(), expertsPerRank, Tensor{{{n}, {n}}, dtype, ge::FORMAT_ND});
+        inputs.insert(inputs.end(), expertsPerRank, Tensor{{{hiddenSize}, {hiddenSize}}, dtype, ge::FORMAT_ND});
+    }
+    gert::TilingContextPara para(
+        "MegaMoe", inputs,
+        {{{{bs, hiddenSize}, {bs, hiddenSize}}, ge::DT_BF16, ge::FORMAT_ND},
+         {{{expertsPerRank}, {expertsPerRank}}, ge::DT_INT32, ge::FORMAT_ND}},
+        {{"moe_expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(expertsPerRank * epWorldSize)},
+         {"ep_world_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(epWorldSize)},
+         {"ccl_buffer_size", Ops::Transformer::AnyValue::CreateFrom<int64_t>(kSufficientCclBuffer)},
+         {"max_recv_token_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(bs * epWorldSize * topK)},
+         {"dispatch_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"dispatch_quant_out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"shared_expert_quant_out_dtype",
+          Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_UNDEFINED))},
+         {"combine_quant_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"comm_alg", Ops::Transformer::AnyValue::CreateFrom<std::string>("")},
+         {"num_max_tokens_per_rank", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"activation", Ops::Transformer::AnyValue::CreateFrom<std::string>(activation)},
+         {"activation_params", Ops::Transformer::AnyValue::CreateFrom<std::vector<float>>(activationParams)},
+         {"activation_out_dtype",
+          Ops::Transformer::AnyValue::CreateFrom<int64_t>(static_cast<int64_t>(ge::DT_UNDEFINED))},
+         {"transpose_weight1", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+         {"transpose_weight2", Ops::Transformer::AnyValue::CreateFrom<bool>(false)},
+         {"weight1_interleave", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         // 16-18 位占位：combine_comm_mode 须落在 tiling 读取的索引 19
+         {"topo_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"rank_num_per_server", Ops::Transformer::AnyValue::CreateFrom<int64_t>(2)},
+         {"topk_weights_type", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"combine_comm_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(combineCommMode)}},
+        {1, 1, 1, 1, expertsPerRank, expertsPerRank, expertsPerRank, expertsPerRank, expertsPerRank, expertsPerRank},
+        {1, 1}, &compileInfo, socVersion, coreNum, ubSize);
+    Mc2Hcom::MockValues values{{"rankNum", epWorldSize}};
+    auto& topology = Mc2Hcom::MC2HcomTopologyMocker::GetInstance();
+    topology.SetValues(values);
+    const bool success = ExecuteTiling(para, info);
+    topology.Reset();
+    return success;
+}
+
+TEST_F(MegaMoeArch22TilingTest, IntermediateHiddenValidation)
+{
+    TilingInfo info;
+    const std::vector<float> params{std::numeric_limits<float>::max()};
+    EXPECT_TRUE(ExecuteW4A8Tiling(info, "Ascend910B", 2048, 256, 128, 2, 8, "swiglu", params));
+    EXPECT_FALSE(ExecuteW4A8Tiling(info, "Ascend910B", 2048, 320, 128, 2, 8, "swiglu", params));
+    for (const char* socVersion : {"Ascend910B", "Ascend910_93"}) {
+        SCOPED_TRACE(socVersion);
+        EXPECT_TRUE(ExecuteW4A8Tiling(info, socVersion, 2048, 4096, 128, 2, 8, "swiglu", params));
+        EXPECT_FALSE(ExecuteW4A8Tiling(info, socVersion, 2048, 4224, 128, 2, 8, "swiglu", params));
+    }
+}
+
+TEST_F(MegaMoeArch22TilingTest, BatchedDispatchActivationSelection)
+{
+    struct ActivationCase {
+        std::string activation;
+        std::vector<float> params;
+    };
+    const float limit = std::numeric_limits<float>::max();
+    for (const auto& activationCase : std::vector<ActivationCase>{
+             {"swiglu", {limit}}, {"swiglustep", {limit}}, {"swigluoai", {limit, 1.702f, 1.0f}}, {"situglu", {1.0f}}}) {
+        SCOPED_TRACE(activationCase.activation);
+        TilingInfo info;
+        ASSERT_TRUE(ExecuteW4A8Tiling(info, "Ascend910B", 2048, 512, 128, 2, 8, activationCase.activation,
+                                      activationCase.params));
+        ASSERT_EQ(info.tilingDataSize, sizeof(MegaMoeA2A3TilingData));
+        EXPECT_TRUE(reinterpret_cast<const MegaMoeA2A3TilingData*>(info.tilingData.get())->useBatchedDispatch);
+    }
+}
+
+TEST_F(MegaMoeArch22TilingTest, BatchedDispatchCombineCommModeSelection)
+{
+    const std::vector<float> params{std::numeric_limits<float>::max()};
+    TilingInfo offInfo;
+    TilingInfo onInfo;
+    EXPECT_FALSE(ExecuteW4A8Tiling(onInfo, "Ascend910B", 2048, 512, 128, 2, 8, "swiglu", params, 1));
+    ASSERT_TRUE(ExecuteW4A8Tiling(offInfo, "Ascend910_93", 2560, 640, 64, 8, 10, "swiglu", params));
+    ASSERT_TRUE(ExecuteW4A8Tiling(onInfo, "Ascend910_93", 2560, 640, 64, 8, 10, "swiglu", params, 1));
+    ASSERT_EQ(onInfo.tilingDataSize, sizeof(MegaMoeA2A3TilingData));
+    ASSERT_EQ(offInfo.tilingDataSize, sizeof(MegaMoeA2A3TilingData));
+    const auto* offData = reinterpret_cast<const MegaMoeA2A3TilingData*>(offInfo.tilingData.get());
+    const auto* onData = reinterpret_cast<const MegaMoeA2A3TilingData*>(onInfo.tilingData.get());
+    EXPECT_TRUE(offData->useBatchedDispatch);
+    EXPECT_TRUE(onData->useBatchedDispatch);
+    EXPECT_EQ(offData->dedupOn, 0U);
+    EXPECT_EQ(onData->dedupOn, 0U);
+    EXPECT_EQ(onData->dedupOffsetD, 0);
+    EXPECT_EQ(onData->dedupRowMetaSize, 0);
+    EXPECT_EQ(onData->recvRoundBudget, offData->recvRoundBudget);
+    EXPECT_EQ(onData->recvRoundsMax, offData->recvRoundsMax);
+    EXPECT_EQ(onInfo.workspaceSizes, offInfo.workspaceSizes);
+}
+
 TEST_F(MegaMoeArch22TilingTest, W8A8MaskTilingKeyAndWorkspace)
 {
     struct MegaMoeCompileInfo {};
     MegaMoeCompileInfo compileInfo;
-    constexpr int64_t bs = 129;
-    constexpr int64_t topK = 3;
-    constexpr int64_t hidden = 1024;
-    constexpr int64_t intermediate = 512;
     constexpr int64_t ep = 2;
-    constexpr uint32_t expertsPerRank = 4;
-    constexpr int64_t experts = ep * expertsPerRank;
 
     // 基线包含 10 MiB 保留区、512 KiB 标志区、3072 B 计数区及 387 行数据，每行 3588 B。
     constexpr int64_t baselineWindow = 12401676;
@@ -1097,22 +1307,25 @@ TEST_F(MegaMoeArch22TilingTest, W8A8MaskTilingKeyAndWorkspace)
     constexpr uint64_t rowKey = 5188;
     constexpr uint64_t blockedKey = 13380;
 
-    using Tensor = gert::TilingContextPara::TensorDescription;
-    std::vector<Tensor> inputs{
-        {{{64}, {64}}, ge::DT_INT32, ge::FORMAT_ND},
-        {{{bs, hidden}, {bs, hidden}}, ge::DT_BF16, ge::FORMAT_ND},
-        {{{bs, topK}, {bs, topK}}, ge::DT_INT32, ge::FORMAT_ND},
-        {{{bs, topK}, {bs, topK}}, ge::DT_FLOAT, ge::FORMAT_ND},
-    };
-    inputs.insert(inputs.end(), expertsPerRank,
-                  Tensor{{{hidden, 2 * intermediate}, {hidden, 2 * intermediate}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ});
-    inputs.insert(inputs.end(), expertsPerRank,
-                  Tensor{{{intermediate, hidden}, {intermediate, hidden}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ});
-    inputs.insert(inputs.end(), expertsPerRank,
-                  Tensor{{{2 * intermediate}, {2 * intermediate}}, ge::DT_UINT64, ge::FORMAT_ND});
-    inputs.insert(inputs.end(), expertsPerRank, Tensor{{{hidden}, {hidden}}, ge::DT_UINT64, ge::FORMAT_ND});
+    auto buildPara = [&](int64_t window, int64_t receiveBudget, int64_t bs = 129, int64_t topK = 3,
+                         int64_t hidden = 1024, int64_t intermediate = 512, uint32_t expertsPerRank = 4) {
+        const int64_t experts = ep * expertsPerRank;
+        using Tensor = gert::TilingContextPara::TensorDescription;
+        std::vector<Tensor> inputs{
+            {{{64}, {64}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{bs, hidden}, {bs, hidden}}, ge::DT_BF16, ge::FORMAT_ND},
+            {{{bs, topK}, {bs, topK}}, ge::DT_INT32, ge::FORMAT_ND},
+            {{{bs, topK}, {bs, topK}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        };
+        inputs.insert(
+            inputs.end(), expertsPerRank,
+            Tensor{{{hidden, 2 * intermediate}, {hidden, 2 * intermediate}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ});
+        inputs.insert(inputs.end(), expertsPerRank,
+                      Tensor{{{intermediate, hidden}, {intermediate, hidden}}, ge::DT_INT8, ge::FORMAT_FRACTAL_NZ});
+        inputs.insert(inputs.end(), expertsPerRank,
+                      Tensor{{{2 * intermediate}, {2 * intermediate}}, ge::DT_UINT64, ge::FORMAT_ND});
+        inputs.insert(inputs.end(), expertsPerRank, Tensor{{{hidden}, {hidden}}, ge::DT_UINT64, ge::FORMAT_ND});
 
-    auto buildPara = [&](int64_t window, int64_t receiveBudget) {
         return gert::TilingContextPara(
             "MegaMoe", inputs,
             {{{{bs, hidden}, {bs, hidden}}, ge::DT_BF16, ge::FORMAT_ND},
@@ -1157,6 +1370,31 @@ TEST_F(MegaMoeArch22TilingTest, W8A8MaskTilingKeyAndWorkspace)
         ASSERT_EQ(fallback.workspaceSizes.size(), 1U);
         ASSERT_EQ(mask.workspaceSizes.size(), 1U);
         EXPECT_EQ(mask.workspaceSizes[0], fallback.workspaceSizes[0] + testCase.workspaceIncrement);
+    }
+    constexpr int64_t tokens = 512;
+    constexpr int64_t topK = 8;
+    constexpr int64_t hidden = 2048;
+    constexpr uint32_t expertsPerRank = 128;
+    constexpr int64_t fixedWindow = 10 * 1024 * 1024 + 512 * 1024 + 3072;
+    constexpr int64_t window = fixedWindow + tokens * topK * (3 * hidden + 512 + sizeof(float));
+    constexpr int64_t maskMetadata = 512 + tokens * ep * expertsPerRank + ep * 512;
+    for (const int64_t intermediate : {512, 1024}) {
+        const bool batched = intermediate == 512;
+        TilingInfo base;
+        TilingInfo extra;
+        ASSERT_TRUE(
+            ExecuteTiling(buildPara(window, tokens * topK, tokens, topK, hidden, intermediate, expertsPerRank), base));
+        ASSERT_TRUE(ExecuteTiling(
+            buildPara(window + maskMetadata, tokens * topK, tokens, topK, hidden, intermediate, expertsPerRank),
+            extra));
+        EXPECT_EQ(base.tilingKey, baselineKey);
+        EXPECT_EQ(extra.tilingKey, batched ? baselineKey : blockedKey);
+        ASSERT_EQ(extra.tilingDataSize, sizeof(MegaMoeA2A3TilingData));
+        const auto* data = reinterpret_cast<const MegaMoeA2A3TilingData*>(extra.tilingData.get());
+        EXPECT_EQ(data->useBatchedDispatch, batched);
+        if (batched) {
+            EXPECT_EQ(base.workspaceSizes, extra.workspaceSizes);
+        }
     }
     TilingInfo tooSmall;
     EXPECT_FALSE(ExecuteTiling(buildPara(baselineWindow - 1, cases[0].budget), tooSmall));

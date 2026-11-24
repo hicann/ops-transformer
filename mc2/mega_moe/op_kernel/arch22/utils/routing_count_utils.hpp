@@ -56,6 +56,21 @@ CATLASS_DEVICE bool IsSyncTask(int32_t task_id, int32_t n_tasks)
     }
 }
 
+template <bool BatchedDispatch, class Params>
+CATLASS_DEVICE bool UseDecodeFastPath(Params const& params)
+{
+    return BatchedDispatch && params.decodeFastPath;
+}
+
+template <bool BatchedDispatch, class Params>
+CATLASS_DEVICE bool IsActivationBoundary(Params const& params, uint32_t groupIdx)
+{
+    if (UseDecodeFastPath<BatchedDispatch>(params)) {
+        return groupIdx + 1 == params.epilogueGranularity || groupIdx + 1 == params.expertPerRank;
+    }
+    return IsSyncTask(groupIdx, params.expertPerRank);
+}
+
 } // namespace Catlass::Gemm::Kernel
 
 #endif // MEGA_MOE_ROUTING_COUNT_UTILS_HPP

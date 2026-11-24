@@ -29,12 +29,18 @@
 namespace Catlass::Epilogue::Block {
 
 namespace detail {
+template <bool Enabled>
+struct SwigluBatchState {};
+template <>
+struct SwigluBatchState<true> {
+    bool rowBatchEnabled_{false};
+};
 
 // The three policies have the same tiled UB layout and arithmetic. Their
 // existing A2/A3 call signatures are provided by the overloads below.
 template <class DispatchPolicy_, class CType_, class LayoutPerTokenScale_, class DType_, class TileElemWiseMuls_,
           class TileCopy_>
-class PerTokenSwigluImpl {
+class PerTokenSwigluImpl : private SwigluBatchState<DispatchPolicy_::ENABLE_BATCHED> {
 public:
     using DispatchPolicy = DispatchPolicy_;
     using ArchTag = typename DispatchPolicy::ArchTag;
@@ -46,6 +52,9 @@ public:
     static constexpr uint32_t SCALE_BATCH_COUNT = 256;
     static constexpr uint32_t SCALE_BUFFER_BYTES = (SCALE_BATCH_COUNT + BYTE_PER_BLK / sizeof(float)) * sizeof(float);
     static constexpr uint32_t ROW_MAX_BYTES = BYTE_PER_BLK;
+    static constexpr uint32_t ROW_BATCH_COUNT = 8;
+    static constexpr uint32_t ROW_BATCH_CAPACITY =
+        ROW_BATCH_COUNT * 512 > TILE_LENGTH ? ROW_BATCH_COUNT * 512 : TILE_LENGTH;
 
     using ElementC = typename CType_::Element;
     using LayoutC = typename CType_::Layout;
@@ -171,6 +180,17 @@ public:
         (void)params_;
     }
 
+    CATLASS_DEVICE void EnableRowBatch(bool enabled, Arch::Resource<ArchTag> const& resource)
+    {
+        this->rowBatchEnabled_ = enabled;
+        if constexpr (ROW_BATCH_CAPACITY > TILE_LENGTH) {
+            if (enabled) {
+                // No buffer has been used yet, so rebind views without republishing ready events.
+                BindBuffers(resource, ROW_BATCH_CAPACITY, 6 * 512 * sizeof(int32_t));
+            }
+        }
+    }
+
     CATLASS_DEVICE
     void operator()(AscendC::GlobalTensor<ElementC> const& gmC, MatrixCoord const& shapeC,
                     AscendC::GlobalTensor<ElementPerTokenScale> const& gmPerTokenScale1,
@@ -191,6 +211,13 @@ public:
         uint32_t tasksForIdx = 0;
         if (!GetTaskRange(blockM, epilogueCoreNum, loopStartIdx, tasksForIdx)) {
             return;
+        }
+        if constexpr (DispatchPolicy::ENABLE_BATCHED && std::is_same_v<ElementD, int8_t>) {
+            if (this->rowBatchEnabled_ && (branchLength == 512 || branchLength == 640)) {
+                RunRowBatches(gmC, gmPerTokenScale1, gmD, gmPerTokenScale2, loopStartIdx, tasksForIdx, branchLength,
+                              gmmOutPreRowStride, activationClamp);
+                return;
+            }
         }
         uint32_t scaleBatchStart = loopStartIdx;
         uint32_t scaleBatchCount = 0;
@@ -287,6 +314,14 @@ public:
         uint32_t tasksForIdx = 0;
         if (!GetTaskRange(blockM, epilogueCoreNum, loopStartIdx, tasksForIdx)) {
             return;
+        }
+
+        if constexpr (DispatchPolicy::ENABLE_BATCHED) {
+            if (this->rowBatchEnabled_ && (branchLength == 512 || branchLength == 640)) {
+                RunDirectRowBatches(gmC, gmD, loopStartIdx, tasksForIdx, branchLength, gmmOutPreRowStride,
+                                    activationClamp);
+                return;
+            }
         }
 
         for (uint32_t loopIdx = loopStartIdx; loopIdx < loopStartIdx + tasksForIdx; ++loopIdx) {
@@ -396,6 +431,192 @@ private:
     static uint32_t NextStage(uint32_t stageId)
     {
         return ::Catlass::Epilogue::Block::detail::SwigluNextStage<UB_STAGES>(stageId);
+    }
+
+    CATLASS_DEVICE void BindBuffers(Arch::Resource<ArchTag> const& resource, uint32_t capacity,
+                                    uint32_t reservedBytes = 0)
+    {
+        size_t ubOffset = 0;
+        for (uint32_t i = 0; i < UB_STAGES; ++i) {
+            ubCList[i] = resource.ubBuf.template GetBufferByByte<ElementC>(ubOffset);
+            ubOffset += 2 * capacity * sizeof(ElementC);
+            ubDList[i] = resource.ubBuf.template GetBufferByByte<ElementD>(ubOffset);
+            ubOffset += capacity * sizeof(ElementD);
+            ubGateFp32List[i] = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
+            ubOffset += capacity * sizeof(float);
+            ubUpFp32List[i] = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
+            ubOffset += capacity * sizeof(float);
+            ubActivationList[i] = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
+            ubOffset += capacity * sizeof(float);
+        }
+        for (uint32_t i = 0; i < SCALE_BUFFER_COUNT; ++i) {
+            ubPerTokenScaleOutputList[i] = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
+            ubOffset += SCALE_BUFFER_BYTES;
+        }
+        ubRowAbsMax = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
+        ubOffset += ROW_MAX_BYTES;
+        ubPerTokenScaleInput = resource.ubBuf.template GetBufferByByte<float>(ubOffset);
+        ubOffset += SCALE_INPUT_BYTES;
+        sharedTmpBuffer = resource.ubBuf.template GetBufferByByte<uint8_t>(ubOffset);
+        if (reservedBytes != 0) {
+            sharedTmpBuffer.SetSize(ArchTag::UB_SIZE - ubOffset - reservedBytes);
+        }
+    }
+
+    CATLASS_DEVICE void LoadRowBatch(AscendC::GlobalTensor<ElementC> const& gmC, uint32_t rows, uint32_t branchLength,
+                                     uint32_t gmRowStride, uint32_t stage)
+    {
+        AscendC::WaitFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[stage]);
+        LayoutC ubLayout{rows, branchLength};
+        LayoutC gmLayout{rows, branchLength, gmRowStride};
+        copyGmToUbC(ubCList[stage], gmC, ubLayout, gmLayout);
+        copyGmToUbC(ubCList[stage][ROW_BATCH_CAPACITY], gmC[branchLength], ubLayout, gmLayout);
+        AscendC::SetFlag<AscendC::HardEvent::MTE2_V>(eventUbCMTE2VList[stage]);
+    }
+
+    CATLASS_DEVICE void RunDirectRowBatches(AscendC::GlobalTensor<ElementC> const& gmC,
+                                            AscendC::GlobalTensor<ElementD> const& gmD, uint32_t firstRow,
+                                            uint32_t rowCount, uint32_t branchLength, uint32_t gmRowStride,
+                                            float activationClamp)
+    {
+        const uint32_t batchRows = branchLength == 512 ? ROW_BATCH_COUNT : 4;
+        for (uint32_t done = 0; done < rowCount; done += batchRows) {
+            const uint32_t rows = min(rowCount - done, batchRows);
+            const uint32_t elements = rows * branchLength;
+            const uint32_t stage = (done / batchRows) % UB_STAGES;
+            LoadRowBatch(gmC[(firstRow + done) * gmRowStride], rows, branchLength, gmRowStride, stage);
+            AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(eventUbCMTE2VList[stage]);
+            Activation::PrepareBranches(ubGateFp32List[stage], ubUpFp32List[stage], ubCList[stage], ROW_BATCH_CAPACITY,
+                                        elements);
+            AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[stage]);
+            Activation::Compute(ubActivationList[stage], ubGateFp32List[stage], ubUpFp32List[stage], sharedTmpBuffer,
+                                elements, activationClamp, activationCode_, activationParams1_, activationParams2_);
+            CopyDirectTile(stage, gmD[(firstRow + done) * branchLength], elements);
+        }
+    }
+
+    CATLASS_DEVICE void RunRowBatches(AscendC::GlobalTensor<ElementC> const& gmC,
+                                      AscendC::GlobalTensor<float> const& gmInputScale,
+                                      AscendC::GlobalTensor<ElementD> const& gmD,
+                                      AscendC::GlobalTensor<float> const& gmOutputScale, uint32_t firstRow,
+                                      uint32_t rowCount, uint32_t branchLength, uint32_t gmRowStride,
+                                      float activationClamp)
+    {
+        static_assert(UB_STAGES * (2 * ROW_BATCH_CAPACITY * sizeof(ElementC) + ROW_BATCH_CAPACITY * sizeof(ElementD) +
+                                   3 * ROW_BATCH_CAPACITY * sizeof(float)) +
+                              SCALE_BUFFER_COUNT * SCALE_BUFFER_BYTES + ROW_MAX_BYTES + SCALE_INPUT_BYTES +
+                              Activation::MIN_SHARED_TMP_BYTES + 6 * 512 * sizeof(int32_t) <=
+                          ArchTag::UB_SIZE,
+                      "The batch buffers must leave the routed-table cache and activation workspace intact");
+        static_assert(SCALE_INPUT_COUNT % ROW_BATCH_COUNT == 0 && SCALE_BATCH_COUNT % ROW_BATCH_COUNT == 0,
+                      "A row batch must not cross a scale-buffer boundary");
+        if (rowCount == 0) {
+            return;
+        }
+        const uint32_t batchRows = branchLength == 512 ? ROW_BATCH_COUNT : 4;
+        uint32_t scaleBatchStart = firstRow;
+        uint32_t scaleBatchCount = 0;
+        uint32_t scaleBatchIndex = 0;
+        uint32_t stage = 0;
+        LoadRowBatch(gmC[firstRow * gmRowStride], min(rowCount, batchRows), branchLength, gmRowStride, stage);
+        for (uint32_t done = 0; done < rowCount; done += batchRows) {
+            const uint32_t rows = min(rowCount - done, batchRows);
+            const uint32_t elements = rows * branchLength;
+            const uint32_t row = firstRow + done;
+            float inputScales[ROW_BATCH_COUNT];
+            float multipliers[ROW_BATCH_COUNT];
+            for (uint32_t i = 0; i < rows; ++i) {
+                inputScales[i] = ::Catlass::Epilogue::Block::detail::ReadSwigluInputScale<SCALE_INPUT_COUNT>(
+                    ubPerTokenScaleInput, gmInputScale, row + i, firstRow, rowCount);
+            }
+            const uint32_t nextStage = NextStage(stage);
+            if (done + rows < rowCount) {
+                LoadRowBatch(gmC[(row + rows) * gmRowStride], min(rowCount - done - rows, batchRows), branchLength,
+                             gmRowStride, nextStage);
+            }
+            auto& gate = ubGateFp32List[stage];
+            auto& up = ubUpFp32List[stage];
+            auto& activated = ubActivationList[stage];
+            AscendC::WaitFlag<AscendC::HardEvent::MTE2_V>(eventUbCMTE2VList[stage]);
+            Activation::PrepareBranches(gate, up, ubCList[stage], ROW_BATCH_CAPACITY, elements);
+            AscendC::SetFlag<AscendC::HardEvent::V_MTE2>(eventUbCVMTE2List[stage]);
+            AscendC::SetFlag<AscendC::HardEvent::S_V>(0);
+            AscendC::WaitFlag<AscendC::HardEvent::S_V>(0);
+            for (uint32_t i = 0; i < rows; ++i) {
+                AscendC::Muls(gate[i * branchLength], gate[i * branchLength], inputScales[i], branchLength);
+                AscendC::Muls(up[i * branchLength], up[i * branchLength], inputScales[i], branchLength);
+            }
+            AscendC::PipeBarrier<PIPE_V>();
+            Activation::Compute(activated, gate, up, sharedTmpBuffer, elements, activationClamp, activationCode_,
+                                activationParams1_, activationParams2_);
+            AscendC::Abs(gate, activated, elements);
+            AscendC::PipeBarrier<PIPE_V>();
+            if (branchLength == 512) {
+                // Reduce the eight 64-element partial maxima for each row.
+                AscendC::WholeReduceMax(up, gate, 64, rows * 8, 1, 1, 8, AscendC::ReduceOrder::ORDER_ONLY_VALUE);
+                AscendC::PipeBarrier<PIPE_V>();
+                AscendC::WholeReduceMax(ubRowAbsMax, up, 8, rows, 1, 1, 1, AscendC::ReduceOrder::ORDER_ONLY_VALUE);
+                AscendC::PipeBarrier<PIPE_V>();
+            } else {
+                // 640 is ten repeats, so do not reuse the 512-specific second reduction stride.
+                for (uint32_t i = 0; i < rows; ++i) {
+                    AscendC::ReduceMax<float>(up, gate[i * branchLength], up, branchLength, false);
+                    AscendC::PipeBarrier<PIPE_V>();
+                    AscendC::SetFlag<AscendC::HardEvent::V_S>(0);
+                    AscendC::WaitFlag<AscendC::HardEvent::V_S>(0);
+                    ubRowAbsMax.SetValue(i, up.GetValue(0));
+                    AscendC::SetFlag<AscendC::HardEvent::S_V>(0);
+                    AscendC::WaitFlag<AscendC::HardEvent::S_V>(0);
+                }
+            }
+            AscendC::Duplicate(up, 0.0f, BYTE_PER_BLK / sizeof(float));
+            AscendC::PipeBarrier<PIPE_V>();
+            AscendC::Max(ubRowAbsMax, up, ubRowAbsMax, rows);
+            AscendC::SetFlag<AscendC::HardEvent::V_S>(0);
+            AscendC::WaitFlag<AscendC::HardEvent::V_S>(0);
+            const uint32_t scaleStage = scaleBatchIndex % SCALE_BUFFER_COUNT;
+            if (scaleBatchCount == 0 && scaleBatchIndex >= SCALE_BUFFER_COUNT) {
+                WaitScaleBuffer(scaleStage);
+            }
+            for (uint32_t i = 0; i < rows; ++i) {
+                const float maximum = ubRowAbsMax.GetValue(i);
+                ubPerTokenScaleOutputList[scaleStage].SetValue(scaleBatchCount + i, maximum / 127.0f);
+                multipliers[i] = maximum > 0.0f ? 127.0f / maximum : 0.0f;
+            }
+            AscendC::SetFlag<AscendC::HardEvent::S_V>(0);
+            AscendC::WaitFlag<AscendC::HardEvent::S_V>(0);
+            for (uint32_t i = 0; i < rows; ++i) {
+                AscendC::Muls(gate[i * branchLength], activated[i * branchLength], multipliers[i], branchLength);
+            }
+            AscendC::PipeBarrier<PIPE_V>();
+            auto quantS32 = gate.template ReinterpretCast<int32_t>();
+            auto quantF16 = gate.template ReinterpretCast<half>();
+            AscendC::Cast(quantS32, gate, AscendC::RoundMode::CAST_RINT, elements);
+            AscendC::PipeBarrier<PIPE_V>();
+            AscendC::SetDeqScale(static_cast<half>(1.0));
+            AscendC::Cast(quantF16, quantS32, AscendC::RoundMode::CAST_RINT, elements);
+            AscendC::PipeBarrier<PIPE_V>();
+            AscendC::WaitFlag<AscendC::HardEvent::MTE3_V>(eventUbDMTE3VList[stage]);
+            AscendC::Cast(ubDList[stage], quantF16, AscendC::RoundMode::CAST_RINT, elements);
+            AscendC::SetFlag<AscendC::HardEvent::V_MTE3>(eventUbDVMTE3List[stage]);
+            AscendC::WaitFlag<AscendC::HardEvent::V_MTE3>(eventUbDVMTE3List[stage]);
+            LayoutD outputLayout{rows, branchLength};
+            copyUbToGmD(gmD[row * branchLength], ubDList[stage], outputLayout, outputLayout);
+            AscendC::SetFlag<AscendC::HardEvent::MTE3_V>(eventUbDMTE3VList[stage]);
+            scaleBatchCount += rows;
+            if (scaleBatchCount == SCALE_BATCH_COUNT) {
+                FlushScaleBatch(gmOutputScale, scaleBatchStart, scaleBatchCount, scaleStage);
+                scaleBatchStart += scaleBatchCount;
+                scaleBatchCount = 0;
+                ++scaleBatchIndex;
+            }
+            stage = nextStage;
+        }
+        if (scaleBatchCount != 0) {
+            FlushScaleBatch(gmOutputScale, scaleBatchStart, scaleBatchCount, scaleBatchIndex % SCALE_BUFFER_COUNT);
+            ++scaleBatchIndex;
+        }
+        DrainScaleBuffers(scaleBatchIndex);
     }
 
     CATLASS_DEVICE
@@ -525,13 +746,13 @@ private:
 
 // A3 keeps its original dispatch policy and constructor/call contract.
 template <uint32_t UB_STAGES_, class CType_, class LayoutPerTokenScale_, class DType_, class TileElemWiseMuls_,
-          class TileCopy_>
-class BlockEpilogue<EpilogueAtlasA2PerTokenDequantSwigluQuant<UB_STAGES_>, CType_,
+          class TileCopy_, bool EnableBatched_>
+class BlockEpilogue<EpilogueAtlasA2PerTokenDequantSwigluQuant<UB_STAGES_, EnableBatched_>, CType_,
                     Gemm::GemmType<float, LayoutPerTokenScale_>, DType_, TileElemWiseMuls_, TileCopy_>
-    : public detail::PerTokenSwigluImpl<EpilogueAtlasA2PerTokenDequantSwigluQuant<UB_STAGES_>, CType_,
+    : public detail::PerTokenSwigluImpl<EpilogueAtlasA2PerTokenDequantSwigluQuant<UB_STAGES_, EnableBatched_>, CType_,
                                         LayoutPerTokenScale_, DType_, TileElemWiseMuls_, TileCopy_> {
-    using Base = detail::PerTokenSwigluImpl<EpilogueAtlasA2PerTokenDequantSwigluQuant<UB_STAGES_>, CType_,
-                                            LayoutPerTokenScale_, DType_, TileElemWiseMuls_, TileCopy_>;
+    using Base = detail::PerTokenSwigluImpl<EpilogueAtlasA2PerTokenDequantSwigluQuant<UB_STAGES_, EnableBatched_>,
+                                            CType_, LayoutPerTokenScale_, DType_, TileElemWiseMuls_, TileCopy_>;
 
 public:
     using Base::Base;
@@ -539,13 +760,13 @@ public:
 
 // A2 INT8 keeps its original dispatch policy and constructor/call contract.
 template <uint32_t UB_STAGES_, class CType_, class LayoutPerTokenScale_, class DType_, class TileElemWiseMuls_,
-          class TileCopy_>
-class BlockEpilogue<EpilogueAtlasA2PerTokenDequantSwigluQuantInt8<UB_STAGES_>, CType_,
+          class TileCopy_, bool EnableBatched_>
+class BlockEpilogue<EpilogueAtlasA2PerTokenDequantSwigluQuantInt8<UB_STAGES_, EnableBatched_>, CType_,
                     Gemm::GemmType<float, LayoutPerTokenScale_>, DType_, TileElemWiseMuls_, TileCopy_>
-    : public detail::PerTokenSwigluImpl<EpilogueAtlasA2PerTokenDequantSwigluQuantInt8<UB_STAGES_>, CType_,
-                                        LayoutPerTokenScale_, DType_, TileElemWiseMuls_, TileCopy_> {
-    using Base = detail::PerTokenSwigluImpl<EpilogueAtlasA2PerTokenDequantSwigluQuantInt8<UB_STAGES_>, CType_,
-                                            LayoutPerTokenScale_, DType_, TileElemWiseMuls_, TileCopy_>;
+    : public detail::PerTokenSwigluImpl<EpilogueAtlasA2PerTokenDequantSwigluQuantInt8<UB_STAGES_, EnableBatched_>,
+                                        CType_, LayoutPerTokenScale_, DType_, TileElemWiseMuls_, TileCopy_> {
+    using Base = detail::PerTokenSwigluImpl<EpilogueAtlasA2PerTokenDequantSwigluQuantInt8<UB_STAGES_, EnableBatched_>,
+                                            CType_, LayoutPerTokenScale_, DType_, TileElemWiseMuls_, TileCopy_>;
 
 public:
     using Base::Base;
@@ -553,13 +774,13 @@ public:
 
 // A2 BF16 keeps its original dispatch policy and constructor/call contract.
 template <uint32_t UB_STAGES_, class CType_, class LayoutPerTokenScale_, class DType_, class TileElemWiseMuls_,
-          class TileCopy_>
-class BlockEpilogue<EpilogueAtlasA2PerTokenDequantSwigluQuantBF16<UB_STAGES_>, CType_,
+          class TileCopy_, bool EnableBatched_>
+class BlockEpilogue<EpilogueAtlasA2PerTokenDequantSwigluQuantBF16<UB_STAGES_, EnableBatched_>, CType_,
                     Gemm::GemmType<float, LayoutPerTokenScale_>, DType_, TileElemWiseMuls_, TileCopy_>
-    : public detail::PerTokenSwigluImpl<EpilogueAtlasA2PerTokenDequantSwigluQuantBF16<UB_STAGES_>, CType_,
-                                        LayoutPerTokenScale_, DType_, TileElemWiseMuls_, TileCopy_> {
-    using Base = detail::PerTokenSwigluImpl<EpilogueAtlasA2PerTokenDequantSwigluQuantBF16<UB_STAGES_>, CType_,
-                                            LayoutPerTokenScale_, DType_, TileElemWiseMuls_, TileCopy_>;
+    : public detail::PerTokenSwigluImpl<EpilogueAtlasA2PerTokenDequantSwigluQuantBF16<UB_STAGES_, EnableBatched_>,
+                                        CType_, LayoutPerTokenScale_, DType_, TileElemWiseMuls_, TileCopy_> {
+    using Base = detail::PerTokenSwigluImpl<EpilogueAtlasA2PerTokenDequantSwigluQuantBF16<UB_STAGES_, EnableBatched_>,
+                                            CType_, LayoutPerTokenScale_, DType_, TileElemWiseMuls_, TileCopy_>;
 
 public:
     using Base::Base;

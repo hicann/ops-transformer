@@ -15,9 +15,9 @@
 namespace Catlass::Gemm::Kernel {
 
 template <class BlockMmad_, class BlockScheduler_, class ElementGroupList_, class BlockEpilogue1_,
-          class BlockEpilogue2_>
-using MegaMoeKernelA2Int8 =
-    MegaMoeKernelA2<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_, BlockEpilogue2_, true>;
+          class BlockEpilogue2_, bool BatchedDispatch = false>
+using MegaMoeKernelA2Int8 = MegaMoeKernelA2<BlockMmad_, BlockScheduler_, ElementGroupList_, BlockEpilogue1_,
+                                            BlockEpilogue2_, true, false, BatchedDispatch>;
 
 } // namespace Catlass::Gemm::Kernel
 

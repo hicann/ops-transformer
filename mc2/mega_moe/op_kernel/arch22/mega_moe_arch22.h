@@ -74,6 +74,21 @@ using namespace AscendC::HcclContextDef;
 using namespace Catlass;
 using namespace Mc2Tiling;
 
+template <typename Params>
+__aicore__ inline void ConfigureDispatchBatch(Params& params)
+{
+    const uint32_t tokens = params.problemShape.m();
+    params.dispatchExpertBatch = tokens <= MegaMoeConfig::SMALL_DISPATCH_MAX_BS ?
+                                     MegaMoeConfig::SMALL_DISPATCH_EXPERTS :
+                                     MegaMoeConfig::DEFAULT_DISPATCH_EXPERTS;
+    params.decodeFastPath = tokens <= MegaMoeConfig::FAST_PATH_MAX_BS;
+    if (params.decodeFastPath) {
+        params.epilogueGranularity = tokens == 1 || params.expertPerRank < params.dispatchExpertBatch ?
+                                         params.expertPerRank :
+                                         params.dispatchExpertBatch;
+    }
+}
+
 // Template parameter pack used by the unified MegaMoe class.
 //   AType_ : input X element type (DTYPE_X)
 //   BType_ : weight element type   (DTYPE_WEIGHT1)
@@ -106,6 +121,9 @@ public:
     __aicore__ inline void Process();
 
 private:
+    template <bool BatchedDispatch>
+    __aicore__ inline void ProcessDispatch();
+
     GM_ADDR contextGM_;
     GM_ADDR xGM_;
     GM_ADDR topkIdsGM_;
@@ -159,6 +177,7 @@ private:
     float activationParams2_;
     // 通信零冗余：dedupOn_=0 时下列字段全 0（基线布局）；=1 时偏移由 host dedup_layout
     // 单一口径透传（kernel 不重算）
+    bool useBatchedDispatch_{false};
     uint32_t dedupOn_{0};
     int64_t offsetExpandedDstToSrcRow_{0};
     int64_t dedupOffsetD_{0};
@@ -181,6 +200,7 @@ private:
         maxOutputSize_ = common.recvRoundBudget;
         recvRoundsMax_ = common.recvRoundsMax;
         // Dedup 布局透传（全路径读取；dedupOn=0 时全 0，kernel 走基线布局）
+        useBatchedDispatch_ = common.useBatchedDispatch != 0U;
         dedupOn_ = common.dedupOn;
         offsetExpandedDstToSrcRow_ = common.offsetExpandedDstToSrcRow;
         dedupOffsetD_ = common.dedupOffsetD;
@@ -249,6 +269,19 @@ __aicore__ inline void MegaMoe<MegaMoeFunc>::Process()
             return;
         }
     }
+    if constexpr (!DedupOn_ && !MASK_ROUTING_) {
+        if (useBatchedDispatch_) {
+            ProcessDispatch<true>();
+            return;
+        }
+    }
+    ProcessDispatch<false>();
+}
+
+template <MegaMoeClass>
+template <bool BatchedDispatch>
+__aicore__ inline void MegaMoe<MegaMoeFunc>::ProcessDispatch()
+{
     using ArchTag = Arch::AtlasA2;
     constexpr bool enableUnitFlag = false;
     constexpr bool enableShuffleK = true;
@@ -436,17 +469,17 @@ __aicore__ inline void MegaMoe<MegaMoeFunc>::Process()
     using A2MatmulKernel = std::conditional_t<
         isW4A8,
         Gemm::Kernel::MegaMoeKernelA2Bf16W4A8<BlockMmad, BlockScheduler, ElementGroupList, BlockEpilogue1,
-                                              BlockEpilogue2>,
+                                              BlockEpilogue2, BatchedDispatch>,
         std::conditional_t<isInt8,
                            Gemm::Kernel::MegaMoeKernelA2Int8<BlockMmad, BlockScheduler, ElementGroupList,
-                                                             BlockEpilogue1, BlockEpilogue2>,
+                                                             BlockEpilogue1, BlockEpilogue2, BatchedDispatch>,
                            Gemm::Kernel::MegaMoeKernelA2BF16<BlockMmad, BlockScheduler, ElementGroupList,
-                                                             BlockEpilogue1, BlockEpilogue2>>>;
+                                                             BlockEpilogue1, BlockEpilogue2, BatchedDispatch>>>;
     using A3MatmulKernel =
         Gemm::Kernel::MegaMoeKernel<BlockMmad, BlockScheduler, ElementGroupList, BlockEpilogue1, BlockEpilogue2,
                                     BlockEpilogue3, SharedBf16Mmad, SharedBf16Epilogue, SharedGmm2Bf16_,
                                     OverlapSharedMmad, OverlapSharedEpilogue1, OverlapSharedEpilogue2,
-                                    BlockEpilogueDedup, DedupOn_>;
+                                    BlockEpilogueDedup, DedupOn_, BatchedDispatch>;
     using MatmulKernel = std::conditional_t<IS_A2_, A2MatmulKernel, A3MatmulKernel>;
 
     typename MatmulKernel::Params params{problemShape,
@@ -488,6 +521,12 @@ __aicore__ inline void MegaMoe<MegaMoeFunc>::Process()
                                          activationParams1_,
                                          activationParams2_,
                                          tilingGM_};
+    if constexpr (BatchedDispatch) {
+        ConfigureDispatchBatch(params);
+        if constexpr (IS_A2_) {
+            params.epilogueCoreNum = static_cast<uint32_t>(aivNum_);
+        }
+    }
     if constexpr (!IS_A2_) {
         params.sharedExpertNum = sharedExpertNum_;
         params.ptrMaskBuffer = maskBufferGM_;
