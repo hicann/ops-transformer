@@ -179,6 +179,33 @@ static aclnnStatus CheckSparseModeAttenMask(const aclTensor* attenMaskOptional, 
     return ACLNN_SUCCESS;
 }
 
+// pseType 与 pseShiftOptional 的配对校验：
+// md 约束——pseType 为 2/3 时 pseShiftOptional 必传且数据类型为 FLOAT32；
+// 不开启 pse（pseShiftOptional 传 nullptr）时 pseType 须为 1。
+static aclnnStatus CheckPseTypeWithPseShift(int64_t pseType, const aclTensor* pseShiftOptional)
+{
+    if (pseShiftOptional == nullptr) {
+        if (pseType != 1) {
+            std::string reason = "pseShiftOptional must be provided when pseType is " + std::to_string(pseType) +
+                                 ", only pseType=1 allows pseShiftOptional to be nullptr";
+            OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("FlashAttentionScoreGrad", "pseShiftOptional", reason.c_str());
+            return ACLNN_ERR_PARAM_NULLPTR;
+        }
+        return ACLNN_SUCCESS;
+    }
+    if (pseType == 2 || pseType == 3) {
+        auto pseDtype = pseShiftOptional->GetDataType();
+        if (pseDtype != op::DataType::DT_FLOAT) {
+            std::string dtypeStr = op::ToString(DataType(pseDtype)).GetString();
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                "FlashAttentionScoreGrad", "pseShiftOptional", dtypeStr.c_str(),
+                "The dtype of pseShiftOptional must be FLOAT32 when pseType is 2 or 3");
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
+    return ACLNN_SUCCESS;
+}
+
 static bool StrideLimited()
 {
     NpuArch npuArch = GetCurrentPlatformInfo().GetCurNpuArch();
@@ -2258,6 +2285,8 @@ aclnnStatus aclnnFlashAttentionScoreGradV2GetWorkspaceSize(
                           attentionInOptional, prefixOptional, qStartIdxOptional, kvStartIdxOptional, scaleValue,
                           keepProb, preTokens, nextTokens, headNum, inputLayout, innerPrecise, sparseMode, pseType),
                    DFX_OUT(dqOut, dkOut, dvOut, dpseOut));
+    auto pseTypeRet = CheckPseTypeWithPseShift(pseType, pseShiftOptional);
+    CHECK_RET(pseTypeRet == ACLNN_SUCCESS, pseTypeRet);
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -2838,6 +2867,8 @@ aclnnStatus aclnnFlashAttentionScoreGradV3GetWorkspaceSize(
                prefixOptional, qStartIdxOptional, kvStartIdxOptional, scaleValue, keepProb, preTokens, nextTokens,
                headNum, inputLayout, innerPrecise, sparseMode, pseType),
         DFX_OUT(dqOut, dkOut, dvOut, dpseOut, dsinkOut));
+    auto pseTypeRet = CheckPseTypeWithPseShift(pseType, pseShiftOptional);
+    CHECK_RET(pseTypeRet == ACLNN_SUCCESS, pseTypeRet);
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -3332,6 +3363,8 @@ aclnnStatus aclnnFlashAttentionScoreGradV4GetWorkspaceSize(
                kvStartIdxOptional, scaleValue, keepProb, preTokens, nextTokens, headNum, inputLayout, softmaxInLayout,
                innerPrecise, sparseMode, pseType, seed, offset, outDtype),
         DFX_OUT(dqOut, dkOut, dvOut, dqRopeOut, dkRopeOut, dpseOut, dsinkOut));
+    auto pseTypeRet = CheckPseTypeWithPseShift(pseType, pseShiftOptional);
+    CHECK_RET(pseTypeRet == ACLNN_SUCCESS, pseTypeRet);
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -3359,6 +3392,8 @@ aclnnStatus aclnnFlashAttentionScoreGradV4GetWorkspaceSize(
     OP_CHECK(executor != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "executor"),
              return ACLNN_ERR_PARAM_NULLPTR);
     OP_CHECK(inputLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "inputLayout"),
+             return ACLNN_ERR_PARAM_NULLPTR);
+    OP_CHECK(softmaxInLayout != nullptr, OP_LOGE_WITH_INVALID_INPUT("FlashAttentionScoreGrad", "softmaxInLayout"),
              return ACLNN_ERR_PARAM_NULLPTR);
     if (dqOut->IsEmpty() && dkOut->IsEmpty() && dvOut->IsEmpty()) {
         if (dpseOut == nullptr || dpseOut->IsEmpty()) {

@@ -32,6 +32,8 @@
     - <term>Ascend 950PR&950DT products</term>: When keepProb is less than 1.0, if no external DropoutMask is passed in, the newly added parameter is used to generate the DropoutMask; if an external DropoutMask is passed in, the external DropoutMask is used.
     <!-- end id7 -->
 
+- pseType indicates how pse (positional encoding) is used: when it is set to 0 or 1, the externally passed pseShiftOptional is used; when it is set to 2 or 3, pse is generated inside the operator. For the meaning of each value and the matching constraints, see [Constraints](#1).
+
 - Formula:
 
   - When pseType is 1, the formula is the same as that of [FlashAttentionScoreGrad](./aclnnFlashAttentionScoreGrad_en.md).
@@ -241,7 +243,7 @@ aclnnStatus aclnnFlashAttentionScoreGradV4(
       <td>pseShiftOptional</td>
       <td>Optional input</td>
       <td>pse in the formula, indicating positional encoding.</td>
-      <td>Data type is consistent with query/keyIn/value.</td>
+      <td>Data type is consistent with query/keyIn/value. This parameter must be used together with pseType.</td>
       <td>FLOAT16, BFLOAT16, FLOAT32</td>
       <td>ND</td>
       <td>[B,N,Sq,Skv], [B,N,1,Skv], [1,N,Sq,Skv], [B,N,1024,Skv], [1,N,1024,Skv]</td>
@@ -749,6 +751,18 @@ aclnnStatus aclnnFlashAttentionScoreGradV4(
 - When sparseMode=7, the optional input pseShiftOptional is not supported.
 - When sparseMode=8, the optional input pseShiftOptional is supported when q and kv of each sequence have equal lengths, and pse is generated globally. Outer splitting in the q direction is supported, which requires that q and kv of each sequence have equal lengths before outer splitting, and after outer splitting, actualSeqQLenOptional[0] - actualSeqKvLenOptional[0] + qStartIdxOptional - kvStartIdxOptional == 0 (this feature is experimental).
 - The actualSeqQLenOptional input supports a case where the S length of a batch is 0, but the optional input pseShiftOptional is not supported in this case.
+- Constraints on pseType and pseShiftOptional are as follows:
+  - If pseType is 2 or 3, the data type of pseShiftOptional must be FLOAT32, and the supported shape range is [B,N] or [N].
+  - If pseShiftOptional is disabled, pass nullptr to pseShiftOptional and pass 1 to pseType.
+- Meaning of each pseType value
+
+    | pseType     | Meaning                           |      Note   |
+    | ----------- | --------------------------------- | ----------|
+    | 0           | The externally passed pse is first multiplied and then added. | - |
+    | 1           | The externally passed pse is first added and then multiplied. | Consistent with the implementation of [FlashAttentionScoreGrad](./aclnnFlashAttentionScoreGrad_en.md). |
+    | 2           | The internally generated pse is first multiplied and then added. | - |
+    | 3           | The internally generated pse is first multiplied, then added, and then square-rooted. | - |
+
 - Constraints on the softmaxMax and softmaxSum parameters: The input format is fixed as [B, N, S, 8], except for the TND input format, which is [N, T, 8]. Note: T = B * S.
 - The value of headNum must be consistent with the N value in the input query.
 

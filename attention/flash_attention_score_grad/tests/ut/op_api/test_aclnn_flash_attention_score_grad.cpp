@@ -86,3 +86,52 @@ TEST_F(flash_attention_score_grad_v3_opapi_ut, flash_attention_score_grad_aclnn_
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
     EXPECT_EQ(aclRet, ACL_SUCCESS);
 }
+
+// issue #732：pseType 与 pseShiftOptional 未配对校验
+// pseType=2/3 时 pseShiftOptional 必传，此处传 nullptr 应被拒绝（161001）
+TEST_F(flash_attention_score_grad_v3_opapi_ut, flash_attention_score_grad_v2_pse_type_without_pse_shift)
+{
+    auto tensorQ = TensorDesc({256, 1, 192}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto tensorK = TensorDesc({256, 1, 192}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto tensorV = TensorDesc({256, 1, 192}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto tensorDx = TensorDesc({256, 1, 192}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto tensorAttenMask = TensorDesc({256, 256}, ACL_UINT8, ACL_FORMAT_ND).Value(vector<uint8_t>{0});
+    auto tensorSoftmaxMax =
+        TensorDesc({1, 1, 256, 8}, ACL_FLOAT, ACL_FORMAT_ND).Value(vector<float>(1 * 1 * 256 * 8, 3.0f));
+    auto tensorSoftmaxSum =
+        TensorDesc({1, 1, 256, 8}, ACL_FLOAT, ACL_FORMAT_ND).Value(vector<float>(1 * 1 * 256 * 8, 3.0f));
+    auto tensorAttentionIn = TensorDesc({256, 1, 192}, ACL_FLOAT, ACL_FORMAT_ND).ValueRange(-1, 1);
+
+    const double scaleValue = 1.0 / sqrt(128);
+    const double keepProb = 1.0;
+    const int64_t preTokens = 65536;
+    const int64_t nextTokens = 65536;
+    const int64_t headNum = 1;
+    char layout[] = "SBH";
+    const int64_t innerPrecise = 0;
+    const int64_t sparseMod = 0;
+    const int64_t pseType = 2;
+    auto tensorDQDesc = TensorDesc({256, 1, 192}, ACL_FLOAT, ACL_FORMAT_ND);
+    auto tensorDKDesc = TensorDesc({256, 1, 192}, ACL_FLOAT, ACL_FORMAT_ND);
+    auto tensorDVDesc = TensorDesc({256, 1, 192}, ACL_FLOAT, ACL_FORMAT_ND);
+    auto tensorDPseDesc = TensorDesc({}, ACL_FLOAT, ACL_FORMAT_ND);
+
+    auto ut =
+        OP_API_UT(aclnnFlashAttentionScoreGradV2,
+                  INPUT(tensorQ, tensorK, tensorV, tensorDx,
+                        nullptr, // pse，pseType=2 时为必选，此处刻意传空
+                        nullptr, // dropmask
+                        nullptr, // psepaddingmask
+                        tensorAttenMask, tensorSoftmaxMax, tensorSoftmaxSum,
+                        nullptr, // softmaxin
+                        tensorAttentionIn,
+                        nullptr, // Prefix
+                        nullptr, // QStartIdx
+                        nullptr, // KVStartIdx
+                        scaleValue, keepProb, preTokens, nextTokens, headNum, layout, innerPrecise, sparseMod, pseType),
+                  OUTPUT(tensorDQDesc, tensorDKDesc, tensorDVDesc, tensorDPseDesc));
+
+    uint64_t workspaceSize = 0;
+    aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspaceSize);
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
+}

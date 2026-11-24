@@ -30,6 +30,8 @@
     - <term>Ascend 950PR&950DT系列产品</term>：keepProb小于1.0时，若没有外部传入的DropoutMask，则使用新增参数生成DropoutMask；若有外部传入的DropoutMask，则使用外部传入的DropoutMask
     <!-- end id7 -->
 
+- pseType表示pse（位置编码）的使用方式：取值为0、1时使用外部传入的pseShiftOptional，取值为2、3时由算子内部生成pse。各取值含义与配套约束参见[约束说明](#1)。
+
 - 计算公式：
 
   - pseType=1时，与[FlashAttentionScoreGrad](./aclnnFlashAttentionScoreGrad.md)计算公式相同
@@ -239,7 +241,7 @@ aclnnStatus aclnnFlashAttentionScoreGradV4(
       <td>pseShiftOptional</td>
       <td>可选输入</td>
       <td>公式中的pse，表示位置编码。</td>
-      <td>数据类型与query/keyIn/value一致</td>
+      <td>数据类型与query/keyIn/value一致，该参数需要与pseType配套使用。</td>
       <td>FLOAT16、BFLOAT16、FLOAT32</td>
       <td>ND</td>
       <td>[B,N,Sq,Skv]、[B,N,1,Skv]、[1,N,Sq,Skv]、[B,N,1024,Skv]、[1,N,1024,Skv]</td>
@@ -748,6 +750,18 @@ aclnnStatus aclnnFlashAttentionScoreGradV4(
 - sparseMode=7时，不支持可选输入pseShiftOptional。
 - sparseMode=8时，当每个sequence的q、kv等长时支持可选输入pseShiftOptional，针对全局做pse生成。支持q方向进行外切，需要外切前每个sequence的q、kv等长，外切后传入的actualSeqQLenOptional[0] - actualSeqKvLenOptional[0] + qStartIdxOptional - kvStartIdxOptional == 0（本功能属实验性功能）。
 - actualSeqQLenOptional输入支持某个Batch上的S长度为0，此时不支持可选输入pseShiftOptional。
+- pseType与pseShiftOptional的配套约束如下：
+  - pseType为2或3时，pseShiftOptional的数据类型需为FLOAT32，对应shape支持范围是[B,N]或[N]。
+  - 如果不开启pseShiftOptional，pseShiftOptional需要传入nullptr，pseType需要传入1。
+- pseType各个取值含义。
+
+    | pseType     | 含义                              |      备注   |
+    | ----------- | --------------------------------- | ----------|
+    | 0           | 外部传入pse先mul再add              | - |
+    | 1           | 外部传入pse先add再mul              | 跟[aclnnFlashAttentionScoreGrad](./aclnnFlashAttentionScoreGrad.md)实现一致。 |
+    | 2           | 内部生成pse先mul再add              | - |
+    | 3           | 内部生成pse先mul再add再sqrt         | - |
+
 - 关于softmaxMax与softmaxSum参数的约束：输入格式固定为\[B, N, S, 8\]，TND的输入格式除外，此时为\[N, T, 8\]，注：T=B*S。
 - headNum的取值必须和传入的Query中的N值保持一致。
 
