@@ -106,7 +106,7 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(
       <td>-</td>
       <td>FLOAT8_E4M3FN, FLOAT8_E5M2, HIFLOAT8, FLOAT4_E2M1</td>
       <td>ND</td>
-      <td>2(K, M)</td>
+      <td>2(K, M) (the transposed input view has shape (M, K))</td>
       <td>√</td>
     </tr>
     <tr>
@@ -300,6 +300,11 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(
         |:---------:| :------ |
         |scale1Optional| 3D tensor with shape ((K / 64) + g, M, 2), scale\_i the start address offset is ((K\_0 + K\_1 + ...+ K\_{i-1})/ 64 + g\_i) \* M \* 2, that is, the start address offset of scale_0 is 0, the start address offset of scale_1 is (K\_0 / 64 + 1) \* M \* 2, the start address offset of scale_2 is ((K\_0 + K\_1) / 64 + 2) \* M \* 2, and so on.|
         |scale2| 3D tensor with shape ((K / 64) + g, N, 2). The start address offset is the same as that of scale1Optional.|
+
+        - `scale1Optional_i`: `((K_0 + K_1 + ... + K_{i-1}) / 64 + g_i) * M * 2`
+        - `scale2_i`: `((K_0 + K_1 + ... + K_{i-1}) / 64 + g_i) * N * 2`
+
+        For example, let `M = 16`, `K = 256`, `N = 64`, and `g = 3`. With `groupListType = 0`, pass cumulative group lengths as `groupList = [64, 128, 256]`. The starting offsets are `[0, 64, 128]` for `scale1Optional` and `[0, 256, 512]` for `scale2`.
 
       - In mxfp4, x1/x2 must both be FLOAT4_E2M1 and scale1/scale2 must both be FLOAT8_E8M0; the M axis of x1 and the N axis of x2 must be even; K \* M != 2 and K \* N != 2.
 

@@ -1068,8 +1068,8 @@ int Init(int32_t deviceId, aclrtStream* stream) {
 }
 
 template <typename T>
-int CreateAclTensor_New(const std::vector<int64_t>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
-                        aclDataType dataType, aclTensor** tensor) {
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
+                    aclDataType dataType, aclTensor** tensor) {
     auto size = GetShapeSize(shape) * sizeof(T);
     // Call aclrtMalloc to allocate memory on the Device.
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
@@ -1091,38 +1091,13 @@ int CreateAclTensor_New(const std::vector<int64_t>& hostData, const std::vector<
     return 0;
 }
 
-template <typename T>
-int CreateAclTensor(const std::vector<int64_t>& shape, void** deviceAddr,
-                    aclDataType dataType, aclTensor** tensor) {
-    auto size = GetShapeSize(shape) * sizeof(T);
-    // Call aclrtMalloc to allocate memory on the Device.
-    auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
-
-    // Call aclrtMemcpy to copy data from the host to the device memory.
-    std::vector<T> hostData(size, 0);
-    ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); return ret);
-
-    // Calculate the strides of the contiguous tensor.
-    std::vector<int64_t> strides(shape.size(), 1);
-    for (int64_t i = shape.size() - 2; i >= 0; i--) {
-        strides[i] = shape[i + 1] * strides[i + 1];
-    }
-
-    // Call the aclCreateTensor API to create an aclTensor.
-    *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
-                              shape.data(), shape.size(), *deviceAddr);
-    return 0;
-}
-
-
-int CreateAclTensorList(const std::vector<std::vector<int64_t>>& shapes, void** deviceAddr,
+int CreateAclTensorList(const std::vector<std::vector<int64_t>>& shapes, std::vector<void*>& deviceAddr,
                         aclDataType dataType, aclTensorList** tensor) {
     int size = shapes.size();
     std::vector<aclTensor*> tensors(size);
     for (int i = 0; i < size; i++) {
-        int ret = CreateAclTensor<uint16_t>(shapes[i], deviceAddr + i, dataType, tensors.data() + i);
+        std::vector<uint16_t> hostData(GetShapeSize(shapes[i]), 0);
+        int ret = CreateAclTensor(hostData, shapes[i], &deviceAddr[i], dataType, &tensors[i]);
         CHECK_RET(ret == ACL_SUCCESS, return ret);
     }
     *tensor = aclCreateTensorList(tensors.data(), size);
@@ -1146,10 +1121,10 @@ int main() {
     std::vector<std::vector<int64_t>> yShape = {{512, 256}};
     std::vector<int64_t> groupListShape = {{2}};
     std::vector<int64_t> groupListData = {256, 512};
-    void* xDeviceAddr[1];
-    void* weightDeviceAddr[1];
-    void* biasDeviceAddr[1];
-    void* yDeviceAddr[1];
+    std::vector<void*> xDeviceAddr(xShape.size());
+    std::vector<void*> weightDeviceAddr(weightShape.size());
+    std::vector<void*> biasDeviceAddr(biasShape.size());
+    std::vector<void*> yDeviceAddr(yShape.size());
     void* groupListDeviceAddr;
     aclTensorList* x = nullptr;
     aclTensorList* weight = nullptr;
@@ -1184,7 +1159,7 @@ int main() {
     ret = CreateAclTensorList(yShape, yDeviceAddr, aclDataType::ACL_FLOAT16, &out);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // Create the group_list aclTensor.
-    ret = CreateAclTensor_New<int64_t>(groupListData, groupListShape, &groupListDeviceAddr, aclDataType::ACL_INT64, &groupedList);
+    ret = CreateAclTensor(groupListData, groupListShape, &groupListDeviceAddr, aclDataType::ACL_INT64, &groupedList);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     uint64_t workspaceSize = 0;
@@ -1209,7 +1184,7 @@ int main() {
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
 
     // 5. Obtain the output values and copy the results from device memory to the host. Modify the code according to the specific API definition.
-    for (int i = 0; i < 1; i++) {
+    for (size_t i = 0; i < yShape.size(); ++i) {
         auto size = GetShapeSize(yShape[i]);
         std::vector<uint16_t> resultData(size, 0);
         ret = aclrtMemcpy(resultData.data(), size * sizeof(resultData[0]), yDeviceAddr[i],
@@ -1225,14 +1200,19 @@ int main() {
     aclDestroyTensorList(weight);
     aclDestroyTensorList(bias);
     aclDestroyTensorList(out);
+    aclDestroyTensor(groupedList);
 
     // 7. Release device resources. Modify the code according to the specific API definition.
-    for (int i = 0; i < 1; i++) {
-        aclrtFree(xDeviceAddr[i]);
-        aclrtFree(weightDeviceAddr[i]);
-        aclrtFree(biasDeviceAddr[i]);
-        aclrtFree(yDeviceAddr[i]);
-    }
+    auto freeDeviceAddrs = [](const std::vector<void*>& addrs) {
+        for (auto addr : addrs) {
+            aclrtFree(addr);
+        }
+    };
+    freeDeviceAddrs(xDeviceAddr);
+    freeDeviceAddrs(weightDeviceAddr);
+    freeDeviceAddrs(biasDeviceAddr);
+    freeDeviceAddrs(yDeviceAddr);
+    aclrtFree(groupListDeviceAddr);
     if (workspaceSize > 0) {
         aclrtFree(workspaceAddr);
     }

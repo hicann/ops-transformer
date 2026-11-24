@@ -258,7 +258,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZ(
         <td rowspan="1">input</td>
         <td>Quantization scaling factor of the right matrix, corresponding to w_scale in the formula.</td>
         <td>The first axis length must be equal to the first axis dimension of weight, and the last axis length must be the same as that of weight restored to ND format.</td>
-        <td>FLOAT, FLOAT16, BFLOAT16</td>
+        <td>FLOAT, FLOAT16, BFLOAT16, UINT64</td>
         <td>ND</td>
         <td>2 (per-channel) or 3 (per-group)</td>
         <td>√</td>
@@ -345,6 +345,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZ(
     - weightScale supports only two dimensions (per-channel).
     - Both bias and offset must be nullptr.
     - The API reserves outputOffset and skips its validation.
+    - In the A8W8 scenario, `weightScale` supports only `FLOAT`, `FLOAT16`, and `BFLOAT16`.
 
   <!-- end id8 -->
 

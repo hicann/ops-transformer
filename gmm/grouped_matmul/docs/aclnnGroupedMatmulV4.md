@@ -1065,31 +1065,7 @@ int Init(int32_t deviceId, aclrtStream* stream) {
 }
 
 template <typename T>
-int CreateAclTensor_New(const std::vector<int64_t>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
-                        aclDataType dataType, aclTensor** tensor) {
-    auto size = GetShapeSize(shape) * sizeof(T);
-    // 调用aclrtMalloc申请Device侧内存
-    auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
-
-    // 调用aclrtMemcpy将Host侧数据拷贝到Device侧内存上
-    ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); return ret);
-
-    // 计算连续tensor的strides
-    std::vector<int64_t> strides(shape.size(), 1);
-    for (int64_t i = shape.size() - 2; i >= 0; i--) {
-        strides[i] = shape[i + 1] * strides[i + 1];
-    }
-
-    // 调用aclCreateTensor接口创建aclTensor
-    *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
-                              shape.data(), shape.size(), *deviceAddr);
-    return 0;
-}
-
-template <typename T>
-int CreateAclTensor(const std::vector<int64_t>& shape, void** deviceAddr,
+int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
                     aclDataType dataType, aclTensor** tensor) {
     auto size = GetShapeSize(shape) * sizeof(T);
     // 调用aclrtMalloc申请Device侧内存
@@ -1097,7 +1073,6 @@ int CreateAclTensor(const std::vector<int64_t>& shape, void** deviceAddr,
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
 
     // 调用aclrtMemcpy将Host侧数据拷贝到Device侧内存上
-    std::vector<T> hostData(size, 0);
     ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); return ret);
 
@@ -1113,13 +1088,13 @@ int CreateAclTensor(const std::vector<int64_t>& shape, void** deviceAddr,
     return 0;
 }
 
-
-int CreateAclTensorList(const std::vector<std::vector<int64_t>>& shapes, void** deviceAddr,
+int CreateAclTensorList(const std::vector<std::vector<int64_t>>& shapes, std::vector<void*>& deviceAddr,
                         aclDataType dataType, aclTensorList** tensor) {
     int size = shapes.size();
     std::vector<aclTensor*> tensors(size);
     for (int i = 0; i < size; i++) {
-        int ret = CreateAclTensor<uint16_t>(shapes[i], deviceAddr + i, dataType, tensors.data() + i);
+        std::vector<uint16_t> hostData(GetShapeSize(shapes[i]), 0);
+        int ret = CreateAclTensor(hostData, shapes[i], &deviceAddr[i], dataType, &tensors[i]);
         CHECK_RET(ret == ACL_SUCCESS, return ret);
     }
     *tensor = aclCreateTensorList(tensors.data(), size);
@@ -1143,10 +1118,10 @@ int main() {
     std::vector<std::vector<int64_t>> yShape = {{512, 256}};
     std::vector<int64_t> groupListShape = {{2}};
     std::vector<int64_t> groupListData = {256, 512};
-    void* xDeviceAddr[1];
-    void* weightDeviceAddr[1];
-    void* biasDeviceAddr[1];
-    void* yDeviceAddr[1];
+    std::vector<void*> xDeviceAddr(xShape.size());
+    std::vector<void*> weightDeviceAddr(weightShape.size());
+    std::vector<void*> biasDeviceAddr(biasShape.size());
+    std::vector<void*> yDeviceAddr(yShape.size());
     void* groupListDeviceAddr;
     aclTensorList* x = nullptr;
     aclTensorList* weight = nullptr;
@@ -1181,7 +1156,7 @@ int main() {
     ret = CreateAclTensorList(yShape, yDeviceAddr, aclDataType::ACL_FLOAT16, &out);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建group_list aclTensor
-    ret = CreateAclTensor_New<int64_t>(groupListData, groupListShape, &groupListDeviceAddr, aclDataType::ACL_INT64, &groupedList);
+    ret = CreateAclTensor(groupListData, groupListShape, &groupListDeviceAddr, aclDataType::ACL_INT64, &groupedList);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     uint64_t workspaceSize = 0;
@@ -1206,7 +1181,7 @@ int main() {
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
 
     // 5. 获取输出的值，将Device侧内存上的结果拷贝至Host侧，需要根据具体API的接口定义修改
-    for (int i = 0; i < 1; i++) {
+    for (size_t i = 0; i < yShape.size(); ++i) {
         auto size = GetShapeSize(yShape[i]);
         std::vector<uint16_t> resultData(size, 0);
         ret = aclrtMemcpy(resultData.data(), size * sizeof(resultData[0]), yDeviceAddr[i],
@@ -1222,14 +1197,19 @@ int main() {
     aclDestroyTensorList(weight);
     aclDestroyTensorList(bias);
     aclDestroyTensorList(out);
+    aclDestroyTensor(groupedList);
 
     // 7. 释放device资源，需要根据具体API的接口定义修改
-    for (int i = 0; i < 1; i++) {
-        aclrtFree(xDeviceAddr[i]);
-        aclrtFree(weightDeviceAddr[i]);
-        aclrtFree(biasDeviceAddr[i]);
-        aclrtFree(yDeviceAddr[i]);
-    }
+    auto freeDeviceAddrs = [](const std::vector<void*>& addrs) {
+        for (auto addr : addrs) {
+            aclrtFree(addr);
+        }
+    };
+    freeDeviceAddrs(xDeviceAddr);
+    freeDeviceAddrs(weightDeviceAddr);
+    freeDeviceAddrs(biasDeviceAddr);
+    freeDeviceAddrs(yDeviceAddr);
+    aclrtFree(groupListDeviceAddr);
     if (workspaceSize > 0) {
         aclrtFree(workspaceAddr);
     }

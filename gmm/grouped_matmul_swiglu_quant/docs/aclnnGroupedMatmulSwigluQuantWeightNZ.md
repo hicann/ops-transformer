@@ -256,7 +256,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZ(
         <td rowspan="1">输入</td>
         <td>右矩阵的缩放因子，对应公式中的w_scale。</td>
         <td>首轴长度需与weight的首轴维度相等，尾轴长度需要与weight还原为ND格式的尾轴长度相同。</td>
-        <td>FLOAT、FLOAT16、BFLOAT16</td>
+        <td>FLOAT、FLOAT16、BFLOAT16、UINT64</td>
         <td>ND</td>
         <td>2（per-channel）或3（per-group）</td>
         <td>√</td>
@@ -343,6 +343,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZ(
     - weightScale仅支持2维（perchannel）。
     - bias和offset必须为nullptr。
     - outputOffset为预留参数，不进行校验。
+    - A8W8场景下，`weightScale`仅支持`FLOAT`、`FLOAT16`和`BFLOAT16`。
 
   <!-- end id8 -->
 

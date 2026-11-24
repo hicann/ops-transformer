@@ -104,7 +104,7 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(
       <td>-</td>
       <td>FLOAT8_E4M3FN、FLOAT8_E5M2、HIFLOAT8、FLOAT4_E2M1</td>
       <td>ND</td>
-      <td>2(K，M)</td>
+      <td>2(K，M)（转置后入参视图为 (M, K)）</td>
       <td>√</td>
     </tr>
     <tr>
@@ -307,6 +307,11 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(
         |:---------:| :------ |
         |scale1Optional| 3维tensor，shape为((K / 64) + g, M, 2)，scale\_i起始地址偏移为((K\_0 + K\_1 + ...+ K\_{i-1})/ 64 + g\_i) \* M \* 2，即scale_0的起始地址偏移为0，scale_1的起始地址偏移为(K\_0 / 64 + 1) \* M \* 2，scale_2的起始地址偏移为((K\_0 + K\_1) / 64 + 2) \* M \* 2，依此类推|
         |scale2| 3维tensor，shape为((K / 64) + g, N, 2)，起始地址偏移与scale1Optional同理|
+
+        - `scale1Optional_i` 的起始地址偏移为 `((K_0 + K_1 + ... + K_{i-1}) / 64 + g_i) * M * 2`。
+        - `scale2_i` 的起始地址偏移为 `((K_0 + K_1 + ... + K_{i-1}) / 64 + g_i) * N * 2`。
+
+        例如，`M = 16`、`K = 256`、`N = 64`、`g = 3`，用 `groupListType = 0` 传入累计分组 `groupList = [64, 128, 256]`。`scale1Optional` 的起始偏移为 `[0, 64, 128]`，`scale2` 的起始偏移为 `[0, 256, 512]`。
 
       - 在mx量化场景下：x1和x2的数据类型必须同时为FLOAT4_E2M1，且scale1Optional和scale2必须同时为FLOAT8_E8M0；x1的M轴、x2的N轴必须为偶数；K\*M不等于2、K\*N不等于2。
 
