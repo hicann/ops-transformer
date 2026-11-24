@@ -49,6 +49,8 @@ struct KernelParams {
     uint32_t dv;
     uint32_t aiCoreNum;
     uint64_t batchCount;
+    uint64_t tokenCount;   // T 维元素数,序列前缀和的合法上界(host 已校验 T=sum(L_i),
+                           // 图模式取不到 host 数据时由 Scheduler 钳制兜底)
     uint64_t stateStride0; // 初始 state 的 batch 步长，单位为元素；0 表示广播
     uint64_t stateStride1; // 初始 state 的 value-head 步长，单位为元素；0 表示广播
 
@@ -90,6 +92,7 @@ struct KernelParams {
         dv = static_cast<uint32_t>(tiling.dv);
         aiCoreNum = static_cast<uint32_t>(tiling.aiCoreNum);
         batchCount = static_cast<uint64_t>(tiling.b);
+        tokenCount = static_cast<uint64_t>(tiling.t);
         stateStride0 = static_cast<uint64_t>(tiling.stateStride0);
         stateStride1 = static_cast<uint64_t>(tiling.stateStride1);
     }

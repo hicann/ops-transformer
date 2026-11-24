@@ -75,6 +75,7 @@ protected:
 
     ge::graphStatus CheckContext();
     ge::graphStatus AnalyzeDtype();
+    ge::graphStatus CheckActualSeqLengths();
     ge::graphStatus AnalyzeShapes();
     ge::graphStatus AnalyzeEmptyTensor();
     ge::graphStatus CheckDerivedDimConstraints();

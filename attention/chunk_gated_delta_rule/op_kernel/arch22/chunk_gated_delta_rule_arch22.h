@@ -15,6 +15,7 @@
 #ifndef CHUNK_GATED_DELTA_RULE_ARCH22_H
 #define CHUNK_GATED_DELTA_RULE_ARCH22_H
 
+#include <type_traits>
 #include "kernel_operator.h"
 #include "lib/matmul_intf.h"
 #include "kernel_tiling/kernel_tiling.h"
@@ -68,10 +69,14 @@ __aicore__ inline void CopyCast(const GlobalTensor<srcType>& src, const GlobalTe
             auto inLocal = inQueue.AllocTensor<srcType>();
             DataCopyPad(inLocal, src[i], inParams, inPadParams);
             inQueue.EnQue(inLocal);
-            // cast
+            // cast; 同类型无 Cast 重载(dav_c220 仅提供异类型转换), 直拷透传
             auto stateIn = inQueue.DeQue<srcType>();
             auto stateOut = outQueue.AllocTensor<dstType>();
-            Cast(stateOut, stateIn, roundMode, blockLen);
+            if constexpr (std::is_same<srcType, dstType>::value) {
+                DataCopy(stateOut, stateIn, blockLen);
+            } else {
+                Cast(stateOut, stateIn, roundMode, blockLen);
+            }
             outQueue.EnQue(stateOut);
             inQueue.FreeTensor(stateIn);
             // copy out
@@ -207,8 +212,31 @@ public:
         cg.chunkSize = tiling_->chunkSize;
         for (int64_t bid = 0; bid < tiling_->b; bid++) {
             int32_t length = actualSeqLens_.GetValue(bid);
+            // 防御: 负 seq length 会使 seqEnd 回退产生负 startPos 越界寻址(host 已校验,
+            // 图模式取不到 host 数据时在此兜底), 与 arch35 行为一致按 0 处理
+            if (length < 0) {
+                length = 0;
+            }
             seqStart = seqEnd;
             seqEnd = seqStart + (int64_t)length;
+            // 防御: 单项超 T 或前缀和越过 T 时, 末段 chunk 对 q/k/v/beta/out 的读写会
+            // 越出 GM 的 T 维(host 已校验 T = sum(L_i), 图模式取不到 host 数据时在此
+            // 兜底), 将区间右界钳制在 T 内, 使本 batch 及后续 batch 只处理 [seqStart, t)
+            // 的合法部分(length 已非负, 逐轮钳制保证 seqStart 恒 <= t, 无需下界回退分支)
+            if (seqEnd > tiling_->t) {
+                seqEnd = tiling_->t;
+            }
+            // 空序列时 chunk 循环整体跳过, final_state 无人写回(GM 残留值), 与 arch35
+            // 行为不一致(arch35 空序列完成 initialState -> finalState 复制, 终态等于初态)。
+            // 对齐 arch35: 复制本 batch 的 initState 到 finalState。CopyCast 内部按 AIV
+            // 切分搬运, 各核只处理自己的数据段, 后接 SyncAll 保证时序。
+            if (length == 0) {
+                const int64_t stateCount = tiling_->nv * tiling_->dv * tiling_->dk;
+                CopyCast(initState_[bid * stateCount], finalState_[bid * stateCount], pipe_, stateCount,
+                         RoundMode::CAST_NONE);
+                SyncAll<false>();
+                continue;
+            }
             for (int64_t pos = seqStart; pos < seqEnd; pos += tiling_->maxGroupLength) {
                 // set chunk group
                 cg.startPos = pos;

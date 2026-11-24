@@ -44,16 +44,26 @@ public:
         const uint64_t batchId = nextWork_ / params_.nv;
         // 当前workId单调递增，只累加新经过的batch。若改为乱序调度，必须一起替换此定位逻辑。
         while (scannedBatch_ < batchId) {
-            tokenStart_ += SequenceLength(scannedBatch_);
+            tokenStart_ = ClampToTokenCount(tokenStart_ + SequenceLength(scannedBatch_));
             ++scannedBatch_;
         }
         // 空序列仍产出任务，由Block完成initialState -> finalState复制。
-        task = {batchId, tokenStart_, SequenceLength(batchId), nextWork_ - batchId * params_.nv};
+        // tokenStart/seqLength 均钳制在 T 内(host 已校验 T=sum(L_i) 与各项 [0,T];
+        // 图模式取不到 host 数据时,单项超 T 或累计和越界在此兜底,保证 cube/vector
+        // 的一切 tokenStart*... GM 偏移不越出 T 维)。
+        const uint64_t seqLength = ClampToTokenCount(tokenStart_ + SequenceLength(batchId)) - tokenStart_;
+        task = {batchId, tokenStart_, seqLength, nextWork_ - batchId * params_.nv};
         nextWork_ += params_.aiCoreNum;
         return true;
     }
 
 private:
+    // T 维合法上界,前缀累加后统一经此钳制,防止单项超 T 或累计和越过 T 时越界寻址。
+    __aicore__ inline uint64_t ClampToTokenCount(uint64_t tokenPos) const
+    {
+        return tokenPos > params_.tokenCount ? params_.tokenCount : tokenPos;
+    }
+
     __aicore__ inline uint64_t SequenceLength(uint64_t batchId) const
     {
         const int32_t length = params_.actualSeqLengths.GetValue(batchId);

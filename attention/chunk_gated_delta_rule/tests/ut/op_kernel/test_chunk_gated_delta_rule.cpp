@@ -360,6 +360,19 @@ INSTANTIATE_TEST_SUITE_P(CombinedEdgeCases, ChunkGatedDeltaRuleTest,
                              // GQA模式 (nk=8, nv=2)
                              CGDRTestParams{2, 128, 8, 2, 64, 64, 1, 64, 128, 1.0f, {64, 64}, "gqa_mode"}));
 
+// 8. 空序列与非法 seqlens 兜底测试(覆盖 kernel 侧负值钳零/seqEnd 钳 T 分支;
+//    仿真环境不校验数值, 判据 = kernel 全程无 SIGSEGV 越界)
+INSTANTIATE_TEST_SUITE_P(SeqlensClampGuard, ChunkGatedDeltaRuleTest,
+                         testing::Values(
+                             // 空序列: batch0 正常处理, batch1 长度 0(终态应等于初态, 与 arch35 对齐)
+                             CGDRTestParams{2, 64, 4, 4, 64, 64, 1, 64, 64, 1.0f, {64, 0}, "empty_second_batch"},
+                             // 首个 batch 为空: 前缀和 tokenStart 不受影响
+                             CGDRTestParams{2, 64, 4, 4, 64, 64, 1, 64, 64, 1.0f, {0, 64}, "empty_first_batch"},
+                             // 负值+单项超T同时出现: -8 钳零后 batch1 的 72 经 seqEnd 钳 T 裁剪到 [0,64)
+                             CGDRTestParams{2, 64, 4, 4, 64, 64, 1, 64, 64, 1.0f, {-8, 72}, "negative_then_overT"},
+                             // 前缀和越过 T: batch0=72 超 T=64 被裁剪, batch1 只处理残段
+                             CGDRTestParams{2, 64, 4, 4, 64, 64, 1, 64, 64, 1.0f, {54, 72}, "prefix_sum_overT"}));
+
 // ============================================================================
 // 测试执行
 // ============================================================================

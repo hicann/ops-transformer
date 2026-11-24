@@ -19,6 +19,8 @@
  *   - GQA 模式测试（Grouped Query Attention）
  *   - scale 参数变化测试
  *   - 异常输入测试（nv 不是 nk 的整数倍）
+ *   - actual_seq_lengths 内容校验测试（负值/单项超 T/总和 != T/元素个数 != batch，
+ *     以及合法边界与非 const 跳过校验路径）
  *   - dtype 异常测试（输入/输出/gamma dtype 错误）
  *   - shape/rank 异常测试（rank 错误、维度不匹配、输出 shape 错误）
  *   - format 异常测试（不支持的 tensor format）
@@ -838,7 +840,261 @@ TEST_F(ChunkGatedDeltaRuleTilingTest, Invalid_FinalStateShape_TInsteadOfB)
 }
 
 // ============================================================================
-// 9. Format 异常场景（期望失败）
+// 9. actual_seq_lengths 内容异常场景（期望失败）/ 合法边界（期望成功）
+// ============================================================================
+// actual_seq_lengths 含小负值(-8)，期望在 CheckActualSeqLengths 中被拦截
+// (kernel 按 seqStart/seqEnd 递进寻址, 负值会使 seqEnd 倒退产生负 startPos 越界)
+TEST_F(ChunkGatedDeltaRuleTilingTest, Invalid_ActualSeqLengths_Negative)
+{
+    optiling::ChunkGatedDeltaRuleCompileInfo compileinfo = {48, 196608};
+    uint32_t bs = 2, seqLen = 16, t = bs * seqLen;
+    uint32_t nk = 4, nv = 8, dk = 64, dv = 64;
+    int32_t seqLengthsData[] = {-8, 16};
+
+    gert::StorageShape queryShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape keyShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape valueShape = {{t, nv, dv}, {t, nv, dv}};
+    gert::StorageShape betaShape = {{t, nv}, {t, nv}};
+    gert::StorageShape stateShape = {{bs, nv, dv, dk}, {bs, nv, dv, dk}};
+    gert::StorageShape seqLengthsShape = {{bs}, {bs}};
+
+    gert::TilingContextPara tilingContextPara("ChunkGatedDeltaRule",
+                                              {{queryShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {keyShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {valueShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {betaShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {stateShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {seqLengthsShape, ge::DT_INT32, ge::FORMAT_ND, true, seqLengthsData}},
+                                              {{{{t, nv, dv}, {t, nv, dv}}, ge::DT_BF16, ge::FORMAT_ND},
+                                               {{{bs, nv, dv, dk}, {bs, nv, dv, dk}}, ge::DT_BF16, ge::FORMAT_ND}},
+                                              {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)}},
+                                              &compileinfo);
+
+    TilingInfo tilingInfo;
+    EXPECT_FALSE(ExecuteTiling(tilingContextPara, tilingInfo));
+}
+
+// actual_seq_lengths 含大负值(-100) 且超出 T，期望在 CheckActualSeqLengths 中被拦截
+TEST_F(ChunkGatedDeltaRuleTilingTest, Invalid_ActualSeqLengths_LargeNegativeOverT)
+{
+    optiling::ChunkGatedDeltaRuleCompileInfo compileinfo = {48, 196608};
+    uint32_t bs = 2, seqLen = 32, t = bs * seqLen;
+    uint32_t nk = 4, nv = 8, dk = 64, dv = 64;
+    int32_t seqLengthsData[] = {-100, 64};
+
+    gert::StorageShape queryShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape keyShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape valueShape = {{t, nv, dv}, {t, nv, dv}};
+    gert::StorageShape betaShape = {{t, nv}, {t, nv}};
+    gert::StorageShape stateShape = {{bs, nv, dv, dk}, {bs, nv, dv, dk}};
+    gert::StorageShape seqLengthsShape = {{bs}, {bs}};
+
+    gert::TilingContextPara tilingContextPara("ChunkGatedDeltaRule",
+                                              {{queryShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {keyShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {valueShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {betaShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {stateShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {seqLengthsShape, ge::DT_INT32, ge::FORMAT_ND, true, seqLengthsData}},
+                                              {{{{t, nv, dv}, {t, nv, dv}}, ge::DT_BF16, ge::FORMAT_ND},
+                                               {{{bs, nv, dv, dk}, {bs, nv, dv, dk}}, ge::DT_BF16, ge::FORMAT_ND}},
+                                              {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)}},
+                                              &compileinfo);
+
+    TilingInfo tilingInfo;
+    EXPECT_FALSE(ExecuteTiling(tilingContextPara, tilingInfo));
+}
+
+// actual_seq_lengths 元素超出 T(seq_len=128 > t=64)，期望在 CheckActualSeqLengths 中被拦截
+TEST_F(ChunkGatedDeltaRuleTilingTest, Invalid_ActualSeqLengths_OverT)
+{
+    optiling::ChunkGatedDeltaRuleCompileInfo compileinfo = {48, 196608};
+    uint32_t bs = 1, seqLen = 64, t = bs * seqLen;
+    uint32_t nk = 4, nv = 8, dk = 64, dv = 64;
+    int32_t seqLengthsData[] = {128};
+
+    gert::StorageShape queryShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape keyShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape valueShape = {{t, nv, dv}, {t, nv, dv}};
+    gert::StorageShape betaShape = {{t, nv}, {t, nv}};
+    gert::StorageShape stateShape = {{bs, nv, dv, dk}, {bs, nv, dv, dk}};
+    gert::StorageShape seqLengthsShape = {{bs}, {bs}};
+
+    gert::TilingContextPara tilingContextPara("ChunkGatedDeltaRule",
+                                              {{queryShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {keyShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {valueShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {betaShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {stateShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {seqLengthsShape, ge::DT_INT32, ge::FORMAT_ND, true, seqLengthsData}},
+                                              {{{{t, nv, dv}, {t, nv, dv}}, ge::DT_BF16, ge::FORMAT_ND},
+                                               {{{bs, nv, dv, dk}, {bs, nv, dv, dk}}, ge::DT_BF16, ge::FORMAT_ND}},
+                                              {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)}},
+                                              &compileinfo);
+
+    TilingInfo tilingInfo;
+    EXPECT_FALSE(ExecuteTiling(tilingContextPara, tilingInfo));
+}
+
+// actual_seq_lengths 元素个数小于 batch(bs=2 但只给 1 个元素)，期望被
+// CheckActualSeqLengths 的元素个数校验拦截,避免逐 batch 读取越界
+TEST_F(ChunkGatedDeltaRuleTilingTest, Invalid_ActualSeqLengths_CountLessThanBatch)
+{
+    optiling::ChunkGatedDeltaRuleCompileInfo compileinfo = {48, 196608};
+    uint32_t bs = 2, seqLen = 32, t = bs * seqLen;
+    uint32_t nk = 4, nv = 8, dk = 64, dv = 64;
+    int32_t seqLengthsData[] = {16};
+
+    gert::StorageShape queryShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape keyShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape valueShape = {{t, nv, dv}, {t, nv, dv}};
+    gert::StorageShape betaShape = {{t, nv}, {t, nv}};
+    gert::StorageShape stateShape = {{bs, nv, dv, dk}, {bs, nv, dv, dk}};
+    gert::StorageShape seqLengthsShape = {{1}, {1}};
+
+    gert::TilingContextPara tilingContextPara("ChunkGatedDeltaRule",
+                                              {{queryShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {keyShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {valueShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {betaShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {stateShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {seqLengthsShape, ge::DT_INT32, ge::FORMAT_ND, true, seqLengthsData}},
+                                              {{{{t, nv, dv}, {t, nv, dv}}, ge::DT_BF16, ge::FORMAT_ND},
+                                               {{{bs, nv, dv, dk}, {bs, nv, dv, dk}}, ge::DT_BF16, ge::FORMAT_ND}},
+                                              {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)}},
+                                              &compileinfo);
+
+    TilingInfo tilingInfo;
+    EXPECT_FALSE(ExecuteTiling(tilingContextPara, tilingInfo));
+}
+
+// actual_seq_lengths 合法边界(含 0 与等于 T 的值)，期望 tiling 成功
+TEST_F(ChunkGatedDeltaRuleTilingTest, Valid_ActualSeqLengths_Boundary)
+{
+    optiling::ChunkGatedDeltaRuleCompileInfo compileinfo = {48, 196608};
+    uint32_t bs = 2, seqLen = 32, t = bs * seqLen;
+    uint32_t nk = 4, nv = 8, dk = 64, dv = 64;
+    int32_t seqLengthsData[] = {64, 0};
+
+    gert::StorageShape queryShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape keyShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape valueShape = {{t, nv, dv}, {t, nv, dv}};
+    gert::StorageShape betaShape = {{t, nv}, {t, nv}};
+    gert::StorageShape stateShape = {{bs, nv, dv, dk}, {bs, nv, dv, dk}};
+    gert::StorageShape seqLengthsShape = {{bs}, {bs}};
+
+    gert::TilingContextPara tilingContextPara("ChunkGatedDeltaRule",
+                                              {{queryShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {keyShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {valueShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {betaShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {stateShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {seqLengthsShape, ge::DT_INT32, ge::FORMAT_ND, true, seqLengthsData}},
+                                              {{{{t, nv, dv}, {t, nv, dv}}, ge::DT_BF16, ge::FORMAT_ND},
+                                               {{{bs, nv, dv, dk}, {bs, nv, dv, dk}}, ge::DT_BF16, ge::FORMAT_ND}},
+                                              {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)}},
+                                              &compileinfo);
+
+    TilingInfo tilingInfo;
+    EXPECT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
+}
+
+// actual_seq_lengths 各项合法但总和小于 T({40,8} sum=48 != t=64)，尾部 token 无
+// chunk 认领会输出残留值，期望被 CheckActualSeqLengths 的总长校验拦截
+TEST_F(ChunkGatedDeltaRuleTilingTest, Invalid_ActualSeqLengths_SumLessThanT)
+{
+    optiling::ChunkGatedDeltaRuleCompileInfo compileinfo = {48, 196608};
+    uint32_t bs = 2, seqLen = 32, t = bs * seqLen;
+    uint32_t nk = 4, nv = 8, dk = 64, dv = 64;
+    int32_t seqLengthsData[] = {40, 8};
+
+    gert::StorageShape queryShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape keyShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape valueShape = {{t, nv, dv}, {t, nv, dv}};
+    gert::StorageShape betaShape = {{t, nv}, {t, nv}};
+    gert::StorageShape stateShape = {{bs, nv, dv, dk}, {bs, nv, dv, dk}};
+    gert::StorageShape seqLengthsShape = {{bs}, {bs}};
+
+    gert::TilingContextPara tilingContextPara("ChunkGatedDeltaRule",
+                                              {{queryShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {keyShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {valueShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {betaShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {stateShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {seqLengthsShape, ge::DT_INT32, ge::FORMAT_ND, true, seqLengthsData}},
+                                              {{{{t, nv, dv}, {t, nv, dv}}, ge::DT_BF16, ge::FORMAT_ND},
+                                               {{{bs, nv, dv, dk}, {bs, nv, dv, dk}}, ge::DT_BF16, ge::FORMAT_ND}},
+                                              {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)}},
+                                              &compileinfo);
+
+    TilingInfo tilingInfo;
+    EXPECT_FALSE(ExecuteTiling(tilingContextPara, tilingInfo));
+}
+
+// actual_seq_lengths 各项合法但总和大于 T({56,24} sum=80 > t=64)，末段 chunk 以前缀和
+// 推进 startPos 会越出 T 维读写 GM，期望被 CheckActualSeqLengths 的总长校验拦截
+TEST_F(ChunkGatedDeltaRuleTilingTest, Invalid_ActualSeqLengths_SumOverT)
+{
+    optiling::ChunkGatedDeltaRuleCompileInfo compileinfo = {48, 196608};
+    uint32_t bs = 2, seqLen = 32, t = bs * seqLen;
+    uint32_t nk = 4, nv = 8, dk = 64, dv = 64;
+    int32_t seqLengthsData[] = {56, 24};
+
+    gert::StorageShape queryShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape keyShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape valueShape = {{t, nv, dv}, {t, nv, dv}};
+    gert::StorageShape betaShape = {{t, nv}, {t, nv}};
+    gert::StorageShape stateShape = {{bs, nv, dv, dk}, {bs, nv, dv, dk}};
+    gert::StorageShape seqLengthsShape = {{bs}, {bs}};
+
+    gert::TilingContextPara tilingContextPara("ChunkGatedDeltaRule",
+                                              {{queryShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {keyShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {valueShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {betaShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {stateShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {seqLengthsShape, ge::DT_INT32, ge::FORMAT_ND, true, seqLengthsData}},
+                                              {{{{t, nv, dv}, {t, nv, dv}}, ge::DT_BF16, ge::FORMAT_ND},
+                                               {{{bs, nv, dv, dk}, {bs, nv, dv, dk}}, ge::DT_BF16, ge::FORMAT_ND}},
+                                              {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)}},
+                                              &compileinfo);
+
+    TilingInfo tilingInfo;
+    EXPECT_FALSE(ExecuteTiling(tilingContextPara, tilingInfo));
+}
+
+// actual_seq_lengths 非常量输入(图模式下 host 拿不到数据)，内容校验跳过不拦截，期望 tiling 成功
+TEST_F(ChunkGatedDeltaRuleTilingTest, Valid_ActualSeqLengths_NonConst_SkipCheck)
+{
+    optiling::ChunkGatedDeltaRuleCompileInfo compileinfo = {48, 196608};
+    uint32_t bs = 2, seqLen = 32, t = bs * seqLen;
+    uint32_t nk = 4, nv = 8, dk = 64, dv = 64;
+
+    gert::StorageShape queryShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape keyShape = {{t, nk, dk}, {t, nk, dk}};
+    gert::StorageShape valueShape = {{t, nv, dv}, {t, nv, dv}};
+    gert::StorageShape betaShape = {{t, nv}, {t, nv}};
+    gert::StorageShape stateShape = {{bs, nv, dv, dk}, {bs, nv, dv, dk}};
+    gert::StorageShape seqLengthsShape = {{bs}, {bs}};
+
+    gert::TilingContextPara tilingContextPara("ChunkGatedDeltaRule",
+                                              {{queryShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {keyShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {valueShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {betaShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {stateShape, ge::DT_BF16, ge::FORMAT_ND},
+                                               {seqLengthsShape, ge::DT_INT32, ge::FORMAT_ND}},
+                                              {{{{t, nv, dv}, {t, nv, dv}}, ge::DT_BF16, ge::FORMAT_ND},
+                                               {{{bs, nv, dv, dk}, {bs, nv, dv, dk}}, ge::DT_BF16, ge::FORMAT_ND}},
+                                              {{"scale_value", Ops::Transformer::AnyValue::CreateFrom<float>(1.0f)}},
+                                              &compileinfo);
+
+    TilingInfo tilingInfo;
+    EXPECT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
+}
+
+// ============================================================================
+// 10. Format 异常场景（期望失败）
 // ============================================================================
 // state 的 format 为当前不支持的 FRACTAL_NZ，期望在 AnalyzeFormat 阶段校验失败
 TEST_F(ChunkGatedDeltaRuleTilingTest, Invalid_StateFormat_NZ)

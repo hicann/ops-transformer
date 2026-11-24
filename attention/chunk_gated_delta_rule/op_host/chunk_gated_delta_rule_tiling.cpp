@@ -553,6 +553,9 @@ ge::graphStatus ChunkGatedDeltaRuleTiling::AnalyzeShapes()
     OP_CHECK_IF(CheckDerivedDimConstraints() != ge::GRAPH_SUCCESS,
                 OP_LOGE(inputParams_.opName, "Invalid derived dim constraints."), return ge::GRAPH_FAILED);
 
+    OP_CHECK_IF(CheckActualSeqLengths() != ge::GRAPH_SUCCESS,
+                OP_LOGE(inputParams_.opName, "Invalid actual_seq_lengths."), return ge::GRAPH_FAILED);
+
     if (tilingData_.hasGamma != 0) {
         gShape = &context_->GetOptionalInputShape(G_INDEX)->GetOriginShape();
         if (!CheckDim(*gShape, G_DIM_NUM, "g")) {
@@ -568,6 +571,44 @@ ge::graphStatus ChunkGatedDeltaRuleTiling::AnalyzeShapes()
         return ge::GRAPH_FAILED;
     }
 
+    return ge::GRAPH_SUCCESS;
+}
+
+// 校验 actual_seq_lengths 内容: kernel 按 seqStart/seqEnd 递进寻址,负值或超 T 的
+// 序列长度会产生越界 GM 读写(实测小负值静默错寻址、大负值 aicore 异常),host 侧显式拦截
+ge::graphStatus ChunkGatedDeltaRuleTiling::CheckActualSeqLengths()
+{
+    const gert::Tensor* seqLensTensor = context_->GetInputTensor(ACTUAL_SEQ_LENGTHS_INDEX);
+    // 图模式下 host 可能拿不到输入数据,取不到数据时跳过内容校验,由 kernel 侧防御兜底
+    if (seqLensTensor == nullptr || seqLensTensor->GetData<int32_t>() == nullptr) {
+        return ge::GRAPH_SUCCESS;
+    }
+    // 逐 batch 校验要求元素个数与 batch 一致: 长度不足时按 b 迭代会越界读张量之外的
+    // 内存,越界值可能恰好落在 [0, t] 内造成漏报,这里与 CheckExpectedShapes 的
+    // shape == [b] 约束同口径显式拦截(不依赖 shape 校验的执行顺序兜底)
+    const int64_t seqLenCount = seqLensTensor->GetShapeSize();
+    OP_CHECK_IF(seqLenCount != tilingData_.b,
+                OP_LOGE(inputParams_.opName,
+                        "The element count of actual_seq_lengths is %ld, which should be equal to batch size %ld.",
+                        seqLenCount, tilingData_.b),
+                return ge::GRAPH_FAILED);
+    const int32_t* seqLens = seqLensTensor->GetData<int32_t>();
+    const int64_t t = tilingData_.t;
+    int64_t seqLenSum = 0; // 64 位累加,防 int32 逐项求和在大 T 多 batch 下溢出
+    for (int64_t i = 0; i < tilingData_.b; i++) {
+        OP_CHECK_IF(seqLens[i] < 0 || seqLens[i] > t,
+                    OP_LOGE(inputParams_.opName,
+                            "The actual_seq_lengths[%ld] is %d, which should be in range [0, %ld].", i, seqLens[i], t),
+                    return ge::GRAPH_FAILED);
+        seqLenSum += static_cast<int64_t>(seqLens[i]);
+    }
+    // 接口契约 T = sum(L_i)(见 README 约束说明): kernel 以前缀和推进 startPos 寻址
+    // packed 的 q/k/v/beta,总长超过 T 时末段 chunk 越出 T 维读写 GM;总长不足 T 时
+    // 尾部 token 无 chunk 认领,输出残留未初始化值
+    OP_CHECK_IF(seqLenSum != t,
+                OP_LOGE(inputParams_.opName, "The sum of actual_seq_lengths is %ld, which should be equal to T %ld.",
+                        seqLenSum, t),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

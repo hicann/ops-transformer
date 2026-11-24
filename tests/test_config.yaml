@@ -830,6 +830,22 @@ attention:
     options:
       - chunk_kda_fwd
 
+  chunk_gated_delta_rule:
+    module: True
+    src:
+      - attention/chunk_gated_delta_rule
+    exclude:
+      - attention/chunk_gated_delta_rule/docs
+      - attention/chunk_gated_delta_rule/README.md
+    ut_cov_exclude:
+      - attention/chunk_gated_delta_rule/tests
+      - attention/chunk_gated_delta_rule/op_kernel
+    test:
+      examples: False
+      ut: True
+    options:
+      - chunk_gated_delta_rule
+
   kv_quant_sparse_flash_attention_v2:
     module: True
     src:
