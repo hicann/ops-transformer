@@ -18,6 +18,9 @@ cmake-build-*
 # Visual Studio Code
 .vscode
 
+# Ascend C Toolkit IDE workspace
+.arts/
+
 # vim cache
 *.swp
 
