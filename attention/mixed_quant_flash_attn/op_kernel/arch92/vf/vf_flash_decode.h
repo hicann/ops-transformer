@@ -286,7 +286,6 @@ __simd_vf__ void ComputeScaleValue_8_VF_FD(__ubuf__ T* lseSink, __ubuf__ T* lseM
                                                                     vregLseSumTmp, pregTailN);
     }
 
-    // todo 排查为啥会进入
     for (i = 0; i < static_cast<uint16_t>(learnableSinkFlag); ++i) {
         MicroAPI::LoadAlign<T, MicroAPI::LoadDist::DIST_NORM>(vregLseSinkCast, (__ubuf__ float*&)lseSink);
         MicroAPI::Sub<T, MicroAPI::MaskMergeMode::ZEROING>(vregLseSinkCast, vregLseSinkCast, vregLseMax, pregTailN);

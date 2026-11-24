@@ -46,7 +46,7 @@ public:
     static constexpr uint8_t QUANT_COMPUTE_MODE = CubeBlockType::QUANT_COMPUTE_MODE;
     static constexpr bool PAGE_ATTENTION = CubeBlockType::PAGE_ATTENTION;
     static constexpr LayOutTypeEnum LAYOUT_Q = CubeBlockType::LAYOUT_Q;
-    static constexpr LayOutTypeEnum LAYOUT_KV = CubeBlockType::LAYOUT_Q; // todo 整改
+    static constexpr LayOutTypeEnum LAYOUT_KV = CubeBlockType::LAYOUT_Q;
     using Q_T = typename CubeBlockType::Q_T;
     using SOFTMAX_OUT_T = typename CubeBlockType::SOFTMAX_OUT_T;
     using MM_T = typename CubeBlockType::MM_T;
@@ -267,7 +267,7 @@ public:
             constInfo.attenMaskBatch = attenMaskParams.attenMaskBatch;
             constInfo.attenMaskS1Size = attenMaskParams.attenMaskS1Size;
             constInfo.attenMaskS2Size = attenMaskParams.attenMaskS2Size;
-            constInfo.isRowInvalidOpen = false; // todo
+            constInfo.isRowInvalidOpen = false;
             constInfo.isExistRowInvalid = attenMaskParams.isExistRowInvalid;
             constInfo.accumOutSize = workspaceParams.accumOutSize;
             constInfo.logSumExpSize = workspaceParams.logSumExpSize;
@@ -382,7 +382,6 @@ public:
         uint32_t bIdx = bN2Cur / constInfo.n2Size;
         if (isFirstTask || prevBIdx != bIdx) {
             prevBIdx = bIdx;
-            // TODO TND适配
             if (constInfo.seqUsedKvSize == 0 && !constInfo.isKvContinuous) {
                 actSeqLensKv = SeqLenFromTensorList<LAYOUT_KV>(keyPtr, bIdx);
             } else {
@@ -666,7 +665,6 @@ public:
         info.isLastS2Loop = (s2Cur + 1 == curS2End);
 
         if constexpr (USE_DN) {
-            // TODO
             info.actMSizeAlign32 = (info.actMSize + 31) >> 5 << 5;
             info.actVecMSize = info.actMSize <= 16 ? info.actMSize : (info.actMSizeAlign32 >> 1);
         } else {

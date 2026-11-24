@@ -14,8 +14,6 @@
  * \brief
  */
 
-// TODO，与A3的合并策略待定
-
 #ifndef MQFA_ATTENMASK_GS1_H
 #define MQFA_ATTENMASK_GS1_H
 
@@ -80,7 +78,7 @@ static __aicore__ inline constexpr T1 Align(T1 s, T1 alignment)
         return uint64_t(s + alignment - 1) & (~uint64_t(alignment - 1));
     }
 }
-// TODO，后续放到VF层
+// 后续可迁移到 VF 层
 __simd_vf__ inline void MergeBand(const uint64_t maskNextUb, const uint64_t maskPreUb, const uint16_t loopCount)
 {
     RegTensor<uint32_t> vreg_pre;
@@ -540,18 +538,6 @@ __aicore__ inline void AttentionmaskCopyInForSgLayout(LocalTensor<T>& attenMaskU
 
     MaskUbCopyS1G<T, s2BaseSize>(attenMaskUb, headGSize, info.gSize, tailGSize, midS1Count);
     Mutex::Unlock<PIPE_V>(mutexId);
-}
-
-// TODO，老模板收编完成后删除该函数
-template <typename T, bool isReconstructTemp, uint32_t s2BaseSize>
-__aicore__ inline void AttentionmaskCopyGS1(LocalTensor<T>& attenMaskUb, GlobalTensor<T>& srcGmAddr, MaskInfo& info,
-                                            uint32_t mutexId, bool isPre = false)
-{
-    if (info.layout == LAYOUT_Q::GS) {
-        AttentionmaskCopyInForGsLayout<T, isReconstructTemp, s2BaseSize>(attenMaskUb, srcGmAddr, info, mutexId, isPre);
-    } else if (info.layout == LAYOUT_Q::SG) {
-        AttentionmaskCopyInForSgLayout<T, isReconstructTemp, s2BaseSize>(attenMaskUb, srcGmAddr, info, mutexId, isPre);
-    }
 }
 
 template <typename T, LAYOUT_Q layoutQ, bool isReconstructTemp, uint32_t s2BaseSize>

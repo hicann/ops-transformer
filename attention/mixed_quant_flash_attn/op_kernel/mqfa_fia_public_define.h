@@ -248,18 +248,6 @@ struct MSplitInfo {
     uint32_t vecDealM = 0U;
 };
 
-// TODO 220分支无attention/common/op_kernel/const_def.h此文件，需打开
-// enum class TASK_DEAL_MODE : uint32_t
-// {
-//     DEAL_ZERO = 0,      // actualSeqLen为0，需清零输出
-//     SKIP = 1,           // 整行S2无需处理
-//     CREATE_TASK = 2,    // 正常创建任务
-//     SKIP_S1OUT = 3,     // 跳过不属于当前核的任务，仅S1外切分场景
-//     SKIP_ZERO = 4,      // 跳过非首个actualSeqLen为0的块
-//     S2_END = 5,         // 有效行且S2已全部计算完
-//     NOT_START = 6,      // 有效行且S2还未开始计算
-// };
-
 template <FIA_LAYOUT LAYOUT_T>
 __aicore__ inline void GetGS1Idx(uint32_t gS1Idx, uint32_t& gIdx, uint32_t& s1Idx,
                                  AttentionCommon::ConstInfo& constInfo)

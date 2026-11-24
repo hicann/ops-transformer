@@ -104,7 +104,7 @@ protected:
     GlobalTensor<float> lseMaxFdGm;
     GlobalTensor<float> accumOutGm;
     GlobalTensor<OUTPUT_T> attentionOutGm;
-    GlobalTensor<int32_t> cuSeqLensGmQ; // TODO 未使用到，看是否需要适配
+    GlobalTensor<int32_t> cuSeqLensGmQ;
     GlobalTensor<int32_t> seqUsedGmQ;
     GlobalTensor<int32_t> seqUsedGmKv;
     GlobalTensor<float> softmaxLseGm;
@@ -136,7 +136,7 @@ protected:
     QActParserT qActSeqLensParser;
     ActualSeqLensParser<KV_MODE, int32_t> kvActSeqLensParser;
 
-    int64_t preTokensPerBatch = 0; // TODO 改
+    int64_t preTokensPerBatch = 0;
     int64_t nextTokensPerBatch = 0;
 
     static constexpr T BOOL_ATTEN_MASK_SCALAR_VALUE = -1000000000000.0; // 用于mask为bool类型

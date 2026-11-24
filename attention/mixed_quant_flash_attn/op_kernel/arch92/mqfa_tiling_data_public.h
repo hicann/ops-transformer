@@ -13,23 +13,10 @@
  * \brief
  */
 
-// TODO，文件头，宏定义整体调整与刷新
-
-// TODO，变量命名优化
-
 #ifndef FIA_TILING_DATA_PUBLIC_H_
 #define FIA_TILING_DATA_PUBLIC_H_
 
 namespace optiling {
-
-// 数组长度
-// TODO，host和device宏定义不一样，如何通过编译宏隔离？
-constexpr uint32_t NPU_AIC_CORE_NUM = 64;
-constexpr uint32_t NPU_AIV_CORE_NUM = 64;
-
-constexpr uint32_t FA_METADATA_SIZE = 8;
-constexpr uint32_t FD_METADATA_SIZE = 8;
-
 // 索引数组含义
 //  FA Metadata Index Definitions
 constexpr uint32_t FA_CORE_ENABLE_INDEX = 0;
@@ -64,8 +51,6 @@ struct FiaBaseParams {
     uint32_t actualSeqLengthsQSize;
     uint32_t actualSeqLengthsKVSize;
     float scaleValue;
-    uint8_t isActualSeqLengthsNull;   // TODO，未使用，是否要删除？
-    uint8_t isActualSeqLengthsKVNull; // TODO，未使用，是否要删除？
     uint8_t isKvContinuous;
     uint8_t isSoftMaxLseEnable;
     uint32_t coreNum;

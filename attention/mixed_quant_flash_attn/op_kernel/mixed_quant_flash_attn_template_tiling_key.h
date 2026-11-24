@@ -33,7 +33,7 @@
 #endif
 
 ASCENDC_TPL_ARGS_DECL(MixedQuantFlashAttn,
-                      // q_out layout (8-bit)   TODO bit分配问题
+                      // q_out layout (8-bit)
                       //    0: BSND
                       //    1: BNSD
                       //    2: TND

@@ -88,7 +88,7 @@ public:
 
     static constexpr GmFormat Q_FORMAT = GetQueryGmFormat<layout>();
     static constexpr ActualSeqLensMode Q_MODE = GetQActSeqMode<layout>();
-    static constexpr GmFormat KV_FORMAT = GetKVGmFormat<layout, LAYOUT_KV>(); // TODO AntiquantCommon::
+    static constexpr GmFormat KV_FORMAT = GetKVGmFormat<layout, LAYOUT_KV>();
 
     static constexpr uint32_t DB = 2U;
     static constexpr uint32_t PRELOAD_N = 2U;
@@ -103,7 +103,8 @@ public:
     static constexpr uint32_t UB_MM1RES_BUF_NUM =
         (mBaseSize == 48 || mBaseSize == 32) ? 2 : 1;                        // 48x512 2块 32x512 2块 64x512 1块
     static constexpr uint32_t UB_MM2RES_BUF_NUM = (mBaseSize == 48) ? 1 : 2; // 48x512 1块 32/64x512 2块
-    static constexpr uint32_t UB_MM2RES_BYTE = mBaseSize * dBaseSize * sizeof(MM_OUT_T); // TODO: mBaseSize+1
+    static constexpr uint32_t UB_MM2RES_BYTE =
+        mBaseSize * dBaseSize * sizeof(MM_OUT_T); // 注意：后续可能按 mBaseSize + 1 预留
     static constexpr uint32_t UB_MM1RES_BYTE = mBaseSize * s2BaseSize * sizeof(MM_OUT_T);
 
     uint32_t ubBaseAddr = UB_MM1RES_BYTE * UB_MM1RES_BUF_NUM + UB_MM2RES_BYTE * UB_MM2RES_BUF_NUM;
@@ -137,7 +138,7 @@ public:
     static constexpr GmFormat Q_FORMAT = GetQueryGmFormat<layout>();
     static constexpr ActualSeqLensMode Q_MODE = GetQActSeqMode<layout>();
 
-    static constexpr GmFormat KV_FORMAT = GetKVGmFormat<layout, LAYOUT_KV>(); // TODO AntiquantCommon::
+    static constexpr GmFormat KV_FORMAT = GetKVGmFormat<layout, LAYOUT_KV>();
 
     static constexpr uint32_t DB = 2U;
     static constexpr uint32_t PRELOAD_N = 2U;
@@ -223,7 +224,8 @@ public:
         (mBaseSize == 48 || mBaseSize == 32) ? 2 : 1;                        // 48x512/32x512 2块 64x512 1块
     static constexpr uint32_t UB_MM2RES_BUF_NUM = (mBaseSize == 48) ? 1 : 2; // 48x512 1块 32/64x512 2块
     static constexpr uint32_t MASK_BUF_NUM = (mBaseSize == 48) ? 1 : 2;      // 48x512 1块 32/64x512 2块
-    static constexpr uint32_t UB_MM2RES_BYTE = mBaseSize * dBaseSize * sizeof(MM_OUT_T); // TODO: mBaseSize+1
+    static constexpr uint32_t UB_MM2RES_BYTE =
+        mBaseSize * dBaseSize * sizeof(MM_OUT_T); // 注意：后续可能按 mBaseSize + 1 预留
     static constexpr uint32_t UB_MM1RES_BYTE = mBaseSize * s2BaseSize * sizeof(MM_OUT_T);
     static constexpr uint32_t SINK_BUF_BYTE = 1024;
     static constexpr uint32_t INIT_BUF_BYTE = 8192;
@@ -397,15 +399,15 @@ public:
     __aicore__ inline void ProcessVec1Dn(LocalTensor<SOFTMAX_OUT_T>& outputBuf, uint32_t l1PBufId,
                                          LocalTensor<MM_OUT_T>& bmm1ResBuf, uint32_t bmm1BufId, RunInfoX runInfo)
     {
-        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(
-            CC_BMM1_0 + bmm1BufId); // TODO 后续优化，会阻塞到V流水上，尽量贴近具体使用的地方
+        CrossCoreWaitFlag<CROSS_CORE_SYNC_MODE, PIPE_V>(CC_BMM1_0 +
+                                                        bmm1BufId); // 后续可优化为贴近使用点，避免阻塞 V 流水
         LocalTensor<uint8_t> attenMaskUb = attenMaskInBuf[(runInfo.loop % MASK_BUF_NUM) * ATTNMASK_BUF_BYTE];
         uint32_t softmaxBufOffset = (runInfo.mloop % (PRELOAD_N + 1)) * SOFTMAX_BUF_BYTES;
         LocalTensor<T> sumUb = this->softmaxSumBuf[softmaxBufOffset].template ReinterpretCast<T>();
         LocalTensor<T> maxUb = this->softmaxMaxBuf[softmaxBufOffset].template ReinterpretCast<T>();
         LocalTensor<T> expUb =
             this->softmaxExpBuf[(runInfo.loop % (PRELOAD_N + 1)) * SOFTMAX_BUF_BYTES].template ReinterpretCast<T>();
-        // todo vec2res单buffer同步id适配
+        // vec2res 单 buffer 同步 id 后续适配
         uint32_t stage1Id = 0;
         auto vec1ResUb = this->vec1ResBuf[stage1Id * VEC1_RES_BYTE].template ReinterpretCast<SOFTMAX_OUT_T>();
         if constexpr (HAS_MASK) {
@@ -854,7 +856,6 @@ public:
                     vec2ResUb, bmm2ResBuf, vec2ResUb, expUb, valueScaleUb, runInfo.actVecMSize, dTemplateAlign64,
                     deSCalePreVValue);
             } else {
-                // todo QUANT_COMPUTE_MODE == 0 适用pc场景
                 LocalTensor<T> sumUb = this->softmaxSumBuf[(runInfo.mloop % (PRELOAD_N + 1)) * SOFTMAX_BUF_BYTES]
                                            .template ReinterpretCast<T>();
                 FlashUpdateLast<T, T, Q_T, T, dTemplateAlign64, QUANT_COMPUTE_MODE == 0>(
@@ -1095,7 +1096,6 @@ public:
 
     __aicore__ inline void SoftmaxInitBuffer()
     {
-        // TODO TPosition类型待确定
         softmaxApiBuf = LocalTensor<uint8_t>(TPosition::VECIN, ubBaseAddr, 512);
         ubBaseAddr += 512;
 
@@ -1132,7 +1132,6 @@ public:
         }
         vec1ResBuf = LocalTensor<uint8_t>(TPosition::VECIN, ubBaseAddr, VEC1_RES_BUF_NUM * VEC1_RES_BYTE);
         ubBaseAddr += VEC1_RES_BUF_NUM * VEC1_RES_BYTE;
-        // TODO 老模板待修改
         vec2ResBuf = LocalTensor<uint8_t>(TPosition::VECIN, ubBaseAddr, VEC2_RES_BYTE);
         ubBaseAddr += VEC2_RES_BYTE;
 

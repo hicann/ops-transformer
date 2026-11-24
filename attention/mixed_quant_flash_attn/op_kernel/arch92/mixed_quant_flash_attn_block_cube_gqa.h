@@ -285,7 +285,6 @@ public:
             l1KVScaleBuffers[3] =
                 LocalTensor<uint8_t>(TPosition::A1, GET_OFFSET(L1_BUF_VIEW, l1KVScaleBuf3), L1_KVSCALE_SLOT_BYTES);
         }
-        // TODO
         l0aBufferManager.Init(64 * 1024);
         l0bBufferManager.Init(64 * 1024);
         l0ABuffers.Init(l0aBufferManager, L0AB_BUF_SIZE, L0A_EVENT_0, L0A_EVENT_1);
