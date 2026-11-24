@@ -262,7 +262,7 @@ __aicore__ inline void BlockAttentionResidualsGrad<T>::Init(GM_ADDR prefixSum, G
     pipe.InitBuffer(invrmsFloatBuf, n1FloatBytes);
     pipe.InitBuffer(gradProbBuf, n1FloatBytes);
     pipe.InitBuffer(gradScoreBuf, n1FloatBytes);
-    pipe.InitBuffer(reduceDstBuf, 32U); // ReduceSumHalfInterval 的独立 dst（1 个 float）
+    pipe.InitBuffer(reduceDstBuf, 32U); // ReduceSumHalfInterval 的独立 dst（1 个 float）.
 }
 
 template <typename T>

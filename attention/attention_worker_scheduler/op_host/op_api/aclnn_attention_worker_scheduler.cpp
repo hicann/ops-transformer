@@ -25,17 +25,27 @@
 #include "opdev/make_op_executor.h"
 
 using namespace op;
+
+namespace {
+constexpr int64_t SCHEDULE_CONTEXT_SIZE = 1024;
+}
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 static aclnnStatus CheckParams(aclTensor* scheduleContextRef)
 {
-    OP_CHECK(
-        scheduleContextRef->GetViewShape().GetDimNum() == 1,
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The input shape must be one-dimensional with the shape (1024), but got %s.",
-                op::ToString(scheduleContextRef->GetViewShape()).GetString()),
-        return ACLNN_ERR_PARAM_INVALID);
+    OP_CHECK(scheduleContextRef->GetViewShape().GetDimNum() == 1 &&
+                 scheduleContextRef->GetViewShape().GetDim(0) == SCHEDULE_CONTEXT_SIZE,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The input shape must be one-dimensional with size %lld, but got %s.",
+                     static_cast<long long>(SCHEDULE_CONTEXT_SIZE),
+                     op::ToString(scheduleContextRef->GetViewShape()).GetString()),
+             return ACLNN_ERR_PARAM_INVALID);
+    OP_CHECK(scheduleContextRef->GetDataType() == DataType::DT_INT8,
+             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The input dtype must be INT8, but got %s.",
+                     op::ToString(scheduleContextRef->GetDataType()).GetString()),
+             return ACLNN_ERR_PARAM_INVALID);
     return ACLNN_SUCCESS;
 }
 

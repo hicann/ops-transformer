@@ -189,3 +189,73 @@ TEST_F(TEST_ATTENTION_WORKER_SCHEDULER_UT, INPUT_DIM_INVALID)
     CREATE_NODEDEF(shapes, data_types, datas);
     RUN_KERNEL(node_def, HOST, KERNEL_STATUS_PARAM_INVALID);
 }
+
+namespace {
+void RunAttentionWorkerSchedulerWithBufSize(uint32_t micro_batch_num, uint32_t micro_batch_size,
+                                            uint32_t selected_expert_num, uint64_t token_info_buf_size,
+                                            uint32_t expect_ret)
+{
+    ScheduleContext input_context = {};
+
+    input_context.common.session_num = 1;
+    input_context.common.micro_batch_num = micro_batch_num;
+    input_context.common.micro_batch_size = micro_batch_size;
+    input_context.common.selected_expert_num = selected_expert_num;
+    input_context.common.expert_num = 16;
+    input_context.common.attn_to_ffn_token_size = 512;
+    input_context.common.ffn_to_attn_token_size = 512;
+    input_context.common.schedule_mode = 1; // attention
+
+    input_context.control.run_flag = 0; // early exit, only the buffer size check is exercised
+
+    input_context.attention.micro_batch_id = 0;
+    input_context.attention.token_info_buf = reinterpret_cast<uint64_t>(new uint8_t[64]);
+    input_context.attention.token_info_buf_size = token_info_buf_size;
+    input_context.attention.token_data_buf = reinterpret_cast<uint64_t>(new uint8_t[64]);
+
+    ScheduleContext output_context = {};
+
+    vector<DataType> data_types = {DT_UINT8, DT_UINT8};
+    vector<vector<int64_t>> shapes = {{sizeof(ScheduleContext)}, {sizeof(ScheduleContext)}};
+    vector<void*> datas = {(void*)&input_context, (void*)&output_context};
+
+    CREATE_NODEDEF(shapes, data_types, datas);
+    RUN_KERNEL(node_def, HOST, expect_ret);
+
+    delete[] reinterpret_cast<uint8_t*>(input_context.attention.token_info_buf);
+    delete[] reinterpret_cast<uint8_t*>(input_context.attention.token_data_buf);
+}
+} // namespace
+
+// micro_batch_size * selected_expert_num == 2^32, which truncates to 0 in 32-bit multiplication.
+// The declared 64 bytes must be rejected; the real requirement is 2 * (0 + 4 * 2^32) = 32 GiB.
+TEST_F(TEST_ATTENTION_WORKER_SCHEDULER_UT, INPUT_TOKEN_INFO_BUF_SIZE_2POW32_TRUNCATION_REJECTED)
+{
+    RunAttentionWorkerSchedulerWithBufSize(2, 65536, 65536, 64, KERNEL_STATUS_PARAM_INVALID);
+}
+
+// micro_batch_size * selected_expert_num > 2^32 and the truncated value is non-zero.
+// Truncation alone still under-reports the real 34360262656 bytes, so 524288 bytes must be rejected.
+TEST_F(TEST_ATTENTION_WORKER_SCHEDULER_UT, INPUT_TOKEN_INFO_BUF_SIZE_TRUNCATION_NONZERO_REJECTED)
+{
+    RunAttentionWorkerSchedulerWithBufSize(2, 65537, 65536, 524288, KERNEL_STATUS_PARAM_INVALID);
+}
+
+// Boundary: the exact required size is 2 * (0 + 4 * 4 * 2) = 64 bytes, one byte less must be rejected.
+TEST_F(TEST_ATTENTION_WORKER_SCHEDULER_UT, INPUT_TOKEN_INFO_BUF_SIZE_ONE_BYTE_SHORT_REJECTED)
+{
+    RunAttentionWorkerSchedulerWithBufSize(2, 4, 2, 63, KERNEL_STATUS_PARAM_INVALID);
+}
+
+// 4 * micro_batch_size * selected_expert_num exceeds UINT64_MAX and must report an inner error.
+TEST_F(TEST_ATTENTION_WORKER_SCHEDULER_UT, INPUT_TOKEN_INFO_BUF_SIZE_FLAG_BYTES_OVERFLOW)
+{
+    RunAttentionWorkerSchedulerWithBufSize(1, 0xFFFFFFFFU, 0xFFFFFFFFU, 64, KERNEL_STATUS_INNER_ERROR);
+}
+
+// micro_batch_num * (sizeof(AttentionDataDesc) + 4 * micro_batch_size * selected_expert_num) overflows UINT64.
+TEST_F(TEST_ATTENTION_WORKER_SCHEDULER_UT, INPUT_TOKEN_INFO_BUF_SIZE_TOTAL_OVERFLOW)
+{
+    RunAttentionWorkerSchedulerWithBufSize(2, 0x80000000U, 0x40000000U, 0xFFFFFFFFFFFFFFFFULL,
+                                           KERNEL_STATUS_INNER_ERROR);
+}

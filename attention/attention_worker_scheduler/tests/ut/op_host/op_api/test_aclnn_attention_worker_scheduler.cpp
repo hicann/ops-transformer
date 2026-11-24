@@ -59,3 +59,41 @@ TEST_F(l2_attention_worker_scheduler_test, invalid_input_dim)
     aclnnStatus aclRet = ut.TestGetWorkspaceSize(&workspace_size);
     EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
 }
+
+TEST_F(l2_attention_worker_scheduler_test, scalar_schedule_context)
+{
+    TensorDesc desc(vector<int64_t>{}, ACL_INT8, ACL_FORMAT_ND);
+    auto ut = OP_API_UT(aclnnInplaceAttentionWorkerScheduler, INPUT(desc), OUTPUT());
+    uint64_t workspaceSize = 0;
+    EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_ERR_PARAM_INVALID);
+}
+
+TEST_F(l2_attention_worker_scheduler_test, null_schedule_context)
+{
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+    EXPECT_EQ(aclnnInplaceAttentionWorkerSchedulerGetWorkspaceSize(nullptr, &workspaceSize, &executor),
+              ACLNN_ERR_PARAM_NULLPTR);
+}
+
+TEST_F(l2_attention_worker_scheduler_test, invalid_schedule_context_length)
+{
+    for (int64_t length : {1, 1023, 1025, 4096}) {
+        SCOPED_TRACE(length);
+        TensorDesc desc({length}, ACL_INT8, ACL_FORMAT_ND);
+        auto ut = OP_API_UT(aclnnInplaceAttentionWorkerScheduler, INPUT(desc), OUTPUT());
+        uint64_t workspaceSize = 0;
+        EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_ERR_PARAM_INVALID);
+    }
+}
+
+TEST_F(l2_attention_worker_scheduler_test, invalid_schedule_context_dtype)
+{
+    for (aclDataType dtype : {ACL_UINT8, ACL_INT32, ACL_FLOAT16}) {
+        SCOPED_TRACE(static_cast<int>(dtype));
+        TensorDesc desc({1024}, dtype, ACL_FORMAT_ND);
+        auto ut = OP_API_UT(aclnnInplaceAttentionWorkerScheduler, INPUT(desc), OUTPUT());
+        uint64_t workspaceSize = 0;
+        EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_ERR_PARAM_INVALID);
+    }
+}

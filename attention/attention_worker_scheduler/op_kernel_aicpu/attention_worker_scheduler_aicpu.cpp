@@ -51,13 +51,14 @@ uint32_t AttentionWorkerSchedulerKernel::InitAndCheckScheduleContextAttention()
     KERNEL_CHECK_FALSE((schedule_context_->attention.token_data_buf != 0), aicpu::KERNEL_STATUS_PARAM_INVALID,
                        "token_data_buf[%lu] can not be 0", schedule_context_->attention.token_data_buf);
 
-    KERNEL_CHECK_FALSE(CheckUint64MulOverflow(micro_batch_size_, selected_expert_num_), KERNEL_STATUS_INNER_ERROR,
-                       "uint64 overflow occurred.");
-    uint64_t micro_batch_expert_product = static_cast<uint64_t>(micro_batch_size_ * selected_expert_num_);
+    uint64_t micro_batch_expert_product = static_cast<uint64_t>(micro_batch_size_) * selected_expert_num_;
     KERNEL_CHECK_FALSE(CheckUint64MulOverflow(sizeof(int32_t), micro_batch_expert_product), KERNEL_STATUS_INNER_ERROR,
                        "uint64 overflow occurred.");
     // check buf size
-    per_data_desc_size_ = sizeof(AttentionDataDesc) + sizeof(int32_t) * micro_batch_expert_product;
+    const uint64_t flag_bytes = micro_batch_expert_product * sizeof(int32_t);
+    KERNEL_CHECK_FALSE(flag_bytes <= UINT64_MAX - sizeof(AttentionDataDesc), KERNEL_STATUS_INNER_ERROR,
+                       "uint64 overflow occurred.");
+    per_data_desc_size_ = sizeof(AttentionDataDesc) + flag_bytes;
 
     KERNEL_CHECK_FALSE(CheckUint64MulOverflow(static_cast<uint64_t>(micro_batch_num_), per_data_desc_size_),
                        KERNEL_STATUS_INNER_ERROR, "uint64 overflow occurred.");
