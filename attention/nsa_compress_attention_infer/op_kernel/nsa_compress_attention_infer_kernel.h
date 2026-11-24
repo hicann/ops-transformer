@@ -412,7 +412,8 @@ __aicore__ inline void NsaCompressAttentionInferAic<NCAIType>::PerformPVMmad(con
     AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(l0abPingPongFlag + 2);
     AscendC::WaitFlag<AscendC::HardEvent::MTE1_M>(l0abPingPongFlag + 4);
     if (sIdx == 0) {
-        AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(l0cPingPongFlag + 2);
+        // QK and PV share L0C buffers, so they must also share the reuse events.
+        AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(l0cPingPongFlag);
     }
     AscendC::Mmad(l0cBufTensor[l0cPingPongFlag * BASE_L0C_BLOCK_ELEM_NUM],
                   l0aBufTensor[l0abPingPongFlag * BASE_L0AB_BLOCK_ELEM_NUM],
@@ -464,7 +465,7 @@ __aicore__ inline void NsaCompressAttentionInferAic<NCAIType>::CopyOToGm(const u
     }
     AscendC::Fixpipe<OUT_T, float, AscendC::CFG_ROW_MAJOR>(
         outGm[oCoreOffset], l0cBufTensor[l0cPingPongFlag * BASE_L0C_BLOCK_ELEM_NUM], intriParams);
-    AscendC::SetFlag<AscendC::HardEvent::FIX_M>(l0cPingPongFlag + 2);
+    AscendC::SetFlag<AscendC::HardEvent::FIX_M>(l0cPingPongFlag);
 }
 
 template <typename NCAIType>
@@ -610,8 +611,6 @@ __aicore__ inline void NsaCompressAttentionInferAic<NCAIType>::Process()
     AscendC::SetFlag<AscendC::HardEvent::M_MTE1>(3);
     AscendC::SetFlag<AscendC::HardEvent::FIX_M>(0);
     AscendC::SetFlag<AscendC::HardEvent::FIX_M>(1);
-    AscendC::SetFlag<AscendC::HardEvent::FIX_M>(2);
-    AscendC::SetFlag<AscendC::HardEvent::FIX_M>(3);
     for (uint32_t processIdx = cubeBlockIdx; processIdx < processNum; processIdx += aicNum) {
         PreProcess(processIdx);
         ProcessMm1(processIdx);
@@ -633,8 +632,6 @@ __aicore__ inline void NsaCompressAttentionInferAic<NCAIType>::Process()
     AscendC::WaitFlag<AscendC::HardEvent::M_MTE1>(3);
     AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(0);
     AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(1);
-    AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(2);
-    AscendC::WaitFlag<AscendC::HardEvent::FIX_M>(3);
 }
 
 #elif __DAV_C220_VEC__

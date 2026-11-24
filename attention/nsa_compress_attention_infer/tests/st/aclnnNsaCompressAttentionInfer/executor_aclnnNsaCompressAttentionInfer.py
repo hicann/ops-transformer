@@ -699,3 +699,39 @@ class SampleAclnnApi(AclnnBaseApi):
         const aclTensor *topKOutput,
         uint64_t *workspaceSize,
         aclOpExecutor **executor)"""
+
+
+@register("executor_nsa_compress_attention_infer_l0c")
+class ConstantValueNsaCompressAttentionInferApi(BaseApi):
+    """Analytic reference for the all-one L0C synchronization regression."""
+
+    def __call__(self, input_data: InputDataset, with_output: bool = False):
+        if self.device != "cpu":
+            raise ValueError("The L0C regression requires a CPU reference node.")
+        inputs = input_data.kwargs
+        for name in ("query", "key", "value"):
+            if not torch.all(inputs[name] == 1).item():
+                raise ValueError("The L0C regression requires all-one inputs.")
+        query = inputs["query"]
+        tokens, heads = query.shape[:2]
+        kv_heads = inputs["numKeyValueHeads"]
+        head_size = inputs["value"].shape[-1] // kv_heads
+        output = torch.ones((tokens, heads, head_size), dtype=query.dtype)
+        # Match the existing ST convention of excluding tied top-K indices.
+        topk = torch.zeros(
+            (tokens, kv_heads, inputs["selectBlockCount"]), dtype=torch.int32
+        )
+        return output, topk
+
+
+@register("executor_aclnn_nsa_compress_attention_infer_l0c")
+class L0cSyncAclnnApi(SampleAclnnApi):
+    """Reject even one corrupted element instead of accepting an error ratio."""
+
+    def after_call(self, output_packages):
+        output, topk = AclnnBaseApi.after_call(self, output_packages)
+        actual = output.cpu()
+        torch.testing.assert_close(
+            actual, torch.ones_like(actual), rtol=0, atol=0.01, equal_nan=False
+        )
+        return output, torch.zeros_like(topk)
