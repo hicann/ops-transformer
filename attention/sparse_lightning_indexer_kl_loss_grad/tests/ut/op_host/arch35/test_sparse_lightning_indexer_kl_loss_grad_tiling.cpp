@@ -42,7 +42,7 @@ const std::string SOC_INFO = R"({
         "CORE_NUM": 32,
         "cube_core_cnt": 32,
         "vector_core_cnt": 64,
-        "socVersion": "3510"
+        "socVersion": "Ascend950"
     }
 })";
 
@@ -59,6 +59,7 @@ gert::TilingContextPara MakeTilingContext(const std::string& layout = "BSND", ge
         info.l1Size = 524288;
         info.l0cSize = 262144;
         info.l2CacheSize = 134217728;
+        info.socVersion = platform_ascendc::SocVersion::ASCEND950;
         info.npuArch = Ops::Base::DAV_3510;
         return info;
     }();
@@ -89,7 +90,7 @@ gert::TilingContextPara MakeTilingContext(const std::string& layout = "BSND", ge
             {"mask_mode", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
             {"cmp_ratio", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
         },
-        &compileInfo, "3510", SOC_INFO, TILING_BUFFER_SIZE);
+        &compileInfo, "Ascend950", SOC_INFO, TILING_BUFFER_SIZE);
     if (layout == "TND") {
         context.inputTensorDesc_[0].shape_ = {{256, 8, 128}, {256, 8, 128}};
         context.inputTensorDesc_[1].shape_ = {{512, 1, 128}, {512, 1, 128}};

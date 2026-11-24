@@ -46,7 +46,7 @@ const std::string kA5SocInfo = "{\n"
                                "    \"L0C_SIZE\": 131072,\n"
                                "    \"vector_core_cnt\": 40,\n"
                                "    \"cube_core_cnt\": 20,\n"
-                               "    \"socVersion\": \"3510\"\n"
+                               "    \"socVersion\": \"Ascend950\"\n"
                                "  }\n"
                                "}";
 
@@ -112,7 +112,7 @@ gert::TilingContextPara MakeBsndPara(optiling::SparseLightningIndexerGradKLLossC
          {{{b, s2, n2, dIdx}, {b, s2, n2, dIdx}}, dataType, ge::FORMAT_ND},
          {{{b, s1, nIdx}, {b, s1, nIdx}}, weightType, ge::FORMAT_ND},
          {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND}},
-        MakeAttrs(layout, sparseMode), &compileInfo, "3510", kA5SocInfo, kTilingDataSize);
+        MakeAttrs(layout, sparseMode), &compileInfo, "Ascend950", kA5SocInfo, kTilingDataSize);
 }
 
 gert::TilingContextPara MakeTndPara(optiling::SparseLightningIndexerGradKLLossCompileInfo& compileInfo,
@@ -146,7 +146,7 @@ gert::TilingContextPara MakeTndPara(optiling::SparseLightningIndexerGradKLLossCo
                                     {{{t2, n2, dIdx}, {t2, n2, dIdx}}, ge::DT_BF16, ge::FORMAT_ND},
                                     {{{t1, nIdx}, {t1, nIdx}}, ge::DT_FLOAT, ge::FORMAT_ND},
                                     {{{1}, {1}}, ge::DT_FLOAT, ge::FORMAT_ND}},
-                                   MakeAttrs("TND"), &compileInfo, "3510", kA5SocInfo, kTilingDataSize);
+                                   MakeAttrs("TND"), &compileInfo, "Ascend950", kA5SocInfo, kTilingDataSize);
 }
 } // namespace
 

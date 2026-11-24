@@ -595,9 +595,7 @@ ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttentionGradScore(gert::TilingConte
     auto npuArch = compilePtr->npuArch;
     if (npuArch == Ops::Base::DAV_3510 || npuArch == Ops::Base::DAV_9201) {
         OP_LOGW(context, "Current npu arch is dav-3510 or dav-9201.");
-        // EOD场景（TND全零seq）与空输出一样无有效计算，regbase侧同样需要拦截，
-        // 否则DoSplit在s1=0时除零（normal_regbase.cpp:1455 FPE）。
-        if (IsEmptyOutput(context) || IsTndAllSeqLenZero(context)) {
+        if (IsEmptyOutput(context)) {
             FlashAttentionScoreGradTiling flashAttentionScoreGradTiling;
             return flashAttentionScoreGradTiling.RunEmptyTilingRegbase(context, npuArch);
         }

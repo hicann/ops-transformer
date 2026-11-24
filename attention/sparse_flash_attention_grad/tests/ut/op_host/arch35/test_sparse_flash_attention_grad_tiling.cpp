@@ -42,7 +42,7 @@ const std::string kAscend950SocInfo = "{\n"
                                       "    \"L0B_SIZE\": 65536,\n"
                                       "    \"L0C_SIZE\": 262144,\n"
                                       "    \"CORE_NUM\": 32,\n"
-                                      "    \"socVersion\": \"3510\"\n"
+                                      "    \"socVersion\": \"Ascend950\"\n"
                                       "  }\n"
                                       "}";
 
@@ -82,7 +82,7 @@ gert::TilingContextPara MakeKvMergePara(CompileInfo& compileInfo, int64_t sparse
          {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
          {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
          {"deterministic", Ops::Transformer::AnyValue::CreateFrom<bool>(deterministicInfo != 0)}},
-        &compileInfo, "3510", kAscend950SocInfo, 4096, deterministicInfo);
+        &compileInfo, "Ascend950", kAscend950SocInfo, 4096, deterministicInfo);
 }
 } // namespace
 
@@ -116,7 +116,7 @@ TEST_F(SparseFlashAttentionGradArch35Tiling, kvmerge)
                                   {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
                                   {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
                                   {"deterministic", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
-                                 &compileInfo, "3510", kAscend950SocInfo, 4096);
+                                 &compileInfo, "Ascend950", kAscend950SocInfo, 4096);
 
     ExecuteTestCase(para, ge::GRAPH_SUCCESS, kKeyBsndBf16KvMerge);
 }
@@ -149,7 +149,7 @@ TEST_F(SparseFlashAttentionGradArch35Tiling, kvmerge_nonempty_dv_should_fail)
                                   {"pre_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
                                   {"next_tokens", Ops::Transformer::AnyValue::CreateFrom<int64_t>(INT64_MAX)},
                                   {"deterministic", Ops::Transformer::AnyValue::CreateFrom<bool>(false)}},
-                                 &compileInfo, "3510", kAscend950SocInfo, 4096);
+                                 &compileInfo, "Ascend950", kAscend950SocInfo, 4096);
 
     ExecuteTestCase(para, ge::GRAPH_FAILED);
 }

@@ -13,7 +13,6 @@
  * \brief
  */
 
-#include "op_common/op_host/util/op_arch_helper.h"
 #include "register/op_def_registry.h"
 
 namespace ops {
@@ -111,17 +110,15 @@ public:
         this->Attr("pre_tokens").AttrType(OPTIONAL).Int(2147483647);
         this->Attr("next_tokens").AttrType(OPTIONAL).Int(2147483647);
         this->Attr("deterministic").AttrType(OPTIONAL).Bool(false); // true, false
-        OpAICoreConfig aicore_config_3510;
-        aicore_config_3510.DynamicCompileStaticFlag(true)
+        OpAICoreConfig aicore_config_95;
+        aicore_config_95.DynamicCompileStaticFlag(true)
             .DynamicFormatFlag(true)
             .DynamicRankSupportFlag(true)
             .DynamicShapeSupportFlag(true)
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("aclnnSupport.value", "support_aclnn");
-        // ascend950 按 NpuArch::DAV_3510 注册：opbase 的 g_archToSocNames 映射
-        // DAV_3510 -> {"ascend950", "ascend350"}，与逐个 AddConfig 语义等价（对齐 ops-nn matmul 族用法）。
-        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_3510, aicore_config_3510);
+        this->AICore().AddConfig("ascend950", aicore_config_95);
 
         OpAICoreConfig aicore_config_96;
         aicore_config_96.DynamicCompileStaticFlag(true)

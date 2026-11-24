@@ -44,7 +44,7 @@ std::string A5SocInfo = "{\n"
                         "    \"L0B_SIZE\": 65536,\n"
                         "    \"L0C_SIZE\": 262144,\n"
                         "    \"CORE_NUM\": 32,\n"
-                        "    \"socVersion\": \"3510\"\n"
+                        "    \"socVersion\": \"Ascend950\"\n"
                         "  }\n"
                         "}";
 
@@ -67,7 +67,7 @@ std::string A5SocInfoHybrid = "{\n"
                               "    \"CORE_NUM\": 32,\n"
                               "    \"cube_core_cnt\": 32,\n"
                               "    \"vector_core_cnt\": 64,\n"
-                              "    \"socVersion\": \"3510\"\n"
+                              "    \"socVersion\": \"Ascend950\"\n"
                               "  }\n"
                               "}";
 
@@ -2395,8 +2395,7 @@ static Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo MakeA5Comp
             131072,   // l0cSize
             33554432, // l2CacheSize
             32,       // coreNum
-            platform_ascendc::SocVersion::RESERVED_VERSION,
-            NpuArch::DAV_3510};
+            platform_ascendc::SocVersion::ASCEND950};
 }
 
 static gert::TilingContextPara MakeMlaRopeTilingContext(
@@ -2450,23 +2449,22 @@ static gert::TilingContextPara MakeMlaRopeTilingContext(
                                     {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                     {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                     {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-                                   compileInfo, "3510", A5SocInfo, 4096);
+                                   compileInfo, "Ascend950", A5SocInfo, 4096);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_0)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_0)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,                                             // aivNum
-        32,                                             // aicNum
-        196608,                                         // ubSize
-        524288,                                         // l1Size
-        65536,                                          // l0aSize
-        65536,                                          // l0bSize
-        131072,                                         // l0cSize
-        33554432,                                       // l2CacheSize
-        32,                                             // coreNum
-        platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_3510                               // npuArch
+        64,                                     // aivNum
+        32,                                     // aicNum
+        196608,                                 // ubSize
+        524288,                                 // l1Size
+        65536,                                  // l0aSize
+        65536,                                  // l0bSize
+        131072,                                 // l0cSize
+        33554432,                               // l2CacheSize
+        32,                                     // coreNum
+        platform_ascendc::SocVersion::ASCEND950 // socVersion
     };
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
@@ -2545,7 +2543,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_0)
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 18577349537174544;
     std::string expectTilingData =
         "32 1 1 1 256 256 128 128 4575657222443697349 255 65536 65536 0 0 0 2 1 0 0 2 1099511627776 0 0 0 0 2 "
@@ -2558,22 +2556,21 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_0)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_1)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_1)
 {
     int64_t actual_seq_qlist[4] = {128, 384, 768, 974};
     int64_t actual_seq_kvlist[4] = {128, 384, 768, 974};
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,                                             // aivNum
-        32,                                             // aicNum
-        196608,                                         // ubSize
-        524288,                                         // l1Size
-        65536,                                          // l0aSize
-        65536,                                          // l0bSize
-        131072,                                         // l0cSize
-        33554432,                                       // l2CacheSize
-        32,                                             // coreNum
-        platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_3510                               // npuArch
+        64,                                     // aivNum
+        32,                                     // aicNum
+        196608,                                 // ubSize
+        524288,                                 // l1Size
+        65536,                                  // l0aSize
+        65536,                                  // l0bSize
+        131072,                                 // l0cSize
+        33554432,                               // l2CacheSize
+        32,                                     // coreNum
+        platform_ascendc::SocVersion::ASCEND950 // socVersion
     };
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
@@ -2655,27 +2652,26 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_1)
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907146416;
     std::string expectTilingData = "";
     std::vector<size_t> expectWorkspaces = {21562880};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_2)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_2)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,                                             // aivNum
-        32,                                             // aicNum
-        196608,                                         // ubSize
-        524288,                                         // l1Size
-        65536,                                          // l0aSize
-        65536,                                          // l0bSize
-        131072,                                         // l0cSize
-        33554432,                                       // l2CacheSize
-        32,                                             // coreNum
-        platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_3510                               // npuArch
+        64,                                     // aivNum
+        32,                                     // aicNum
+        196608,                                 // ubSize
+        524288,                                 // l1Size
+        65536,                                  // l0aSize
+        65536,                                  // l0bSize
+        131072,                                 // l0cSize
+        33554432,                               // l2CacheSize
+        32,                                     // coreNum
+        platform_ascendc::SocVersion::ASCEND950 // socVersion
     };
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
@@ -2757,7 +2753,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_2)
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19140298953724962;
     std::string expectTilingData =
         "32 1 1 1 1 1 1 1 4575657222473777152 255 65536 0 2 0 0 2 1 0 0 2 4294967296 281474976710656 0 0 0 1 "
@@ -2770,20 +2766,19 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_2)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_3)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_3)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,                                             // aivNum
-        32,                                             // aicNum
-        196608,                                         // ubSize
-        524288,                                         // l1Size
-        65536,                                          // l0aSize
-        65536,                                          // l0bSize
-        131072,                                         // l0cSize
-        33554432,                                       // l2CacheSize
-        32,                                             // coreNum
-        platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_3510                               // npuArch
+        64,                                     // aivNum
+        32,                                     // aicNum
+        196608,                                 // ubSize
+        524288,                                 // l1Size
+        65536,                                  // l0aSize
+        65536,                                  // l0bSize
+        131072,                                 // l0cSize
+        33554432,                               // l2CacheSize
+        32,                                     // coreNum
+        platform_ascendc::SocVersion::ASCEND950 // socVersion
     };
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
@@ -2865,7 +2860,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_3)
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 18577350074044432;
     std::string expectTilingData =
         "32 1 1 1 64 128 129 129 4575657222443651324 255 2147483647 2147483647 2 0 0 3 1 0 0 0 0 0 0 0 0 1 "
@@ -2878,20 +2873,19 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_3)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_4)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_4)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,                                             // aivNum
-        32,                                             // aicNum
-        196608,                                         // ubSize
-        524288,                                         // l1Size
-        65536,                                          // l0aSize
-        65536,                                          // l0bSize
-        131072,                                         // l0cSize
-        33554432,                                       // l2CacheSize
-        32,                                             // coreNum
-        platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_3510                               // npuArch
+        64,                                     // aivNum
+        32,                                     // aicNum
+        196608,                                 // ubSize
+        524288,                                 // l1Size
+        65536,                                  // l0aSize
+        65536,                                  // l0bSize
+        131072,                                 // l0cSize
+        33554432,                               // l2CacheSize
+        32,                                     // coreNum
+        platform_ascendc::SocVersion::ASCEND950 // socVersion
     };
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
@@ -2973,7 +2967,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_4)
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 29132661700694064;
     std::string expectTilingData =
         "32 2 8 1 2000 2000 192 128 4575657222441520442 255 2147483647 2147483647 2 0 256 1 1 0 0 0 0 "
@@ -2989,20 +2983,19 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_4)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_5)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_5)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,                                             // aivNum
-        32,                                             // aicNum
-        196608,                                         // ubSize
-        524288,                                         // l1Size
-        65536,                                          // l0aSize
-        65536,                                          // l0bSize
-        131072,                                         // l0cSize
-        33554432,                                       // l2CacheSize
-        32,                                             // coreNum
-        platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_3510                               // npuArch
+        64,                                     // aivNum
+        32,                                     // aicNum
+        196608,                                 // ubSize
+        524288,                                 // l1Size
+        65536,                                  // l0aSize
+        65536,                                  // l0bSize
+        131072,                                 // l0cSize
+        33554432,                               // l2CacheSize
+        32,                                     // coreNum
+        platform_ascendc::SocVersion::ASCEND950 // socVersion
     };
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
@@ -3084,7 +3077,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_5)
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19140301101207586;
     std::string expectTilingData =
         "32 64 16 1 123 64 389 389 4575657222437055722 255 2147483647 2147483647 2 0 0 1 1 0 0 0 0 0 0 0 0 1 "
@@ -3099,20 +3092,19 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_5)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_6)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_6)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,                                             // aivNum
-        32,                                             // aicNum
-        196608,                                         // ubSize
-        524288,                                         // l1Size
-        65536,                                          // l0aSize
-        65536,                                          // l0bSize
-        131072,                                         // l0cSize
-        33554432,                                       // l2CacheSize
-        32,                                             // coreNum
-        platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_3510                               // npuArch
+        64,                                     // aivNum
+        32,                                     // aicNum
+        196608,                                 // ubSize
+        524288,                                 // l1Size
+        65536,                                  // l0aSize
+        65536,                                  // l0bSize
+        131072,                                 // l0cSize
+        33554432,                               // l2CacheSize
+        32,                                     // coreNum
+        platform_ascendc::SocVersion::ASCEND950 // socVersion
     };
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
@@ -3194,7 +3186,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_6)
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19140299490594850;
     std::string expectTilingData =
         "32 3 1 1 128 121 128 128 4575657222443697395 255 2147483647 2147483647 2 0 0 1 1 0 0 0 0 0 0 0 0 1 "
@@ -3207,20 +3199,19 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_6)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_7)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_7)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,                                             // aivNum
-        32,                                             // aicNum
-        196608,                                         // ubSize
-        524288,                                         // l1Size
-        65536,                                          // l0aSize
-        65536,                                          // l0bSize
-        131072,                                         // l0cSize
-        33554432,                                       // l2CacheSize
-        32,                                             // coreNum
-        platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_3510                               // npuArch
+        64,                                     // aivNum
+        32,                                     // aicNum
+        196608,                                 // ubSize
+        524288,                                 // l1Size
+        65536,                                  // l0aSize
+        65536,                                  // l0bSize
+        131072,                                 // l0cSize
+        33554432,                               // l2CacheSize
+        32,                                     // coreNum
+        platform_ascendc::SocVersion::ASCEND950 // socVersion
     };
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
@@ -3302,7 +3293,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_7)
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19140300564337952;
     std::string expectTilingData =
         "32 1 1 1 73 4096 200 200 4561245704492732611 204 2147483647 0 2 0 0 1 1 0 0 8589934594 8796093022209 "
@@ -3316,22 +3307,21 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_7)
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_8)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_8)
 {
     int64_t actual_seq_qlist[3] = {13, 14, 81};
     int64_t actual_seq_kvlist[3] = {13, 14, 81};
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,                                             // aivNum
-        32,                                             // aicNum
-        196608,                                         // ubSize
-        524288,                                         // l1Size
-        65536,                                          // l0aSize
-        65536,                                          // l0bSize
-        131072,                                         // l0cSize
-        33554432,                                       // l2CacheSize
-        32,                                             // coreNum
-        platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_3510                               // npuArch
+        64,                                     // aivNum
+        32,                                     // aicNum
+        196608,                                 // ubSize
+        524288,                                 // l1Size
+        65536,                                  // l0aSize
+        65536,                                  // l0bSize
+        131072,                                 // l0cSize
+        33554432,                               // l2CacheSize
+        32,                                     // coreNum
+        platform_ascendc::SocVersion::ASCEND950 // socVersion
     };
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
@@ -3413,29 +3403,28 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_8)
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 18577350610917264;
     std::string expectTilingData = "";
     std::vector<size_t> expectWorkspaces = {21037056};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_9)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_9)
 {
     int64_t actual_seq_qlist[3] = {13, 14, 81};
     int64_t actual_seq_kvlist[3] = {13, 14, 81};
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,                                             // aivNum
-        32,                                             // aicNum
-        196608,                                         // ubSize
-        524288,                                         // l1Size
-        65536,                                          // l0aSize
-        65536,                                          // l0bSize
-        131072,                                         // l0cSize
-        33554432,                                       // l2CacheSize
-        32,                                             // coreNum
-        platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_3510                               // npuArch
+        64,                                     // aivNum
+        32,                                     // aicNum
+        196608,                                 // ubSize
+        524288,                                 // l1Size
+        65536,                                  // l0aSize
+        65536,                                  // l0bSize
+        131072,                                 // l0cSize
+        33554432,                               // l2CacheSize
+        32,                                     // coreNum
+        platform_ascendc::SocVersion::ASCEND950 // socVersion
     };
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
@@ -3517,30 +3506,29 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_9)
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703249444018098;
     std::string expectTilingData = "";
     std::vector<size_t> expectWorkspaces = {25756160};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_10)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_10)
 {
     int64_t actual_seq_qlist[3] = {13, 14, 81};
     int64_t actual_seq_kvlist[3] = {13, 14, 81};
     int64_t prefix_list[3] = {10, 12, 60};
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,                                             // aivNum
-        32,                                             // aicNum
-        196608,                                         // ubSize
-        524288,                                         // l1Size
-        65536,                                          // l0aSize
-        65536,                                          // l0bSize
-        131072,                                         // l0cSize
-        33554432,                                       // l2CacheSize
-        32,                                             // coreNum
-        platform_ascendc::SocVersion::RESERVED_VERSION, // socVersion
-        NpuArch::DAV_3510                               // npuArch
+        64,                                     // aivNum
+        32,                                     // aicNum
+        196608,                                 // ubSize
+        524288,                                 // l1Size
+        65536,                                  // l0aSize
+        65536,                                  // l0bSize
+        131072,                                 // l0cSize
+        33554432,                               // l2CacheSize
+        32,                                     // coreNum
+        platform_ascendc::SocVersion::ASCEND950 // socVersion
     };
     gert::TilingContextPara tilingContextPara(
         "FlashAttentionScoreGrad",
@@ -3622,14 +3610,14 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_10)
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 18577350610917264;
     std::string expectTilingData = "";
     std::vector<size_t> expectWorkspaces = {21037056};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_11_tnd_same_as_input)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_11_tnd_same_as_input)
 {
     int64_t actual_seq_qlist[4] = {128, 384, 768, 974};
     int64_t actual_seq_kvlist[4] = {128, 384, 768, 974};
@@ -3683,7 +3671,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_11_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("same_as_input")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907146416;
     std::string expectTilingData =
         "32 4 1 2 384 384 32 32 4575657222452086003 255 45 2 2 0 0 4294967300 1 0 0 17179869186 8796093022211 "
@@ -3702,7 +3690,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_11_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_12_pad_causal_deter)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_12_pad_causal_deter)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -3754,7 +3742,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_12_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 4096, 1);
     int64_t expectTilingKey = 19182080395580448;
     std::string expectTilingData =
         "32 1 1 1 256 256 64 64 4575657222448611328 255 2147483647 0 0 0 0 1 1 0 0 8589934594 8796093022209 "
@@ -3771,7 +3759,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_12_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_13_pad_band_deter)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_13_pad_band_deter)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -3823,7 +3811,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_13_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 4096, 1);
     int64_t expectTilingKey = 19747229372257328;
     std::string expectTilingData =
         "32 1 1 1 256 256 64 64 4575657222448611328 255 64 64 0 0 0 1 1 0 0 17179869186 8796093022211 "
@@ -3840,7 +3828,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_13_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_15_pad_prefix5)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_15_pad_prefix5)
 {
     int64_t prefix_list[2] = {16, 16};
     auto compileInfo = MakeA5CompileInfo();
@@ -3893,7 +3881,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_15_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907146288;
     std::string expectTilingData =
         "32 2 2 1 256 256 64 64 4575657222448611328 255 65536 65536 0 0 0 1 1 0 0 21474836482 1099511627776 "
@@ -3907,7 +3895,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_15_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_16_pad_prefix6)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_16_pad_prefix6)
 {
     int64_t prefix_list[2] = {16, 24};
     auto compileInfo = MakeA5CompileInfo();
@@ -3960,7 +3948,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_16_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19140298953724960;
     std::string expectTilingData =
         "32 2 2 1 256 256 64 64 4575657222448611328 255 65536 65536 0 0 0 1 1 0 0 25769803778 8796093022212 "
@@ -3974,7 +3962,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_16_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_17_tnd_sparse7)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_17_tnd_sparse7)
 {
     int64_t actual_seq_qlist[3] = {0, 32, 64};
     int64_t actual_seq_kvlist[3] = {0, 32, 64};
@@ -4028,7 +4016,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_17_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907146416;
     std::string expectTilingData =
         "32 3 2 1 32 32 64 64 4575657222448611328 255 16 16 0 0 0 4 1 0 0 30064771074 8796093022213 844424930131968 "
@@ -4044,7 +4032,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_17_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_18_tnd_sparse8_inner_pse)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_18_tnd_sparse8_inner_pse)
 {
     int64_t actual_seq_qlist[3] = {32, 64, 96};
     int64_t actual_seq_kvlist[3] = {32, 64, 96};
@@ -4100,7 +4088,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_18_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 18577349000304272;
     std::string expectTilingData =
         "32 3 2 1 32 32 64 64 4575657222448611328 255 16 16 0 0 0 4 25769803778 3 0 34359738370 8796093022214 "
@@ -4116,7 +4104,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_18_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_19_outer_pse_bn1s)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_19_outer_pse_bn1s)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -4168,7 +4156,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_19_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907145778;
     std::string expectTilingData =
         "32 1 1 1 64 64 64 64 4575657222448611328 255 2147483647 2147483647 0 0 0 3 4294967297 1 0 0 0 0 0 0 0 1 "
@@ -4181,7 +4169,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_19_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_20_inner_pse_bn)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_20_inner_pse_bn)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -4233,7 +4221,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_20_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19140298953724450;
     std::string expectTilingData =
         "32 2 1 1 64 64 64 64 4575657222448611328 255 2147483647 2147483647 0 0 0 3 21474836482 2 0 0 0 0 0 0 0 1 "
@@ -4246,7 +4234,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_20_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_21_dropout_dropmask)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_21_dropout_dropmask)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -4298,7 +4286,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_21_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19140300564336928;
     std::string expectTilingData =
         "32 1 1 1 73 200 200 200 4561245704492732611 204 2147483647 2147483647 2 0 0 1 1 0 0 0 0 72058693549555712 0 "
@@ -4312,7 +4300,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_21_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_22_bn2)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_22_bn2)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -4364,7 +4352,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_22_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19140298953723938;
     std::string expectTilingData =
         "32 1 4 1 64 64 64 64 4575657222448611328 255 2147483647 2147483647 0 0 0 1 1 0 0 0 0 0 0 0 0 1 274877907008 "
@@ -4377,7 +4365,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_22_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_23_bn2s2)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_23_bn2s2)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -4429,7 +4417,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_23_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19140298953723936;
     std::string expectTilingData =
         "32 1 1 1 64 256 64 64 4575657222448611328 255 2147483647 2147483647 0 0 0 1 1 0 0 0 0 0 0 0 0 1 "
@@ -4442,7 +4430,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_23_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_24_bn2_multiblk)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_24_bn2_multiblk)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -4494,7 +4482,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_24_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19773617651322930;
     std::string expectTilingData =
         "32 16 8 1 256 256 64 64 4575657222448611328 255 2147483647 2147483647 0 0 0 1 1 0 0 0 0 0 0 0 0 2 "
@@ -4509,7 +4497,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_24_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_25_tnd_all_same)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_25_tnd_all_same)
 {
     int64_t actual_seq_qlist[3] = {64, 128, 192};
     int64_t actual_seq_kvlist[3] = {64, 128, 192};
@@ -4563,7 +4551,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_25_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907145266;
     std::string expectTilingData =
         "32 3 2 1 64 64 32 32 4575657222452086003 255 2147483647 2147483647 0 0 0 1 1 0 0 0 0 0 0 0 0 1 274877907008 "
@@ -4576,7 +4564,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_25_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_27_fp32_large_d)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_27_fp32_large_d)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -4628,7 +4616,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_27_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 18577351147784208;
     std::string expectTilingData =
         "32 1 1 1 64 64 320 320 4575657222438451502 255 2147483647 2147483647 0 0 0 3 1 0 0 0 0 0 0 0 0 1 "
@@ -4641,7 +4629,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_27_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_28_atten_mask_4d)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_28_atten_mask_4d)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -4693,7 +4681,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_28_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907146290;
     std::string expectTilingData =
         "32 1 2 1 64 64 64 64 4575657222448611328 255 65536 65536 0 0 0 1 1 0 0 0 274877906944 0 0 0 0 1 "
@@ -4706,7 +4694,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_28_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_29_tnd_outer_pse_1d)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_29_tnd_outer_pse_1d)
 {
     int64_t actual_seq_qlist[3] = {32, 64, 96};
     int64_t actual_seq_kvlist[3] = {32, 64, 96};
@@ -4760,7 +4748,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_29_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907145778;
     std::string expectTilingData =
         "32 3 2 1 32 32 64 64 4575657222448611328 255 2147483647 2147483647 0 0 0 1 4294967297 1 0 0 0 0 0 0 0 1 "
@@ -4773,7 +4761,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_29_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_30_alibi_pse)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_30_alibi_pse)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -4825,7 +4813,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_30_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907146800;
     std::string expectTilingData =
         "32 1 1 1 1024 1024 64 64 4575657222448611328 255 2147483647 0 0 0 0 3 1 0 0 8589934594 8796093022209 "
@@ -4839,7 +4827,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_30_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_softmax_dim)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_tnd_softmax_dim)
 {
     int64_t actual_seq_qlist[4] = {128, 384, 768, 974};
     int64_t actual_seq_kvlist[4] = {128, 384, 768, 974};
@@ -4893,11 +4881,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_s
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("same_as_input")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_atten_mask_shape)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_atten_mask_shape)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -4949,11 +4937,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_atten
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_dropmask_keepprob)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_dropmask_keepprob)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -5005,11 +4993,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_dropm
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_fp8)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_fp8)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -5061,11 +5049,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_fp8)
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_pad_tokens)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_pad_tokens)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -5117,11 +5105,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_pad_t
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_inner_pse_dim)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_inner_pse_dim)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -5173,11 +5161,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_inner
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_tokens)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_tnd_tokens)
 {
     // Prefix-sum must stay unequal so layout remains TND (all-same would rewrite to pad).
     int64_t actual_seq_qlist[4] = {128, 384, 768, 974};
@@ -5232,11 +5220,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_t
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_atten_mask_rank)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_atten_mask_rank)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -5288,11 +5276,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_atten
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_sparse5)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_tnd_sparse5)
 {
     int64_t actual_seq_qlist[4] = {128, 384, 768, 974};
     int64_t actual_seq_kvlist[4] = {128, 384, 768, 974};
@@ -5347,11 +5335,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_s
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_pad_sparse7)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_pad_sparse7)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -5403,11 +5391,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_pad_s
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_prefix6_empty_prefix)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_prefix6_empty_prefix)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -5459,11 +5447,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_prefi
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_pse_type)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_pse_type)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -5515,11 +5503,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_pse_t
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_softmax_max_dim)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_softmax_max_dim)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -5571,11 +5559,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_softm
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_dscale)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_dscale)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -5627,11 +5615,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_dscal
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_atten_mask_4d_bn)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_atten_mask_4d_bn)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -5683,11 +5671,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_atten
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_31_all_mask)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_31_all_mask)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -5739,7 +5727,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_31_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907146290;
     std::string expectTilingData =
         "32 1 1 1 64 64 64 64 4575657222448611328 255 2147483647 2147483647 0 0 0 1 1 0 0 4294967298 274877906944 0 "
@@ -5752,7 +5740,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_31_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_32_pad_right_down_causal)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_32_pad_right_down_causal)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -5804,7 +5792,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_32_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907146290;
     std::string expectTilingData =
         "32 1 1 1 64 64 64 64 4575657222448611328 255 2147483647 0 0 0 0 1 1 0 0 12884901890 8796093022210 "
@@ -5817,7 +5805,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_32_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_33_prefix5_empty)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_33_prefix5_empty)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -5869,7 +5857,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_33_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19140298953724960;
     std::string expectTilingData =
         "32 2 2 1 256 256 64 64 4575657222448611328 255 65536 65536 0 0 0 1 1 0 0 4294967298 1099511627776 0 0 0 0 2 "
@@ -5883,7 +5871,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_33_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_34_outer_pse_bnss)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_34_outer_pse_bnss)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -5935,7 +5923,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_34_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907145778;
     std::string expectTilingData =
         "32 2 2 1 64 64 64 64 4575657222448611328 255 2147483647 2147483647 0 0 0 1 1 0 0 0 0 0 0 0 0 1 274877907008 "
@@ -5948,7 +5936,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_34_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_35_outer_pse_1nss)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_35_outer_pse_1nss)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -6000,7 +5988,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_35_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907145778;
     std::string expectTilingData =
         "32 2 2 1 64 64 64 64 4575657222448611328 255 2147483647 2147483647 0 0 0 1 8589934593 0 0 0 0 0 0 0 0 1 "
@@ -6013,7 +6001,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_35_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_36_atten_mask_4d_b1)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_36_atten_mask_4d_b1)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -6065,7 +6053,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_36_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907146290;
     std::string expectTilingData =
         "32 2 2 1 64 64 64 64 4575657222448611328 255 65536 65536 0 0 0 1 1 0 0 1 274877906944 0 0 0 0 1 "
@@ -6078,7 +6066,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_36_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_37_atten_mask_4d_11)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_37_atten_mask_4d_11)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -6130,7 +6118,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_37_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907146290;
     std::string expectTilingData =
         "32 2 2 1 64 64 64 64 4575657222448611328 255 65536 65536 0 0 0 1 1 0 0 2 274877906944 0 0 0 0 1 "
@@ -6143,7 +6131,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_37_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_38_qkv_start_idx)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_38_qkv_start_idx)
 {
     int64_t q_start_list[1] = {8};
     int64_t kv_start_list[1] = {4};
@@ -6197,7 +6185,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_38_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907145266;
     std::string expectTilingData =
         "32 1 1 1 64 64 64 64 4575657222448611328 255 2147483647 2147483647 0 0 0 1 1 0 17179869192 0 0 0 0 0 0 1 "
@@ -6210,7 +6198,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_38_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_39_dropout_s2_not_div8)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_39_dropout_s2_not_div8)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -6262,7 +6250,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_39_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907145522;
     std::string expectTilingData =
         "32 1 1 1 65 65 64 64 4568451461326831616 229 2147483647 2147483647 0 0 0 1 1 0 0 0 0 0 0 0 0 1 279172874304 "
@@ -6275,7 +6263,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_39_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_40_pad_gqa)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_40_pad_gqa)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -6327,7 +6315,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_40_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907145264;
     std::string expectTilingData =
         "32 1 2 2 64 64 64 64 4575657222448611328 255 2147483647 2147483647 0 0 0 1 1 0 0 0 0 0 0 0 0 1 274877907008 "
@@ -6340,7 +6328,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_40_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_41_atten_mask_bool)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_41_atten_mask_bool)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -6392,7 +6380,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_41_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907146290;
     std::string expectTilingData =
         "32 1 1 1 64 64 64 64 4575657222448611328 255 65536 65536 0 0 0 1 1 0 0 2 274877906944 0 0 0 0 1 "
@@ -6405,7 +6393,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_41_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_42_inner_pse_2d)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_42_inner_pse_2d)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -6457,7 +6445,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_42_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19140298953724450;
     std::string expectTilingData =
         "32 2 2 1 64 64 64 64 4575657222448611328 255 2147483647 2147483647 0 0 0 1 21474836482 2 0 0 0 0 0 0 0 1 "
@@ -6470,7 +6458,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_42_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_compress_mask_not_square)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_compress_mask_not_square)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -6522,11 +6510,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_compr
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_softmax_dtype)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_softmax_dtype)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -6578,11 +6566,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_softm
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_attention_in_dtype)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_attention_in_dtype)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -6634,11 +6622,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_atten
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_attention_in_rank)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_attention_in_rank)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -6690,11 +6678,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_atten
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_softmax_max_rank)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_softmax_max_rank)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -6746,11 +6734,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_softm
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_dropmask_dtype)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_dropmask_dtype)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -6802,11 +6790,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_dropm
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_dropmask_size)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_dropmask_size)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -6858,11 +6846,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_dropm
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_sparse7_inner_pse)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_tnd_sparse7_inner_pse)
 {
     int64_t actual_seq_qlist[4] = {128, 384, 768, 974};
     int64_t actual_seq_kvlist[4] = {128, 384, 768, 974};
@@ -6916,11 +6904,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_s
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_sparse8_inner_pse_s1s2)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_tnd_sparse8_inner_pse_s1s2)
 {
     int64_t actual_seq_qlist[3] = {32, 80, 160};
     int64_t actual_seq_kvlist[3] = {32, 64, 96};
@@ -6974,11 +6962,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_s
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_prefix_len)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_prefix_len)
 {
     int64_t prefix_list[3] = {8, 8, 8};
     auto compileInfo = MakeA5CompileInfo();
@@ -7031,11 +7019,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_prefi
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_43_prefix5_deter)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_43_prefix5_deter)
 {
     int64_t prefix_list[2] = {16, 16};
     auto compileInfo = MakeA5CompileInfo();
@@ -7088,7 +7076,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_43_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 262144, 1);
     int64_t expectTilingKey = 19705447930401840;
     std::string expectTilingData =
         "32 2 2 1 512 512 64 64 4575657222448611328 255 65536 65536 0 0 0 1 1 0 0 21474836482 2199023255552 "
@@ -7105,7 +7093,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_43_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_44_sbh_prefix5_deter)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_44_sbh_prefix5_deter)
 {
     int64_t prefix_list[2] = {16, 16};
     auto compileInfo = MakeA5CompileInfo();
@@ -7158,7 +7146,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_44_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 262144, 1);
     int64_t expectTilingKey = 19705447930401840;
     std::string expectTilingData =
         "32 2 2 1 512 512 64 64 4575657222448611328 255 65536 65536 0 0 0 2 1 0 0 21474836482 2199023255552 "
@@ -7175,7 +7163,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_44_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_45_tnd_prefix6_deter)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_45_tnd_prefix6_deter)
 {
     int64_t actual_seq_qlist[4] = {128, 384, 768, 974};
     int64_t actual_seq_kvlist[4] = {128, 384, 768, 974};
@@ -7230,7 +7218,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_45_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 262144, 1);
     int64_t expectTilingKey = 19705447930401968;
     std::string expectTilingData =
         "32 4 2 1 384 384 32 32 4575657222448611328 255 65536 65536 0 0 0 4 1 0 0 25769803778 8796093022212 "
@@ -7250,7 +7238,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_45_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_46_bnsd_prefix5_deter)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_46_bnsd_prefix5_deter)
 {
     int64_t prefix_list[2] = {16, 16};
     auto compileInfo = MakeA5CompileInfo();
@@ -7303,7 +7291,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_46_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 262144, 1);
     int64_t expectTilingKey = 19705447930401840;
     std::string expectTilingData =
         "32 2 2 1 512 512 64 64 4575657222448611328 255 65536 65536 0 0 0 3 1 0 0 21474836482 2199023255552 "
@@ -7320,7 +7308,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_46_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_47_causal_s1_lt_s2)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_47_causal_s1_lt_s2)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -7372,7 +7360,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_47_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 28710448161887280;
     std::string expectTilingData =
         "32 1 1 1 4096 16384 64 64 4575657222448611328 255 2147483647 0 0 0 528 1 1 0 0 8589934594 8796093022209 "
@@ -7387,7 +7375,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_47_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_48_rd_causal_s1_lt_s2)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_48_rd_causal_s1_lt_s2)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -7439,7 +7427,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_48_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907146288;
     std::string expectTilingData =
         "32 1 1 1 4096 16384 64 64 4575657222448611328 255 2147471359 12288 0 0 0 1 1 0 0 12884901890 8796093022210 "
@@ -7454,7 +7442,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_48_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_49_band_split_block)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_49_band_split_block)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -7506,7 +7494,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_49_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 27584548791915536;
     std::string expectTilingData =
         "32 2 8 1 4096 4096 128 128 4575657222443697349 255 256 256 0 0 154 1 1 0 0 17179869186 8796093022211 "
@@ -7522,7 +7510,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_49_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_50_alibi_1nhs)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_50_alibi_1nhs)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -7574,7 +7562,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_50_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907146800;
     std::string expectTilingData =
         "32 1 1 1 1024 1024 64 64 4575657222448611328 255 2147483647 0 0 0 0 1 1 0 0 8589934594 8796093022209 "
@@ -7588,7 +7576,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_50_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_51_alibi_bnhs)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_51_alibi_bnhs)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -7640,7 +7628,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_51_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907146800;
     std::string expectTilingData =
         "32 2 2 1 1024 1024 64 64 4575657222448611328 255 2147483647 0 0 0 0 1 1 0 0 8589934594 8796093022209 "
@@ -7655,7 +7643,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_51_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_sparse4_tokens)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_tnd_sparse4_tokens)
 {
     int64_t actual_seq_qlist[4] = {128, 384, 768, 974};
     int64_t actual_seq_kvlist[4] = {128, 384, 768, 974};
@@ -7709,11 +7697,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_s
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_sparse7_tokens)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_tnd_sparse7_tokens)
 {
     int64_t actual_seq_qlist[4] = {128, 384, 768, 974};
     int64_t actual_seq_kvlist[4] = {128, 384, 768, 974};
@@ -7767,11 +7755,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_s
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_pse_alibi_shape)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_pse_alibi_shape)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -7823,11 +7811,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_pse_a
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_pse_alibi_shape)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_tnd_pse_alibi_shape)
 {
     int64_t actual_seq_qlist[4] = {128, 384, 768, 974};
     int64_t actual_seq_kvlist[4] = {128, 384, 768, 974};
@@ -7881,11 +7869,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_p
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_pse_not_causal)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_tnd_pse_not_causal)
 {
     int64_t actual_seq_qlist[4] = {128, 384, 768, 974};
     int64_t actual_seq_kvlist[4] = {128, 384, 768, 974};
@@ -7939,11 +7927,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_p
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_pse_pad_not_alibi)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_pse_pad_not_alibi)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -7995,11 +7983,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_pse_p
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_regbase_h_helpers)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_regbase_h_helpers)
 {
     using optiling::fag::AbsCeil;
     using optiling::fag::CeilDivideBy;
@@ -8021,7 +8009,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_regbase_h_
     EXPECT_EQ(sliced[2], 5);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_52_tnd_deter_b129)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_52_tnd_deter_b129)
 {
     constexpr int64_t kBatch = 129;
     int64_t actual_seq_qlist[kBatch];
@@ -8083,7 +8071,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_52_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 262144, 1);
     int64_t expectTilingKey = 19742831325745328;
     std::string expectTilingData =
         "32 129 2 1 256 256 32 32 4575657222452086003 255 2147483647 2147483647 0 0 0 4 1 0 0 0 0 0 0 0 0 2 "
@@ -8118,7 +8106,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_52_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_query_rope_xor)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_query_rope_xor)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -8170,11 +8158,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_query
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_key_rope_without_query_rope)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_key_rope_without_query_rope)
 {
     constexpr size_t queryRopeIndex = 22;
     auto compileInfo = MakeA5CompileInfo();
@@ -8185,7 +8173,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_key_r
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_eod_nonzero)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_tnd_eod_nonzero)
 {
     int64_t actual_seq_qlist[3] = {32, 16, 8};
     int64_t actual_seq_kvlist[3] = {32, 16, 8};
@@ -8239,11 +8227,11 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_tnd_e
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_53_gqa_dense_deter)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_53_gqa_dense_deter)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -8295,7 +8283,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_53_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 4096, 1);
     int64_t expectTilingKey = 19707646953656368;
     std::string expectTilingData =
         "32 5 1 2 1024 1024 64 64 4575657222448611328 255 2147483647 2147483647 0 0 0 1 1 0 0 0 0 0 0 0 0 8 "
@@ -8313,7 +8301,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_53_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_55_deter_left_up)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_55_deter_left_up)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -8365,7 +8353,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_55_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 4096, 1);
     int64_t expectTilingKey = 19745030349001776;
     std::string expectTilingData =
         "32 1 1 1 256 256 64 64 4575657222448611328 255 2147483647 0 0 0 0 1 1 0 0 8589934594 8796093022209 "
@@ -8382,7 +8370,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_55_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_56_deter_nomask_neg_next)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_56_deter_nomask_neg_next)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -8434,7 +8422,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_56_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 4096, 1);
     int64_t expectTilingKey = 19745030349001776;
     std::string expectTilingData =
         "32 1 1 1 256 256 64 64 4575657222448611328 255 65536 -64 0 0 0 1 1 0 0 2 1099511627776 562949953421312 0 0 "
@@ -8450,7 +8438,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_56_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_57_bn2_multiblk_sparse)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_57_bn2_multiblk_sparse)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -8502,7 +8490,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_57_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19773617651323954;
     std::string expectTilingData =
         "32 16 16 1 256 256 64 64 4575657222448611328 255 2147483647 0 0 0 0 1 1 0 0 8589934594 8796093022209 "
@@ -8517,7 +8505,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_57_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_58_bn2_multiblk_invalid)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_58_bn2_multiblk_invalid)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -8569,7 +8557,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_58_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19773617651323954;
     std::string expectTilingData =
         "32 16 16 1 256 256 64 64 4575657222448611328 255 16 16 0 0 0 1 1 0 0 17179869186 8796093022211 "
@@ -8584,7 +8572,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_58_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_59_nz_out)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_59_nz_out)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -8636,7 +8624,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_59_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703249444016176;
     std::string expectTilingData =
         "32 1 4 1 2048 2048 72 72 4575657222447651805 255 2147483647 2147483647 0 0 0 1 1 0 0 0 0 72057594037927936 "
@@ -8651,7 +8639,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_59_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_60_tnd_swizzle)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_60_tnd_swizzle)
 {
     int64_t actual_seq_qlist[1] = {2048};
     int64_t actual_seq_kvlist[1] = {2048};
@@ -8705,7 +8693,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_60_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144);
+        &compileInfo, "Ascend950", A5SocInfo, 262144);
     int64_t expectTilingKey = 19703248907145396;
     std::string expectTilingData =
         "32 1 4 1 2048 2048 64 64 4575657222448611328 255 2147483647 2147483647 0 0 0 4 1 0 0 0 0 0 0 0 0 16 "
@@ -8722,7 +8710,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_60_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_62_tnd_gqa_nz)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_62_tnd_gqa_nz)
 {
     int64_t actual_seq_qlist[1] = {2048};
     int64_t actual_seq_kvlist[1] = {2048};
@@ -8776,7 +8764,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_62_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144);
+        &compileInfo, "Ascend950", A5SocInfo, 262144);
     int64_t expectTilingKey = 19703249444016176;
     std::string expectTilingData =
         "32 1 1 4 2048 2048 72 72 4575657222447651805 255 2147483647 2147483647 0 0 0 1 1 0 0 0 0 72057594037927936 "
@@ -8791,28 +8779,28 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_62_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_63_mla_rope)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_63_mla_rope)
 {
     auto compileInfo = MakeA5CompileInfo();
     auto tilingContextPara = MakeMlaRopeTilingContext(&compileInfo, 128, 128);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, UINT64_MAX);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_mla_rope_query_key_d)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_mla_rope_query_key_d)
 {
     auto compileInfo = MakeA5CompileInfo();
     auto tilingContextPara = MakeMlaRopeTilingContext(&compileInfo, 192, 128);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_fail_mla_rope_value_d)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_fail_mla_rope_value_d)
 {
     auto compileInfo = MakeA5CompileInfo();
     auto tilingContextPara = MakeMlaRopeTilingContext(&compileInfo, 128, 192);
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_64_sink)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_64_sink)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -8867,7 +8855,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_64_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096);
+        &compileInfo, "Ascend950", A5SocInfo, 4096);
     int64_t expectTilingKey = 19703248907145266;
     std::string expectTilingData =
         "32 1 1 1 128 128 64 64 4575657222448611328 255 2147483647 2147483647 0 0 0 1 1 0 0 0 0 1 2 1 0 1 "
@@ -8880,7 +8868,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_64_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_65_rd_causal_deter)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_65_rd_causal_deter)
 {
     auto compileInfo = MakeA5CompileInfo();
     gert::TilingContextPara tilingContextPara(
@@ -8932,7 +8920,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_65_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 4096, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 4096, 1);
     int64_t expectTilingKey = 19745030349001776;
     std::string expectTilingData =
         "32 1 1 1 256 256 64 64 4575657222448611328 255 2147483647 0 0 0 0 1 1 0 0 12884901890 8796093022210 "
@@ -8949,7 +8937,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_65_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_66_tnd_deter_bn2s2_swizzle)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_66_tnd_deter_bn2s2_swizzle)
 {
     // Prefix-sum TND, MHA, dense+deter. Many unique (B,N,S1) tiles so CheckExceedL2Cache
     // trips the real 128MB L2; BN2S2 is kept so ConfigureTndDeterBn2S2Swizzle can run.
@@ -9005,7 +8993,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_66_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 262144, 1);
     int64_t expectTilingKey = 28750030580486324;
     std::string expectTilingData =
         "32 8 16 1 2304 2048 64 64 4575657222448611328 255 2147483647 2147483647 0 0 0 4 1 0 0 0 0 0 0 0 0 18 "
@@ -9047,7 +9035,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_66_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_67_band_deter_pq_le_m)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_67_band_deter_pq_le_m)
 {
     // Pad BAND + deter. B*N is a multiple of AIC so blockOuter==aicNum; unique tiles
     // exceed 128MB L2; Hybrid soc reports AIV=2*AIC so SelectDeterBandSchedule runs
@@ -9102,7 +9090,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_67_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfoHybrid, 4096, 1);
+        &compileInfo, "Ascend950", A5SocInfoHybrid, 4096, 1);
     int64_t expectTilingKey = 28754429163869232;
     std::string expectTilingData =
         "64 32 1 1 4096 4096 128 128 4575657222443697349 255 256 256 0 0 154 1 1 0 0 17179869186 8796093022211 "
@@ -9122,7 +9110,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_67_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_68_band_deter_causal_odd_b)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_68_band_deter_causal_odd_b)
 {
     // Near-causal BAND (next=0), odd B so SelectDeterBandSchedule can take the
     // lower-causal path and CalcCausalSingleBatchRound.
@@ -9176,7 +9164,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_68_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfoHybrid, 4096, 1);
+        &compileInfo, "Ascend950", A5SocInfoHybrid, 4096, 1);
     int64_t expectTilingKey = 28754429163869232;
     std::string expectTilingData =
         "64 33 1 1 4096 4096 128 128 4575657222443697349 255 65536 0 0 0 528 1 1 0 0 17179869186 8796093022211 "
@@ -9196,7 +9184,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_68_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_69_tnd_line_left_up)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_69_tnd_line_left_up)
 {
     int64_t actual_seq_qlist[2] = {4096, 10240};
     int64_t actual_seq_kvlist[2] = {4096, 8192};
@@ -9250,7 +9238,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_69_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 262144, 1);
     int64_t expectTilingKey = 19745030349001904;
     std::string expectTilingData =
         "32 2 5 1 6144 4096 64 64 4575657222448611328 255 2147483647 0 0 0 0 4 1 0 0 8589934594 8796093022209 "
@@ -9282,7 +9270,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_69_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_73_tnd_causal_gqa)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_73_tnd_causal_gqa)
 {
     int64_t actual_seq_qlist[2] = {512, 1280};
     int64_t actual_seq_kvlist[2] = {512, 1024};
@@ -9336,7 +9324,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_73_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 262144, 1);
     int64_t expectTilingKey = 19709845976913072;
     std::string expectTilingData =
         "32 2 3 2 768 512 64 64 4575657222448611328 255 2147483647 0 0 0 0 4 1 0 0 8589934594 8796093022209 "
@@ -9366,7 +9354,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_73_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_74_tnd_causal_n1)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_74_tnd_causal_n1)
 {
     int64_t actual_seq_qlist[2] = {512, 1536};
     int64_t actual_seq_kvlist[2] = {768, 1280};
@@ -9420,7 +9408,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_74_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 262144, 1);
     int64_t expectTilingKey = 19745030349001904;
     std::string expectTilingData =
         "32 2 1 1 1024 768 64 64 4575657222448611328 255 2147483647 0 0 0 0 4 1 0 0 8589934594 8796093022209 "
@@ -9450,7 +9438,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_74_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_75_tnd_band_bns2)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_75_tnd_band_bns2)
 {
     int64_t actual_seq_qlist[2] = {1024, 2304};
     int64_t actual_seq_kvlist[2] = {256, 640};
@@ -9504,7 +9492,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_75_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 262144, 1);
     int64_t expectTilingKey = 19747229372257456;
     std::string expectTilingData =
 
@@ -9540,7 +9528,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_75_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_79_tnd_line_band_unpad)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_79_tnd_line_band_unpad)
 {
     // Stay TND (not isAllSame). n2>=2 + deter BAND so PreferTNDLineDeter actually calls GetTNDBandMN.
     int64_t actual_seq_qlist[2] = {4096, 10240};
@@ -9595,7 +9583,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_79_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 262144, 1);
     int64_t expectTilingKey = 19747229372257456;
     std::string expectTilingData =
 
@@ -9633,7 +9621,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_79_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_80_tnd_band_bns2_n1)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_80_tnd_band_bns2_n1)
 {
     // n2==1 skips line deter; per-batch square but different lengths keep TND BN2S2 for split-dk.
     int64_t actual_seq_qlist[2] = {256, 768};
@@ -9688,7 +9676,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_80_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 262144, 1);
     int64_t expectTilingKey = 19747229372257456;
     std::string expectTilingData =
 
@@ -9724,7 +9712,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_80_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_81_tnd_bn2s2_lu_ge)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_81_tnd_bn2s2_lu_ge)
 {
     // TND CASUAL needs n1 even and S1>=S2 every batch; stay unpadded via different batch sizes.
     int64_t actual_seq_qlist[2] = {512, 1280};
@@ -9779,7 +9767,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_81_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144);
+        &compileInfo, "Ascend950", A5SocInfo, 262144);
     int64_t expectTilingKey = 19703248907146416;
     std::string expectTilingData =
         "32 2 4 1 768 384 64 64 4575657222448611328 255 2147483647 0 0 0 0 4 1 0 0 8589934594 8796093022209 "
@@ -9798,7 +9786,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_81_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_82_tnd_bn2s2_rd_le)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_82_tnd_bn2s2_rd_le)
 {
     int64_t actual_seq_qlist[2] = {256, 768};
     int64_t actual_seq_kvlist[2] = {512, 1280};
@@ -9852,7 +9840,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_82_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144);
+        &compileInfo, "Ascend950", A5SocInfo, 262144);
     int64_t expectTilingKey = 19703248907146420;
     std::string expectTilingData =
         "32 2 4 1 512 768 64 64 4575657222448611328 255 2147483647 0 0 0 0 4 1 0 0 12884901890 8796093022210 "
@@ -9871,7 +9859,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_82_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_83_tnd_bn2s2_band_sq)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_83_tnd_bn2s2_band_sq)
 {
     // BAND sparseType needs isS1S2Same; different per-batch lengths keep TND (not isAllSame).
     int64_t actual_seq_qlist[2] = {512, 1536};
@@ -9926,7 +9914,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_83_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144);
+        &compileInfo, "Ascend950", A5SocInfo, 262144);
     int64_t expectTilingKey = 19703248907146420;
     std::string expectTilingData =
         "32 2 4 1 1024 1024 64 64 4575657222448611328 255 256 256 0 0 0 4 1 0 0 17179869186 8796093022211 "
@@ -9946,7 +9934,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_83_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_84_tnd_band_deter_bns2_small_m)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_84_tnd_band_deter_bns2_small_m)
 {
     // Stay TND: different per-batch S1 so isAllSame is false (equal lengths are rewritten to pad
     // in ProcessSparseModeInfo and CalcleTNDDeterParam never runs). S2=128 keeps n=1 for
@@ -10003,7 +9991,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_84_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 262144, 1);
     int64_t expectTilingKey = 19747229372257456;
     std::string expectTilingData =
         "32 2 1 1 384 128 64 64 4575657222448611328 255 64 64 0 0 0 4 1 0 0 17179869186 8796093022211 844424930131968 "
@@ -10032,7 +10020,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_84_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_85_tnd_band_deter_bns2_large_m)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_85_tnd_band_deter_bns2_large_m)
 {
     // Same TND/BN2S2/SupportTNDBns2 gates as tiling_84 (unequal S1, S2=128). Larger S1 so p+q<=m.
     int64_t actual_seq_qlist[2] = {512, 1152};
@@ -10087,7 +10075,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_85_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144, 1);
+        &compileInfo, "Ascend950", A5SocInfo, 262144, 1);
     int64_t expectTilingKey = 19747229372257456;
     std::string expectTilingData =
         "32 2 1 1 640 128 64 64 4575657222448611328 255 64 64 0 0 0 4 1 0 0 17179869186 8796093022211 844424930131968 "
@@ -10115,7 +10103,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_85_
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
 }
 
-TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_86_tnd_bn2s2_short_seq_swizzle)
+TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_86_tnd_bn2s2_short_seq_swizzle)
 {
     int64_t actualSeqQlen[36] = {71,   159,  242,  323,  436,  608,  740,  824,  944,  1012, 1098, 1183,
                                  1259, 1419, 1486, 1569, 1725, 1941, 2042, 2166, 2242, 2369, 2456, 2594,
@@ -10173,7 +10161,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_dav3510_tiling_86_
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfo, 262144);
+        &compileInfo, "Ascend950", A5SocInfo, 262144);
 
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(tilingContextPara, tilingInfo));
@@ -10290,7 +10278,7 @@ static gert::TilingContextPara MakeGqaDeterPara(
                                     {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                     {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                     {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-                                   compileInfo, "3510", A5SocInfoHybrid, 262144, deter);
+                                   compileInfo, "Ascend950", A5SocInfoHybrid, 262144, deter);
 }
 
 // ---------------------------------------------------------------------------
@@ -10300,17 +10288,7 @@ static gert::TilingContextPara MakeGqaDeterPara(
 TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaBandDeter_Bsnd_G2)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeGqaDeterPara(&compileInfo, 4, 4096, 4096, 2, 1, 64, 4, 65536, 65536);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
@@ -10321,17 +10299,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaBandDeter_Bsnd_G2)
 TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaBandDeter_NegativeTokens)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeGqaDeterPara(&compileInfo, 4, 4096, 4096, 2, 1, 64, 4, -256, 1024);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
@@ -10341,17 +10309,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaBandDeter_NegativeTokens)
 TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaCausalDeter_Bsnd_G2)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeGqaDeterPara(&compileInfo, 5, 2048, 2048, 2, 1, 64, 2, 65536, 65536);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
@@ -10361,17 +10319,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaCausalDeter_Bsnd_G2)
 TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaCausalDeter_RightDown)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeGqaDeterPara(&compileInfo, 5, 2048, 2048, 2, 1, 64, 3, 65536, 65536);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
@@ -10379,7 +10327,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaCausalDeter_RightDown)
 
 // P0-5: 空输出 tiling——RunEmptyTilingRegbase + CalculateTschBlockDim。
 // dq 输出 shape 含 0 维（shapeSize==0），其余输入合法；3 维输入按 SBH 声明，
-// compileInfo 带 NpuArch::DAV_3510 走 regbase 空输出分支。
+// compileInfo 带 Ops::Base::DAV_3510 走 regbase 空输出分支。
 TEST_F(FlashAttentionScoreGradTiling, Coverage_EmptyOutput_DqDimZero)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
@@ -10392,8 +10340,8 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_EmptyOutput_DqDimZero)
         131072,
         134217728,
         32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        platform_ascendc::SocVersion::ASCEND950,
+        Ops::Base::DAV_3510};
     gert::TilingContextPara para("FlashAttentionScoreGrad",
                                  {
                                      // q: SBH [S, B, H*D]
@@ -10445,7 +10393,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_EmptyOutput_DqDimZero)
                                   {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                   {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                   {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-                                 &compileInfo, "3510", A5SocInfoHybrid, 4096);
+                                 &compileInfo, "Ascend950", A5SocInfoHybrid, 4096);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
 }
@@ -10456,17 +10404,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_EmptyOutput_DqDimZero)
 TEST_F(FlashAttentionScoreGradTiling, Coverage_Hifloat8Rejected)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     gert::TilingContextPara para("FlashAttentionScoreGrad",
                                  {
                                      // q/k/dy: HIFLOAT8 [B, S1, N, D]
@@ -10527,7 +10465,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_Hifloat8Rejected)
                                   {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                   {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                   {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-                                 &compileInfo, "3510", A5SocInfoHybrid, 4096);
+                                 &compileInfo, "Ascend950", A5SocInfoHybrid, 4096);
     TilingInfo tilingInfo;
     // HIFLOAT8 当前在 ProcessQuantInfo 被拒绝（common_regbase.cpp:2203），预期失败返回。
     EXPECT_FALSE(ExecuteTiling(para, tilingInfo));
@@ -10539,17 +10477,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_Hifloat8Rejected)
 TEST_F(FlashAttentionScoreGradTiling, Coverage_E4m3fn_Dtype)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     // 合法 dtype 对照：同构夹具 FP16 走完整 tiling，验证参数构造可通过全部前置检查。
     auto fp16Para = MakeGqaDeterPara(&compileInfo, 1, 2048, 2048, 1, 1, 128, 0, 65536, 65536, ge::DT_FLOAT16, 0);
     TilingInfo fp16TilingInfo;
@@ -10580,17 +10508,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_E4m3fn_Dtype)
 TEST_F(FlashAttentionScoreGradTiling, Coverage_SinkWrongShape)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     // 直接构造完整 para：sink shape 为 [2]（应为 [n1]=[1]）
     gert::TilingContextPara sinkPara(
         "FlashAttentionScoreGrad",
@@ -10646,7 +10564,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_SinkWrongShape)
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfoHybrid, 4096);
+        &compileInfo, "Ascend950", A5SocInfoHybrid, 4096);
     TilingInfo tilingInfo;
     EXPECT_FALSE(ExecuteTiling(sinkPara, tilingInfo));
 }
@@ -10655,17 +10573,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_SinkWrongShape)
 TEST_F(FlashAttentionScoreGradTiling, Coverage_SinkWrongDtype)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     gert::TilingContextPara sinkPara(
         "FlashAttentionScoreGrad",
         {
@@ -10719,7 +10627,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_SinkWrongDtype)
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfoHybrid, 4096);
+        &compileInfo, "Ascend950", A5SocInfoHybrid, 4096);
     TilingInfo tilingInfo;
     EXPECT_FALSE(ExecuteTiling(sinkPara, tilingInfo));
 }
@@ -10732,17 +10640,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_SinkWrongDtype)
 TEST_F(FlashAttentionScoreGradTiling, Coverage_HeadNumZero)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     // attrs 构造后不可修改，head_num=0 需直接构造完整 para。
     gert::TilingContextPara headNumZeroPara(
         "FlashAttentionScoreGrad",
@@ -10793,7 +10691,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_HeadNumZero)
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        &compileInfo, "3510", A5SocInfoHybrid, 4096);
+        &compileInfo, "Ascend950", A5SocInfoHybrid, 4096);
     TilingInfo tilingInfo;
     EXPECT_FALSE(ExecuteTiling(headNumZeroPara, tilingInfo));
 }
@@ -10860,7 +10758,7 @@ static gert::TilingContextPara MakeTndSparseModePara(
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        compileInfo, "3510", A5SocInfo, 4096);
+        compileInfo, "Ascend950", A5SocInfo, 4096);
 }
 
 TEST_F(FlashAttentionScoreGradTiling, Coverage_TndSparseMode9)
@@ -10887,17 +10785,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_TndSparseMode9)
 TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaBandDeterSwizzle_L2Exceed)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeGqaDeterPara(&compileInfo, 32, 4096, 4096, 2, 1, 64, 4, 65536, 65536);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
@@ -10908,17 +10796,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaBandDeterSwizzle_L2Exceed)
 TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaCausalDeterSwizzle_L2Exceed)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeGqaDeterPara(&compileInfo, 32, 4096, 4096, 2, 1, 64, 2, 65536, 65536);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
@@ -10929,17 +10807,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaCausalDeterSwizzle_L2Exceed)
 TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaBandDeterSwizzle_NegativeTokens_L2Exceed)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeGqaDeterPara(&compileInfo, 32, 4096, 4096, 2, 1, 64, 4, -256, 1024);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
@@ -11004,23 +10872,13 @@ static gert::TilingContextPara MakeTndDeterBn2S2SwizzlePara(
          {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
          {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-        compileInfo, "3510", A5SocInfoHybrid, 262144, 1);
+        compileInfo, "Ascend950", A5SocInfoHybrid, 262144, 1);
 }
 
 TEST_F(FlashAttentionScoreGradTiling, Coverage_TndDeterBn2S2Swizzle_L2Exceed)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeTndDeterBn2S2SwizzlePara(&compileInfo, 0);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
@@ -11031,17 +10889,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_TndDeterBn2S2Swizzle_L2Exceed)
 TEST_F(FlashAttentionScoreGradTiling, Coverage_GqaBandDeterSwizzle_RightDown_L2Exceed)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeGqaDeterPara(&compileInfo, 32, 4096, 4096, 2, 1, 64, 3, 65536, 65536);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
@@ -11110,24 +10958,14 @@ static gert::TilingContextPara MakeTndGqaVarlenPara(
                                     {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                     {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                     {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-                                   compileInfo, "3510", A5SocInfo, 262144, 1);
+                                   compileInfo, "Ascend950", A5SocInfo, 262144, 1);
 }
 
 // P1: TND GQA DENSE deter——TryApplyTndGqaBn2Exclusive + CalcleTNDDenseDeterParam。
 TEST_F(FlashAttentionScoreGradTiling, Coverage_TndGqaDenseDeter_Varlen)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeTndGqaVarlenPara(&compileInfo, 0);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
@@ -11137,17 +10975,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_TndGqaDenseDeter_Varlen)
 TEST_F(FlashAttentionScoreGradTiling, Coverage_TndGqaBandDeter_Varlen)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeTndGqaVarlenPara(&compileInfo, 4);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
@@ -11159,17 +10987,7 @@ TEST_F(FlashAttentionScoreGradTiling, Coverage_TndGqaBandDeter_Varlen)
 TEST_F(FlashAttentionScoreGradTiling, Coverage_TndGqaCausalDeter_Varlen)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeTndGqaVarlenPara(&compileInfo, 2);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
@@ -11273,7 +11091,7 @@ static gert::TilingContextPara MakeTndDeterVarlenParaEx(
                                     {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                     {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                     {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-                                   compileInfo, "3510", A5SocInfo, 262144, deter);
+                                   compileInfo, "Ascend950", A5SocInfo, 262144, deter);
 }
 
 // 950_tiling_87: MHA BAND deter grouped 深搜索——SelectGroupedDeterBandSchedule 家族
@@ -11284,17 +11102,7 @@ static gert::TilingContextPara MakeTndDeterVarlenParaEx(
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_87_band_grouped_deter_wide_pq)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeGqaDeterPara(&compileInfo, 32, 4096, 4096, 1, 1, 128, 4, 3840, 3840);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
@@ -11308,17 +11116,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_87_band
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_88_tnd_gqa_causal_mirror_n2_1)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     static int64_t seqQ[8] = {1024, 3072, 6144, 10240, 16384, 23040, 30720, 38912};
     static int64_t seqKv[8] = {1024, 3072, 6144, 10240, 16384, 23040, 30720, 38912};
     auto para = MakeTndDeterVarlenParaEx(&compileInfo, 4, 1, 64, 2, 65536, 65536, 8, seqQ, seqKv);
@@ -11333,17 +11131,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_88_tnd_
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_89_tnd_gqa_causal_column_exclusive)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     static int64_t seqQ[8] = {512, 1536, 3072, 5120, 7680, 10752, 14336, 18432};
     static int64_t seqKv[8] = {512, 1536, 3072, 5120, 7680, 10752, 14336, 18432};
     auto para = MakeTndDeterVarlenParaEx(&compileInfo, 8, 2, 128, 2, 65536, 65536, 8, seqQ, seqKv, ge::DT_BF16);
@@ -11359,17 +11147,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_89_tnd_
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_90_tnd_rd_causal_deter_line)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     static int64_t seqQ[2] = {4096, 6144};
     static int64_t seqKv[2] = {4096, 6144};
     auto para = MakeTndDeterVarlenParaEx(&compileInfo, 4, 4, 64, 3, 65536, 65536, 2, seqQ, seqKv);
@@ -11385,17 +11163,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_90_tnd_
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_91_gqa_causal_deter_oddb)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeGqaDeterPara(&compileInfo, 33, 12288, 12288, 2, 1, 128, 2, 65536, 0);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
@@ -11407,17 +11175,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_91_gqa_
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_92_gqa_causal_deter_ell_tail)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeGqaDeterPara(&compileInfo, 34, 8192, 4224, 2, 1, 128, 2, 65536, 65536);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
@@ -11431,17 +11189,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_92_gqa_
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_93_gqa_band_deter_diag_tokens0)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeGqaDeterPara(&compileInfo, 32, 4096, 4096, 2, 1, 128, 4, 0, 0);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
@@ -11513,7 +11261,7 @@ static gert::TilingContextPara MakeDispatchRoutePara(
                                     {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                     {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                     {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-                                   compileInfo, "3510", A5SocInfoHybrid, 4096);
+                                   compileInfo, "Ascend950", A5SocInfoHybrid, 4096);
 }
 
 // 950_tiling_94: else 分支（npuArch 缺省 0）空输出——RunEmptyTiling 全函数
@@ -11522,17 +11270,7 @@ static gert::TilingContextPara MakeDispatchRoutePara(
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_94_empty_output_dq_zero_else)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeDispatchRoutePara(&compileInfo, {{1, 0, 1, 64}, {1, 0, 1, 64}}, {{128, 1, 128}, {128, 1, 128}},
                                       {{128, 1, 128}, {128, 1, 128}}, {{}, {}}, {{}, {}});
     TilingInfo tilingInfo;
@@ -11544,17 +11282,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_94_empt
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_95_empty_output_rope_zero_else)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeDispatchRoutePara(&compileInfo, {{128, 1, 128}, {128, 1, 128}}, {{128, 1, 128}, {128, 1, 128}},
                                       {{128, 1, 128}, {128, 1, 128}}, {{1, 0, 1, 64}, {1, 0, 1, 64}},
                                       {{128, 1, 128}, {128, 1, 128}});
@@ -11569,17 +11297,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_95_empt
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_96_tnd_eod_all_zero)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     static int64_t seqQlist[3] = {0, 0, 0};
     static int64_t seqKvlist[3] = {0, 0, 0};
     gert::TilingContextPara para("FlashAttentionScoreGrad",
@@ -11630,7 +11348,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_96_tnd_
                                   {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                   {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                   {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-                                 &compileInfo, "3510", A5SocInfo, 4096);
+                                 &compileInfo, "Ascend950", A5SocInfo, 4096);
     TilingInfo tilingInfo;
     ASSERT_TRUE(ExecuteTiling(para, tilingInfo));
 }
@@ -11650,8 +11368,8 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_97_empt
         131072,
         134217728,
         32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        platform_ascendc::SocVersion::ASCEND950,
+        Ops::Base::DAV_3510};
     auto para =
         MakeDispatchRoutePara(&compileInfo, {{1, 0, 1, 64}, {1, 0, 1, 64}}, {{1, 1, 100}, {1, 1, 100}},
                               {{1, 1, 100}, {1, 1, 100}}, {{1, 1, 100}, {1, 1, 100}}, {{1, 1, 100}, {1, 1, 100}});
@@ -11663,17 +11381,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_97_empt
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_98_fail_invalid_layout)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     auto para = MakeDispatchRoutePara(&compileInfo, {{128, 1, 128}, {128, 1, 128}}, {{128, 1, 128}, {128, 1, 128}},
                                       {{128, 1, 128}, {128, 1, 128}}, {{}, {}}, {{}, {}}, "XY");
     TilingInfo tilingInfo;
@@ -11687,17 +11395,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_98_fail
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_99_fail_sbh_batch_mismatch)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     gert::TilingContextPara para("FlashAttentionScoreGrad",
                                  {
                                      {{{128, 1, 128}, {128, 1, 128}}, ge::DT_FLOAT16, ge::FORMAT_ND},
@@ -11746,7 +11444,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_99_fail
                                   {"offset", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                   {"out_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
                                   {"softmax_in_layout", Ops::Transformer::AnyValue::CreateFrom<std::string>("")}},
-                                 &compileInfo, "3510", A5SocInfoHybrid, 4096);
+                                 &compileInfo, "Ascend950", A5SocInfoHybrid, 4096);
     TilingInfo tilingInfo;
     EXPECT_FALSE(ExecuteTiling(para, tilingInfo));
 }
@@ -11757,17 +11455,7 @@ TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_99_fail
 TEST_F(FlashAttentionScoreGradTiling, FlashAttentionScoreGrad_950_tiling_101_warn_tnd_d_gt768)
 {
     Ops::Transformer::OpTiling::FlashAttentionScoreGradCompileInfo compileInfo = {
-        64,
-        32,
-        196608,
-        524288,
-        65536,
-        65536,
-        131072,
-        134217728,
-        32,
-        platform_ascendc::SocVersion::RESERVED_VERSION,
-        NpuArch::DAV_3510};
+        64, 32, 196608, 524288, 65536, 65536, 131072, 134217728, 32, platform_ascendc::SocVersion::ASCEND950};
     static int64_t seqQ[1] = {1};
     static int64_t seqKv[1] = {1};
     auto para = MakeTndDeterVarlenParaEx(&compileInfo, 1, 1, 769, 0, 65536, 65536, 1, seqQ, seqKv);

@@ -207,6 +207,7 @@ struct SparseLightningIndexerKLLossGradCompileInfo {
     uint64_t l1Size;
     uint64_t l0cSize;
     uint64_t l2CacheSize;
+    platform_ascendc::SocVersion socVersion;
 };
 
 class SparseLightningIndexerKLLossGradTilingBase : public TilingBaseClass {
@@ -314,6 +315,7 @@ protected:
     int64_t accumS1;
     int64_t accumS2;
 
+    platform_ascendc::SocVersion socVersion;
     bool deterministic;
     bool privateScatter = false;
     bool hasRope = false;

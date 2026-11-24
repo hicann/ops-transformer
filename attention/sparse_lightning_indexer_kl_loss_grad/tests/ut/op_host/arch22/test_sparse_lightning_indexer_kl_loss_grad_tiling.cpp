@@ -52,6 +52,7 @@ gert::TilingContextPara MakeTilingContext(const std::string& layout = "BSND", ge
         info.l1Size = 524288;
         info.l0cSize = 262144;
         info.l2CacheSize = 134217728;
+        info.socVersion = platform_ascendc::SocVersion::ASCEND910B;
         return info;
     }();
     gert::TilingContextPara context(

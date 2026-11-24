@@ -12,7 +12,6 @@
  * \file dense_lightning_indexer_softmax_lse_v2_def.cpp
  * \brief
  */
-#include "op_common/op_host/util/op_arch_helper.h"
 #include "register/op_def_registry.h"
 
 namespace ops {
@@ -82,8 +81,7 @@ public:
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("opFile.value", "dense_lightning_indexer_softmax_lse_v2")
             .ExtendCfgInfo("aclnnSupport.value", "support_aclnn");
-        // DAV_3510 按映射表注册 ascend950 + ascend350（opbase g_archToSocNames）。
-        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_3510, aicore_config);
+        this->AICore().AddConfig("ascend950", aicore_config);
         this->AICore().AddConfig("ascend960dt", aicore_config);
     }
 };

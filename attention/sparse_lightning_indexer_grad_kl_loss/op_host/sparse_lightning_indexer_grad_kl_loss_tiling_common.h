@@ -95,6 +95,7 @@ struct SparseLightningIndexerGradKLLossCompileInfo {
     uint64_t l1Size;
     uint64_t l0cSize;
     uint64_t l2CacheSize;
+    platform_ascendc::SocVersion socVersion;
     NpuArch npuArch;
 };
 

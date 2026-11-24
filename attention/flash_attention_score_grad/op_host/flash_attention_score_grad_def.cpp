@@ -13,7 +13,6 @@
  * \brief
  */
 
-#include "op_common/op_host/util/op_arch_helper.h"
 #include "register/op_def_registry.h"
 
 namespace ops {
@@ -584,8 +583,8 @@ public:
         this->Attr("offset").AttrType(OPTIONAL).Int(0);
         this->Attr("out_dtype").AttrType(OPTIONAL).Int(0);
         this->Attr("softmax_in_layout").AttrType(OPTIONAL).String("");
-        OpAICoreConfig aicore_config_3510;
-        aicore_config_3510.DynamicCompileStaticFlag(true)
+        OpAICoreConfig aicore_config_95;
+        aicore_config_95.DynamicCompileStaticFlag(true)
             .DynamicFormatFlag(true)
             .DynamicRankSupportFlag(true)
             .DynamicShapeSupportFlag(true)
@@ -595,9 +594,8 @@ public:
             .ExtendCfgInfo("coreType.value", "AiCore")
             .ExtendCfgInfo("opFile.value", "flash_attention_score_grad_apt")
             .ExtendCfgInfo("jitCompile.flag", "static_false,dynamic_false");
-        // ascend950/ascend350 统一按 NpuArch::DAV_3510 注册：opbase 的 g_archToSocNames 映射
-        // DAV_3510 -> {"ascend950", "ascend350"}，与逐个 AddConfig 语义等价（对齐 ops-nn matmul 族用法）。
-        opbase::ArchConfigHelper::AddConfigByArch(this->AICore(), Ops::Base::DAV_3510, aicore_config_3510);
+        this->AICore().AddConfig("ascend950", aicore_config_95);
+        this->AICore().AddConfig("ascend350", aicore_config_95);
         OpAICoreConfig aicore_config_96;
         aicore_config_96.DynamicCompileStaticFlag(true)
             .DynamicFormatFlag(true)
