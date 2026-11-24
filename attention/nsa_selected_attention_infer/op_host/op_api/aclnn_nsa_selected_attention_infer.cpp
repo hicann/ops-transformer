@@ -13,12 +13,15 @@
  * \brief
  */
 
+#include <memory>
+
 #include "nsa_selected_attention_infer.h"
 #include "aclnn_kernels/contiguous.h"
 #include "aclnn_kernels/pad.h"
 #include "aclnn_kernels/reshape.h"
 #include "aclnn_kernels/slice.h"
 #include "aclnn_kernels/transpose.h"
+#include "base/err_msg.h"
 #include "opdev/common_types.h"
 #include "opdev/fast_vector.h"
 #include "opdev/op_errno.h"
@@ -40,6 +43,14 @@ static const uint64_t DIM_NUM_0 = 0;
 static const int64_t HEAD_DIM_MAX = 192;
 static const int64_t HEAD_DIM_V_MAX = 128;
 static const int64_t GROUP_LIMITS = 16;
+
+void ReportInvalidParameter(const std::string& reason)
+{
+    const std::string message = "aclnnNsaSelectedAttentionInfer: " + reason;
+    OP_LOGE_WITHOUT_REPORT(ACLNN_ERR_PARAM_INVALID, "%s", message.c_str());
+    REPORT_PREDEFINED_ERR_MSG("EZ1001", (std::vector<const char*>{"message"}),
+                              (std::vector<const char*>{message.c_str()}));
+}
 
 struct AxesInfo {
     int64_t b;
@@ -123,17 +134,18 @@ aclnnStatus AnalysisAxisShape(const aclTensor* query, const aclTensor* key, cons
     } else if (shapeInfo.dimNum == DIM_NUM_3 && inputLayoutStr == "TND") {
         AnalysisAxisForTND(qShape, kShape, vShape, shapeInfo);
     } else {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "not support input_layout %s with dim_num %lu", inputLayout, shapeInfo.dimNum);
+        ReportInvalidParameter("query rank " + std::to_string(shapeInfo.dimNum) + " is invalid for layout " +
+                               inputLayoutStr + "; BSH/TND require rank 3 and BSND requires rank 4");
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (shapeInfo.axes.d != shapeInfo.axes.dk) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "qD and kD should be same, but got qD=%ld kD=%ld", shapeInfo.axes.d,
-                shapeInfo.axes.dk);
+        ReportInvalidParameter("query and key head dimensions must match; got query=" +
+                               std::to_string(shapeInfo.axes.d) + ", key=" + std::to_string(shapeInfo.axes.dk));
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (shapeInfo.axes.d < shapeInfo.axes.dv) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "only support kD >= vD, but got kD=%ld vD=%ld", shapeInfo.axes.d,
-                shapeInfo.axes.dv);
+        ReportInvalidParameter("key head dimension must be at least the value head dimension; got key=" +
+                               std::to_string(shapeInfo.axes.dk) + ", value=" + std::to_string(shapeInfo.axes.dv));
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
@@ -147,17 +159,19 @@ aclnnStatus DtypeCheck(const aclTensor* query, const aclTensor* key, const aclTe
     auto qDtype = query->GetDataType();
     auto topkDtype = topkIndices->GetDataType();
     if (qDtype != kDtype || kDtype != vDtype) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The data type of query[%s], key[%s], value[%s] are not equal.",
-                op::ToString(DataType(qDtype)).GetString(), op::ToString(DataType(kDtype)).GetString(),
-                op::ToString(DataType(vDtype)).GetString());
+        ReportInvalidParameter(std::string("query, key and value must use the same dtype; got query=") +
+                               op::ToString(qDtype).GetString() + ", key=" + op::ToString(kDtype).GetString() +
+                               ", value=" + op::ToString(vDtype).GetString());
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (qDtype != ge::DT_FLOAT16 && qDtype != ge::DT_BF16) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The data type does not meet requirements.");
+        ReportInvalidParameter(std::string("query, key and value must use FLOAT16 or BFLOAT16; got ") +
+                               op::ToString(qDtype).GetString());
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (topkDtype != ge::DT_INT32) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "topk dtype does not match with required dtype int32.");
+        ReportInvalidParameter(std::string("topkIndices dtype must be INT32; got ") +
+                               op::ToString(topkDtype).GetString());
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
@@ -170,8 +184,8 @@ aclnnStatus TopkIndicesShapeCheck(const aclTensor* topkIndices, const char* inpu
     uint64_t dimNumExpected = (inputLayoutStr == "TND") ? DIM_NUM_3 : DIM_NUM_4;
     uint64_t dimNum = topkIndices->GetViewShape().GetDimNum();
     if (dimNum != dimNumExpected) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "topkIndices should be %lu dims when input_layout is %s, but got %lu dims",
-                dimNumExpected, inputLayout, dimNum);
+        ReportInvalidParameter("topkIndices rank must be " + std::to_string(dimNumExpected) + " for layout " +
+                               inputLayoutStr + "; got " + std::to_string(dimNum));
         return ACLNN_ERR_PARAM_INVALID;
     }
     return ACLNN_SUCCESS;
@@ -187,32 +201,35 @@ aclnnStatus AnalysisInputNsa(const aclTensor* query, const aclTensor* key, const
     CHECK_RET(AnalysisAxisShape(query, key, value, inputLayout, shapeInfo) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     if (shapeInfo.axes.d != HEAD_DIM_MAX) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "QK Head dim must == 192, but got %ld", shapeInfo.axes.d);
+        ReportInvalidParameter("query and key head dimensions must be 192; got " + std::to_string(shapeInfo.axes.d));
         return ACLNN_ERR_PARAM_INVALID;
     }
     if (shapeInfo.axes.dv != HEAD_DIM_V_MAX) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "V Head dim must == 128, but got %ld", shapeInfo.axes.dv);
+        ReportInvalidParameter("value head dimension must be 128; got " + std::to_string(shapeInfo.axes.dv));
         return ACLNN_ERR_PARAM_INVALID;
     }
 
     if ((actualQSeqLenOptional != nullptr && actualSeqKvLenOptional != nullptr) &&
         (actualQSeqLenOptional->Size() > 3 * 1024 || actualSeqKvLenOptional->Size() > 3 * 1024)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "actualSeqQLen size and actualSeqKvLen size must <= 3072, but got %lu ",
-                actualQSeqLenOptional->Size());
-        return ACLNN_ERR_PARAM_INVALID;
-    }
-
-    if (shapeInfo.axes.n2 == 0 || shapeInfo.axes.d == 0) {
+        ReportInvalidParameter("actualQSeqLenOptional and actualKvSeqLenOptional sizes must not exceed 3072; got Q=" +
+                               std::to_string(actualQSeqLenOptional->Size()) +
+                               ", KV=" + std::to_string(actualSeqKvLenOptional->Size()));
         return ACLNN_ERR_PARAM_INVALID;
     }
 
     std::string inputLayoutStr = op::ToString(inputLayout).GetString();
     if (inputLayoutStr == "TND") {
         if (shapeInfo.axes.numtokens == 0 || shapeInfo.axes.s2 == 0) {
+            ReportInvalidParameter("TND query token count and value cache sequence size must be nonzero; got " +
+                                   std::to_string(shapeInfo.axes.numtokens) + ", " + std::to_string(shapeInfo.axes.s2));
             return ACLNN_ERR_PARAM_INVALID;
         }
     } else {
         if (shapeInfo.axes.b == 0 || shapeInfo.axes.s1 == 0 || shapeInfo.axes.s2 == 0) {
+            ReportInvalidParameter("query batch size, query sequence size and value cache sequence size must be "
+                                   "nonzero; got " +
+                                   std::to_string(shapeInfo.axes.b) + ", " + std::to_string(shapeInfo.axes.s1) + ", " +
+                                   std::to_string(shapeInfo.axes.s2));
             return ACLNN_ERR_PARAM_INVALID;
         }
     }
@@ -246,22 +263,31 @@ aclnnStatus CheckNsaSelectParam(const aclTensor* query, const aclTensor* key, co
                                 const char* layoutOptional, const aclTensor* attentionOut,
                                 const uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    // 必须的参数指针判空
-    CHECK_RET(query != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(key != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(value != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(topkIndices != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(blockTableOptional != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(actualQSeqLenOptional != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(actualKvSeqLenOptional != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(layoutOptional != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(executor != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(workspaceSize != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    CHECK_RET(attentionOut != nullptr, ACLNN_ERR_PARAM_NULLPTR);
+    const std::pair<const void*, const char*> requiredParameters[] = {
+        {query, "query"},
+        {key, "key"},
+        {value, "value"},
+        {topkIndices, "topkIndices"},
+        {blockTableOptional, "blockTableOptional"},
+        {actualQSeqLenOptional, "actualQSeqLenOptional"},
+        {actualKvSeqLenOptional, "actualKvSeqLenOptional"},
+        {layoutOptional, "layoutOptional"},
+        {executor, "executor"},
+        {workspaceSize, "workspaceSize"},
+        {attentionOut, "attentionOut"},
+    };
+    for (const auto& parameter : requiredParameters) {
+        if (parameter.first == nullptr) {
+            ReportInvalidParameter(std::string(parameter.second) + " must not be null");
+            return ACLNN_ERR_PARAM_NULLPTR;
+        }
+    }
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus FakeArray_sai(const aclIntArray* inArray, aclIntArray*& outArray)
+using OwnedIntArray = std::unique_ptr<aclIntArray, decltype(&aclDestroyIntArray)>;
+
+aclnnStatus MakeWorkspaceLengthArray(const aclIntArray* inArray, OwnedIntArray& outArray)
 {
     OP_LOGD("start fake array");
     if (inArray != nullptr) {
@@ -269,9 +295,9 @@ aclnnStatus FakeArray_sai(const aclIntArray* inArray, aclIntArray*& outArray)
         uint64_t size = inArray->Size();
         std::vector<int64_t> fake_array(size, -1);
         // tiling侧认为有tensor但没有data就是计算最大workspace
-        outArray = aclCreateIntArray(fake_array.data(), size);
+        outArray.reset(aclCreateIntArray(fake_array.data(), size));
         if (outArray == nullptr) {
-            OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "Try alloc array failed");
+            OP_LOGE_WITHOUT_REPORT(ACLNN_ERR_INNER_NULLPTR, "aclCreateIntArray returned null for %lu elements", size);
             return ACLNN_ERR_INNER_NULLPTR;
         }
     }
@@ -286,22 +312,25 @@ aclnnStatus aclnnNsaSelectedAttentionInferGetMaxWorkspaceSize(
     int64_t selectBlockSize, int64_t selectBlockCount, int64_t pageBlockSize, double scaleValue, int64_t sparseMode,
     aclTensor* output, uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    aclIntArray* fakeActualKvSeqLenOptional{nullptr};
-    aclIntArray* fakeActualQSeqLenOptional{nullptr};
+    OwnedIntArray fakeActualKvSeqLenOptional(nullptr, aclDestroyIntArray);
+    OwnedIntArray fakeActualQSeqLenOptional(nullptr, aclDestroyIntArray);
     // nullptr不处理， nullptr是空指针，这样不会影响原来就不传入actual seq length为空的逻辑
-    aclnnStatus ret = FakeArray_sai(actualKvSeqLenOptional, fakeActualKvSeqLenOptional);
-    CHECK_RET_CODE(ret, "Try alloc fake actualKvSeqLenOptional failed");
+    aclnnStatus ret = MakeWorkspaceLengthArray(actualKvSeqLenOptional, fakeActualKvSeqLenOptional);
+    if (ret != ACLNN_SUCCESS) {
+        OP_LOGE_WITHOUT_REPORT(ret, "MakeWorkspaceLengthArray failed for actualKvSeqLenOptional with status %d", ret);
+        return ret;
+    }
 
-    ret = FakeArray_sai(actualQSeqLenOptional, fakeActualQSeqLenOptional);
-    CHECK_RET_CODE(ret, "Try alloc fake actualQSeqLenOptional failed");
+    ret = MakeWorkspaceLengthArray(actualQSeqLenOptional, fakeActualQSeqLenOptional);
+    if (ret != ACLNN_SUCCESS) {
+        OP_LOGE_WITHOUT_REPORT(ret, "MakeWorkspaceLengthArray failed for actualQSeqLenOptional with status %d", ret);
+        return ret;
+    }
 
-    ret = aclnnNsaSelectedAttentionInferGetWorkspaceSize(
-        query, key, value, topkIndices, attenMaskOptional, blockTableOptional, fakeActualQSeqLenOptional,
-        fakeActualKvSeqLenOptional, layoutOptional, numHeads, numKeyValueHeads, selectBlockSize, selectBlockCount,
+    return aclnnNsaSelectedAttentionInferGetWorkspaceSize(
+        query, key, value, topkIndices, attenMaskOptional, blockTableOptional, fakeActualQSeqLenOptional.get(),
+        fakeActualKvSeqLenOptional.get(), layoutOptional, numHeads, numKeyValueHeads, selectBlockSize, selectBlockCount,
         pageBlockSize, scaleValue, sparseMode, output, workspaceSize, executor);
-    aclDestroyIntArray(fakeActualKvSeqLenOptional);
-    aclDestroyIntArray(fakeActualQSeqLenOptional);
-    return ret;
 }
 
 aclnnStatus aclnnNsaSelectedAttentionInferGetWorkspaceSize(
@@ -322,7 +351,6 @@ aclnnStatus aclnnNsaSelectedAttentionInferGetWorkspaceSize(
                    DFX_OUT(output));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
-    CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
     // b, n1, s1 为0时，不进行任何处理
     // n2, s2, d 为0时，直接调用l0接口处理
     if (output->IsEmpty()) {
@@ -332,8 +360,7 @@ aclnnStatus aclnnNsaSelectedAttentionInferGetWorkspaceSize(
     }
     std::string layoutStr = op::ToString(layoutOptional).GetString();
     if ((layoutStr != "BSND") && (layoutStr != "BSH") && (layoutStr != "TND")) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Layout %s is not BSND or BSH or TND, invalid shape, please check",
-                layoutOptional);
+        ReportInvalidParameter("layoutOptional must be BSND, BSH or TND; got " + layoutStr);
         *workspaceSize = 0;
         uniqueExecutor.ReleaseTo(executor);
         return ACLNN_ERR_PARAM_INVALID;
@@ -341,8 +368,17 @@ aclnnStatus aclnnNsaSelectedAttentionInferGetWorkspaceSize(
     NSAShapeInfo shapeInfo;
     shapeInfo.axes.n1 = numHeads;
     shapeInfo.axes.n2 = numKeyValueHeads;
-    CHECK_RET(!(numHeads == 0 || numKeyValueHeads == 0 || numHeads % numKeyValueHeads != 0), ACLNN_ERR_PARAM_INVALID);
-    CHECK_RET(shapeInfo.axes.n1 / shapeInfo.axes.n2 <= GROUP_LIMITS, ACLNN_ERR_PARAM_INVALID);
+    if (numHeads == 0 || numKeyValueHeads == 0 || numHeads % numKeyValueHeads != 0) {
+        ReportInvalidParameter("numHeads and numKeyValueHeads must be nonzero and numHeads must be divisible by "
+                               "numKeyValueHeads; got " +
+                               std::to_string(numHeads) + ", " + std::to_string(numKeyValueHeads));
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    if (numHeads / numKeyValueHeads > GROUP_LIMITS) {
+        ReportInvalidParameter("numHeads / numKeyValueHeads must not exceed " + std::to_string(GROUP_LIMITS) +
+                               "; got " + std::to_string(numHeads / numKeyValueHeads));
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     CHECK_RET(AnalysisInputNsa(query, key, value, topkIndices, layoutOptional, shapeInfo, actualQSeqLenOptional,
                                actualKvSeqLenOptional) == ACLNN_SUCCESS,
               ACLNN_ERR_PARAM_INVALID);
@@ -357,7 +393,7 @@ aclnnStatus aclnnNsaSelectedAttentionInferGetWorkspaceSize(
         actualKvSeqLenOptional, layoutOptional, numHeads, numKeyValueHeads, selectBlockSize, selectBlockCount,
         pageBlockSize, scaleValue, sparseMode, l0Executor);
     if (l0attentionOut == nullptr) {
-        OP_LOGE(ACLNN_ERR_INNER_NULLPTR, "l0attentionOut is null");
+        OP_LOGE_WITHOUT_REPORT(ACLNN_ERR_INNER_NULLPTR, "NsaSelectedAttentionInfer returned a null attention output");
         *workspaceSize = 0;
         uniqueExecutor.ReleaseTo(executor);
         return ACLNN_ERR_INNER_NULLPTR;

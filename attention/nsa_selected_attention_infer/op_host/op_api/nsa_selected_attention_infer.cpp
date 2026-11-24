@@ -68,7 +68,7 @@ const aclTensor* NsaSelectedAttentionInfer(const aclTensor* query, const aclTens
         OP_ATTR(layoutOptional, numHeads, numKeyValueHeads, selectBlockSize, selectBlockCount, pageBlockSize,
                 static_cast<float>(scaleValue), sparseMode));
     if (ret != ACLNN_SUCCESS) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "NsaSelectedAttentionInfer InferShape failed.");
+        OP_LOGE_WITHOUT_REPORT(ret, "NsaSelectedAttentionInfer INFER_SHAPE failed with status %d", ret);
         return nullptr;
     }
 

@@ -233,7 +233,6 @@ private:
     ge::graphStatus ZeroTensorProcess();
 
     ge::graphStatus CheckUbSpace();
-    ge::graphStatus CheckPABlockSize() const;
 
     ge::graphStatus CheckInputFormatAndLimits() const;
     ge::graphStatus CheckInputParameterFormat();
