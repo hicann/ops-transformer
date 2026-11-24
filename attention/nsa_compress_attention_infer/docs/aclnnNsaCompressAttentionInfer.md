@@ -206,7 +206,7 @@ aclnnStatus aclnnNsaCompressAttentionInfer(
       <td>actualSelKvSeqLenOptional</td>
       <td>可选输入</td>
       <td>压缩前的key和value的S轴实际长度。</td>
-      <td>-</td>
+      <td>多token推理场景下必须传入，数组长度须等于blockTableOptional的batch维度。</td>
       <td>INT64</td>
       <td>ND</td>
       <td>-</td>
@@ -445,6 +445,8 @@ aclnnStatus aclnnNsaCompressAttentionInfer(
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
+  调用方须分别检查两段接口的返回值；异步执行后，还须检查流同步接口的返回值。
+
 ## 约束说明
 
 - 确定性计算：
@@ -452,8 +454,8 @@ aclnnStatus aclnnNsaCompressAttentionInfer(
 
 * 参数query仅支持TND、BSND输入。T是B和S合轴紧密排列的数据（每个batch的actualQSeqLenOptional）、B（batch）表示输入样本批量大小、S（qSeqlen）表示输入样本序列长度、N（numHeads）表示多头数、D（headDimsQK）表示隐藏层最小的单元尺寸。
 
-* 压缩前的kvSeqlen的上限可以表示为：actualSelKvSeqLenCeil=(actualCmpKvSeqLenOptional-1)*compressBlockStride+compressBlockSize，需要满足actualSelKvSeqLenCeil/selectBlockSize<=4096，且需要满足selectBlockCount<=actualSelKvSeqLenCeil/selectBlockSize。如果actualSelKvSeqLenOptional不满足actualCmpKvSeqLenOptional=(actualSelKvSeqLenOptional-compressBlockSize)/compressBlockStride+1，或者actualCmpKvSeqLenOptional的长度和blockTableOptional的batch维度不同，则会默认进入单token推理场景。
-* 多token推理场景下，actualQSeqLenOptional参数必须传入，actualQSeqLenOptional的长度必须和blockTableOptional的batch维度相等，仅支持query的S轴最大等于4，并且此时要求每个batch单独的actualQSeqLenOptional<=actualSelKvSeqLenOptional。如果actualQSeqLenOptional的长度和blockTableOptional的batch维度不同，或者actualQSeqLenOptional的值小于1或者大于4，则会默认进入单token推理场景。
+* 根据压缩后的KV实际长度，推导的压缩前长度表示为：actualSelKvSeqLenCeil=(actualCmpKvSeqLenOptional-1)*compressBlockStride+compressBlockSize，需要满足ceil(actualSelKvSeqLenCeil/selectBlockSize)<=4096，且需要满足selectBlockCount<=ceil(actualSelKvSeqLenCeil/selectBlockSize)，其中ceil表示向上取整，上述约束须对每个batch分别满足。如果actualSelKvSeqLenOptional不满足actualCmpKvSeqLenOptional=(actualSelKvSeqLenOptional-compressBlockSize)/compressBlockStride+1，或者actualSelKvSeqLenOptional的长度和blockTableOptional的batch维度不同，则会默认进入单token推理场景。
+* 多token推理场景下，actualQSeqLenOptional和actualSelKvSeqLenOptional参数必须传入，两者的长度均须和blockTableOptional的batch维度相等，仅支持query的S轴最大等于4，并且此时要求每个batch单独的actualQSeqLenOptional<=actualSelKvSeqLenOptional。如果actualQSeqLenOptional的长度和blockTableOptional的batch维度不同，或者actualQSeqLenOptional的值小于1或者大于4，则会默认进入单token推理场景。
 
 ## 调用示例
 

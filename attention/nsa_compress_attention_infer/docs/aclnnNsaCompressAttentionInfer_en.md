@@ -205,7 +205,7 @@ aclnnStatus aclnnNsaCompressAttentionInfer(
       <td>actualSelKvSeqLenOptional</td>
       <td>Optional input</td>
       <td>Actual length of the S axis of key and value before compression.</td>
-      <td>-</td>
+      <td>Required for multi-token inference. The array length must equal the batch dimension of blockTableOptional.</td>
       <td>INT64</td>
       <td>ND</td>
       <td>-</td>
@@ -444,6 +444,8 @@ aclnnStatus aclnnNsaCompressAttentionInfer(
 
   aclnnStatus: return status code. For details, see [aclnn Return Codes](../../../docs/en/context/aclnn_return_code.md).
 
+  Check the return values of both API phases separately. For asynchronous execution, also check the return value of the stream synchronization API.
+
 ## Constraints
 
 - Deterministic computation:
@@ -451,8 +453,8 @@ aclnnStatus aclnnNsaCompressAttentionInfer(
 
 - The query parameter only supports TND and BSND inputs. T is the tightly packed data of the B and S axes (actualQSeqLenOptional for each batch), B (batch) indicates the input sample batch size, S (qSeqlen) indicates the input sample sequence length, N (numHeads) indicates the number of multi-heads, and D (headDimsQK) indicates the minimum unit size of the hidden layer.
 
-- The upper limit of kvSeqlen before compression can be expressed as: actualSelKvSeqLenCeil = (actualCmpKvSeqLenOptional - 1) * compressBlockStride + compressBlockSize. The condition actualSelKvSeqLenCeil / selectBlockSize <= 4096 must be satisfied, and selectBlockCount <= actualSelKvSeqLenCeil / selectBlockSize must also be satisfied. If actualSelKvSeqLenOptional does not satisfy actualCmpKvSeqLenOptional = (actualSelKvSeqLenOptional - compressBlockSize) / compressBlockStride + 1, or the length of actualCmpKvSeqLenOptional differs from the batch dimension of blockTableOptional, the single-token inference scenario is entered by default.
-- In multi-token inference scenarios, the actualQSeqLenOptional parameter must be passed in. The length of actualQSeqLenOptional must be equal to the batch dimension of blockTableOptional. It only supports a maximum S-axis of query equal to 4, and in this case, each individual batch's actualQSeqLenOptional must be less than or equal to actualSelKvSeqLenOptional. If the length of actualQSeqLenOptional differs from the batch dimension of blockTableOptional, or the value of actualQSeqLenOptional is less than 1 or greater than 4, the single-token inference scenario is entered by default.
+- The length before compression derived from the actual compressed KV length can be expressed as: actualSelKvSeqLenCeil = (actualCmpKvSeqLenOptional - 1) * compressBlockStride + compressBlockSize. The conditions ceil(actualSelKvSeqLenCeil / selectBlockSize) <= 4096 and selectBlockCount <= ceil(actualSelKvSeqLenCeil / selectBlockSize) must hold for every batch, where ceil rounds up. If actualSelKvSeqLenOptional does not satisfy actualCmpKvSeqLenOptional = (actualSelKvSeqLenOptional - compressBlockSize) / compressBlockStride + 1, or the length of actualSelKvSeqLenOptional differs from the batch dimension of blockTableOptional, the single-token inference scenario is entered by default.
+- In multi-token inference scenarios, both actualQSeqLenOptional and actualSelKvSeqLenOptional must be passed in. The length of each array must equal the batch dimension of blockTableOptional. It only supports a maximum S-axis of query equal to 4, and in this case, each individual batch's actualQSeqLenOptional must be less than or equal to actualSelKvSeqLenOptional. If the length of actualQSeqLenOptional differs from the batch dimension of blockTableOptional, or the value of actualQSeqLenOptional is less than 1 or greater than 4, the single-token inference scenario is entered by default.
 
 ## Example
 
