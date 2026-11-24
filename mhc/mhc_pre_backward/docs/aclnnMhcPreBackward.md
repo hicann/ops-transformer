@@ -469,9 +469,11 @@ aclnnStatus aclnnMhcPreBackward(
     <col style="width: 671px">
     </colgroup>
         <thead>
-            <th>返回值</th>
-            <th>错误码</th>
-            <th>描述</th>
+          <tr>
+              <th>返回值</th>
+              <th>错误码</th>
+              <th>描述</th>
+          </tr>
         </thead>
         <tbody>
             <tr>
