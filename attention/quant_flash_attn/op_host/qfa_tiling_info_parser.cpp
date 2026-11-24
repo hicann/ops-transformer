@@ -614,8 +614,11 @@ void QfaInfoParser::GenerateVTailInfo(QfaTilingInfo& qfaInfo)
     qfaInfo.hasVTail = !isEmptyOptional(opParamInfo_.vTail) && !isEmptyOptional(opParamInfo_.sequsedVTail);
     qfaInfo.tailMaxBlockNum = 0;
     qfaInfo.vTailStrides = nullptr;
-    if (qfaInfo.hasVTail && context_->InputIsView(V_TAIL_INDEX)) {
-        qfaInfo.vTailStrides = context_->GetInputStride(V_TAIL_INDEX);
+    // v_tail 是 OPTIONAL_INPUT，必须按 IR index 用 Optional 系接口取 view/stride；
+    // InputIsView/GetInputStride 走已实例化输入的平铺索引，UT 中未传的 optional
+    // 不占位时会错位，导致截断 stride 校验无法在 UT 中覆盖。
+    if (qfaInfo.hasVTail && context_->OptionalInputIsView(V_TAIL_INDEX)) {
+        qfaInfo.vTailStrides = context_->GetOptionalInputStride(V_TAIL_INDEX);
     }
     if (qfaInfo.hasVTail && !isEmptyOptional(opParamInfo_.blockTableTail) &&
         (opParamInfo_.blockTableTail.tensor->GetStorageShape().GetDimNum() >= arch35QFA::DIM_NUM_2)) {

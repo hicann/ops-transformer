@@ -98,15 +98,16 @@ ge::graphStatus QfaBaseChecker::CheckTensorContiguous(const uint32_t& tensorDimN
     if (strides->GetDimNum() == 1 && strides->GetStride(0) == 1) {
         return ge::GRAPH_SUCCESS;
     }
-    // 静态编译路径对连续张量的紧凑写法为单元素 {1}，已在上方按连续放行；
-    // 其余形态(含 GE 只填 dim_num 但数组值真实的截断写法)沿用逐维比较，
-    // 保证最内轴非连续等非法输入仍被拦截。
+    // 静态编译路径还可能对“仅前若干轴可能非连续”的张量截断下发 stride（如 4D
+    // v_tail 只下发 {bn, n2} 两维），未下发的尾部轴按连续处理；已下发的轴仍逐维
+    // 比较，保证最内轴非连续等非法输入仍被拦截。
     uint64_t preStride = 1; // 连续场景最后一维的 stride 默认为 1
     for (index = static_cast<int32_t>(tensorDimNum) - 1; index >= 0; index--) {
         if (inputShape.GetDim(index) == 1) { // dim=1 时步长不影响连续性
             continue;
         }
-        if (preStride != static_cast<uint64_t>(strides->GetStride(index))) {
+        if (static_cast<uint32_t>(index) < strides->GetDimNum() &&
+            preStride != static_cast<uint64_t>(strides->GetStride(index))) {
             return ge::GRAPH_FAILED;
         }
         preStride *= inputShape.GetDim(index);

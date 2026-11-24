@@ -127,6 +127,37 @@ TEST(QuantFlashAttnArch35VTailTiling, VtailTripletEnabledAndDisabledSerializeTai
     }
 }
 
+TEST(QuantFlashAttnArch35VTailTiling, TruncatedStaticStrideForContiguousVTailIsAccepted)
+{
+    // 静态图路径下 GE 对“仅前两轴可能非连续”的 4D v_tail 只下发 {bn, n2} 两维
+    // stride，尾部 Bs/D 隐含连续；连续性校验不能把未下发的尾部轴当成 stride=0
+    // 而误判为非连续。
+    Arch35VTailCase params(false);
+    params.inputs[15].stride_ = gert::Stride({32768, 16384});
+    params.inputs[15].hasStride_ = true;
+    ::TilingInfo result;
+    ASSERT_TRUE(ExecuteTiling(params.Context(), result));
+    optiling::QuantFlashAttnTilingData parsed{};
+    ASSERT_EQ(result.tilingDataSize, sizeof(parsed));
+    std::memcpy(&parsed, result.tilingData.get(), sizeof(parsed));
+    const auto& tail = parsed.baseTiling.quantFlashAttnVTailParams;
+    EXPECT_EQ(tail.hasVTail, 1);
+    EXPECT_EQ(tail.vTailStrides.bnStride, 32768U);
+    EXPECT_EQ(tail.vTailStrides.n2Stride, 16384U);
+}
+
+TEST(QuantFlashAttnArch35VTailTiling, TruncatedStaticStrideStillValidatesProvidedAxes)
+{
+    // 截断写法只豁免未下发的尾部轴；已下发且本应连续的轴仍须与 shape 推导值一致。
+    // 3D stride 省略 D（隐含连续），但 Bs 轴 stride=256 != D=128，必须拦截；
+    // 注意不能把 N2 轴写成错误值来断言失败——PA_BNBD 允许 0/1 轴非连续。
+    Arch35VTailCase params(false);
+    params.inputs[15].stride_ = gert::Stride({32768, 16384, 256});
+    params.inputs[15].hasStride_ = true;
+    ::TilingInfo result;
+    EXPECT_FALSE(ExecuteTiling(params.Context(), result));
+}
+
 TEST(QuantFlashAttnArch35VTailTiling, NonNdVTailFormatIsRejected)
 {
     Arch35VTailCase params(false);

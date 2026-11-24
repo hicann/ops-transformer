@@ -1396,23 +1396,26 @@ def cpu_qfa_hif8(
         )
     )
 
-    if len(cu_seqlens_q) > 1:
+    # 与 kernel ActualSeqLensParser / cpu_qfa_mxfp8 一致：seqused 优先于
+    # cu_seqlens 差分。TND 下 seqused 可小于物理跨度（尾部为 padding，
+    # 需由 mask 屏蔽），先取 cu_seqlens 会把整段 span 都算进去。
+    if seqused_q is not None and len(list(seqused_q)) > 0:
+        actual_seq_q = list(seqused_q)
+    elif len(cu_seqlens_q) > 1:
         actual_seq_q = [
             cu_seqlens_q[i + 1] - cu_seqlens_q[i] for i in range(len(cu_seqlens_q) - 1)
         ]
-    elif seqused_q is not None and len(list(seqused_q)) > 0:
-        actual_seq_q = list(seqused_q)
     elif max_seqlen_q is not None and max_seqlen_q > 0:
         actual_seq_q = [max_seqlen_q] * B
     else:
         actual_seq_q = [0]
-    if len(cu_seqlens_kv) > 1:
+    if seqused_kv is not None and len(list(seqused_kv)) > 0:
+        actual_seq_kv = list(seqused_kv)
+    elif len(cu_seqlens_kv) > 1:
         actual_seq_kv = [
             cu_seqlens_kv[i + 1] - cu_seqlens_kv[i]
             for i in range(len(cu_seqlens_kv) - 1)
         ]
-    elif seqused_kv is not None and len(list(seqused_kv)) > 0:
-        actual_seq_kv = list(seqused_kv)
     elif max_seqlen_kv is not None and max_seqlen_kv > 0:
         actual_seq_kv = [max_seqlen_kv] * B
     else:
