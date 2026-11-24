@@ -23,6 +23,7 @@
 #include "kda_input_proj_mx_quant.h"
 #include "kda_input_proj_qmm_qkv.h"
 #include "kda_input_proj_sigmoid.h"
+#include "kda_input_proj_transpose.h"
 #include "../kda_input_proj_tiling_data.h"
 #include "../kda_input_proj_workspace.h"
 
@@ -55,7 +56,14 @@ public:
 
         mmBgg_.Init(x_, weightBeta_, weightGate_, weightG_, beta_, gate_, g_, workspace_, tiling_);
         mxQuant_.Init(x_, quantX, scaleX, tiling_);
-        qmmQkv_.Init(quantX, weightQkv_, scaleX, weightQkvScale_, qkv_, tiling_);
+        if (KdaInputProjWorkspace::NeedsQkvWeightTranspose(TypePack::TRANS_WEIGHT_QKV, base.hiddenSize, base.qkvSize)) {
+            packedWeightQkv_ = workspace_ + KdaInputProjWorkspace::OffsetWeightQkv(base.tSize, base.hiddenSize);
+            packedWeightQkvScale_ =
+                workspace_ + KdaInputProjWorkspace::OffsetWeightQkvScale(base.tSize, base.hiddenSize, base.qkvSize);
+            qmmQkv_.Init(quantX, packedWeightQkv_, scaleX, packedWeightQkvScale_, qkv_, tiling_);
+        } else {
+            qmmQkv_.Init(quantX, weightQkv_, scaleX, weightQkvScale_, qkv_, tiling_);
+        }
         sigmoid_.Init(beta_, tiling_);
     }
 
@@ -77,6 +85,8 @@ protected:
     __gm__ uint8_t* weightGate_{nullptr};
     __gm__ uint8_t* weightG_{nullptr};
     __gm__ uint8_t* weightQkvScale_{nullptr};
+    __gm__ uint8_t* packedWeightQkv_{nullptr};
+    __gm__ uint8_t* packedWeightQkvScale_{nullptr};
     __gm__ uint8_t* qkv_{nullptr};
     __gm__ uint8_t* beta_{nullptr};
     __gm__ uint8_t* gate_{nullptr};
@@ -93,6 +103,15 @@ __aicore__ inline void KdaInputProjKernel<TypePack>::ProcessStage1()
     }
     if ASCEND_IS_AIV {
         mxQuant_.Process();
+#ifndef __DAV_CUBE__
+        if (packedWeightQkv_ != nullptr) {
+            const auto& base = tiling_->baseParams;
+            TransposeQkvWeight<uint8_t>(weightQkv_, packedWeightQkv_, base.hiddenSize, base.qkvSize);
+            // Keep each pair of e8m0 scales together when transposing [ceil(K/64), N, 2].
+            const uint32_t scaleGroups = KdaInputProjWorkspace::ScaleKLen(base.hiddenSize) / sizeof(uint16_t);
+            TransposeQkvWeight<uint16_t>(weightQkvScale_, packedWeightQkvScale_, scaleGroups, base.qkvSize);
+        }
+#endif
     }
 }
 
@@ -113,8 +132,8 @@ __aicore__ inline void KdaInputProjKernel<TypePack>::Process()
 {
     ProcessStage1();
     // MIX 默认 SyncAll() 是 isAIVOnly=true，只栅栏 AIV，这里两个方向都需要全核屏障：
-    // Stage2 的 QMM 在 AIC 上读 Stage1 由 AIV 写进 workspace 的 quantX / scaleX；
-    // Stage2 的 Sigmoid 在 AIV 上读 Stage1 由 AIC 写出的 beta / gate / g。
+    // Stage2 的 QMM 在 AIC 上读 Stage1 由 AIV 写进 workspace 的量化激活及重新排布的权重；
+    // Stage2 的 Sigmoid 在 AIV 上原地更新 Stage1 由 AIC 写出的 beta。
     AscendC::SyncAll<false>();
     ProcessStage2();
 }

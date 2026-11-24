@@ -37,6 +37,7 @@ constexpr uint32_t VF_LEN_16 = 128;
 constexpr uint32_t VF_LEN_16_DOUBLE = VF_LEN_16 * 2;
 constexpr uint32_t VF_LEN_32 = 64;
 constexpr uint32_t ELEMENT_AFTER_REDUCE_ = 8;
+constexpr int64_t UB_COPY_ALIGN = 32;
 
 constexpr uint16_t BF16_NAN_CUSTOM = 0x7f81;
 constexpr uint16_t BF16_MAX_EXP = 0x7f80;
@@ -190,6 +191,11 @@ __aicore__ inline void KdaInputProjMxQuant<TypePack>::Init(__gm__ uint8_t* x, __
     SetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>(0);
 #endif
     ParseTilingData(&tiling_->mxQuantParams);
+    coreIdx_ = static_cast<int64_t>(GetBlockIdx());
+    if (coreIdx_ >= usedCoreNum_) {
+        return;
+    }
+
     GetGmParams();
     GetUbParams();
     InitUbLayout();
@@ -257,7 +263,6 @@ __aicore__ inline void KdaInputProjMxQuant<TypePack>::ParseTilingData(
 template <typename TypePack>
 __aicore__ inline void KdaInputProjMxQuant<TypePack>::GetGmParams()
 {
-    coreIdx_ = static_cast<int64_t>(GetBlockIdx());
     if (colTileNum_ <= 0) {
         return;
     }
@@ -296,6 +301,12 @@ __aicore__ inline void KdaInputProjMxQuant<TypePack>::GetUbParams()
     ubFactorColTailBlockLen_ = ubFactorColNum_ - (ubFactorColLoopNum_ - DIGIT_ONE) * ubFactorColNormalBlockLen_;
 
     ubFactorRowNormalBlockNum_ = FloorDiv(maxUbBlockNum_, ubFactorColNormalBlockNum_);
+    const bool splitColumns = ubFactorColNum_ != colNum_ || ubFactorColLoopNum_ > 1;
+    const int64_t tailScaleBytes = CeilAlign(ubFactorColTailBlockNum_, DIGIT_TWO);
+    if (splitColumns && (ubFactorColNormalBlockNum_ % UB_COPY_ALIGN != 0 || tailScaleBytes % UB_COPY_ALIGN != 0)) {
+        // Strided GM writeback needs aligned UB rows. Keep a single packed row for unaligned splits.
+        ubFactorRowNormalBlockNum_ = 1;
+    }
     ubFactorRowLoopNum_ = CeilDiv(ubFactorRow1BlockNum_, ubFactorRowNormalBlockNum_);
     ubFactorRowNormalBlockNum_ = CeilDiv(ubFactorRow1BlockNum_, ubFactorRowLoopNum_);
     ubFactorRowTailBlockNum_ = ubFactorRow1BlockNum_ - (ubFactorRowLoopNum_ - DIGIT_ONE) * ubFactorRowNormalBlockNum_;
@@ -414,15 +425,17 @@ __aicore__ inline void KdaInputProjMxQuant<TypePack>::CopyOut(int64_t dim0LoopId
         DataCopyPad(yGm_[offset], yLocal_[bufSlot], copyOutParamY);
     }
 
-    DataCopyExtParams copyOutParamScale = {0, 0, 0, 0, 0};
-    copyOutParamScale.blockCount = ubFactorRowNum;
-    copyOutParamScale.blockLen = ubFactorColBlockNum + scaleIsNotOdd;
-    copyOutParamScale.srcStride = 0;
-    copyOutParamScale.dstStride = scaleColNum_ - copyOutParamScale.blockLen;
-
-    int64_t scaleOffset =
+    const uint32_t scaleBytes = static_cast<uint32_t>(ubFactorColBlockNum + scaleIsNotOdd);
+    const uint32_t scaleDstGap = static_cast<uint32_t>(scaleColNum_) - scaleBytes;
+    const int64_t scaleOffset =
         dim0LoopIdx * ubFactorRowNormalBlockNum_ * scaleColNum_ + dim1LoopIdx * ubFactorColNormalBlockNum_;
-    DataCopyPad<uint8_t, PaddingMode::Compact>(scaleGm_[scaleOffset], scaleLocalBytes_[bufSlot], copyOutParamScale);
+    if (scaleDstGap == 0) {
+        const DataCopyExtParams copyScale = {1U, static_cast<uint32_t>(ubFactorRowNum) * scaleBytes, 0U, 0U, 0U};
+        DataCopyPad(scaleGm_[scaleOffset], scaleLocalBytes_[bufSlot], copyScale);
+    } else {
+        const DataCopyExtParams copyScale = {static_cast<uint16_t>(ubFactorRowNum), scaleBytes, 0U, scaleDstGap, 0U};
+        DataCopyPad(scaleGm_[scaleOffset], scaleLocalBytes_[bufSlot], copyScale);
+    }
 
     SetFlag<HardEvent::MTE3_MTE2>(EvtMte3Mte2(bufSlot));
     SetFlag<HardEvent::MTE3_V>(EvtMte3V(bufSlot));

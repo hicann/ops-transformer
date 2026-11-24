@@ -230,8 +230,9 @@ void CheckCommon(const TilingInfo& info, const ShapeCfg& cfg)
     EXPECT_GT(td->sigmoidParams.ubTile, 0U);
 
     ASSERT_EQ(info.workspaceSizes.size(), 1U);
-    EXPECT_GE(info.workspaceSizes[0], KdaInputProj::KdaInputProjWorkspace::TotalBytes(static_cast<uint32_t>(cfg.t),
-                                                                                      static_cast<uint32_t>(cfg.k)));
+    EXPECT_GE(info.workspaceSizes[0], KdaInputProj::KdaInputProjWorkspace::TotalBytes(
+                                          static_cast<uint32_t>(cfg.t), static_cast<uint32_t>(cfg.k),
+                                          static_cast<uint32_t>(cfg.nQkv), cfg.transQkv));
 }
 
 bool RunSuccess(const ShapeCfg& cfg, TilingInfo& info)
@@ -353,9 +354,9 @@ TEST_F(KdaInputProjTilingTest, tiling_success_t512_sigmoid_multicore)
     EXPECT_GT(td->sigmoidParams.aivNum, 1U);
 }
 
-TEST_F(KdaInputProjTilingTest, tiling_success_qmm_n_align_trans_true_vs_false)
+TEST_F(KdaInputProjTilingTest, tiling_success_qmm_nd_tail_uses_transposed_workspace)
 {
-    // N=240：trans=true nAlign=16 → baseN=240；trans=false nAlign=32 → baseN=256
+    // N=240 requires the transposed Cube layout for an ND input.
     ShapeCfg cfgTrue;
     cfgTrue.nQkv = 240;
     TilingInfo infoTrue;
@@ -368,7 +369,28 @@ TEST_F(KdaInputProjTilingTest, tiling_success_qmm_n_align_trans_true_vs_false)
     TilingInfo infoFalse;
     ASSERT_TRUE(RunSuccess(cfgFalse, infoFalse));
     CheckCommon(infoFalse, cfgFalse);
-    EXPECT_EQ(AsTilingData(infoFalse)->qmmQkvParams.baseN, 256U);
+    EXPECT_EQ(AsTilingData(infoFalse)->qmmQkvParams.baseN, 240U);
+    const uint64_t weightBytes = cfgFalse.k * cfgFalse.nQkv;
+    const uint64_t scaleBytes = cfgFalse.k / kMxScaleBlock * cfgFalse.nQkv * kScalePack;
+    EXPECT_GE(infoFalse.workspaceSizes[0], infoTrue.workspaceSizes[0] + weightBytes + scaleBytes);
+
+    cfgFalse.nQkv = 224;
+    TilingInfo infoAligned;
+    ASSERT_TRUE(RunSuccess(cfgFalse, infoAligned));
+    CheckCommon(infoAligned, cfgFalse);
+    EXPECT_EQ(AsTilingData(infoAligned)->qmmQkvParams.baseN, 224U);
+    EXPECT_EQ(infoAligned.workspaceSizes[0], infoTrue.workspaceSizes[0]);
+}
+
+TEST_F(KdaInputProjTilingTest, tiling_success_qmm_nd_tail_split_preserves_alignment)
+{
+    ShapeCfg cfg;
+    cfg.transQkv = false;
+    cfg.nQkv = 22 * 256 + 32;
+    TilingInfo info;
+    ASSERT_TRUE(RunSuccess(cfg, info));
+    CheckCommon(info, cfg);
+    EXPECT_EQ(AsTilingData(info)->qmmQkvParams.nTailTile, 1U);
 }
 
 TEST_F(KdaInputProjTilingTest, tiling_success_mxquant_col_split_slice256)

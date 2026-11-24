@@ -404,7 +404,8 @@ ge::graphStatus KdaInputProjTiling::CalcModuleTilings(const KdaInputProjTilingIn
 ge::graphStatus KdaInputProjTiling::CalcWorkspaceSize(const KdaInputProjTilingInfo& tilingInfo)
 {
     const auto& base = tilingInfo.baseParams;
-    workspaceSize_ = KdaInputProj::KdaInputProjWorkspace::TotalBytes(base.tSize, base.hiddenSize);
+    workspaceSize_ = KdaInputProj::KdaInputProjWorkspace::TotalBytes(base.tSize, base.hiddenSize, base.qkvSize,
+                                                                     tilingInfo.transWeightQkv);
     return ge::GRAPH_SUCCESS;
 }
 

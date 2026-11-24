@@ -20,6 +20,7 @@
 #include "kernel_operator.h"
 #include "kda_input_proj_common.h"
 #include "../kda_input_proj_tiling_data.h"
+#include "../kda_input_proj_workspace.h"
 #include "blaze/gemm/block/block_scheduler_qbmm.h"
 #include "blaze/epilogue/block/block_epilogue_empty.h"
 #include "blaze/gemm/block/block_mmad_qbmm_mx.h"
@@ -45,8 +46,6 @@ protected:
     using BiasType = float;
 
     using LayoutA = AscendC::Te::NDExtLayoutPtn;
-    using LayoutB = AscendC::Std::conditional_t<TypePack::TRANS_WEIGHT_QKV, AscendC::Te::DNExtLayoutPtn,
-                                                AscendC::Te::NDExtLayoutPtn>;
     using LayoutC = AscendC::Te::NDExtLayoutPtn;
 
     static constexpr uint64_t FULL_LOAD_MODE = 0;
@@ -55,16 +54,11 @@ protected:
 
     using BlockEpilogue = Blaze::Epilogue::Block::BlockEpilogueEmpty;
     using ProblemShape = AscendC::Te::Shape<int64_t, int64_t, int64_t, int64_t>;
-    using BlockScheduler =
-        Blaze::Gemm::Block::BlockSchedulerQuantBatchMatmulV3<ProblemShape, FULL_LOAD_MODE, LayoutA, LayoutB, AType>;
     using DispatchPolicy =
         Blaze::Gemm::MatmulWithScaleMx<FULL_LOAD_MODE, false, Blaze::Gemm::KernelMmadWithScaleMxWithoutBatch>;
-    using BlockMmad = Blaze::Gemm::Block::BlockMmad<DispatchPolicy, AType, LayoutA, BType, LayoutB, OutType, LayoutC,
-                                                    BiasType, LayoutC>;
-    using MatmulKernel = Blaze::Gemm::Kernel::GemmUniversal<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>;
-    using Params = typename MatmulKernel::Params;
 
-    __aicore__ inline Params BuildBlazeParams() const;
+    template <typename LayoutB>
+    __aicore__ inline void RunMatmul() const;
 
     const optiling::KdaInputProjTilingData* tiling_{nullptr};
     __gm__ uint8_t* quantX_{nullptr};
@@ -89,11 +83,17 @@ __aicore__ inline void KdaInputProjQmmQkv<TypePack>::Init(__gm__ uint8_t* quantX
 }
 
 template <typename TypePack>
-__aicore__ inline typename KdaInputProjQmmQkv<TypePack>::Params KdaInputProjQmmQkv<TypePack>::BuildBlazeParams() const
+template <typename LayoutB>
+__aicore__ inline void KdaInputProjQmmQkv<TypePack>::RunMatmul() const
 {
+    using BlockScheduler =
+        Blaze::Gemm::Block::BlockSchedulerQuantBatchMatmulV3<ProblemShape, FULL_LOAD_MODE, LayoutA, LayoutB, AType>;
+    using BlockMmad = Blaze::Gemm::Block::BlockMmad<DispatchPolicy, AType, LayoutA, BType, LayoutB, OutType, LayoutC,
+                                                    BiasType, LayoutC>;
+    using MatmulKernel = Blaze::Gemm::Kernel::GemmUniversal<ProblemShape, BlockMmad, BlockEpilogue, BlockScheduler>;
     const auto& base = tiling_->baseParams;
     const auto& td = tiling_->qmmQkvParams;
-    Params params{};
+    typename MatmulKernel::Params params{};
     params.problemShape = ProblemShape{static_cast<int64_t>(base.tSize), static_cast<int64_t>(base.qkvSize),
                                        static_cast<int64_t>(base.hiddenSize), NO_BATCH};
     params.mmadParams.aGmAddr = quantX_;
@@ -119,7 +119,7 @@ __aicore__ inline typename KdaInputProjQmmQkv<TypePack>::Params KdaInputProjQmmQ
     params.qbmmParams.isBias = NO_BIAS;
     params.qbmmParams.dbL0C = td.dbL0C;
     params.qbmmParams.bMustHitL2 = td.bMustHitL2;
-    return params;
+    MatmulKernel{}(params);
 }
 
 template <typename TypePack>
@@ -128,7 +128,16 @@ __aicore__ inline void KdaInputProjQmmQkv<TypePack>::Process()
     if ASCEND_IS_AIV {
         return;
     }
-    MatmulKernel{}(BuildBlazeParams());
+    if constexpr (TypePack::TRANS_WEIGHT_QKV) {
+        RunMatmul<AscendC::Te::DNExtLayoutPtn>();
+    } else {
+        const auto& base = tiling_->baseParams;
+        if (KdaInputProjWorkspace::NeedsQkvWeightTranspose(false, base.hiddenSize, base.qkvSize)) {
+            RunMatmul<AscendC::Te::DNExtLayoutPtn>();
+        } else {
+            RunMatmul<AscendC::Te::NDExtLayoutPtn>();
+        }
+    }
 }
 } // namespace KdaInputProj
 

@@ -22,6 +22,7 @@
 #include "err/ops_err.h"
 #include "op_common/op_host/util/math_util.h"
 #include "kda_input_proj_tiling.h"
+#include "../op_kernel/kda_input_proj_workspace.h"
 
 namespace optiling {
 
@@ -32,7 +33,9 @@ public:
           m_(tilingInfo.baseParams.tSize),
           n_(tilingInfo.baseParams.qkvSize),
           k_(tilingInfo.baseParams.hiddenSize),
-          transWeight_(tilingInfo.transWeightQkv),
+          transWeight_(tilingInfo.transWeightQkv ||
+                       KdaInputProj::KdaInputProjWorkspace::NeedsQkvWeightTranspose(
+                           tilingInfo.transWeightQkv, tilingInfo.baseParams.hiddenSize, tilingInfo.baseParams.qkvSize)),
           aicNum_(tilingInfo.aicNum),
           l1Size_(tilingInfo.l1Size),
           l0cSize_(tilingInfo.l0cSize)
@@ -387,8 +390,14 @@ private:
 
         uint64_t bestM = 1UL;
         uint64_t bestN = 1UL;
+        const uint64_t tailN = n_ - (nCnt - 1UL) * baseN;
         for (uint64_t mt = 1UL; mt <= 4UL; ++mt) {
             for (uint64_t nt = 1UL; nt <= 4UL; ++nt) {
+                // An ND tail split must retain the same N alignment in L1 and L0B.
+                if (!transWeight_ && (Ops::Base::CeilDiv(baseN, nt) % L1_ALIGN_SIZE != 0UL ||
+                                      Ops::Base::CeilDiv(tailN, nt) % L1_ALIGN_SIZE != 0UL)) {
+                    continue;
+                }
                 if (tailBlocks * mt * nt <= static_cast<uint64_t>(usedAic) && mt * nt >= bestM * bestN) {
                     bestM = mt;
                     bestN = nt;

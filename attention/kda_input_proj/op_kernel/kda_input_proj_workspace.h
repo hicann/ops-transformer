@@ -13,8 +13,8 @@
  * \brief User-workspace layout shared by host tiling and device orchestration.
  *
  * Stage1 DynamicMxQuant writes quantized x (fp8e4m3, [T, K]) and xScale (e8m0,
- * [T, CeilDiv(K, 64) * 2]). Stage2 QMM consumes the same slices. Offsets are
- * owned here so mx_quant and qmm_qkv do not slice workspace independently.
+ * [T, CeilDiv(K, 64) * 2]). For tail shapes, Stage1 also packs ND QKV weights and
+ * scales into the transposed layout consumed by Stage2.
  *
  * 这些偏移量在 Host tiling 与 Device kernel 两侧共用，必须是 constexpr：
  * 写成不带 __aicore__ 的 static inline 时它们是 host-only 函数，Device 侧
@@ -32,6 +32,7 @@ namespace KdaInputProj {
 struct KdaInputProjWorkspace {
     static constexpr uint64_t MXFP_GROUP_K = 64UL;
     static constexpr uint64_t MXFP_SCALE_MULTI = 2UL;
+    static constexpr uint32_t MXFP8_N_ALIGN = 32U;
     static constexpr uint64_t ALIGN = 512UL;
 
     static constexpr uint64_t CeilDiv(uint64_t a, uint64_t b)
@@ -70,9 +71,27 @@ struct KdaInputProjWorkspace {
         return CeilAlign(QuantXBytes(tSize, hiddenSize), ALIGN);
     }
 
-    static constexpr uint64_t TotalBytes(uint32_t tSize, uint32_t hiddenSize)
+    static constexpr bool NeedsQkvWeightTranspose(bool alreadyTransposed, uint32_t hiddenSize, uint32_t qkvSize)
+    {
+        return !alreadyTransposed && (hiddenSize % MXFP_GROUP_K != 0 || qkvSize % MXFP8_N_ALIGN != 0);
+    }
+
+    static constexpr uint64_t OffsetWeightQkv(uint32_t tSize, uint32_t hiddenSize)
     {
         return CeilAlign(OffsetScaleX(tSize, hiddenSize) + XScaleBytes(tSize, hiddenSize), ALIGN);
+    }
+
+    static constexpr uint64_t OffsetWeightQkvScale(uint32_t tSize, uint32_t hiddenSize, uint32_t qkvSize)
+    {
+        return CeilAlign(OffsetWeightQkv(tSize, hiddenSize) + static_cast<uint64_t>(hiddenSize) * qkvSize, ALIGN);
+    }
+
+    static constexpr uint64_t TotalBytes(uint32_t tSize, uint32_t hiddenSize, uint32_t qkvSize, bool transWeightQkv)
+    {
+        if (NeedsQkvWeightTranspose(transWeightQkv, hiddenSize, qkvSize)) {
+            return CeilAlign(OffsetWeightQkvScale(tSize, hiddenSize, qkvSize) + qkvSize * ScaleKLen(hiddenSize), ALIGN);
+        }
+        return OffsetWeightQkv(tSize, hiddenSize);
     }
 };
 
