@@ -1092,8 +1092,8 @@ ge::graphStatus PromptFlashAttentionTiling::CheckKeyValueParamsConsistency(const
 
     OP_CHECK_IF(contextKeyParams.kDataType != contextKeyParams.vDataType,
         OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(contextKeyParams.opName, "key,value",
-        (TypeUtils::DataTypeToSerialString(contextKeyParams.kDataType) + ", " +
-        TypeUtils::DataTypeToSerialString(contextKeyParams.vDataType)).c_str(),
+        (v2::GetPfaDataTypeStr(contextKeyParams.kDataType) + ", " +
+        v2::GetPfaDataTypeStr(contextKeyParams.vDataType)).c_str(),
         "tensor key dtype must be consistent with tensor value dtype"),
         return ge::GRAPH_FAILED);
     OP_CHECK_IF(keyDimNum != valueDimNum,
@@ -1911,19 +1911,19 @@ bool PromptFlashAttentionTiling::CheckPseShiftTypeAndShape(ContextParamsForPFATi
 
     OP_CHECK_IF((inputType == ge::DT_FLOAT16 && pseShiftElemType != ge::DT_FLOAT16),
         OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(contextKeyParams.opName, "query, pse_shift",
-        (TypeUtils::DataTypeToSerialString(inputType) + ", " + g_strDataTypePfa.at(ValidPfaDataType(pseShiftElemType))).c_str(),
+        (v2::GetPfaDataTypeStr(inputType) + ", " + g_strDataTypePfa.at(ValidPfaDataType(pseShiftElemType))).c_str(),
         "q type is fp16, but pse shift type is not fp16"),
         return false);
 
     OP_CHECK_IF((inputType == ge::DT_BF16 && pseShiftElemType != ge::DT_BF16),
         OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(contextKeyParams.opName, "query, pse_shift",
-        (TypeUtils::DataTypeToSerialString(inputType) + ", " + g_strDataTypePfa.at(ValidPfaDataType(pseShiftElemType))).c_str(),
+        (v2::GetPfaDataTypeStr(inputType) + ", " + g_strDataTypePfa.at(ValidPfaDataType(pseShiftElemType))).c_str(),
         "q type is bf16, but pse shift type is not bf16"),
         return false);
 
     OP_CHECK_IF((inputType == ge::DT_INT8 && pseShiftElemType != ge::DT_FLOAT16),
         OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(contextKeyParams.opName, "query, pse_shift",
-        (TypeUtils::DataTypeToSerialString(inputType) + ", " + g_strDataTypePfa.at(ValidPfaDataType(pseShiftElemType))).c_str(),
+        (v2::GetPfaDataTypeStr(inputType) + ", " + g_strDataTypePfa.at(ValidPfaDataType(pseShiftElemType))).c_str(),
         "q type is int8, but pse shift type is not fp16"),
         return false);
 
@@ -2004,7 +2004,7 @@ bool PromptFlashAttentionTiling::checkPABlockSizeAndBlockTable(ContextParamsForP
     ge::DataType blockTableType = contextKeyParams.blockTableType;
     OP_CHECK_IF((blockTableType != ge::DT_INT32),
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(contextKeyParams.opName, "block_table",
-        TypeUtils::DataTypeToSerialString(blockTableType).c_str(),
+        v2::GetPfaDataTypeStr(blockTableType).c_str(),
         "blockTable only support int32 when PA enable"),
         return false);
     int32_t blockTableDim = static_cast<int32_t>(blockTableShape->GetStorageShape().GetDimNum());
@@ -2342,7 +2342,7 @@ bool PromptFlashAttentionTiling::CheckPATypeAndShape(ContextParamsForPFATiling& 
     ge::DataType blockTableType = contextKeyParams.blockTableType;
     OP_CHECK_IF((blockTableType != ge::DT_INT32),
         OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(contextKeyParams.opName, "block_table",
-        TypeUtils::DataTypeToSerialString(blockTableType).c_str(),
+        v2::GetPfaDataTypeStr(blockTableType).c_str(),
         "blockTable only support int32 when PA enable"),
         return false);
 
