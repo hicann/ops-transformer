@@ -17,7 +17,9 @@ if(OP_GRAPH_COMMON_SRCS)
         ${ASCEND_DIR}/include ${ASCEND_DIR}/include/external ${ASCEND_DIR}/include/op_common
         ${ASCEND_DIR}/${SYSTEM_PREFIX}/include ${ASCEND_DIR}/${SYSTEM_PREFIX}/include/external
         ${ASCEND_DIR}/${SYSTEM_PREFIX}/include/op_common)
-    if("ascend950" IN_LIST ASCEND_COMPUTE_UNIT)
+    # 编译 ascend950/ascend960dt/ascend960pr 时注入平台宏，桩注册内容才编入
+    if("ascend950" IN_LIST ASCEND_COMPUTE_UNIT OR "ascend960dt" IN_LIST ASCEND_COMPUTE_UNIT
+       OR "ascend960pr" IN_LIST ASCEND_COMPUTE_UNIT)
         set_source_files_properties(${OP_GRAPH_COMMON_SRCS} PROPERTIES COMPILE_DEFINITIONS OP_GRAPH_TRANSFORMER_ASCEND950=1)
     endif()
     target_sources(${GRAPH_PLUGIN_NAME}_obj PRIVATE ${OP_GRAPH_COMMON_SRCS})

@@ -15,7 +15,7 @@
  *        OP_GRAPH_FE_REGISTRY 选项门控（默认 ON）。
  */
 
-// 仅当编译 soc 为 ascend950 时，当前 cpp 中的桩注册内容才编入
+// 仅当编译 soc 为 ascend950/ascend960dt/ascend960pr 时，当前 cpp 中的桩注册内容才编入
 #if defined(OP_GRAPH_TRANSFORMER_ASCEND950)
 
 // 包含顺序契约：桩头（内含 log/log.h → log_types.h 的 GE 枚举）必须先于
