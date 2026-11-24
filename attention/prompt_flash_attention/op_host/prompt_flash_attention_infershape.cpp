@@ -46,7 +46,7 @@ namespace ops {
 static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* context)
 {
     if (context == nullptr) {
-        OP_LOGE("PromptFlashAttention", "Context for inferring shape is nullptr!");
+        OP_LOGE_WITHOUT_REPORT("PromptFlashAttention", "Context for inferring shape is nullptr!");
         return ge::GRAPH_FAILED;
     }
     OP_LOGD(context->GetNodeName(), "Enter PromptFlashAttention inferShape impl.");
@@ -84,7 +84,8 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* c
 
     // KV_N除零保护, 当KV_N为零时KV_N = Q_N
     if (*numHeadsPtr == 0) {
-        OP_LOGE(context->GetNodeName(), "numHeads can not be 0!");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "num_heads", std::to_string(*numHeadsPtr).c_str(),
+                                              "num_heads can not be 0");
         return ge::GRAPH_FAILED;
     }
     int64_t numKeyValueHeads = (*numKeyValueHeadsPtr == 0) ? *numHeadsPtr : *numKeyValueHeadsPtr;
@@ -92,7 +93,9 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* c
     // Set output shape
     if (strcmp(inputLayoutPtr, "BNSD_BSND") == 0) {
         if (queryShape->GetDimNum() != PFA_LAYOUT_BNSD_BSND_DIMS) {
-            OP_LOGE(context->GetNodeName(), "Layout BNSD_BSND, queryDims(%zu) must be 4!", queryShape->GetDimNum());
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "query",
+                                                     std::to_string(queryShape->GetDimNum()).c_str(),
+                                                     "Layout BNSD_BSND, queryDims must be 4");
             return ge::GRAPH_FAILED;
         }
         int64_t outputD = (*valueShape)[PFA_LAYOUT_DIM3];
@@ -103,8 +106,9 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* c
         (*attentionOutShape)[PFA_LAYOUT_DIM3] = outputD;
     } else if (strcmp(inputLayoutPtr, "TND") == 0) {
         if (queryShape->GetDimNum() != PFA_LAYOUT_TND_DIMS || valueShape->GetDimNum() != PFA_LAYOUT_TND_DIMS) {
-            OP_LOGE(context->GetNodeName(), "Layout %s, queryDims(%zu) valueDims(%zu) must be 3!", inputLayoutPtr,
-                    queryShape->GetDimNum(), valueShape->GetDimNum());
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "query",
+                                                     std::to_string(queryShape->GetDimNum()).c_str(),
+                                                     "Layout TND, queryDims and valueDims must be 3");
             return ge::GRAPH_FAILED;
         }
         int64_t outputD = (*valueShape)[PFA_LAYOUT_DIM2];
@@ -114,8 +118,9 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* c
         (*attentionOutShape)[PFA_LAYOUT_DIM2] = outputD;
     } else if (strcmp(inputLayoutPtr, "NTD") == 0) {
         if (queryShape->GetDimNum() != PFA_LAYOUT_NTD_DIMS || valueShape->GetDimNum() != PFA_LAYOUT_NTD_DIMS) {
-            OP_LOGE(context->GetNodeName(), "Layout NTD, queryDims(%zu) valueDims(%zu) must be 3!",
-                    queryShape->GetDimNum(), valueShape->GetDimNum());
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "query",
+                                                     std::to_string(queryShape->GetDimNum()).c_str(),
+                                                     "Layout NTD, queryDims and valueDims must be 3");
             return ge::GRAPH_FAILED;
         }
         int64_t outputD = (*valueShape)[PFA_LAYOUT_DIM2];
@@ -125,8 +130,9 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* c
         (*attentionOutShape)[PFA_LAYOUT_DIM2] = outputD;
     } else if (strcmp(inputLayoutPtr, "NTD_TND") == 0) {
         if (queryShape->GetDimNum() != PFA_LAYOUT_TND_DIMS || valueShape->GetDimNum() != PFA_LAYOUT_TND_DIMS) {
-            OP_LOGE(context->GetNodeName(), "Layout NTD_TND, queryDims(%zu) valueDims(%zu) must be 3!",
-                    queryShape->GetDimNum(), valueShape->GetDimNum());
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "query",
+                                                     std::to_string(queryShape->GetDimNum()).c_str(),
+                                                     "Layout NTD_TND, queryDims and valueDims must be 3");
             return ge::GRAPH_FAILED;
         }
         (*attentionOutShape)[PFA_LAYOUT_DIM0] = (*queryShape)[PFA_LAYOUT_DIM1];
@@ -134,8 +140,9 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* c
         (*attentionOutShape)[PFA_LAYOUT_DIM2] = (*valueShape)[PFA_LAYOUT_DIM2];
     } else if (strcmp(inputLayoutPtr, "TND_NTD") == 0) {
         if (queryShape->GetDimNum() != PFA_LAYOUT_TND_DIMS || valueShape->GetDimNum() != PFA_LAYOUT_TND_DIMS) {
-            OP_LOGE(context->GetNodeName(), "Layout TND_NTD, queryDims(%zu) valueDims(%zu) must be 3!",
-                    queryShape->GetDimNum(), valueShape->GetDimNum());
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "query",
+                                                     std::to_string(queryShape->GetDimNum()).c_str(),
+                                                     "Layout TND_NTD, queryDims and valueDims must be 3");
             return ge::GRAPH_FAILED;
         }
         (*attentionOutShape)[PFA_LAYOUT_DIM0] = (*queryShape)[PFA_LAYOUT_DIM1];
@@ -143,12 +150,16 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* c
         (*attentionOutShape)[PFA_LAYOUT_DIM2] = (*valueShape)[PFA_LAYOUT_DIM2];
     } else if (strcmp(inputLayoutPtr, "SH") == 0) {
         if (queryShape->GetDimNum() != PFA_LAYOUT_SH_DIMS) {
-            OP_LOGE(context->GetNodeName(), "Layout SH, queryDims(%zu) must be 2!", queryShape->GetDimNum());
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "query",
+                                                     std::to_string(queryShape->GetDimNum()).c_str(),
+                                                     "Layout SH, queryDims must be 2");
             return ge::GRAPH_FAILED;
         }
     } else if (strcmp(inputLayoutPtr, "BSH") == 0) {
         if (queryShape->GetDimNum() != PFA_LAYOUT_BSH_DIMS) {
-            OP_LOGE(context->GetNodeName(), "Layout BSH, queryDims(%zu) must be 3!", queryShape->GetDimNum());
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "query",
+                                                     std::to_string(queryShape->GetDimNum()).c_str(),
+                                                     "Layout BSH, queryDims must be 3");
             return ge::GRAPH_FAILED;
         }
         if (valueShape->GetDim(PFA_LAYOUT_DIM2) != -1) {
@@ -160,12 +171,16 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* c
         }
     } else if (strcmp(inputLayoutPtr, "NSD") == 0) {
         if (queryShape->GetDimNum() != PFA_LAYOUT_NSD_DIMS) {
-            OP_LOGE(context->GetNodeName(), "Layout NSD, queryDims(%zu) must be 3!", queryShape->GetDimNum());
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "query",
+                                                     std::to_string(queryShape->GetDimNum()).c_str(),
+                                                     "Layout NSD, queryDims must be 3");
             return ge::GRAPH_FAILED;
         }
     } else if (strcmp(inputLayoutPtr, "BNSD") == 0) {
         if (queryShape->GetDimNum() != PFA_LAYOUT_BNSD_DIMS) {
-            OP_LOGE(context->GetNodeName(), "Layout BNSD, queryDims(%zu) must be 4!", queryShape->GetDimNum());
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "query",
+                                                     std::to_string(queryShape->GetDimNum()).c_str(),
+                                                     "Layout BNSD, queryDims must be 4");
             return ge::GRAPH_FAILED;
         }
         int64_t outputD = (*valueShape)[PFA_LAYOUT_DIM3];
@@ -176,7 +191,9 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* c
         (*attentionOutShape)[PFA_LAYOUT_DIM3] = outputD;
     } else if (strcmp(inputLayoutPtr, "BSND") == 0) {
         if (queryShape->GetDimNum() != PFA_LAYOUT_BSND_DIMS) {
-            OP_LOGE(context->GetNodeName(), "Layout BSND, queryDims(%zu) must be 4!", queryShape->GetDimNum());
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "query",
+                                                     std::to_string(queryShape->GetDimNum()).c_str(),
+                                                     "Layout BSND, queryDims must be 4");
             return ge::GRAPH_FAILED;
         }
         int64_t outputD = (*valueShape)[PFA_LAYOUT_DIM3];
@@ -186,7 +203,8 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* c
         (*attentionOutShape)[PFA_LAYOUT_DIM2] = (*queryShape)[PFA_LAYOUT_DIM2];
         (*attentionOutShape)[PFA_LAYOUT_DIM3] = outputD;
     } else {
-        OP_LOGE(context->GetNodeName(), "Invalid input layout: %s, not support!", inputLayoutPtr);
+        OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(context->GetNodeName(), "input_layout", inputLayoutPtr,
+                                               "input_layout is not supported");
         return ge::GRAPH_FAILED;
     }
 
@@ -197,7 +215,7 @@ static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* c
 static ge::graphStatus InferDataTypePromptFlashAttention(gert::InferDataTypeContext* context)
 {
     if (context == nullptr) {
-        OP_LOGE("PromptFlashAttention", "Context for inferring data type is nullptr!");
+        OP_LOGE_WITHOUT_REPORT("PromptFlashAttention", "Context for inferring data type is nullptr!");
         return ge::GRAPH_FAILED;
     }
     OP_LOGD(context->GetNodeName(), "Enter PromptFlashAttention inferDataType impl.");

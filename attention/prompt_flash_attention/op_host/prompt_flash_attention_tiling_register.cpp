@@ -16,21 +16,30 @@
 #include "../../prompt_flash_attention/op_host/prompt_flash_attention_tiling.h"
 #include "register/op_def_registry.h"
 #include "../../common/op_host/fia_tiling_templates_registry.h"
+#include <vector>
 
 using namespace ge;
 using namespace AscendC;
 namespace optiling {
+namespace {
+// 合法输入下 Tiling 失败时，按 EZ1008 正式错误码首报（Arglist: op_name, reason），并输出 PLOG 上下文
+inline void ReportTilingFailure(const gert::TilingParseContext* context, const char* reason)
+{
+    OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "%s\n", reason);
+    const std::vector<const char*> msgKey = {"op_name", "reason"};
+    const std::vector<const char*> msgvalue = {context->GetNodeName(), reason};
+    REPORT_PREDEFINED_ERR_MSG("EZ1008", msgKey, msgvalue);
+}
+} // namespace
 constexpr uint32_t ACTUAL_SEQ_Q_INDEX_PFA = 5;
 constexpr uint32_t ACTUAL_SEQ_KV_INDEX_PFA = 6;
 static ge::graphStatus TilingPrepareForPromptFlashAttention(gert::TilingParseContext* context)
 {
     auto platformInfoPtr = context->GetPlatformInfo();
-    OP_CHECK_IF(platformInfoPtr == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "platformInfoPtr is null!"),
+    OP_CHECK_IF(platformInfoPtr == nullptr, ReportTilingFailure(context, "platformInfoPtr is null"),
                 return ge::GRAPH_FAILED);
     auto compileInfoPtr = context->GetCompiledInfo<PromptFlashAttentionCompileInfo>();
-    OP_CHECK_IF(compileInfoPtr == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "compileInfoPtr is null!"),
+    OP_CHECK_IF(compileInfoPtr == nullptr, ReportTilingFailure(context, "compileInfoPtr is null"),
                 return ge::GRAPH_FAILED);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     compileInfoPtr->aivNum = ascendcPlatform.GetCoreNumAiv();

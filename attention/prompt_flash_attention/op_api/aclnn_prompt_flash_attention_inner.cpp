@@ -818,7 +818,6 @@ aclnnStatus InnerPromptFlashAttentionGetWorkspaceSize(
                    DFX_OUT(attentionOut));
 
     auto uniqueExecutor = CREATE_EXECUTOR();
-    CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     // Check if the required input pointer is empty
     CHECK_RET(CheckNotNull(query, key, value, inputLayout, attentionOut), ACLNN_ERR_PARAM_NULLPTR);

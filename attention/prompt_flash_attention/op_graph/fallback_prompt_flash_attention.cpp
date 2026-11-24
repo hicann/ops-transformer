@@ -27,19 +27,23 @@ static const int64_t INNER_PRECISE_MAX = 4;
 
 static graphStatus PromptHostExecuteFunc(OpExecuteContext* host_api_ctx)
 {
-    OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE("aclnnfallback", "host_api_ctx is null"), return GRAPH_FAILED);
+    OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE_WITHOUT_REPORT("aclnnfallback", "host_api_ctx is null"),
+                return GRAPH_FAILED);
 
     auto query = host_api_ctx->GetInputTensor(QUERY_INDEX);
-    OP_CHECK_IF(query == nullptr, OP_LOGE("aclnnfallback", "query is null"), return GRAPH_FAILED);
+    OP_CHECK_IF(query == nullptr, OP_LOGE_WITH_INVALID_INPUT(host_api_ctx->GetNodeName(), "query"),
+                return GRAPH_FAILED);
 
     auto key = host_api_ctx->GetInputTensor(KEY_INDEX);
-    OP_CHECK_IF(key == nullptr, OP_LOGE("aclnnfallback", "key is null"), return GRAPH_FAILED);
+    OP_CHECK_IF(key == nullptr, OP_LOGE_WITH_INVALID_INPUT(host_api_ctx->GetNodeName(), "key"), return GRAPH_FAILED);
 
     auto value = host_api_ctx->GetInputTensor(VALUE_INDEX);
-    OP_CHECK_IF(value == nullptr, OP_LOGE("aclnnfallback", "value is null"), return GRAPH_FAILED);
+    OP_CHECK_IF(value == nullptr, OP_LOGE_WITH_INVALID_INPUT(host_api_ctx->GetNodeName(), "value"),
+                return GRAPH_FAILED);
 
     auto output = host_api_ctx->GetOutputTensor(0);
-    OP_CHECK_IF(output == nullptr, OP_LOGE("aclnnfallback", "output is null"), return GRAPH_FAILED);
+    OP_CHECK_IF(output == nullptr, OP_LOGE_WITH_INVALID_INPUT(host_api_ctx->GetNodeName(), "attention_out"),
+                return GRAPH_FAILED);
 
     auto pseShiftGe = host_api_ctx->GetOptionalInputTensor(3);
     auto attenMaskGe = host_api_ctx->GetOptionalInputTensor(4);
@@ -55,12 +59,8 @@ static graphStatus PromptHostExecuteFunc(OpExecuteContext* host_api_ctx)
     std::vector<int64_t> actSeqArray;
     if (actualSeqLengthsGe != nullptr) {
         const int64_t* actSeqData = actualSeqLengthsGe->GetData<int64_t>();
-        OP_CHECK_IF(
-            actSeqData == nullptr,
-            OP_LOGE("aclnnfallback",
-                    "When processing attention padding masking, actSeqData is a required parameter (stores valid "
-                    "sequence lengths excluding padding), must not be null, but a null was actually passed."),
-            return GRAPH_FAILED);
+        OP_CHECK_IF(actSeqData == nullptr,
+                    OP_LOGE_WITH_INVALID_INPUT(host_api_ctx->GetNodeName(), "actual_seq_lengths"), return GRAPH_FAILED);
 
         const size_t len = static_cast<size_t>(actualSeqLengthsGe->GetShapeSize());
         for (size_t i = 0; i < len; i++) {
@@ -99,7 +99,9 @@ static graphStatus PromptHostExecuteFunc(OpExecuteContext* host_api_ctx)
         innerPrecise > INNER_PRECISE_MAX) { // innerPrecise=2,3 corresponds to high-performance or high-precision mode
                                             // with invalid rows.
         // 4 is for approximate computation. only for 310p
-        OP_LOGE("aclnnfallback", "invalid innerPrecise(%ld). Only support 0~4 now.", innerPrecise);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(host_api_ctx->GetNodeName(), "inner_precise",
+                                              std::to_string(innerPrecise).c_str(),
+                                              "inner_precise only supports 0 to 4");
         return GRAPH_FAILED;
     }
     OP_LOGD("aclnnFallback", "PromptFlashAttentionV3 fallback begin, numHeads = %ld, dScaleValue = %lf", numHeads,
@@ -120,7 +122,9 @@ static graphStatus PromptHostExecuteFunc(OpExecuteContext* host_api_ctx)
                        actSeqArrayKv, deq_scale1, quant_scale1, deq_scale2, quant_scale2, quant_offset2, numHeads,
                        dScaleValue, preTokens, nextTokens, layout, kvHeadNum, sparseMode, innerPrecise, output);
 
-    OP_CHECK_IF(api_ret != GRAPH_SUCCESS, OP_LOGE("aclnnfallback", "api_ret failed: %u", api_ret), return GRAPH_FAILED);
+    OP_CHECK_IF(api_ret != GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(host_api_ctx->GetNodeName(), "api_ret failed: %u", api_ret),
+                return GRAPH_FAILED);
 
     return GRAPH_SUCCESS;
 }

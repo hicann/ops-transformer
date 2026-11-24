@@ -44,19 +44,23 @@ static const size_t INNER_PRECISE_INDEX = 5;
 
 graphStatus IncreHostExecuteFunc(OpExecutePrepareContext* host_api_ctx)
 {
-    OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE("aclnnfallback", "host_api_ctx is null"), return GRAPH_FAILED);
+    OP_CHECK_IF(host_api_ctx == nullptr, OP_LOGE_WITHOUT_REPORT("aclnnfallback", "host_api_ctx is null"),
+                return GRAPH_FAILED);
 
     auto query = host_api_ctx->GetInputTensor(QUERY_INDEX);
-    OP_CHECK_IF(query == nullptr, OP_LOGE(host_api_ctx->GetNodeName(), "query is null"), return GRAPH_FAILED);
+    OP_CHECK_IF(query == nullptr, OP_LOGE_WITH_INVALID_INPUT(host_api_ctx->GetNodeName(), "query"),
+                return GRAPH_FAILED);
 
     auto key = host_api_ctx->GetDynamicInputTensor(KEY_INDEX, 0);
-    OP_CHECK_IF(key == nullptr, OP_LOGE(host_api_ctx->GetNodeName(), "key is null"), return GRAPH_FAILED);
+    OP_CHECK_IF(key == nullptr, OP_LOGE_WITH_INVALID_INPUT(host_api_ctx->GetNodeName(), "key"), return GRAPH_FAILED);
 
     auto value = host_api_ctx->GetDynamicInputTensor(VALUE_INDEX, 0);
-    OP_CHECK_IF(value == nullptr, OP_LOGE(host_api_ctx->GetNodeName(), "value is null"), return GRAPH_FAILED);
+    OP_CHECK_IF(value == nullptr, OP_LOGE_WITH_INVALID_INPUT(host_api_ctx->GetNodeName(), "value"),
+                return GRAPH_FAILED);
 
     auto output = host_api_ctx->GetOutputTensor(0);
-    OP_CHECK_IF(output == nullptr, OP_LOGE(host_api_ctx->GetNodeName(), "output is null"), return GRAPH_FAILED);
+    OP_CHECK_IF(output == nullptr, OP_LOGE_WITH_INVALID_INPUT(host_api_ctx->GetNodeName(), "attention_out"),
+                return GRAPH_FAILED);
 
     std::vector<const gert::Tensor*> ge_tenserListKey;
     ge_tenserListKey.push_back(key);
@@ -93,22 +97,19 @@ graphStatus IncreHostExecuteFunc(OpExecutePrepareContext* host_api_ctx)
     const uint32_t* kvHeadNum = attrs->GetAttrPointer<uint32_t>(KV_HEAD_NUM_INDEX);
     const uint32_t* blockSize = attrs->GetAttrPointer<uint32_t>(BLOCK_SIZE_INDEX);
     OP_CHECK_IF(blockSize == nullptr,
-                OP_LOGE(host_api_ctx->GetNodeName(),
-                        "In block-wise attention computation, blockSize is a required parameter (controls matrix block "
-                        "dimension), must not be null, but a null was actually passed."),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(host_api_ctx->GetNodeName(), "block_size",
+                                                         "required attribute is missing"),
                 return GRAPH_FAILED);
 
     const uint32_t* innerPrecise = attrs->GetAttrPointer<uint32_t>(INNER_PRECISE_INDEX);
     OP_CHECK_IF(innerPrecise == nullptr,
-                OP_LOGE(host_api_ctx->GetNodeName(),
-                        "In internal operations (e.g., attention matrix multiplication, softmax), innerPrecise is a "
-                        "required parameter (specifies precision), must not be null, but a null was actually passed."),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(host_api_ctx->GetNodeName(), "inner_precise",
+                                                         "required attribute is missing"),
                 return GRAPH_FAILED);
 
     OP_CHECK_IF(scaleValue == nullptr,
-                OP_LOGE(host_api_ctx->GetNodeName(),
-                        "When computing attention weights, scaleValue is a required parameter (normalizes QK^T to "
-                        "prevent softmax gradient vanishing), must not be null, but a null was actually passed."),
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(host_api_ctx->GetNodeName(), "scale_value",
+                                                         "required attribute is missing"),
                 return GRAPH_FAILED);
 
     double dScaleValue = *scaleValue;
@@ -119,8 +120,8 @@ graphStatus IncreHostExecuteFunc(OpExecutePrepareContext* host_api_ctx)
                                attenMaskGe, actSeqArray, dequantScale1Ge, quantScale1Ge, dequantScale2Ge, quantScale2Ge,
                                quantOffset2Ge, antiquantScaleGe, antiquantOffsetGe, blocktableGe, kvPaddingSizeGe,
                                *num_heads, dScaleValue, layout, *kvHeadNum, *blockSize, *innerPrecise, output);
-    OP_CHECK_IF(api_ret != GRAPH_SUCCESS, OP_LOGE(host_api_ctx->GetNodeName(), "api_ret failed:%u", api_ret),
-                return GRAPH_FAILED);
+    OP_CHECK_IF(api_ret != GRAPH_SUCCESS,
+                OP_LOGE_WITHOUT_REPORT(host_api_ctx->GetNodeName(), "api_ret failed:%u", api_ret), return GRAPH_FAILED);
 
     return GRAPH_SUCCESS;
 }

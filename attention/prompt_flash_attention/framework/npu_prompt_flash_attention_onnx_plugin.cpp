@@ -47,19 +47,19 @@ static Status GetAttrFromPre4(const ge::Operator& op, int& num_heads, string& in
                               int& pre_tokens)
 {
     if (op.GetAttr("num_heads", num_heads) != SUCCESS) {
-        OP_LOGE(GetOpName(op).c_str(), "get num_heads from op failed");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GetOpName(op).c_str(), "num_heads", "get attribute from op failed");
         return FAILED;
     }
     if (op.GetAttr("input_layout", input_layout) != SUCCESS) {
-        OP_LOGE(GetOpName(op).c_str(), "get input_layout from op failed");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GetOpName(op).c_str(), "input_layout", "get attribute from op failed");
         return FAILED;
     }
     if (op.GetAttr("scale_value", scale_value) != SUCCESS) {
-        OP_LOGE(GetOpName(op).c_str(), "get scale_value from op failed");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GetOpName(op).c_str(), "scale_value", "get attribute from op failed");
         return FAILED;
     }
     if (op.GetAttr("pre_tokens", pre_tokens) != SUCCESS) {
-        OP_LOGE(GetOpName(op).c_str(), "get pre_tokens from op failed");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GetOpName(op).c_str(), "pre_tokens", "get attribute from op failed");
         return FAILED;
     }
     return SUCCESS;
@@ -69,19 +69,21 @@ static Status GetAttrFromLast4(const ge::Operator& op, int& next_tokens, int& nu
                                int& inner_precise)
 {
     if (op.GetAttr("next_tokens", next_tokens) != SUCCESS) {
-        OP_LOGE(GetOpName(op).c_str(), "get next_tokens from op failed");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GetOpName(op).c_str(), "next_tokens", "get attribute from op failed");
         return FAILED;
     }
     if (op.GetAttr("num_key_value_heads", num_key_value_heads) != SUCCESS) {
-        OP_LOGE(GetOpName(op).c_str(), "get num_key_value_heads from op failed");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GetOpName(op).c_str(), "num_key_value_heads",
+                                                 "get attribute from op failed");
         return FAILED;
     }
     if (op.GetAttr("sparse_mode", sparse_mode) != SUCCESS) {
-        OP_LOGE(GetOpName(op).c_str(), "get sparse_mode from op failed");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GetOpName(op).c_str(), "sparse_mode", "get attribute from op failed");
         return FAILED;
     }
     if (op.GetAttr("inner_precise", inner_precise) != SUCCESS) {
-        OP_LOGE(GetOpName(op).c_str(), "get inner_precise from op failed");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GetOpName(op).c_str(), "inner_precise",
+                                                 "get attribute from op failed");
         return FAILED;
     }
     return SUCCESS;
@@ -90,11 +92,11 @@ static Status GetAttrFromLast4(const ge::Operator& op, int& next_tokens, int& nu
 static Status GetAttrFromPromptFlashAttention(const ge::Operator& op, std::string& ori_name, int& input_size)
 {
     if (op.GetAttr("name", ori_name) != SUCCESS) {
-        OP_LOGE(GetOpName(op).c_str(), "get name from op failed.");
+        OP_LOGE_WITHOUT_REPORT(GetOpName(op).c_str(), "get name from op failed.");
         return FAILED;
     }
     if (op.GetAttr("input_size", input_size) != SUCCESS) {
-        OP_LOGE(GetOpName(op).c_str(), "get input_size from op failed.");
+        OP_LOGE_WITHOUT_REPORT(GetOpName(op).c_str(), "get input_size from op failed.");
         return FAILED;
     }
     return SUCCESS;
@@ -105,7 +107,7 @@ static Status ParseParamsPromptFlashAttention(const Message* op_src, ge::Operato
 {
     const NodeProto* node = dynamic_cast<const NodeProto*>(op_src);
     if (node == nullptr) {
-        OP_LOGE("PromptFlashAttention", "Dynamic cast op_src to NodeProto failed.");
+        OP_LOGE_WITHOUT_REPORT("PromptFlashAttention", "Dynamic cast op_src to NodeProto failed.");
         return FAILED;
     }
 
@@ -142,7 +144,8 @@ static Status ParseParamsPromptFlashAttention(const Message* op_src, ge::Operato
     }
 
     if (required_attr_num != REQUIRED_ATTR) {
-        OP_LOGE(GetOpName(op_dest).c_str(), "Attr num_heads and input_layout are required, please check.");
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(GetOpName(op_dest).c_str(), "num_heads, input_layout",
+                                                 "required attribute is missing");
         return FAILED;
     }
 

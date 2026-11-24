@@ -658,6 +658,7 @@ protected:
     ge::graphStatus CheckLearnableSinkWhenLayoutIsTND(ContextParamsForPFATiling& contextKeyParams) const;
 
 protected:
+    void ReportTilingFailure(const gert::TilingContext* context, const char* reason) const;
     ContextParamsForPFATiling* contextKeyParamsPtr = nullptr;
     int64_t ubSizeRemain = 1;
     bool isSOuterNoTail = true;

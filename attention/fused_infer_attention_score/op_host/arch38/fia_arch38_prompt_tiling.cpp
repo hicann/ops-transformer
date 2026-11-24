@@ -14,6 +14,7 @@
  */
 #include "fia_arch38_prompt_tiling.h"
 #include <queue>
+#include <vector>
 
 #include "register/op_def_registry.h"
 #include "tiling/tiling_api.h"
@@ -132,6 +133,15 @@ using namespace matmul_tiling;
 namespace optiling {
 
 namespace arch38 {
+namespace {
+inline void ReportTilingFailure(const gert::TilingContext* context, const char* reason)
+{
+    OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "%s\n", reason);
+    const std::vector<const char*> msgKey = {"op_name", "reason"};
+    const std::vector<const char*> msgvalue = {context->GetNodeName(), reason};
+    REPORT_PREDEFINED_ERR_MSG("EZ1008", msgKey, msgvalue);
+}
+} // namespace
 constexpr uint32_t INPUT_QKV_SHAPE_MIN_DIMS = 3;
 constexpr uint32_t INPUT_QKV_SHAPE_MAX_DIMS = 4;
 
@@ -289,11 +299,9 @@ bool FiaArch38PromptTiling::CheckNonEmptyShapeExceptions(const FiaArch38ContextP
                                                          const gert::StorageShape* shape,
                                                          const std::string& sName) const
 {
-    OP_CHECK_IF(shape == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "%s shape is null.", sName.c_str()), return false);
+    OP_CHECK_IF(shape == nullptr, OP_LOGE_WITH_INVALID_INPUT(contextKeyParams.opName, sName.c_str()), return false);
     OP_CHECK_IF(shape->GetStorageShape().GetShapeSize() == gert::Shape::kInvalidDimValue,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Get the shape size of %s failed.", sName.c_str()),
-                return false);
+                ReportTilingFailure(context_, "get the shape size of tensor failed"), return false);
     return true;
 }
 
@@ -366,9 +374,10 @@ bool FiaArch38PromptTiling::CheckIODataType(FiaArch38ContextParams& contextKeyPa
                 GetPfaDataTypeStr(inputType).c_str());
     }
     OP_CHECK_IF((inputTypeCheck == allowedDtypes.end() || outputTypeCheck == allowedDtypes.end()),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName, "inputType(%s) and outputType(%s) should be DT_FLOAT16, DT_BF16, DT_INT8.",
-                    GetPfaDataTypeStr(inputType).c_str(), GetPfaDataTypeStr(outputType).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+                    contextKeyParams.opName, "inputType, outputType",
+                    (GetPfaDataTypeStr(inputType) + ", " + GetPfaDataTypeStr(outputType)).c_str(),
+                    "inputType and outputType should be DT_FLOAT16, DT_BF16 or DT_INT8"),
                 return false);
     return true;
 }
@@ -468,20 +477,20 @@ bool FiaArch38PromptTiling::GetAndCheckShape(FiaArch38ContextParams& contextKeyP
                                              const gert::StorageShape* shape, const std::string& sName) const
 {
     std::string layoutStr(contextKeyParams.layout);
-    OP_CHECK_IF((shape->GetStorageShape().GetDimNum() != 3) &&
-                    (inputLayout == InputLayout::BSH || inputLayout == InputLayout::TND),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "dim num of %s should = 3 when inputLayout is %s,"
-                                            "but dim num is %zu.",
-                                            sName.c_str(), layoutStr.c_str(), shape->GetStorageShape().GetDimNum()),
-                return false);
-    OP_CHECK_IF((shape->GetStorageShape().GetDimNum() != 4) &&
-                    (inputLayout != InputLayout::BSH && inputLayout != InputLayout::TND),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "dim num of %s should = 4 when inputLayout is %s,"
-                                            "but dim num is %zu.",
-                                            sName.c_str(), layoutStr.c_str(), shape->GetStorageShape().GetDimNum()),
-                return false);
+    OP_CHECK_IF(
+        (shape->GetStorageShape().GetDimNum() != 3) &&
+            (inputLayout == InputLayout::BSH || inputLayout == InputLayout::TND),
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            contextKeyParams.opName, sName.c_str(), std::to_string(shape->GetStorageShape().GetDimNum()).c_str(),
+            (std::string("dim num of ") + sName + " must be 3 when inputLayout is " + layoutStr).c_str()),
+        return false);
+    OP_CHECK_IF(
+        (shape->GetStorageShape().GetDimNum() != 4) &&
+            (inputLayout != InputLayout::BSH && inputLayout != InputLayout::TND),
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            contextKeyParams.opName, sName.c_str(), std::to_string(shape->GetStorageShape().GetDimNum()).c_str(),
+            (std::string("dim num of ") + sName + " must be 4 when inputLayout is " + layoutStr).c_str()),
+        return false);
 
     int64_t b = 0;
     int64_t n = 0;
@@ -492,43 +501,41 @@ bool FiaArch38PromptTiling::GetAndCheckShape(FiaArch38ContextParams& contextKeyP
     if (!SetShape(contextKeyParams, shape, sName, b, n, s, d, h, t)) {
         return false;
     }
-    OP_CHECK_IF((b > BLIMIT || b <= 0),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "batch size of %s should be less than or equal to %u and > 0, but batch size = %ld.", sName.c_str(),
-                    BLIMIT, b),
-                return false);
-    OP_CHECK_IF((s <= 0),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "seq size of %s should > 0, but sequence size = %ld.", sName.c_str(), s),
-                return false);
+    OP_CHECK_IF(
+        (b > BLIMIT || b <= 0),
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(contextKeyParams.opName, sName.c_str(), std::to_string(b).c_str(),
+                                                  "batch size of tensor must be within (0, BLIMIT]"),
+        return false);
+    OP_CHECK_IF(
+        (s <= 0),
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(contextKeyParams.opName, sName.c_str(), std::to_string(s).c_str(),
+                                                  "seq size of tensor must be greater than 0"),
+        return false);
     if (s > SLIMIT) {
         OP_LOGW(contextKeyParams.opName, "sequence size of %s should <= 20M, but seq = %ld.", sName.c_str(), s);
     }
     if (inputLayout == InputLayout::BSH) {
-        OP_CHECK_IF((d > DLIMIT || d <= 0),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "d size of %s should be less than or equal to %u and > 0, but d = %ld, "
-                                                "and layout is BSH, d = h / headsNumber.",
-                                                sName.c_str(), DLIMIT, d),
-                    return false);
-        OP_CHECK_IF((n > NLIMIT || n <= 0),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "n size of %s should be less than or equal to %u and > 0, but n = %ld, "
-                                                "and layout is BSH, n = headsNumber.",
-                                                sName.c_str(), NLIMIT, n),
-                    return false);
+        OP_CHECK_IF(
+            (d > DLIMIT || d <= 0),
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(contextKeyParams.opName, sName.c_str(), std::to_string(d).c_str(),
+                                                      "d size of tensor must be within (0, DLIMIT]"),
+            return false);
+        OP_CHECK_IF(
+            (n > NLIMIT || n <= 0),
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(contextKeyParams.opName, sName.c_str(), std::to_string(n).c_str(),
+                                                      "n size of tensor must be within (0, NLIMIT]"),
+            return false);
     } else {
-        OP_CHECK_IF((n > NLIMIT || n <= 0),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "n size of %s should be less than or equal to %u and > 0, but n = %ld.",
-                                                sName.c_str(), NLIMIT, n),
-                    return false);
-        OP_CHECK_IF((d > DLIMIT || d <= 0),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "d size of %s should be less than or equal to %u and > 0, but d = %ld.",
-                                                sName.c_str(), DLIMIT, d),
-                    return false);
+        OP_CHECK_IF(
+            (n > NLIMIT || n <= 0),
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(contextKeyParams.opName, sName.c_str(), std::to_string(n).c_str(),
+                                                      "n size of tensor must be within (0, NLIMIT]"),
+            return false);
+        OP_CHECK_IF(
+            (d > DLIMIT || d <= 0),
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(contextKeyParams.opName, sName.c_str(), std::to_string(d).c_str(),
+                                                      "d size of tensor must be within (0, DLIMIT]"),
+            return false);
     }
     if (((inputLayout == InputLayout::BSH) || (inputLayout == InputLayout::BSND)) && (h > HLIMIT)) {
         OP_LOGW(contextKeyParams.opName,
@@ -538,7 +545,8 @@ bool FiaArch38PromptTiling::GetAndCheckShape(FiaArch38ContextParams& contextKeyP
     }
     OP_CHECK_IF(
         (inputLayout == InputLayout::TND) && (t <= 0),
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "When layout is TND, t should > 0, but t = %ld.", t),
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(contextKeyParams.opName, sName.c_str(), std::to_string(t).c_str(),
+                                                  "when layout is TND, t must be greater than 0"),
         return false);
     shapeInfo.b = static_cast<uint32_t>(b);
     shapeInfo.n = static_cast<uint64_t>(n);
@@ -554,26 +562,25 @@ bool FiaArch38PromptTiling::GetAndCheckRopeShape(FiaArch38ContextParams& context
                                                  const std::string& sName, const std::string& rName) const
 {
     std::string layoutStr(contextKeyParams.layout);
-    OP_CHECK_IF((shape->GetStorageShape().GetDimNum() != 3) &&
-                    (inputLayout == InputLayout::BSH || inputLayout == InputLayout::TND),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "dim num of %s should = 3 when inputLayout is %s,"
-                                            "but dim num is %zu.",
-                                            sName.c_str(), layoutStr.c_str(), shape->GetStorageShape().GetDimNum()),
-                return false);
-    OP_CHECK_IF((shape->GetStorageShape().GetDimNum() != 4) &&
-                    (inputLayout != InputLayout::BSH && inputLayout != InputLayout::TND),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "dim num of %s should = 4 when inputLayout is %s,"
-                                            "but dim num is %zu.",
-                                            sName.c_str(), layoutStr.c_str(), shape->GetStorageShape().GetDimNum()),
-                return false);
+    OP_CHECK_IF(
+        (shape->GetStorageShape().GetDimNum() != 3) &&
+            (inputLayout == InputLayout::BSH || inputLayout == InputLayout::TND),
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            contextKeyParams.opName, sName.c_str(), std::to_string(shape->GetStorageShape().GetDimNum()).c_str(),
+            (std::string("dim num of ") + sName + " must be 3 when inputLayout is " + layoutStr).c_str()),
+        return false);
+    OP_CHECK_IF(
+        (shape->GetStorageShape().GetDimNum() != 4) &&
+            (inputLayout != InputLayout::BSH && inputLayout != InputLayout::TND),
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            contextKeyParams.opName, sName.c_str(), std::to_string(shape->GetStorageShape().GetDimNum()).c_str(),
+            (std::string("dim num of ") + sName + " must be 4 when inputLayout is " + layoutStr).c_str()),
+        return false);
 
     OP_CHECK_IF((shapeInfo.d != 128 && shapeInfo.d != 512),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "When queryRope and keyRope is not null, d size of %s must be 128 or 512, "
-                                            "but d = %d.",
-                                            sName.c_str(), shapeInfo.d),
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                    contextKeyParams.opName, sName.c_str(), std::to_string(shapeInfo.d).c_str(),
+                    "when queryRope and keyRope is not null, d must be 128 or 512"),
                 return false);
 
     int64_t b = 0;
@@ -588,47 +595,44 @@ bool FiaArch38PromptTiling::GetAndCheckRopeShape(FiaArch38ContextParams& context
 
     if (inputLayout == InputLayout::BSH) {
         OP_CHECK_IF((d != 64),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "When queryRope and keyRope is not null, d size of %s must be 64, "
-                                                "but d = %ld, and layout is BSH, d = h / headNumber.",
-                                                rName.c_str(), d),
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                        contextKeyParams.opName, rName.c_str(), std::to_string(d).c_str(),
+                        "when queryRope and keyRope is not null, d must be 64 when layout is BSH"),
                     return false);
     } else {
-        OP_CHECK_IF((d != 64),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "When queryRope and keyRope is not null, d size of %s must be 64, "
-                                                "but d = %ld.",
-                                                rName.c_str(), d),
-                    return false);
+        OP_CHECK_IF(
+            (d != 64),
+            OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(contextKeyParams.opName, rName.c_str(), std::to_string(d).c_str(),
+                                                      "when queryRope and keyRope is not null, d must be 64"),
+            return false);
     }
 
     if (!enableTensorList || sName == "query") {
         OP_CHECK_IF(
             (b != shapeInfo.b),
-            OPS_REPORT_VECTOR_INNER_ERR(
-                contextKeyParams.opName,
-                "batch size of %s should be equal to %s batch size, but %s batch size = %ld, %s batch size = %u.",
-                rName.c_str(), sName.c_str(), rName.c_str(), b, sName.c_str(), shapeInfo.b),
+            OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(contextKeyParams.opName, (rName + ", " + sName).c_str(),
+                                                       (std::to_string(b) + ", " + std::to_string(shapeInfo.b)).c_str(),
+                                                       "batch size of rope must be equal to batch size of tensor"),
             return false);
     }
     OP_CHECK_IF(
         (n != shapeInfo.n),
-        OPS_REPORT_VECTOR_INNER_ERR(
-            contextKeyParams.opName,
-            "head number of %s should be equal to %s head number, but %s head number = %ld, %s head number = %u.",
-            rName.c_str(), sName.c_str(), rName.c_str(), n, sName.c_str(), shapeInfo.n),
+        OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(contextKeyParams.opName, (rName + ", " + sName).c_str(),
+                                                   (std::to_string(n) + ", " + std::to_string(shapeInfo.n)).c_str(),
+                                                   "head number of rope must be equal to head number of tensor"),
         return false);
-    OP_CHECK_IF((s != shapeInfo.s),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "seq length of %s should be equal to %s seq length, but %s seq length = %ld, %s seq length = %u.",
-                    rName.c_str(), sName.c_str(), rName.c_str(), s, sName.c_str(), shapeInfo.s),
-                return false);
-    OP_CHECK_IF((t != shapeInfo.t),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "t of %s should be equal to %s t, but %s t = %ld, %s t = %u.",
-                                            rName.c_str(), sName.c_str(), rName.c_str(), t, sName.c_str(), shapeInfo.t),
-                return false);
+    OP_CHECK_IF(
+        (s != shapeInfo.s),
+        OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(contextKeyParams.opName, (rName + ", " + sName).c_str(),
+                                                   (std::to_string(s) + ", " + std::to_string(shapeInfo.s)).c_str(),
+                                                   "seq length of rope must be equal to seq length of tensor"),
+        return false);
+    OP_CHECK_IF(
+        (t != shapeInfo.t),
+        OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(contextKeyParams.opName, (rName + ", " + sName).c_str(),
+                                                   (std::to_string(t) + ", " + std::to_string(shapeInfo.t)).c_str(),
+                                                   "t of rope must be equal to t of tensor"),
+        return false);
 
     if (((inputLayout == InputLayout::BSH) || (inputLayout == InputLayout::BSND)) &&
         (static_cast<uint32_t>(h) > HLIMIT)) {
@@ -657,16 +661,16 @@ bool FiaArch38PromptTiling::CheckQueryOutParamsConsistency(const FiaArch38Contex
     std::string layoutStr(contextKeyParams.layout);
 
     OP_CHECK_IF(queryDimNum != outDimNum,
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "tensor query shape dimNum(%zu) must be consistent with tensor output shape dimNum(%zu)!",
-                    queryDimNum, outDimNum),
+                OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+                    contextKeyParams.opName, "query, attention_out",
+                    (std::to_string(queryDimNum) + ", " + std::to_string(outDimNum)).c_str(),
+                    "query dim num must be consistent with output dim num"),
                 return false);
-    OP_CHECK_IF((queryDimNum < INPUT_QKV_SHAPE_MIN_DIMS) || (queryDimNum > INPUT_QKV_SHAPE_MAX_DIMS),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "tensor query shape dimNum(%zu) is invalid! Only support range [%u, %u].",
-                                            queryDimNum, INPUT_QKV_SHAPE_MIN_DIMS, INPUT_QKV_SHAPE_MAX_DIMS),
-                return false);
+    OP_CHECK_IF(
+        (queryDimNum < INPUT_QKV_SHAPE_MIN_DIMS) || (queryDimNum > INPUT_QKV_SHAPE_MAX_DIMS),
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(contextKeyParams.opName, "query", std::to_string(queryDimNum).c_str(),
+                                                 "query dim num is invalid, only support 3 or 4 dimensions"),
+        return false);
 
     for (uint32_t i = 0; i < queryDimNum; ++i) {
         if ((i == queryDimNum - 1) && enablePFAMLA) {
@@ -685,10 +689,10 @@ bool FiaArch38PromptTiling::CheckQueryOutParamsConsistency(const FiaArch38Contex
             outDim = outShape->GetStorageShape().GetDim(i);
         }
         OP_CHECK_IF(tmpqueryDim != outDim,
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        contextKeyParams.opName,
-                        "tensor query shape (%ld) do not equal to tensor output shape(%ld) in dim %u for %s.",
-                        tmpqueryDim, outDim, i, layoutStr.c_str()),
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        contextKeyParams.opName, "query, attention_out",
+                        (std::to_string(tmpqueryDim) + ", " + std::to_string(outDim)).c_str(),
+                        "query and output shape must be equal in the same dim"),
                     return false);
     }
     return true;
@@ -704,16 +708,17 @@ bool FiaArch38PromptTiling::CheckKVDataType(FiaArch38ContextParams& contextKeyPa
 
     auto keyTypeCheck = std::find(allowedDtypes.begin(), allowedDtypes.end(), keyDataType);
 
-    OP_CHECK_IF(
-        (keyDataType != valueDataType),
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "DataType of key(%s) not equal datatype of value(%s).",
-                                    GetPfaDataTypeStr(contextKeyParams.kDataType).c_str(),
-                                    GetPfaDataTypeStr(contextKeyParams.vDataType).c_str()),
-        return false);
+    OP_CHECK_IF((keyDataType != valueDataType),
+                OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(contextKeyParams.opName, "key, value",
+                                                       (GetPfaDataTypeStr(contextKeyParams.kDataType) + ", " +
+                                                        GetPfaDataTypeStr(contextKeyParams.vDataType))
+                                                           .c_str(),
+                                                       "key and value must have the same data type"),
+                return false);
     OP_CHECK_IF((keyTypeCheck == allowedDtypes.end()),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "DataType of key(%s) should be DT_FLOAT16, DT_BF16, DT_INT8.",
-                                            GetPfaDataTypeStr(contextKeyParams.kDataType).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(contextKeyParams.opName, "key",
+                                                      GetPfaDataTypeStr(contextKeyParams.kDataType).c_str(),
+                                                      "key dtype only supports DT_FLOAT16, DT_BF16 or DT_INT8"),
                 return false);
     return true;
 }
@@ -728,28 +733,28 @@ bool FiaArch38PromptTiling::CheckKeyValueParamsConsistency(FiaArch38ContextParam
     const size_t keyDimNum = keyShape->GetStorageShape().GetDimNum();
     const size_t valueDimNum = valueShape->GetStorageShape().GetDimNum();
     OP_CHECK_IF(keyDimNum != valueDimNum,
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "tensor key shape dimNum(%zu) must be consistent with tensor value shape dimNum(%zu)!", keyDimNum,
-                    valueDimNum),
+                OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+                    contextKeyParams.opName, "key, value",
+                    (std::to_string(keyDimNum) + ", " + std::to_string(valueDimNum)).c_str(),
+                    "key dim num must be consistent with value dim num"),
                 return false);
-    OP_CHECK_IF((keyDimNum < INPUT_QKV_SHAPE_MIN_DIMS) || (keyDimNum > INPUT_QKV_SHAPE_MAX_DIMS),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "tensor key shape dimNum(%zu) is invalid! Only support range [%u, %u].",
-                                            keyDimNum, INPUT_QKV_SHAPE_MIN_DIMS, INPUT_QKV_SHAPE_MAX_DIMS),
-                return false);
+    OP_CHECK_IF(
+        (keyDimNum < INPUT_QKV_SHAPE_MIN_DIMS) || (keyDimNum > INPUT_QKV_SHAPE_MAX_DIMS),
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(contextKeyParams.opName, "key", std::to_string(keyDimNum).c_str(),
+                                                 "key dim num is invalid, only support 3 or 4 dimensions"),
+        return false);
     for (uint32_t i = 0; i < keyDimNum; ++i) {
         if ((i == keyDimNum - 1) && enablePFAMLA) {
             continue;
         }
         int64_t tmpKeyDim = keyShape->GetStorageShape().GetDim(i);
         int64_t tmpValueDim = valueShape->GetStorageShape().GetDim(i);
-        OP_CHECK_IF(
-            tmpKeyDim != tmpValueDim,
-            OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                        "tensor key shape (%ld) do not equal to tensor value shape(%ld) in dim %u.",
-                                        tmpKeyDim, tmpValueDim, i),
-            return false);
+        OP_CHECK_IF(tmpKeyDim != tmpValueDim,
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        contextKeyParams.opName, "key, value",
+                        (std::to_string(tmpKeyDim) + ", " + std::to_string(tmpValueDim)).c_str(),
+                        "key and value shape must be equal in the same dim"),
+                    return false);
     }
     return true;
 }
@@ -781,8 +786,10 @@ bool FiaArch38PromptTiling::CheckInputDimAndHeadNum(FiaArch38ContextParams& cont
             keyShapeHeadNum = keyShape->GetStorageShape().GetDim(nIdx);
             valueShapeHeadNum = valueShape->GetStorageShape().GetDim(nIdx);
         } else {
-            OP_LOGE(contextKeyParams.opName, "input dim of q(%zu), k(%zu), v(%zu) must be 4 for BNSD or BSND format!",
-                    queryDim, keyDim, valueDim);
+            OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+                contextKeyParams.opName, "query, key, value",
+                (std::to_string(queryDim) + ", " + std::to_string(keyDim) + ", " + std::to_string(valueDim)).c_str(),
+                "query, key and value must be 4D for BNSD or BSND format");
             return false;
         }
     } else if ((inputLayout == InputLayout::TND) && (!enablePA)) {
@@ -791,30 +798,36 @@ bool FiaArch38PromptTiling::CheckInputDimAndHeadNum(FiaArch38ContextParams& cont
             keyShapeHeadNum = keyShape->GetStorageShape().GetDim(nIdx);
             valueShapeHeadNum = valueShape->GetStorageShape().GetDim(nIdx);
         } else {
-            OP_LOGE(contextKeyParams.opName, "input dim of q(%zu), k(%zu), v(%zu) must be 3 for TND format!", queryDim,
-                    keyDim, valueDim);
+            OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+                contextKeyParams.opName, "query, key, value",
+                (std::to_string(queryDim) + ", " + std::to_string(keyDim) + ", " + std::to_string(valueDim)).c_str(),
+                "query, key and value must be 3D for TND format");
             return false;
         }
     }
 
     OP_CHECK_IF(nQ > 256U, // The maximum limit for head is 256.
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "numHeads(%u) should not be more than 256!", nQ),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "num_heads", std::to_string(nQ).c_str(),
+                                                      "numHeads should not be more than 256"),
                 return false);
-    OP_CHECK_IF(queryShapeHeadNum != nQ,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "numHeads(%u) in query shape must be equal to numHeads(%u) in attr!",
-                                            queryShapeHeadNum, nQ),
-                return false);
-    OP_CHECK_IF(keyShapeHeadNum != nKV,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "numHeads(%u) in key shape do not match numKeyValueHeads(%u) in attr!",
-                                            keyShapeHeadNum, nKV),
-                return false);
-    OP_CHECK_IF(valueShapeHeadNum != nKV,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "numHeads(%u) in value shape do not match numKeyValueHeads(%u) in attr!",
-                                            valueShapeHeadNum, nKV),
-                return false);
+    OP_CHECK_IF(
+        queryShapeHeadNum != nQ,
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "query, num_heads",
+                                               (std::to_string(queryShapeHeadNum) + ", " + std::to_string(nQ)).c_str(),
+                                               "numHeads in query shape must be equal to numHeads in attr"),
+        return false);
+    OP_CHECK_IF(
+        keyShapeHeadNum != nKV,
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "key, num_key_value_heads",
+                                               (std::to_string(keyShapeHeadNum) + ", " + std::to_string(nKV)).c_str(),
+                                               "numHeads in key shape must match numKeyValueHeads in attr"),
+        return false);
+    OP_CHECK_IF(
+        valueShapeHeadNum != nKV,
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "value, num_key_value_heads",
+                                               (std::to_string(valueShapeHeadNum) + ", " + std::to_string(nKV)).c_str(),
+                                               "numHeads in value shape must match numKeyValueHeads in attr"),
+        return false);
     if (enableIFAMLA || enableIFA) {
         gSize = nQ / nKV;
     }
@@ -831,7 +844,9 @@ bool FiaArch38PromptTiling::SetAndCheckHeadNumRatio(FiaArch38ContextParams& cont
     const int64_t nKV = *contextKeyParams.numKeyValueHeads;
 
     if ((nQ < 0) || (nKV < 0)) {
-        OP_LOGE(contextKeyParams.opName, "numHeads(%d) or numKeyValueHeads(%d) is negative!", nQ, nKV);
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "num_heads, num_key_value_heads",
+                                               (std::to_string(nQ) + ", " + std::to_string(nKV)).c_str(),
+                                               "numHeads and numKeyValueHeads must not be negative");
         return false;
     }
 
@@ -854,11 +869,15 @@ bool FiaArch38PromptTiling::SetAndCheckHeadNumRatio(FiaArch38ContextParams& cont
     }
 
     if (nQ % nKV != 0) {
-        OP_LOGE(contextKeyParams.opName, "numHeads(%d) must be divisible by numKeyValueHeads(%d)!", nQ, nKV);
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "num_heads, num_key_value_heads",
+                                               (std::to_string(nQ) + ", " + std::to_string(nKV)).c_str(),
+                                               "numHeads must be divisible by numKeyValueHeads");
         return false;
     } else {
         if (nQ / nKV > 64 && (!enablePFAMLA)) { // G cannot be greater than 64.
-            OP_LOGE(contextKeyParams.opName, "numHeads / numKeyValueHeads = %d, cannot be larger than 64.", nQ / nKV);
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "num_heads / num_key_value_heads",
+                                                  std::to_string(nQ / nKV).c_str(),
+                                                  "numHeads / numKeyValueHeads must not be larger than 64");
             return false;
         }
         tilingData.fiaArch38AttentionBaseParams.set_headNumRatio(nQ / nKV);
@@ -873,42 +892,41 @@ bool FiaArch38PromptTiling::CheckPostQuantShape(const FiaArch38ContextParams& co
                                                 const PFAShapeInfo& valueShapeInfo) const
 {
     // dtype verification
-    OP_CHECK_IF((quantOffset2Shape != nullptr) && (quantScale2Type != contextKeyParams.quantOffset2Type),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "post quant scale dtype(%s) and offset dtype(%s) must be consistent.",
-                                            GetPfaDataTypeStr(quantScale2Type).c_str(),
-                                            GetPfaDataTypeStr(contextKeyParams.quantOffset2Type).c_str()),
-                return false);
-
     OP_CHECK_IF(
-        (quantScale2Type != ge::DT_BF16) && (quantScale2Type != ge::DT_FLOAT),
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "post quant scale dtype(%s) only support bf16 and fp32.",
-                                    GetPfaDataTypeStr(quantScale2Type).c_str()),
+        (quantOffset2Shape != nullptr) && (quantScale2Type != contextKeyParams.quantOffset2Type),
+        OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+            contextKeyParams.opName, "quant_scale2, quant_offset2",
+            (GetPfaDataTypeStr(quantScale2Type) + ", " + GetPfaDataTypeStr(contextKeyParams.quantOffset2Type)).c_str(),
+            "post quant scale and offset must have the same data type"),
         return false);
+
+    OP_CHECK_IF((quantScale2Type != ge::DT_BF16) && (quantScale2Type != ge::DT_FLOAT),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(contextKeyParams.opName, "quant_scale2",
+                                                      GetPfaDataTypeStr(quantScale2Type).c_str(),
+                                                      "post quant scale dtype only supports bf16 and fp32"),
+                return false);
 
     if (inputType == ge::DT_BF16) {
         OP_CHECK_IF(quantScale2Type != ge::DT_FLOAT && quantScale2Type != ge::DT_BF16,
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        contextKeyParams.opName,
-                        "invalid post quant scale dtype(%s), when q is %s, only support float32 and bf16",
-                        GetPfaDataTypeStr(quantScale2Type).c_str(), GetPfaDataTypeStr(inputType).c_str()),
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        contextKeyParams.opName, "quant_scale2", GetPfaDataTypeStr(quantScale2Type).c_str(),
+                        "post quant scale dtype only supports float32 and bf16 for this query dtype"),
                     return false);
     } else {
-        OP_CHECK_IF(
-            quantScale2Type != ge::DT_FLOAT,
-            OPS_REPORT_VECTOR_INNER_ERR(
-                contextKeyParams.opName, "invalid post quant scale dtype(%s), when q is %s, only support float32",
-                GetPfaDataTypeStr(quantScale2Type).c_str(), GetPfaDataTypeStr(inputType).c_str()),
-            return false);
+        OP_CHECK_IF(quantScale2Type != ge::DT_FLOAT,
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        contextKeyParams.opName, "quant_scale2", GetPfaDataTypeStr(quantScale2Type).c_str(),
+                        "post quant scale dtype only supports float32 for this query dtype"),
+                    return false);
     }
     // shape verification
     if (quantOffset2Shape != nullptr) {
         int64_t quantOffset2ShapeSize = quantOffset2Shape->GetStorageShape().GetShapeSize();
         OP_CHECK_IF(quantScale2ShapeSize != quantOffset2ShapeSize,
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "quant_scale2 dimension multiply result(%ld) do not equal "
-                                                "quant_offset2 dimension multiply result(%ld).",
-                                                quantScale2ShapeSize, quantOffset2ShapeSize),
+                    OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                        contextKeyParams.opName, "quant_scale2, quant_offset2",
+                        (std::to_string(quantScale2ShapeSize) + ", " + std::to_string(quantOffset2ShapeSize)).c_str(),
+                        "quant_scale2 and quant_offset2 dimension multiply results must be equal"),
                     return false);
     }
 
@@ -917,11 +935,9 @@ bool FiaArch38PromptTiling::CheckPostQuantShape(const FiaArch38ContextParams& co
     OP_CHECK_IF(
         quantScale2ShapeSize < 0 || ((static_cast<uint64_t>(quantScale2ShapeSize) != 1U) &&
                                      (static_cast<uint64_t>(quantScale2ShapeSize) != quantScale2ShapeSizePerChannel)),
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                    "post quant scale2/offset2 dimension multiply result only support 1 and qN * vD(%u "
-                                    "* %u = %lu), now is (%ld).",
-                                    queryShapeInfo.n, valueShapeInfo.d, quantScale2ShapeSizePerChannel,
-                                    quantScale2ShapeSize),
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            contextKeyParams.opName, "quant_scale2, quant_offset2", std::to_string(quantScale2ShapeSize).c_str(),
+            "post quant scale2/offset2 dimension multiply result only supports 1 or qN * vD"),
         return false);
     return true;
 }
@@ -934,23 +950,20 @@ bool FiaArch38PromptTiling::CheckPerTensorQuantParams(const FiaArch38ContextPara
     const ge::DataType inputParamsType = contextKeyParams.inputDataType;
     OP_CHECK_IF((inputParamsType != ge::DT_INT8) && (inputParamsType != ge::DT_HIFLOAT8) &&
                     (inputParamsType != ge::DT_FLOAT8_E4M3FN),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "inputParamsType must be INT8 or HIFLOAT8 or FLOAT8_E4M3FN in per-tensor quant scenario, now is %s",
-                    GetPfaDataTypeStr(contextKeyParams.inputDataType).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                    contextKeyParams.opName, "query", GetPfaDataTypeStr(contextKeyParams.inputDataType).c_str(),
+                    "input type must be INT8, HIFLOAT8 or FLOAT8_E4M3FN in per-tensor quant scenario"),
+                return false);
+    OP_CHECK_IF((deqScale1Shape == nullptr) || (quantScale1Shape == nullptr) || (deqScale2Shape == nullptr),
+                OP_LOGE_WITH_INVALID_INPUT(contextKeyParams.opName, "deq_scale1, quant_scale1, deq_scale2"),
                 return false);
     OP_CHECK_IF(
-        (deqScale1Shape == nullptr) || (quantScale1Shape == nullptr) || (deqScale2Shape == nullptr),
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                    "deqScale1, quantScale1 or deqScale2 is nullptr in per-tensor quant scenario."),
+        (deqScale1Shape != nullptr && deqScale1Shape->GetStorageShape().GetShapeSize() == 0) ||
+            (quantScale1Shape != nullptr && quantScale1Shape->GetStorageShape().GetShapeSize() == 0) ||
+            (deqScale2Shape != nullptr && deqScale2Shape->GetStorageShape().GetShapeSize() == 0),
+        OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(contextKeyParams.opName, "deq_scale1, quant_scale1, deq_scale2", "0",
+                                                   "quant scale inputs must not be empty in per-tensor quant scenario"),
         return false);
-    OP_CHECK_IF((deqScale1Shape != nullptr && deqScale1Shape->GetStorageShape().GetShapeSize() == 0) ||
-                    (quantScale1Shape != nullptr && quantScale1Shape->GetStorageShape().GetShapeSize() == 0) ||
-                    (deqScale2Shape != nullptr && deqScale2Shape->GetStorageShape().GetShapeSize() == 0),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "deqScale1, quantScale1 or deqScale2 is empty tensor in per-tensor quant scenario."),
-                return false);
     return true;
 }
 
@@ -967,38 +980,38 @@ bool FiaArch38PromptTiling::CheckPerblockQuantParams(const FiaArch38ContextParam
     const gert::StorageShape* valueAntiquantScaleshape = contextKeyParams.valueAntiquantScaleShape;
     OP_CHECK_IF(
         (contextKeyParams.inputDataType != ge::DT_HIFLOAT8) && (contextKeyParams.inputDataType != ge::DT_FLOAT8_E4M3FN),
-        OPS_REPORT_VECTOR_INNER_ERR(
-            contextKeyParams.opName,
-            "inputType must be HIFLOAT8 or FLOAT8_E4M3FN in per-block quant scenario, now is %s.",
-            GetPfaDataTypeStr(inputType).c_str()),
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+            contextKeyParams.opName, "query", GetPfaDataTypeStr(inputType).c_str(),
+            "input type must be HIFLOAT8 or FLOAT8_E4M3FN in per-block quant scenario"),
         return false);
     OP_CHECK_IF((dequantScaleQueryType != ge::DT_FLOAT) || (keyAntiquantScaleType != ge::DT_FLOAT) ||
                     (valueAntiquantScaleType != ge::DT_FLOAT),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "dequantscale type must be DT_FLOAT in per-block quant scenario, now is %s, %s, %s.",
-                    GetPfaDataTypeStr(dequantScaleQueryType).c_str(), GetPfaDataTypeStr(keyAntiquantScaleType).c_str(),
-                    GetPfaDataTypeStr(valueAntiquantScaleType).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(
+                    contextKeyParams.opName, "dequant_scale_query, key_antiquant_scale, value_antiquant_scale",
+                    (GetPfaDataTypeStr(dequantScaleQueryType) + ", " + GetPfaDataTypeStr(keyAntiquantScaleType) + ", " +
+                     GetPfaDataTypeStr(valueAntiquantScaleType))
+                        .c_str(),
+                    "dequant scale type must be DT_FLOAT in per-block quant scenario"),
                 return false);
-    OP_CHECK_IF(
-        (dequantScaleQueryShape == nullptr) || (keyAntiquantScaleShape == nullptr) ||
-            (valueAntiquantScaleshape == nullptr),
-        OPS_REPORT_VECTOR_INNER_ERR(
-            contextKeyParams.opName,
-            "dequantScaleQuery, keyAntiquantScale or valueAntiquantScale is nullptr in per-block quant scenario."),
-        return false);
+    OP_CHECK_IF((dequantScaleQueryShape == nullptr) || (keyAntiquantScaleShape == nullptr) ||
+                    (valueAntiquantScaleshape == nullptr),
+                OP_LOGE_WITH_INVALID_INPUT(contextKeyParams.opName,
+                                           "dequant_scale_query, key_antiquant_scale, value_antiquant_scale"),
+                return false);
     OP_CHECK_IF(
         (dequantScaleQueryShape->GetStorageShape().GetDim(0) != queryShapeInfo.b) ||
             (dequantScaleQueryShape->GetStorageShape().GetDim(1) != queryShapeInfo.n) ||
             (dequantScaleQueryShape->GetStorageShape().GetDim(2) !=
              CeilDivision(queryShapeInfo.s, static_cast<uint64_t>(128U))) || // 2 is the dim of dequantscale along s1.
             (dequantScaleQueryShape->GetStorageShape().GetDim(3) != 1),      // 3 is the dim of dequantscale along d.
-        OPS_REPORT_VECTOR_INNER_ERR(
-            contextKeyParams.opName,
-            "dequantScaleQueryShape must be (b,n1,ceil(s1/128),1) in per-block quant scenario, now is  [%ld, %ld, %ld, "
-            "%ld].",
-            dequantScaleQueryShape->GetStorageShape().GetDim(0), dequantScaleQueryShape->GetStorageShape().GetDim(1),
-            dequantScaleQueryShape->GetStorageShape().GetDim(2), dequantScaleQueryShape->GetStorageShape().GetDim(3)),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            contextKeyParams.opName, "dequant_scale_query",
+            ("[" + std::to_string(dequantScaleQueryShape->GetStorageShape().GetDim(0)) + ", " +
+             std::to_string(dequantScaleQueryShape->GetStorageShape().GetDim(1)) + ", " +
+             std::to_string(dequantScaleQueryShape->GetStorageShape().GetDim(2)) + ", " +
+             std::to_string(dequantScaleQueryShape->GetStorageShape().GetDim(3)) + "]")
+                .c_str(),
+            "dequantScaleQueryShape must be (b, n1, ceil(s1/128), 1) in per-block quant scenario"),
         return false);
     OP_CHECK_IF(
         (keyAntiquantScaleShape->GetStorageShape().GetDim(0) != keyShapeInfo.b) ||
@@ -1006,12 +1019,14 @@ bool FiaArch38PromptTiling::CheckPerblockQuantParams(const FiaArch38ContextParam
             (keyAntiquantScaleShape->GetStorageShape().GetDim(2) !=
              CeilDivision(keyShapeInfo.s, static_cast<uint64_t>(256U))) || //  2 is the dim of dequantscale along s2.
             (keyAntiquantScaleShape->GetStorageShape().GetDim(3) != 1),    // 3 is the dim of dequantscale along d.
-        OPS_REPORT_VECTOR_INNER_ERR(
-            contextKeyParams.opName,
-            "keyAntiquantScaleShape must be (b,n2,ceil(s2/256),1) in per-block quant scenario, now is [%ld, %ld, %ld, "
-            "%ld].",
-            keyAntiquantScaleShape->GetStorageShape().GetDim(0), keyAntiquantScaleShape->GetStorageShape().GetDim(1),
-            keyAntiquantScaleShape->GetStorageShape().GetDim(2), keyAntiquantScaleShape->GetStorageShape().GetDim(3)),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            contextKeyParams.opName, "key_antiquant_scale",
+            ("[" + std::to_string(keyAntiquantScaleShape->GetStorageShape().GetDim(0)) + ", " +
+             std::to_string(keyAntiquantScaleShape->GetStorageShape().GetDim(1)) + ", " +
+             std::to_string(keyAntiquantScaleShape->GetStorageShape().GetDim(2)) + ", " +
+             std::to_string(keyAntiquantScaleShape->GetStorageShape().GetDim(3)) + "]")
+                .c_str(),
+            "keyAntiquantScaleShape must be (b, n2, ceil(s2/256), 1) in per-block quant scenario"),
         return false);
     OP_CHECK_IF(
         (valueAntiquantScaleshape->GetStorageShape().GetDim(0) != valueShapeInfo.b) ||
@@ -1019,13 +1034,14 @@ bool FiaArch38PromptTiling::CheckPerblockQuantParams(const FiaArch38ContextParam
             (valueAntiquantScaleshape->GetStorageShape().GetDim(2) !=
              CeilDivision(valueShapeInfo.s, static_cast<uint64_t>(256U))) || // 2 is the dim of dequantscale along s2.
             (valueAntiquantScaleshape->GetStorageShape().GetDim(3) != 1),    // 3 is the dim of dequantscale along d.
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                    "valueAntiquantScaleshape must be (b,n2,ceil(s2/256),1) when enablePertensorQuant "
-                                    "is true, now is [%ld, %ld, %ld, %ld].",
-                                    valueAntiquantScaleshape->GetStorageShape().GetDim(0),
-                                    valueAntiquantScaleshape->GetStorageShape().GetDim(1),
-                                    valueAntiquantScaleshape->GetStorageShape().GetDim(2),
-                                    valueAntiquantScaleshape->GetStorageShape().GetDim(3)),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            contextKeyParams.opName, "value_antiquant_scale",
+            ("[" + std::to_string(valueAntiquantScaleshape->GetStorageShape().GetDim(0)) + ", " +
+             std::to_string(valueAntiquantScaleshape->GetStorageShape().GetDim(1)) + ", " +
+             std::to_string(valueAntiquantScaleshape->GetStorageShape().GetDim(2)) + ", " +
+             std::to_string(valueAntiquantScaleshape->GetStorageShape().GetDim(3)) + "]")
+                .c_str(),
+            "valueAntiquantScaleShape must be (b, n2, ceil(s2/256), 1) when enablePertensorQuant is true"),
         return false);
     return true;
 }
@@ -1045,22 +1061,20 @@ bool FiaArch38PromptTiling::CheckPostQuantParams(const FiaArch38ContextParams& c
     uint64_t queryD = h / n;
 
     OP_CHECK_IF(outputType != ge::DT_INT8 && outputType != ge::DT_FLOAT8_E4M3FN && outputType != ge::DT_HIFLOAT8,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "invalid output type [%s], only support int8, fp8_e4m3fn_t, hifloat8_t",
-                                            GetPfaDataTypeStr(outputType).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(contextKeyParams.opName, "attention_out",
+                                                      GetPfaDataTypeStr(outputType).c_str(),
+                                                      "output type only supports int8, fp8_e4m3fn or hifloat8"),
                 return false);
 
     // Basic verification: quantScale2 must be inputted and not an empty tensor
-    OP_CHECK_IF(
-        quantScale2Shape == nullptr,
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "quant_scale2_shape is nullptr in post quant scenario."),
-        return false);
+    OP_CHECK_IF(quantScale2Shape == nullptr, OP_LOGE_WITH_INVALID_INPUT(contextKeyParams.opName, "quant_scale2"),
+                return false);
     quantScale2ShapeSize = quantScale2Shape->GetStorageShape().GetShapeSize();
     quantD = quantScale2ShapeSize / n;
-    OP_CHECK_IF(
-        quantScale2ShapeSize == 0,
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "quant_scale2 is empty tensor in post quant scenario."),
-        return false);
+    OP_CHECK_IF(quantScale2ShapeSize == 0,
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(contextKeyParams.opName, "quant_scale2", "0",
+                                                          "quant_scale2 must not be empty in post quant scenario"),
+                return false);
 
     // altert unsupported situation(post quant per-tensor + BF16 + BSH + D unalign)
     if ((contextKeyParams.inputDataType == ge::DT_BF16) && (quantScale2ShapeSize == 1) &&
@@ -1070,7 +1084,7 @@ bool FiaArch38PromptTiling::CheckPostQuantParams(const FiaArch38ContextParams& c
     }
     OP_CHECK_IF(!CheckPostQuantShape(contextKeyParams, quantOffset2Shape, quantScale2Type, quantScale2ShapeSize,
                                      queryShapeInfo, valueShapeInfo),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "post quant params check failed!"), return false);
+                OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "post quant params check failed!"), return false);
     return true;
 }
 
@@ -1079,7 +1093,7 @@ bool FiaArch38PromptTiling::CheckAntiquantParamsShape(FiaArch38ContextParams& co
     const gert::StorageShape* antiquantScaleShape = contextKeyParams.antiquantScaleShape;
     // 伪量化收编至ifa tiling，pfa接口kv若传入伪量化dtype均会在此被拦截
     OP_CHECK_IF(contextKeyParams.antiquantScale == nullptr || antiquantScaleShape == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "antiquant scale is nullptr"), return false);
+                OP_LOGE_WITH_INVALID_INPUT(contextKeyParams.opName, "antiquant_scale"), return false);
     return true;
 }
 
@@ -1098,22 +1112,30 @@ bool FiaArch38PromptTiling::GetAndCheckPrefixShape(FiaArch38ContextParams& conte
                   dPrefix, hPrefix, tPrefix)) {
         return false;
     }
-    OP_CHECK_IF((bPrefix != 1),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "prefix batch num(%ld) only support 1!", bPrefix),
-                return false);
+    OP_CHECK_IF(
+        (bPrefix != 1),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "prefix batch", std::to_string(bPrefix).c_str(),
+                                              "prefix batch num only supports 1"),
+        return false);
     if (inputLayout == InputLayout::BSH) {
-        OP_CHECK_IF(
-            (hPrefix != queryShapeInfo.h / tilingData.fiaArch38AttentionBaseParams.get_headNumRatio()),
-            OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "prefix H(%ld) should be same with KV H(%u)!", hPrefix,
-                                        queryShapeInfo.h / tilingData.fiaArch38AttentionBaseParams.get_headNumRatio()),
-            return false);
+        OP_CHECK_IF((hPrefix != queryShapeInfo.h / tilingData.fiaArch38AttentionBaseParams.get_headNumRatio()),
+                    OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                        contextKeyParams.opName, "key_shared_prefix, key",
+                        (std::to_string(hPrefix) + ", " +
+                         std::to_string(queryShapeInfo.h / tilingData.fiaArch38AttentionBaseParams.get_headNumRatio()))
+                            .c_str(),
+                        "prefix H must be the same as KV H"),
+                    return false);
     } else {
         OP_CHECK_IF((nPrefix != queryShapeInfo.n / tilingData.fiaArch38AttentionBaseParams.get_headNumRatio()) ||
                         (dPrefix != queryShapeInfo.h / queryShapeInfo.n),
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        contextKeyParams.opName, "prefix N(%ld) and D(%ld) should be same with KV N(%u) and D(%u)!",
-                        nPrefix, dPrefix, queryShapeInfo.n / tilingData.fiaArch38AttentionBaseParams.get_headNumRatio(),
-                        queryShapeInfo.h / queryShapeInfo.n),
+                    OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                        contextKeyParams.opName, "key_shared_prefix, key",
+                        (std::to_string(nPrefix) + ", " + std::to_string(dPrefix) + ", " +
+                         std::to_string(queryShapeInfo.n / tilingData.fiaArch38AttentionBaseParams.get_headNumRatio()) +
+                         ", " + std::to_string(queryShapeInfo.h / queryShapeInfo.n))
+                            .c_str(),
+                        "prefix N and D must be the same as KV N and D"),
                     return false);
     }
     prefixShapeInfo.b = static_cast<uint32_t>(bPrefix);
@@ -1132,25 +1154,26 @@ bool FiaArch38PromptTiling::CheckKeyValuePrefixConsistency(FiaArch38ContextParam
     size_t KVDim = keyShape->GetStorageShape().GetDimNum();
     OP_CHECK_IF(
         ((prefixKeyDim != KVDim) || (prefixKeyDim != prefixValueDim)),
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                    "dim num of key_shared_prefix and value_shared_prefix should be same with KV, "
-                                    "but key_shared_prefix dim(%zu), value_shared_prefix dim(%zu), KV dim(%zu)!",
-                                    prefixKeyDim, prefixValueDim, KVDim),
+        OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+            contextKeyParams.opName, "key_shared_prefix, value_shared_prefix, key",
+            (std::to_string(prefixKeyDim) + ", " + std::to_string(prefixValueDim) + ", " + std::to_string(KVDim))
+                .c_str(),
+            "dim num of key_shared_prefix and value_shared_prefix must be the same as KV"),
         return false);
     for (uint32_t i = 0; i < prefixKeyDim; i++) {
         int64_t tmpPrefixKeyDim = contextKeyParams.keySharedPrefix->GetStorageShape().GetDim(i);
         int64_t tmpPrefixValueDim = contextKeyParams.valueSharedPrefix->GetStorageShape().GetDim(i);
         OP_CHECK_IF(((tmpPrefixKeyDim == 0) || (tmpPrefixValueDim == 0)),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "key_shared_prefix and value_shared_prefix not support empty tensor,"
-                                                "but key_shared_prefix[%u]:%ld, value_shared_prefix[%u]:%ld!",
-                                                i, tmpPrefixKeyDim, i, tmpPrefixValueDim),
+                    OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                        contextKeyParams.opName, "key_shared_prefix, value_shared_prefix",
+                        (std::to_string(tmpPrefixKeyDim) + ", " + std::to_string(tmpPrefixValueDim)).c_str(),
+                        "key_shared_prefix and value_shared_prefix do not support empty tensor"),
                     return false);
         OP_CHECK_IF(((tmpPrefixKeyDim != tmpPrefixValueDim)),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "shape of key_shared_prefix should be same with value_shared_prefix,"
-                                                "but key_shared_prefix[%u]:%ld, value_shared_prefix[%u]:%ld!",
-                                                i, tmpPrefixKeyDim, i, tmpPrefixValueDim),
+                    OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
+                        contextKeyParams.opName, "key_shared_prefix, value_shared_prefix",
+                        (std::to_string(tmpPrefixKeyDim) + ", " + std::to_string(tmpPrefixValueDim)).c_str(),
+                        "shape of key_shared_prefix must be the same as value_shared_prefix"),
                     return false);
     }
     return true;
@@ -1161,23 +1184,25 @@ bool FiaArch38PromptTiling::CheckActSharedPrefix(FiaArch38ContextParams& context
 {
     size_t prefixDimNum = contextKeyParams.actualSharedPrefixLen->GetStorageShape().GetDimNum();
     OP_CHECK_IF((prefixDimNum != 1),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "actualSharedPrefixLen dim num(%zu) should be 1!",
-                                            prefixDimNum),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(contextKeyParams.opName, "actual_shared_prefix_len",
+                                                         std::to_string(prefixDimNum).c_str(),
+                                                         "actualSharedPrefixLen dim num must be 1"),
                 return false);
     int64_t prefixShapeSize = contextKeyParams.actualSharedPrefixLen->GetStorageShape().GetShapeSize();
     OP_CHECK_IF((prefixShapeSize != 1),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "actualSharedPrefixLen length(%ld) should be 1!",
-                                            prefixShapeSize),
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(contextKeyParams.opName, "actual_shared_prefix_len",
+                                                          std::to_string(prefixShapeSize).c_str(),
+                                                          "actualSharedPrefixLen length must be 1"),
                 return false);
     OP_CHECK_IF((contextKeyParams.actualSharedPrefixLen->GetData<int64_t>() == nullptr),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "input actualSharedPrefixLen GetData is nullptr!"),
+                OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "input actualSharedPrefixLen GetData is nullptr!"),
                 return false);
     actualSharedPrefixLen = contextKeyParams.actualSharedPrefixLen->GetData<int64_t>()[0];
-    OP_CHECK_IF(
-        (actualSharedPrefixLen > sPrefix) || (actualSharedPrefixLen < 0),
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "actualSharedPrefixLen(%ld) must be in range[0, %u]!",
-                                    actualSharedPrefixLen, sPrefix),
-        return false);
+    OP_CHECK_IF((actualSharedPrefixLen > sPrefix) || (actualSharedPrefixLen < 0),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "actual_shared_prefix_len",
+                                                      std::to_string(actualSharedPrefixLen).c_str(),
+                                                      "actualSharedPrefixLen must be in range [0, sPrefix]"),
+                return false);
 
     if (actualSharedPrefixLen + sKV > SLIMIT) {
         OP_LOGW(contextKeyParams.opName, "Seq size of actualSharedPrefixLen(%ld) + kv_s(%u) should <= 20m",
@@ -1206,38 +1231,42 @@ bool FiaArch38PromptTiling::CheckPAKeyValueShape(FiaArch38ContextParams& context
     OP_CHECK_IF(
         (keyDim == KV_CACHE_DIM_NUMS_4) && ((keyDim1 != valueDim1) || (keyDim2 != valueDim2) ||
                                             (keyDim3 != valueDim3) || ((keyDim4 != valueDim4) && (!enablePFAMLA))),
-        OPS_REPORT_VECTOR_INNER_ERR(
-            contextKeyParams.opName,
-            "the dim num of key and value are inconsistent when PA enable. key shape [%ld,%ld,%ld,%ld],"
-            " value shape [%ld,%ld,%ld,%ld].",
-            keyDim1, keyDim2, keyDim3, keyDim4, valueDim1, valueDim2, valueDim3, valueDim4),
+        OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+            contextKeyParams.opName, "key, value",
+            (std::to_string(keyDim1) + ", " + std::to_string(keyDim2) + ", " + std::to_string(keyDim3) + ", " +
+             std::to_string(keyDim4) + ", " + std::to_string(valueDim1) + ", " + std::to_string(valueDim2) + ", " +
+             std::to_string(valueDim3) + ", " + std::to_string(valueDim4))
+                .c_str(),
+            "the dim num of key and value are inconsistent when PA enable"),
         return false);
     OP_CHECK_IF((keyDim == KV_CACHE_DIM_NUMS_3) &&
                     ((keyDim1 != valueDim1) || (keyDim2 != valueDim2) || ((keyDim3 != valueDim3) && (!enablePFAMLA))),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "the dim num of key and value are inconsistent when PA enable. key shape "
-                                            "[%ld,%ld,%ld], value shape [%ld,%ld,%ld].",
-                                            keyDim1, keyDim2, keyDim3, valueDim1, valueDim2, valueDim3),
+                OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+                    contextKeyParams.opName, "key, value",
+                    (std::to_string(keyDim1) + ", " + std::to_string(keyDim2) + ", " + std::to_string(keyDim3) + ", " +
+                     std::to_string(valueDim1) + ", " + std::to_string(valueDim2) + ", " + std::to_string(valueDim3))
+                        .c_str(),
+                    "the dim num of key and value are inconsistent when PA enable"),
                 return false);
     std::string layoutStr(contextKeyParams.layout);
     if (inputLayout == InputLayout::BNSD || inputLayout == InputLayout::TND) {
-        OP_CHECK_IF(((keyDim != KV_CACHE_DIM_NUMS_3) && (keyDim != KV_CACHE_DIM_NUMS_4)),
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        contextKeyParams.opName, // dim num: 3/4
-                        "the layout of query is %s, key and value layout should be [>=%ld, %d, %u] or [>=%ld, %u, %d, "
-                        "%u] when PA enable.",
-                        layoutStr.c_str(), blockNumValid, *blockSize, queryShapeInfo.h / headNumRatio, blockNumValid,
-                        queryShapeInfo.n / headNumRatio, *blockSize, (queryShapeInfo.h / queryShapeInfo.n)),
-                    return false);
+        OP_CHECK_IF(
+            ((keyDim != KV_CACHE_DIM_NUMS_3) && (keyDim != KV_CACHE_DIM_NUMS_4)),
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(contextKeyParams.opName, "key, value",
+                                                   (std::to_string(keyDim1) + ", " + std::to_string(keyDim2) + ", " +
+                                                    std::to_string(keyDim3) + ", " + std::to_string(keyDim4))
+                                                       .c_str(),
+                                                   "the layout of key and value is invalid when PA enable"),
+            return false);
     } else if (inputLayout == InputLayout::BSH || inputLayout == InputLayout::BSND) {
-        OP_CHECK_IF(keyDim != 3,
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        contextKeyParams.opName,
-                        "the layout of query is %s, key and value layout should be [>=%ld, %d, %u] when PA enable."
-                        " now key and value shape [%ld, %ld, %ld, %ld].",
-                        layoutStr.c_str(), blockNumValid, *blockSize, queryShapeInfo.h / headNumRatio, keyDim1, keyDim2,
-                        keyDim3, keyDim4),
-                    return false);
+        OP_CHECK_IF(
+            keyDim != 3,
+            OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(contextKeyParams.opName, "key, value",
+                                                   (std::to_string(keyDim1) + ", " + std::to_string(keyDim2) + ", " +
+                                                    std::to_string(keyDim3) + ", " + std::to_string(keyDim4))
+                                                       .c_str(),
+                                                   "the layout of key and value is invalid when PA enable"),
+            return false);
     }
     return true;
 }
@@ -1258,35 +1287,35 @@ bool FiaArch38PromptTiling::CheckPACacheShape(FiaArch38ContextParams& contextKey
     int64_t tempD = 0;
     if (keyDim == 3) {    // dim num: 3
         paLayoutType = 1; // If it is three-dimensional, paLayoutType = 1
-        OP_CHECK_IF(((dim1 < blockNumValid) || (tempBlockSize != *blockSize) || (tempH * headNumRatio != shapeInfo.h)),
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        contextKeyParams.opName,
-                        "the dim of %s [%ld, %ld, %ld] is wrong, which should be [>=%ld, %d, %u] when PA enable",
-                        sName.c_str(), dim1, dim2, dim3, blockNumValid, *blockSize, shapeInfo.h / headNumRatio),
-                    return false);
+        OP_CHECK_IF(
+            ((dim1 < blockNumValid) || (tempBlockSize != *blockSize) || (tempH * headNumRatio != shapeInfo.h)),
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                contextKeyParams.opName, sName.c_str(),
+                ("[" + std::to_string(dim1) + ", " + std::to_string(dim2) + ", " + std::to_string(dim3) + "]").c_str(),
+                "the dim must be [>=blockNumValid, blockSize, h/headNumRatio] when PA enable"),
+            return false);
         // In the BSH input of the PA scenario, it is required that the h of the KV matrix does not exceed 65535.
         // The dim and dim3 of the K/V have already been verified to be equal, so only the K matrix is verified here.
-        OP_CHECK_IF(
-            dim3 > HLIMIT,
-            OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                        "layout of key/value is BSH, the %s h(%ld) should not > 65535 when PA enable",
-                                        sName.c_str(), dim3),
-            return false);
+        OP_CHECK_IF(dim3 > HLIMIT,
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                        contextKeyParams.opName, sName.c_str(), std::to_string(dim3).c_str(),
+                        "layout of key/value is BSH, h must not be greater than 65535 when PA enable"),
+                    return false);
     } else {
         dim4 = shape->GetStorageShape().GetDim(3); // 3: The third dimension.
         tempN = dim2;
         tempBlockSize = dim3;
         tempD = dim4;
         paLayoutType = 0; // If it is four-dimensional, paLayoutType = 0
-        OP_CHECK_IF(
-            ((dim1 < blockNumValid) || (tempN * headNumRatio != shapeInfo.n) || (tempBlockSize != *blockSize) ||
-             (tempD != (shapeInfo.h / shapeInfo.n))),
-            OPS_REPORT_VECTOR_INNER_ERR(
-                contextKeyParams.opName,
-                "the dim of %s [%ld, %ld, %ld, %ld] is wrong, which should be [>=%ld, %u, %d, %u] when PA enable!",
-                sName.c_str(), dim1, dim2, dim3, dim4, blockNumValid, shapeInfo.n / headNumRatio, *blockSize,
-                (shapeInfo.h / shapeInfo.n)),
-            return false);
+        OP_CHECK_IF(((dim1 < blockNumValid) || (tempN * headNumRatio != shapeInfo.n) || (tempBlockSize != *blockSize) ||
+                     (tempD != (shapeInfo.h / shapeInfo.n))),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        contextKeyParams.opName, sName.c_str(),
+                        ("[" + std::to_string(dim1) + ", " + std::to_string(dim2) + ", " + std::to_string(dim3) + ", " +
+                         std::to_string(dim4) + "]")
+                            .c_str(),
+                        "the dim must be [>=blockNumValid, n/headNumRatio, blockSize, h/n] when PA enable"),
+                    return false);
     }
     return true;
 }
@@ -1329,12 +1358,12 @@ bool FiaArch38PromptTiling::CheckBlockTableShape(FiaArch38ContextParams& context
     if (enableIFAMLA) {
         const gert::StorageShape* keyRopeShape = contextKeyParams.keyRopeInputShape;
         const size_t keyRopeDim = keyRopeShape->GetStorageShape().GetDimNum();
-        OP_CHECK_IF(
-            (keyRopeDim != keyDim),
-            OPS_REPORT_VECTOR_INNER_ERR(
-                contextKeyParams.opName,
-                "the dim of keyRope(%zu) should be equal to the dim of key(%zu) when PA enable!", keyRopeDim, keyDim),
-            return false);
+        OP_CHECK_IF((keyRopeDim != keyDim),
+                    OP_LOGE_FOR_INVALID_SHAPEDIMS_WITH_REASON(
+                        contextKeyParams.opName, "key_rope, key",
+                        (std::to_string(keyRopeDim) + ", " + std::to_string(keyDim)).c_str(),
+                        "the dim of keyRope must be equal to the dim of key when PA enable"),
+                    return false);
         if (!CheckPACacheShape(contextKeyParams, keyDim, queryRopeShapeInfo, keyRopeShape, blockSize, blockNumValid,
                                headNumRatio, "keyRope")) {
             return false;
@@ -1352,16 +1381,16 @@ bool FiaArch38PromptTiling::CheckBlockTableShape(FiaArch38ContextParams& context
     blockTableStr.pop_back();
 
     OP_CHECK_IF(blockTableDim != 2, // PA BlockTable dim size
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "the dim of block table must be 2 when PA enable! blockTable dims [%zu], Shape [%s].",
-                    blockTableDim, blockTableStr.c_str()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(contextKeyParams.opName, "block_table",
+                                                         std::to_string(blockTableDim).c_str(),
+                                                         "the dim of block table must be 2 when PA enable"),
                 return false);
 
     OP_CHECK_IF(((blockTableDim1 != queryShapeInfo.b) || (blockTableDim2 < maxBlockNumPerBatch)),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "block table shape should be [%u, >=%d], now is [%ld, %d] when PA enable!",
-                                            queryShapeInfo.b, maxBlockNumPerBatch, blockTableDim1, blockTableDim2),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    contextKeyParams.opName, "block_table",
+                    ("[" + std::to_string(blockTableDim1) + ", " + std::to_string(blockTableDim2) + "]").c_str(),
+                    "block table shape should be [b, >=maxBlockNumPerBatch] when PA enable"),
                 return false);
 
     paBlockNumSum = keyDim1;
@@ -1405,7 +1434,9 @@ bool FiaArch38PromptTiling::CheckMaskShape(FiaArch38ContextParams& contextKeyPar
         strMaskShape = std::to_string(attenMaskBatch) + ", " + std::to_string(attenMaskN) + ", " +
                        std::to_string(attenMaskS1) + ", " + std::to_string(attenMaskS2);
     } else {
-        OP_LOGE(contextKeyParams.opName, "attenMask dim(%zu) must be 2 or 3 or 4!", attenMaskDim);
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(contextKeyParams.opName, "atten_mask",
+                                                 std::to_string(attenMaskDim).c_str(),
+                                                 "attenMask dim must be 2, 3 or 4");
         return false;
     }
 
@@ -1509,32 +1540,32 @@ bool FiaArch38PromptTiling::CheckMaskShapeCrossSparse(FiaArch38ContextParams& co
         return false;
     }
     if (enableIFA) {
-        OP_CHECK_IF(
-            !checkMask,
-            OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                        "attenMask batch(%ld) must be %u, attenMask Q_S(%ld) must be 1,"
-                                        "attenMask KV_S(%ld) must be larger than or equal to sK(%u), please check",
-                                        attenMaskBatch, batchSize, attenMaskS1, attenMaskS2, sK),
-            return false);
+        OP_CHECK_IF(!checkMask,
+                    OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                        contextKeyParams.opName, "atten_mask",
+                        (std::to_string(attenMaskBatch) + ", " + std::to_string(attenMaskS1) + ", " +
+                         std::to_string(attenMaskS2))
+                            .c_str(),
+                        "attenMask batch, Q_S and KV_S are invalid for the given sparse mode"),
+                    return false);
     } else {
         if (isDefaultSparseMode || ((sparseMode != nullptr) && (*sparseMode == SPARSE_MODE_ALL_MASK))) {
-            OP_CHECK_IF(
-                !checkMask,
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "attenMask batch(%ld) must be 1 or %u, attenMask Q_S(%ld) must be larger than or equal to sQ(%u),"
-                    "attenMask KV_S(%ld) must be larger than or equal to sK(%u), please check",
-                    attenMaskBatch, batchSize, attenMaskS1, sQ, attenMaskS2, sK),
-                return false);
+            OP_CHECK_IF(!checkMask,
+                        OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                            contextKeyParams.opName, "atten_mask",
+                            (std::to_string(attenMaskBatch) + ", " + std::to_string(attenMaskS1) + ", " +
+                             std::to_string(attenMaskS2))
+                                .c_str(),
+                            "attenMask batch, Q_S and KV_S are invalid for the given sparse mode"),
+                        return false);
         }
         if ((sparseMode != nullptr) &&
             ((*sparseMode == SPARSE_MODE_LEFT_UP) || (*sparseMode == SPARSE_MODE_RIGHT_DOWN) ||
              (*sparseMode == SPARSE_MODE_BAND)) &&
             !checkMask) {
-            OP_LOGE(contextKeyParams.opName,
-                    "attenMask shape must be (2048, 2048) or (1, 2048, 2048) or (1, 1, 2048, 2048) when sparse mode = "
-                    "%d, but now it's (%s).",
-                    *sparseMode, strMaskShape.c_str());
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                contextKeyParams.opName, "atten_mask", strMaskShape.c_str(),
+                "attenMask shape must be (2048, 2048), (1, 2048, 2048) or (1, 1, 2048, 2048) for this sparse mode");
             return false;
         }
     }
@@ -1574,16 +1605,13 @@ bool FiaArch38PromptTiling::CheckIO(FiaArch38ContextParams& contextKeyParams, PF
 
     // check layout
     OP_CHECK_IF((!SetInputLayout(contextKeyParams.layout)),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "Invalid input layout:%s. Currently only TND/BSH/BNSD/BSND/BSND_BNSD layout are supported.",
-                    contextKeyParams.layout),
+                OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(contextKeyParams.opName, "input_layout", contextKeyParams.layout,
+                                                       "input layout must be one of TND, BSH, BNSD, BSND or BNSD_BSND"),
                 return false);
 
     // check query shape size and bnsd
     OP_CHECK_IF((!GetAndCheckShape(contextKeyParams, queryShapeInfo, queryShape, "query")),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Get and check query shape failed."),
-                return false);
+                OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Get and check query shape failed."), return false);
     if (queryShapeInfo.s == 1 && !enableAlibiPse) {
         enableIFA = true;
     }
@@ -1602,8 +1630,7 @@ bool FiaArch38PromptTiling::CheckIO(FiaArch38ContextParams& contextKeyParams, PF
         valueShapeInfo.d = d;
     } else {
         OP_CHECK_IF((!GetAndCheckShape(contextKeyParams, valueShapeInfo, valueShape, "value")),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Get and check value shape failed."),
-                    return false);
+                    OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Get and check value shape failed."), return false);
     }
     if (queryShapeInfo.d == MLA_QKD_SIZE && valueShapeInfo.d == MLA_VD_SIZE) {
         enablePFAMLA = true;
@@ -1611,7 +1638,7 @@ bool FiaArch38PromptTiling::CheckIO(FiaArch38ContextParams& contextKeyParams, PF
     }
     // check query and output consistency
     OP_CHECK_IF((!CheckQueryOutParamsConsistency(contextKeyParams, queryShape, outShape)),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Query and output consistency check failed."),
+                OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Query and output consistency check failed."),
                 return false);
 
     return true;
@@ -1630,16 +1657,15 @@ bool FiaArch38PromptTiling::CheckKV(FiaArch38ContextParams& contextKeyParams, PF
 
     // check key shape size and bnsd
     OP_CHECK_IF((!enablePA && !GetAndCheckShape(contextKeyParams, keyShapeInfo, keyShape, "key")),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Get and check key shape failed."), return false);
+                OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Get and check key shape failed."), return false);
 
     // check value shape size and bnsd
     OP_CHECK_IF((!enablePA && !GetAndCheckShape(contextKeyParams, valueShapeInfo, valueShape, "value")),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Get and check value shape failed."),
-                return false);
+                OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Get and check value shape failed."), return false);
 
     // check key and value consistency
     OP_CHECK_IF((!CheckKeyValueParamsConsistency(contextKeyParams, keyShape, valueShape)),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Key and value consistency check failed."),
+                OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Key and value consistency check failed."),
                 return false);
 
     return true;
@@ -1656,17 +1682,18 @@ bool FiaArch38PromptTiling::CheckQueryAndKey(FiaArch38ContextParams& contextKeyP
     // check b and s for not PA
     OP_CHECK_IF((contextKeyParams.fromTilingSink == 0) && (queryShapeInfo.b != keyShapeInfo.b) && (!enableTensorList) &&
                     (!enablePA),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "query batch must be equal to key/value batch, query batch = %u , key/value batch = %u.",
-                    queryShapeInfo.b, keyShapeInfo.b),
+                OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                    contextKeyParams.opName, "query, key, value",
+                    (std::to_string(queryShapeInfo.b) + ", " + std::to_string(keyShapeInfo.b)).c_str(),
+                    "query batch must be equal to key and value batch"),
                 return false);
     // check d size
     OP_CHECK_IF((contextKeyParams.fromTilingSink == 0) && (queryShapeInfo.d != keyShapeInfo.d) && (!enableTensorList) &&
                     (!enablePA),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "query d size must be equal to key d size, query d = %u , key d = %u.",
-                                            queryShapeInfo.d, keyShapeInfo.d),
+                OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                    contextKeyParams.opName, "query, key",
+                    (std::to_string(queryShapeInfo.d) + ", " + std::to_string(keyShapeInfo.d)).c_str(),
+                    "query d size must be equal to key d size"),
                 return false);
     return true;
 }
@@ -1676,25 +1703,22 @@ bool FiaArch38PromptTiling::CheckIFAMLA(FiaArch38ContextParams& contextKeyParams
 {
     constexpr uint32_t maxQuerySeqLenInIfaMla = 16U; // ifa mla场景qS最大支持16
     OP_CHECK_IF((queryShapeInfo.s > maxQuerySeqLenInIfaMla || queryShapeInfo.s < 1),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "input query's sequence length is %u, it should be "
-                                            "in range of [1, %u] when enable ifa mla",
-                                            queryShapeInfo.s, maxQuerySeqLenInIfaMla),
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                    contextKeyParams.opName, "query", std::to_string(queryShapeInfo.s).c_str(),
+                    "when enable ifa mla, query sequence length must be in range [1, maxQuerySeqLenInIfaMla]"),
                 return false);
     static const std::set<uint32_t> supportNumHeadInIfaMla = {32U, 64U, 128U}; // ifa mla场景qN支持范围
     OP_CHECK_IF((supportNumHeadInIfaMla.find(queryShapeInfo.n) == supportNumHeadInIfaMla.end()),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "input query's heads num is %u, it should be in range of "
-                                            "{32, 64, 128} when enable ifa mla",
-                                            queryShapeInfo.n),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "num_heads",
+                                                      std::to_string(queryShapeInfo.n).c_str(),
+                                                      "when enable ifa mla, query heads num must be 32, 64 or 128"),
                 return false);
     const int64_t nKV =
         *contextKeyParams.numKeyValueHeads; // ifa mla场景不支持g = 1, 因此在nKV用默认值0, nQ替代也属于异常场景
     OP_CHECK_IF((nKV != 1U),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "input key/value's heads num is %u, it should be 1 when enable "
-                                            "ifa mla",
-                                            nKV),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "num_key_value_heads",
+                                                      std::to_string(nKV).c_str(),
+                                                      "when enable ifa mla, key and value heads num must be 1"),
                 return false);
     return true;
 }
@@ -1706,12 +1730,14 @@ bool FiaArch38PromptTiling::CheckRope(FiaArch38ContextParams& contextKeyParams, 
         return true;
     }
     OP_CHECK_IF((contextKeyParams.queryRopeInputShape == nullptr && contextKeyParams.keyRopeInputShape != nullptr),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "queryRope is null, but keyRope is not null, "
-                                                                     "they should be consistent."),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "query_rope, key_rope",
+                                                       "queryRope absent, keyRope present",
+                                                       "queryRope and keyRope must be both present or both absent"),
                 return false);
     OP_CHECK_IF((contextKeyParams.queryRopeInputShape != nullptr && contextKeyParams.keyRopeInputShape == nullptr),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "queryRope is not null, but keyRope is null, "
-                                                                     "they should be consistent."),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "query_rope, key_rope",
+                                                       "queryRope present, keyRope absent",
+                                                       "queryRope and keyRope must be both present or both absent"),
                 return false);
     const gert::StorageShape* queryRopeShape = contextKeyParams.queryRopeInputShape;
     const gert::StorageShape* keyRopeShape = contextKeyParams.keyRopeInputShape;
@@ -1719,14 +1745,12 @@ bool FiaArch38PromptTiling::CheckRope(FiaArch38ContextParams& contextKeyParams, 
     // check queryRope shape
     OP_CHECK_IF((!GetAndCheckRopeShape(contextKeyParams, queryShapeInfo, queryRopeShapeInfo, queryRopeShape, "query",
                                        "queryRope")),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Get and check queryRope shape failed."),
-                return false);
+                OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Get and check queryRope shape failed."), return false);
     // check keyRope shape
     PFAShapeInfo keyRopeShapeInfo;
-    OP_CHECK_IF(
-        (!enablePA &&
-         !GetAndCheckRopeShape(contextKeyParams, keyShapeInfo, keyRopeShapeInfo, keyRopeShape, "key", "keyRope")),
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Get and check queryRope shape failed."), return false);
+    OP_CHECK_IF((!enablePA && !GetAndCheckRopeShape(contextKeyParams, keyShapeInfo, keyRopeShapeInfo, keyRopeShape,
+                                                    "key", "keyRope")),
+                OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Get and check queryRope shape failed."), return false);
     enableIFA = false;
     enablePFAMerge = false;
     if (queryShapeInfo.d == QUERY_SHAPE_DIM_D_128_TILING_V2) {
@@ -1748,42 +1772,42 @@ bool FiaArch38PromptTiling::CheckQuant(FiaArch38ContextParams& contextKeyParams,
     // per-tensor quant check
     if (enablePertensorQuant) {
         OP_CHECK_IF(!CheckPerTensorQuantParams(contextKeyParams),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "per-tensor quant params check failed!"),
+                    OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "per-tensor quant params check failed!"),
                     return false);
     }
 
     // per-block quant check
     if (enablePerblockQuant) {
         OP_CHECK_IF(!CheckPerblockQuantParams(contextKeyParams, queryShapeInfo, keyShapeInfo, valueShapeInfo),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "per-block quant params check failed!"),
+                    OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "per-block quant params check failed!"),
                     return false);
     }
 
     OP_CHECK_IF(
         ((contextKeyParams.inputDataType == ge::DT_INT8) && (contextKeyParams.outputDataType == ge::DT_FLOAT16) &&
          ((contextKeyParams.scale2Shape != nullptr) || (contextKeyParams.offset2Shape != nullptr))),
-        OPS_REPORT_VECTOR_INNER_ERR(
-            contextKeyParams.opName,
-            "When query dtype is int8 and output dtype is fp16, quantScale2 and quantOffset2 should be null."),
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+            contextKeyParams.opName, "quant_scale2, quant_offset2", "present",
+            "when query dtype is int8 and output dtype is fp16, quant_scale2 and quant_offset2 must be null"),
         return false);
 
     // quant/dequant dtype check
     if ((inputType == ge::DT_FLOAT16) && enablePostQuant) {
         OP_CHECK_IF((deqScale1Shape != nullptr) || (quantScale1Shape != nullptr) || (deqScale2Shape != nullptr),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "When input dtype is fp16 and postQuant is enable, "
-                                                "dequantScale1, quantScale1 and dequantScale2 should be null."),
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        contextKeyParams.opName, "dequant_scale1, quant_scale1, dequant_scale2", "present",
+                        "when input dtype is fp16 and postQuant is enabled, dequantScale1, quantScale1 and "
+                        "dequantScale2 must be null"),
                     return false);
     }
 
     // post-quant check
     if (enablePostQuant) {
         OP_CHECK_IF(!CheckPostQuantParams(contextKeyParams, queryShapeInfo, valueShapeInfo),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "post quant params check failed!"),
-                    return false);
+                    OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "post quant params check failed!"), return false);
     }
     OP_CHECK_IF(enableKVAntiquant && !CheckAntiquantParamsShape(contextKeyParams),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "antiquant params check failed!"), return false);
+                OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "antiquant params check failed!"), return false);
     return true;
 }
 
@@ -1799,28 +1823,30 @@ bool FiaArch38PromptTiling::CheckPrefix(FiaArch38ContextParams& contextKeyParams
     }
     // The prefix does not support tensorlist, PA, or left padding
     OP_CHECK_IF(enableTensorList,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "when tensorlist is used, system prefix is not supported!"),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "tensorlist, prefix",
+                                                       "tensorlist with system prefix",
+                                                       "when tensorlist is used, system prefix is not supported"),
                 return false);
     OP_CHECK_IF(enableLeftPadding,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "when system prefix is used, leftpadding is not supported!"),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "prefix, leftPadding",
+                                                       "system prefix with left padding",
+                                                       "when system prefix is used, left padding is not supported"),
                 return false);
     OP_CHECK_IF((contextKeyParams.inputDataType == ge::DT_INT8) && (contextKeyParams.kDataType == ge::DT_INT8),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "when system prefix is used, query and key/value should not both be int8!"),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    contextKeyParams.opName, "query, key/value", "both int8",
+                    "when system prefix is used, query and key/value should not both be int8"),
                 return false);
 
     // get prefix shape
     const gert::StorageShape* keyShape = contextKeyParams.keyInputShape;
 
     OP_CHECK_IF(!GetAndCheckPrefixShape(contextKeyParams, queryShapeInfo, prefixShapeInfo, tilingData),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Get and check prefix shape failed."),
-                return false);
+                OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Get and check prefix shape failed."), return false);
 
     // check prefix kv consistency
     OP_CHECK_IF(!CheckKeyValuePrefixConsistency(contextKeyParams, keyShape),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "key value prefix consistency check failed."),
+                OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "key value prefix consistency check failed."),
                 return false);
 
     // check actSharedPrefix
@@ -1845,24 +1871,19 @@ bool FiaArch38PromptTiling::CheckActSeq(const FiaArch38ContextParams& contextKey
 
     const gert::Tensor* actSeqLen = contextKeyParams.actualSequenceLengthQ;
     const gert::Tensor* actSeqLenKV = contextKeyParams.actualSequenceLengthKV;
-    OP_CHECK_IF(actSeqLen == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "When layout is TND, actualSequenceLengthQ can not be nullptr"),
+    OP_CHECK_IF(actSeqLen == nullptr, OP_LOGE_WITH_INVALID_INPUT(contextKeyParams.opName, "actual_seq_lengths"),
                 return false);
-    OP_CHECK_IF(actSeqLenKV == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "When layout is TND, actualSequenceLengthKV can not be nullptr"),
+    OP_CHECK_IF(actSeqLenKV == nullptr, OP_LOGE_WITH_INVALID_INPUT(contextKeyParams.opName, "actual_seq_lengths_kv"),
                 return false);
 
     auto batchOfQuery = actSeqLen->GetShapeSize();
     auto batchOfKey = actSeqLenKV->GetShapeSize();
     OP_CHECK_IF(
         batchOfQuery != batchOfKey,
-        OPS_REPORT_VECTOR_INNER_ERR(
-            contextKeyParams.opName,
-            "When layout is TND, the batch size of actualSequenceLengthQ and actualSequenceLengthKV must be equal, "
-            "batch size of actualSequenceLengthQ = %ld, batch size of actualSequenceLengthKV = %ld",
-            batchOfQuery, batchOfKey),
+        OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+            contextKeyParams.opName, "actual_seq_lengths, actual_seq_lengths_kv",
+            (std::to_string(batchOfQuery) + ", " + std::to_string(batchOfKey)).c_str(),
+            "when layout is TND, the batch size of actualSequenceLengthQ and actualSequenceLengthKV must be equal"),
         return false);
 
     int64_t lastActSeq = 0;
@@ -1871,26 +1892,26 @@ bool FiaArch38PromptTiling::CheckActSeq(const FiaArch38ContextParams& contextKey
     for (uint32_t i = LOOP_BEGIN_NUM; i < batchSize; ++i) {
         int64_t curActSeq = actSeqLen->GetData<int64_t>()[i];
         int64_t curActSeqKV = actSeqLenKV->GetData<int64_t>()[i];
-        OP_CHECK_IF(curActSeq < 0,
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "actualSeqLengths[%u] = %ld, should >= 0", i,
-                                                curActSeq),
-                    return false);
+        OP_CHECK_IF(
+            curActSeq < 0,
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "actual_seq_lengths",
+                                                  std::to_string(curActSeq).c_str(), "actualSeqLengths must be >= 0"),
+            return false);
         OP_CHECK_IF(((i >= 1) && (curActSeq < lastActSeq)),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "When layout is TND, actualSeqLengths must not be decreasing, but "
-                                                "actSeqLen[%u]=%ld is smaller than actSeqLen[%u]=%ld",
-                                                i, curActSeq, i - 1, lastActSeq),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        contextKeyParams.opName, "actual_seq_lengths", std::to_string(curActSeq).c_str(),
+                        "when layout is TND, actualSeqLengths must not be decreasing"),
                     return false);
         OP_CHECK_IF(curActSeqKV < 0,
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "actualSeqLengthsKv[%u] = %ld, should >= 0", i,
-                                                curActSeqKV),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "actual_seq_lengths_kv",
+                                                          std::to_string(curActSeqKV).c_str(),
+                                                          "actualSeqLengthsKv must be >= 0"),
                     return false);
         if (!enablePA) {
             OP_CHECK_IF(((i >= 1) && (curActSeqKV < lastActSeqKV)),
-                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                    "When layout is TND, actualSeqLengthsKv must not be decreasing, "
-                                                    "but actSeqLenKV[%u]=%ld is smaller than actSeqLenKV[%u]=%ld",
-                                                    i, curActSeqKV, i - 1, lastActSeqKV),
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                            contextKeyParams.opName, "actual_seq_lengths_kv", std::to_string(curActSeqKV).c_str(),
+                            "when layout is TND, actualSeqLengthsKv must not be decreasing"),
                         return false);
         }
         lastActSeq = curActSeq;
@@ -1900,17 +1921,17 @@ bool FiaArch38PromptTiling::CheckActSeq(const FiaArch38ContextParams& contextKey
     const gert::StorageShape* queryShape = contextKeyParams.queryInputShape;
     const gert::StorageShape* keyShape = contextKeyParams.keyInputShape;
     OP_CHECK_IF(actSeqLen->GetData<int64_t>()[batchSize - 1] != queryShape->GetStorageShape().GetDim(0),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "When layout is TND, the last element of Actual_seq_lengths(%ld) must be equal to T(%ld)",
-                    actSeqLen->GetData<int64_t>()[batchSize - 1], queryShape->GetStorageShape().GetDim(0)),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    contextKeyParams.opName, "actual_seq_lengths",
+                    std::to_string(actSeqLen->GetData<int64_t>()[batchSize - 1]).c_str(),
+                    "when layout is TND, the last element of actual_seq_lengths must equal T"),
                 return false);
     if (!enablePA) {
         OP_CHECK_IF(actSeqLenKV->GetData<int64_t>()[batchSize - 1] != keyShape->GetStorageShape().GetDim(0),
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        contextKeyParams.opName,
-                        "When layout is TND, the last element of Actual_seq_lengths_kv(%ld) must be equal to T(%ld)",
-                        actSeqLenKV->GetData<int64_t>()[batchSize - 1], keyShape->GetStorageShape().GetDim(0)),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        contextKeyParams.opName, "actual_seq_lengths_kv",
+                        std::to_string(actSeqLenKV->GetData<int64_t>()[batchSize - 1]).c_str(),
+                        "when layout is TND, the last element of actual_seq_lengths_kv must equal T"),
                     return false);
     }
 
@@ -1929,16 +1950,14 @@ bool FiaArch38PromptTiling::CheckActSeqLen(FiaArch38ContextParams& contextKeyPar
     std::string layoutStr(contextKeyParams.layout);
     if (enableActSeqLen) { // check the length of actual_seq_lengthsQ, whether is 1 or batch size
         OP_CHECK_IF(enableIFAMLA && (inputLayout != InputLayout::TND),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "The layout is %s, Actual_seq_lengths cannot be configured in MLA and "
-                                                "non-TND scenarios, only supported when layout is TND!",
-                                                layoutStr.c_str()),
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "input_layout, actual_seq_lengths",
+                                                           (layoutStr + ", present").c_str(),
+                                                           "actual_seq_lengths is only supported when layout is TND"),
                     return false);
         OP_CHECK_IF((actSeqLenDims < queryShapeInfo.b) && (actSeqLenDims > actSeqLenDimsQMin),
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        contextKeyParams.opName,
-                        "Dim(%ld) of actual_seq_lengths must equal to 1 or greater than or equal to batch size(%u)!",
-                        actSeqLenDims, queryShapeInfo.b),
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                        contextKeyParams.opName, "actual_seq_lengths", std::to_string(actSeqLenDims).c_str(),
+                        "the dim of actual_seq_lengths must be 1 or greater than or equal to batch size"),
                     return false);
         uint32_t actSeqLengthSize = std::min(static_cast<uint32_t>(actSeqLenDims), queryShapeInfo.b);
         for (uint32_t i = LOOP_BEGIN_NUM; i < actSeqLengthSize; ++i) {
@@ -1947,9 +1966,9 @@ bool FiaArch38PromptTiling::CheckActSeqLen(FiaArch38ContextParams& contextKeyPar
                 actSeqTmp -= actSeqLen->GetData<int64_t>()[i - 1];
             }
             OP_CHECK_IF(actSeqTmp < 0 || actSeqTmp > queryShapeInfo.s,
-                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                    "Actual_seq_lengths[%u](%ld) must be in range[0, %u]!", i,
-                                                    actSeqTmp, queryShapeInfo.s),
+                        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "actual_seq_lengths",
+                                                              std::to_string(actSeqTmp).c_str(),
+                                                              "actual_seq_lengths must be in range [0, s]"),
                         return false);
             // query act seq len padding情况下不支持合轴
             if (actSeqTmp < queryShapeInfo.s) {
@@ -1962,10 +1981,9 @@ bool FiaArch38PromptTiling::CheckActSeqLen(FiaArch38ContextParams& contextKeyPar
         // Batch of key is 1 under tensorlist mode, the number of actual_seq_lengthsKV should be compared
         // with batch of query, batch of key is equal to query under non-tensorlist mode.
         OP_CHECK_IF((actSeqLenKVDims < queryShapeInfo.b) && (actSeqLenKVDims > actSeqLenDimsKVMin),
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        contextKeyParams.opName,
-                        "Dim(%ld) of actSeqLen kv must equal to 1 or greater than or equal to batch size(%u)!",
-                        actSeqLenKVDims, queryShapeInfo.b),
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                        contextKeyParams.opName, "actual_seq_lengths_kv", std::to_string(actSeqLenKVDims).c_str(),
+                        "the dim of actual_seq_lengths_kv must be 1 or greater than or equal to batch size"),
                     return false);
         uint32_t actSeqLengthKVSize = std::min(static_cast<uint32_t>(actSeqLenKVDims), queryShapeInfo.b);
         for (uint32_t i = LOOP_BEGIN_NUM; i < actSeqLengthKVSize; ++i) {
@@ -1976,9 +1994,9 @@ bool FiaArch38PromptTiling::CheckActSeqLen(FiaArch38ContextParams& contextKeyPar
             if (!enableTensorList && !enablePA) {
                 int64_t actSeqKVMax = static_cast<int64_t>(keyShapeInfo.s);
                 OP_CHECK_IF((actSeqKVTmp < 0) || (actSeqKVTmp > actSeqKVMax),
-                            OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                        "Actual_seq_lengths_kv[%u](%ld) must be in range[0, %ld]!", i,
-                                                        actSeqKVTmp, actSeqKVMax),
+                            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                                contextKeyParams.opName, "actual_seq_lengths_kv", std::to_string(actSeqKVTmp).c_str(),
+                                "actual_seq_lengths_kv must be in range [0, actSeqKVMax]"),
                             return false);
             } else if (enableTensorList) {
                 int64_t actSeqKVMax;
@@ -1988,9 +2006,9 @@ bool FiaArch38PromptTiling::CheckActSeqLen(FiaArch38ContextParams& contextKeyPar
                     actSeqKVMax = contextKeyParams.kTensorList[i]->GetStorageShape().GetDim(2); // 2: Dim S for BNSD
                 }
                 OP_CHECK_IF((actSeqKVTmp < 0) || (actSeqKVTmp > actSeqKVMax),
-                            OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                        "Actual_seq_lengths_kv[%u](%ld) must be in range[0, %ld]!", i,
-                                                        actSeqKVTmp, actSeqKVMax),
+                            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                                contextKeyParams.opName, "actual_seq_lengths_kv", std::to_string(actSeqKVTmp).c_str(),
+                                "actual_seq_lengths_kv must be in range [0, actSeqKVMax]"),
                             return false);
             }
         }
@@ -2003,33 +2021,35 @@ bool FiaArch38PromptTiling::CheckPATypeAndShape(FiaArch38ContextParams& contextK
                                                 FiaArch38FlashAttentionTilingData& tilingData)
 {
     // The interception that is mutually exclusive with the left padding has been implemented in FIA.
-    OP_CHECK_IF(
-        enableTensorList,
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "not support tensorlist when blockTable is not null"),
-        return false);
-    OP_CHECK_IF((!enableActSeqLenKV) && (contextKeyParams.fromTilingSink == 0),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "actual seq length kv can't be null when blockTable is not null"),
+    OP_CHECK_IF(enableTensorList,
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "block_table, tensorlist",
+                                                       "block_table present with tensorlist",
+                                                       "tensorlist is not supported when blockTable is not null"),
                 return false);
+    OP_CHECK_IF((!enableActSeqLenKV) && (contextKeyParams.fromTilingSink == 0),
+                OP_LOGE_WITH_INVALID_INPUT(contextKeyParams.opName, "actual_seq_lengths_kv"), return false);
 
     const gert::StorageShape* blockTableShape = contextKeyParams.blockTableShape;
     // check blockTable shape is nullptr
-    OP_CHECK_IF(blockTableShape == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "blockTable can't be nullptr when PA enable"),
+    OP_CHECK_IF(blockTableShape == nullptr, OP_LOGE_WITH_INVALID_INPUT(contextKeyParams.opName, "block_table"),
                 return false);
 
     // check blockTable each dim cannot be 0
-    OP_CHECK_IF(blockTableShape->GetStorageShape().GetShapeSize() == 0,
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName, "blockTable each dim can't be 0, blockTable Shape [%ld, %ld].",
-                    blockTableShape->GetStorageShape().GetDim(0), blockTableShape->GetStorageShape().GetDim(1)),
-                return false);
+    OP_CHECK_IF(
+        blockTableShape->GetStorageShape().GetShapeSize() == 0,
+        OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(contextKeyParams.opName, "block_table",
+                                                   (std::to_string(blockTableShape->GetStorageShape().GetDim(0)) +
+                                                    ", " + std::to_string(blockTableShape->GetStorageShape().GetDim(1)))
+                                                       .c_str(),
+                                                   "blockTable each dim must not be 0"),
+        return false);
 
     // check Dtype
     ge::DataType blockTableType = contextKeyParams.blockTableType;
     OP_CHECK_IF((blockTableType != ge::DT_INT32),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "blockTable(%s) only support int32 when PA enable",
-                                            GetPfaDataTypeStr(blockTableType).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(contextKeyParams.opName, "block_table",
+                                                      GetPfaDataTypeStr(blockTableType).c_str(),
+                                                      "blockTable only supports int32 when PA enable"),
                 return false);
 
     // check block table shape
@@ -2039,19 +2059,17 @@ bool FiaArch38PromptTiling::CheckPATypeAndShape(FiaArch38ContextParams& contextK
     // PFA PA blockSize % 128 == 0
     OP_CHECK_IF((!enableIFAMLA && !enableIFA && !(queryShapeInfo.s == 1 && enableAlibiPse) &&
                  (*blockSize % BLOCK_SIZE_BASE != 0 || *blockSize < BLOCK_SIZE_BASE || *blockSize > BLOCK_SIZE_MAX)),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "block size(%d) should be a multiple of %d, and should be in range of [%d, %d] when PA enable",
-                    *blockSize, BLOCK_SIZE_BASE, BLOCK_SIZE_BASE, BLOCK_SIZE_MAX),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    contextKeyParams.opName, "block_size", std::to_string(*blockSize).c_str(),
+                    "block size must be a multiple of BLOCK_SIZE_BASE and within the allowed range"),
                 return false);
     // IFA PA blockSize % 16 == 0
     ifaBlockSizeBase /= static_cast<int32_t>(dataTypeSize);
     OP_CHECK_IF(((enableIFAMLA || enableIFA || (queryShapeInfo.s == 1 && enableAlibiPse)) &&
                  (*blockSize % ifaBlockSizeBase != 0 || *blockSize < ifaBlockSizeBase || *blockSize > BLOCK_SIZE_MAX)),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "block size(%d) should be a multiple of %d, and should be in range of [%d, %d] when PA enable",
-                    *blockSize, ifaBlockSizeBase, ifaBlockSizeBase, BLOCK_SIZE_MAX),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    contextKeyParams.opName, "block_size", std::to_string(*blockSize).c_str(),
+                    "block size must be a multiple of ifaBlockSizeBase and within the allowed range"),
                 return false);
 
     if (contextKeyParams.fromTilingSink != 0) {
@@ -2078,21 +2096,21 @@ bool FiaArch38PromptTiling::CheckPseShiftTypeAndShape(FiaArch38ContextParams& co
     pseShiftElemType = contextKeyParams.pseShiftDataType;
 
     OP_CHECK_IF((inputType == ge::DT_FLOAT16 && pseShiftElemType != ge::DT_FLOAT16),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "q type is fp16, but pse shift type is not fp16, pse shift type = %s",
-                                            GetPfaDataTypeStr(pseShiftElemType).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(contextKeyParams.opName, "pse_shift",
+                                                      GetPfaDataTypeStr(pseShiftElemType).c_str(),
+                                                      "when query dtype is fp16, pse shift type must be fp16"),
                 return false);
 
     OP_CHECK_IF((inputType == ge::DT_BF16 && pseShiftElemType != ge::DT_BF16),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "q type is bf16, but pse shift type is not bf16, pse shift type = %s",
-                                            GetPfaDataTypeStr(pseShiftElemType).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(contextKeyParams.opName, "pse_shift",
+                                                      GetPfaDataTypeStr(pseShiftElemType).c_str(),
+                                                      "when query dtype is bf16, pse shift type must be bf16"),
                 return false);
 
     OP_CHECK_IF((inputType == ge::DT_INT8 && pseShiftElemType != ge::DT_FLOAT16),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "q type is int8, but pse shift type is not fp16, pse shift type = %s",
-                                            GetPfaDataTypeStr(pseShiftElemType).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(contextKeyParams.opName, "pse_shift",
+                                                      GetPfaDataTypeStr(pseShiftElemType).c_str(),
+                                                      "when query dtype is int8, pse shift type must be fp16"),
                 return false);
 
     if (pseShiftElemType == ge::DT_FLOAT16) {
@@ -2103,11 +2121,11 @@ bool FiaArch38PromptTiling::CheckPseShiftTypeAndShape(FiaArch38ContextParams& co
     pseShiftTypeByteNum = BYTE_BLOCK / pseShiftElemSize;
 
     size_t pseShiftDim = pseShiftShape->GetStorageShape().GetDimNum();
-    OP_CHECK_IF(
-        (pseShiftDim != PSESHIFTDIM_4),
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                    "pse shift shape must be 4 dimension, rather than %zu dimension", pseShiftDim),
-        return false);
+    OP_CHECK_IF((pseShiftDim != PSESHIFTDIM_4),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(contextKeyParams.opName, "pse_shift",
+                                                         std::to_string(pseShiftDim).c_str(),
+                                                         "pse shift shape must be 4 dimension"),
+                return false);
 
     pseShiftBatch = pseShiftShape->GetStorageShape().GetDim(0);
     int64_t pseShiftN = pseShiftShape->GetStorageShape().GetDim(1); // 1: The sirst dimension is N.
@@ -2115,10 +2133,12 @@ bool FiaArch38PromptTiling::CheckPseShiftTypeAndShape(FiaArch38ContextParams& co
     pseShiftS2 = pseShiftShape->GetStorageShape().GetDim(3);        // 3: The third dimension is S2.
     OP_CHECK_IF(
         ((pseShiftBatch != 1 && pseShiftBatch != b) || (pseShiftN != n) || (pseShiftS1 < s1) || (pseShiftS2 < s2)),
-        OPS_REPORT_VECTOR_INNER_ERR(
-            contextKeyParams.opName,
-            "pse shift shape must be [1 or %u, %u, >=%u, >=%u], but now it is [%ld, %ld, %ld, %ld], the layout is %s",
-            b, n, s1, s2, pseShiftBatch, pseShiftN, pseShiftS1, pseShiftS2, layoutStr.c_str()),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            contextKeyParams.opName, "pse_shift",
+            ("[" + std::to_string(pseShiftBatch) + ", " + std::to_string(pseShiftN) + ", " +
+             std::to_string(pseShiftS1) + ", " + std::to_string(pseShiftS2) + "]")
+                .c_str(),
+            "pse shift shape must be [1 or b, n, >=s1, >=s2]"),
         return false);
     return true;
 }
@@ -2129,7 +2149,9 @@ bool FiaArch38PromptTiling::CheckInnerPrecise(FiaArch38ContextParams& contextKey
     // 0: Invalid plural number; 4: Invalid if greater than or equal to 4; 0,1,2,3 are effective values for
     // innerPrecise.
     if (innerPrecise >= 4 || innerPrecise < 0) {
-        OP_LOGE(contextKeyParams.opName, "innerPrecise [%d] should be 0,1,2,3, please check.", innerPrecise);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "inner_precise",
+                                              std::to_string(innerPrecise).c_str(),
+                                              "inner_precise should be 0, 1, 2 or 3");
         return false;
     }
     // Determine if the bit1 bit of innerPrecise requires invalid correction.
@@ -2161,8 +2183,7 @@ bool FiaArch38PromptTiling::CheckMaskTypeAndShape(FiaArch38ContextParams& contex
 {
     const gert::StorageShape* attenMaskShape = contextKeyParams.attentionMaskShape;
     OP_CHECK_IF((attenMaskShape->GetStorageShape().GetShapeSize() == gert::Shape::kInvalidDimValue),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Get the shape size of attenMask failed."),
-                return false);
+                ReportTilingFailure(context_, "get the shape size of atten_mask failed"), return false);
 
     auto maskDataType = contextKeyParams.maskDataType;
     std::vector<ge::DataType> allowedMaskDtypes = {ge::DT_FLOAT16, ge::DT_BOOL, ge::DT_INT8, ge::DT_UINT8};
@@ -2171,9 +2192,9 @@ bool FiaArch38PromptTiling::CheckMaskTypeAndShape(FiaArch38ContextParams& contex
     auto maskTypeCheck = std::find(allowedMaskDtypes.begin(), allowedMaskDtypes.end(), maskDataType);
 
     OP_CHECK_IF((maskTypeCheck == allowedMaskDtypes.end()),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "maskType(%s) should be DT_FLOAT16, DT_BOOL, DT_INT8 and DT_UINT8",
-                                            GetPfaDataTypeStr(maskDataType).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(contextKeyParams.opName, "atten_mask",
+                                                      GetPfaDataTypeStr(maskDataType).c_str(),
+                                                      "maskType should be DT_FLOAT16, DT_BOOL, DT_INT8 or DT_UINT8"),
                 return false);
     int32_t maskTypeIndex = std::distance(allowedMaskDtypes.begin(), maskTypeCheck);
     maskElemSize = maskTypeSizeArray[maskTypeIndex];
@@ -2181,17 +2202,16 @@ bool FiaArch38PromptTiling::CheckMaskTypeAndShape(FiaArch38ContextParams& contex
     // When in fp16 high-precision mode, the mask type only supports bool or int8.
     OP_CHECK_IF(((inputType == ge::DT_FLOAT16) && (innerPrecise == HIGH_PRECISION)) && (maskDataType != ge::DT_BOOL) &&
                     (maskDataType != ge::DT_INT8) && (maskDataType != ge::DT_UINT8),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "maskType[%s] should be bool, int8 or uint8 when innerprecise = %d and input type is fp16.",
-                    GetPfaDataTypeStr(maskDataType).c_str(), innerPrecise),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                    contextKeyParams.opName, "atten_mask", GetPfaDataTypeStr(maskDataType).c_str(),
+                    "when innerprecise is 2/3 and input type is fp16, maskType should be bool, int8 or uint8"),
                 return false);
     // When bf16, the mask type only supports bool or int8.
     OP_CHECK_IF((inputType == ge::DT_BF16) && (maskDataType != ge::DT_BOOL) && (maskDataType != ge::DT_INT8) &&
                     (maskDataType != ge::DT_UINT8),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "maskType[%s] should be bool, int8 or uint8 when input type is bfloat16",
-                                            GetPfaDataTypeStr(maskDataType).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                    contextKeyParams.opName, "atten_mask", GetPfaDataTypeStr(maskDataType).c_str(),
+                    "when input type is bfloat16, maskType should be bool, int8 or uint8"),
                 return false);
 
     int64_t maskKVsSize = 2048; // 2048 : default the last frist dim.
@@ -2248,9 +2268,9 @@ bool FiaArch38PromptTiling::CheckSparseMode(FiaArch38ContextParams& contextKeyPa
                        (*sparseMode != SPARSE_MODE_RIGHT_DOWN) && (*sparseMode != SPARSE_MODE_ALL_MASK) &&
                        (*sparseMode != SPARSE_MODE_BAND));
         OP_CHECK_IF(sparseCheck,
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        contextKeyParams.opName,
-                        "sparse_mode = %d is out of range. Currently only 0,1,2,3,4 are supported.", *sparseMode),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        contextKeyParams.opName, "sparse_mode", std::to_string(*sparseMode).c_str(),
+                        "sparse_mode is out of range, only 0, 1, 2, 3, 4 are supported"),
                     return false);
     }
     const gert::StorageShape* attenMaskShape = contextKeyParams.attentionMaskShape;
@@ -2258,41 +2278,38 @@ bool FiaArch38PromptTiling::CheckSparseMode(FiaArch38ContextParams& contextKeyPa
 
     OP_CHECK_IF(((attenMaskShape != nullptr) && (sparseMode != nullptr) && (*sparseMode == SPARSE_MODE_BAND) &&
                  (*preTokens < 0 && *nextTokens < 0)),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "preTokens and nextTokens must not be negative in band mode, preTokens = %ld, nextTokens = %ld.",
-                    *preTokens, *nextTokens),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    contextKeyParams.opName, "pre_tokens, next_tokens",
+                    (std::to_string(*preTokens) + ", " + std::to_string(*nextTokens)).c_str(),
+                    "preTokens and nextTokens must not be negative in band mode"),
                 return false);
 
     OP_CHECK_IF((sparsePreTokens < 0) && (sparseNextTokens < 0),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "preTokens and nextTokens cannot be negative numbers, preTokens = %ld, nextTokens = %ld.",
-                    sparsePreTokens, sparseNextTokens),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    contextKeyParams.opName, "pre_tokens, next_tokens",
+                    (std::to_string(sparsePreTokens) + ", " + std::to_string(sparseNextTokens)).c_str(),
+                    "preTokens and nextTokens must not be negative"),
                 return false);
 
     OP_CHECK_IF((sparseNextTokens * (-1)) > sparsePreTokens,
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "nexttoken line should be higher than pretoken line, preTokens = %ld, nextTokens = %ld.",
-                    sparsePreTokens, sparseNextTokens),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    contextKeyParams.opName, "pre_tokens, next_tokens",
+                    (std::to_string(sparsePreTokens) + ", " + std::to_string(sparseNextTokens)).c_str(),
+                    "nexttoken line should be higher than pretoken line"),
                 return false);
 
     OP_CHECK_IF(isDefaultSparseMode && (sparseNextTokens < 0) && (sparseNextTokens * (-1)) >= static_cast<int32_t>(qS),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "nextTokens absolute value should be smaller than length of q, nextTokens = %ld, length of q = %u.",
-                    sparseNextTokens, qS),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    contextKeyParams.opName, "next_tokens", std::to_string(sparseNextTokens).c_str(),
+                    "nextTokens absolute value should be smaller than the length of query"),
                 return false);
 
     OP_CHECK_IF(
         isDefaultSparseMode && (sparsePreTokens < 0) &&
             (sparsePreTokens * (-1) >= (static_cast<int32_t>(S2) + static_cast<int32_t>(actualSharedPrefixLen))),
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                    "preToken absolute value should be smaller than length of k and v "
-                                    "(length of k and v + length of prefix when enable prefix), "
-                                    "preTokens = %ld, seqLengthKV = %u, actualSharedPrefixLen = %ld",
-                                    sparsePreTokens, S2, actualSharedPrefixLen),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            contextKeyParams.opName, "pre_tokens", std::to_string(sparsePreTokens).c_str(),
+            "preTokens absolute value should be smaller than the length of key and value"),
         return false);
 
     SetSparseType(qS);
@@ -2303,22 +2320,26 @@ bool FiaArch38PromptTiling::CheckPACrossover(FiaArch38ContextParams& contextKeyP
 {
     if (enablePA) {
         OP_CHECK_IF((isKVHasPrefix),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "when system prefix is used, page attention is not supported!"),
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        contextKeyParams.opName, "prefix, block_table", "system prefix with page attention",
+                        "when system prefix is used, page attention is not supported"),
                     return false);
-        OP_CHECK_IF(
-            (enableKVAntiquant),
-            OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "not support antiquant when blockTable is not null"),
-            return false);
+        OP_CHECK_IF((enableKVAntiquant),
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "block_table, antiquant_scale",
+                                                           "block_table present with antiquant",
+                                                           "antiquant is not supported when blockTable is not null"),
+                    return false);
     }
     if (enableActSeqLenKV && !enableTensorList) {
         const gert::Tensor* actSeqLenKV = contextKeyParams.actualSequenceLengthKV;
         uint32_t actSeqLenKVSize = std::min(static_cast<uint32_t>(actSeqLenKVDims), queryShapeInfo.b);
         for (uint32_t i = LOOP_BEGIN_NUM; i < actSeqLenKVSize; ++i) {
-            OP_CHECK_IF(enablePA && (actSeqLenKV->GetData<int64_t>()[i] < 0),
-                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Actual_seq_lengths_kv[%u](%ld) must >= 0",
-                                                    i, actSeqLenKV->GetData<int64_t>()[i]),
-                        return false);
+            OP_CHECK_IF(
+                enablePA && (actSeqLenKV->GetData<int64_t>()[i] < 0),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "actual_seq_lengths_kv",
+                                                      std::to_string(actSeqLenKV->GetData<int64_t>()[i]).c_str(),
+                                                      "actual_seq_lengths_kv must be >= 0"),
+                return false);
         }
     }
     return true;
@@ -2332,20 +2353,19 @@ bool FiaArch38PromptTiling::CheckMaskCrossIFAMLA(FiaArch38ContextParams& context
     }
     if (queryS == 1U) {
         OP_CHECK_IF(!((*sparseMode == SPARSE_MODE_NO_MASK) && (!enableMask)),
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        contextKeyParams.opName,
-                        "Only support sparse 0 without mask when ifa mla and query's sequence length is 1, "
-                        "input sparse mode is %d and there has%smask",
-                        *sparseMode, enableMask ? " " : " no "),
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        contextKeyParams.opName, "sparse_mode, atten_mask",
+                        (std::to_string(*sparseMode) + ", " + std::string(enableMask ? "present" : "absent")).c_str(),
+                        "only sparse 0 without mask is supported when ifa mla and query sequence length is 1"),
                     return false);
     } else {
         OP_CHECK_IF(!(((*sparseMode == SPARSE_MODE_RIGHT_DOWN) && (enableMask)) ||
                       ((*sparseMode == SPARSE_MODE_NO_MASK) && (!enableMask))),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "Only support sparse 3 with mask, or sparse 0 without mask when ifa "
-                                                "mla and query's sequence length is > 1, "
-                                                "input sparse mode is %d and there has%smask",
-                                                *sparseMode, enableMask ? " " : " no "),
+                    OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                        contextKeyParams.opName, "sparse_mode, atten_mask",
+                        (std::to_string(*sparseMode) + ", " + std::string(enableMask ? "present" : "absent")).c_str(),
+                        "only sparse 3 with mask or sparse 0 without mask is supported when ifa mla and "
+                        "query sequence length is > 1"),
                     return false);
     }
     return true;
@@ -2361,24 +2381,22 @@ bool FiaArch38PromptTiling::CheckMaskCrossover(FiaArch38ContextParams& contextKe
                                     *sparseMode == SPARSE_MODE_ALL_MASK || *sparseMode == SPARSE_MODE_BAND)) {
         OP_CHECK_IF(((attenMaskShape != nullptr) && (attenMaskShape->GetStorageShape().GetShapeSize() == 0)) ||
                         (attenMaskShape == nullptr),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "attenMask should not be null when sparse_mode is %d.", *sparseMode),
-                    return false);
+                    OP_LOGE_WITH_INVALID_INPUT(contextKeyParams.opName, "atten_mask"), return false);
 
         // When sparse=2, 3, 4, the mask type only supports bool, int8, uint8
         OP_CHECK_IF((*sparseMode != SPARSE_MODE_ALL_MASK) && (maskDataType != ge::DT_BOOL) &&
                         (maskDataType != ge::DT_INT8) && (maskDataType != ge::DT_UINT8),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "maskType[%s] should be bool, int8 or uint8 when sparse mode is %d.",
-                                                GetPfaDataTypeStr(maskDataType).c_str(), *sparseMode),
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        contextKeyParams.opName, "atten_mask", GetPfaDataTypeStr(maskDataType).c_str(),
+                        "maskType should be bool, int8 or uint8 for this sparse mode"),
                     return false);
     }
     // FP16 mask type does not support invalid line correction.
     OP_CHECK_IF((maskDataType == ge::DT_FLOAT16 &&
                  static_cast<bool>(tilingData.fiaArch38AttentionBaseParams.get_isRowInvalid())),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "maskType[%s] should not be float16 when innerPrecise = 2 or 3",
-                                            GetPfaDataTypeStr(maskDataType).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(contextKeyParams.opName, "atten_mask",
+                                                      GetPfaDataTypeStr(maskDataType).c_str(),
+                                                      "maskType should not be float16 when innerPrecise is 2 or 3"),
                 return false);
     if (!CheckMaskShapeCrossSparse(contextKeyParams, sparseMode, queryShapeInfo.s, S2 + actualSharedPrefixLen,
                                    queryShapeInfo.b)) {
@@ -2396,18 +2414,21 @@ bool FiaArch38PromptTiling::CheckTNDLayoutCrossover(FiaArch38ContextParams& cont
         return true;
     }
 
-    OP_CHECK_IF(
-        enableLeftPadding,
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "When layout is TND, left padding is not supported!"),
-        return false);
+    OP_CHECK_IF(enableLeftPadding,
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "input_layout, leftPadding",
+                                                       "TND with left padding",
+                                                       "when layout is TND, left padding is not supported"),
+                return false);
 
-    OP_CHECK_IF(
-        enableTensorList,
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "When layout is TND, tensorlist is not supported!"),
-        return false);
+    OP_CHECK_IF(enableTensorList,
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "input_layout, tensorlist",
+                                                       "TND with tensorlist",
+                                                       "when layout is TND, tensorlist is not supported"),
+                return false);
 
     OP_CHECK_IF(enablePseShift,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "When layout is TND, pse is not supported!"),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "input_layout, pse_shift",
+                                                       "TND with pse", "when layout is TND, pse is not supported"),
                 return false);
 
     return true;
@@ -2454,14 +2475,13 @@ bool FiaArch38PromptTiling::ParseActualSeqLengths(FiaArch38ContextParams& contex
                                                         static_cast<uint32_t>(actSeqLenData->GetData<int64_t>()[0]);
             if (actualSeqLengths[i] != queryShapeInfo.s / gSize) {
                 needInit = 1;
-                OP_CHECK_IF(
-                    (sparseNextTokens < 0) && (sparseNextTokens * (-1) >= static_cast<int32_t>(actualSeqLengths[i])) &&
-                        isDefaultSparseMode,
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "nexttoken absolute value should be smaller than actual length of q, "
-                                                "nextTokens = %ld, actualSeqLengthsQ = %ld",
-                                                sparseNextTokens, actualSeqLengths[i]),
-                    return false);
+                OP_CHECK_IF((sparseNextTokens < 0) &&
+                                (sparseNextTokens * (-1) >= static_cast<int32_t>(actualSeqLengths[i])) &&
+                                isDefaultSparseMode,
+                            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                                contextKeyParams.opName, "next_tokens", std::to_string(sparseNextTokens).c_str(),
+                                "nexttoken absolute value should be smaller than the actual length of query"),
+                            return false);
             }
             if (inputLayout == InputLayout::BSND || inputLayout == InputLayout::BSH) {
                 actualSeqLengths[i] *= gSize;
@@ -2473,14 +2493,13 @@ bool FiaArch38PromptTiling::ParseActualSeqLengths(FiaArch38ContextParams& contex
                                                         static_cast<uint32_t>(actSeqLenData->GetData<int64_t>()[0]);
             if (actualSeqLengths[i] != queryShapeInfo.s) {
                 needInit = 1;
-                OP_CHECK_IF(
-                    (sparseNextTokens < 0) && (sparseNextTokens * (-1) >= static_cast<int32_t>(actualSeqLengths[i])) &&
-                        isDefaultSparseMode,
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "nexttoken absolute value should be smaller than actual length of q, "
-                                                "nextTokens = %ld, actualSeqLengthsQ = %ld",
-                                                sparseNextTokens, actualSeqLengths[i]),
-                    return false);
+                OP_CHECK_IF((sparseNextTokens < 0) &&
+                                (sparseNextTokens * (-1) >= static_cast<int32_t>(actualSeqLengths[i])) &&
+                                isDefaultSparseMode,
+                            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                                contextKeyParams.opName, "next_tokens", std::to_string(sparseNextTokens).c_str(),
+                                "nexttoken absolute value should be smaller than the actual length of query"),
+                            return false);
             }
         }
         middleActualSeqLengths += actualSeqLengths[i];
@@ -2524,12 +2543,9 @@ bool FiaArch38PromptTiling::CheckMultiFeatureCrossover(FiaArch38ContextParams& c
     for (uint32_t i = LOOP_BEGIN_NUM; i < lenDims; i++) {
         OP_CHECK_IF(isDefaultSparseMode && (sparsePreTokens < 0) &&
                         (sparsePreTokens * (-1) >= (actualSeqLengthsKV[i] + actualSharedPrefixLen)),
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        contextKeyParams.opName,
-                        "preToken absolute value should be smaller than actual length of k and v "
-                        "(actual length of k and v + length of prefix when enable prefix), preToken = %ld,"
-                        "actual length of k and v = %ld, actual prefix len = %ld.",
-                        sparsePreTokens, actualSeqLengthsKV[i], actualSharedPrefixLen),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        contextKeyParams.opName, "pre_tokens", std::to_string(sparsePreTokens).c_str(),
+                        "preToken absolute value should be smaller than the actual length of key and value"),
                     return false);
         if (sparseModeVal == SPARSE_MODE_RIGHT_DOWN) {
             preTokensPerbatch = SPARSE_MODE_INT_MAX;
@@ -2555,20 +2571,16 @@ bool FiaArch38PromptTiling::CheckMultiFeatureCrossover(FiaArch38ContextParams& c
 
         OP_CHECK_IF((isBandMode && (sparseNextTokens < 0) &&
                      (sparseNextTokens * (-1) >= actualSeqLengthsKV[i] + actualSharedPrefixLen)),
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        contextKeyParams.opName,
-                        "nextTokens absolute value should be smaller than actual length of k and v in band mode "
-                        "(actual length of k and v + length of prefix when enable prefix), "
-                        "nextTokens = %ld, actual length of k and v = %ld, prefix length = %ld",
-                        sparseNextTokens, actualSeqLengthsKV[i], actualSharedPrefixLen),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        contextKeyParams.opName, "next_tokens", std::to_string(sparseNextTokens).c_str(),
+                        "nextTokens absolute value should be smaller than the actual length of key and value "
+                        "in band mode"),
                     return false);
 
         OP_CHECK_IF((isBandMode && (sparsePreTokens < 0) && (sparsePreTokens * (-1) >= actualSeqLengths[i])),
-                    OPS_REPORT_VECTOR_INNER_ERR(
-                        contextKeyParams.opName,
-                        "preTokens absolute value should be smaller than actual length of q in band mode,"
-                        "preTokens = %ld, actual length of q = %ld",
-                        sparsePreTokens, actualSeqLengths[i]),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        contextKeyParams.opName, "pre_tokens", std::to_string(sparsePreTokens).c_str(),
+                        "preTokens absolute value should be smaller than the actual length of query in band mode"),
                     return false);
 
         OP_LOGI(
@@ -2579,12 +2591,13 @@ bool FiaArch38PromptTiling::CheckMultiFeatureCrossover(FiaArch38ContextParams& c
         tilingData.fiaArch38AttentionInitOutputParams.set_needInit(needInit);
 
         if (enableAlibiPse) {
-            OP_CHECK_IF((actualSeqLengths[i] != actualSeqLengthsKV[i]),
-                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                    "When pseType = 2/3, actualSeqLengths[%u](seq size of query)=%ld "
-                                                    "must be equal to actualSeqLengthsKv[%u](seq size of key)=%ld",
-                                                    i, actualSeqLengths[i], i, actualSeqLengthsKV[i]),
-                        return false);
+            OP_CHECK_IF(
+                (actualSeqLengths[i] != actualSeqLengthsKV[i]),
+                OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                    contextKeyParams.opName, "actual_seq_lengths, actual_seq_lengths_kv",
+                    (std::to_string(actualSeqLengths[i]) + ", " + std::to_string(actualSeqLengthsKV[i])).c_str(),
+                    "when pseType is 2/3, actualSeqLengths must be equal to actualSeqLengthsKv"),
+                return false);
         }
     }
     return true;
@@ -2595,51 +2608,62 @@ bool FiaArch38PromptTiling::CheckPerblockCrossover(FiaArch38ContextParams& conte
     if (!enablePerblockQuant) {
         return true;
     }
-    OP_CHECK_IF(
-        enableActSeqLen,
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "ActSeqLen is not supported in per-block quant scenario!"),
-        return false);
-    OP_CHECK_IF(enableActSeqLenKV,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "ActSeqLenKV is not supported in per-block quant scenario!"),
+    OP_CHECK_IF(enableActSeqLen,
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "actual_seq_lengths, per-block quant",
+                                                       "actualSeqLen present with per-block quant",
+                                                       "ActSeqLen is not supported in per-block quant scenario"),
                 return false);
+    OP_CHECK_IF(
+        enableActSeqLenKV,
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "actual_seq_lengths_kv, per-block quant",
+                                               "actualSeqLenKV present with per-block quant",
+                                               "ActSeqLenKV is not supported in per-block quant scenario"),
+        return false);
     OP_CHECK_IF((innerPrecise == 2) || (innerPrecise == 3),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "innerPrecise must be 0 or 1 in per-block quant scenario, now is %ld",
-                                            innerPrecise),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "inner_precise",
+                                                      std::to_string(innerPrecise).c_str(),
+                                                      "innerPrecise must be 0 or 1 in per-block quant scenario"),
                 return false);
-    OP_CHECK_IF(
-        enablePA,
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "PA is not supported in per-block quant scenario!"),
-        return false);
+    OP_CHECK_IF(enablePA,
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "block_table, per-block quant",
+                                                       "PA enabled with per-block quant",
+                                                       "PA is not supported in per-block quant scenario"),
+                return false);
     OP_CHECK_IF(enableTensorList,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "tensorlist is not supported in per-block quant scenario!"),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "tensorlist, per-block quant",
+                                                       "tensorlist with per-block quant",
+                                                       "tensorlist is not supported in per-block quant scenario"),
                 return false);
     OP_CHECK_IF(enableLeftPadding,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "leftpadding is not supported in per-block quant scenario!"),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "leftPadding, per-block quant",
+                                                       "left padding with per-block quant",
+                                                       "leftpadding is not supported in per-block quant scenario"),
                 return false);
-    OP_CHECK_IF(
-        enablePFAMLA,
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "PFAMLA is not supported in per-block quant scenario!"),
-        return false);
-    OP_CHECK_IF(
-        enablePFARope,
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "PFARope is not supported in per-block quant scenario!"),
-        return false);
-    OP_CHECK_IF(
-        enableMask,
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "mask is not supported in per-block quant scenario!"),
-        return false);
-    OP_CHECK_IF(
-        enablePseShift,
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "PseShift is not supported in per-block quant scenario!"),
-        return false);
-    OP_CHECK_IF(
-        enableAlibiPse,
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "AlibiPse is not supported in per-block quant scenario!"),
-        return false);
+    OP_CHECK_IF(enablePFAMLA,
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "query_rope/key_rope, per-block quant",
+                                                       "PFAMLA with per-block quant",
+                                                       "PFAMLA is not supported in per-block quant scenario"),
+                return false);
+    OP_CHECK_IF(enablePFARope,
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "query_rope/key_rope, per-block quant",
+                                                       "PFARope with per-block quant",
+                                                       "PFARope is not supported in per-block quant scenario"),
+                return false);
+    OP_CHECK_IF(enableMask,
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "atten_mask, per-block quant",
+                                                       "mask with per-block quant",
+                                                       "mask is not supported in per-block quant scenario"),
+                return false);
+    OP_CHECK_IF(enablePseShift,
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "pse_shift, per-block quant",
+                                                       "PseShift with per-block quant",
+                                                       "PseShift is not supported in per-block quant scenario"),
+                return false);
+    OP_CHECK_IF(enableAlibiPse,
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "pse_shift, per-block quant",
+                                                       "AlibiPse with per-block quant",
+                                                       "AlibiPse is not supported in per-block quant scenario"),
+                return false);
     return true;
 }
 
@@ -2841,8 +2865,7 @@ bool FiaArch38PromptTiling::EnableMTE2BmmPipe(FiaArch38FlashAttentionTilingData&
     }
     int32_t ret = 0;
     ret = bmm.SetFixSplit(baseM, baseN, baseK);
-    OP_CHECK_IF(ret != 0, OPS_REPORT_VECTOR_INNER_ERR("FiaArch38", "bmm SetFixSplit failed, ret = %d!", ret),
-                return false);
+    OP_CHECK_IF(ret != 0, ReportTilingFailure(context_, "bmm SetFixSplit failed"), return false);
     bool res = bmm.GetTiling(bmmTilingData) != -1;
     return res;
 }
@@ -2872,9 +2895,7 @@ bool FiaArch38PromptTiling::FiaArch38CheckBmm1(FiaArch38FlashAttentionTilingData
     bmm1.SetCType(matmul_tiling::TPosition::VECCALC, matmul_tiling::CubeFormat::ND_ALIGN, bmm1OutputType);
 
     int32_t ret = bmm1.SetShape(sOuterFactor, sInnerFactor, tilingData.fiaArch38AttentionBaseParams.get_qkHeadSize());
-    OP_CHECK_IF(ret != 0,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "bmm1 SetShape failed, ret = %d!", ret),
-                return false);
+    OP_CHECK_IF(ret != 0, ReportTilingFailure(context_, "bmm1 SetShape failed"), return false);
     int32_t ratio = tilingData.fiaArch38AttentionBaseParams.get_headNumRatio();
     int32_t strideQ = tilingData.fiaArch38AttentionBaseParams.get_qkHeadSize() *
                       tilingData.fiaArch38AttentionBaseParams.get_headNumSize();
@@ -2909,22 +2930,13 @@ bool FiaArch38PromptTiling::FiaArch38CheckBmm1(FiaArch38FlashAttentionTilingData
 
     bmm1.SetBias(false);
     ret = bmm1.SetBufferSpace(l1SizeRemain, l0CSize);
-    OP_CHECK_IF(ret != 0,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName,
-                                            "bmm1 SetBufferSpace failed, l1SizeRemain = %ld, l0CSize = %ld, ret = %d!",
-                                            l1SizeRemain, l0CSize, ret),
-                return false);
+    OP_CHECK_IF(ret != 0, ReportTilingFailure(context_, "bmm1 SetBufferSpace failed"), return false);
     if (!enableIFAMLA && enablePA) {
         ret = bmm1.SetFixSplit(sOuterFactor, BLOCK_SIZE_BASE);
     } else {
         ret = bmm1.SetFixSplit(sOuterFactor, sInnerFactor);
     }
-    OP_CHECK_IF(ret != 0,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName,
-                                            "bmm1 SetFixSplit failed, l1SizeRemain = %ld, l0CSize = %ld, sOuterFactor "
-                                            "= %u, sInnerFactor = %u, ret = %d!",
-                                            l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor, ret),
-                return false);
+    OP_CHECK_IF(ret != 0, ReportTilingFailure(context_, "bmm1 SetFixSplit failed"), return false);
 
     ret = bmm1.GetTiling(bmm1TilingData);
     if (autoBaseMNK) {
@@ -2933,10 +2945,7 @@ bool FiaArch38PromptTiling::FiaArch38CheckBmm1(FiaArch38FlashAttentionTilingData
         if (enableMatmulNorm) {
             uint32_t baseK = 128U;
             ret = bmm1.SetFixSplit(baseM, baseN, baseK);
-            OP_CHECK_IF(
-                ret != 0,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "bmm1 SetFixSplit failed, ret = %d!", ret),
-                return false);
+            OP_CHECK_IF(ret != 0, ReportTilingFailure(context_, "bmm1 SetFixSplit failed"), return false);
             ret = bmm1.GetTiling(bmm1TilingData);
         } else {
             uint32_t baseK = 64U;
@@ -2945,22 +2954,13 @@ bool FiaArch38PromptTiling::FiaArch38CheckBmm1(FiaArch38FlashAttentionTilingData
             }
             if (ret != 0) {
                 ret = bmm1.SetFixSplit(baseM, baseN, baseK);
-                OP_CHECK_IF(
-                    ret != 0,
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "bmm1 SetFixSplit failed, ret = %d!", ret),
-                    return false);
+                OP_CHECK_IF(ret != 0, ReportTilingFailure(context_, "bmm1 SetFixSplit failed"), return false);
                 ret = bmm1.GetTiling(bmm1TilingData);
             }
         }
     }
     // Get tiling fail for bmm1.
-    OP_CHECK_IF(ret != 0,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName,
-                                            "bmm1 GetTiling failed, l1SizeRemain = %ld, l0CSize = %ld, sOuterFactor = "
-                                            "%u, sInnerFactor = %u, autoBaseMNK = %d,"
-                                            "ret = %d!",
-                                            l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor, autoBaseMNK, ret),
-                return false);
+    OP_CHECK_IF(ret != 0, ReportTilingFailure(context_, "bmm1 GetTiling failed"), return false);
 
     bmm1TilingData.set_shareMode(0);
     bmm1TilingData.set_shareL1Size(l1SizeRemain);
@@ -2971,7 +2971,7 @@ bool FiaArch38PromptTiling::FiaArch38CheckBmm1(FiaArch38FlashAttentionTilingData
     // Open MTE2 Matmul pipeline.
     bool res = EnableMTE2BmmPipe(tilingData, bmm1, bmm1TilingData, sOuterFactor, sInnerFactor);
     // EnableMTE2BmmPipe fail.
-    OP_CHECK_IF(res == false, OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "EnableMTE2BmmPipe failed!"),
+    OP_CHECK_IF(res == false, OP_LOGE_WITHOUT_REPORT(contextKeyParamsPtr->opName, "EnableMTE2BmmPipe failed!"),
                 return false);
 
     return true;
@@ -2990,7 +2990,7 @@ bool FiaArch38PromptTiling::AdjustCVTilingCVDiff(const FiaArch38ContextParams& c
     bool res = FiaArch38ComputeCVDiffParams(tilingData, compileInfoPtr->l1Size, compileInfoPtr->l0CSize, minFactor,
                                             rectangleFactor);
     OP_CHECK_IF(res == false,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "FiaArch38ComputeCVDiffParams failed!"),
+                OP_LOGE_WITHOUT_REPORT(contextKeyParamsPtr->opName, "FiaArch38ComputeCVDiffParams failed!"),
                 return false);
 
     if (tilingData.fiaArch38AttentionBaseParams.get_vHeadSize() <= 128 && !enablePFAMLA) { // 128 for D size
@@ -3062,11 +3062,7 @@ bool FiaArch38PromptTiling::FiaArch38CheckBmm2(FiaArch38FlashAttentionTilingData
     bmm2.SetCType(matmul_tiling::TPosition::VECCALC, matmul_tiling::CubeFormat::ND_ALIGN, bmm2OutputType);
     ret = bmm2.SetShape(sOuterFactor, tilingData.fiaArch38AttentionBaseParams.get_vHeadSize(), sInnerFactor);
 
-    OP_CHECK_IF(ret != 0,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName,
-                                            "bmm2 set SetShape failed, sOuterFactor = %u, sInnerFactor = %u, ret = %d!",
-                                            sOuterFactor, sInnerFactor, ret),
-                return false);
+    OP_CHECK_IF(ret != 0, ReportTilingFailure(context_, "bmm2 set SetShape failed"), return false);
     int32_t ratio = tilingData.fiaArch38AttentionBaseParams.get_headNumRatio();
     if (ratio == 0) {
         return false;
@@ -3094,12 +3090,7 @@ bool FiaArch38PromptTiling::FiaArch38CheckBmm2(FiaArch38FlashAttentionTilingData
 
     bmm2.SetBias(false);
     ret = bmm2.SetBufferSpace(l1SizeRemain, l0CSize);
-    OP_CHECK_IF(ret != 0,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName,
-                                            "bmm2 set SetBufferSpace failed, l1SizeRemain = %ld, l0CSize = %ld, "
-                                            "sOuterFactor = %u, sInnerFactor = %u, ret = %d!",
-                                            l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor, ret),
-                return false);
+    OP_CHECK_IF(ret != 0, ReportTilingFailure(context_, "bmm2 set SetBufferSpace failed"), return false);
 
     if (autoBaseMNK) {
         if (enableMatmulNorm) {
@@ -3107,8 +3098,7 @@ bool FiaArch38PromptTiling::FiaArch38CheckBmm2(FiaArch38FlashAttentionTilingData
             uint32_t baseN = std::min(uint32_t(128), tilingData.fiaArch38AttentionBaseParams.get_vHeadSize());
             uint32_t baseK = 128U;
             ret = bmm2.SetFixSplit(baseM, baseN, baseK);
-            OP_CHECK_IF(ret != 0, OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "bmm2 SetFixSplit failed!"),
-                        return false);
+            OP_CHECK_IF(ret != 0, ReportTilingFailure(context_, "bmm2 SetFixSplit failed"), return false);
         }
         ret = bmm2.GetTiling(bmm2TilingData);
     } else {
@@ -3117,29 +3107,14 @@ bool FiaArch38PromptTiling::FiaArch38CheckBmm2(FiaArch38FlashAttentionTilingData
         } else {
             ret = bmm2.SetFixSplit(sOuterFactor, tilingData.fiaArch38AttentionBaseParams.get_alignedHeadSize());
         }
-        OP_CHECK_IF(ret != 0, OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "bmm2 SetFixSplit failed!"),
-                    return false);
+        OP_CHECK_IF(ret != 0, ReportTilingFailure(context_, "bmm2 SetFixSplit failed"), return false);
         ret = bmm2.GetTiling(bmm2TilingData);
     }
-    OP_CHECK_IF(
-        ret != 0,
-        OPS_REPORT_VECTOR_INNER_ERR(
-            contextKeyParamsPtr->opName,
-            "bmm2 set GetTiling failed, l1SizeRemain = %ld, l0CSize = %ld, sOuterFactor = %u, sInnerFactor = %u, "
-            "autoBaseMNK = %d, ret = %d!",
-            l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor, autoBaseMNK, ret),
-        return false);
+    OP_CHECK_IF(ret != 0, ReportTilingFailure(context_, "bmm2 set GetTiling failed"), return false);
     bmm2TilingData.set_shareMode(0);
     bmm2TilingData.set_shareL1Size(l1SizeRemain);
     bmm2TilingData.set_shareL0CSize(l0CSize);
-    OP_CHECK_IF(
-        ret != 0,
-        OPS_REPORT_VECTOR_INNER_ERR(
-            contextKeyParamsPtr->opName,
-            "bmm2 set shareL0CSize failed, l1SizeRemain = %ld, l0CSize = %ld, sOuterFactor = %u, sInnerFactor = %u,"
-            "autoBaseMNK = %d, ret = %d!",
-            l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor, autoBaseMNK, ret),
-        return false);
+    OP_CHECK_IF(ret != 0, ReportTilingFailure(context_, "bmm2 set shareL0CSize failed"), return false);
     bmm2TilingData.set_shareUbSize(0);
     return true;
 }
@@ -3152,13 +3127,11 @@ bool FiaArch38PromptTiling::FiaArch38ComputeCVDiffParams(FiaArch38FlashAttention
     int32_t l1SizeRemain = l1Size;
     bool res = FiaArch38CheckBmm1(tilingData, tilingData.bmm1TilingDataRect, l1SizeRemain, l0CSize, sOuterFactor,
                                   sInnerFactor, true);
-    OP_CHECK_IF(!res, OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "FiaArch38CheckBmm1 failed!"),
-                return false);
+    OP_CHECK_IF(!res, OP_LOGE_WITHOUT_REPORT(contextKeyParamsPtr->opName, "FiaArch38CheckBmm1 failed!"), return false);
 
     res = FiaArch38CheckBmm2(tilingData, tilingData.bmm2TilingDataRect, l1SizeRemain, l0CSize, sOuterFactor,
                              sInnerFactor, dSplitFactorBmm2, true);
-    OP_CHECK_IF(!res, OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "FiaArch38CheckBmm2 failed!"),
-                return false);
+    OP_CHECK_IF(!res, OP_LOGE_WITHOUT_REPORT(contextKeyParamsPtr->opName, "FiaArch38CheckBmm2 failed!"), return false);
 
     return true;
 }
@@ -3730,19 +3703,15 @@ ge::graphStatus FiaArch38PromptTiling::SetPlatMemoryInfo(FiaArch38ContextParams&
     auto compileInfoPtr = contextKeyParams.compileInfoPtr;
     contextKeyParamsPtr = &contextKeyParams;
 
-    OP_CHECK_IF(compileInfoPtr == nullptr,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "compileInfoPtr is null"),
+    OP_CHECK_IF(compileInfoPtr == nullptr, ReportTilingFailure(context_, "compileInfoPtr is null"),
                 return ge::GRAPH_FAILED);
 
     coreNum = compileInfoPtr->aivNum;
-    OP_CHECK_IF(coreNum == 0, OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "coreNum is 0"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(coreNum == 0, ReportTilingFailure(context_, "coreNum is 0"), return ge::GRAPH_FAILED);
     aivNum = compileInfoPtr->aivNum;
-    OP_CHECK_IF(aivNum == 0, OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "aivNum is 0"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(aivNum == 0, ReportTilingFailure(context_, "aivNum is 0"), return ge::GRAPH_FAILED);
     aicNum = compileInfoPtr->aicNum;
-    OP_CHECK_IF(aicNum == 0, OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "aicNum is 0"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(aicNum == 0, ReportTilingFailure(context_, "aicNum is 0"), return ge::GRAPH_FAILED);
     ascendPlatformInfo.socVersion = compileInfoPtr->socShortName;
     ascendPlatformInfo.l1Size = compileInfoPtr->l1Size;
     ascendPlatformInfo.l0CSize = compileInfoPtr->l0CSize;
@@ -3768,9 +3737,7 @@ ge::graphStatus FiaArch38PromptTiling::SetAttributeInfo(FiaArch38ContextParams& 
             enableKVAntiquant = true;
         }
         OP_CHECK_IF(contextKeyParams.inputDataType == ge::DT_BF16 && contextKeyParams.kDataType == ge::DT_INT8,
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "keyAntiquantScale and valueAntiquantScale should not be null, "
-                                                "when data type of query is bf16 and data type of key/value is int8"),
+                    OP_LOGE_WITH_INVALID_INPUT(contextKeyParams.opName, "key_antiquant_scale, value_antiquant_scale"),
                     return ge::GRAPH_FAILED);
     }
 
@@ -3779,9 +3746,7 @@ ge::graphStatus FiaArch38PromptTiling::SetAttributeInfo(FiaArch38ContextParams& 
         (contextKeyParams.keySharedPrefix != nullptr) && (contextKeyParams.valueSharedPrefix != nullptr) ? true : false;
     OP_CHECK_IF((!isKVHasPrefix &&
                  ((contextKeyParams.keySharedPrefix != nullptr) || contextKeyParams.valueSharedPrefix != nullptr)),
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "when system prefix is used, key_shared_prefix and value_shared_prefix are required!"),
+                OP_LOGE_WITH_INVALID_INPUT(contextKeyParams.opName, "key_shared_prefix, value_shared_prefix"),
                 return ge::GRAPH_FAILED);
 
     // actSeqLen check
@@ -3797,7 +3762,8 @@ ge::graphStatus FiaArch38PromptTiling::SetAttributeInfo(FiaArch38ContextParams& 
     // PA check
     if (contextKeyParams.blockTable != nullptr) {
         OP_CHECK_IF(contextKeyParams.blockSize == nullptr,
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "blockSize can't be null when PA enable"),
+                    OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(contextKeyParams.opName, "block_size",
+                                                             "block_size is required when PA is enabled"),
                     return ge::GRAPH_FAILED);
         enablePA = true;
     }
@@ -3809,10 +3775,11 @@ ge::graphStatus FiaArch38PromptTiling::SetAttributeInfo(FiaArch38ContextParams& 
 
     if (contextKeyParams.pseType != nullptr) {
         pseType = *contextKeyParams.pseType;
-        OP_CHECK_IF((pseType != 0) && (pseType != 2) && (pseType != 3),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                "PseType(%ld) is not support, pseType must be 0/2/3.", pseType),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            (pseType != 0) && (pseType != 2) && (pseType != 3),
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "pse_type", std::to_string(pseType).c_str(),
+                                                  "pse_type is not supported, must be 0, 2 or 3"),
+            return ge::GRAPH_FAILED);
         faTilingAdapter.inputParamsRegbase.set_pseType(pseType);
     }
     if (pseType == PSE_TYPE_2_TILING_V2 || pseType == PSE_TYPE_3_TILING_V2) {
@@ -3868,11 +3835,14 @@ ge::graphStatus FiaArch38PromptTiling::CheckRopeInvalid(const FiaArch38ContextPa
     const gert::StorageShape* queryRopeShapeParam = contextKeyParams.queryRopeInputShape;
     const gert::StorageShape* keyRopeShapeParam = contextKeyParams.keyRopeInputShape;
     if ((queryRopeShapeParam != nullptr) && (queryRopeShapeParam->GetStorageShape().GetShapeSize() == 0)) {
-        OP_LOGE(contextKeyParams.opName, "When queryRopeShape is not nullptr, queryRope should not be empty tensor.");
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+            contextKeyParams.opName, "query_rope", "0",
+            "queryRope must not be an empty tensor when queryRopeShape is not null");
         return ge::GRAPH_FAILED;
     }
     if ((keyRopeShapeParam != nullptr) && (keyRopeShapeParam->GetStorageShape().GetShapeSize() == 0)) {
-        OP_LOGE(contextKeyParams.opName, "When keyRopeShape is not nullptr, keyRope should not be empty tensor.");
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(contextKeyParams.opName, "key_rope", "0",
+                                                  "keyRope must not be an empty tensor when keyRopeShape is not null");
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -3885,7 +3855,9 @@ ge::graphStatus FiaArch38PromptTiling::CheckTensorInvalid(const FiaArch38Context
     }
     OP_CHECK_IF((contextKeyParams.queryInputShape->GetStorageShape().GetShapeSize() == 0) &&
                     (contextKeyParams.outputShape->GetStorageShape().GetShapeSize() != 0),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Query input is empty and output is not empty!"),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "query, attention_out",
+                                                       "query empty, attention_out not empty",
+                                                       "query input is empty but output is not empty"),
                 return ge::GRAPH_FAILED);
     if (!CheckNonEmptyShapeExceptions(contextKeyParams, contextKeyParams.keyInputShape, "key")) {
         return ge::GRAPH_FAILED;
@@ -3910,9 +3882,9 @@ bool FiaArch38PromptTiling::CheckAlibiPseShiftTypeAndShape(FiaArch38ContextParam
     pseShiftElemType = contextKeyParams.pseShiftDataType;
 
     OP_CHECK_IF((pseShiftElemType != ge::DT_FLOAT),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "When pseType = 2/3, pse shift type must be float, but pse shift type = %s",
-                                            GetPfaDataTypeStr(pseShiftElemType).c_str()),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(contextKeyParams.opName, "pse_shift",
+                                                      GetPfaDataTypeStr(pseShiftElemType).c_str(),
+                                                      "when pseType is 2/3, pse shift type must be float"),
                 return false);
 
     // 0: (B,N2,G,S1,S2), 1: (B,N2,G,1,S2)
@@ -3923,18 +3895,17 @@ bool FiaArch38PromptTiling::CheckAlibiPseShiftTypeAndShape(FiaArch38ContextParam
         int64_t pseBSize = 0;
         if (pseType == static_cast<int64_t>(PfaPseType::PSE_INNER_MUL_ADD_TYPE) ||
             pseType == static_cast<int64_t>(PfaPseType::PSE_INNER_MUL_ADD_SQRT_TYPE)) {
-            OP_CHECK_IF(
-                pseDimNum != SLOPE_N_DIM_NUM,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "The dim of pseShift(%ld) must be 1, when pseType = 2/3.", pseDimNum),
-                return false);
+            OP_CHECK_IF(pseDimNum != SLOPE_N_DIM_NUM,
+                        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(contextKeyParams.opName, "pse_shift",
+                                                                 std::to_string(pseDimNum).c_str(),
+                                                                 "when pseType is 2/3, the dim of pseShift must be 1"),
+                        return false);
             int64_t pseShiftN = pseShape->GetStorageShape().GetDim(0); // 0: The first dimension is N.
-            OP_CHECK_IF(
-                pseShiftN != n,
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "The length of pseShift(%ld) must be equal to query head number, when pseType = 2/3.", pseShiftN),
-                return false);
+            OP_CHECK_IF(pseShiftN != n,
+                        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                            contextKeyParams.opName, "pse_shift", std::to_string(pseShiftN).c_str(),
+                            "when pseType is 2/3, the length of pseShift must be equal to query head number"),
+                        return false);
             if (pseDimNum == 1) {
                 pseShapeType = PfaPseShapeType::PSE_1_N2_G_SLOPE;
                 pseBSize = 1;
@@ -3954,19 +3925,19 @@ ge::graphStatus FiaArch38PromptTiling::CheckSingleAttribute(FiaArch38ContextPara
                                                             FiaArch38FlashAttentionTilingData& tilingData)
 {
     if (!CheckIO(contextKeyParams, queryShapeInfo, valueShapeInfo)) {
-        OP_LOGE(contextKeyParams.opName, "Check query/ouput failed!");
+        OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Check query/ouput failed!");
         return ge::GRAPH_FAILED;
     }
     if (!CheckKV(contextKeyParams, keyShapeInfo, valueShapeInfo)) {
-        OP_LOGE(contextKeyParams.opName, "Check key/value failed!");
+        OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Check key/value failed!");
         return ge::GRAPH_FAILED;
     }
     if (!CheckRope(contextKeyParams, queryShapeInfo, keyShapeInfo, queryRopeShapeInfo)) {
-        OP_LOGE(contextKeyParams.opName, "Check queryRope/keyRope failed!");
+        OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Check queryRope/keyRope failed!");
         return ge::GRAPH_FAILED;
     }
     if (!CheckQueryAndKey(contextKeyParams, queryShapeInfo, keyShapeInfo, tilingData)) {
-        OP_LOGE(contextKeyParams.opName, "Check query and key consistency failed!");
+        OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Check query and key consistency failed!");
         return ge::GRAPH_FAILED;
     }
     if (enableIFAMLA && (!CheckIFAMLA(contextKeyParams, queryShapeInfo))) {
@@ -3981,26 +3952,26 @@ ge::graphStatus FiaArch38PromptTiling::CheckSingleAttribute(FiaArch38ContextPara
 
     // quant/dequant/antiquant
     if (!CheckQuant(contextKeyParams, queryShapeInfo, keyShapeInfo, valueShapeInfo)) {
-        OP_LOGE(contextKeyParams.opName, "Check quant failed!");
+        OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Check quant failed!");
         return ge::GRAPH_FAILED;
     }
 
     // prefix check
     if (!CheckPrefix(contextKeyParams, queryShapeInfo, keyShapeInfo, tilingData)) {
-        OP_LOGE(contextKeyParams.opName, "Check prefix failed!");
+        OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Check prefix failed!");
         return ge::GRAPH_FAILED;
     }
 
     // actSeq check
     if (!CheckActSeq(contextKeyParams, queryShapeInfo)) {
-        OP_LOGE(contextKeyParams.opName, "Check actual sequence failed!");
+        OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Check actual sequence failed!");
         return ge::GRAPH_FAILED;
     }
 
     // actSeqLen check
     if ((contextKeyParams.fromTilingSink == static_cast<uint32_t>(0)) &&
         !CheckActSeqLen(contextKeyParams, queryShapeInfo, keyShapeInfo)) {
-        OP_LOGE(contextKeyParams.opName, "Check actual sequence length failed!");
+        OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "Check actual sequence length failed!");
         return ge::GRAPH_FAILED;
     }
 
@@ -4059,21 +4030,23 @@ bool FiaArch38PromptTiling::CheckAlibiPseCrossover(FiaArch38ContextParams& conte
         return true;
     }
 
-    OP_CHECK_IF(
-        enableLeftPadding,
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "When pseType = 2/3, left padding is not supported!"),
-        return false);
+    OP_CHECK_IF(enableLeftPadding,
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "pse_type, leftPadding",
+                                                       "pseType 2/3 with left padding",
+                                                       "when pseType is 2/3, left padding is not supported"),
+                return false);
 
     OP_CHECK_IF((enableIFAMLA || enablePFARope),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "When pseType = 2/3, rope is not supported, pseType = %ld", pseType),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "pse_type, query_rope/key_rope",
+                                                       (std::to_string(pseType) + ", present").c_str(),
+                                                       "when pseType is 2/3, rope is not supported"),
                 return false);
 
-    OP_CHECK_IF((enablePFAMLA),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "When pseType = 2/3, query, key and value D should be the same, input "
-                                            "query's D and key's D = 192, but value's D = 128."),
-                return false);
+    OP_CHECK_IF(
+        (enablePFAMLA),
+        OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(contextKeyParams.opName, "query, key, value", "192, 192, 128",
+                                                   "when pseType is 2/3, query, key and value D must be the same"),
+        return false);
 
     return true;
 }
@@ -4085,14 +4058,16 @@ bool FiaArch38PromptTiling::CheckArch38PlatformSupported(const FiaArch38ContextP
     // 以下约束只与平台已注册的模板/tilingKey 有关，不依赖 IFA/合轴改写后的 n/s，
     // 因此 IFA / MLA / 合轴路径也必须满足，不能放在 early-return 之后。
     OP_CHECK_IF((inputLayout != InputLayout::BNSD),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "only BNSD layout is supported on this platform."),
+                OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(contextKeyParams.opName, "input_layout", contextKeyParams.layout,
+                                                       "only BNSD layout is supported on this platform"),
                 return false);
 
     OP_CHECK_IF((!IsArch38SupportedHeadSize(static_cast<int64_t>(queryShapeInfo.d)) ||
                  !IsArch38SupportedHeadSize(static_cast<int64_t>(valueShapeInfo.d))),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "head size only supports 64/80/128/256, but query d = %u, value d = %u.",
-                                            queryShapeInfo.d, valueShapeInfo.d),
+                OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                    contextKeyParams.opName, "query, value",
+                    (std::to_string(queryShapeInfo.d) + ", " + std::to_string(valueShapeInfo.d)).c_str(),
+                    "head size only supports 64, 80, 128 or 256 on this platform"),
                 return false);
 
     // 本平台注册的模板中 query d 恒等于 value d。
@@ -4150,9 +4125,11 @@ bool FiaArch38PromptTiling::CheckArch38ScenarioSupported(const FiaArch38ContextP
 
     // 带 mask 的 band（sparseMode=4）会生成 +2e8 的 tilingKey，本平台没有注册；
     // 不带 mask 的 band 仍走普通的 no-mask key，IFA / 合轴可继续使用。
-    OP_CHECK_IF((enableMask && (sparseModeVal == SPARSE_MODE_BAND)),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "band mask is not supported on this platform."),
-                return false);
+    OP_CHECK_IF(
+        (enableMask && (sparseModeVal == SPARSE_MODE_BAND)),
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "sparse_mode, atten_mask", "band mask present",
+                                               "band mask is not supported on this platform"),
+        return false);
 
     // IFA / 合轴在调用点前已按 gSize 改写 queryShapeInfo.n/.s，下面 qs == kvs、qs > 1 等
     // PFA 原始形状约束不适用，因此这里只跳过形状相关检查（平台级约束已在上方执行）。
@@ -4161,65 +4138,70 @@ bool FiaArch38PromptTiling::CheckArch38ScenarioSupported(const FiaArch38ContextP
     }
 
     OP_CHECK_IF((queryShapeInfo.b != 1U && queryShapeInfo.b != 9U),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "batch size must be 1 or 9, but b = %u.",
-                                            queryShapeInfo.b),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "query batch",
+                                                      std::to_string(queryShapeInfo.b).c_str(),
+                                                      "batch size must be 1 or 9 on this platform"),
                 return false);
 
     OP_CHECK_IF((queryShapeInfo.s != static_cast<uint64_t>(S2)),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "query seq length must equal kv seq length, but qs = %lu, kvs = %u.",
-                                            queryShapeInfo.s, S2),
+                OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                    contextKeyParams.opName, "query, key/value",
+                    (std::to_string(queryShapeInfo.s) + ", " + std::to_string(S2)).c_str(),
+                    "query seq length must equal kv seq length on this platform"),
                 return false);
 
     OP_CHECK_IF(((queryShapeInfo.s <= 1UL) || (S2 <= 1U)),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "query and kv seq length must be greater than 1, but qs = %lu, kvs = %u.",
-                                            queryShapeInfo.s, S2),
+                OP_LOGE_FOR_INVALID_SHAPESIZES_WITH_REASON(
+                    contextKeyParams.opName, "query, key/value",
+                    (std::to_string(queryShapeInfo.s) + ", " + std::to_string(S2)).c_str(),
+                    "query and kv seq length must be greater than 1 on this platform"),
                 return false);
 
     OP_CHECK_IF((queryShapeInfo.s > static_cast<uint64_t>(ARCH38_SUPPORTED_MAX_SEQ)),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "seq length must be <= %ld, but seq = %lu.",
-                                            ARCH38_SUPPORTED_MAX_SEQ, queryShapeInfo.s),
+                OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                    contextKeyParams.opName, "query", std::to_string(queryShapeInfo.s).c_str(),
+                    "seq length must be less than or equal to ARCH38_SUPPORTED_MAX_SEQ on this platform"),
                 return false);
 
     const int64_t nQ = *contextKeyParams.headsNumber;
     const int64_t nKV = (*contextKeyParams.numKeyValueHeads > 0) ? *contextKeyParams.numKeyValueHeads : nQ;
-    OP_CHECK_IF(((nQ <= 0) || (nQ > ARCH38_SUPPORTED_MAX_N) || (nKV <= 0) || (nKV > ARCH38_SUPPORTED_MAX_N)),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "head num must be in (0, %ld], but numHeads = %ld, "
-                                            "numKeyValueHeads = %ld.",
-                                            ARCH38_SUPPORTED_MAX_N, nQ, nKV),
-                return false);
+    OP_CHECK_IF(
+        ((nQ <= 0) || (nQ > ARCH38_SUPPORTED_MAX_N) || (nKV <= 0) || (nKV > ARCH38_SUPPORTED_MAX_N)),
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "num_heads, num_key_value_heads",
+                                               (std::to_string(nQ) + ", " + std::to_string(nKV)).c_str(),
+                                               "head num must be in (0, ARCH38_SUPPORTED_MAX_N] on this platform"),
+        return false);
 
     // Guarantees the kernel never takes the InitOutput branch.
     OP_CHECK_IF((needInit != 0U),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                            "output must be fully covered by main loop (needInit = 0), "
-                                            "check actual_seq_lengths / preTokens / left padding configuration."),
+                OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(
+                    contextKeyParams.opName, "actual_seq_lengths, pre_tokens, leftPadding", "needInit = 1",
+                    "output must be fully covered by the main loop, check actual_seq_lengths / preTokens / "
+                    "left padding configuration"),
                 return false);
 
-    OP_CHECK_IF(
-        (sparseModeVal != SPARSE_MODE_NO_MASK),
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                    "attention mask only supports sparseMode = 0, but sparseMode = %d.", sparseModeVal),
-        return false);
+    OP_CHECK_IF((sparseModeVal != SPARSE_MODE_NO_MASK),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "sparse_mode",
+                                                      std::to_string(sparseModeVal).c_str(),
+                                                      "attention mask only supports sparseMode = 0 on this platform"),
+                return false);
 
     if (!enableMask) {
         return true;
     }
 
     // With sparseMode = 0, nextTokensPerbatch always equals this attribute, no per-batch conversion needed.
-    OP_CHECK_IF(
-        (sparseNextTokens != 0),
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                    "attention mask requires nextTokens = 0, but nextTokens = %ld.", sparseNextTokens),
-        return false);
+    OP_CHECK_IF((sparseNextTokens != 0),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "next_tokens",
+                                                      std::to_string(sparseNextTokens).c_str(),
+                                                      "attention mask requires nextTokens = 0"),
+                return false);
 
-    OP_CHECK_IF(
-        (sparsePreTokens <= 0),
-        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                    "attention mask requires preTokens > 0, but preTokens = %ld.", sparsePreTokens),
-        return false);
+    OP_CHECK_IF((sparsePreTokens <= 0),
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "pre_tokens",
+                                                      std::to_string(sparsePreTokens).c_str(),
+                                                      "attention mask requires preTokens > 0"),
+                return false);
 
     return true;
 }
@@ -4272,8 +4254,7 @@ ge::graphStatus FiaArch38PromptTiling::AdjustTilingData(FiaArch38ContextParams& 
     // Currently, there will be no D splitting scenario, and split D = 0 is default when splitting.
     auto ret = AdjustCVTilingCVDiff(contextKeyParams, sOuterFactor, sInnerFactor, softmaxSOuterFactor, tilingData,
                                     queryShapeInfo);
-    OP_CHECK_IF(!ret, OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "adjust tiling cv diff fail"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!ret, ReportTilingFailure(context_, "adjust tiling cv diff fail"), return ge::GRAPH_FAILED);
 
     // fp16 输入的部分形状没有注册 tiling key，在此 fail fast。
     // 该判断需与 fia_arch38_entry_regbase.h 的 key 列表保持一致。
@@ -4377,8 +4358,7 @@ ge::graphStatus FiaArch38PromptTiling::ComputeTilingKey(uint64_t& tilingKey, Fia
                                                         FiaArch38FlashAttentionTilingData& tilingData)
 {
     bool tilingRet = TilingGetTilingKeyAttentionAscendC(tilingKey, contextKeyParams, tilingData);
-    OP_CHECK_IF(!tilingRet, OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Get tilingKey fail"),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(!tilingRet, ReportTilingFailure(context_, "Get tilingKey fail"), return ge::GRAPH_FAILED);
 
     auto platformInfoPtr = context_->GetPlatformInfo();
     OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE_WITHOUT_REPORT(contextKeyParams.opName, "platformInfoPtr is null!"),
@@ -4441,9 +4421,9 @@ ge::graphStatus FiaArch38PromptTiling::SetQKVStartIdx(FiaArch38ContextParams& co
             if (value != nullptr) {
                 qStartIdx = value[0];
                 OP_CHECK_IF(qStartIdx > INT32_MAX || qStartIdx < INT32_MIN,
-                            OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                        "qStartIdx should >= %d and <= %d, but qStartIdx = %ld.",
-                                                        INT32_MIN, INT32_MAX, qStartIdx),
+                            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "q_start_idx",
+                                                                  std::to_string(qStartIdx).c_str(),
+                                                                  "qStartIdx must be in range [INT32_MIN, INT32_MAX]"),
                             return ge::GRAPH_FAILED);
                 inputParams.set_qStartIdx(qStartIdx);
             }
@@ -4457,21 +4437,21 @@ ge::graphStatus FiaArch38PromptTiling::SetQKVStartIdx(FiaArch38ContextParams& co
             if (kvValue != nullptr) {
                 kvStartIdx = kvValue[0];
                 OP_CHECK_IF(kvStartIdx > INT32_MAX || kvStartIdx < INT32_MIN,
-                            OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                                                        "kvStartIdx should >= %d and <= %d, but kvStartIdx = %ld.",
-                                                        INT32_MIN, INT32_MAX, kvStartIdx),
+                            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(contextKeyParams.opName, "kv_start_idx",
+                                                                  std::to_string(kvStartIdx).c_str(),
+                                                                  "kvStartIdx must be in range [INT32_MIN, INT32_MAX]"),
                             return ge::GRAPH_FAILED);
                 inputParams.set_kvStartIdx(kvStartIdx);
             }
         }
     }
     // 当kvStartIdx - qStartIdx超出范围后，由于编译器不支持大数值类型转换，kernel侧int_64转float类型时可能发生截断。
-    OP_CHECK_IF(kvStartIdx - qStartIdx > INT32_MAX || kvStartIdx - qStartIdx < INT32_MIN,
-                OPS_REPORT_VECTOR_INNER_ERR(
-                    contextKeyParams.opName,
-                    "kvStartIdx - qStartIdx should >= %d and <= %d, but qStartIdx = %ld, kvStartIdx = %ld.", INT32_MIN,
-                    INT32_MAX, qStartIdx, kvStartIdx),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        kvStartIdx - qStartIdx > INT32_MAX || kvStartIdx - qStartIdx < INT32_MIN,
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(contextKeyParams.opName, "q_start_idx, kv_start_idx",
+                                               (std::to_string(qStartIdx) + ", " + std::to_string(kvStartIdx)).c_str(),
+                                               "kvStartIdx - qStartIdx must be in range [INT32_MIN, INT32_MAX]"),
+        return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
