@@ -146,227 +146,227 @@ aclnnStatus aclnnMhcPreSinkhornV2(
     <col style="width: 145px">
     </colgroup>
     <thead>
-      <tr>
-        <th>参数名</th>
-        <th>输入/输出</th>
-        <th>描述</th>
-        <th>使用说明</th>
-        <th>数据类型</th>
-        <th>数据格式</th>
-        <th>维度(shape)</th>
-        <th>非连续Tensor</th>
-      </tr></thead>
+    <tr>
+      <th>参数名</th>
+      <th>输入/输出</th>
+      <th>描述</th>
+      <th>使用说明</th>
+      <th>数据类型</th>
+      <th>数据格式</th>
+      <th>维度(shape)</th>
+      <th>非连续Tensor</th>
+    </tr></thead>
     <tbody>
-      <tr>
-        <td>x（const aclTensor*）</td>
-        <td>输入</td>
-        <td>待计算数据，表示网络中mHC层的输入数据。</td>
-        <td><ul><il>支持空Tensor。</il><il>shape支持(bs, seq_len, n, c)或者(t, n, c)。</il></ul></td>
-        <td>FLOAT16、BFLOAT16</td>
-        <td>ND</td>
-        <td>3-4</td>
-        <td>√</td>
-      </tr>
-      <tr>
-        <td>phi（const aclTensor*）</td>
-        <td>输入</td>
-        <td>mHC的参数矩阵。</td>
-        <td><ul><il>支持空Tensor。</il><il>shape支持(n * n + 2 * n, n * c)。</il></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>2</td>
-        <td>√</td>
-      </tr>
-      <tr>
-        <td>alpha（const aclTensor*）</td>
-        <td>输入</td>
-        <td>mHC的缩放参数。</td>
-        <td><ul><il>支持空Tensor。</il><il>shape支持(3)。</il></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>1</td>
-        <td>√</td>
-      </tr>
-      <tr>
-        <td>bias（const aclTensor*）</td>
-        <td>输入</td>
-        <td>mHC的bias参数。</td>
-        <td><ul><il>支持空Tensor。</il><il>shape支持(n * n + 2 * n)。</il></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>1</td>
-        <td>√</td>
-      </tr>
-      <tr>
-        <td>premix（const aclTensor*）</td>
-        <td>输入</td>
-        <td>可选输入，premix加权系数（通常填上一层输出的hPre）。</td>
-        <td><ul><il>支持空Tensor。</il><il>shape支持(bs, seq_len, n)或者(t, n)。</il></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>√</td>
-      </tr>
-      <tr>
-        <td>hcMult（int64_t）</td>
-        <td>输入</td>
-        <td>残差流数量，HC维度大小。</td>
-        <td>当前仅支持4。</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
-        <td>numIters（int64_t）</td>
-        <td>输入</td>
-        <td>表示sinkhorn算法迭代次数。</td>
-        <td>当前仅支持20。</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
-        <td>hcEps（double）</td>
-        <td>输入</td>
-        <td>H<sub>pre</sub>的sigmoid后的eps参数。</td>
-        <td>建议值：1e-6。</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
-        <td>normEps（double）</td>
-        <td>输入</td>
-        <td>RmsNorm的防除零参数。</td>
-        <td>建议值：1e-6。</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
-        <td>needBackward（bool）</td>
-        <td>输入</td>
-        <td>是否需要输出额外属性。</td>
-        <td>建议值为true。</td>
-        <td></td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
-        <td>enableHf32（bool）</td>
-        <td>输入</td>
-        <td>可选属性（仅V2接口），表示Cube是否启用HF32计算模式。</td>
-        <td>可为true（默认，与V1接口一致）。传入false切换为FP32。</td>
-        <td></td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
-        <td>hin（aclTensor*）</td>
-        <td>输出</td>
-        <td>输出的hin作为Atten/MLP层的输入。</td>
-        <ul><il>不支持空Tensor。</il><il>shape支持(bs, seq_len, c)、(t, c)。</il></ul>
-        <td>FLOAT16、BFLOAT16</td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>×</td>
-      </tr>
-      <tr>
-        <td>hPost（aclTensor*）</td>
-        <td>输出</td>
-        <td>输出的mHC的hPost变换矩阵。</td>
-        <ul><il>不支持空Tensor。</il><il>shape支持(bs, seq_len, n)、(t, n)。</il></ul>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>×</td>
-      </tr>
-      <tr>
-        <td>hRes（aclTensor*）</td>
-        <td>输出</td>
-        <td>输出的mHC的hRes变换矩阵。</td>
-        <ul><il>不支持空Tensor。</il><il>shape支持(bs, seq_len, n * n)、(t, n * n)。</il></ul>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>×</td>
-      </tr>
-      <tr>
-        <td>hPre（aclTensor*）</td>
-        <td>输出</td>
-        <td>需要反向时输出，做完sigmoid计算之后的hPre矩阵。</td>
-        <ul><il>不支持空Tensor。</il><il>当needBackward为false时，此输出无效；传入premix时即使needBackward为false也输出有效值。</il><il>shape支持(bs, seq_len, n)、(t, n)。</il></ul>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>×</td>
-      </tr>
-      <tr>
-        <td>hcBeforeNorm（aclTensor*）</td>
-        <td>输出</td>
-        <td>需要反向时输出，x与phi矩阵乘的结果。</td>
-        <ul><il>不支持空Tensor。</il><il>当needBackward为false时，此输出无效。</il><il>shape支持(bs, seq_len, n*n + 2*n)、(t, n*n + 2*n)。</il></ul>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>×</td>
-      </tr>
-      <tr>
-        <td>invRms（aclTensor*）</td>
-        <td>输出</td>
-        <td>需要反向时输出，RmsNorm计算得到的1/r。</td>
-        <ul><il>不支持空Tensor。</il><il>当needBackward为false时，此输出无效。</il><il>shape支持(bs, seq_len, 1)、(t, 1)。</il></ul>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>×</td>
-      </tr>
-      <tr>
-        <td>sumOut（aclTensor*）</td>
-        <td>输出</td>
-        <td>需要反向时输出，每一次迭代的colSum/rowSum结果。</td>
-        <ul><il>不支持空Tensor。</il><il>当needBackward为false时，此输出无效。</il><il>shape支持(sk_iter_count * 2, bs, seq_len, n)、(sk_iter_count * 2, t, n)。</il></ul>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>3-4</td>
-        <td>×</td>
-      </tr>
-      <tr>
-        <td>normOut（aclTensor*）</td>
-        <td>输出</td>
-        <td>需要反向时输出，每一次colSum/rowSum迭代后的comb结果。</td>
-        <ul><il>不支持空Tensor。</il><il>当needBackward为false时，此输出无效。</il><il>shape支持(sk_iter_count * 2, bs, seq_len, n, n)、(sk_iter_count * 2, t, n, n)。</il></ul>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>4-5</td>
-        <td>×</td>
-      </tr>
-      <tr>
-        <td>workspaceSize（uint64_t*）</td>
-        <td>输出</td>
-        <td>返回需要在Device侧申请的workspace大小。</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
-        <td>executor（aclOpExecutor**）</td>
-        <td>输出</td>
-        <td>返回op执行器，包含了算子计算流程。</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
+    <tr>
+      <td>x（const aclTensor*）</td>
+      <td>输入</td>
+      <td>待计算数据，表示网络中mHC层的输入数据。</td>
+      <td><ul><li>支持空Tensor。</li><li>shape支持(bs, seq_len, n, c)或者(t, n, c)。</li></ul></td>
+      <td>FLOAT16、BFLOAT16</td>
+      <td>ND</td>
+      <td>3-4</td>
+      <td>√</td>
+    </tr>
+    <tr>
+      <td>phi（const aclTensor*）</td>
+      <td>输入</td>
+      <td>mHC的参数矩阵。</td>
+      <td><ul><li>支持空Tensor。</li><li>shape支持(n * n + 2 * n, n * c)。</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>2</td>
+      <td>√</td>
+    </tr>
+    <tr>
+      <td>alpha（const aclTensor*）</td>
+      <td>输入</td>
+      <td>mHC的缩放参数。</td>
+      <td><ul><li>支持空Tensor。</li><li>shape支持(3)。</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>1</td>
+      <td>√</td>
+    </tr>
+    <tr>
+      <td>bias（const aclTensor*）</td>
+      <td>输入</td>
+      <td>mHC的bias参数。</td>
+      <td><ul><li>支持空Tensor。</li><li>shape支持(n * n + 2 * n)。</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>1</td>
+      <td>√</td>
+    </tr>
+    <tr>
+      <td>premix（const aclTensor*）</td>
+      <td>输入</td>
+      <td>可选输入，premix加权系数（通常填上一层输出的hPre）。</td>
+      <td><ul><li>支持空Tensor。</li><li>shape支持(bs, seq_len, n)或者(t, n)。</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>2-3</td>
+      <td>√</td>
+    </tr>
+    <tr>
+      <td>hcMult（int64_t）</td>
+      <td>输入</td>
+      <td>残差流数量，HC维度大小。</td>
+      <td>当前仅支持4。</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>numIters（int64_t）</td>
+      <td>输入</td>
+      <td>表示sinkhorn算法迭代次数。</td>
+      <td>当前仅支持20。</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>hcEps（double）</td>
+      <td>输入</td>
+      <td>H<sub>pre</sub>的sigmoid后的eps参数。</td>
+      <td>建议值：1e-6。</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>normEps（double）</td>
+      <td>输入</td>
+      <td>RmsNorm的防除零参数。</td>
+      <td>建议值：1e-6。</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>needBackward（bool）</td>
+      <td>输入</td>
+      <td>是否需要输出额外属性。</td>
+      <td>建议值为true。</td>
+      <td></td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>enableHf32（bool）</td>
+      <td>输入</td>
+      <td>可选属性（仅V2接口），表示Cube是否启用HF32计算模式。</td>
+      <td>可为true（默认，与V1接口一致）。传入false切换为FP32。</td>
+      <td></td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>hin（aclTensor*）</td>
+      <td>输出</td>
+      <td>输出的hin作为Atten/MLP层的输入。</td>
+      <td><ul><li>不支持空Tensor。</li><li>shape支持(bs, seq_len, c)、(t, c)。</li></ul></td>
+      <td>FLOAT16、BFLOAT16</td>
+      <td>ND</td>
+      <td>2-3</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>hPost（aclTensor*）</td>
+      <td>输出</td>
+      <td>输出的mHC的hPost变换矩阵。</td>
+      <td><ul><li>不支持空Tensor。</li><li>shape支持(bs, seq_len, n)、(t, n)。</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>2-3</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>hRes（aclTensor*）</td>
+      <td>输出</td>
+      <td>输出的mHC的hRes变换矩阵。</td>
+      <td><ul><li>不支持空Tensor。</li><li>shape支持(bs, seq_len, n * n)、(t, n * n)。</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>2-3</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>hPre（aclTensor*）</td>
+      <td>输出</td>
+      <td>需要反向时输出，做完sigmoid计算之后的hPre矩阵。</td>
+      <td><ul><li>不支持空Tensor。</li><li>当needBackward为false时，此输出无效；传入premix时即使needBackward为false也输出有效值。</li><li>shape支持(bs, seq_len, n)、(t, n)。</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>2-3</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>hcBeforeNorm（aclTensor*）</td>
+      <td>输出</td>
+      <td>需要反向时输出，x与phi矩阵乘的结果。</td>
+      <td><ul><li>不支持空Tensor。</li><li>当needBackward为false时，此输出无效。</li><li>shape支持(bs, seq_len, n*n + 2*n)、(t, n*n + 2*n)。</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>2-3</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>invRms（aclTensor*）</td>
+      <td>输出</td>
+      <td>需要反向时输出，RmsNorm计算得到的1/r。</td>
+      <td><ul><li>不支持空Tensor。</li><li>当needBackward为false时，此输出无效。</li><li>shape支持(bs, seq_len, 1)、(t, 1)。</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>2-3</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>sumOut（aclTensor*）</td>
+      <td>输出</td>
+      <td>需要反向时输出，每一次迭代的colSum/rowSum结果。</td>
+      <td><ul><li>不支持空Tensor。</li><li>当needBackward为false时，此输出无效。</li><li>shape支持(sk_iter_count * 2, bs, seq_len, n)、(sk_iter_count * 2, t, n)。</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>3-4</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>normOut（aclTensor*）</td>
+      <td>输出</td>
+      <td>需要反向时输出，每一次colSum/rowSum迭代后的comb结果。</td>
+      <td><ul><li>不支持空Tensor。</li><li>当needBackward为false时，此输出无效。</li><li>shape支持(sk_iter_count * 2, bs, seq_len, n, n)、(sk_iter_count * 2, t, n, n)。</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>4-5</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>workspaceSize（uint64_t*）</td>
+      <td>输出</td>
+      <td>返回需要在Device侧申请的workspace大小。</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>executor（aclOpExecutor**）</td>
+      <td>输出</td>
+      <td>返回op执行器，包含了算子计算流程。</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
     </tbody>
   </table>
 
@@ -390,34 +390,34 @@ aclnnStatus aclnnMhcPreSinkhornV2(
   <col style="width: 819px">
   </colgroup>
   <thead>
-    <tr>
-      <th>返回值</th>
-      <th>错误码</th>
-      <th>描述</th>
-    </tr>
+  <tr>
+    <th>返回值</th>
+    <th>错误码</th>
+    <th>描述</th>
+  </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>ACLNN_ERR_PARAM_NULLPTR</td>
-      <td>161001</td>
-      <td>传入参数是必选输入，输出或者必选属性，且是空指针。</td>
-    </tr>
-    <tr>
-      <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="3">161002</td>
-      <td>输入变量的数据类型或shape维度不在支持的范围内。</td>
-    </tr>
-    <tr>
-      <td>numIters不为20。</td>
-    </tr>
-    <tr>
-      <td>hcMult的值非4。</td>
-    </tr>
-    <tr>
-      <td>ACLNN_ERR_RUNTIME_ERROR</td>
-      <td>361001</td>
-      <td>调用NPU Runtime接口申请内存/创建Tensor失败。</td>
-    </tr>
+  <tr>
+    <td>ACLNN_ERR_PARAM_NULLPTR</td>
+    <td>161001</td>
+    <td>传入参数是必选输入，输出或者必选属性，且是空指针。</td>
+  </tr>
+  <tr>
+    <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
+    <td rowspan="3">161002</td>
+    <td>输入变量的数据类型或shape维度不在支持的范围内。</td>
+  </tr>
+  <tr>
+    <td>numIters不为20。</td>
+  </tr>
+  <tr>
+    <td>hcMult的值非4。</td>
+  </tr>
+  <tr>
+    <td>ACLNN_ERR_RUNTIME_ERROR</td>
+    <td>361001</td>
+    <td>调用NPU Runtime接口申请内存/创建Tensor失败。</td>
+  </tr>
   </tbody>
   </table>
 
@@ -430,32 +430,32 @@ aclnnStatus aclnnMhcPreSinkhornV2(
   <col style="width: 880px">
   </colgroup>
   <thead>
-    <tr>
-      <th>参数名</th>
-      <th>输入/输出</th>
-      <th>描述</th>
-    </tr></thead>
+  <tr>
+    <th>参数名</th>
+    <th>输入/输出</th>
+    <th>描述</th>
+  </tr></thead>
   <tbody>
-    <tr>
-      <td>workspace</td>
-      <td>输入</td>
-      <td>在Device侧申请的workspace内存地址。</td>
-    </tr>
-    <tr>
-      <td>workspaceSize</td>
-      <td>输入</td>
-      <td>在Device侧申请的workspace大小，由第一段接口aclnnMhcPreSinkhornV2GetWorkspaceSize获取。</td>
-    </tr>
-    <tr>
-      <td>executor</td>
-      <td>输入</td>
-      <td>op执行器，包含了算子计算流程。</td>
-    </tr>
-    <tr>
-      <td>stream</td>
-      <td>输入</td>
-      <td>指定执行任务的Stream。</td>
-    </tr>
+  <tr>
+    <td>workspace</td>
+    <td>输入</td>
+    <td>在Device侧申请的workspace内存地址。</td>
+  </tr>
+  <tr>
+    <td>workspaceSize</td>
+    <td>输入</td>
+    <td>在Device侧申请的workspace大小，由第一段接口aclnnMhcPreSinkhornV2GetWorkspaceSize获取。</td>
+  </tr>
+  <tr>
+    <td>executor</td>
+    <td>输入</td>
+    <td>op执行器，包含了算子计算流程。</td>
+  </tr>
+  <tr>
+    <td>stream</td>
+    <td>输入</td>
+    <td>指定执行任务的Stream。</td>
+  </tr>
   </tbody>
   </table>
 

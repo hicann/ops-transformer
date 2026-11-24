@@ -335,260 +335,260 @@ aclnnStatus aclnnMhcPreSinkhornBackwardV2(
 - **参数说明：**
 
   <table style="undefined;table-layout: fixed; width: 1550px">
-    <colgroup>
-    <col style="width: 265px">
-    <col style="width: 120px">
-    <col style="width: 223px">
-    <col style="width: 391px">
-    <col style="width: 181px">
-    <col style="width: 111px">
-    <col style="width: 126px">
-    <col style="width: 145px">
-    </colgroup>
-    <thead>
-    <tr>
-        <th>参数名</th>
-        <th>输入/输出</th>
-        <th>描述</th>
-        <th>使用说明</th>
-        <th>数据类型</th>
-        <th>数据格式</th>
-        <th>维度(shape)</th>
-        <th>非连续Tensor</th>
-    </tr></thead>
-    <tbody>
-    <tr>
-        <td>gradHin（const aclTensor *）</td>
-        <td>输入</td>
-        <td>正向输出hin的梯度。</td>
-        <td><ul><il>支持空Tensor。</il><il>shape支持(B,S,C)、(T,C)。</il></ul></td>
-        <td>FLOAT16、BFLOAT16</td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>gradHPost（const aclTensor *）</td>
-        <td>输入</td>
-        <td>正向输出hPost的梯度。</td>
-        <td><ul><il>支持空Tensor。</il><il>shape支持(B,S,N)、(T,N)。</il></ul></td>
-        <td>FLOAT32 </td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>gradHRes（const aclTensor *）</td>
-        <td>输入</td>
-        <td>正向输出hRes的梯度。</td>
-        <td><ul><il>支持空Tensor。</il><il>shape支持(B,S,N*N)、(B,S,N,N)、(T,N*N)、(T,N,N)。</il></ul></td>
-        <td>FLOAT32 </td>
-        <td>ND</td>
-        <td>2-4</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>x（const aclTensor *）</td>
-        <td>输入</td>
-        <td>前向输入x。</td>
-        <td><ul><il>支持空Tensor。</il><il>shape支持(B,S,N,C)、(T,N,C)。</il></ul></td>
-        <td>FLOAT16、BFLOAT16</td>
-        <td>ND</td>
-        <td>3-4</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>phi（const aclTensor *）</td>
-        <td>输入</td>
-        <td>前向参数phi。</td>
-        <td><ul><il>不支持空Tensor。</il><il>shape支持(2N+N^2, N*C)。</il></ul></td>
-        <td>FLOAT32 </td>
-        <td>ND</td>
-        <td>2</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>alpha（const aclTensor *）</td>
-        <td>输入</td>
-        <td>前向参数alpha。</td>
-        <td><ul><il>不支持空Tensor。</il><il>shape支持(3)。</il></ul></td>
-        <td>FLOAT32 </td>
-        <td>ND</td>
-        <td>1</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>bias（const aclTensor *）</td>
-        <td>输入</td>
-        <td>前向参数bias。</td>
-        <td><ul><il>不支持空Tensor。</il><il>shape支持(2N+N^2)。</il></ul></td>
-        <td>FLOAT32 </td>
-        <td>ND</td>
-        <td>1</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>hPre（const aclTensor *）</td>
-        <td>输入</td>
-        <td>前向保存的中间结果hPre。</td>
-        <td><ul><il>支持空Tensor。</il><il>shape支持(B,S,N)、(T,N)。</il></ul></td>
-        <td>FLOAT32 </td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>hcBeforeNorm（const aclTensor *）</td>
-        <td>输入</td>
-        <td>前向保存的中间结果hcBeforeNorm。</td>
-        <td><ul><il>支持空Tensor。</il><il>shape支持(B,S,N*N+2*N)、(T,N*N+2*N)。</il></ul></td>
-        <td>FLOAT32 </td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>invRms（const aclTensor *）</td>
-        <td>输入</td>
-        <td>前向保存的中间结果invRms。</td>
-        <td><ul><il>支持空Tensor。</il><il>shape支持(B,S,1)、(T,1)。</il></ul></td>
-        <td>FLOAT32 </td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>sumOut（const aclTensor *）</td>
-        <td>输入</td>
-        <td>Sinkhorn变换正向计算保存的中间sum结果。</td>
-        <td><ul><il>支持空Tensor。</il><il>shape支持(2*sk_iter_count,B,S,N)、(2*sk_iter_count,T,N)。</il></ul></td>
-        <td>FLOAT32 </td>
-        <td>ND</td>
-        <td>3-4</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>normOut（const aclTensor *）</td>
-        <td>输入</td>
-        <td>Sinkhorn变换正向计算保存的中间norm结果。</td>
-        <td><ul><il>支持空Tensor。</il><il>shape支持(2*sk_iter_count,B,S,N,N)、(2*sk_iter_count,T,N,N)。</il></ul></td>
-        <td>FLOAT32 </td>
-        <td>ND</td>
-        <td>4-5</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>preMix（const aclTensor *）</td>
-        <td>输入</td>
-        <td>可选输入，premix加权系数（通常填上一轮输出的hPre）。传入时反向计算合并premix梯度分支。</td>
-        <td><ul><il>可为nullptr（不传），与gradPre必须同时传入或同时缺省。</il><il>shape支持(B,S,N)、(T,N)。</il></ul></td>
-        <td>FLOAT32 </td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>gradPre（const aclTensor *）</td>
-        <td>输入</td>
-        <td>可选输入，反向链路上pre的梯度gradPre。</td>
-        <td><ul><il>可为nullptr（不传），与preMix必须同时传入或同时缺省。</il><il>shape支持(B,S,N)、(T,N)。</il></ul></td>
-        <td>FLOAT32 </td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>hcEps（double）</td>
-        <td>输入</td>
-        <td>数值稳定性参数。</td>
-        <td>建议值1e-6。</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-    </tr>
-    <tr>
-        <td>enableHf32（bool）</td>
-        <td>输入</td>
-        <td>可选属性（仅V2接口），表示Cube是否启用HF32计算模式。</td>
-        <td>可为true（默认，与V1接口一致）。传入false切换为FP32。</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-    </tr>
-    <tr>
-        <td>gradX（aclTensor *）</td>
-        <td>输出</td>
-        <td>输入x的梯度。</td>
-        <td><ul><il>不支持空Tensor。</il><il>shape支持(B,S,N,C)、(T,N,C)。</il></ul></td>
-        <td>FLOAT16、BFLOAT16</td>
-        <td>ND</td>
-        <td>3-4</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>gradPhi（aclTensor *）</td>
-        <td>输出</td>
-        <td>参数phi的梯度。</td>
-        <td><ul><il>不支持空Tensor。</il><il>shape支持(2N+N^2, N*C)。</il></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>2</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>gradAlpha（aclTensor *）</td>
-        <td>输出</td>
-        <td>参数alpha的梯度。</td>
-        <td><ul><il>不支持空Tensor。</il><il>shape支持(3)。</il></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>1</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>gradBias（aclTensor *）</td>
-        <td>输出</td>
-        <td>参数bias的梯度。</td>
-        <td><ul><il>不支持空Tensor。</il><il>shape支持(2N+N^2)。</il></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>1</td>
-        <td>√</td>
-    </tr>
-    <tr>
-        <td>gradPreMix（aclTensor *）</td>
-        <td>输出</td>
-        <td>可选输出，preMix的梯度，为∑<sub>c</sub>(gradHin · x)。</td>
-        <td><ul><il>不支持空Tensor。</il><il>仅preMix与gradPre同时传入时为真实值，否则无效。</il><il>shape支持(B,S,N)、(T,N)。</il></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>√</td>
-    </tr>
-    <tr>
-      <td>workspaceSize（uint64_t *）</td>
-      <td>输出</td>
-      <td>返回需要在Device侧申请的workspace大小。</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-    </tr>
-    <tr>
-      <td>executor（aclOpExecutor **）</td>
-      <td>输出</td>
-      <td>返回op执行器，包含了算子计算流程。</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-    </tr>
-    </tbody>
-    </table>
+  <colgroup>
+  <col style="width: 265px">
+  <col style="width: 120px">
+  <col style="width: 223px">
+  <col style="width: 391px">
+  <col style="width: 181px">
+  <col style="width: 111px">
+  <col style="width: 126px">
+  <col style="width: 145px">
+  </colgroup>
+  <thead>
+  <tr>
+    <th>参数名</th>
+    <th>输入/输出</th>
+    <th>描述</th>
+    <th>使用说明</th>
+    <th>数据类型</th>
+    <th>数据格式</th>
+    <th>维度(shape)</th>
+    <th>非连续Tensor</th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td>gradHin（const aclTensor *）</td>
+    <td>输入</td>
+    <td>正向输出hin的梯度。</td>
+    <td><ul><li>支持空Tensor。</li><li>shape支持(B,S,C)、(T,C)。</li></ul></td>
+    <td>FLOAT16、BFLOAT16</td>
+    <td>ND</td>
+    <td>2-3</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>gradHPost（const aclTensor *）</td>
+    <td>输入</td>
+    <td>正向输出hPost的梯度。</td>
+    <td><ul><li>支持空Tensor。</li><li>shape支持(B,S,N)、(T,N)。</li></ul></td>
+    <td>FLOAT32 </td>
+    <td>ND</td>
+    <td>2-3</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>gradHRes（const aclTensor *）</td>
+    <td>输入</td>
+    <td>正向输出hRes的梯度。</td>
+    <td><ul><li>支持空Tensor。</li><li>shape支持(B,S,N*N)、(B,S,N,N)、(T,N*N)、(T,N,N)。</li></ul></td>
+    <td>FLOAT32 </td>
+    <td>ND</td>
+    <td>2-4</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>x（const aclTensor *）</td>
+    <td>输入</td>
+    <td>前向输入x。</td>
+    <td><ul><li>支持空Tensor。</li><li>shape支持(B,S,N,C)、(T,N,C)。</li></ul></td>
+    <td>FLOAT16、BFLOAT16</td>
+    <td>ND</td>
+    <td>3-4</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>phi（const aclTensor *）</td>
+    <td>输入</td>
+    <td>前向参数phi。</td>
+    <td><ul><li>不支持空Tensor。</li><li>shape支持(2N+N^2, N*C)。</li></ul></td>
+    <td>FLOAT32 </td>
+    <td>ND</td>
+    <td>2</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>alpha（const aclTensor *）</td>
+    <td>输入</td>
+    <td>前向参数alpha。</td>
+    <td><ul><li>不支持空Tensor。</li><li>shape支持(3)。</li></ul></td>
+    <td>FLOAT32 </td>
+    <td>ND</td>
+    <td>1</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>bias（const aclTensor *）</td>
+    <td>输入</td>
+    <td>前向参数bias。</td>
+    <td><ul><li>不支持空Tensor。</li><li>shape支持(2N+N^2)。</li></ul></td>
+    <td>FLOAT32 </td>
+    <td>ND</td>
+    <td>1</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>hPre（const aclTensor *）</td>
+    <td>输入</td>
+    <td>前向保存的中间结果hPre。</td>
+    <td><ul><li>支持空Tensor。</li><li>shape支持(B,S,N)、(T,N)。</li></ul></td>
+    <td>FLOAT32 </td>
+    <td>ND</td>
+    <td>2-3</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>hcBeforeNorm（const aclTensor *）</td>
+    <td>输入</td>
+    <td>前向保存的中间结果hcBeforeNorm。</td>
+    <td><ul><li>支持空Tensor。</li><li>shape支持(B,S,N*N+2*N)、(T,N*N+2*N)。</li></ul></td>
+    <td>FLOAT32 </td>
+    <td>ND</td>
+    <td>2-3</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>invRms（const aclTensor *）</td>
+    <td>输入</td>
+    <td>前向保存的中间结果invRms。</td>
+    <td><ul><li>支持空Tensor。</li><li>shape支持(B,S,1)、(T,1)。</li></ul></td>
+    <td>FLOAT32 </td>
+    <td>ND</td>
+    <td>2-3</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>sumOut（const aclTensor *）</td>
+    <td>输入</td>
+    <td>Sinkhorn变换正向计算保存的中间sum结果。</td>
+    <td><ul><li>支持空Tensor。</li><li>shape支持(2*sk_iter_count,B,S,N)、(2*sk_iter_count,T,N)。</li></ul></td>
+    <td>FLOAT32 </td>
+    <td>ND</td>
+    <td>3-4</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>normOut（const aclTensor *）</td>
+    <td>输入</td>
+    <td>Sinkhorn变换正向计算保存的中间norm结果。</td>
+    <td><ul><li>支持空Tensor。</li><li>shape支持(2*sk_iter_count,B,S,N,N)、(2*sk_iter_count,T,N,N)。</li></ul></td>
+    <td>FLOAT32 </td>
+    <td>ND</td>
+    <td>4-5</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>preMix（const aclTensor *）</td>
+    <td>输入</td>
+    <td>可选输入，premix加权系数（通常填上一轮输出的hPre）。传入时反向计算合并premix梯度分支。</td>
+    <td><ul><li>可为nullptr（不传），与gradPre必须同时传入或同时缺省。</li><li>shape支持(B,S,N)、(T,N)。</li></ul></td>
+    <td>FLOAT32 </td>
+    <td>ND</td>
+    <td>2-3</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>gradPre（const aclTensor *）</td>
+    <td>输入</td>
+    <td>可选输入，反向链路上pre的梯度gradPre。</td>
+    <td><ul><li>可为nullptr（不传），与preMix必须同时传入或同时缺省。</li><li>shape支持(B,S,N)、(T,N)。</li></ul></td>
+    <td>FLOAT32 </td>
+    <td>ND</td>
+    <td>2-3</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>hcEps（double）</td>
+    <td>输入</td>
+    <td>数值稳定性参数。</td>
+    <td>建议值1e-6。</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+  </tr>
+  <tr>
+    <td>enableHf32（bool）</td>
+    <td>输入</td>
+    <td>可选属性（仅V2接口），表示Cube是否启用HF32计算模式。</td>
+    <td>可为true（默认，与V1接口一致）。传入false切换为FP32。</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+  </tr>
+  <tr>
+    <td>gradX（aclTensor *）</td>
+    <td>输出</td>
+    <td>输入x的梯度。</td>
+    <td><ul><li>不支持空Tensor。</li><li>shape支持(B,S,N,C)、(T,N,C)。</li></ul></td>
+    <td>FLOAT16、BFLOAT16</td>
+    <td>ND</td>
+    <td>3-4</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>gradPhi（aclTensor *）</td>
+    <td>输出</td>
+    <td>参数phi的梯度。</td>
+    <td><ul><li>不支持空Tensor。</li><li>shape支持(2N+N^2, N*C)。</li></ul></td>
+    <td>FLOAT32</td>
+    <td>ND</td>
+    <td>2</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>gradAlpha（aclTensor *）</td>
+    <td>输出</td>
+    <td>参数alpha的梯度。</td>
+    <td><ul><li>不支持空Tensor。</li><li>shape支持(3)。</li></ul></td>
+    <td>FLOAT32</td>
+    <td>ND</td>
+    <td>1</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>gradBias（aclTensor *）</td>
+    <td>输出</td>
+    <td>参数bias的梯度。</td>
+    <td><ul><li>不支持空Tensor。</li><li>shape支持(2N+N^2)。</li></ul></td>
+    <td>FLOAT32</td>
+    <td>ND</td>
+    <td>1</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>gradPreMix（aclTensor *）</td>
+    <td>输出</td>
+    <td>可选输出，preMix的梯度，为∑<sub>c</sub>(gradHin · x)。</td>
+    <td><ul><li>不支持空Tensor。</li><li>仅preMix与gradPre同时传入时为真实值，否则无效。</li><li>shape支持(B,S,N)、(T,N)。</li></ul></td>
+    <td>FLOAT32</td>
+    <td>ND</td>
+    <td>2-3</td>
+    <td>√</td>
+  </tr>
+  <tr>
+    <td>workspaceSize（uint64_t *）</td>
+    <td>输出</td>
+    <td>返回需要在Device侧申请的workspace大小。</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+  </tr>
+  <tr>
+    <td>executor（aclOpExecutor **）</td>
+    <td>输出</td>
+    <td>返回op执行器，包含了算子计算流程。</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+    <td>-</td>
+  </tr>
+  </tbody>
+  </table>
 
 - **返回值：**
 
@@ -597,84 +597,84 @@ aclnnStatus aclnnMhcPreSinkhornBackwardV2(
   第一段接口完成入参校验，出现以下场景时报错：
 
   <table style="undefined;table-layout: fixed;width: 1180px"><colgroup>
-      <col style="width: 250px">
-      <col style="width: 130px">
-      <col style="width: 800px">
-    </colgroup>
-        <thead>
-            <th>返回值</th>
-            <th>错误码</th>
-            <th>描述</th>
-        </thead>
-        <tbody>
-            <tr>
-                <td>ACLNN_ERR_PARAM_NULLPTR</td>
-                <td>161001</td>
-                <td>必选参数或者输出是空指针。</td>
-            </tr>
-            <tr>
-                <td rowspan="5">ACLNN_ERR_PARAM_INVALID</td>
-                <td rowspan="5">161002</td>
-                <td>输入或输出tensor的维度个数(dim)与参数说明不符。</td>
-            </tr>
-            <tr>
-                <td>输入或输出tensor的维度(shape)与参数说明不符。</td>
-            </tr>
-            <tr>
-                <td>输入变量的数据类型不在支持的范围内。</td>
-            </tr>
-            <tr>
-                <td>N取值不符合约束要求。</td>
-            </tr>
-            <tr>
-                <td>C不符合大于0小于100000且可以被128整除的要求。</td>
-            </tr>
-            <tr>
-                <td>ACLNN_ERR_INNER_NULLPTR</td>
-                <td>561103</td>
-                <td>sk_iter_count不等于20。</td>
-            </tr>
-        </tbody>
-    </table>
+    <col style="width: 250px">
+    <col style="width: 130px">
+    <col style="width: 800px">
+  </colgroup>
+  <thead>
+    <th>返回值</th>
+    <th>错误码</th>
+    <th>描述</th>
+  </thead>
+  <tbody>
+  <tr>
+    <td>ACLNN_ERR_PARAM_NULLPTR</td>
+    <td>161001</td>
+    <td>必选参数或者输出是空指针。</td>
+  </tr>
+  <tr>
+    <td rowspan="5">ACLNN_ERR_PARAM_INVALID</td>
+    <td rowspan="5">161002</td>
+    <td>输入或输出tensor的维度个数(dim)与参数说明不符。</td>
+  </tr>
+  <tr>
+    <td>输入或输出tensor的维度(shape)与参数说明不符。</td>
+  </tr>
+  <tr>
+    <td>输入变量的数据类型不在支持的范围内。</td>
+  </tr>
+  <tr>
+    <td>N取值不符合约束要求。</td>
+  </tr>
+  <tr>
+    <td>C不符合大于0小于100000且可以被128整除的要求。</td>
+  </tr>
+  <tr>
+    <td>ACLNN_ERR_INNER_NULLPTR</td>
+    <td>561103</td>
+    <td>sk_iter_count不等于20。</td>
+  </tr>
+  </tbody>
+  </table>
 
 ## aclnnMhcPreSinkhornBackwardV2
 
 - **参数说明：**
 
   <table style="undefined;table-layout: fixed; width: 1180px"><colgroup>
-      <col style="width: 250px">
-      <col style="width: 130px">
-      <col style="width: 800px">
-    </colgroup>
-    <thead>
-        <tr>
-        <th>参数名</th>
-        <th>输入/输出</th>
-        <th>描述</th>
-        </tr></thead>
-    <tbody>
-        <tr>
-        <td>workspace</td>
-        <td>输入</td>
-        <td>在Device侧申请的workspace内存地址。</td>
-        </tr>
-        <tr>
-        <td>workspaceSize</td>
-        <td>输入</td>
-        <td>在Device侧申请的workspace大小，由第一段接口aclnnMhcPreSinkhornBackwardV2GetWorkspaceSize获取。</td>
-        </tr>
-        <tr>
-        <td>executor</td>
-        <td>输入</td>
-        <td>op执行器，包含了算子计算流程。</td>
-        </tr>
-        <tr>
-        <td>stream</td>
-        <td>输入</td>
-        <td>指定执行任务的Stream流。</td>
-        </tr>
-    </tbody>
-    </table>
+    <col style="width: 250px">
+    <col style="width: 130px">
+    <col style="width: 800px">
+  </colgroup>
+  <thead>
+  <tr>
+    <th>参数名</th>
+    <th>输入/输出</th>
+    <th>描述</th>
+  </tr></thead>
+  <tbody>
+  <tr>
+    <td>workspace</td>
+    <td>输入</td>
+    <td>在Device侧申请的workspace内存地址。</td>
+  </tr>
+  <tr>
+    <td>workspaceSize</td>
+    <td>输入</td>
+    <td>在Device侧申请的workspace大小，由第一段接口aclnnMhcPreSinkhornBackwardV2GetWorkspaceSize获取。</td>
+  </tr>
+  <tr>
+    <td>executor</td>
+    <td>输入</td>
+    <td>op执行器，包含了算子计算流程。</td>
+  </tr>
+  <tr>
+    <td>stream</td>
+    <td>输入</td>
+    <td>指定执行任务的Stream流。</td>
+  </tr>
+  </tbody>
+  </table>
 
 - **返回值：**
 

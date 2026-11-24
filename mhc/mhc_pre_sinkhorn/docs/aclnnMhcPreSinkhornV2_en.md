@@ -148,227 +148,227 @@ aclnnStatus aclnnMhcPreSinkhornV2(
     <col style="width: 145px">
     </colgroup>
     <thead>
-      <tr>
-        <th>Parameter</th>
-        <th>Input/Output</th>
-        <th>Description</th>
-        <th>Instruction</th>
-        <th>Data Type</th>
-        <th>Data Format</th>
-        <th>Dimension (shape)</th>
-        <th>Non-contiguous Tensor</th>
-      </tr></thead>
+    <tr>
+      <th>Parameter</th>
+      <th>Input/Output</th>
+      <th>Description</th>
+      <th>Instruction</th>
+      <th>Data Type</th>
+      <th>Data Format</th>
+      <th>Dimension (shape)</th>
+      <th>Non-contiguous Tensor</th>
+    </tr></thead>
     <tbody>
-      <tr>
-        <td>x (const aclTensor*)</td>
-        <td>Input</td>
-        <td>Data to be computed, representing the mHC layer input data in the network.</td>
-        <td><ul><li>Supports empty tensor.</li><li>The shape supports (bs, seq_len, n, c) or (t, n, c).</li></ul></td>
-        <td>FLOAT16, BFLOAT16</td>
-        <td>ND</td>
-        <td>3-4</td>
-        <td>√</td>
-      </tr>
-      <tr>
-        <td>phi (const aclTensor*)</td>
-        <td>Input</td>
-        <td>Parameter matrix of mHC.</td>
-        <td><ul><li>Supports empty tensor.</li><li>The shape supports (n * n + 2 * n, n * c).</li></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>2</td>
-        <td>√</td>
-      </tr>
-      <tr>
-        <td>alpha (const aclTensor*)</td>
-        <td>Input</td>
-        <td>Scaling parameter of mHC.</td>
-        <td><ul><li>Supports empty tensor.</li><li>The shape supports (3).</li></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>1</td>
-        <td>√</td>
-      </tr>
-      <tr>
-        <td>bias (const aclTensor*)</td>
-        <td>Input</td>
-        <td>Bias parameter of mHC.</td>
-        <td><ul><li>Supports empty tensor.</li><li>The shape supports (n * n + 2 * n).</li></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>1</td>
-        <td>√</td>
-      </tr>
-      <tr>
-        <td>premix (const aclTensor*)</td>
-        <td>Input</td>
-        <td>Optional input, premix weighting coefficient (usually filled with the hPre output from the previous layer).</td>
-        <td><ul><li>Supports empty tensor.</li><li>The shape supports (bs, seq_len, n) or (t, n).</li></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>√</td>
-      </tr>
-      <tr>
-        <td>hcMult (int64_t)</td>
-        <td>Input</td>
-        <td>Number of residual streams, size of the HC dimension.</td>
-        <td>Currently, only 4 is supported.</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
-        <td>numIters (int64_t)</td>
-        <td>Input</td>
-        <td>Indicates the number of Sinkhorn algorithm iterations.</td>
-        <td>Currently, only 20 is supported.</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
-        <td>hcEps (double)</td>
-        <td>Input</td>
-        <td>The eps parameter after the sigmoid of H<sub>pre</sub>.</td>
-        <td>Recommended value: 1e-6.</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
-        <td>normEps (double)</td>
-        <td>Input</td>
-        <td>Division-by-zero prevention parameter of RmsNorm.</td>
-        <td>Recommended value: 1e-6.</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
-        <td>needBackward (bool)</td>
-        <td>Input</td>
-        <td>Whether to output additional attributes.</td>
-        <td>The recommended value is true.</td>
-        <td></td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
-        <td>enableHf32 (bool)</td>
-        <td>Input</td>
-        <td>Optional attribute (V2 interface only), indicating whether the Cube enables the HF32 computation mode.</td>
-        <td>Can be true (default, consistent with the V1 interface). Passing false switches to FP32.</td>
-        <td></td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
-        <td>hin (aclTensor*)</td>
-        <td>Output</td>
-        <td>The output hin serves as the Attention/MLP layer input.</td>
-        <td><ul><li>Empty tensor is not supported.</li><li>The shape supports (bs, seq_len, c) and (t, c).</li></ul></td>
-        <td>FLOAT16, BFLOAT16</td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>×</td>
-      </tr>
-      <tr>
-        <td>hPost (aclTensor*)</td>
-        <td>Output</td>
-        <td>hPost transformation matrix of the output mHC.</td>
-        <td><ul><li>Empty tensor is not supported.</li><li>The shape supports (bs, seq_len, n) and (t, n).</li></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>×</td>
-      </tr>
-      <tr>
-        <td>hRes (aclTensor*)</td>
-        <td>Output</td>
-        <td>hRes transformation matrix of the output mHC.</td>
-        <td><ul><li>Empty tensor is not supported.</li><li>The shape supports (bs, seq_len, n * n) and (t, n * n).</li></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>×</td>
-      </tr>
-      <tr>
-        <td>hPre (aclTensor*)</td>
-        <td>Output</td>
-        <td>Output when backward is required. The hPre matrix after the sigmoid computation.</td>
-        <td><ul><li>Empty tensor is not supported.</li><li>When needBackward is false, this output is invalid; when premix is provided, a valid value is output even if needBackward is false.</li><li>The shape supports (bs, seq_len, n) and (t, n).</li></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>×</td>
-      </tr>
-      <tr>
-        <td>hcBeforeNorm (aclTensor*)</td>
-        <td>Output</td>
-        <td>Output when backward is required. The result of matrix multiplication between x and phi.</td>
-        <td><ul><li>Empty tensor is not supported.</li><li>When needBackward is false, this output is invalid.</li><li>The shape supports (bs, seq_len, n*n + 2*n) and (t, n*n + 2*n).</li></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>×</td>
-      </tr>
-      <tr>
-        <td>invRms (aclTensor*)</td>
-        <td>Output</td>
-        <td>Output when backward is required, which is 1/r computed by RmsNorm.</td>
-        <td><ul><li>Empty tensor is not supported.</li><li>When needBackward is false, this output is invalid.</li><li>The shape supports (bs, seq_len, 1) and (t, 1).</li></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>2-3</td>
-        <td>×</td>
-      </tr>
-      <tr>
-        <td>sumOut (aclTensor*)</td>
-        <td>Output</td>
-        <td>Output when backward is required. The colSum/rowSum result of each iteration.</td>
-        <td><ul><li>Empty tensor is not supported.</li><li>When needBackward is false, this output is invalid.</li><li>The shape supports (sk_iter_count * 2, bs, seq_len, n) and (sk_iter_count * 2, t, n).</li></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>3-4</td>
-        <td>×</td>
-      </tr>
-      <tr>
-        <td>normOut (aclTensor*)</td>
-        <td>Output</td>
-        <td>Output when backward is required. The comb result after each colSum/rowSum iteration.</td>
-        <td><ul><li>Empty tensor is not supported.</li><li>When needBackward is false, this output is invalid.</li><li>The shape supports (sk_iter_count * 2, bs, seq_len, n, n) and (sk_iter_count * 2, t, n, n).</li></ul></td>
-        <td>FLOAT32</td>
-        <td>ND</td>
-        <td>4-5</td>
-        <td>×</td>
-      </tr>
-      <tr>
-        <td>workspaceSize (uint64_t*)</td>
-        <td>Output</td>
-        <td>Returns the workspace size that needs to be applied on the Device side.</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
-      <tr>
-        <td>executor (aclOpExecutor**)</td>
-        <td>Output</td>
-        <td>Returns the op executor, which contains the operator computation flow.</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-        <td>-</td>
-      </tr>
+    <tr>
+      <td>x (const aclTensor*)</td>
+      <td>Input</td>
+      <td>Data to be computed, representing the mHC layer input data in the network.</td>
+      <td><ul><li>Supports empty tensor.</li><li>The shape supports (bs, seq_len, n, c) or (t, n, c).</li></ul></td>
+      <td>FLOAT16, BFLOAT16</td>
+      <td>ND</td>
+      <td>3-4</td>
+      <td>√</td>
+    </tr>
+    <tr>
+      <td>phi (const aclTensor*)</td>
+      <td>Input</td>
+      <td>Parameter matrix of mHC.</td>
+      <td><ul><li>Supports empty tensor.</li><li>The shape supports (n * n + 2 * n, n * c).</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>2</td>
+      <td>√</td>
+    </tr>
+    <tr>
+      <td>alpha (const aclTensor*)</td>
+      <td>Input</td>
+      <td>Scaling parameter of mHC.</td>
+      <td><ul><li>Supports empty tensor.</li><li>The shape supports (3).</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>1</td>
+      <td>√</td>
+    </tr>
+    <tr>
+      <td>bias (const aclTensor*)</td>
+      <td>Input</td>
+      <td>Bias parameter of mHC.</td>
+      <td><ul><li>Supports empty tensor.</li><li>The shape supports (n * n + 2 * n).</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>1</td>
+      <td>√</td>
+    </tr>
+    <tr>
+      <td>premix (const aclTensor*)</td>
+      <td>Input</td>
+      <td>Optional input, premix weighting coefficient (usually filled with the hPre output from the previous layer).</td>
+      <td><ul><li>Supports empty tensor.</li><li>The shape supports (bs, seq_len, n) or (t, n).</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>2-3</td>
+      <td>√</td>
+    </tr>
+    <tr>
+      <td>hcMult (int64_t)</td>
+      <td>Input</td>
+      <td>Number of residual streams, size of the HC dimension.</td>
+      <td>Currently, only 4 is supported.</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>numIters (int64_t)</td>
+      <td>Input</td>
+      <td>Indicates the number of Sinkhorn algorithm iterations.</td>
+      <td>Currently, only 20 is supported.</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>hcEps (double)</td>
+      <td>Input</td>
+      <td>The eps parameter after the sigmoid of H<sub>pre</sub>.</td>
+      <td>Recommended value: 1e-6.</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>normEps (double)</td>
+      <td>Input</td>
+      <td>Division-by-zero prevention parameter of RmsNorm.</td>
+      <td>Recommended value: 1e-6.</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>needBackward (bool)</td>
+      <td>Input</td>
+      <td>Whether to output additional attributes.</td>
+      <td>The recommended value is true.</td>
+      <td></td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>enableHf32 (bool)</td>
+      <td>Input</td>
+      <td>Optional attribute (V2 interface only), indicating whether the Cube enables the HF32 computation mode.</td>
+      <td>Can be true (default, consistent with the V1 interface). Passing false switches to FP32.</td>
+      <td></td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>hin (aclTensor*)</td>
+      <td>Output</td>
+      <td>The output hin serves as the Attention/MLP layer input.</td>
+      <td><ul><li>Empty tensor is not supported.</li><li>The shape supports (bs, seq_len, c) and (t, c).</li></ul></td>
+      <td>FLOAT16, BFLOAT16</td>
+      <td>ND</td>
+      <td>2-3</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>hPost (aclTensor*)</td>
+      <td>Output</td>
+      <td>hPost transformation matrix of the output mHC.</td>
+      <td><ul><li>Empty tensor is not supported.</li><li>The shape supports (bs, seq_len, n) and (t, n).</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>2-3</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>hRes (aclTensor*)</td>
+      <td>Output</td>
+      <td>hRes transformation matrix of the output mHC.</td>
+      <td><ul><li>Empty tensor is not supported.</li><li>The shape supports (bs, seq_len, n * n) and (t, n * n).</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>2-3</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>hPre (aclTensor*)</td>
+      <td>Output</td>
+      <td>Output when backward is required. The hPre matrix after the sigmoid computation.</td>
+      <td><ul><li>Empty tensor is not supported.</li><li>When needBackward is false, this output is invalid; when premix is provided, a valid value is output even if needBackward is false.</li><li>The shape supports (bs, seq_len, n) and (t, n).</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>2-3</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>hcBeforeNorm (aclTensor*)</td>
+      <td>Output</td>
+      <td>Output when backward is required. The result of matrix multiplication between x and phi.</td>
+      <td><ul><li>Empty tensor is not supported.</li><li>When needBackward is false, this output is invalid.</li><li>The shape supports (bs, seq_len, n*n + 2*n) and (t, n*n + 2*n).</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>2-3</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>invRms (aclTensor*)</td>
+      <td>Output</td>
+      <td>Output when backward is required, which is 1/r computed by RmsNorm.</td>
+      <td><ul><li>Empty tensor is not supported.</li><li>When needBackward is false, this output is invalid.</li><li>The shape supports (bs, seq_len, 1) and (t, 1).</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>2-3</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>sumOut (aclTensor*)</td>
+      <td>Output</td>
+      <td>Output when backward is required. The colSum/rowSum result of each iteration.</td>
+      <td><ul><li>Empty tensor is not supported.</li><li>When needBackward is false, this output is invalid.</li><li>The shape supports (sk_iter_count * 2, bs, seq_len, n) and (sk_iter_count * 2, t, n).</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>3-4</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>normOut (aclTensor*)</td>
+      <td>Output</td>
+      <td>Output when backward is required. The comb result after each colSum/rowSum iteration.</td>
+      <td><ul><li>Empty tensor is not supported.</li><li>When needBackward is false, this output is invalid.</li><li>The shape supports (sk_iter_count * 2, bs, seq_len, n, n) and (sk_iter_count * 2, t, n, n).</li></ul></td>
+      <td>FLOAT32</td>
+      <td>ND</td>
+      <td>4-5</td>
+      <td>×</td>
+    </tr>
+    <tr>
+      <td>workspaceSize (uint64_t*)</td>
+      <td>Output</td>
+      <td>Returns the workspace size that needs to be applied on the Device side.</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+    <tr>
+      <td>executor (aclOpExecutor**)</td>
+      <td>Output</td>
+      <td>Returns the op executor, which contains the operator computation flow.</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
     </tbody>
   </table>
 
@@ -376,7 +376,9 @@ aclnnStatus aclnnMhcPreSinkhornV2(
   - <term>Ascend 950PR&950DT products</term>: The parameter `enableHf32` is invalid in the current product usage scenario.
   <!-- end id11 -->
 
-  > Note: A 4D input is in BSND format, and a 3D input is in TND format. Here, bs indicates the batch size, seq_len indicates the sequence length of a single batch, t indicates the sum of sequence lengths of all batches, n indicates the number of residual streams, and c indicates the hidden dimension size on the tail axis.
+  > Note:
+  >
+  > A 4D input is in BSND format, and a 3D input is in TND format. Here, bs indicates the batch size, seq_len indicates the sequence length of a single batch, t indicates the sum of sequence lengths of all batches, n indicates the number of residual streams, and c indicates the hidden dimension size on the tail axis.
 
 - **Return Value**
 
@@ -390,34 +392,34 @@ aclnnStatus aclnnMhcPreSinkhornV2(
   <col style="width: 819px">
   </colgroup>
   <thead>
-    <tr>
-      <th>Return Value</th>
-      <th>Error Code</th>
-      <th>Description</th>
-    </tr>
+  <tr>
+    <th>Return Value</th>
+    <th>Error Code</th>
+    <th>Description</th>
+  </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>ACLNN_ERR_PARAM_NULLPTR</td>
-      <td>161001</td>
-      <td>The input parameter is a required input, output, or attribute and is a null pointer.</td>
-    </tr>
-    <tr>
-      <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="3">161002</td>
-      <td>The data type, shape dimension, and data format of the input variables are not within the supported range.</td>
-    </tr>
-    <tr>
-      <td>numIters is not 20.</td>
-    </tr>
-    <tr>
-      <td>The value of hcMult is not 4.</td>
-    </tr>
-    <tr>
-      <td>ACLNN_ERR_RUNTIME_ERROR</td>
-      <td>361001</td>
-      <td>Calling the NPU Runtime API to allocate memory/create a Tensor fails.</td>
-    </tr>
+  <tr>
+    <td>ACLNN_ERR_PARAM_NULLPTR</td>
+    <td>161001</td>
+    <td>The input parameter is a required input, output, or attribute and is a null pointer.</td>
+  </tr>
+  <tr>
+    <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
+    <td rowspan="3">161002</td>
+    <td>The data type, shape dimension, and data format of the input variables are not within the supported range.</td>
+  </tr>
+  <tr>
+    <td>numIters is not 20.</td>
+  </tr>
+  <tr>
+    <td>The value of hcMult is not 4.</td>
+  </tr>
+  <tr>
+    <td>ACLNN_ERR_RUNTIME_ERROR</td>
+    <td>361001</td>
+    <td>Calling the NPU Runtime API to allocate memory/create a Tensor fails.</td>
+  </tr>
   </tbody>
   </table>
 
@@ -430,32 +432,32 @@ aclnnStatus aclnnMhcPreSinkhornV2(
   <col style="width: 880px">
   </colgroup>
   <thead>
-    <tr>
-      <th>Parameter</th>
-      <th>Input/Output</th>
-      <th>Description</th>
-    </tr></thead>
+  <tr>
+    <th>Parameter</th>
+    <th>Input/Output</th>
+    <th>Description</th>
+  </tr></thead>
   <tbody>
-    <tr>
-      <td>workspace</td>
-      <td>Input</td>
-      <td>Device-side-applied workspace memory address.</td>
-    </tr>
-    <tr>
-      <td>workspaceSize</td>
-      <td>Input</td>
-      <td>Device-side-applied workspace size, obtained by the first-phase API aclnnMhcPreSinkhornV2GetWorkspaceSize.</td>
-    </tr>
-    <tr>
-      <td>executor</td>
-      <td>Input</td>
-      <td>op executor, which contains the operator computation flow.</td>
-    </tr>
-    <tr>
-      <td>stream</td>
-      <td>Input</td>
-      <td>Stream used to execute tasks.</td>
-    </tr>
+  <tr>
+    <td>workspace</td>
+    <td>Input</td>
+    <td>Device-side-applied workspace memory address.</td>
+  </tr>
+  <tr>
+    <td>workspaceSize</td>
+    <td>Input</td>
+    <td>Device-side-applied workspace size, obtained by the first-phase API aclnnMhcPreSinkhornV2GetWorkspaceSize.</td>
+  </tr>
+  <tr>
+    <td>executor</td>
+    <td>Input</td>
+    <td>op executor, which contains the operator computation flow.</td>
+  </tr>
+  <tr>
+    <td>stream</td>
+    <td>Input</td>
+    <td>Stream used to execute tasks.</td>
+  </tr>
   </tbody>
   </table>
 
