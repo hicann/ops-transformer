@@ -78,7 +78,7 @@ The memory resources occupied by the ping and pong computation data are independ
 
     Under the pipeline characteristics of this scenario, there are few Vector computation nodes and the computation speed is fast. In the case of C:V=1:2 on <term>Atlas A2 training products</term>, the Cube data movement duration is sufficient to cover the Vector computation duration, so only the MTE2 time consumption of the Cube needs to be considered, finally achieving the MTE2 bound. Under the Cube dual-launch mechanism, two Cube computations are launched in advance, and Cube1 and Cube2 computations can be connected, maximizing Cube utilization and achieving the Cube bound.
 
-  ![FA Pipeline.jpg](../../../docs/zh/figures/fa_pipeline.png)
+  ![FA Pipeline.jpg](../../../docs/en/figures/fa_pipeline.png)
 
 2. Ascend 950PR&950DT products
   The CV pipeline design idea of Ascend 950PR&950DT products is basically the same as that of A2. The difference is that the number of Cube preload operations is 3: the mm2 computation starts only after three mm1 computations are completed. The purpose is to optimize the CV pipeline in the startup phase and make it tighter, so as to achieve the best overall performance.
