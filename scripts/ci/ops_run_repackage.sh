@@ -264,6 +264,125 @@ merge_all_jsons() {
 
 merge_all_jsons "$MERGE_SCRIPT" "$MERGE_OPS_SCRIPT"
 
+# Check DSL keys against the original shards before cleaning up their files.
+python3 - "$SOC" "$TARGET_CONFIG_DIR" "${kernel_run_files[@]}" <<'PYTHON' || die "Failed to validate DSL binary configs"
+import json
+import re
+import sys
+from filecmp import cmp
+from fnmatch import fnmatchcase
+from pathlib import Path
+
+soc = sys.argv[1]
+config, *runs = map(Path, sys.argv[2:])
+summary = "binary_info_config.json"
+# Mode 2 is also used by ASC. OpKit keys end in a SHA-256 digest.
+pattern = re.compile(r"[A-Za-z][A-Za-z0-9]*/d=[0-9]+,p=[0-9]+/[0-9a-f]{64}")
+shards = {}
+
+
+def read(index):
+    return json.loads(index.read_text(encoding="utf-8"))
+
+
+def summaries(table):
+    return (
+        group
+        for group in table.values()
+        if isinstance(group, dict) and group.get("simplifiedKeyMode") == 2
+    )
+
+
+def unique(rows, index, seen, root=None):
+    result = []
+    for row in rows:
+        keys = row.get("simplifiedKey") if isinstance(row, dict) else None
+        keys = keys if isinstance(keys, list) else []
+        matching = [
+            key
+            for key in keys
+            if isinstance(key, str)
+            and (pattern.fullmatch(key) if root else key in shards)
+        ]
+        if not matching:
+            result.append(row)
+            continue
+        paths = [Path(row[field]) for field in ("binPath", "jsonPath")] if root else []
+        for path in paths:
+            if (
+                not path.parts
+                or path.parts[0] != soc
+                or ".." in path.parts
+                or not (root / path).is_file()
+            ):
+                sys.exit(
+                    f"{index}: invalid or missing DSL resource {path} for {matching[0]}"
+                )
+        # Keep the whole alias list in sync with the device description.
+        for key in matching:
+            if key not in seen:
+                continue
+            previous, other_index, other_root = seen[key]
+            if previous != row or any(
+                not cmp(other_root / p, root / p, shallow=False) for p in paths
+            ):
+                sys.exit(
+                    f"Conflicting DSL device key {key}: {other_index} {previous} and {index} {row}"
+                )
+            break
+        else:
+            seen.update(dict.fromkeys(matching, (row, index, root)))
+            result.append(row)
+    return result
+
+
+for run in runs:
+    vendors = Path(f"kernel_{run.parent.name}_{run.stem}/packages/vendors")
+    vendor = next(
+        (
+            path
+            for path in vendors.iterdir()
+            if fnmatchcase(path.name, "custom_*_transformer")
+            and path.is_dir()
+            and not path.is_symlink()
+        ),
+        None,
+    )
+    if vendor is None:
+        sys.exit(f"{run}: kernel_dir not found")
+    root = vendor / "op_impl/ai_core/tbe/kernel"
+    if not (root / soc).is_dir():
+        continue
+    index = root / "config" / soc / summary
+    if index.is_file():
+        for group in summaries(read(index)):
+            unique(group.get("binaryList", []), index, shards, root)
+
+if shards:
+    names = {
+        Path(row["jsonPath"]).parent.name + ".json" for row, _, _ in shards.values()
+    }
+    updates = {}
+    for name in sorted(names | {summary}):
+        index = config / name
+        if not index.is_file():
+            continue
+        table = read(index)
+        groups, field = (
+            (summaries(table), "binaryList")
+            if name == summary
+            else ([table], "binList")
+        )
+        for group in groups:
+            rows = group.get(field, [])
+            normalized = unique(rows, index, {})
+            if len(normalized) != len(rows):
+                group[field] = normalized
+                updates[index] = table
+    for index, table in updates.items():
+        index.write_text(json.dumps(table, indent=2) + "\n", encoding="utf-8")
+PYTHON
+
 # 7. 清理解压目录
 for runfile in "${kernel_run_files[@]}"; do
     [[ -f "$runfile" ]] || continue
