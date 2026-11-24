@@ -183,7 +183,7 @@ aclnnStatus aclnnBlockAttentionResiduals(
       <td>normEps（double）</td>
       <td>可选输入</td>
       <td>RMS归一化数值稳定性参数，对应公式中的norm_eps。</td>
-      <td><ul><li>须大于0。</li><li>默认值：1e-6。</li></ul></td>
+      <td><ul><li>须传入有限正数。</li><li>默认值：1e-6。</li></ul></td>
       <td>DOUBLE</td>
       <td>-</td>
       <td>-</td>
@@ -360,7 +360,7 @@ aclnnStatus aclnnBlockAttentionResiduals(
   - partialBlock、blockRes、projWeight、normWeight、hiddenStates的数据类型须一致，支持FLOAT16、BFLOAT16、FLOAT32；invNorm、probs仅支持FLOAT32。
   - shape须满足：partialBlock为(T, H)，blockRes为(T, N, H)，projWeight为(H)或(1, H)，normWeight为(H)，hiddenStates为(T, H)；needBackward为true时invNorm、probs为(T, N+1)。
   - validBlockNum为预留属性，默认值为-1，当前不参与计算；仅支持传入-1（表示使用N）或N（blockRes.shape[1]）。
-  - normEps须大于0，默认值为1e-6。
+  - normEps须传入有限正数，默认值为1e-6。若传入NaN，hiddenStates为NaN，needBackward为true时invNorm也为NaN；若传入正无穷，needBackward为true时invNorm为0。
   - 输入张量支持非连续Tensor，接口内部转为Contiguous后计算；输出不支持非连续Tensor。
   - workspace仅使用平台系统预留，不追加用户侧workspace。
 

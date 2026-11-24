@@ -184,7 +184,7 @@ aclnnStatus aclnnBlockAttentionResiduals(
       <td>normEps (double)</td>
       <td>Optional input</td>
       <td>Numerical stability parameter of RMS normalization, corresponding to norm_eps in the corresponding formula.</td>
-      <td><ul><li>Must be greater than 0.</li><li>Default value: 1e-6.</li></ul></td>
+      <td><ul><li>Must be a finite positive number.</li><li>Default value: 1e-6.</li></ul></td>
       <td>DOUBLE</td>
       <td>-</td>
       <td>-</td>
@@ -361,7 +361,7 @@ aclnnStatus aclnnBlockAttentionResiduals(
   - partialBlock, blockRes, projWeight, normWeight, and hiddenStates must have the same data type. FLOAT16, BFLOAT16, and FLOAT32 are supported. invNorm and probs support only FLOAT32.
   - The shape must meet the following requirements: partialBlock is (T, H), blockRes is (T, N, H), projWeight is (H) or (1, H), normWeight is (H), and hiddenStates is (T, H). When needBackward is true, invNorm and probs are (T, N+1).
   - validBlockNum is a reserved attribute. The default value is -1, and it does not participate in the computation currently. Only -1 can be passed in.
-  - normEps must be greater than 0. The default value is 1e-6.
+  - normEps must be a finite positive number. The default value is 1e-6. If normEps is NaN, hiddenStates is NaN, and invNorm is also NaN when needBackward is true. If normEps is positive infinity, invNorm is 0 when needBackward is true.
   - Input tensors support non-contiguous tensors; the computation is performed after the interface-internal conversion to Contiguous. Output tensors do not support non-contiguous tensors.
   - Only the platform system-reserved workspace is used; no additional user-side workspace is requested.
 
