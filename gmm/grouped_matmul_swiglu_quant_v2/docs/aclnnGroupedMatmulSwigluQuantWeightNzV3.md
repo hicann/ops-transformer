@@ -25,7 +25,7 @@
 
 - 接口功能：融合GroupedMatmul、dequant、SwiGLU和quant。该接口为weight NZ特化版本，支持Ascend 950PR&950DT系列产品的单Tensor MX A8W8、MX A8W4及A4W4 BF16输出场景。`weight`必须为三维FRACTAL_NZ格式，A8W8和A4W4支持转置和非转置weightNZ；MX A8W4仅支持转置weightNZ。`x`仅支持非转置输入。
 
-- 补充V2与V3两段参数调用代码对比示例：V2段仅保留原有grouped matmul与反量化入参，V3段在相同位置增加swigluMode、clampLimit、gluAlpha、gluBias及roundMode、scaleAlg、dstTypeMax，并在示例前说明新增参数的业务作用与兼容性。：增加SwiGLU计算参数`swigluMode`、`clampLimit`、`gluAlpha`和`gluBias`，以及MX量化参数`roundMode`、`scaleAlg`和`dstTypeMax`。量化输出路径的`swigluMode`仅支持2；原有A4W4 BF16输出路径支持0或2，且`outputScale`必须为nullptr。
+- 相比V2，V3增加SwiGLU计算参数`swigluMode`、`clampLimit`、`gluAlpha`和`gluBias`，以及MX量化参数`roundMode`、`scaleAlg`和`dstTypeMax`。量化输出路径的`swigluMode`仅支持2；A4W4 BF16输出路径支持0或2，且`outputScale`必须为nullptr。
 
 - 计算公式：
 
@@ -130,20 +130,20 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
   | x（const aclTensor *） | 输入 | 激活矩阵。 | A8W8/A8W4为FP8；A4W4为FP4。 | FLOAT8_E4M3FN、FLOAT4_E2M1 | ND | 2维，(M, K) | √ |
   | weight（const aclTensorList *） | 输入 | 分组权重矩阵。 | 支持转置和非转置weightNZ；具体view和storage shape见约束说明。 | FLOAT8_E4M3FN、FLOAT4_E2M1 | FRACTAL_NZ | 3维，(E, K, N) | 仅支持约束说明中的转置weight view |
   | weightScale（const aclTensorList *） | 输入 | 权重量化因子。 | 与weight对应，具体view和storage shape见约束说明。 | FLOAT8_E8M0 | ND | 4维，(E, ceil(K / 64), N, 2) | √ |
-  | weightAssistMatrix（const aclTensorList *） | 可选输入 | 权重辅助矩阵。 | 当前不支持有效数据；可传nullptr、长度为0的TensorList，或长度为1且唯一元素为nullptr/shape (0)的TensorList。 | - | - | - | - |
-  | bias（const aclTensor *） | 可选输入 | 矩阵乘偏置。 | 当前不支持，必须传nullptr。 | - | - | - | - |
+  | weightAssistMatrix（const aclTensorList *） | 输入 | 权重辅助矩阵。 | 当前不支持有效数据；可传nullptr、长度为0的TensorList，或长度为1且唯一元素为nullptr/shape (0)的TensorList。 | - | - | - | - |
+  | bias（const aclTensor *） | 输入 | 矩阵乘偏置。 | 当前不支持，必须传nullptr。 | - | - | - | - |
   | xScale（const aclTensor *） | 输入 | 激活量化因子。 | 按K方向每64个元素对应两个E8M0 scale。 | FLOAT8_E8M0 | ND | 3维，(M, ceil(K / 64), 2) | √ |
-  | smoothScale（const aclTensor *） | 可选输入 | 按expert的平滑量化因子。 | 仅MX A8W4可选，非空时必须为Device HBM内存，不接受Host Tensor；其他场景必须传nullptr。FP32 SwiGLU结果乘smooth后再进行BF16舍入和MX量化。 | FLOAT | ND | 2维，(E, N / 2) | √，入口连续化 |
-  | groupList（const aclTensor *） | 输入 | 分组信息。 | 长度必须为E；其语义由groupListType决定。A8W4及A4W4 BF16输出要求Device内存；A8W8保持原有行为。 | INT64 | ND | 1维，(E) | √ |
+  | smoothScale（const aclTensor *） | 输入 | 按expert的平滑量化因子。 | 仅MX A8W4可选，其他场景必须传nullptr。FP32 SwiGLU结果乘smooth后再进行BF16舍入和MX量化。 | FLOAT | ND | 2维，(E, N / 2) | √，入口连续化 |
+  | groupList（const aclTensor *） | 输入 | 分组信息。 | 长度必须为E；其语义由groupListType决定。 | INT64 | ND | 1维，(E) | √ |
   | dequantMode（int64_t） | 输入 | 反量化模式。 | 当前仅支持2，表示MX反量化。 | - | - | - | - |
   | dequantDtype（int64_t） | 输入 | GroupedMatmul中间结果类型。 | 当前仅支持ACL_FLOAT（枚举值为0）。 | - | - | - | - |
   | quantMode（int64_t） | 输入 | 输出量化模式。 | 当前仅支持2，表示MX量化。 | - | - | - | - |
   | groupListType（int64_t） | 输入 | 分组列表解释方式。 | 0表示cumsum，1表示count。 | - | - | - | - |
-  | tuningConfigOptional（const aclIntArray *） | 可选输入 | tiling调优配置。 | 当前不支持，必须传nullptr或空数组。 | INT64 | - | - | - |
+  | tuningConfigOptional（const aclIntArray *） | 输入 | tiling调优配置。 | 当前不支持，必须传nullptr或空数组。 | INT64 | - | - | - |
   | swigluMode（int64_t） | 输入 | SwiGLU计算模式。 | 量化输出仅支持2：沿最后一维前后分半，前半为激活分支，后半为线性分支。A4W4 BF16输出还支持0。 | - | - | - | - |
-  | clampLimit（double） | 输入 | 表示SwiGLU中间结果的裁剪上限。 | 激活分支裁剪上限为clampLimit，线性分支裁剪范围为[-clampLimit, clampLimit]；必须为有限、可由FLOAT表示且大于0的值。 | - | - | - | - |
-  | gluAlpha（double） | 输入 | 表示Sigmoid输入的缩放系数。 | 必须为有限且可由FLOAT表示的值。 | - | - | - | - |
-  | gluBias（double） | 输入 | 表示线性分支的偏置。 | 必须为有限且可由FLOAT表示的值。 | - | - | - | - |
+  | clampLimit（double） | 输入 | 表示SwiGLU中间结果的裁剪上限。 | 激活分支裁剪上限为clampLimit，线性分支裁剪范围为[-clampLimit, clampLimit]；swigluMode=2时必须为有限、可由FLOAT表示且转换为FLOAT后仍大于0的值；A4W4的swigluMode=0不使用该参数。 | - | - | - | - |
+  | gluAlpha（double） | 输入 | 表示Sigmoid输入的缩放系数。 | swigluMode=2时必须为有限且可由FLOAT表示的值；A4W4的swigluMode=0不使用该参数。 | - | - | - | - |
+  | gluBias（double） | 输入 | 表示线性分支的偏置。 | swigluMode=2时必须为有限且可由FLOAT表示的值；A4W4的swigluMode=0不使用该参数。 | - | - | - | - |
   | roundMode（const char *） | 输入 | MX量化舍入模式。 | 传入nullptr或空字符串时按`"rint"`处理；当前仅支持`"rint"`。 | - | - | - | - |
   | scaleAlg（int64_t） | 输入 | MX量化scale算法。 | 当前接口支持0（OCP）和1（cuBLAS）；其他值会报错。 | - | - | - | - |
   | dstTypeMax（double） | 输入 | MX量化目标类型最大值。 | 当前MXFP8输出仅支持0.0。 | - | - | - | - |
@@ -174,7 +174,7 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>x、weight、weightScale、xScale、groupList、output、outputScale、workspaceSize或executor为空指针，或者weight或weightScale的TensorList中包含空Tensor。</td>
+      <td>x、weight、weightScale、xScale、groupList、output、workspaceSize或executor为空指针；A8W8/A8W4的outputScale为空指针，或者weight或weightScale的TensorList中包含空Tensor。</td>
     </tr>
     <tr>
       <td rowspan="7">ACLNN_ERR_PARAM_INVALID</td>
@@ -185,16 +185,16 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
       <td>输入或输出的参数维度、shape或format不满足约束，例如weight不是三维FRACTAL_NZ格式，或输出shape不匹配。</td>
     </tr>
     <tr>
-      <td>当前设备不是Ascend 950PR&950DT系列产品，或者weight、weightScale的TensorList长度不为1。</td>
+      <td>当前设备不是支持的产品类型，或者weight、weightScale的TensorList长度不为1。</td>
     </tr>
     <tr>
       <td>dequantMode、quantMode、dequantDtype不满足2、2、ACL_FLOAT的约束。</td>
     </tr>
     <tr>
-      <td>weightAssistMatrix、bias、smoothScale或tuningConfigOptional传入了当前场景不支持的内容；MX A8W4的groupList或非空smoothScale不是Device HBM Tensor。</td>
+      <td>weightAssistMatrix、bias、smoothScale或tuningConfigOptional传入了当前场景不支持的内容。</td>
     </tr>
     <tr>
-      <td>swigluMode不等于2，或clampLimit、gluAlpha、gluBias不满足有限性及float32可表示性约束；其中clampLimit还必须大于0。</td>
+      <td>A8W8/A8W4的swigluMode不等于2，或A4W4的swigluMode不为0或2；swigluMode=2时，clampLimit、gluAlpha、gluBias不满足有限性及float32可表示性约束，其中clampLimit转换为float32后还必须大于0。</td>
     </tr>
     <tr>
       <td>roundMode、scaleAlg、dstTypeMax不满足MXFP8场景约束。</td>
@@ -221,7 +221,11 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
 
 ## 约束说明
 
-### 新增MX A8W4
+### 确定性计算
+
+aclnnGroupedMatmulSwigluQuantWeightNzV3默认为确定性实现。
+
+### MX A8W4
 
 - `x`固定为FLOAT8_E4M3FN，`weight`固定为FLOAT4_E2M1 FRACTAL_NZ；不接受FLOAT8_E5M2、FLOAT4_E1M2或ND权重。`xScale`、`weightScale`及`outputScale`均为FLOAT8_E8M0，`output`固定为FLOAT8_E4M3FN。
 - 当前仅支持单Tensor承载全部expert，仅支持`transposeWeight=true`，由weight和weightScale的view stride识别，不额外暴露转置参数。
@@ -229,14 +233,18 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNzV3(
 - weightScale的入口view均为`(E, ceil(K/64), N, 2)`。转置stride为`(N*ceil(K/64)*2, 2, ceil(K/64)*2, 1)`，对应storage为`(E, N, ceil(K/64), 2)`。weight与weightScale的转置属性必须一致。入口复用既有转置归一化和scale连续化函数。
 - `E`范围为`[1,1024]`，`M`为正整数，`K`、`N`为正的128整数倍；`xScale`、输出及groupList的shape和分组语义与下方A8W8规则一致。
 - `smoothScale`可为nullptr；非空时必须严格为FLOAT、ND、`(E,N/2)`，不接受`(E)`、`(N/2)`或其他广播shape。支持非连续输入，入口检查存储边界后进行连续化，并传给既有执行函数。
-- 新A8W4的`groupList`以及非空`smoothScale`必须为Device HBM Tensor；Host输入在第一段接口返回`ACLNN_ERR_PARAM_INVALID`，包括连续和非连续Host Tensor。调用方应先完成H2D拷贝，再创建对应Device Tensor。kernel直接通过GM地址读取两者，入口没有可依赖的executor自动H2D保证，`Contiguous`只负责连续化，不能视为Host到Device搬运。旧A8W8的Host groupList处理及原A4W4校验保持不变。
-- 仅支持`swigluMode=2`、`dequantMode=2`、`dequantDtype=ACL_FLOAT`、`quantMode=2`、`roundMode="rint"`（nullptr或空字符串取默认值）、`scaleAlg=0/1`、`dstTypeMax=0.0`。其余可选参数沿用原有拒绝规则。
-- FP32 SwiGLU结果先乘对应expert的smooth，再进行既有BF16最近偶数舍入和MX量化。ACLNN入口负责校验和传参，该计算顺序依赖配套host tiling/kernel/APT实现；入口UT不验证设备数值精度。
+- 仅支持`swigluMode=2`、`dequantMode=2`、`dequantDtype=ACL_FLOAT`、`quantMode=2`、`roundMode="rint"`（nullptr或空字符串取默认值）、`scaleAlg=0/1`、`dstTypeMax=0.0`。
+
+### MX A4W4 BF16输出
+
+- `x`、`weight`均为FLOAT4_E2M1，`xScale`、`weightScale`为FLOAT8_E8M0；`output`为BFLOAT16、ND、`(M,N/2)`，`outputScale`必须为nullptr，不执行MXFP8输出量化。
+- `x`为非转置ND `(M,K)`；weight TensorList长度为1，view为`(E,K,N)`，支持转置和非转置FRACTAL_NZ。转置storage为`(E,K/64,N/16,16,64)`；非转置storage为`(E,N/64,K/16,16,64)`，C0均为64个逻辑FP4元素。weightScale的view为`(E,K/64,N,2)`，转置属性须与weight一致。
+- `E`为`[1,1024]`内的整数，`M>0`，`K`和`N`均为128的正整数倍；`xScale`为`(M,K/64,2)`。groupList为Device INT64 ND `(E)`，分组语义与下方说明一致。
+- `smoothScale`、`bias`必须为nullptr；weightAssistMatrix及tuningConfigOptional沿用参数表的空值约束。
+- `swigluMode`支持0和2。模式0不使用clampLimit、gluAlpha、gluBias；模式2使用上述clamp计算公式和标量校验规则。
+- `dequantMode=2`、`dequantDtype=ACL_FLOAT`、`quantMode=2`仍须传入；roundMode、scaleAlg、dstTypeMax仍按参数表校验，不能因BF16输出而传入任意值。
 
 ### 原有MX A8W8
-
-  - 确定性计算：
-      - aclnnGroupedMatmulSwigluQuantWeightNzV3默认为确定性实现。
 
   <!-- npu="950" id7 -->
   - <term>Ascend 950PR&950DT系列产品</term>：

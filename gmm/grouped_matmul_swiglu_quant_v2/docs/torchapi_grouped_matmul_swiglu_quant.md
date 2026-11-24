@@ -99,7 +99,7 @@ cann_ops_transformer.grouped_matmul_swiglu_quant(
 | 参数名 | 参数类型 | 可选/必选 | 描述 | 数据类型 | 维度 |
 | --- | --- | --- | --- | --- | --- |
 | `x` | Tensor | 必选 | 左矩阵，仅支持非转置输入。 | `torch.float8_e4m3fn` | `(M, K)` |
-| `weight` | List[Tensor] | 必选 | 右矩阵TensorList，长度必须为1，且唯一Tensor必须为FRACTAL_NZ格式，其第一维包含全部E个expert。MX A8W8支持非转置和转置布局；MX A8W4仅支持转置WeightNZ及配套转置weight_scale view，不支持其他任意非连续view。 | `torch.float8_e4m3fn`，或MX A8W4的packed E2M1（见下文） | 3维，具体shape见下表。 |
+| `weight` | List[Tensor] | 必选 | 右矩阵TensorList，长度必须为1，且唯一Tensor必须为FRACTAL_NZ格式，其第一维包含全部E个expert。MX A8W8支持非转置和转置布局；MX A8W4仅支持转置WeightNZ及配套转置weight_scale view，不支持其他任意非连续view。 | `torch.float8_e4m3fn`，或`torch.float4_e2m1fn_x2`（MX A8W4） | 3维，具体shape见下表。 |
 | `weight_scale` | List[Tensor] | 必选 | `weight`的MX量化scale，TensorList长度必须为1。Tensor使用`torch.int8`或`torch.uint8`承载，通过`weight_scale_dtype`按E8M0解析；转置属性需与`weight`一致。 | `torch.int8`或`torch.uint8`（逻辑类型为`torch_npu.float8_e8m0fnu`） | 4维，具体shape见下表。 |
 | `x_scale` | Tensor | 必选 | `x`的MX量化scale。Tensor使用`torch.int8`或`torch.uint8`承载，通过`x_scale_dtype`按E8M0解析。 | `torch.int8`或`torch.uint8`（逻辑类型为`torch_npu.float8_e8m0fnu`） | `(M, ceil(K / 64), 2)` |
 | `group_list` | Tensor | 必选 | 分组信息，长度为expert数E，其语义由`group_list_type`决定。 | `torch.int64` | `(E,)` |
@@ -117,10 +117,10 @@ cann_ops_transformer.grouped_matmul_swiglu_quant(
 | `weight_scale_dtype` | torch.dtype/int | 可选 | `weight_scale`的逻辑数据类型，默认值为`torch_npu.float8_e8m0fnu`，当前仅支持该类型。 | - | - |
 | `x_scale_dtype` | torch.dtype/int | 可选 | `x_scale`的逻辑数据类型，默认值为`torch_npu.float8_e8m0fnu`，当前仅支持该类型。 | - | - |
 | `swiglu_mode` | int | 可选 | SwiGLU计算模式，默认值为`None`。当前Torch Extension要求显式传入2：沿最后一维前后分半，前半为激活分支，后半为线性分支。 | - | - |
-| `clamp_limit` | float | 可选 | SwiGLU裁剪上限，默认值为`None`，此时按7.0处理。必须为有限正数；激活分支上限为`clamp_limit`，线性分支范围为`[-clamp_limit, clamp_limit]`。 | - | - |
+| `clamp_limit` | float | 可选 | SwiGLU裁剪上限，默认值为`None`，此时按7.0处理。必须为有限、可由`torch.float32`表示且转换后仍大于0的值；激活分支上限为`clamp_limit`，线性分支范围为`[-clamp_limit, clamp_limit]`。 | - | - |
 | `glu_alpha` | float | 可选 | Sigmoid输入的缩放系数，默认值为`None`，此时按1.702处理。必须为有限且可由`torch.float32`表示的值。 | - | - |
 | `glu_bias` | float | 可选 | 线性分支的偏置，默认值为`None`，此时按1.0处理。必须为有限且可由`torch.float32`表示的值。 | - | - |
-| `round_mode` | str | 可选 | MX量化舍入模式，默认值为`"rint"`，当前仅支持`"rint"`。 | - | - |
+| `round_mode` | str | 可选 | MX量化舍入模式，默认值为`"rint"`，支持`"rint"`或空字符串（按`"rint"`处理）；不接受内嵌NUL字符或`None`。 | - | - |
 | `scale_alg` | int | 可选 | MX量化scale算法，默认值为0，0表示OCP实现，1表示cuBLAS实现；当前MXFP8输出仅支持0或1。 | - | - |
 | `dst_type_max` | float | 可选 | 表示目标数据类型的最大值，默认值为0.0。当前MXFP8输出仅支持0.0。 | - | - |
 
@@ -149,21 +149,18 @@ cann_ops_transformer.grouped_matmul_swiglu_quant(
 
 ### MX A8W4 weight布局
 
-`x`为E4M3FN，`weight`为E2M1，输出为E4M3FN/E8M0。K和完整N均须为128的倍数；支持小M、空expert和N=128/384对应的半宽尾块。`dequant_mode=quant_mode=2`沿用现有默认值。`dequant_dtype=6`、`torch.float32`或`None`按FP32处理，不将不合法属性静默改成合法值。
+`x`为E4M3FN，`weight`为E2M1，输出为E4M3FN/E8M0。K和完整N均须为128的倍数。
 
-以下shape均区分Torch packed元素和ACL逻辑FP4元素；原生`torch.float4_e2m1fn_x2`也是一字节两个FP4，并非已经展开的逻辑shape。normal NZ格式必须为29，ACL storage C0为64，不能使用C032替代。
+MX A8W4仅支持转置weight及配套的转置weight_scale。下表中weight的source shape、view shape和view stride按Torch packed元素计数（每字节两个FP4），storage shape按ACL逻辑FP4元素计数。
 
-| weight方向 | Torch source packed shape | Torch传入view shape | Torch view stride | ACL逻辑view shape | ACL storage shape |
+| 参数名 | 场景 | source shape | view shape | view stride | storage shape |
 | --- | --- | --- | --- | --- | --- |
-| 转置 | `(E,N,K/2)` | `(E,K/2,N)` | `(N*K/2,1,K/2)` | `(E,K,N)` | `(E,K/64,N/16,16,64)` |
+| `weight` | 转置 | `(E, N, K / 2)` | `(E, K / 2, N)` | `(N * K / 2, 1, K / 2)` | `(E, K / 64, N / 16, 16, 64)` |
+| `weight_scale` | 转置 | `(E, N, K / 64, 2)` | `(E, K / 64, N, 2)` | `(N * K / 64 * 2, 2, K / 64 * 2, 1)` | `(E, N, K / 64, 2)` |
 
-MX A8W4仅支持转置方向，先按source packed shape准备数据并format cast，再创建转置view；不支持false/false组合。通用FP4 converter扩大packed轴、相关strides和NZ storage最内轴一次；调用方不要自行重复扩大。weight_scale采用与weight配套的KN/NK视图；N推导通过`S=ceil(K/64)`定位K-group轴，KN `(E,S,N,2)`取dim2，NK `(E,N,S,2)`取dim1，且不改动传入strides。最终配对和物理布局由ACLNN校验。
+转置场景先对形状为`(E, N, K / 2)`的packed源`weight`执行`npu_format_cast(..., 29)`，再执行`transpose(-1, -2)`；形状为`(E, N, K / 64, 2)`的源`weight_scale`执行`transpose(-3, -2)`。weight的ACL逻辑view shape为`(E, K, N)`。
 
-`group_list`和可选`smooth_scale`必须在NPU，封装不将其搬到CPU。新A8W4分支不额外启动scale清零kernel，旧MXFP8的初始化保持不变。
-
-合法非连续`x_scale`在A8W4封装中先按int8/uint8原始字节连续化，再包装为E8M0；已连续时不会复制数据。公共转换器产生的普通scale NCL/NCHW描述符由A8W4 ACLNN分支归一化为ND，不要求调用方重复转置scale。
-
-以下示例复用同一个接口，构造转置normal NZ64权重。FP4源Tensor的每个元素包含两个nibble；format cast前的source shape决定物理布局，不能对已有错误布局仅修改shape。
+以下示例使用INT8承载packed FP4权重，并通过`weight_dtype=torch_npu.float4_e2m1fn_x2`指定逻辑类型。
 
 ```python
 import math
@@ -180,7 +177,7 @@ smooth_scale = torch.ones((E, N // 2), dtype=torch.float32).npu()
 for transpose_weight in (True,):
     packed_shape = (E, N, K // 2) if transpose_weight else (E, K, N // 2)
     source = torch.randint(-128, 128, packed_shape, dtype=torch.int8).npu()
-    weight = torch_npu.npu_format_cast(source, 29).view(torch.float4_e2m1fn_x2)
+    weight = torch_npu.npu_format_cast(source, 29)
     scale_shape = (E, N, math.ceil(K / 64), 2) if transpose_weight else (E, math.ceil(K / 64), N, 2)
     weight_scale = torch.full(scale_shape, 127, dtype=torch.uint8).npu()
     if transpose_weight:
@@ -189,22 +186,13 @@ for transpose_weight in (True,):
     y, y_scale = cann_ops_transformer.grouped_matmul_swiglu_quant(
         x, [weight], [weight_scale], x_scale, group_list,
         swiglu_mode=2, group_list_type=1, smooth_scale=smooth_scale,
+        weight_dtype=torch_npu.float4_e2m1fn_x2,
     )
     torch.npu.synchronize()
     print(y.shape, y_scale.shape)
 ```
 
-不需要smooth时传`None`。示例先按每字节两个FP4编码准备packed source，再完成NZ转换并附加native FP4类型，以兼容不支持native FP4直接format cast的torch_npu版本。如果保留int8/uint8 packed存储，须按上表准备shape和物理数据，并传`weight_dtype=torch_npu.float4_e2m1fn_x2`（推荐具名dtype）。公共Python接口也接受逻辑FP4编码`40`和偏移编码`296`，两者均规范化为内部偏移编码`296`。不要将未按FP4打包的普通矩阵仅修改dtype后传入。
-
-CPU桥接契约测试（需要PyTorch；C++项需设置`GMMSQ_TEST_CXX`或存在C++17编译器）：
-
-```bash
-python -B -m unittest discover -s gmm/grouped_matmul_swiglu_quant_v2/torch_extension/tests -p test_a8w4_bridge.py -v
-```
-
-这些测试验证Meta/Fake、参数透传和描述符尺寸，不替代CANN扩展编译及NPU数值/布局联调。
-
-Ascend 950安装本仓库扩展及配套CANN算子包后，可将上述命令的pattern改为`test_a8w4_bridge_npu.py`，执行真实封装的转置WeightNZ及identity smooth一致性smoke；不满足环境条件时跳过。该smoke不替代完整数值精度测试。
+不需要smooth时传`None`。
 
 ## 返回值说明
 
@@ -217,7 +205,7 @@ Ascend 950安装本仓库扩展及配套CANN算子包后，可将上述命令的
 
 - 适用场景：支持训练和推理场景。
 - 调用方式：支持单算子模式调用。
-- `group_list_type=0`时，`group_list`表示每个group在M轴上的累计结束位置，数值必须非负、单调不递减且不大于M；`group_list_type=1`时，`group_list`表示每个group的M轴长度，数值必须非负且总和不大于M。`group_list`未指定的`y`区域不参与计算，其内容不作保证。MXFP8场景下，对应的`y_scale`填充编码0。MX A8W4场景下，对应的`y_scale`内容不作保证。
+- `group_list_type=0`时，`group_list`表示每个group在M轴上的累计结束位置，数值必须非负、单调不递减且不大于M；`group_list_type=1`时，`group_list`表示每个group的M轴长度，数值必须非负且总和不大于M。`group_list`未指定的`y`区域不参与计算。对应的`y_scale`如果为奇数场景均会填充0。
 
 各维度的取值约束如下，与ACLNN接口一致：
 
