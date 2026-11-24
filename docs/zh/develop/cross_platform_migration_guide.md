@@ -273,8 +273,8 @@ __simd_vf__ __aicore__ void GatherProcess(ubuf int8_t* curXAddr, ubuf int8_t* cu
 {
     Reg::RegTensor<int8_t> vregTemp;
     Reg::MaskReg preg;
-    // sreg为剩余待处理元素（普通unit32_t标量计数）
-    unit32_t sreg = static_cast<unit32_t>(repeatimes)*computeSize;
+    // sreg为剩余待处理元素（普通uint32_t标量计数）
+    uint32_t sreg = static_cast<uint32_t>(repeatTimes) * computeSize;
 
     for (uint16_t r = 0; r < repeatTimes; r++) {
         // 根据剩余元素数更新掩码
