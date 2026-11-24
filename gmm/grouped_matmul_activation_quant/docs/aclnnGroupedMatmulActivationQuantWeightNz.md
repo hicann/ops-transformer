@@ -273,7 +273,7 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
     </tr>
     <tr>
       <td>bias（const aclTensorList *）</td>
-      <td rowspan="1">可选输入</td>
+      <td rowspan="1">输入</td>
       <td>表示偏置。</td>
       <td>MX场景下必须为空，支持nullptr、空tensorlist或长度为1且元素shape为(0)的空tensorlist。</td>
       <td>-</td>
@@ -285,7 +285,7 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
       <td>xScaleOptional（const aclTensor *）</td>
       <td rowspan="1">输入</td>
       <td>表示左矩阵的量化因子，对应公式中的xScale。</td>
-      <td>当前MX量化场景下必选，不能传nullptr。</td>
+      <td>MX量化场景下不支持nullptr。</td>
       <td>FLOAT8_E8M0</td>
       <td>ND</td>
       <td>3</td>
@@ -313,7 +313,7 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
     </tr>
     <tr>
       <td>tuningConfig（const aclIntArray *）</td>
-      <td>可选输入</td>
+      <td>输入</td>
       <td>表示调优参数，预留参数。</td>
       <td>支持传入nullptr，当前暂不使用。</td>
       <td>-</td>
@@ -323,7 +323,7 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
     </tr>
     <tr>
       <td>quantMode（const char *）</td>
-      <td>可选输入</td>
+      <td>输入</td>
       <td>表示量化模式。</td>
       <td>支持传入nullptr或空字符串。当前仅支持"mx"；传入nullptr或空字符串时，若x的数据类型为支持的FLOAT8或FLOAT4类型且xScaleOptional的数据类型为FLOAT8_E8M0，则推导为"mx"。若显式传入非"mx"，则报错。</td>
       <td>-</td>
@@ -333,7 +333,7 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
     </tr>
     <tr>
       <td>roundMode（const char *）</td>
-      <td>可选输入</td>
+      <td>输入</td>
       <td>表示量化舍入模式。</td>
       <td>支持传入nullptr或空字符串，传入nullptr或空字符串时按"rint"处理，当前仅支持"rint"。</td>
       <td>-</td>
@@ -437,15 +437,18 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>必选参数为空指针，例如x、groupList、xScaleOptional、weight、weightScale、activationType、y、yScale、workspaceSize或executor为空。</td>
+      <td>必选参数为空指针，例如x、groupList、weight、weightScale、activationType、y、yScale、workspaceSize或executor为空。</td>
     </tr>
     <tr>
-      <td rowspan="5">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="5">161002</td>
+      <td rowspan="6">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="6">161002</td>
       <td>activationType不是"gelu_tanh"。</td>
     </tr>
     <tr>
       <td>bias非空。</td>
+    </tr>
+    <tr>
+      <td>MX量化场景下xScaleOptional为空指针。</td>
     </tr>
     <tr>
       <td>输入数据类型或数据格式不支持。</td>

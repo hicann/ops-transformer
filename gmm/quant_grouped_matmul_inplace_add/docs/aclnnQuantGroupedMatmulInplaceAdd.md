@@ -164,7 +164,7 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(
       <td>yRef</td>
       <td>输入输出</td>
       <td>Device侧的aclTensor，对应公式中的输入输出y。</td>
-      <td>当x1的M轴或者x2的N轴为0时，yRef为空tensor。</td>
+      <td>-</td>
       <td>FLOAT32</td>
       <td>ND</td>
       <td>3(g，M，N)</td>
@@ -248,7 +248,7 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
       <td>161002</td>
-      <td>x1、x2、scale2、groupList、yRef、scale1Optional的数据类型和数据格式不在支持的范围内，或groupListType、groupSize的取值不在支持的范围内。</td>
+      <td>x1、x2、scale2、groupList、yRef、scale1Optional的shape、数据类型和数据格式不在支持的范围内，或groupListType、groupSize的取值不在支持的范围内。</td>
     </tr>
   </tbody></table>
 
@@ -274,8 +274,10 @@ aclnnStatus aclnnQuantGroupedMatmulInplaceAdd(
 ## 约束说明
 
   - 确定性说明：aclnnQuantGroupedMatmulInplaceAdd默认确定性实现。
-  - x1、x2仅支持ND，不支持FRACTAL_NZ，空Tensor也不例外。
-  - 对合法输入，M或N为0时调用成功，yRef为原shape的空Tensor；仅K为0时调用成功，yRef保持原值，shape仍为[E, M, N]。M、N、K同时有多个为0时按同样规则处理。空维度不免除输入的类型、格式和逻辑shape校验。
+  - 支持M、K、N为0的空Tensor场景，yRef shape仍为[g, M, N]：
+
+    1. 当M=0或N=0时，yRef为原shape的空Tensor。
+    2. 当M和N不为0、仅K为0时，yRef保持原值。
   - x1和x2的每一维大小在32字节对齐后都应小于int32的最大值2147483647，且内轴大小需小于2097152。
     - 动态量化（T-T/T-C量化）场景支持的输入类型为：
       - 不为空的参数支持的数据类型组合要满足下表：

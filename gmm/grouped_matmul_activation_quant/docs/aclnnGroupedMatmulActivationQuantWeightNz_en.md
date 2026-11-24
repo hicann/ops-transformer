@@ -275,7 +275,7 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
     </tr>
     <tr>
       <td>bias (const aclTensorList *)</td>
-      <td rowspan="1">optional input</td>
+      <td rowspan="1">Input</td>
       <td>Bias.</td>
       <td>Must be empty in the MX quantization scenario. Supports nullptr, an empty tensorlist, or an empty tensorlist of length 1 with an element shape of (0).</td>
       <td>-</td>
@@ -287,7 +287,7 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
       <td>xScaleOptional (const aclTensor *)</td>
       <td rowspan="1">Input</td>
       <td>Represents the quantization factor of the left matrix, corresponding to xScale in the formula.</td>
-      <td>Mandatory in the current MX quantization scenario. Do not pass nullptr.</td>
+      <td>In the MX quantization scenario, nullptr is not supported.</td>
       <td>FLOAT8_E8M0</td>
       <td>ND</td>
       <td>3</td>
@@ -315,7 +315,7 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
     </tr>
     <tr>
       <td>tuningConfig (const aclIntArray *)</td>
-      <td>Optional input</td>
+      <td>Input</td>
       <td>Represents the tuning parameter. Reserved parameter.</td>
       <td>Supports nullptr. Currently not used.</td>
       <td>-</td>
@@ -325,7 +325,7 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
     </tr>
     <tr>
       <td>quantMode (const char *)</td>
-      <td>Optional input</td>
+      <td>Input</td>
       <td>Indicates the quantization mode.</td>
       <td>Supports nullptr or an empty string. Currently, only "mx" is supported. When nullptr or an empty string is passed, the mode is deduced as "mx" if the data type of x is a supported FLOAT8 or FLOAT4 type and the data type of xScaleOptional is FLOAT8_E8M0. If a value other than "mx" is explicitly passed, an error is reported.</td>
       <td>-</td>
@@ -335,7 +335,7 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
     </tr>
     <tr>
       <td>roundMode (const char *)</td>
-      <td>Optional input</td>
+      <td>Input</td>
       <td>Indicates the quantization rounding mode.</td>
       <td>Passing nullptr or an empty string is supported. If nullptr or an empty string is passed, the value is processed as "rint". Currently, only "rint" is supported.</td>
       <td>-</td>
@@ -439,15 +439,18 @@ aclnnStatus aclnnGroupedMatmulActivationQuantWeightNz(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>A mandatory parameter is a null pointer. For example, x, groupList, xScaleOptional, weight, weightScale, activationType, y, yScale, workspaceSize, or executor is null.</td>
+      <td>A mandatory parameter is a null pointer. For example, x, groupList, weight, weightScale, activationType, y, yScale, workspaceSize, or executor is null.</td>
     </tr>
     <tr>
-      <td rowspan="5">ACLNN_ERR_PARAM_INVALID</td>
-      <td rowspan="5">161002</td>
+      <td rowspan="6">ACLNN_ERR_PARAM_INVALID</td>
+      <td rowspan="6">161002</td>
       <td>activationType is not "gelu_tanh".</td>
     </tr>
     <tr>
       <td>bias is not empty.</td>
+    </tr>
+    <tr>
+      <td>xScaleOptional is a null pointer in the MX quantization scenario.</td>
     </tr>
     <tr>
       <td>The input data type or data format is not supported.</td>

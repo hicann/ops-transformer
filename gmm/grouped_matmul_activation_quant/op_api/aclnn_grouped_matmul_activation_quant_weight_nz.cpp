@@ -683,9 +683,17 @@ aclnnStatus CheckMxQuantParams(const aclTensor* x, const aclTensor* groupList, c
                                int64_t scaleAlg, float dstTypeMax, const aclTensor* y, const aclTensor* yScale,
                                aclOpExecutor* executor)
 {
-    GMMAQ_CHECK_WITH_LOG(
-        xScaleOptional != nullptr, ACLNN_ERR_PARAM_NULLPTR,
-        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(OP_NAME, "xScaleOptional", "does not support nullptr"));
+    if (xScaleOptional == nullptr) {
+        CHECK_RET(CheckTensorDimNum(x, "x", gmaq::X_DIM_NUM) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+        const auto& xShape = x->GetViewShape();
+        const op::Shape expectedShape = {xShape.GetDim(gmaq::DIM_0),
+                                         Ops::Base::CeilDiv(xShape.GetDim(gmaq::DIM_1), gmaq::MX_GROUP_SIZE),
+                                         gmaq::MX_SCALE_PAIR};
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+            OP_NAME, "xScaleOptional", "nullptr",
+            FormatString("xScaleOptional must be %s for mx quantize", op::ToString(expectedShape).GetString()).c_str());
+        return ACLNN_ERR_PARAM_INVALID;
+    }
     const aclTensor* w = (*weight)[gmaq::FIRST_TENSOR_INDEX];
     const aclTensor* wScale = (*weightScale)[gmaq::FIRST_TENSOR_INDEX];
 
