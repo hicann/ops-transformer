@@ -13,7 +13,7 @@
 
 ## 功能说明
 
-- 算子功能：CompressorGrad是Compressor算子的反向算子，用于计算输入$X$、权重$W^{KV}$/$W^{Gate}$与位置编码$Ape$的梯度。前向在gradEnabled为true时导出softmax\_score（分组softmax结果）与kv（softmax结果与kv\_state的Hadamard乘积）中间结果，作为本算子的输入。主要计算过程为：
+- 算子功能：CompressorGrad是Compressor算子的反向算子，用于计算输入$X$、权重$W^{KV}$/$W^{Gate}$与位置编码$Ape$的梯度。前向在gradEnabled为true时导出softmax\_score（分组softmax结果）与kv（按压缩窗口组织的原始KV，即softmax加权前的kv\_state块）中间结果，作为本算子的输入。主要计算过程为：
     1. 逐块计算Hadamard积反向：将上游梯度$dC$与softmax\_score、kv逐元素相乘，得到$dK$与$dS^\prime$；
     2. softmax反向：对$dS^\prime$沿压缩轴做softmax反向，得到$dZ$；
     3. APE梯度计算：按token位置累加$dZ$，得到$dApe$；
@@ -43,6 +43,8 @@
         dApe = ScatterAdd\left(dZ,~ pos \% cmp\_ratio\right)
         $$
 
+        说明：coff=2 时，softmax\_score、kv 与反向中间量 $dZ$ 的第 2 维按行交错排列，行索引 $j = r \times coff + e$（$r$ 为 token 在压缩块内的行号，$e=0$ 为 prev 槽、$e=1$ 为 cur 槽）；$dApe$ 形状为 $[cmp\_ratio, coff \cdot D]$，其中 $dApe[pos\%cmp\_ratio, e \cdot D + d]$ 由 $dZ[r \cdot coff + e, d]$ 累加得到，即 prev 槽累加到列 $[0,D)$、cur 槽累加到列 $[D,2D)$；首块的 prev 槽为 cache 行，不参与累加。
+
     4. 计算矩阵乘法反向，$dNewKv$、$dNewScore$为$dK$、$dZ$按压缩块映射回全局token行的结果（coff=2时prev/cur半区分别对应上一块与本块的token行，与正向的$W^{aKV}$/$W^{bKV}$对应）：
 
         $$
@@ -61,7 +63,7 @@
 | wgate | 输入 | 公式中的$W^{Gate}$，前向gate压缩权重。 | FLOAT16、BFLOAT16 | ND |
 | d\_cmp\_kv | 输入 | 公式中的$dC$，前向输出cmp\_kv的上游梯度。 | FLOAT16、BFLOAT16 | ND         |
 | softmax\_score | 输入 | 公式中的$S$，前向在gradEnabled为true时导出的分组softmax中间结果。 | FLOAT32     | ND         |
-| kv | 输入 | 公式中的$K$，前向在gradEnabled为true时导出的softmax结果与kv\_state的Hadamard乘积中间结果。 | FLOAT32       | ND         |
+| kv | 输入 | 公式中的$K$，前向在gradEnabled为true时导出的原始KV中间结果（softmax加权前、按压缩窗口组织，与softmax\_score分开保存）。 | FLOAT32       | ND         |
 | cu\_seqlens | 可选输入 | 表示不同Batch中的有效token数。<br>当x的shape为[T,H]时必传；当x的shape为[B,S,H]时，参数必须为空。 | INT32 | ND         |
 | seqused | 可选输入 | 表示不同Batch中实际参与压缩的token数。<br>如果指定为None时，表示和每个Batch上的Sequence Length长度相同。 | INT32          | ND         |
 | start\_pos | 可选输入 | 表示计算起始位置。<br>如果指定为None时，表示从0开始进行计算。 | INT32          | ND         |
@@ -79,6 +81,7 @@
 
 - x参数维度含义：B（Batch Size）表示输入样本批量大小、S（Sequence Length）表示输入样本序列长度、H（Head Size）表示hidden层的大小、D（Head Dim）表示hidden层的最小单元大小、T表示所有Batch输入样本序列长度的累加和。
 - 支持布局：BSH（x为[B,S,H]）与TH（x为[T,H]变长序列）两种布局；Atlas A2系列与A3系列共用同一算子实现。
+- 数据类型约束：x、wkv、wgate、dCmpKv、dX、dWkv、dWgate 必须使用同一种数据类型（同为 FLOAT16 或同为 BFLOAT16）；softmaxScore、kv、dApe 固定为 FLOAT32。数据类型混用会在 Tiling 阶段报错。
 - 输入shape限制：
     - wkv支持输入shape[coff* D,H]
     - wgate支持输入shape[coff* D,H]

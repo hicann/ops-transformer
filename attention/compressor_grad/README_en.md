@@ -15,7 +15,7 @@ English | [简体中文](./README.md)
 
 ## Function Description
 
-- Operator function: CompressorGrad is the backward operator of the Compressor operator. It computes the gradients of the input $X$, the weights $W^{KV}$/$W^{Gate}$, and the position encoding $Ape$. The forward pass exports softmax\_score (grouped softmax result) and kv (the Hadamard product of the softmax result and kv\_state) as intermediate results when gradEnabled is true, which serve as the inputs of this operator. The main computation process is as follows:
+- Operator function: CompressorGrad is the backward operator of the Compressor operator. It computes the gradients of the input $X$, the weights $W^{KV}$/$W^{Gate}$, and the position encoding $Ape$. The forward pass exports softmax\_score (grouped softmax result) and kv (the raw KV organized by compression window, i.e. kv\_state before softmax weighting) as intermediate results when gradEnabled is true, which serve as the inputs of this operator. The main computation process is as follows:
     1. Computes the Hadamard product backward block by block: Multiplies the upstream gradient $dC$ with softmax\_score and kv element-wise to obtain $dK$ and $dS^\prime$;
     2. Computes the softmax backward: Performs the softmax backward on $dS^\prime$ along the compression axis to obtain $dZ$;
     3. Computes the APE gradient: Accumulates $dZ$ by token position to obtain $dApe$;
@@ -45,6 +45,8 @@ English | [简体中文](./README.md)
         dApe = ScatterAdd\left(dZ,~ pos \% cmp\_ratio\right)
         $$
 
+        When coff=2, the second dimension of softmax\_score, kv, and the backward intermediate $dZ$ is interleaved row by row with row index $j = r \times coff + e$ ($r$ is the row index of the token within the compression block; $e=0$ for the prev slot and $e=1$ for the cur slot); $dApe$ has shape $[cmp\_ratio, coff \cdot D]$ and is accumulated from $dZ[r \cdot coff+e, d]$ into $dApe[pos\%cmp\_ratio, e \cdot D+d]$, that is, the prev slot is accumulated into columns $[0,D)$ and the cur slot into columns $[D,2D)$; the prev slot of the first block contains cache rows and does not contribute.
+
     4. Computes the matrix multiplication backward, where $dNewKv$ and $dNewScore$ are the results of mapping $dK$ and $dZ$ back to global token rows by compression block (when coff=2, the prev/cur halves correspond to the token rows of the previous block and the current block respectively, matching the forward $W^{aKV}$/$W^{bKV}$):
 
         $$
@@ -63,7 +65,7 @@ English | [简体中文](./README.md)
 | wgate | Input | $W^{Gate}$ in the formulas. The gate compression weight of the forward pass. | FLOAT16, BFLOAT16 | ND |
 | d\_cmp\_kv | Input | $dC$ in the formulas. The upstream gradient of the forward output cmp\_kv. | FLOAT16, BFLOAT16 | ND         |
 | softmax\_score | Input | $S$ in the formulas. The grouped softmax intermediate result exported by the forward pass when gradEnabled is true. | FLOAT32     | ND         |
-| kv | Input | $K$ in the formulas. The Hadamard product intermediate result of the softmax result and kv\_state exported by the forward pass when gradEnabled is true. | FLOAT32       | ND         |
+| kv | Input | $K$ in the formulas. The raw KV intermediate result exported by the forward pass when gradEnabled is true (before softmax weighting, organized by compression window, and stored separately from softmax\_score). | FLOAT32       | ND         |
 | cu\_seqlens | Optional input | Number of valid tokens in different batches.<br>Required when the shape of x is [T,H]; must be empty when the shape of x is [B,S,H]. | INT32 | ND         |
 | seqused | Optional input | Number of tokens that actually participate in compression in different batches.<br>If set to None, the value is the same as the Sequence Length of each batch. | INT32          | ND         |
 | start\_pos | Optional input | Starting position of the computation.<br>If set to None, the computation starts from 0. | INT32          | ND         |
@@ -81,6 +83,7 @@ English | [简体中文](./README.md)
 
 - Meanings of the x parameter dimensions: B (Batch Size) indicates the batch size of input samples, S (Sequence Length) indicates the sequence length of input samples, H (Head Size) indicates the size of the hidden layer, D (Head Dim) indicates the minimum unit size of the hidden layer, and T indicates the sum of sequence lengths of input samples across all batches.
 - Supported layouts: two layouts, BSH (x is [B,S,H]) and TH (x is [T,H] variable-length sequences). The Atlas A2 products and A3 products share the same operator implementation.
+- Data type constraint: x, wkv, wgate, dCmpKv, dX, dWkv, and dWgate must use the same data type (all FLOAT16 or all BFLOAT16); softmaxScore, kv, and dApe are fixed to FLOAT32. Mixed data types are rejected during tiling.
 - Input shape restrictions:
     - wkv supports the input shape [coff* D,H]
     - wgate supports the input shape [coff* D,H]

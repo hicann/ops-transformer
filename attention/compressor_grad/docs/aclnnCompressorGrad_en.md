@@ -25,7 +25,7 @@
 
 ## Function
 
-- Description: CompressorGrad is the backward operator of Compressor. It computes the gradients of the input $X$, weights $W^{KV}$/$W^{Gate}$, and positional encoding $Ape$. When gradEnabled is true, the forward pass exports the intermediate results softmax\_score (grouped softmax result) and kv (Hadamard product of the softmax result and kv\_state), which are inputs of this operator. The main computation procedure is as follows:
+- Description: CompressorGrad is the backward operator of Compressor. It computes the gradients of the input $X$, weights $W^{KV}$/$W^{Gate}$, and positional encoding $Ape$. When gradEnabled is true, the forward pass exports the intermediate results softmax\_score (grouped softmax result) and kv (the raw KV organized by compression window, i.e. kv\_state before softmax weighting), which are inputs of this operator. The main computation procedure is as follows:
     1. Compute the Hadamard product backward block by block: multiply the upstream gradient $dC$ element-wise with softmax\_score and kv to obtain $dK$ and $dS^\prime$;
     2. Softmax backward: compute the softmax backward of $dS^\prime$ along the compression axis to obtain $dZ$;
     3. APE gradient computation: accumulate $dZ$ by token position to obtain $dApe$;
@@ -54,6 +54,8 @@
         $$
         dApe = ScatterAdd\left(dZ,~ pos \% cmp\_ratio\right)
         $$
+
+        When coff=2, the second dimension of softmax\_score, kv, and the backward intermediate $dZ$ is interleaved row by row with row index $j = r \times coff + e$ ($r$ is the row index of the token within the compression block; $e=0$ for the prev slot and $e=1$ for the cur slot); $dApe$ has shape $[cmp\_ratio, coff \cdot D]$ and is accumulated from $dZ[r \cdot coff+e, d]$ into $dApe[pos\%cmp\_ratio, e \cdot D+d]$, that is, the prev slot is accumulated into columns $[0,D)$ and the cur slot into columns $[D,2D)$; the prev slot of the first block contains cache rows and does not contribute.
 
     4. Compute the matmul backward. $dNewKv$ and $dNewScore$ are obtained by mapping $dK$ and $dZ$ back to the global token rows by compressed block (when coff=2, the prev/cur halves correspond to the token rows of the previous block and the current block, respectively, matching $W^{aKV}$/$W^{bKV}$ in the forward pass):
 
@@ -110,7 +112,7 @@ aclnnStatus aclnnCompressorGrad(
     | wgate | Input | $W^{Gate}$ in the formula, gate compression weight of the forward pass. |Empty tensors are not supported.| FLOAT16, BFLOAT16 | ND |[coff* D,H]|×|
     | dCmpKv | Input | $dC$ in the formula, upstream gradient of the forward output cmp\_kv. | Empty tensors are not supported. | FLOAT16, BFLOAT16 | ND |BS merged: [min(T,T//cmp_ratio+B),D], BS non-merged: [B,ceil(S/cmp_ratio),D]|×|
     | softmaxScore | Input | $S$ in the formula, grouped softmax intermediate result exported in the forward pass when gradEnabled is true. | Empty tensors are not supported. | FLOAT32 | ND |BS merged: [min(T,T//cmp_ratio+B), coff*cmp_ratio, D], BS non-merged: [B,ceil(S/cmp_ratio),coff*cmp_ratio,D]|×|
-    | kv | Input | $K$ in the formula, intermediate result of the Hadamard product between the softmax result exported in the forward pass when gradEnabled is true and kv\_state. | Empty tensors are not supported. | FLOAT32 | ND |Same as softmaxScore|×|
+    | kv | Input | $K$ in the formula, the raw KV intermediate result exported in the forward pass when gradEnabled is true (before softmax weighting, organized by compression window, and stored separately from softmax\_score). | Empty tensors are not supported. | FLOAT32 | ND |Same as softmaxScore|×|
     | cuSeqlensOptional | Optional input | Number of valid tokens in each Batch. | Required when the shape of x is [T,H]; the input shape is [B+1,]. Must be empty when the shape of x is [B,S,H]. Empty tensors are not supported.| INT32 | ND |[B+1,] when the shape of x is [T,H]|×|
     | sequsedOptional | Optional input | Number of tokens actually participating in compression in each Batch. | When set to None, the value is the same as the Sequence Length of each Batch; seqused[n] must not exceed the corresponding Sequence Length and must be greater than or equal to 0.| INT32 | ND |[B,]|×|
     | startPosOptional | Optional input | Start position of the computation. | When set to None, the computation starts from 0.| INT32 | ND |[B,]|×|
@@ -218,6 +220,7 @@ aclnnStatus aclnnCompressorGrad(
 - Deterministic computation:
   - aclnnCompressorGrad defaults to a deterministic implementation.
 - Meanings of dimensions of x: B (Batch Size) denotes the batch size of input samples, S (Sequence Length) denotes the sequence length of input samples, H (Head Size) denotes the size of the hidden layer, D (Head Dim) denotes the size of the minimum unit of the hidden layer, and T denotes the sum of sequence lengths of input samples across all batches.
+- Data type constraint: x, wkv, wgate, dCmpKv, dX, dWkv, and dWgate must use the same data type (all FLOAT16 or all BFLOAT16); softmaxScore, kv, and dApe are fixed to FLOAT32. Mixed data types are rejected during tiling.
 - Input shape constraints:
     - wkv supports input shape [coff* D,H].
     - wgate supports input shape [coff* D,H].
