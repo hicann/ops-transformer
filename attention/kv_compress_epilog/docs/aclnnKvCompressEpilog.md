@@ -258,8 +258,6 @@ aclnnStatus aclnnKvCompressEpilog(
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
 
-  第一段接口执行下列基础检查；返回成功不表示全部形状、数据类型和属性约束检查已完成，后续tiling检查失败可能由第二段返回：
-
   <table style="undefined;table-layout: fixed; width: 1000px"><colgroup>
   <col style="width: 300px">
   <col style="width: 150px">
@@ -276,7 +274,7 @@ aclnnStatus aclnnKvCompressEpilog(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>cacheRef、x、slotMapping存在空指针。</td>
+      <td>cacheRef、x、slotMapping存在空指针；workspaceSize或executor出参为空指针。</td>
     </tr>
     <tr>
       <td>ACLNN_ERR_PARAM_INVALID</td>
@@ -284,6 +282,15 @@ aclnnStatus aclnnKvCompressEpilog(
       <td>cacheRef、x或slotMapping为空Tensor；cacheRef布局不符合约束（须连续或仅blockNum维非连续）。</td>
     </tr>
   </tbody></table>
+
+<!-- npu="A3,910b" id14 -->
+- <term>Atlas A2系列产品</term>、<term>Atlas A3系列产品</term>上以下额外场景返回161002:
+  - quantMode≠1、quantGroupSize≠64。
+  - x非2D或d≠512或数据类型非BFLOAT16。
+  - cacheRef非4D或dim2≠1或数据类型非UINT8。
+  - blockNum≤0或headDim&lt;608或blockStride小于blockSize×headDim。
+  - slotMapping数据类型非INT32/INT64或维度不等于x维度减1。
+<!-- end id14 -->
 
 ## aclnnKvCompressEpilog
 
@@ -308,8 +315,6 @@ aclnnStatus aclnnKvCompressEpilog(
 - **返回值**
 
   aclnnStatus：返回状态码，具体参见[aclnn返回码](../../../docs/zh/context/aclnn_return_code.md)。
-
-  违反下文约束时，后续执行准备或tiling检查失败可能返回以下内部错误。具体错误码取决于失败环节和运行时版本，不保证统一返回161002；请结合运行日志定位，不能仅凭内部错误码判定为参数错误。
 
   | 返回值 | 错误码 | 说明 |
   | --- | --- | --- |

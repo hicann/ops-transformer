@@ -17,6 +17,7 @@
 #include "opdev/op_dfx.h"
 #include "opdev/op_executor.h"
 #include "opdev/op_log.h"
+#include "op_common/log/log.h"
 #include "opdev/platform.h"
 #include "opdev/shape_utils.h"
 #include "opdev/tensor_view_utils.h"
@@ -34,6 +35,29 @@ constexpr size_t CACHE_VIEW_DIM_NUM = 4;
 constexpr size_t CACHE_BLOCKNUM_DIM = 0;
 constexpr size_t CACHE_BLOCKSIZE_DIM = 1;
 constexpr size_t CACHE_HEAD_DIM = 3;
+
+// EZ 码细分上报使用的 aclnn 接口名与 dtype 文案
+constexpr const char* ACLNN_OP_NAME = "aclnnKvCompressEpilog";
+
+std::string DtypeToLogStr(DataType t)
+{
+    switch (t) {
+        case DataType::DT_BF16:
+            return "bfloat16";
+        case DataType::DT_FLOAT16:
+            return "float16";
+        case DataType::DT_FLOAT:
+            return "float32";
+        case DataType::DT_UINT8:
+            return "uint8";
+        case DataType::DT_INT32:
+            return "int32";
+        case DataType::DT_INT64:
+            return "int64";
+        default:
+            return "unknown(" + std::to_string(static_cast<int>(t)) + ")";
+    }
+}
 
 // cacheRef 的布局契约: 必须连续, 或仅 blockNum(维0)维非连续(分页)。
 // [blockNum, blockSize, 1, headDim] 须满足:
@@ -102,14 +126,13 @@ aclnnStatus aclnnKvCompressEpilogGetWorkspaceSize(aclTensor* cacheRef, const acl
     const bool isArch22 = (op::GetCurrentPlatformInfo().GetCurNpuArch() == NpuArch::DAV_2201);
     if (isArch22) {
         if (quantMode != QUANT_MODE_INT8_ACLNN) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID,
-                    "quant_mode %lld is not supported on arch22 (A2/A3); only quant_mode=1 (INT8) is supported",
-                    static_cast<long long>(quantMode));
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "quantMode", std::to_string(quantMode),
+                                                  "only quantMode=1 (INT8) is supported on arch22 (A2/A3)");
             return ACLNN_ERR_PARAM_INVALID;
         }
         if (quantGroupSize != DEFAULT_QUANT_GROUP_SIZE_ACLNN) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "quant_group_size must be 64 when quant_mode==1, got %lld",
-                    static_cast<long long>(quantGroupSize));
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "quantGroupSize", std::to_string(quantGroupSize),
+                                                  "must be 64 when quantMode==1 on arch22 (A2/A3)");
             return ACLNN_ERR_PARAM_INVALID;
         }
 
@@ -123,34 +146,36 @@ aclnnStatus aclnnKvCompressEpilogGetWorkspaceSize(aclTensor* cacheRef, const acl
             return ACLNN_ERR_PARAM_INVALID;
         }
         if (xShape.GetDimNum() != 2) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "x must be 2D [bs, d] when quant_mode==1, got dimNum=%u",
-                    static_cast<unsigned>(xShape.GetDimNum()));
+            OP_LOGE_FOR_INVALID_SHAPEDIM(ACLNN_OP_NAME, "x", std::to_string(xShape.GetDimNum()) + "D", "2D");
             return ACLNN_ERR_PARAM_INVALID;
         }
         if (xShape.GetDim(1) != D_LENGTH_MODE3_ACLNN) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "d must be 512 when quant_mode==1, got %ld",
-                    static_cast<long>(xShape.GetDim(1)));
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "d", std::to_string(xShape.GetDim(1)),
+                                                  "must be 512 when quantMode==1 on arch22 (A2/A3)");
             return ACLNN_ERR_PARAM_INVALID;
         }
         if (x->GetDataType() != DataType::DT_BF16) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "x dtype must be bfloat16, got %d", static_cast<int>(x->GetDataType()));
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(ACLNN_OP_NAME, "x", DtypeToLogStr(x->GetDataType()),
+                                                  "must be bfloat16 on arch22 (A2/A3)");
             return ACLNN_ERR_PARAM_INVALID;
         }
 
         // cache: 4D [blockNum, blockSize, 1, headDim], uint8, blockNum>0, headDim>=608,
         //        blockStride >= blockSize*headDim (分页视图)
         if (cacheShape.GetDimNum() != 4 || cacheShape.GetDim(2) != 1) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "cache must be 4D with dim2 == 1 when quant_mode==1");
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                ACLNN_OP_NAME, "cacheRef", std::to_string(cacheShape.GetDimNum()) + "D",
+                "must be 4D [blockNum, blockSize, 1, headDim] with dim2 == 1 when quantMode==1");
             return ACLNN_ERR_PARAM_INVALID;
         }
         if (cacheRef->GetDataType() != DataType::DT_UINT8) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "cache dtype must be uint8, got %d",
-                    static_cast<int>(cacheRef->GetDataType()));
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(ACLNN_OP_NAME, "cacheRef", DtypeToLogStr(cacheRef->GetDataType()),
+                                                  "must be uint8 on arch22 (A2/A3)");
             return ACLNN_ERR_PARAM_INVALID;
         }
         if (cacheShape.GetDim(0) <= 0) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "cache blockNum must be > 0, got %ld",
-                    static_cast<long>(cacheShape.GetDim(0)));
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "cacheRef blockNum",
+                                                  std::to_string(cacheShape.GetDim(0)), "must be > 0");
             return ACLNN_ERR_PARAM_INVALID;
         }
         if (cacheRef->IsEmpty()) {
@@ -159,8 +184,8 @@ aclnnStatus aclnnKvCompressEpilogGetWorkspaceSize(aclTensor* cacheRef, const acl
         }
         const int64_t headDim = cacheShape.GetDim(3);
         if (headDim < KVCACHE_COL_MODE3_ACLNN) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "cache headDim must be >= 608 when quant_mode==1, got %ld",
-                    static_cast<long>(headDim));
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(ACLNN_OP_NAME, "cacheRef headDim", std::to_string(headDim),
+                                                  "must be >= 608 when quantMode==1 on arch22 (A2/A3)");
             return ACLNN_ERR_PARAM_INVALID;
         }
         {
@@ -168,8 +193,9 @@ aclnnStatus aclnnKvCompressEpilogGetWorkspaceSize(aclTensor* cacheRef, const acl
             const int64_t blockSize = cacheShape.GetDim(1);
             const int64_t blockStride = cacheStrides[0];
             if (blockStride < blockSize * headDim) {
-                OP_LOGE(ACLNN_ERR_PARAM_INVALID, "cache blockStride must be >= blockSize * headDim, got %ld < %ld",
-                        static_cast<long>(blockStride), static_cast<long>(blockSize * headDim));
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                    ACLNN_OP_NAME, "cacheRef blockStride", std::to_string(blockStride),
+                    "must be >= blockSize * headDim (" + std::to_string(blockSize * headDim) + ")");
                 return ACLNN_ERR_PARAM_INVALID;
             }
         }
@@ -180,14 +206,14 @@ aclnnStatus aclnnKvCompressEpilogGetWorkspaceSize(aclTensor* cacheRef, const acl
             return ACLNN_ERR_PARAM_INVALID;
         }
         if (slotMapping->GetDataType() != DataType::DT_INT32 && slotMapping->GetDataType() != DataType::DT_INT64) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "slot_mapping dtype only supports int32/int64, got %d",
-                    static_cast<int>(slotMapping->GetDataType()));
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                ACLNN_OP_NAME, "slotMapping", DtypeToLogStr(slotMapping->GetDataType()), "only supports int32/int64");
             return ACLNN_ERR_PARAM_INVALID;
         }
         if (slotShape.GetDimNum() != 1 || slotShape.GetDim(0) != xShape.GetDim(0)) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "slot_mapping length must equal x bs, got dimNum=%u len=%ld, x bs=%ld",
-                    static_cast<unsigned>(slotShape.GetDimNum()), static_cast<long>(slotShape.GetDim(0)),
-                    static_cast<long>(xShape.GetDim(0)));
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                ACLNN_OP_NAME, "slotMapping", std::to_string(slotShape.GetDimNum()) + "D",
+                "must be 1D [bs] with length equal to x batch size (" + std::to_string(xShape.GetDim(0)) + ")");
             return ACLNN_ERR_PARAM_INVALID;
         }
     }
