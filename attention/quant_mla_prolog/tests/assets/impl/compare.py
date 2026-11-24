@@ -323,6 +323,7 @@ def quant_mla_prolog_compare(
         fields.get("tensor_formats"),
         raw.get("weight_format"),
     )
+    args[1:4] = _load_sibling("golden").reference_weights(args[1:4], weight_format)
     for i in (6, 7, 8):
         args[i] = _load_sibling("golden").descale_logical(
             args[i], weight_format, args[i - 5].shape[0]

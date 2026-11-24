@@ -77,27 +77,6 @@ def run(
 
     adapter._load_under_test()
     mode = adapter._mode_int("w_qr_quant_mode", w_qr_quant_mode)
-    # 在计时和捕获前将 descale 从 (O,G,2) 适配为 (G,O,2)，保留 CSV 输入及绑定对象。
-
-    if mode == 1 and adapter._is_nz(weight_format):
-        import torch
-        import torch_npu
-
-        for weight, scale in zip(
-            (wqa, wqb, wkva), (descale_wqa, descale_wqb, descale_wkva)
-        ):
-            if (
-                not getattr(scale, "_ttk_descale_nz_prepared", False)
-                and not getattr(weight, "_ttk_nz_transposed", False)
-                and scale.dim() == 3
-                and scale.shape[0] == weight.shape[0]
-            ):
-                logical = torch_npu.npu_format_cast(scale, 2)
-                logical = logical.permute(1, 0, 2).contiguous()
-                scale.data = torch_npu.npu_format_cast(
-                    logical, 29, input_dtype=torch.float8_e8m0fnu
-                )
-                scale._ttk_descale_nz_prepared = True
     adapter._validate_device_formats(
         (wqa, wqb, wkva),
         (descale_wqa, descale_wqb, descale_wkva),
@@ -137,15 +116,6 @@ def run(
         ),
     )
     # MX scale 存储已在计时及捕获前完成规范化。
-    # NZ 权重按逻辑 weight.T 转换为设备格式。
-    if adapter._is_nz(weight_format):
-        import torch_npu
-
-        for weight in (wqa, wqb, wkva):
-            if not getattr(weight, "_ttk_nz_transposed", False):
-                logical = torch_npu.npu_format_cast(weight, 2)
-                weight.data = torch_npu.npu_format_cast(logical.t().contiguous(), 29)
-                weight._ttk_nz_transposed = True
     import logging
 
     logging.info("cache shape=%s stride=%s", tuple(kv_cache.shape), kv_cache.stride())

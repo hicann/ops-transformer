@@ -87,6 +87,13 @@ def _golden_cache_mode(reference, cache_mode):
     return (reference.CacheMode.PA_BSND, reference.CacheMode.PA_NZ)[int(cache_mode)]
 
 
+def reference_weights(weights, weight_format):
+    """将公开接口的 NZ (K,O) 权重映射为 CPU 参考使用的 (O,K)。"""
+    if str(weight_format).strip().upper() in ("NZ", "FRACTAL_NZ", "29"):
+        return tuple(weight.t().contiguous() for weight in weights)
+    return tuple(weights)
+
+
 def mla_prolog_v4_golden(
     x,
     wqa,
@@ -166,6 +173,7 @@ def mla_prolog_v4_golden(
     # 还原 TTK 可选的 BF16 类型提升，使参考计算使用声明的输入类型。
 
     x, wqa, wqb, wkva, wkb = (_as_bf16(t) for t in (x, wqa, wqb, wkva, wkb))
+    wqa, wqb, wkva = reference_weights((wqa, wqb, wkva), weight_format)
     # 只有模式 0 的 Cache 使用 BF16，不转换量化载体的数值类型。
     if qkv_mode == 0:
         kv_cache = _as_bf16(kv_cache)

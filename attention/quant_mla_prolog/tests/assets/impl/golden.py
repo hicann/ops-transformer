@@ -122,6 +122,13 @@ def _golden_cache_snapshot(cache):
     return cache.detach().cpu().contiguous().clone()
 
 
+def reference_weights(weights, weight_format):
+    """将公开接口的 NZ (K,O) 权重映射为 CPU 参考使用的 (O,K)。"""
+    if str(weight_format).strip().upper() in ("NZ", "FRACTAL_NZ", "29"):
+        return tuple(weight.t().contiguous() for weight in weights)
+    return tuple(weights)
+
+
 def descale_logical(descale, weight_format, output_size=None):
     """将声明为 NZ 的 MXFP8 权重 descale 映射为 CPU 参考的 ND 顺序。
 
@@ -218,6 +225,7 @@ def quant_mla_prolog_golden(
             rope_cos,
         )
     )
+    wqa, wqb, wkva = reference_weights((wqa, wqb, wkva), weight_format)
     # 还原可选的 BF16 类型提升，使参考计算使用声明的输入类型。
 
     wkva, wkb = (_as_bf16(t) for t in (wkva, wkb))

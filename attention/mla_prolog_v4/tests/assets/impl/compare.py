@@ -177,6 +177,15 @@ def _reference_context(context):
     args += [None] * (len(_INPUT_NAMES) - len(args))
     args[7] = _cache_snapshot(args[7])
     raw = dict(getattr(context, "attributes", None) or {})
+    import mla_prolog_v4_ttk_ops as adapter
+
+    fields = dict(getattr(context, "csv_fields", None) or {})
+    weight_format = adapter._resolve_weight_format(
+        (args[1], args[2], args[3]),
+        fields.get("tensor_formats"),
+        raw.get("weight_format"),
+    )
+    args[1:4] = _load_sibling("golden").reference_weights(args[1:4], weight_format)
     attrs = {k: raw[k] for k in _REFERENCE_ATTRS if k in raw}
     return ref, args, attrs
 
@@ -259,8 +268,9 @@ def mla_prolog_v4_compare(
     )
     fallback = None
     if ref.precision_status(direct) == "FAIL":
+        fallback_inputs = dict(inputs, kv_cache=expected_cache)
         fallback, _ = ref.fallback_segments(
-            ref.golden, inputs, attrs, device, after, expected, captured
+            ref.golden, fallback_inputs, attrs, device, after, expected, captured
         )
     verdict = ref.accept_output_comparisons(direct, fallback, diagnostics, mode)
     _unchanged_cache(ref, before, after, inputs["cache_index"], attrs["cache_mode"])

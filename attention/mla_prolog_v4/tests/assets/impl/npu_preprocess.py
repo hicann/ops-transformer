@@ -52,15 +52,7 @@ def run(
     # 在首次解析即时或图模式算子前加载模块，完成 torch.library schema 注册。
 
     adapter._load_under_test()
-    # NZ 权重按逻辑 weight.T 转换为设备格式。
-    import torch_npu
-
-    if adapter._validate_weight_format(weight_format):
-        for weight in (wqa, wqb, wkva):
-            if not getattr(weight, "_ttk_nz_transposed", False):
-                logical = torch_npu.npu_format_cast(weight, 2)
-                weight.data = torch_npu.npu_format_cast(logical.t().contiguous(), 29)
-                weight._ttk_nz_transposed = True
+    adapter._validate_weight_format(weight_format)
     qkv_quant_mode = kwargs.get("qkv_quant_mode", 0)
     qr_scale = kwargs.get("qr_scale", 1.0)
     kvr_scale = kwargs.get("kvr_scale", 1.0)
