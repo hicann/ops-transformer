@@ -2632,7 +2632,9 @@ FIA_EXTERN_C ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingCont
 
     using Cache = FusedInferAttentionScoreTilingCache;
     auto& cache = Cache::GetInstance();
-    std::string key;
+    // 键缓冲按线程复用：clear() 保留容量，避免逐调用重新分配
+    static thread_local std::string key;
+    key.clear();
     bool cacheable = false;
     try {
         cacheable = Cache::BuildKey(context, key);
@@ -2656,7 +2658,7 @@ FIA_EXTERN_C ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingCont
                 OP_LOGD(context->GetNodeName(), "FIA tiling cache store");
             }
         } catch (const std::bad_alloc&) {
-            // The computed result remains valid when caching runs out of memory.
+            // 缓存写入内存不足时，已计算出的 tiling 结果仍然有效
         }
     }
     return status;

@@ -13,6 +13,9 @@
 #include <vector>
 #include <cstdint>
 #include "gtest/gtest.h"
+#include "../../../op_api/aclnn_fused_infer_attention_score.h"
+#include "../../../op_api/aclnn_fused_infer_attention_score_v2.h"
+#include "../../../op_api/aclnn_fused_infer_attention_score_v3.h"
 #include "../../../op_api/aclnn_fused_infer_attention_score_v4.h"
 #include "op_api_ut_common/tensor_desc.h"
 #include "op_api_ut_common/scalar_desc.h"
@@ -166,6 +169,134 @@ TEST_F(fused_infer_attention_score_opapi_ut, bnbd_block_size_exceeded_routing_re
 {
     auto descs = MakeBnbdDescs({4, 1, 37}, {1, 1, 528, 37}, {1, 1, 528, 37}, {1, 1});
     auto attentionOut = TensorDesc({0}, ACL_FLOAT16, ACL_FORMAT_ND);
+    char layout[] = "TND";
+
+    auto ut = OP_API_UT(
+        aclnnFusedInferAttentionScoreV4,
+        INPUT(descs.query, descs.key, descs.value, nullptr, nullptr, descs.seqLens, descs.seqLensKv, nullptr, nullptr,
+              nullptr, nullptr, nullptr, nullptr, nullptr, descs.blockTable, nullptr, nullptr, nullptr, nullptr,
+              nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, int64_t{1},
+              0.1643989873053573, int64_t{65536}, int64_t{65536}, layout, int64_t{1}, int64_t{0}, int64_t{0},
+              int64_t{128}, int64_t{0}, false, int64_t{0}, int64_t{0}, int64_t{0}),
+        OUTPUT(attentionOut, nullptr));
+
+    uint64_t workspaceSize = 0;
+    EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_SUCCESS);
+}
+
+// Deprecated V1/V2/V3 interfaces share the same inner implementation as V4. The cases below reuse the BNBD
+// inputs so the pre-processing logic inside each GetWorkspaceSize (TensorPreProcess/PrefixTensorPreProcess,
+// FakeArray of the actual-seq arrays, softmax LSE handling) stays covered after the interface rework.
+TEST_F(fused_infer_attention_score_opapi_ut, deprecated_v1_bnbd_routing)
+{
+    auto descs = MakeBnbdDescs({4, 1, 37}, {2, 1, 128, 37}, {2, 1, 128, 37}, {1, 2});
+    auto attentionOut = TensorDesc({0}, ACL_FLOAT16, ACL_FORMAT_ND);
+    char layout[] = "TND";
+
+    auto ut = OP_API_UT(aclnnFusedInferAttentionScore,
+                        INPUT(descs.query, descs.key, descs.value, nullptr, nullptr, descs.seqLens, descs.seqLensKv,
+                              nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, descs.blockTable, nullptr,
+                              nullptr, int64_t{1}, 0.1643989873053573, int64_t{65536}, int64_t{65536}, layout,
+                              int64_t{1}, int64_t{0}, int64_t{0}, int64_t{128}, int64_t{0}, false),
+                        OUTPUT(attentionOut, nullptr));
+
+    uint64_t workspaceSize = 0;
+    EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_SUCCESS);
+}
+
+TEST_F(fused_infer_attention_score_opapi_ut, deprecated_v2_bnbd_routing)
+{
+    auto descs = MakeBnbdDescs({4, 1, 37}, {2, 1, 128, 37}, {2, 1, 128, 37}, {1, 2});
+    auto attentionOut = TensorDesc({0}, ACL_FLOAT16, ACL_FORMAT_ND);
+    char layout[] = "TND";
+
+    auto ut = OP_API_UT(aclnnFusedInferAttentionScoreV2,
+                        INPUT(descs.query, descs.key, descs.value, nullptr, nullptr, descs.seqLens, descs.seqLensKv,
+                              nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, descs.blockTable, nullptr,
+                              nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, int64_t{1},
+                              0.1643989873053573, int64_t{65536}, int64_t{65536}, layout, int64_t{1}, int64_t{0},
+                              int64_t{0}, int64_t{128}, int64_t{0}, false, int64_t{0}, int64_t{0}),
+                        OUTPUT(attentionOut, nullptr));
+
+    uint64_t workspaceSize = 0;
+    EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_SUCCESS);
+}
+
+TEST_F(fused_infer_attention_score_opapi_ut, deprecated_v3_bnbd_routing)
+{
+    auto descs = MakeBnbdDescs({4, 1, 37}, {2, 1, 128, 37}, {2, 1, 128, 37}, {1, 2});
+    auto attentionOut = TensorDesc({0}, ACL_FLOAT16, ACL_FORMAT_ND);
+    char layout[] = "TND";
+
+    auto ut =
+        OP_API_UT(aclnnFusedInferAttentionScoreV3,
+                  INPUT(descs.query, descs.key, descs.value, nullptr, nullptr, descs.seqLens, descs.seqLensKv, nullptr,
+                        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, descs.blockTable, nullptr, nullptr,
+                        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                        int64_t{1}, 0.1643989873053573, int64_t{65536}, int64_t{65536}, layout, int64_t{1}, int64_t{0},
+                        int64_t{0}, int64_t{128}, int64_t{0}, false, int64_t{0}, int64_t{0}),
+                  OUTPUT(attentionOut, nullptr));
+
+    uint64_t workspaceSize = 0;
+    EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_SUCCESS);
+}
+
+// INT4 packed KV cache: key/value are stored as packed INT32 (logical headDim 32 -> packed last dim 4).
+// Covers the INT32->INT4 metadata conversion (last dim x8, stride rescale) in TensorPreProcess on the
+// V2 entry; the empty output short-circuit keeps the case focused on the preprocessing branch.
+TEST_F(fused_infer_attention_score_opapi_ut, deprecated_v2_bnbd_routing_int4_kv_preprocess)
+{
+    auto attentionOut = TensorDesc({0}, ACL_FLOAT16, ACL_FORMAT_ND);
+    auto keyPacked = TensorListDesc({TensorDesc({2, 1, 128, 4}, ACL_INT32, ACL_FORMAT_ND).ValueRange(-1, 1)});
+    auto valuePacked = TensorListDesc({TensorDesc({2, 1, 128, 4}, ACL_INT32, ACL_FORMAT_ND).ValueRange(-1, 1)});
+    char layout[] = "TND";
+
+    auto ut = OP_API_UT(
+        aclnnFusedInferAttentionScoreV2,
+        INPUT(TensorDesc({4, 1, 32}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-1, 1), keyPacked, valuePacked, nullptr,
+              nullptr, IntArrayDesc(vector<int64_t>{4}), IntArrayDesc(vector<int64_t>{256}), nullptr, nullptr, nullptr,
+              nullptr, nullptr, nullptr, nullptr, TensorDesc({1, 2}, ACL_INT32, ACL_FORMAT_ND), nullptr, nullptr,
+              nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, int64_t{1}, 0.1643989873053573,
+              int64_t{65536}, int64_t{65536}, layout, int64_t{1}, int64_t{0}, int64_t{0}, int64_t{128}, int64_t{0},
+              false, int64_t{0}, int64_t{0}),
+        OUTPUT(attentionOut, nullptr));
+
+    uint64_t workspaceSize = 0;
+    EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_SUCCESS);
+}
+
+// Non-empty INT32 packed shared prefix with FP16 key/value: only the PrefixTensorPreProcess branch
+// (INT32->INT4 metadata conversion of the prefix tensors) runs, TensorPreProcess exits early on FP16.
+TEST_F(fused_infer_attention_score_opapi_ut, deprecated_v2_bnbd_routing_int4_prefix_preprocess)
+{
+    auto attentionOut = TensorDesc({0}, ACL_FLOAT16, ACL_FORMAT_ND);
+    auto prefixKey = TensorDesc({2, 1, 128, 4}, ACL_INT32, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto prefixValue = TensorDesc({2, 1, 128, 4}, ACL_INT32, ACL_FORMAT_ND).ValueRange(-1, 1);
+    auto key = TensorListDesc({TensorDesc({2, 1, 128, 32}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-1, 1)});
+    auto value = TensorListDesc({TensorDesc({2, 1, 128, 32}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-1, 1)});
+    char layout[] = "TND";
+
+    auto ut = OP_API_UT(
+        aclnnFusedInferAttentionScoreV2,
+        INPUT(TensorDesc({4, 1, 32}, ACL_FLOAT16, ACL_FORMAT_ND).ValueRange(-1, 1), key, value, nullptr, nullptr,
+              IntArrayDesc(vector<int64_t>{4}), IntArrayDesc(vector<int64_t>{384}), nullptr, nullptr, nullptr, nullptr,
+              nullptr, nullptr, nullptr, TensorDesc({1, 2}, ACL_INT32, ACL_FORMAT_ND), nullptr, nullptr, nullptr,
+              nullptr, nullptr, nullptr, prefixKey, prefixValue, IntArrayDesc(vector<int64_t>{128}), int64_t{1},
+              0.1643989873053573, int64_t{65536}, int64_t{65536}, layout, int64_t{1}, int64_t{0}, int64_t{0},
+              int64_t{128}, int64_t{0}, false, int64_t{0}, int64_t{0}),
+        OUTPUT(attentionOut, nullptr));
+
+    uint64_t workspaceSize = 0;
+    EXPECT_EQ(ut.TestGetWorkspaceSize(&workspaceSize), ACLNN_SUCCESS);
+}
+
+// Non-empty attentionOut: the BNBD candidate flows into real SplitFuse tiling instead of being masked
+// by the empty-output short-circuit. A routing-rejected 4D BNBD input would fail the standard TND path,
+// so a SUCCESS here actually distinguishes routing-supported from routing-rejected.
+TEST_F(fused_infer_attention_score_opapi_ut, v4_bnbd_routing_full_flow)
+{
+    auto descs = MakeBnbdDescs({4, 1, 37}, {2, 1, 128, 37}, {2, 1, 128, 37}, {1, 2});
+    auto attentionOut = TensorDesc({4, 1, 37}, ACL_FLOAT16, ACL_FORMAT_ND);
     char layout[] = "TND";
 
     auto ut = OP_API_UT(

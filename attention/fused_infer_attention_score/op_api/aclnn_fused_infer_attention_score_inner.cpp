@@ -19,104 +19,8 @@
 #include "aclnn_kernels/contiguous.h"
 #include "opdev/tensor_view_utils.h"
 #include "acl/acl.h"
-#include <cstdlib>
-#include <cstring>
 
 using namespace op;
-
-namespace {
-extern "C" void UnInitPTACacheThreadLocal() __attribute__((weak));
-
-bool FiaExecutorCacheEnabled()
-{
-    static const bool enabled = [] {
-        const char* disabled = std::getenv("FIA_DISABLE_LOCAL_EXECUTOR_CACHE");
-        return disabled == nullptr || std::strcmp(disabled, "1") != 0;
-    }();
-    return enabled && UnInitPTACacheThreadLocal != nullptr;
-}
-} // namespace
-
-std::string FiaPrepareExecutorCache(const aclTensorList* key, const aclTensorList* value,
-                                    std::initializer_list<const aclTensor*> tensors)
-{
-    if (!FiaExecutorCacheEnabled() || key == nullptr || value == nullptr || key->Size() == 0 ||
-        key->Size() != value->Size()) {
-        return {};
-    }
-    std::vector<const aclTensor*> inputs(tensors);
-    for (const auto* list : {key, value}) {
-        for (uint64_t i = 0; i < list->Size(); ++i) {
-            if ((*list)[i] == nullptr) {
-                return {};
-            }
-            inputs.push_back((*list)[i]);
-        }
-    }
-    // opdev already keys view/storage shapes, strides, dtype, view offset and
-    // scalar/array values. Complete the metadata used by address/plan selection.
-    std::string metadata;
-    const auto append = [&metadata](int64_t field) {
-        metadata.append(reinterpret_cast<const char*>(&field), sizeof(field));
-    };
-    for (size_t i = 0; i < inputs.size(); ++i) {
-        const auto* tensor = inputs[i];
-        append(tensor != nullptr);
-        if (tensor == nullptr) {
-            continue;
-        }
-        const auto placement = tensor->GetPlacement();
-        const bool isHost = placement == gert::kOnHost || placement == gert::kFollowing;
-        if (!tensor->IsEmpty() &&
-            ((placement != gert::kOnDeviceHbm && !isHost) || tensor->GetStorageAddr() == nullptr)) {
-            return {};
-        }
-        append(placement);
-        if (isHost) {
-            // Host constants can be embedded in the cached plan. opdev's Tensor
-            // key omits their values. Include the bounded storage span so
-            // strided views and offsets remain valid without copying the view.
-            const auto bytes =
-                op::CalcShapeBytes(tensor->GetStorageShape().GetShapeSize(), tensor->GetDataType(), true);
-            if (bytes < 0 || bytes > 4096 || (bytes != 0 && tensor->GetStorageAddr() == nullptr)) {
-                return {};
-            }
-            append(bytes);
-            if (bytes != 0) {
-                metadata.append(static_cast<const char*>(tensor->GetStorageAddr()), bytes);
-            }
-        }
-        append(tensor->GetStorageOffset());
-        append(tensor->GetStorageFormat());
-        append(tensor->GetOriginalFormat());
-        const auto& originalShape = tensor->GetOriginalShape();
-        append(originalShape.GetDimNum());
-        for (size_t d = 0; d < originalShape.GetDimNum(); ++d) {
-            append(originalShape.GetDim(d));
-        }
-        // Cache address rules refer to the first matching storage argument.
-        // Encode the relationship, never the allocation address itself.
-        size_t storageIndex = i;
-        size_t addressIndex = i;
-        for (size_t j = 0; j < i; ++j) {
-            if (inputs[j] == nullptr) {
-                continue;
-            }
-            if (storageIndex == i && inputs[j]->GetStorage() == tensor->GetStorage()) {
-                storageIndex = j;
-            }
-            if (addressIndex == i && inputs[j]->GetStorageAddr() == tensor->GetStorageAddr()) {
-                addressIndex = j;
-            }
-        }
-        append(storageIndex);
-        append(addressIndex);
-    }
-    // Select the complete opdev argument key for both empty and nonempty PTA
-    // keys. opdev retains executor ownership, eviction and runtime IO updates.
-    UnInitPTACacheThreadLocal();
-    return metadata;
-}
 
 #ifdef __cplusplus
 extern "C" {
@@ -136,6 +40,8 @@ void TensorPreProcess(const aclTensorList*& tensorListKey, const aclTensorList*&
         OP_LOGD("tensorListValue is nullptr,TensorPreProcess exit.");
         return;
     }
+    // 防御空列表（aclCreateTensorList(nullptr, 0) 会返回非空句柄）和空元素，避免下方 [0] 解引用崩溃。
+    // 空列表/空元素本身由 Inner 入口校验统一返回参数错误。
     if (tensorListKey->Size() == 0 || tensorListValue->Size() == 0 || (*tensorListKey)[0] == nullptr ||
         (*tensorListValue)[0] == nullptr) {
         return;
@@ -840,6 +746,10 @@ static aclnnStatus InnerFusedInferAttentionScoreGetWorkspaceSizeImpl(
     OP_CHECK_NULL(value, return ACLNN_ERR_PARAM_NULLPTR);
     OP_CHECK_NULL(attentionOut, return ACLNN_ERR_PARAM_NULLPTR);
     if (key->Size() == 0 || key->Size() != value->Size()) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+                "key tensorList size[%lu] should be equal to value tensorList size[%lu], "
+                "and both should not be empty.",
+                key->Size(), value->Size());
         return ACLNN_ERR_PARAM_INVALID;
     }
     for (uint64_t i = 0; i < key->Size(); ++i) {

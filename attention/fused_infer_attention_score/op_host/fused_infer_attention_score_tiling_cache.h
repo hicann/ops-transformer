@@ -25,9 +25,19 @@
 #include "../../common/op_host/fia_tiling_schedule_recorder.h"
 
 namespace optiling {
-// Cross-invocation HOST tiling cache for A2/A3. Entries become usable immediately
-// after successful tiling; no executor or device-task replay is stored here.
-// opbase still owns workspace allocation, address refresh and kernel launch.
+// Cross-invocation HOST tiling cache for A2/A3 (DAV_2201). Entries become usable
+// immediately after successful tiling; no executor or device-task replay is
+// stored here. opbase still owns workspace allocation, address refresh and
+// kernel launch. On a cache hit, Restore() writes tilingData / tilingKey /
+// blockDim / workspaceSize straight back into the TilingContext so the whole
+// tiling computation is skipped.
+//
+// Host-side cost model (why this shape): per invocation the cache must pay
+// BuildKey + hash lookup and must stay well below the tiling computation it
+// replaces. The platform descriptor (arch/soc/core counts/memory sizes) is
+// process-invariant, so it is serialized once per platform-info object and
+// appended as a static prefix. The key buffer is reused across invocations by
+// the caller (thread_local) to avoid reallocation.
 class FusedInferAttentionScoreTilingCache {
 public:
     struct TilingResult {
@@ -60,29 +70,75 @@ public:
         return disabled;
     }
 
-    static bool BuildKey(gert::TilingContext* context, std::string& key)
+private:
+    // Serialized platform descriptor plus a cacheable flag (only DAV_2201
+    // participates). Platform infos are process-wide singletons owned by the
+    // framework, so the pointer is a stable identity.
+    struct PlatformKeyInfo {
+        std::string blob;
+        bool cacheable = false;
+    };
+
+    static PlatformKeyInfo BuildPlatformKey(fe::PlatFormInfos* platformInfo)
     {
-        if (context == nullptr || context->GetAttrs() == nullptr || context->GetPlatformInfo() == nullptr) {
-            return false;
+        PlatformKeyInfo info;
+        if (platformInfo == nullptr) {
+            return info;
         }
-        platform_ascendc::PlatformAscendC platform(context->GetPlatformInfo());
+        const platform_ascendc::PlatformAscendC platform(platformInfo);
         if (platform.GetCurNpuArch() != Ops::Base::DAV_2201) {
-            return false;
+            return info;
         }
-        key.clear();
-        Append<uint32_t>(key, 2); // serialization version
-        Append<int32_t>(key, static_cast<int32_t>(platform.GetCurNpuArch()));
-        Append<int32_t>(key, static_cast<int32_t>(platform.GetSocVersion()));
-        Append<uint32_t>(key, platform.GetCoreNumAic());
-        Append<uint32_t>(key, platform.GetCoreNumAiv());
-        Append<uint64_t>(key, platform.GetLibApiWorkSpaceSize());
+        Append<uint32_t>(info.blob, 2); // serialization version
+        Append<int32_t>(info.blob, static_cast<int32_t>(platform.GetCurNpuArch()));
+        Append<int32_t>(info.blob, static_cast<int32_t>(platform.GetSocVersion()));
+        Append<uint32_t>(info.blob, platform.GetCoreNumAic());
+        Append<uint32_t>(info.blob, platform.GetCoreNumAiv());
+        Append<uint64_t>(info.blob, platform.GetLibApiWorkSpaceSize());
         for (auto type : {platform_ascendc::CoreMemType::UB, platform_ascendc::CoreMemType::L1,
                           platform_ascendc::CoreMemType::L0_A, platform_ascendc::CoreMemType::L0_B,
                           platform_ascendc::CoreMemType::L0_C, platform_ascendc::CoreMemType::L2}) {
             uint64_t size = 0;
             platform.GetCoreMemSize(type, size);
-            Append(key, size);
+            Append(info.blob, size);
         }
+        info.cacheable = true;
+        return info;
+    }
+
+    // Fast path: thread_local copy of the entry for the platform pointer seen
+    // last on this thread; rebuilds under the global mutex only when the
+    // pointer changes (effectively once per thread per process).
+    static const PlatformKeyInfo& GetPlatformKey(fe::PlatFormInfos* platformInfo)
+    {
+        static std::mutex platformMutex;
+        static std::unordered_map<fe::PlatFormInfos*, PlatformKeyInfo> platformKeys;
+        static thread_local fe::PlatFormInfos* tlsInfo = nullptr;
+        static thread_local PlatformKeyInfo tlsKey;
+        if (tlsInfo != platformInfo) {
+            std::lock_guard<std::mutex> lock(platformMutex);
+            auto iter = platformKeys.find(platformInfo);
+            if (iter == platformKeys.end()) {
+                iter = platformKeys.emplace(platformInfo, BuildPlatformKey(platformInfo)).first;
+            }
+            tlsKey = iter->second;
+            tlsInfo = platformInfo;
+        }
+        return tlsKey;
+    }
+
+public:
+    static bool BuildKey(gert::TilingContext* context, std::string& key)
+    {
+        if (context == nullptr || context->GetAttrs() == nullptr || context->GetPlatformInfo() == nullptr) {
+            return false;
+        }
+        const PlatformKeyInfo& platformKey = GetPlatformKey(context->GetPlatformInfo());
+        if (!platformKey.cacheable) {
+            return false;
+        }
+        key.clear();
+        key.append(platformKey.blob);
         Append<int32_t>(key, context->GetDeterministic());
 
         const auto* attrs = context->GetAttrs();
