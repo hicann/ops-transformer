@@ -161,7 +161,7 @@ aclnnStatus aclnnLightningIndexerGrad(
       <td>√</td>
     </tr>
     <tr>
-      <td>actualSeqLengthsQuery</td>
+      <td>actualSeqQLenOptional</td>
       <td>输入</td>
       <td>表示query每个Batch S的累加和长度。</td>
       <td>TND排布时需要输入，其余场景输入nullptr。</td>
@@ -171,7 +171,7 @@ aclnnStatus aclnnLightningIndexerGrad(
       <td>√</td>
     </tr>
     <tr>
-      <td>actualSeqLengthsKey</td>
+      <td>actualSeqKvLenOptional</td>
       <td>输入</td>
       <td>表示key每个Batch S的累加和长度。</td>
       <td>TND排布时需要输入，其余场景输入nullptr。</td>
@@ -191,7 +191,7 @@ aclnnStatus aclnnLightningIndexerGrad(
       <td>-</td>
     </tr>
     <tr>
-      <td>layout</td>
+      <td>inputLayout</td>
       <td>输入</td>
       <td>代表query/key的数据排布格式。</td>
       <td>当前支持TND/BSND。</td>
@@ -241,7 +241,7 @@ aclnnStatus aclnnLightningIndexerGrad(
       <td>-</td>
     </tr>
     <tr>
-      <td>dQuery</td>
+      <td>dqOut</td>
       <td>输出</td>
       <td>dQuery梯度。</td>
       <td>数据类型与query一致。</td>
@@ -251,7 +251,7 @@ aclnnStatus aclnnLightningIndexerGrad(
       <td>√</td>
     </tr>
     <tr>
-      <td>dKey</td>
+      <td>dkOut</td>
       <td>输出</td>
       <td>dKey梯度。</td>
       <td>数据类型与key一致。</td>
@@ -261,7 +261,7 @@ aclnnStatus aclnnLightningIndexerGrad(
       <td>√</td>
     </tr>
     <tr>
-      <td>dWeights</td>
+      <td>dweightsOut</td>
       <td>输出</td>
       <td>dWeights梯度。</td>
       <td>数据类型与weights一致。</td>
