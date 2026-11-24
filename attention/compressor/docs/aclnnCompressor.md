@@ -184,9 +184,9 @@ aclnnStatus aclnnCompressor(
     </tr>
     <tr>
       <td>ape（const aclTensor*）</td>
-      <td>输入</td>
+      <td>可选输入</td>
       <td>公式中的<span class="math-inline">Ape</span>，表示positional biases。</td>
-      <td>不支持空Tensor。</td>
+      <td>传入nullptr时跳过位置偏置加法；传入Tensor时，不支持空Tensor。</td>
       <td>FLOAT</td>
       <td>ND</td>
       <td>[cmp_ratio,coff* D]</td>
@@ -365,7 +365,7 @@ aclnnStatus aclnnCompressor(
     <tr>
       <td>ACLNN_ERR_PARAM_NULLPTR</td>
       <td>161001</td>
-      <td>x、wkv、wgate、stateCacheRef、ape、cmpKvOut等必选参数中存在空指针。</td>
+      <td>x、wkv、wgate、stateCacheRef、cmpKvOut等必选参数中存在空指针。</td>
     </tr>
     <tr>
       <td rowspan="4">ACLNN_ERR_PARAM_INVALID</td>
