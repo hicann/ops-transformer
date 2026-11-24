@@ -1195,6 +1195,19 @@ mask_mode参数解释：
 > [!NOTE]
 >
 > 算子不校验 `seqused_q`/`seqused_kv` 中的最大值是否与 `max_seqlen_q`/`max_seqlen_kv` 一致。若同时传入，用户需自行保证 `max(seqused_q) <= max_seqlen_q`、`max(seqused_kv) <= max_seqlen_kv`。
+>
+> 算子不校验 `seqused_q`/`seqused_kv` 与 `cu_seqlens_q`/`cu_seqlens_kv` 之间的对应关系。`layout_q` 为 `TND`/`NTD` 时，若同时传入 `seqused_q` 与 `cu_seqlens_q`，用户需自行保证每个 batch 的 `seqused_q` 不超过其在 `cu_seqlens_q` 上对应区间的长度，即 `seqused_q[i] <= cu_seqlens_q[i + 1] - cu_seqlens_q[i]`；`layout_kv` 为 `TND` 时，若同时传入 `seqused_kv` 与 `cu_seqlens_kv`，同理需保证 `seqused_kv[i] <= cu_seqlens_kv[i + 1] - cu_seqlens_kv[i]`。
+>
+> `seqused_q` 的缺省取值规则如下：
+>
+> 1. `layout_q` 为 `TND`/`NTD` 时，若未传入 `seqused_q`，`cu_seqlens_q` 的相邻元素差值等价于每个 batch 的 `seqused_q`，即 `seqused_q[i] = cu_seqlens_q[i + 1] - cu_seqlens_q[i]`，用户需自行保证 `max(seqused_q) <= max_seqlen_q`。
+> 2. `layout_q` 不为 `TND` 且不为 `NTD` 时，若未传入 `seqused_q`，使用 q 的物理序列长度 `Q_S` 作为每个 batch 的 `seqused_q`，即 `seqused_q[i] = Q_S`，用户需自行保证 `max(seqused_q) <= max_seqlen_q`。
+>
+> `seqused_kv` 的缺省取值规则如下：
+>
+> 1. `layout_kv` 为 `TND` 时，若未传入 `seqused_kv`，`cu_seqlens_kv` 的相邻元素差值等价于每个 batch 的 `seqused_kv`，即 `seqused_kv[i] = cu_seqlens_kv[i + 1] - cu_seqlens_kv[i]`，用户需自行保证 `max(seqused_kv) <= max_seqlen_kv`。
+> 2. `layout_kv` 不为 `TND` 且不为 PA 场景时，若未传入 `seqused_kv`，使用 k/v 的物理序列长度 `KV_S` 作为每个 batch 的 `seqused_kv`，即 `seqused_kv[i] = KV_S`，用户需自行保证 `max(seqused_kv) <= max_seqlen_kv`。
+> 3. PA 场景下 `seqused_kv` 必须传入（见 <a href="#Paged Attention参数组">Paged Attention参数组</a>），不存在缺省取值，用户需自行保证 `max(seqused_kv) <= max_seqlen_kv`。
 
 #### Paged Attention参数组 <a name="Paged Attention参数组"></a>
 
