@@ -190,8 +190,8 @@ class FLAThirdParty:
             torch.cat(states)
             if states
             else torch.empty(0, dtype=torch.float32, device=q.device),
-            # 第三项未启用时使用空槽，与 NPU 打包结果和 CPU golden 保持一致。
+            # 第三项未启用时使用 BF16 空槽，与 NPU 公开输出类型保持一致。
             torch.cat(chunk_states)
             if chunk_states
-            else torch.empty(0, dtype=torch.float32, device=q.device),
+            else torch.empty(0, dtype=torch.bfloat16, device=q.device),
         ]

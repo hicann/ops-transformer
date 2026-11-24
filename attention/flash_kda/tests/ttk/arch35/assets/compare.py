@@ -12,6 +12,8 @@ from arch35.kda_ttk_ops import load_asset
 
 SLOTS = range(3)
 FORWARD_SLOTS = range(16)
+# 公开三项输出的接口类型，空槽位也使用对应类型。
+PUBLIC_OUTPUT_DTYPES = (torch.bfloat16, torch.float32, torch.bfloat16)
 
 
 def numerical_slots(c, *, forward=False):
@@ -28,8 +30,8 @@ def check_arity(outputs, *, forward=False):
         )
 
 
-def empty():
-    return torch.empty(0, dtype=torch.float32)
+def empty(dtype=torch.float32):
+    return torch.empty(0, dtype=dtype)
 
 
 def effective(c):
@@ -172,7 +174,12 @@ def pack(outputs, c, *, forward=False):
     for slot in numerical_slots(c, forward=forward):
         value = outputs[slot]
         if value is None:
-            result.append(empty().to(outputs[0].device))
+            dtype = (
+                PUBLIC_OUTPUT_DTYPES[slot]
+                if slot < len(PUBLIC_OUTPUT_DTYPES)
+                else torch.float32
+            )
+            result.append(empty(dtype=dtype).to(outputs[0].device))
             continue
         if slot == 1:
             parts = [value.flatten()]

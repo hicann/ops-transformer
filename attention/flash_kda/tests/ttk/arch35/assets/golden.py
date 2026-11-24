@@ -616,7 +616,14 @@ def reference(inputs, c, kind):
                 result[j].append(x.flatten())
         if not c["inference"] and f["use_beta_sigmoid_in_kernel"]:
             result[15].append(beta_activation.flatten())
-    return [torch.cat(parts) if parts else empty() for parts in result]
+    outputs = [torch.cat(parts) if parts else empty() for parts in result]
+    if kind == "npu_chunk":
+        # 模拟计算保留 FP32 累加；返回时按公开接口保存前三项（包括空槽位）。
+        # out 和 chunk_states 已完成 BF16 舍入，此处不改变其有限数值。
+        # CPU 高精度参考保持 FP32，避免对比较基准额外舍入。
+        for slot, dtype in enumerate(load_asset("compare").PUBLIC_OUTPUT_DTYPES):
+            outputs[slot] = outputs[slot].to(dtype=dtype)
+    return outputs
 
 
 def select_reference(outputs, c, *, forward=False):
