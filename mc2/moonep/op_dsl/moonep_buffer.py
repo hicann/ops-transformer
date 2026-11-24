@@ -206,7 +206,6 @@ class Buffer:
         weight_dtype: str | torch.dtype = "bf16",
         grad_dtype: str | torch.dtype = "bf16",
         slots: int = 1,
-        eb_netlayer: str = "auto",
     ) -> None:
         """构造（集体调用）。
 
@@ -226,7 +225,6 @@ class Buffer:
             weight_dtype: 权重 dtype（bf16/fp16/e4m3fn/e5m2）。
             grad_dtype: 梯度 dtype（bf16/fp16/fp32）。
             slots: 权重窗口槽数（层间流水取 2）。
-            eb_netlayer: ElasticBuffer netlayer 透传，``auto`` 或非负数字符串。
         """
         if not isinstance(group, torch.distributed.ProcessGroup):
             raise TypeError(
@@ -275,16 +273,6 @@ class Buffer:
             raise ValueError(f"H 须 >= 1，got {H}")
         if Hp < 1:
             raise ValueError(f"Hp 须 >= 1，got {Hp}")
-        if not (
-            isinstance(eb_netlayer, str)
-            and (
-                eb_netlayer == "auto"
-                or (eb_netlayer.isascii() and eb_netlayer.isdigit())
-            )
-        ):
-            raise ValueError(
-                f"eb_netlayer 须为 'auto' 或非负数字符串，got {eb_netlayer!r}"
-            )
         w = int(H) * int(Hp)
         gdtype = _normalize_grad_dtype(grad_dtype)
         wdtype = _normalize_weight_dtype(weight_dtype)
@@ -305,7 +293,6 @@ class Buffer:
         self._eb = None  # 懒构造（首调 dispatch/combine）
         self._eb_lock = threading.Lock()  # 首调并发守卫（EB 构造不可重入）
         self._nmtr = int(S)
-        self._eb_netlayer = eb_netlayer
         self._S, self._K, self._E = int(S), int(K), int(E)
         self._H = int(H)
         self._epn = epn
@@ -347,16 +334,11 @@ class Buffer:
                     "dispatch/combine 需要 cann_ops_transformer（ElasticBuffer）。"
                     "安装：pip install <cann_ops_transformer whl>"
                 ) from exc
-            # 仅显式设置时透传——旧版 ElasticBuffer 不接受 netlayer 参数
-            eb_kwargs = {}
-            if self._eb_netlayer != "auto":
-                eb_kwargs["netlayer"] = self._eb_netlayer
             self._eb = ElasticBuffer(
                 self._group,
                 num_max_tokens_per_rank=self._nmtr,
                 hidden=self._H,
                 num_topk=self._K,
-                **eb_kwargs,
             )
 
     # --------------------------------------------------------------------------
@@ -449,12 +431,24 @@ class Buffer:
         )
 
     def _dispatch_and_return(self, x, plan, do_cpu_sync, topk_weights, forward):
-        self._ensure_eb()
+        expected_epn = self._E // self._rank_size
+        etc_shape = tuple(plan.experts_to_copy.shape)
+        if etc_shape != (self._rank_size, expected_epn):
+            raise ValueError(
+                f"plan 的专家空间与当前 Buffer 不一致："
+                f"etc.shape={etc_shape}, 期望=({self._rank_size}, {expected_epn})"
+            )
+        if plan.cu_seqlens.numel() != 2 * expected_epn:
+            raise ValueError(
+                f"plan.cu_seqlens.numel()={plan.cu_seqlens.numel()} "
+                f"!= 2*epn={2 * expected_epn}"
+            )
         if tuple(plan.vtopk.shape) != (self._S, self._K):
             raise ValueError(
                 f"plan.vtopk.shape={tuple(plan.vtopk.shape)} "
                 f"!= 构造期 (S, K)=({self._S}, {self._K})"
             )
+        self._ensure_eb()
         dispatch_kwargs = {
             "topk_weights": (
                 topk_weights.float() if topk_weights is not None else None

@@ -82,13 +82,13 @@ grad_expert_output_nvsh, _, _, _ = dispatch(grad_output_sh, plan=plan)
 
 | Parameter | Input/Output | Description | Data Type | Data Format |
 | :--- | :--- | :--- | :--- | :--- |
-| `hidden_sh` | Input | Forward token payload / backward output gradient, shape `(S, H)` | BFLOAT16 | ND |
+| `hidden_sh` | Input | Forward token / backward output gradient, shape `(S, H)` | BFLOAT16, FLOAT16 | ND |
 | `route_weights_sk` | Optional input | Forward routing weights, shape `(S, K)`, converted to fp32 internally | FLOAT32 | ND |
 | `topk_experts_sk` | Optional input | Forward top-k expert indices, shape `(S, K)` | INT32 | ND |
 | `tokens_per_expert` | Optional input | Forward per-expert counts, shape `(E,)` | INT32 | ND |
 | `plan` | Optional input | Backward reuse of the forward plan; mutually exclusive with routing arguments | MoonepPlan | - |
 | `do_cpu_sync` | Optional input | True (default) allocates the receive area exactly; False allocates the worst-case capacity `cap = R × S × min(K, 2·epn)` | BOOL | - |
-| `hidden_nvsh` | Output | Receive area, shape `(cap, H)`; same dtype as the input | BFLOAT16 | ND |
+| `hidden_nvsh` | Output | Receive area, shape `(cap, H)`; same dtype as the input | Same as input | ND |
 | `route_weights_nvs` | Output | Routing weights of the received rows, shape `(cap,)`; None on the backward pass | FLOAT32 | ND |
 | `cu_seqlens` | Output | Segment offsets of the forward plan (`plan.cu_seqlens`) | INT32 | ND |
 | `plan` | Output | `MoonepPlan` created by the forward pass / returned unchanged by the backward pass | MoonepPlan | - |
@@ -114,6 +114,7 @@ Interface constraints:
 - The forward pass must pass `topk_experts_sk` and `tokens_per_expert`; `route_weights_sk` is optional. The backward pass must pass `plan=` and no routing arguments.
 - `hidden_sh` must be exactly `(S, H)`; `route_weights_sk` / `topk_experts_sk` must be exactly `(S, K)`; tensors must reside on the NPU.
 - Internally `plan.vtopk` is used as `topk_idx`, with `num_experts = 2E` and per-rank capacity `nmtr = S`.
+- `hidden_sh` must be bf16/fp16 and contiguous (same rule as `combine`'s `hidden_nvsh`).
 
 ### MoonepPlan Structure
 
@@ -214,7 +215,7 @@ grad_hidden_sh, _, _ = combine(plan=plan, hidden_nvsh=grad_hidden_nvsh)
 | Parameter | Input/Output | Description | Data Type | Data Format |
 | :--- | :--- | :--- | :--- | :--- |
 | `plan` | Input | `MoonepPlan` used by the same-direction dispatch | MoonepPlan | - |
-| `hidden_nvsh` | Input | Expert outputs, shape `(cap, H)`; trailing rows must be zero-filled up to cap | BFLOAT16 | ND |
+| `hidden_nvsh` | Input | Expert outputs, shape `(cap, H)`; trailing rows must be zero-filled up to cap | BFLOAT16, FLOAT16 | ND |
 | `route_weights_nvs` | Optional input | Forward: pass the weights given to dispatch; backward: omit | FLOAT32 | ND |
 | `output_sh` | Output | Result gathered in token-major order, shape `(S, H)` | Same as input | ND |
 | `gathered_route_weights_sk` | Output | Gathered weights, shape `(S, K)`; None on the backward pass | FLOAT32 | ND |
@@ -232,7 +233,7 @@ Interface constraints:
 - There is no `handle` argument: passing `route_weights_nvs` selects the forward pass; when omitted, the direction is inferred from the unconsumed dispatch handle,
   and an ambiguity error is raised if both forward and backward handles are pending.
   No additional same-direction dispatch may be inserted between a `dispatch` and its `combine`.
-- the first dim of `hidden_nvsh` must equal the `cap` of the matching dispatch, and it must be a contiguous bf16 tensor;
+- the first dim of `hidden_nvsh` must equal the `cap` of the matching dispatch, and it must be a contiguous bf16/fp16 tensor;
   `route_weights_nvs` must be a contiguous 1D float32 tensor whose length equals the number of rows of `hidden_nvsh`.
 - Forward and backward handles must not be mixed; when `route_weights_nvs=None`, `gathered_route_weights_sk` is None as well.
 
@@ -279,11 +280,12 @@ Interface constraints:
 
 - The gradients are 2 or 3 groups of full-dW: the first `epn` rows are home seeds and the last `epn` rows are replica dW; row order matches the `prefetch_weight` views.
 - All groups share the constructor `grad_dtype`; `Wg` must be a multiple of 64.
+- Precision bounds: replica gradients are accumulated on-chip in fp32 (16-bit gradients are converted to fp32 during the merge) and written back once in the original dtype — bf16 (7-bit mantissa) error <= 2^-8; fp16 (10-bit mantissa) error <= 2^-11; fp32 (23-bit mantissa) error <= (R-1)·2^-24, i.e. the rounding accumulation of R-1 fp32 additions. With fixed inputs the per-element addition sequence is constant, so outputs are bit-for-bit reproducible.
 - Ordering: later than the last read of this layer's weights and earlier than the next layer's `prefetch_weight`; with `async_finish=True` the launch stream event is appended at the outermost level.
 
 ### Auxiliary Interfaces
 
-- `barrier()`: group-wide barrier. When it returns, all work previously launched on the group's streams has completed; useful for phase switches or debugging.
+- `barrier()`: group-wide symmetric-heap spin barrier (monotonically increasing epoch, flags ordered on the same channel as the data, without HCCL collectives). When it returns, all work previously launched on each rank's streams has completed. Typical uses: (1) confirming group readiness at phase switches or during debugging; (2) establishing cross-rank ordering before reusing MoonEP buffers that peers may read or write (the symmetric-heap window, `prefetch_weight` replica slots) — e.g. in multi-round weight prefetch, "this rank writes replica slots → `barrier()` → the next round's push" — and aligning the whole group before reusing or verifying windows on the `async_finish=True` path.
 - `destroy(*, release_group=False, release_eb=False)`: idempotent release. The communication group is owned by the caller and is never destroyed here (`release_group` is kept for compatibility only);
   the ElasticBuffer is not destroyed by default; pass `True` to release it explicitly.
 - Query properties: `rank`, `rank_size`, `epn`, `H`, `Hp`, `slots`, `weight_dtype`, `grad_dtype`, `layout_groups`,
@@ -292,24 +294,18 @@ Interface constraints:
 ## Constraints
 
 - **Environment**: finish `dist.init_process_group(backend="hccl")` before construction;
-  one process per card bound with `torch.npu.set_device(local_rank)`; at least 2 cards, 8 cards is the acceptance form.
+  one process per card bound with `torch.npu.set_device(local_rank)`; at least 2 cards.
 - **Communication domain**: `group` is required and is a single `ProcessGroup` shared by the MoonEP context and the ElasticBuffer.
   The data path does not consume the communication domain's external HCCL buffer; `hccl_buffer_size` is managed by the creator.
 - **Scale and shapes**: `2 <= num_ep_ranks <= 128` and equal to the communication group world size; `E <= 1024`, `E % R == 0`, `S >= 1`, `K >= 1`; `S` must be identical on all ranks.
 - **Data types**: `tokens_per_expert` / `topk_experts_sk` / `experts_to_copy` are int32;
   weights support bf16 / fp16 / e4m3 / e5m2 and must be consistent across groups;
-  gradients support bf16 / fp16 / fp32 and must equal the constructor specialization.
+  gradients support bf16 / fp16 / fp32 and must equal the constructor specialization;
+  the tokens of `dispatch` / `combine` support bf16 / fp16.
 - **Grouping and row width**: weights and gradients support either the 3-group form (commonly equal width `(W, W, W)`)
   or the W13 interleaved form (`(2W, W)`), with a total width cap of `3W` (`W = H × Hp`); `W` must be a multiple of 64.
 - **Slots**: `slots >= 1`, consistent along the whole chain; `num_sms` and `token_padding` are reserved and currently only accept `None` and the default value respectively.
 - **Lifetime**: tensors returned as views and by `plan` must be used before `destroy()`; `destroy` may be called repeatedly.
-
-### Environment Variables
-
-| Variable | Value | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `MOONEP_PUSH_BLOCKS` | Positive integer, no more than the number of AIV blocks that can reside concurrently on the device | `64` | Caps the concurrent blocks of the `prefetch_weight` push kernel; enters the compile key, so all EP ranks must use the same value. |
-| `MOONEP_ACC_DEPTH` | `2`–`16` | `4` when R<=8, `3` when R>8 | Read pipeline ring depth of `reduce_grad`; also determines the UB chunk limit and enters the compile key, so all EP ranks must use the same value. |
 
 ## Usage
 
@@ -360,31 +356,6 @@ buf.destroy()
 ```
 
 The full set of weight forms (3-group / W13 / fp16 / FP8) is covered by the sections above.
-
-### Bare API Usage
-
-```python
-from moonep_buffer import _workspace_need
-from moonep_context import create_moonep_context
-from moonep_plan import moonep_plan
-from prefetch_weight import prefetch_weight
-from reduce_grad import reduce_grad
-
-ctx = create_moonep_context(
-    group=dist.group.WORLD,
-    workspace_bytes=_workspace_need(
-        E // dist.get_world_size(), W, 1, torch.bfloat16, torch.bfloat16
-    ),
-)
-topk = topk_idx.to(torch.int32).npu()
-tpe = torch.bincount(topk.cpu().flatten(), minlength=E).to(torch.int32).npu()
-dst_n, cu_seqlens, copy_list, src_n, vtopk = moonep_plan(ctx, tpe, topk)
-weights, scales = prefetch_weight(ctx, copy_list, (w13, w2), epn)
-home_views = reduce_grad(ctx, copy_list, (dw13, dw2), epn)
-```
-
-By default `create_moonep_context` allocates only the lower bound of the plan exchange region;
- the shape-dependent regions of `prefetch_weight` / `reduce_grad` are supplied by the caller via `_workspace_need()`.
 
 ### Testing and Performance
 

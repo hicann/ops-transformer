@@ -78,13 +78,13 @@ grad_expert_output_nvsh, _, _, _ = dispatch(grad_output_sh, plan=plan)
 
 | 参数名 | 输入/输出 | 描述 | 数据类型 | 数据格式 |
 | :--- | :--- | :--- | :--- | :--- |
-| `hidden_sh` | 输入 | 前向 token 载荷 / 反向输出梯度，shape `(S, H)` | BFLOAT16 | ND |
+| `hidden_sh` | 输入 | 前向 token / 反向输出梯度，shape `(S, H)` | BFLOAT16、FLOAT16 | ND |
 | `route_weights_sk` | 可选输入 | 前向路由权重，shape `(S, K)`，内部转 fp32 | FLOAT32 | ND |
 | `topk_experts_sk` | 可选输入 | 前向 top-k 专家索引，shape `(S, K)` | INT32 | ND |
 | `tokens_per_expert` | 可选输入 | 前向专家计数，shape `(E,)` | INT32 | ND |
 | `plan` | 可选输入 | 反向复用前向 plan；与路由参数互斥 | MoonepPlan | - |
 | `do_cpu_sync` | 可选输入 | True（缺省）精确分配接收区；False 按最坏容量 `cap = R × S × min(K, 2·epn)` 分配 | BOOL | - |
-| `hidden_nvsh` | 输出 | 接收区，shape `(cap, H)`；dtype 同输入 | BFLOAT16 | ND |
+| `hidden_nvsh` | 输出 | 接收区，shape `(cap, H)`；dtype 同输入 | 同输入 | ND |
 | `route_weights_nvs` | 输出 | 接收行路由权重，shape `(cap,)`；反向为 None | FLOAT32 | ND |
 | `cu_seqlens` | 输出 | 前向 plan 的分段偏移（`plan.cu_seqlens`） | INT32 | ND |
 | `plan` | 输出 | 前向新建 / 反向原样返回的 `MoonepPlan` | MoonepPlan | - |
@@ -108,6 +108,7 @@ grad_expert_output_nvsh, _, _, _ = dispatch(grad_output_sh, plan=plan)
 - 前向须传 `topk_experts_sk` 与 `tokens_per_expert`，`route_weights_sk` 可选；反向必须传 `plan=` 且路由参数为空。
 - `hidden_sh` 严格为 `(S, H)`；`route_weights_sk` / `topk_experts_sk` 严格为 `(S, K)`；张量须在 NPU 上。
 - 内部用 `plan.vtopk` 作为 `topk_idx`、`num_experts = 2E`、每 rank 容量 `nmtr = S`。
+- `hidden_sh` 须为 bf16/fp16 且连续（与 `combine` 的 `hidden_nvsh` 同规则）。
 
 ### MoonepPlan 结构
 
@@ -203,7 +204,7 @@ grad_hidden_sh, _, _ = combine(plan=plan, hidden_nvsh=grad_hidden_nvsh)
 | 参数名 | 输入/输出 | 描述 | 数据类型 | 数据格式 |
 | :--- | :--- | :--- | :--- | :--- |
 | `plan` | 输入 | 同方向 dispatch 使用的 `MoonepPlan` | MoonepPlan | - |
-| `hidden_nvsh` | 输入 | 专家输出，shape `(cap, H)`；尾行须零填充到 cap | BFLOAT16 | ND |
+| `hidden_nvsh` | 输入 | 专家输出，shape `(cap, H)`；尾行须零填充到 cap | BFLOAT16、FLOAT16 | ND |
 | `route_weights_nvs` | 可选输入 | 前向传 dispatch 的权重；反向不传 | FLOAT32 | ND |
 | `output_sh` | 输出 | token 主序回收结果，shape `(S, H)` | 同输入 | ND |
 | `gathered_route_weights_sk` | 输出 | 回收权重，shape `(S, K)`；反向为 None | FLOAT32 | ND |
@@ -219,7 +220,7 @@ grad_hidden_sh, _, _ = combine(plan=plan, hidden_nvsh=grad_hidden_nvsh)
 接口约束：
 
 - 无 `handle` 入参：带 `route_weights_nvs` 为前向；不传时按未消费的 dispatch handle 推断方向；若前向/反向 handle 同时存在则报歧义错误。同方向 `dispatch → combine` 之间不能再插同方向 dispatch。
-- `hidden_nvsh` 行数须等于同方向 dispatch 的 `cap`，且须为 bf16 连续张量；`route_weights_nvs` 须为连续 1D float32，长度等于 `hidden_nvsh` 行数。
+- `hidden_nvsh` 行数须等于同方向 dispatch 的 `cap`，且须为 bf16/fp16 且连续；`route_weights_nvs` 须为连续 1D float32，长度等于 `hidden_nvsh` 行数。
 - 前向与反向的 handle 不能混用；`route_weights_nvs=None` 时 `gathered_route_weights_sk` 也为 None。
 
 ### reduce_grad
@@ -265,30 +266,24 @@ gate_up_rb, down_rb = reduce_grad(
 
 - 梯度为 2 或 3 组 full-dW：前 `epn` 行 home 种子、后 `epn` 行副本 dW，行序与 `prefetch_weight` 视图一致。
 - 组间 dtype 一致且等于构造期 `grad_dtype`；`Wg` 须为 64 的倍数。
+- 精度界：副本梯度在片上以 fp32 累加（16 位梯度归并期转 fp32）后单次写回原 dtype——bf16（尾数 7 位）误差 <= 2^-8；fp16（尾数 10 位）误差 <= 2^-11；fp32（尾数 23 位）误差 <= (R-1)·2^-24，即 R-1 次 fp32 加法的舍入累积。固定输入下逐元素加法序列恒定，输出逐位可重复。
 - 时序：晚于本层权重最后一次读、早于下一层 `prefetch_weight`；`async_finish=True` 时在最外层追加发起流事件。
 
 ### 辅助接口
 
-- `barrier()`：组内屏障。返回时全组在此前流上发起的工作都已完成，用于阶段切换或调试。
+- `barrier()`：组内对称堆自旋屏障（epoch 单调递增，flag 与数据同通道保序，不经 HCCL 集合通信）。返回时全组各 rank 在此前流上发起的工作都已完成。典型用法：① 阶段切换或调试时确认全组就绪；② 复用对端可读写的 MoonEP 缓冲（对称堆窗口、`prefetch_weight` 副本槽）前做跨 rank 先后保证——如多轮权重预取中"本 rank 写副本槽 → `barrier()` → 下一轮推送"，以及 `async_finish=True` 路径在复用或校验窗口前先对齐全组。
 - `destroy(*, release_group=False, release_eb=False)`：幂等释放。通信组由调用方创建和销毁，本方法不会销毁它（`release_group` 仅为兼容保留）；EB 缺省不销毁，传 `True` 才显式回收。
 - 查询属性：`rank`、`rank_size`、`epn`、`H`、`Hp`、`slots`、`weight_dtype`、`grad_dtype`、`layout_groups`、`heap_required_bytes`、`heap_bytes`、`destroyed`，以及预留参数当前值 `num_sms`、`token_padding`。
 
 ## 约束说明
 
-- **环境**：构造前完成 `dist.init_process_group(backend="hccl")`；一进程一卡并绑定 `torch.npu.set_device(local_rank)`；单机 ≥ 2 卡，8 卡为验收形态。
+- **环境**：构造前完成 `dist.init_process_group(backend="hccl")`；一进程一卡并绑定 `torch.npu.set_device(local_rank)`；单机 ≥ 2 卡。
 - **通信域**：`group` 为必选参数，单个 `ProcessGroup`，同时用于 MoonEP 上下文与 ElasticBuffer。数据面不占通信域 HCCL 外部 buffer，`hccl_buffer_size` 由创建方自理。
 - **规模与形状**：`2 <= num_ep_ranks <= 128` 且等于通信组 world size；`E <= 1024`、`E % R == 0`、`S >= 1`、`K >= 1`；各 rank 的 S 一致。
-- **数据类型**：`tokens_per_expert` / `topk_experts_sk` / `experts_to_copy` 为 int32；权重支持 bf16 / fp16 / e4m3 / e5m2，组间一致；梯度支持 bf16 / fp16 / fp32 且等于构造定型值。
+- **数据类型**：`tokens_per_expert` / `topk_experts_sk` / `experts_to_copy` 为 int32；权重支持 bf16 / fp16 / e4m3 / e5m2，组间一致；梯度支持 bf16 / fp16 / fp32 且等于构造定型值；`dispatch` / `combine` 的 token 支持 bf16 / fp16。
 - **分组与行宽**：权重/梯度支持 3 组形态（常见等宽 `(W, W, W)`）或 W13 交织形态（`(2W, W)`），总宽上限 `3W`（`W = H × Hp`）；`W` 须为 64 的倍数。
 - **槽位**：`slots >= 1`，全链一致；`num_sms`、`token_padding` 为预留参数，当前分别只接受 `None` 与缺省值。
 - **生命周期**：视图和 `plan` 返回的张量须在 `destroy()` 前用完；`destroy` 可重复调用。
-
-### 环境变量
-
-| 变量 | 取值 | 默认值 | 说明 |
-| :--- | :--- | :--- | :--- |
-| `MOONEP_PUSH_BLOCKS` | 正整数，且不超过设备可同时常驻 AIV block 数 | `64` | 限制 `prefetch_weight` push kernel 的并发 block 上限；进入编译键，全 EP rank 须使用相同值。 |
-| `MOONEP_ACC_DEPTH` | `2`–`16` | R≤8 为 `4`，R>8 为 `3` | 指定 `reduce_grad` 读流水环深；同时决定 UB chunk 上限并进入编译键，全 EP rank 须使用相同值。 |
 
 ## 调用说明
 
@@ -337,32 +332,6 @@ gate_rb, up_rb, down_rb = buf.reduce_grad(
 )
 buf.destroy()
 ```
-
-完整的权重形态（3 组 / W13 / fp16 / FP8）见下文。
-
-### 裸 API 用法
-
-```python
-from moonep_buffer import _workspace_need
-from moonep_context import create_moonep_context
-from moonep_plan import moonep_plan
-from prefetch_weight import prefetch_weight
-from reduce_grad import reduce_grad
-
-ctx = create_moonep_context(
-    group=dist.group.WORLD,
-    workspace_bytes=_workspace_need(
-        E // dist.get_world_size(), W, 1, torch.bfloat16, torch.bfloat16
-    ),
-)
-topk = topk_idx.to(torch.int32).npu()
-tpe = torch.bincount(topk.cpu().flatten(), minlength=E).to(torch.int32).npu()
-dst_n, cu_seqlens, copy_list, src_n, vtopk = moonep_plan(ctx, tpe, topk)
-weights, scales = prefetch_weight(ctx, copy_list, (w13, w2), epn)
-home_views = reduce_grad(ctx, copy_list, (dw13, dw2), epn)
-```
-
-`create_moonep_context` 缺省只分配 plan 交换区下界；`prefetch_weight` / `reduce_grad` 的形状相关区域由调用方按 `_workspace_need()` 传入。
 
 ### 测试与性能
 
