@@ -9,6 +9,7 @@
  */
 
 #include "aclnn_quant_lightning_indexer_v3.h"
+#include <string>
 #include "opdev/op_log.h"
 
 extern "C" {
@@ -99,6 +100,19 @@ aclnnStatus aclnnQuantLightningIndexerV3GetWorkspaceSize(
         }
     }
     // dcpParams 的具体取值（cpWorld/cpRank/cpInterleaveSize）及 DCP 组合约束由算子 tiling 统一校验。
+    // 参数取值类错误优先于 metadata 空指针：保留既有 candidate/layout 用例的 161002 预期。
+    if (layoutQOptional != nullptr) {
+        const std::string layoutQ(layoutQOptional);
+        if (layoutQ != "BSND" && layoutQ != "TND") {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "layout_q must be BSND or TND, but got %s.", layoutQ.c_str());
+            return ACLNN_ERR_PARAM_INVALID;
+        }
+    }
+    // metadata 为必选输入（资料明确不支持传空）。
+    if (metadataOptional == nullptr) {
+        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR, "Metadata is required, but it is nullptr.");
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
 
     CandidateOutputHolder indicesHolder(candidateBlockIndicesOut);
     CandidateOutputHolder lengthHolder(candidateBlockLengthOut);

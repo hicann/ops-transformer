@@ -433,7 +433,12 @@ aclnnStatus aclnnQuantSparseLightningIndexer(
             <tr>
                 <td>ACLNN_ERR_PARAM_INVALID</td>
                 <td>161002</td>
-                <td>q、k、w、qDescale、kDescale、cuSeqlensQOptional、cuSeqlensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional、blockTableOptional、outputIdxOffsetOptional、metadataOptional、candidateBlockIndices、layoutQOptional、layoutKOptional、topk、quantMode、maskMode、cmpRatio、returnValue、candidateBlockSize、sparseIndicesOut、sparseValuesOut的数据类型、数据格式或取值不在支持的范围内。</td>
+                <td>q、k、w、qDescale、kDescale、cuSeqlensQOptional、cuSeqlensKOptional、sequsedQOptional、sequsedKOptional、cmpResidualKOptional、blockTableOptional、outputIdxOffsetOptional、metadataOptional、candidateBlockIndices、layoutQOptional、layoutKOptional、topk、quantMode、maskMode、cmpRatio、returnValue、candidateBlockSize、sparseIndicesOut、sparseValuesOut的数据类型或数据格式不在支持的范围内。</td>
+            </tr>
+            <tr>
+                <td>ACLNN_ERR_INNER_TILING_ERROR</td>
+                <td>561002</td>
+                <td>第一段接口在tiling阶段校验参数失败时返回561002。当前在tiling校验的约束包括：topk（tiling内部为sparse_count）取值越界；cmpRatio不在(0,128]或不是2的幂；quantMode不为2或7；returnValue不为0；candidateBlockSize不为8；layoutQOptional/layoutKOptional取值非法或组合不满足约束（如layoutQOptional=TND时layoutKOptional必须为PA_BBND且cuSeqlensQOptional必传；layoutKOptional=PA_BBND时blockTableOptional/sequsedKOptional必传且cuSeqlensKOptional不允许传入）；candidateBlockIndices末维或元素个数不符；candidateBlockLengthOptional传入非空tensor；metadataOptional缺失或shape不符。数据类型/数据格式错误仍由接口层校验并返回161002。</td>
             </tr>
         </tbody>
     </table>
@@ -498,7 +503,7 @@ aclnnStatus aclnnQuantSparseLightningIndexer(
             <tr>
                 <td>ACLNN_ERR_PARAM_INVALID</td>
                 <td>161002</td>
-                <td>传入参数的数据类型、数据格式或取值不在支持的范围内。</td>
+                <td>传入参数的数据类型或数据格式不在支持的范围内。</td>
             </tr>
         </tbody>
     </table>
@@ -516,6 +521,7 @@ aclnnStatus aclnnQuantSparseLightningIndexer(
 - `metadataOptional`必传，不能为空，需由`aclnnQuantSparseLightningIndexerMetadata`生成且与本次调用的query/key形状匹配。
 - 不支持`returnValue`为1，`sparseValuesOut`恒为shape (0,)。
 - 当传入的`layoutQOptional`为TND时，若同时传入`sequsedQOptional`，应保证由`sequsedQOptional`传入的各个batch的query长度不超过根据`cuSeqlensQOptional`计算出的各个batch的q序列长度；此时会启用TND Padding功能，将该batch的无效部分的`sparseIndicesOut`和`sparseValuesOut`置为无效值。部分长序列场景下，如果需要填充的无效数据过多，由于硬件限制可能会导致aicore执行超时，可以通过(seqlen2 - seqlen1) * topk来计算需要填充的数据量，建议将这个数据量控制在4亿以内。
+- 返回值说明：必选参数空指针返回`161001`；数据类型/数据格式错误返回`161002`；上述属性取值、layout组合、按布局必填的可选输入、candidate形状等约束在tiling（算子切分）阶段校验，失败返回`561002`（ACLNN_ERR_INNER_TILING_ERROR）。
 
 ## 调用示例
 

@@ -51,7 +51,7 @@ TEST_F(quant_lightning_indexer_opapi_ut, quant_lightning_indexer_aclnn_0)
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0, layoutQuery, layoutKey, 4, 3,
         INT64_MAX, INT64_MAX, nullptr, &workspaceSize, &executor);
 
-    EXPECT_NE(aclRet, ACL_SUCCESS);
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
     EXPECT_EQ(executor, nullptr);
 }
 

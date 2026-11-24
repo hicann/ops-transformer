@@ -57,7 +57,7 @@ aclnnStatus aclnnQuantLightningIndexerGetWorkspaceSize(
 {
     if (query == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("aclnnQuantLightningIndexerGetWorkspaceSize", "query");
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_NULLPTR;
     }
 
     int64_t keyStride0 = -1;

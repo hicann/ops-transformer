@@ -53,6 +53,18 @@ aclnnStatus aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize(
                                                  "Pass the address of a writable aclOpExecutor pointer output.");
         return ACLNN_ERR_INNER_NULLPTR;
     }
+    // 用户传入的必选输出/按布局必填输入为空指针时返回 161001；
+    // 这些检查若下沉到 ParamsCheckQliV2，会被统一折算为 161002。
+    if (metadata == nullptr) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize", "metadata",
+                                                 "Metadata must be provided, but it is nullptr.");
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
+    if ((layoutQOptional != nullptr) && (std::string(layoutQOptional) == "TND") && (cuSeqlensQOptional == nullptr)) {
+        OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnQuantLightningIndexerV2MetadataGetWorkspaceSize", "cu_seqlens_q",
+                                                 "When layout_q is TND, cu_seqlens_q must be provided.");
+        return ACLNN_ERR_PARAM_NULLPTR;
+    }
     L2_DFX_PHASE_1(aclnnQuantLightningIndexerV2Metadata,
                    DFX_IN(cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional,
                           cmpResidualKOptional, numHeadsQ, numHeadsK, headDim, topk, quantMode, batchSize, maxSeqlenQ,

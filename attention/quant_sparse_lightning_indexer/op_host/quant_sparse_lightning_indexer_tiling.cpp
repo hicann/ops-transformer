@@ -336,25 +336,24 @@ ge::graphStatus QLIV2InfoParserConsumer::CheckAttrParaInfo()
 
     if (npuArch_ == NpuArch::DAV_2201) {
         OP_CHECK_IF((std::string(opParamInfo_.layOutKey) != "PA_BBND"),
-                    OP_LOGE(opName_,
-                            "input attr layout_key only supported PA_BBND,"
-                            "but now layout_key is %s.",
-                            layout_key.c_str()),
+                    OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(
+                        opName_, "layout_key", layout_key.c_str(),
+                        "The value of layout_key can only be PA_BBND on the current SoC version"),
                     return ge::GRAPH_FAILED);
     }
 
     if (npuArch_ == NpuArch::DAV_2201) {
         OP_CHECK_IF(!((*opParamInfo_.sparseCount > 0) && (*opParamInfo_.sparseCount <= SPARSE_LIMIT)),
-                    OP_LOGE(opName_, "input attr sparse_count must > 0 and <= %d, but now sparse_count is %d",
-                            SPARSE_LIMIT, *opParamInfo_.sparseCount),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "sparse_count", std::to_string(*opParamInfo_.sparseCount).c_str(),
+                        "Sparse_count must be in (0, " + std::to_string(SPARSE_LIMIT) + "]"),
                     return ge::GRAPH_FAILED);
-        OP_CHECK_IF((*opParamInfo_.cmpRatio <= 0) || (*opParamInfo_.cmpRatio > 128) ||
-                        ((*opParamInfo_.cmpRatio & (*opParamInfo_.cmpRatio - 1)) != 0),
-                    OP_LOGE(opName_,
-                            "input attr cmpRatio must > 0 and <= 128 and should be powers of 2,"
-                            " but now cmpRatio is %ld.",
-                            *opParamInfo_.cmpRatio),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            (*opParamInfo_.cmpRatio <= 0) || (*opParamInfo_.cmpRatio > 128) ||
+                ((*opParamInfo_.cmpRatio & (*opParamInfo_.cmpRatio - 1)) != 0),
+            OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "cmpRatio", std::to_string(*opParamInfo_.cmpRatio).c_str(),
+                                                  "Cmp_ratio must be in (0, 128] and a power of 2"),
+            return ge::GRAPH_FAILED);
     }
 
     OP_CHECK_IF(
@@ -375,12 +374,17 @@ ge::graphStatus QLIV2InfoParserConsumer::CheckAttrParaInfo()
         return ge::GRAPH_FAILED);
     if (npuArch_ == NpuArch::DAV_2201) {
         OP_CHECK_IF((*opParamInfo_.quantMode != QUANT_MODE_INT8 && *opParamInfo_.quantMode != QUANT_MODE_INT4),
-                    OP_LOGE(opName_, "input attr quant_mode only supported 2(INT8) or 7(INT4)."),
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "quant_mode", std::to_string(*opParamInfo_.quantMode).c_str(),
+                        "Quant_mode only supports 2(INT8) or 7(INT4) on the current SoC version"),
                     return ge::GRAPH_FAILED);
     }
 
     if (npuArch_ == NpuArch::DAV_2201) {
-        OP_CHECK_IF(*opParamInfo_.returnValue, OP_LOGE(opName_, "input attr returnValue only supported False."),
+        OP_CHECK_IF(*opParamInfo_.returnValue,
+                    OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(
+                        opName_, "returnValue", std::to_string(*opParamInfo_.returnValue).c_str(),
+                        "Return_value only supports 0 (false) on the current SoC version"),
                     return ge::GRAPH_FAILED);
     }
     OP_CHECK_IF(
@@ -396,7 +400,8 @@ ge::graphStatus QLIV2InfoParserConsumer::CheckAttrParaInfo()
         // candidate 功能仅在 arch22 (910b/910_93) 实现 (def 已不再注册其他架构)
         // A12: layout_q 支持 BSND 与 TND (TND 需 cu_seqlens_q; layout_k 固定 PA_BBND — K 仅支持分页布局)
         OP_CHECK_IF(std::string(opParamInfo_.layOutQuery) != "BSND" && std::string(opParamInfo_.layOutQuery) != "TND",
-                    OP_LOGE(opName_, "candidate only supports layout_q=BSND/TND, but got %s.", layout_query.c_str()),
+                    OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(opName_, "layout_q", layout_query.c_str(),
+                                                           "Candidate mode only supports layout_q=BSND or TND"),
                     return ge::GRAPH_FAILED);
         if (std::string(opParamInfo_.layOutQuery) == "TND") {
             OP_CHECK_IF(std::string(opParamInfo_.layOutKey) != "PA_BBND",
@@ -486,18 +491,24 @@ ge::graphStatus QLIV2InfoParserConsumer::GetAndCheckInOutDataType()
         bool isInt4Mode = (*opParamInfo_.quantMode == QUANT_MODE_INT4);
         ge::DataType expectQKType = isInt4Mode ? ge::DT_INT4 : ge::DT_INT8;
         OP_CHECK_IF(inputQType_ != expectQKType,
-                    OP_LOGE(opName_, "The data types of the input query and key must be int8 when quant_mode=2, "
-                                     "or int4 when quant_mode=7."),
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        opName_, "q and k", QLIV2ConsumerDataTypeToSerialString(inputQType_).c_str(),
+                        "The dtype of q and k must be int8 when quant_mode=2, or int4 when quant_mode=7"),
                     return ge::GRAPH_FAILED);
-        OP_CHECK_IF(
-            inputQueryScaleType_ != ge::DT_FLOAT16,
-            OP_LOGE(opName_, "The data types of the input query_dequant_scale and key_dequant_scale must be float16."),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(inputQueryScaleType_ != ge::DT_FLOAT16,
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(
+                        opName_, "query_dequant_scale and key_dequant_scale",
+                        QLIV2ConsumerDataTypeToSerialString(inputQueryScaleType_).c_str(),
+                        "The dtype of query_dequant_scale and key_dequant_scale must be float16"),
+                    return ge::GRAPH_FAILED);
     }
 
     if (npuArch_ == NpuArch::DAV_2201) {
         OP_CHECK_IF(weightsType_ != ge::DT_FLOAT16,
-                    OP_LOGE(opName_, "The data types of the input weights must be float16."), return ge::GRAPH_FAILED);
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(opName_, "weights",
+                                                          QLIV2ConsumerDataTypeToSerialString(weightsType_).c_str(),
+                                                          "The dtype of weights must be float16"),
+                    return ge::GRAPH_FAILED);
     }
 
     OP_CHECK_IF(outputType_ != ge::DT_INT32,
@@ -900,7 +911,8 @@ ge::graphStatus QLIV2InfoParserConsumer::GetHeadDim()
             dIndex = DIM_IDX_THREE;
             break;
         default:
-            OP_LOGE(opName_, "unsupported layout for getting head dim.");
+            OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(opName_, "layout_q", std::string(opParamInfo_.layOutQuery).c_str(),
+                                                   "Unsupported layout for getting head dim");
             return ge::GRAPH_FAILED;
     }
     headDim_ = opParamInfo_.query.shape->GetStorageShape().GetDim(dIndex);
@@ -1571,9 +1583,16 @@ ge::graphStatus QuantSparseLightningIndexerTiling::DoTiling(QLIV2TilingInfoConsu
     // -------------set tilingdata-----------------
     // candidate (two-level topk) 输入校验: mode=2 时 candidate_block_indices 必须为 [B, S1, N2, candBlocks] int32
     if (tilingInfo->candidateMode == CANDIDATE_MODE_CONSUMER) {
+        std::string candidateBlockIndicesDtype = "nullptr";
+        if (tilingInfo->opParamInfo.candidateBlockIndices.desc != nullptr) {
+            candidateBlockIndicesDtype =
+                QLIV2ConsumerDataTypeToSerialString(tilingInfo->opParamInfo.candidateBlockIndices.desc->GetDataType());
+        }
         OP_CHECK_IF(tilingInfo->opParamInfo.candidateBlockIndices.desc == nullptr ||
                         tilingInfo->opParamInfo.candidateBlockIndices.desc->GetDataType() != ge::DT_INT32,
-                    OP_LOGE("QuantSparseLightningIndexer", "candidate_block_indices dtype only supports int32."),
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON("QuantSparseLightningIndexer", "candidate_block_indices",
+                                                          candidateBlockIndicesDtype.c_str(),
+                                                          "The dtype of candidate_block_indices must be int32"),
                     return ge::GRAPH_FAILED);
         int64_t expectSize = 0;
         if (tilingInfo->inputQLayout == DataLayout::TND) {
@@ -1586,8 +1605,9 @@ ge::graphStatus QuantSparseLightningIndexerTiling::DoTiling(QLIV2TilingInfoConsu
         }
         int64_t actualSize = tilingInfo->opParamInfo.candidateBlockIndices.tensor->GetShapeSize();
         OP_CHECK_IF(actualSize != expectSize,
-                    OP_LOGE("QuantSparseLightningIndexer",
-                            "candidate_block_indices shape size must be %ld, but got %ld.", expectSize, actualSize),
+                    OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
+                        "QuantSparseLightningIndexer", "candidate_block_indices", std::to_string(actualSize).c_str(),
+                        "The shape size of candidate_block_indices must be " + std::to_string(expectSize)),
                     return ge::GRAPH_FAILED);
     }
     tilingData_.set_bSize(tilingInfo->bSize);

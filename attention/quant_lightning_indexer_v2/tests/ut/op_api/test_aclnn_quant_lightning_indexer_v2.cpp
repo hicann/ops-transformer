@@ -171,6 +171,70 @@ TEST_F(quant_lightning_indexer_v2_opapi_ut, quant_lightning_indexer_v3_aclnn_mis
     EXPECT_EQ(executor, nullptr);
 }
 
+// V3 candidate 接口：metadata 为空返回 161001
+TEST_F(quant_lightning_indexer_v2_opapi_ut, quant_lightning_indexer_v3_aclnn_metadata_null_failed)
+{
+    char layoutQuery[] = "BSND";
+    char layoutKey[] = "PA_BBND";
+    auto query = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 64, 128}, ACL_INT8, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto key = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 16, 1, 128}, ACL_INT8, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto weights = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto qScale = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto kScale = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 16, 1}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseIndicesOut = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 1, 2048}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseValuesOut = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({0}, ACL_BF16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+
+    aclnnStatus aclRet = aclnnQuantLightningIndexerV3GetWorkspaceSize(
+        query.get(), key.get(), weights.get(), qScale.get(), kScale.get(), nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, nullptr, nullptr, 2048, 2, -1, layoutQuery, layoutKey, 0, 1, 0, -1, -1, nullptr,
+        sparseIndicesOut.get(), sparseValuesOut.get(), nullptr, nullptr, &workspaceSize, &executor);
+
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
+    EXPECT_EQ(executor, nullptr);
+}
+
+// V3 candidate 接口：layout_q 非法取值返回 161002
+TEST_F(quant_lightning_indexer_v2_opapi_ut, quant_lightning_indexer_v3_aclnn_bad_layout_q_failed)
+{
+    char layoutQuery[] = "XXX";
+    char layoutKey[] = "PA_BBND";
+    auto query = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 64, 128}, ACL_INT8, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto key = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 16, 1, 128}, ACL_INT8, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto weights = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto qScale = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 64}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto kScale = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 16, 1}, ACL_FLOAT16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto metadata = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({1024}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseIndicesOut = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({2, 39, 1, 2048}, ACL_INT32, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    auto sparseValuesOut = std::unique_ptr<aclTensor, decltype(&DestroyAclTensor)>(
+        TensorDesc({0}, ACL_BF16, ACL_FORMAT_ND).ToAclTypeRawPtr(), DestroyAclTensor);
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor = nullptr;
+
+    aclnnStatus aclRet = aclnnQuantLightningIndexerV3GetWorkspaceSize(
+        query.get(), key.get(), weights.get(), qScale.get(), kScale.get(), nullptr, nullptr, nullptr, nullptr, nullptr,
+        nullptr, nullptr, metadata.get(), nullptr, 2048, 2, -1, layoutQuery, layoutKey, 0, 1, 0, -1, -1, nullptr,
+        sparseIndicesOut.get(), sparseValuesOut.get(), nullptr, nullptr, &workspaceSize, &executor);
+
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_INVALID);
+    EXPECT_EQ(executor, nullptr);
+}
+
 // V3 candidate 接口：第二段接口空执行器直通
 TEST_F(quant_lightning_indexer_v2_opapi_ut, quant_lightning_indexer_v3_aclnn_empty_executor)
 {
