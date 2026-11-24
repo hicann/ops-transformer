@@ -384,16 +384,12 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm1(const RunInfo& info, cons
                     if constexpr (IS_DSPARK) {
                         uint64_t mergeBase = static_cast<uint64_t>(info.cmpLoop % MERGE_CACHE_GM_BUF_NUM) *
                                              N_WORKSPACE_SIZE * constInfo.headDim;
-                        uint32_t blockElementCnt = 32U / sizeof(KV_T);
-                        for (uint32_t row = 0; row < nL1Size; ++row) {
-                            uint64_t mergeOffset = mergeBase +
-                                                   static_cast<uint64_t>(nL1 * N_SPLIT_SIZE + row) * constInfo.headDim +
-                                                   kL1 * D_SPLIT_SIZE;
-                            GlobalTensor<KV_T> mergeSrcGm = kvMergeGm_[mergeOffset];
-                            kTensor = bL1Tensor[row * blockElementCnt];
-                            DataCopyGmNDToL1<KV_T>(kTensor, mergeSrcGm, 1, nL1SizeAlign, D_SPLIT_SIZE,
-                                                   constInfo.headDim);
-                        }
+                        uint64_t mergeOffset = mergeBase +
+                                               static_cast<uint64_t>(nL1 * N_SPLIT_SIZE) * constInfo.headDim +
+                                               kL1 * D_SPLIT_SIZE;
+                        GlobalTensor<KV_T> mergeSrcGm = kvMergeGm_[mergeOffset];
+                        DataCopyGmNDToL1<KV_T>(bL1Tensor, mergeSrcGm, nL1Size, nL1SizeAlign, D_SPLIT_SIZE,
+                                               constInfo.headDim);
                     } else
                         while (copyFinishRowCnt < nL1Size) {
                             // 由于ori_left的存在， 即使第一块搬运也可能并非是pa_block的零点位
@@ -841,17 +837,13 @@ __aicore__ inline void SWACubeBlock<SMLAT>::ComputeMm2(const RunInfo& info, cons
                         if constexpr (IS_DSPARK) {
                             uint64_t mergeBase = static_cast<uint64_t>(info.cmpLoop % MERGE_CACHE_GM_BUF_NUM) *
                                                  N_WORKSPACE_SIZE * constInfo.headDim;
-                            uint32_t blockElementCnt = 32U / sizeof(KV_T);
                             subvTensor = bL1Tensor[(kL1 - kOffset) * K_L0_SPLIT_SIZE * N_SPLIT_SIZE];
-                            for (uint32_t row = 0; row < kL0Size; ++row) {
-                                uint64_t mergeOffset =
-                                    mergeBase + static_cast<uint64_t>(kL1 * K_L0_SPLIT_SIZE + row) * constInfo.headDim +
-                                    nL1 * N_SPLIT_SIZE;
-                                GlobalTensor<KV_T> mergeSrcGm = kvMergeGm_[mergeOffset];
-                                LocalTensor<KV_T> dstTensor = subvTensor[row * blockElementCnt];
-                                DataCopyGmNDToL1<KV_T>(dstTensor, mergeSrcGm, 1, kL0SizeAlign, nL1Size,
-                                                       constInfo.headDim);
-                            }
+                            uint64_t mergeOffset = mergeBase +
+                                                   static_cast<uint64_t>(kL1 * K_L0_SPLIT_SIZE) * constInfo.headDim +
+                                                   nL1 * N_SPLIT_SIZE;
+                            GlobalTensor<KV_T> mergeSrcGm = kvMergeGm_[mergeOffset];
+                            DataCopyGmNDToL1<KV_T>(subvTensor, mergeSrcGm, kL0Size, kL0SizeAlign, nL1Size,
+                                                   constInfo.headDim);
                         } else
                             while (copyFinishRowCnt < kL0Size) {
                                 copyRowCnt = constInfo.paOriBlockSize - curS2Offset % constInfo.paOriBlockSize;
