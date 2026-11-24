@@ -96,11 +96,11 @@ aclnnStatus aclnnTextGatedResidualGetWorkspaceSize(
     int64_t          channels,
     double           eps,
     bool             needBackward,
-    aclTensor       *mixed,
-    aclTensor       *injectOptional,
-    aclTensor       *invRmsOptional,
-    aclTensor       *downPreActOptional,
-    aclTensor       *upPreActOptional,
+    const aclTensor *mixed,
+    const aclTensor *injectOptional,
+    const aclTensor *invRmsOptional,
+    const aclTensor *downPreActOptional,
+    const aclTensor *upPreActOptional,
     uint64_t        *workspaceSize,
     aclOpExecutor  **executor)
 ```
