@@ -110,6 +110,11 @@ static constexpr int SCALE_TENSOR_EXPECTED_DIMS = 2;
 
 static constexpr int64_t MULTI_WEIGHT_DIM = 2L;
 
+static bool IsFormatND(const aclTensor* tensor)
+{
+    return ge::GetPrimaryFormat(tensor->GetStorageFormat()) == op::Format::FORMAT_ND;
+}
+
 static bool IsFormatNZWithC0(const aclTensor* tensor)
 {
     return ge::GetPrimaryFormat(tensor->GetStorageFormat()) == op::Format::FORMAT_FRACTAL_NZ_C0_2 ||
@@ -139,10 +144,10 @@ static aclnnStatus SetSpecialNZTensorToNormalNZFormat(const aclTensorList*& tens
     return ACLNN_SUCCESS;
 }
 
-static void SetStorageShapeForNZ(aclTensor* tensor)
+static void SetStorageShapeForB4(aclTensor* tensor)
 {
     // A 32-bit carrier stores eight 4-bit values. Reinterpreting the carrier as
-    // INT4 keeps the bytes in place and expands only the last storage dimension,
+    // four-bit values keeps the bytes in place and expands only the last storage dimension,
     // for example [..., 16, 4] -> [..., 16, 32].
     auto storageShape = tensor->GetStorageShape();
     auto storageShapeDim = storageShape.GetDimNum();
@@ -182,8 +187,8 @@ static void UnpackB32ToB4(const aclTensorList*& tensorListB32, const std::string
         (*tensorListB4)[i]->SetViewShape(tensorShape);
         (*tensorListB4)[i]->SetDataType(b4Dtype);
 
-        if (IsFormatNZ((*tensorListB4)[i])) {
-            SetStorageShapeForNZ((*tensorListB4)[i]);
+        if (IsFormatNZ((*tensorListB4)[i]) || IsFormatND((*tensorListB4)[i])) {
+            SetStorageShapeForB4((*tensorListB4)[i]);
         }
 
         if (transposeTensor) {
