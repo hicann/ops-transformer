@@ -235,15 +235,6 @@ aclnnGroupedMatmulSwigluQuantWeightNzV3默认为确定性实现。
 - `smoothScale`可为nullptr；非空时必须严格为FLOAT、ND、`(E,N/2)`，不接受`(E)`、`(N/2)`或其他广播shape。支持非连续输入，入口检查存储边界后进行连续化，并传给既有执行函数。
 - 仅支持`swigluMode=2`、`dequantMode=2`、`dequantDtype=ACL_FLOAT`、`quantMode=2`、`roundMode="rint"`（nullptr或空字符串取默认值）、`scaleAlg=0/1`、`dstTypeMax=0.0`。
 
-### MX A4W4 BF16输出
-
-- `x`、`weight`均为FLOAT4_E2M1，`xScale`、`weightScale`为FLOAT8_E8M0；`output`为BFLOAT16、ND、`(M,N/2)`，`outputScale`必须为nullptr，不执行MXFP8输出量化。
-- `x`为非转置ND `(M,K)`；weight TensorList长度为1，view为`(E,K,N)`，支持转置和非转置FRACTAL_NZ。转置storage为`(E,K/64,N/16,16,64)`；非转置storage为`(E,N/64,K/16,16,64)`，C0均为64个逻辑FP4元素。weightScale的view为`(E,K/64,N,2)`，转置属性须与weight一致。
-- `E`为`[1,1024]`内的整数，`M>0`，`K`和`N`均为128的正整数倍；`xScale`为`(M,K/64,2)`。groupList为Device INT64 ND `(E)`，分组语义与下方说明一致。
-- `smoothScale`、`bias`必须为nullptr；weightAssistMatrix及tuningConfigOptional沿用参数表的空值约束。
-- `swigluMode`支持0和2。模式0不使用clampLimit、gluAlpha、gluBias；模式2使用上述clamp计算公式和标量校验规则。
-- `dequantMode=2`、`dequantDtype=ACL_FLOAT`、`quantMode=2`仍须传入；roundMode、scaleAlg、dstTypeMax仍按参数表校验，不能因BF16输出而传入任意值。
-
 ### 原有MX A8W8
 
   <!-- npu="950" id7 -->
