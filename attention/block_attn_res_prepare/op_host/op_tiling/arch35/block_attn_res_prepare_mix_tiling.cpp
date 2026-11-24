@@ -66,6 +66,7 @@ constexpr size_t CUBE_BASE_D_CANDIDATE_NUM = 3;
 struct BlockAttnResPrepareMixTiling::TileCandidate {
     uint64_t baseT;
     uint64_t baseS;
+    uint64_t sAlign;
     uint64_t baseD;
     uint64_t baseDAlign;
     uint64_t dTileNum;
@@ -80,7 +81,6 @@ struct BlockAttnResPrepareMixTiling::TileCandidate {
     uint64_t dotUbElems;
     uint64_t reduceUbElems;
     uint64_t softmaxUbElems;
-    uint32_t sAlign;
 };
 
 struct BlockAttnResPrepareMixTiling::ResourceUsage {
@@ -205,17 +205,17 @@ BlockAttnResPrepareMixTiling::TileCandidate BlockAttnResPrepareMixTiling::BuildT
     candidate.baseS = candidateS;
     candidate.baseD = candidateD;
     candidate.baseDAlign = Ops::Base::CeilAlign<uint64_t>(candidateD, CUBE_BLOCK_ELEMS);
-    candidate.sAlign = static_cast<uint32_t>(Ops::Base::CeilAlign<uint64_t>(candidateS, CUBE_BLOCK_ELEMS));
+    candidate.sAlign = Ops::Base::CeilAlign<uint64_t>(candidateS, CUBE_BLOCK_ELEMS);
     candidate.dTileNum = Ops::Base::CeilDiv(totalD_, candidateD);
     candidate.mm1NAlign = Ops::Base::CeilAlign<uint64_t>(candidateT * totalN_, CUBE_BLOCK_ELEMS);
     candidate.qL1BufferNum = candidate.dTileNum > 1U ? DOUBLE_BUFFER_NUM : 1U;
     candidate.vL1BufferNum = candidate.dTileNum > 1U ? DOUBLE_BUFFER_NUM : 1U;
     candidate.vUbBufferNum = DOUBLE_BUFFER_NUM;
-    candidate.qL1Elems = static_cast<uint64_t>(candidate.sAlign) * candidate.baseDAlign;
+    candidate.qL1Elems = candidate.sAlign * candidate.baseDAlign;
     candidate.vL1Elems = candidate.mm1NAlign * candidate.baseDAlign;
-    candidate.eL1Elems = static_cast<uint64_t>(candidate.sAlign) * tilingData_.nAlign;
+    candidate.eL1Elems = candidate.sAlign * tilingData_.nAlign;
     candidate.vUbElems = static_cast<uint64_t>(tilingData_.nAlign) * candidate.baseDAlign;
-    candidate.dotUbElems = static_cast<uint64_t>(candidate.sAlign) * tilingData_.nAlign + FP32_REG_ELEMS;
+    candidate.dotUbElems = candidate.eL1Elems + FP32_REG_ELEMS;
     candidate.reduceUbElems = FP32_REG_ELEMS;
     candidate.softmaxUbElems = static_cast<uint64_t>(STAT_VECTOR_COUNT) * candidate.sAlign;
     return candidate;
@@ -232,27 +232,30 @@ BlockAttnResPrepareMixTiling::ResourceUsage BlockAttnResPrepareMixTiling::Calcul
                      candidate.softmaxUbElems) *
                     FP32_BYTES;
     const uint64_t mm1BaseK = std::min<uint64_t>(candidate.baseDAlign, CUBE_MM1_MAX_BASE_K);
-    usage.mm1L0ABytes = static_cast<uint64_t>(candidate.sAlign) * mm1BaseK * FP32_BYTES;
-    usage.mm2L0ABytes = static_cast<uint64_t>(candidate.sAlign) * tilingData_.nAlign * FP32_BYTES;
+    usage.mm1L0ABytes = candidate.sAlign * mm1BaseK * FP32_BYTES;
+    usage.mm2L0ABytes = candidate.sAlign * tilingData_.nAlign * FP32_BYTES;
     usage.mm1L0BBytes = candidate.mm1NAlign * mm1BaseK * FP32_BYTES;
     usage.mm2L0BBytes = static_cast<uint64_t>(tilingData_.nAlign) * candidate.baseDAlign * FP32_BYTES;
-    usage.mm1L0CBytes = static_cast<uint64_t>(candidate.sAlign) * candidate.mm1NAlign * FP32_BYTES;
-    usage.mm2L0CBytes = static_cast<uint64_t>(candidate.sAlign) * candidate.baseDAlign * FP32_BYTES;
-    usage.mm1L1SlotBytes =
-        (static_cast<uint64_t>(candidate.sAlign) + candidate.mm1NAlign) * candidate.baseDAlign * FP32_BYTES;
-    usage.mm2L1SlotBytes = (static_cast<uint64_t>(candidate.sAlign) * tilingData_.nAlign +
-                            static_cast<uint64_t>(tilingData_.nAlign) * candidate.baseDAlign) *
-                           FP32_BYTES;
+    usage.mm1L0CBytes = candidate.sAlign * candidate.mm1NAlign * FP32_BYTES;
+    usage.mm2L0CBytes = candidate.sAlign * candidate.baseDAlign * FP32_BYTES;
+    usage.mm1L1SlotBytes = (candidate.sAlign + candidate.mm1NAlign) * candidate.baseDAlign * FP32_BYTES;
+    usage.mm2L1SlotBytes =
+        (candidate.sAlign * tilingData_.nAlign + static_cast<uint64_t>(tilingData_.nAlign) * candidate.baseDAlign) *
+        FP32_BYTES;
     return usage;
 }
 
 bool BlockAttnResPrepareMixTiling::DoesCandidateFit(const ResourceUsage& usage, uint64_t usableL1Bytes,
                                                     uint64_t usableUbBytes) const
 {
+    // Blaze alternates L0A/L0B loads between the two halves of each buffer, independently of L1 staging.
+    const uint64_t l0AStageBytes = l0ASize_ / DOUBLE_BUFFER_NUM;
+    const uint64_t l0BStageBytes = l0BSize_ / DOUBLE_BUFFER_NUM;
     return usage.l1Bytes <= usableL1Bytes && usage.ubBytes <= usableUbBytes &&
            usage.mm1L1SlotBytes <= l1Size_ / L1_SLOT_NUM && usage.mm2L1SlotBytes <= l1Size_ / L1_SLOT_NUM &&
-           usage.mm1L0ABytes <= l0ASize_ && usage.mm2L0ABytes <= l0ASize_ && usage.mm1L0BBytes <= l0BSize_ &&
-           usage.mm2L0BBytes <= l0BSize_ && usage.mm1L0CBytes <= l0CSize_ && usage.mm2L0CBytes <= l0CSize_;
+           usage.mm1L0ABytes <= l0AStageBytes && usage.mm2L0ABytes <= l0AStageBytes &&
+           usage.mm1L0BBytes <= l0BStageBytes && usage.mm2L0BBytes <= l0BStageBytes && usage.mm1L0CBytes <= l0CSize_ &&
+           usage.mm2L0CBytes <= l0CSize_;
 }
 
 void BlockAttnResPrepareMixTiling::ApplyTileCandidate(const TileCandidate& candidate)
@@ -261,7 +264,7 @@ void BlockAttnResPrepareMixTiling::ApplyTileCandidate(const TileCandidate& candi
     tilingData_.baseS = static_cast<uint32_t>(candidate.baseS);
     tilingData_.baseD = static_cast<uint32_t>(candidate.baseD);
     tilingData_.baseDAlign = static_cast<uint32_t>(candidate.baseDAlign);
-    tilingData_.sAlign = candidate.sAlign;
+    tilingData_.sAlign = static_cast<uint32_t>(candidate.sAlign);
     tilingData_.dTileNum = static_cast<uint32_t>(candidate.dTileNum);
     tilingData_.mm1NAlign = static_cast<uint32_t>(candidate.mm1NAlign);
     tilingData_.qL1BufferNum = static_cast<uint8_t>(candidate.qL1BufferNum);

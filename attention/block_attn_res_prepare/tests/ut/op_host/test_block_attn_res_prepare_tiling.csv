@@ -6,6 +6,9 @@ Ascend950,multi_round_double_buffer,true,multi_round_double_buffer,8:1:7168,16:7
 Ascend950,network_prefill,true,network_prefill,254:8:7168,24:7168,FLOAT,UINT64,FLOAT,1e-6,32,64,64,true,2,none,-1,-1,-1,-1,-1,-1,false,-1,-1
 Ascend950,mix_workspace,true,mix_workspace,254:8:7168,24:7168,FLOAT,UINT64,FLOAT,1e-6,32,64,64,true,2,mix,-1,2,24,-1,16,16,true,-1,-1
 Ascend950,mix_t_grouping,true,mix_t_grouping,32:8:7168,24:7168,FLOAT,UINT64,FLOAT,1e-6,32,64,64,true,2,mix,-1,1,-1,32,-1,-1,true,-1,-1
+Ascend950,mix_l0a_stage_exact_fit,true,mix_l0a_stage_exact_fit,32:8:256,128:256,FLOAT,UINT64,FLOAT,1e-6,32,64,64,true,2,mix,-1,1,128,32,16,16,true,-1,-1
+Ascend950,mix_l0a_stage_overflow,true,mix_l0a_stage_overflow,32:8:256,129:256,FLOAT,UINT64,FLOAT,1e-6,32,64,64,true,2,mix,-1,2,128,32,16,16,true,-1,-1
+Ascend950,mix_s_alignment_overflow,true,mix_s_alignment_overflow,32:8:256,4294967295:256,FLOAT,UINT64,FLOAT,1e-6,32,64,64,true,2,mix,-1,2,128,536870912,16,16,true,-1,-1
 Ascend950,cv_ratio_fallback_to_vector,true,cv_ratio_fallback_to_vector,32:8:7168,24:7168,FLOAT,UINT64,FLOAT,1e-6,32,1,1,true,0,vector,-1,-1,1,-1,-1,-1,false,-1,-1
 Ascend950,too_many_blocks,true,too_many_blocks,1:65:7168,18:7168,FLOAT,UINT64,FLOAT,1e-6,32,64,64,false,-1,none,-1,-1,-1,-1,-1,-1,false,-1,-1
 Ascend950,mismatched_d,true,mismatched_d,1:8:7168,18:4096,FLOAT,UINT64,FLOAT,1e-6,32,64,64,false,-1,none,-1,-1,-1,-1,-1,-1,false,-1,-1
