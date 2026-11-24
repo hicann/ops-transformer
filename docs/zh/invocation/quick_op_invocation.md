@@ -100,7 +100,7 @@
         -o test_aclnn_flash_attention_score   # 替换为实际算子可执行文件名
 
         # 编译MC2算子可执行文件时，在编译命令的末尾添加如下链接库
-        # -lruntime -lpthread -Wl,--no-as-needed -lhccl -lhccl_fwk -o
+        # -lruntime -lpthread -Wl,--no-as-needed -lhccl -lhccl_fwk
 
         # 执行程序
         ./test_aclnn_flash_attention_score
