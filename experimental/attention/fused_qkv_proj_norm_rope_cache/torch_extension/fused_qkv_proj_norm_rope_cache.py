@@ -11,17 +11,6 @@ from torch.library import impl
 
 from cann_ops_transformer.op_builder import get_as_library
 
-from .op_dsl.fused_qkv_proj_norm_rope_cache import (
-    AIC_NUM,
-    HEAD_DIM,
-    HIDDEN,
-    NUM_Q_HEADS,
-    NUM_UNITS,
-    PAIR_M,
-    ROPE_DIM,
-    _get_compiled,
-)
-
 
 def _core_budget(device=None):
     """Return the launchable MIX group count for the current stream.
@@ -30,6 +19,7 @@ def _core_budget(device=None):
     ``min(cube_num, vector_num // 2)``.  The live stream quota is queried on
     every call and enters both the launch count and the compile cache key.
     """
+    from .op_dsl.fused_qkv_proj_norm_rope_cache import AIC_NUM
     from cannbotdsl.ops.info import get_platform_info
 
     stream = None
@@ -125,6 +115,16 @@ def _fused_qkv_proj_norm_rope_cache_impl(
     ``_kv_mirror_mxfp8_source_projection`` path (raw (N,K) weight + e8m0
     scales) is NOT covered by this operator.
     """
+    from .op_dsl.fused_qkv_proj_norm_rope_cache import (
+        HEAD_DIM,
+        HIDDEN,
+        NUM_Q_HEADS,
+        PAIR_M,
+        QKV_WIDTH,
+        ROPE_DIM,
+        _get_compiled,
+    )
+
     assert hidden.dim() == 2 and hidden.shape[1] == HIDDEN
     assert hidden.dtype == torch.bfloat16 and hidden.is_contiguous()
     assert weight.dim() == 2 and weight.shape[1] == HIDDEN

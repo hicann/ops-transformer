@@ -14,16 +14,6 @@ from torch.library import impl
 
 from cann_ops_transformer.op_builder import get_as_library
 
-from .op_dsl.attn_epilogue import (
-    DIM,
-    F,
-    HEAD_DIM,
-    MX_DIVISOR,
-    O_LORA,
-    _get_compiled,
-    core_budget,
-)
-
 SCRATCH_LOCK = threading.RLock()
 _SCRATCH = OrderedDict()
 _CACHE_LIMIT = 8
@@ -31,6 +21,8 @@ _CACHE_LIMIT = 8
 
 def _projection_shape(x, woa, wob):
     """Read static dispatch metadata; callers supply tensors matching the documented contract."""
+    from .op_dsl.attn_epilogue import DIM, HEAD_DIM, O_LORA
+
     t, heads, dim = x.shape
     if t < 1 or heads not in (8, 16, 64) or dim != HEAD_DIM:
         raise ValueError("x must have shape (T>=1, H, 512), H in (8, 16, 64)")
@@ -39,6 +31,8 @@ def _projection_shape(x, woa, wob):
 
 def _get_scratch(device, t, capture, ng):
     """Reuse four byte workspaces per device/stream/shape; capture allocates in its graph pool."""
+    from .op_dsl.attn_epilogue import F, O_LORA
+
     stream = torch.npu.current_stream(device)
     key = (device, stream.npu_stream, t, ng)
     # Capture gets graph-pool storage, independent of eager calls and other graphs.
@@ -74,6 +68,8 @@ get_as_library().define(
 
 @impl(get_as_library(), "attn_epilogue", "Meta")
 def _attn_epilogue_meta(x, woa, wob, descale_woa, descale_wob, rope_sin, rope_cos):
+    from .op_dsl.attn_epilogue import DIM
+
     del woa, wob, descale_woa, descale_wob, rope_sin, rope_cos
     return torch.empty((x.shape[0], DIM), dtype=torch.bfloat16, device="meta")
 
@@ -94,6 +90,15 @@ def attn_epilogue(
     documented in README. Only activation dimensions are checked here; tensor
     metadata and private-format scans are intentionally absent from the hot path.
     """
+    from .op_dsl.attn_epilogue import (
+        DIM,
+        F,
+        MX_DIVISOR,
+        O_LORA,
+        _get_compiled,
+        core_budget,
+    )
+
     t, ng, first_nz, second_nz = _projection_shape(x, woa, wob)
     m = (t + 15) // 16 * 16
     with torch.npu.device(x.device):
