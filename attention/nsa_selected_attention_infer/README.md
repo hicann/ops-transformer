@@ -112,4 +112,4 @@
 
 | 调用方式  | 样例代码                                                                | 说明                                                                                          |
 | ----------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| aclnn接口 | [test_aclnn_nsa_selected_attention_infer](./examples/test_aclnn_nsa_selected_attention_infer.cpp) | 通过[`aclnnNsaSelectedAttentionInfer`](./docs/aclnnNsaSelectedAttentionInfer.md)接口方式调用NsaCompressAttentionInfer算子。 |
+| aclnn接口 | [test_aclnn_nsa_selected_attention_infer](./examples/test_aclnn_nsa_selected_attention_infer.cpp) | 通过[`aclnnNsaSelectedAttentionInfer`](./docs/aclnnNsaSelectedAttentionInfer.md)接口方式调用NsaSelectedAttentionInfer算子。 |

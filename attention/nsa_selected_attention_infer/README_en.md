@@ -114,4 +114,4 @@ English | [简体中文](./README.md)
 
 | Calling Method  | Sample Code                                                                | Description                                                                                          |
 | ----------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| aclnn API | [test_aclnn_nsa_selected_attention_infer](./examples/test_aclnn_nsa_selected_attention_infer.cpp) | Calls the NsaCompressAttentionInfer operator through the [`aclnnNsaSelectedAttentionInfer`](docs/aclnnNsaSelectedAttentionInfer_en.md) API. |
+| aclnn API | [test_aclnn_nsa_selected_attention_infer](./examples/test_aclnn_nsa_selected_attention_infer.cpp) | Calls the NsaSelectedAttentionInfer operator through the [`aclnnNsaSelectedAttentionInfer`](docs/aclnnNsaSelectedAttentionInfer_en.md) API. |
