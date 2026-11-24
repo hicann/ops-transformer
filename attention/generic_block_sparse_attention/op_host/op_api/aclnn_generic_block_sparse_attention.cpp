@@ -23,8 +23,10 @@
 #include "opdev/platform.h"
 #include <algorithm>
 #include <cmath>
+#include <initializer_list>
 #include <string>
 #include <unordered_map>
+#include <utility>
 
 using namespace op;
 
@@ -42,6 +44,19 @@ constexpr uint32_t GBSA_A8C4_MAX_KV_HEADS_PA_BBND_BSND_TND = 5U;
 static constexpr int64_t LSE_OUT = 1;
 static constexpr int64_t MXFP8_QUANT_TYPE = 6;
 static constexpr int64_t GBSA_QUANT_TYPE_A4C4 = 4;
+
+static void WarnNonNdFormats(std::initializer_list<std::pair<const char*, const aclTensor*>> tensors)
+{
+    for (const auto& [name, tensor] : tensors) {
+        if (tensor == nullptr) {
+            continue;
+        }
+        const auto format = tensor->GetStorageFormat();
+        if (format != ge::FORMAT_ND) {
+            OP_LOGW("%s has storage format %d, expected FORMAT_ND.", name, static_cast<int>(format));
+        }
+    }
+}
 
 static bool CheckDataType(const aclTensor* query, const aclTensor* key, const aclTensor* value, int64_t quantType)
 {
@@ -548,6 +563,27 @@ __attribute__((visibility("default"))) aclnnStatus aclnnGenericBlockSparseAttent
             }
         }
     }
+
+    WarnNonNdFormats({
+        {"query", query},
+        {"key", key},
+        {"value", value},
+        {"sparseBlockIdx", sparseBlockIdx},
+        {"sparseBlockCount", sparseBlockCount},
+        {"metadataOptional", metadataOptional},
+        {"attenMaskOptional", attenMaskOptional},
+        {"qDequantScaleOptional", qDequantScaleOptional},
+        {"kDequantScaleOptional", kDequantScaleOptional},
+        {"vDequantScaleOptional", vDequantScaleOptional},
+        {"pQuantScaleOptional", pQuantScaleOptional},
+        {"cuSeqLengthsQOptional", cuSeqLengthsQOptional},
+        {"cuSeqLengthsKvOptional", cuSeqLengthsKvOptional},
+        {"sequsedQOptional", sequsedQOptional},
+        {"sequsedKvOptional", sequsedKvOptional},
+        {"blockTableOptional", blockTableOptional},
+        {"attentionOut", attentionOut},
+        {"softmaxLseOptional", returnSoftmaxlse == LSE_OUT ? softmaxLseOptional : nullptr},
+    });
 
     L2_DFX_PHASE_1(
         aclnnGenericBlockSparseAttention,
