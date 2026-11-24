@@ -148,7 +148,7 @@ ASCENDC_TPL_SEL(
         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_PA_BBND, KvLayoutType_PA_BNBD),
         ASCENDC_TPL_BOOL_SEL(IsFd, true), ASCENDC_TPL_BOOL_SEL(HasVTail, true),
         ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
-    // HiF4 level1 dynamic quant(sOuteraBase=256, sInnerBase=128)
+    // HiF4 level1 dynamic quant(sOuterBase=256, sInnerBase=128)
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BNSD_BNSD),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST,
                                               Config_S1Aligned256_S2Aligned128_DAligned128_DVAligned128),
@@ -157,7 +157,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, KvLayoutType_NO_PA),
                          ASCENDC_TPL_BOOL_SEL(IsFd, false), ASCENDC_TPL_BOOL_SEL(HasVTail, false),
                          ASCENDC_TPL_TILING_STRUCT_SEL(QuantFlashAttnTilingData)),
-    // HiF4 static quant(sOuteraBase=128, sInnerBase=1024)
+    // HiF4 static quant(sOuterBase=128, sInnerBase=1024)
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BNSD_BNSD),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST,
                                               Config_S1Aligned128_S2Aligned1024_DAligned128_DVAligned128),

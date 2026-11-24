@@ -18,6 +18,15 @@
 #include "register/op_def_registry.h"
 #include "common/include/op_host/op_const_def_transformer.h"
 
+// 旧版 CANN(如 9.2.0)的 op_build 生成器不支持 DT_HIFLOAT4/Ascend960,
+// 通过 devkit 版本宏守卫整段 960 配置: CANN >= 9.3 才注册(参照 moe_re_routing 同型守卫)
+#if __has_include("version/asc_devkit_version.h")
+#include "version/asc_devkit_version.h"
+#if ASC_DEVKIT_MAJOR > 9 || (ASC_DEVKIT_MAJOR == 9 && ASC_DEVKIT_MINOR >= 3)
+#define ENABLE_QFA_DT_HIFLOAT4
+#endif
+#endif
+
 namespace ops {
 
 class QuantFlashAttn : public OpDef {
@@ -296,9 +305,10 @@ public:
             .ExtendCfgInfo("prebuildPattern.value", "Opaque")
             .ExtendCfgInfo("coreType.value", "AiCore")
             .ExtendCfgInfo("opFile.value", "quant_flash_attn");
-
+#ifdef ENABLE_QFA_DT_HIFLOAT4
         this->AICore().AddConfig("ascend960dt", aicore_config_96);
         this->AICore().AddConfig("ascend960pr", aicore_config_96);
+#endif
     }
 };
 

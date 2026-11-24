@@ -77,7 +77,7 @@ ge::graphStatus QuantChecker::CheckSingleParaQuantMode(const QfaTilingInfo& qfaI
                                                   "The value of quant_mode must be 1 (MxFP8) or 10 (HiF4)"),
             return ge::GRAPH_FAILED);
     } else if (qfaInfo.npuArch == NpuArch::DAV_9202) {
-        // 支持输入范围为 1、10
+        // 支持输入范围为 7
         const std::vector<uint32_t> supportedQuantModes = {
             static_cast<uint32_t>(QfaQuantMode::A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16)};
         OP_CHECK_IF(

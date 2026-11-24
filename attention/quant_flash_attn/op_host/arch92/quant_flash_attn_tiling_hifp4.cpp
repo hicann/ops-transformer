@@ -120,7 +120,6 @@ void QuantFlashAttnHiFP4TilingImpl::InitImplParam()
 
 void QuantFlashAttnHiFP4TilingImpl::SplitPolicy()
 {
-    // 121调整基本块大小 todo
     if (qfaInfo_->quantMode == QfaQuantMode::A4C4_QKV_HIF4_P_HIF4_LEVEL1_SOFTMAX_FP16) {
         sOuterFactor_ = SOUTER_256;
         sInnerFactor_ = SINNER_128;
