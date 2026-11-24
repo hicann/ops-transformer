@@ -28,29 +28,28 @@ English | [简体中文](./README.md)
 - Computation formula:
 
 $$
-\text{Initialize:} \quad \text{ready\_count} = 0, \quad \text{flag\_num} = \text{micro\_batch\_size} \times \text{selected\_expert\_num}
-$$
-
-$$
-\text{Check if run\_flag is 0:}
-\quad \text{if run\_flag} = 0, \quad \text{exit and log}
+\text{Initialize:} \quad \text{next} = (\text{micro\_batch\_id} + 1) \% \text{micro\_batch\_num}, \quad \text{flag\_num} = \text{micro\_batch\_size} \times \text{selected\_expert\_num}
 $$
 
 $$
 \text{Loop:} \quad \text{while run\_flag} \neq 0:
-\quad \text{ready\_count} = \sum\_{i=1}^{\text{flag\_num}} \mathbf{1}\_{\{ \text{flag}[i] = 1 \}}; \quad \text{if ready\_count} = \text{flag\_num}, \quad \text{break}
+\quad \text{ready\_count} = \sum_{i=1}^{\text{flag\_num}} \mathbf{1}_{\{ \text{flag}[\text{next}, i] = 1 \}}; \quad \text{if ready\_count} = \text{flag\_num}, \quad \text{break}
+$$
+
+$$
+\text{Check after waiting:} \quad \text{if run\_flag} = 0, \quad \text{exit}
 $$
 
 $$
 \text{Reset flags:}
-\quad \text{flag}[i] = 0 \quad \text{for} \quad i = 1, 2, \dots, \text{flag\_num}
+\quad \text{flag}[\text{next}, i] = 0 \quad \text{for} \quad i = 1, 2, \dots, \text{flag\_num}
 $$
 
 $$
-\text{Set micro\_batch\_id:} \quad \text{micro\_batch\_id} = (\text{micro\_batch\_id} + 1) \% \text{micro\_batch\_num}
+\text{Set micro\_batch\_id:} \quad \text{micro\_batch\_id} = \text{next}
 $$
 
-Note: micro_batch_size, selected_expert_num, run_flag, and micro_batch_id are parameters of the input ScheduleContext structure. The structure information is demonstrated in the invocation example.
+Note: micro_batch_num, micro_batch_size, selected_expert_num, run_flag, and micro_batch_id are parameters of the input ScheduleContext structure. The structure information is demonstrated in the invocation example. next is the next micro-batch selected from the input micro_batch_id, and flag[next, i] is its i-th flag. If run_flag is 0 after waiting, the operator exits without clearing the flags or updating micro_batch_id. Otherwise, it updates micro_batch_id after the flags are cleared successfully.
 
 ## Parameter Description
 
@@ -93,7 +92,7 @@ Note: micro_batch_size, selected_expert_num, run_flag, and micro_batch_id are pa
 - `schedule_mode` must be `1` (Attention); `micro_batch_num`, `micro_batch_size`, and `selected_expert_num` must all be greater than 0.
 - `token_info_buf` and `token_data_buf` must both be non-empty addresses; `token_info_buf_size` must be at least `micro_batch_num * (sizeof(AttentionDataDesc) + sizeof(int32_t) * micro_batch_size * selected_expert_num)` bytes.
 - `micro_batch_id` must be in the range `[0, micro_batch_num)`.
-- When `run_flag` is `0`, the operator exits; when it is a non-zero value, the operator waits until all flags of the current batch are ready and then continues processing.
+- When `run_flag` is nonzero, the operator waits until all flags of the next micro-batch selected from the input `micro_batch_id` are ready. If `run_flag` is `0` after waiting, the operator exits.
 - If an integer multiplication overflows when computing the required buffer length, the operator returns an internal error.
 
 ## Invocation Description

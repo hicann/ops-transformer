@@ -26,29 +26,28 @@
 - 计算公式：
 
 $$
-\text{Initialize:} \quad \text{ready\_count} = 0, \quad \text{flag\_num} = \text{micro\_batch\_size} \times \text{selected\_expert\_num}
-$$
-
-$$
-\text{Check if run\_flag is 0:}
-\quad \text{if run\_flag} = 0, \quad \text{exit and log}
+\text{Initialize:} \quad \text{next} = (\text{micro\_batch\_id} + 1) \% \text{micro\_batch\_num}, \quad \text{flag\_num} = \text{micro\_batch\_size} \times \text{selected\_expert\_num}
 $$
 
 $$
 \text{Loop:} \quad \text{while run\_flag} \neq 0:
-\quad \text{ready\_count} = \sum\_{i=1}^{\text{flag\_num}} \mathbf{1}\_{\{ \text{flag}[i] = 1 \}}; \quad \text{if ready\_count} = \text{flag\_num}, \quad \text{break}
+\quad \text{ready\_count} = \sum_{i=1}^{\text{flag\_num}} \mathbf{1}_{\{ \text{flag}[\text{next}, i] = 1 \}}; \quad \text{if ready\_count} = \text{flag\_num}, \quad \text{break}
+$$
+
+$$
+\text{Check after waiting:} \quad \text{if run\_flag} = 0, \quad \text{exit}
 $$
 
 $$
 \text{Reset flags:}
-\quad \text{flag}[i] = 0 \quad \text{for} \quad i = 1, 2, \dots, \text{flag\_num}
+\quad \text{flag}[\text{next}, i] = 0 \quad \text{for} \quad i = 1, 2, \dots, \text{flag\_num}
 $$
 
 $$
-\text{Set micro\_batch\_id:} \quad \text{micro\_batch\_id} = (\text{micro\_batch\_id} + 1) \% \text{micro\_batch\_num}
+\text{Set micro\_batch\_id:} \quad \text{micro\_batch\_id} = \text{next}
 $$
 
-备注：micro_batch_size、selected_expert_num、run_flag、micro_batch_id是入参ScheduleContext结构体的参数，该结构体信息在调用示例中进行展示说明。
+备注：micro_batch_num、micro_batch_size、selected_expert_num、run_flag、micro_batch_id是入参ScheduleContext结构体的参数，该结构体信息在调用示例中进行展示说明。next为根据输入micro_batch_id选出的下一微批次，flag[next, i]为该批次的第i个flag。等待结束后若run_flag为0，算子退出，不清除flag，也不更新micro_batch_id；否则在清除flag成功后更新micro_batch_id。
 
 ## 参数说明
 
@@ -91,7 +90,7 @@ $$
 - `schedule_mode` 必须为 `1`（Attention）；`micro_batch_num`、`micro_batch_size`、`selected_expert_num` 均须大于 0。
 - `token_info_buf` 和 `token_data_buf` 均须为非空地址；`token_info_buf_size` 至少为 `micro_batch_num * (sizeof(AttentionDataDesc) + sizeof(int32_t) * micro_batch_size * selected_expert_num)` 字节。
 - `micro_batch_id` 必须在 `[0, micro_batch_num)` 范围内。
-- `run_flag` 为 `0` 时算子退出；为非零值时等待当前批次的 flag 全部就绪后继续处理。
+- `run_flag` 为非零值时，算子等待根据输入 `micro_batch_id` 选出的下一微批次的 flag 全部就绪；等待结束后若 `run_flag` 为 `0`，算子退出。
 - 计算缓冲区所需长度时若整数乘法溢出，算子返回内部错误。
 
 ## 调用说明

@@ -36,29 +36,28 @@
 - **计算公式**：
 
   $$
-  \text{Initialize:} \quad \text{ready\_count} = 0, \quad \text{flag\_num} = \text{micro\_batch\_size} \times \text{selected\_expert\_num}
-  $$
-
-  $$
-  \text{Check if run\_flag is 0:}
-    \quad \text{if run\_flag} = 0, \quad \text{exit and log}
+  \text{Initialize:} \quad \text{next} = (\text{micro\_batch\_id} + 1) \% \text{micro\_batch\_num}, \quad \text{flag\_num} = \text{micro\_batch\_size} \times \text{selected\_expert\_num}
   $$
 
   $$
   \text{Loop:} \quad \text{while run\_flag} \neq 0:
-    \quad \text{ready\_count} = \sum_{i=1}^{\text{flag\_num}} \mathbf{1}\_{\{ \text{flag}[i] = 1 \}}; \quad \text{if ready\_count} = \text{flag\_num}, \quad \text{break}
+    \quad \text{ready\_count} = \sum_{i=1}^{\text{flag\_num}} \mathbf{1}_{\{ \text{flag}[\text{next}, i] = 1 \}}; \quad \text{if ready\_count} = \text{flag\_num}, \quad \text{break}
+  $$
+
+  $$
+  \text{Check after waiting:} \quad \text{if run\_flag} = 0, \quad \text{exit}
   $$
 
   $$
   \text{Reset flags:}
-    \quad \text{flag}[i] = 0 \quad \text{for} \quad i = 1, 2, \dots, \text{flag\_num}
+    \quad \text{flag}[\text{next}, i] = 0 \quad \text{for} \quad i = 1, 2, \dots, \text{flag\_num}
   $$
 
   $$
-  \text{Set micro\_batch\_id:} \quad \text{micro\_batch\_id} = (\text{micro\_batch\_id} + 1) \% \text{micro\_batch\_num}
+  \text{Set micro\_batch\_id:} \quad \text{micro\_batch\_id} = \text{next}
   $$
 
-  备注：micro_batch_size、selected_expert_num、run_flag、micro_batch_id是入参ScheduleContext结构体的参数，该结构体信息在[调用示例](#调用示例)中进行展示说明。
+  备注：micro_batch_num、micro_batch_size、selected_expert_num、run_flag、micro_batch_id是入参ScheduleContext结构体的参数，该结构体信息在[调用示例](#调用示例)中进行展示说明。next为根据输入micro_batch_id选出的下一微批次，flag[next, i]为该批次的第i个flag。等待结束后若run_flag为0，算子退出，不清除flag，也不更新micro_batch_id；否则在清除flag成功后更新micro_batch_id。
 
 ## 函数原型
 
@@ -217,6 +216,11 @@ aclnnStatus aclnnInplaceAttentionWorkerScheduler(
 
 ## 约束说明
 
+  - scheduleContextRef包含有效的ScheduleContext结构体，当前结构体大小为1024字节。
+  - common.schedule_mode必须为1；common.micro_batch_num、common.micro_batch_size和common.selected_expert_num均须大于0。
+  - attention.micro_batch_id必须在[0, micro_batch_num)范围内。
+  - attention.token_info_buf和attention.token_data_buf均须为非空的有效设备地址，关联缓冲区须在算子执行完成前保持有效。token_info_buf指向的缓冲区须支持读写。
+  - attention.token_info_buf_size及token_info_buf指向的实际可访问缓冲区大小均至少为`micro_batch_num * (sizeof(AttentionDataDesc) + sizeof(int32_t) * micro_batch_size * selected_expert_num)`字节。
   - aclnnInplaceAttentionWorkerScheduler默认为确定性实现，暂不支持非确定性实现，确定性计算配置也不会生效。
 
 ## 调用示例
