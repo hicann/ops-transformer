@@ -26,77 +26,81 @@ def extension():
 
 @pytest.mark.parametrize("layout", ["TND", "BNSD", "BSND"])
 @pytest.mark.parametrize(
-    "gate_dtype,beta_dtype",
-    [(torch.float32, torch.bfloat16), (torch.bfloat16, torch.float32)],
-)
-@pytest.mark.parametrize(
     "fused_gate,has_bias", [(True, True), (True, False), (False, False)]
 )
-def test_fake_backward_contract(
-    extension, layout, gate_dtype, beta_dtype, fused_gate, has_bias
-):
+def test_fake_backward_contract(extension, layout, fused_gate, has_bias):
     q_shape = {"TND": (65, 2, 128), "BNSD": (2, 2, 65, 128), "BSND": (2, 65, 2, 128)}[
         layout
     ]
     v_shape = {"TND": (65, 4, 128), "BNSD": (2, 4, 65, 128), "BSND": (2, 65, 4, 128)}[
         layout
     ]
+    gate_shape = (65, 4, 128) if layout == "TND" else (2, 65, 4, 128)
+    matrix_shape = (4, 65, 64) if layout == "TND" else (2, 4, 65, 64)
+    gate_dtype = torch.bfloat16 if fused_gate else torch.float32
     with FakeTensorMode():
         q = torch.empty(q_shape, dtype=torch.bfloat16)
         k = torch.empty_like(q)
         v = torch.empty(v_shape, dtype=torch.bfloat16)
-        g = torch.empty(v_shape, dtype=gate_dtype)
-        beta = torch.empty(v_shape[:-1], dtype=beta_dtype)
+        g = torch.empty(gate_shape, dtype=gate_dtype)
+        beta = torch.empty(gate_shape[:-1], dtype=torch.bfloat16)
+        do = torch.empty(gate_shape, dtype=torch.bfloat16)
         state = torch.empty((2, 4, 128, 128), dtype=torch.float32)
-        matrices = torch.empty((4, 4, 64, 64), dtype=torch.bfloat16)
+        matrices = torch.empty(matrix_shape, dtype=torch.bfloat16)
         metadata = torch.empty((64,), dtype=torch.int32)
         bias = torch.empty((4, 128), dtype=torch.float32) if has_bias else None
+        attrs = dict(dt_bias=bias, use_gate_in_kernel=fused_gate, layout=layout)
         out = extension.flash_kda_grad(
             q,
             k,
             v,
             g,
             beta,
-            v,
-            state,
-            matrices,
-            matrices,
-            metadata,
-            dt_bias=bias,
-            use_gate_in_kernel=fused_gate,
-            layout=layout,
+            do,
+            Aqk=matrices,
+            Akk=matrices,
+            metadata=metadata,
+            **attrs,
         )
-        assert [tuple(t.shape) for t in out[:6]] == [
-            q_shape,
-            q_shape,
-            v_shape,
-            tuple(state.shape),
-            v_shape,
-            v_shape[:-1],
-        ]
-        assert [t.dtype for t in out[:6]] == [
-            q.dtype,
-            k.dtype,
-            v.dtype,
-            torch.float32,
-            gate_dtype,
-            beta_dtype,
-        ]
-        expected_stride = {"TND": (1, 66), "BNSD": (264, 66, 1), "BSND": (264, 1, 66)}[
-            layout
-        ]
-        assert out[5].stride() == expected_stride
+        assert out[3] is None
+        assert out[0].shape == q.shape and out[0].dtype == q.dtype
+        assert out[1].shape == k.shape and out[1].dtype == k.dtype
+        assert out[2].shape == v.shape and out[2].dtype == v.dtype
+        assert out[4].shape == g.shape and out[4].dtype == g.dtype
+        assert out[5].shape == beta.shape and out[5].dtype == beta.dtype
         assert (out[6] is not None) == fused_gate
         assert (out[7] is not None) == (fused_gate and has_bias)
         if fused_gate:
             assert out[6].shape == (4,) and out[6].dtype == torch.float32
             assert out[6].stride() == (8,)
 
+        with_state = extension.flash_kda_grad(
+            q,
+            k,
+            v,
+            g,
+            beta,
+            do,
+            dht=state,
+            Aqk=matrices,
+            Akk=matrices,
+            metadata=metadata,
+            initial_state=state,
+            **attrs,
+        )
+        assert (
+            with_state[3].shape == state.shape and with_state[3].dtype == torch.float32
+        )
+        with pytest.raises(TypeError, match="Aqk"):
+            extension.flash_kda_grad(q, k, v, g, beta, do, Akk=matrices, **attrs)
+        with pytest.raises(TypeError, match="Akk"):
+            extension.flash_kda_grad(q, k, v, g, beta, do, Aqk=matrices, **attrs)
+
 
 def test_metadata_fake_without_lengths(extension):
     with FakeTensorMode():
         metadata = extension.flash_kda_grad_metadata(
-            batch_size=2, n_heads_qk=2, n_heads_v=4, seqlens=65, layout="BNSD"
+            batch_size=2, nheads_qk=2, nheads_v=4, seqlens=65, layout="BNSD"
         )
         assert metadata.shape == (64,)
         assert metadata.dtype == torch.int32
@@ -105,7 +109,7 @@ def test_metadata_fake_without_lengths(extension):
 def test_metadata_meta_dispatch(extension):
     lengths = torch.empty((3,), dtype=torch.int32, device="meta")
     metadata = extension.flash_kda_grad_metadata(
-        lengths, batch_size=2, n_heads_qk=2, n_heads_v=4, seqlens=65
+        lengths, batch_size=2, nheads_qk=2, nheads_v=4, seqlens=65
     )
     assert metadata.device.type == "meta"
     assert metadata.shape == (64,)
@@ -127,6 +131,11 @@ def test_schema_and_dispatch_registered(extension):
     grad = torch.ops.cann_ops_transformer.flash_kda_grad.default
     meta = torch.ops.cann_ops_transformer.flash_kda_grad_metadata.default
     assert grad is not None and meta is not None
+    args = {arg.name: arg for arg in grad._schema.arguments}
+    assert args["dht"].has_default_value() and args["dht"].default_value is None
+    for name in ("Aqk", "Akk"):
+        assert args[name].kwarg_only and not args[name].has_default_value()
+        assert str(args[name].type) == "Tensor"
     for name in (
         "cann_ops_transformer::flash_kda_grad",
         "cann_ops_transformer::flash_kda_grad_metadata",
@@ -152,27 +161,26 @@ def test_installed_package_end_to_end(extension):
     metadata = extension.flash_kda_grad_metadata(
         cu_seqlens,
         batch_size=1,
-        n_heads_qk=n_qk,
-        n_heads_v=n_v,
+        nheads_qk=n_qk,
+        nheads_v=n_v,
         seqlens=length,
         headdim_qk=dim,
         headdim_v=dim,
         layout="TND",
     )
     assert metadata.dtype == torch.int32
-    assert metadata.shape == (64,)
+    assert metadata.shape == (8 + 7 * n_v,)
     assert metadata.device.type == "npu"
 
-    chunks = (length + 63) // 64
     q = torch.randn(length, n_qk, dim, dtype=torch.bfloat16, device=device) * 0.1
     k = torch.randn_like(q)
     v = torch.randn(length, n_v, dim, dtype=torch.bfloat16, device=device) * 0.1
     g = torch.randn_like(v) * 0.1
-    beta = torch.randn(length, n_v, dtype=torch.bfloat16, device=device) * 0.1
+    beta = torch.rand(length, n_v, dtype=torch.float32, device=device)
     do = torch.randn_like(v) * 0.1
     dht = torch.zeros(1, n_v, dim, dim, dtype=torch.float32, device=device)
     initial_state = torch.zeros(1, n_v, dim, dim, dtype=torch.float32, device=device)
-    Aqk = torch.zeros(chunks, n_v, 64, 64, dtype=torch.bfloat16, device=device)
+    Aqk = torch.zeros(n_v, length, 64, dtype=torch.bfloat16, device=device)
     Akk = torch.zeros_like(Aqk)
     A_log = torch.full((n_v,), -3.0, dtype=torch.float32, device=device)
     dt_bias = torch.zeros(n_v, dim, dtype=torch.float32, device=device)
@@ -184,15 +192,17 @@ def test_installed_package_end_to_end(extension):
         g,
         beta,
         do,
-        dht,
-        Aqk,
-        Akk,
-        metadata,
+        dht=dht,
+        Aqk=Aqk,
+        Akk=Akk,
+        metadata=metadata,
         initial_state=initial_state,
         A_log=A_log,
         dt_bias=dt_bias,
         cu_seqlens=cu_seqlens,
         disable_recompute=False,
+        use_qk_l2norm_in_kernel=False,
+        use_beta_sigmoid_in_kernel=False,
         lower_bound=-5.0,
         layout="TND",
     )
@@ -210,3 +220,22 @@ def test_installed_package_end_to_end(extension):
     ):
         assert tensor is not None, name
         assert torch.isfinite(tensor.float()).all(), name
+
+    without_state = extension.flash_kda_grad(
+        q,
+        k,
+        v,
+        g,
+        beta,
+        do,
+        Aqk=Aqk,
+        Akk=Akk,
+        metadata=metadata,
+        A_log=A_log,
+        dt_bias=dt_bias,
+        cu_seqlens=cu_seqlens,
+        use_qk_l2norm_in_kernel=False,
+        use_beta_sigmoid_in_kernel=False,
+        lower_bound=-5.0,
+    )
+    assert without_state[3] is None

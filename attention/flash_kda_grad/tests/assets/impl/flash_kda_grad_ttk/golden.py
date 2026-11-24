@@ -483,7 +483,7 @@ def _bf16_operand(x: torch.Tensor) -> torch.Tensor:
 def _split_operand(x: torch.Tensor) -> torch.Tensor:
     """Round a *state-gradient* operand: BF16 high part + BF16 residual.
 
-    ``StageTwoMatmul.compute_token_state_split`` feeds ``dH`` as two MMADs
+    ``StateGradientMatmul.compute_token_state_split`` feeds ``dH`` as two MMADs
     (high and residual), which keeps ~14 effective mantissa bits. The kernel
     uses that split only for the ``d_kg`` product; every other product reads a
     plain BF16 operand (see :func:`_bf16_operand`).

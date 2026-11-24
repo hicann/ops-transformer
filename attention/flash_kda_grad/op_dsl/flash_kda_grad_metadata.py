@@ -6,11 +6,11 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 
-"""Task metadata and all scheduling policies for fused FlashKDA backward.
+"""Task metadata, validated snapshots, owner planning and device task addressing.
 
-The AICPU producer preserves the task-table ABI. Host policies select the
-existing Native template and workspace; inline DSL policies map work to cores.
-Both consumers share this module, including versioned plan/device-table caches.
+The AICPU producer preserves the task-table ABI. This module owns validated
+task snapshots, task partitioning, owner plans and owner-table publication.
+The Host entry assembles the execution plan and launch configuration.
 """
 
 import os

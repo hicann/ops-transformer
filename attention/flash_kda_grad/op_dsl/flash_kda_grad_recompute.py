@@ -6,14 +6,10 @@
 # INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
 # See LICENSE in the root of the software repository for the full text of the License.
 
-"""Forward-precision cache reconstruction inside the existing grad kernel.
+"""Rebuild the forward caches required by the backward templates."""
 
-BF16 operand packing and Cube contractions retain FP32 recurrent state.
-All implementation lives here. The grad metadata and owner schedule are reused;
-no second launch or separate forward schedule is created. Aqk/Akk and activation/norm caches stay read-only.
-"""
-
-from cannbotdsl import from_tensor, PIPE, MemLoc, dtypes
+from __future__ import annotations
+from cannbotdsl import Constexpr, MemLoc, PIPE, dtypes, from_tensor, make_layout
 from cannbotdsl.buffer import Buffer
 from cannbotdsl.lang import vf
 from cannbotdsl.lang.constexpr import const_expr
@@ -21,7 +17,7 @@ from cannbotdsl.lang.control_flow import range as dsl_range
 from cannbotdsl.lang.jit import jit
 from cannbotdsl.ops.arch import get_block_idx, get_block_num, get_subblock_id
 from cannbotdsl.ops.matmul import matmul
-from cannbotdsl.ops.memcpy import cube_fill_l1_zero, copy_options, mem_copy
+from cannbotdsl.ops.memcpy import copy_options, cube_fill_l1_zero, mem_copy
 from cannbotdsl.ops.reg import (
     PackMode,
     UnpackMode,
@@ -46,13 +42,13 @@ from cannbotdsl.ops.reg import (
     vpack,
     vreinterpret,
     vreinterpret_lanes,
+    vselect as vselect_raw,
     vstore,
     vstore_first,
     vstore_pack,
     vstore_strided,
     vsub,
 )
-from cannbotdsl.ops.reg import vselect as vselect_raw
 from cannbotdsl.ops.sync import (
     cube_sync_all,
     cube_sync_pipe,
@@ -60,25 +56,29 @@ from cannbotdsl.ops.sync import (
     vec_sync_notify,
     vec_sync_wait,
 )
-from cannbotdsl.tensor import tile_slice
-from cannbotdsl import Constexpr
-from cannbotdsl import make_layout
 from cannbotdsl.ring_buffer import RingBuffer
+from cannbotdsl.tensor import tile_slice
 
-try:
-    from . import flash_kda_grad as grad
-except ImportError:
-    import flash_kda_grad as grad
+if __package__:
+    from . import flash_kda_grad_metadata as _metadata
+    from .flash_kda_grad_buffer import _cube_buffer, _sync_cube_vector_handoff
+else:
+    import flash_kda_grad_metadata as _metadata
+    from flash_kda_grad_buffer import _cube_buffer, _sync_cube_vector_handoff
 
-_cube_buffer = grad._cube_buffer
-_cube_ring = grad._cube_ring
 
-# Cross-core transfers use paired single-slot channels; same-core scratch
-# uses plain buffers. Each chunk consumes its operands before recurrence.
 C, D, HALF = 64, 128, 64
+
+
 CHUNK_SIZE, SUPPORTED_HEAD_DIM, D_HALF = C, D, HALF
+
+
 K_RESTORED_OPERAND_INDEX = 1
+
+
 K_DECAYED_BETA_OPERAND_INDEX = 2
+
+
 V_BETA_OPERAND_INDEX = 3
 # Forward packs qg, kg, weighted K and weighted V once in BF16.
 RECOMPUTE_OPERAND_PLANES = 4
@@ -836,18 +836,18 @@ def recompute_tracks(
 ):
     part = get_subblock_id()
     heads_per_key_head = v.shape[1] // q.shape[1]
-    task_count = (metadata.shape[0] - grad.HEADER_WORDS) // grad.TASK_WORDS
+    task_count = (metadata.shape[0] - _metadata.HEADER_WORDS) // _metadata.TASK_WORDS
     if (
-        metadata[grad.HEADER_STATUS] != grad.STATUS_OK
-        or metadata[grad.HEADER_MAGIC] != grad.MAGIC
-        or metadata[grad.HEADER_ABI_VERSION] != grad.ABI_VERSION
+        metadata[_metadata.HEADER_STATUS] != _metadata.STATUS_OK
+        or metadata[_metadata.HEADER_MAGIC] != _metadata.MAGIC
+        or metadata[_metadata.HEADER_ABI_VERSION] != _metadata.ABI_VERSION
     ):
         task_count = 0
-    begin, end, step = grad._owner_loop_bounds(
+    begin, end, step = _metadata._owner_loop_bounds(
         gm_owner_schedule, task_count // heads_per_key_head
     )
     for slot in range(begin, end, step):
-        owner = grad._scheduled_owner(gm_owner_schedule, slot)
+        owner = _metadata._scheduled_owner(gm_owner_schedule, slot)
         for local_head in range(heads_per_key_head):
             # Restrict reconstruction resources to this owner. They must not
             # become loop-carried channel state in the later backward scan.
@@ -863,14 +863,14 @@ def recompute_tracks(
             prep.has_lower_bound = softplus == 0
             prep.fused_beta = fused_beta
             record = (
-                grad.HEADER_WORDS
-                + (owner * heads_per_key_head + local_head) * grad.TASK_WORDS
+                _metadata.HEADER_WORDS
+                + (owner * heads_per_key_head + local_head) * _metadata.TASK_WORDS
             )
-            sequence = metadata[record + grad.TASK_SEQUENCE]
-            head = metadata[record + grad.TASK_VALUE_HEAD]
-            length = metadata[record + grad.TASK_LENGTH]
-            compact_start = metadata[record + grad.TASK_COMPACT_TOKEN_START]
-            chunks = metadata[record + grad.TASK_CHUNKS]
+            sequence = metadata[record + _metadata.TASK_SEQUENCE]
+            head = metadata[record + _metadata.TASK_VALUE_HEAD]
+            length = metadata[record + _metadata.TASK_LENGTH]
+            compact_start = metadata[record + _metadata.TASK_COMPACT_TOKEN_START]
+            chunks = metadata[record + _metadata.TASK_CHUNKS]
             batch, origin, state_batch, state_base = (
                 0,
                 compact_start,
@@ -1210,20 +1210,18 @@ def _recompute_staged_states(
     round_u_pre: dtypes.int64,
 ):
     part = get_subblock_id()
-    begin, end, step = grad._metadata._staged_reverse_loop_bounds(
+    begin, end, step = _metadata._staged_reverse_loop_bounds(
         task_count, (D // value_rows)
     )
     for owner in range(begin, end, step):
         recurrence = _StagedState(value_rows, operands, result, resources)
-        task, value_part = grad._metadata._staged_reverse_owner(
-            owner, (D // value_rows)
-        )
-        record = grad.HEADER_WORDS + task * grad.TASK_WORDS
-        sequence = metadata[record + grad.TASK_SEQUENCE]
-        head = metadata[record + grad.TASK_VALUE_HEAD]
-        length = metadata[record + grad.TASK_LENGTH]
-        chunks = metadata[record + grad.TASK_CHUNKS]
-        origin = metadata[record + grad.TASK_COMPACT_TOKEN_START]
+        task, value_part = _metadata._staged_reverse_owner(owner, (D // value_rows))
+        record = _metadata.HEADER_WORDS + task * _metadata.TASK_WORDS
+        sequence = metadata[record + _metadata.TASK_SEQUENCE]
+        head = metadata[record + _metadata.TASK_VALUE_HEAD]
+        length = metadata[record + _metadata.TASK_LENGTH]
+        chunks = metadata[record + _metadata.TASK_CHUNKS]
+        origin = metadata[record + _metadata.TASK_COMPACT_TOKEN_START]
         batch, state_batch, state_base = 0, 0, origin // C + sequence
         if padded:
             batch, origin, state_batch, state_base = sequence, 0, sequence, 0
@@ -1372,11 +1370,11 @@ def recompute_staged_tracks(
     """
     part, block, cores = get_subblock_id(), get_block_idx(), get_block_num()
     heads_per_key_head = v.shape[1] // q.shape[1]
-    task_count = (metadata.shape[0] - grad.HEADER_WORDS) // grad.TASK_WORDS
+    task_count = (metadata.shape[0] - _metadata.HEADER_WORDS) // _metadata.TASK_WORDS
     if (
-        metadata[grad.HEADER_STATUS] != grad.STATUS_OK
-        or metadata[grad.HEADER_MAGIC] != grad.MAGIC
-        or metadata[grad.HEADER_ABI_VERSION] != grad.ABI_VERSION
+        metadata[_metadata.HEADER_STATUS] != _metadata.STATUS_OK
+        or metadata[_metadata.HEADER_MAGIC] != _metadata.MAGIC
+        or metadata[_metadata.HEADER_ABI_VERSION] != _metadata.ABI_VERSION
     ):
         task_count = 0
     # Keep reconstruction resources in a uniform metadata-valid region.
@@ -1394,17 +1392,17 @@ def recompute_staged_tracks(
         caches = _Caches(part)
         decay = Buffer(MemLoc.UB, dtypes.float32, make_layout((HALF,)))
         for task in range(task_count):
-            record = grad.HEADER_WORDS + task * grad.TASK_WORDS
-            sequence = metadata[record + grad.TASK_SEQUENCE]
-            head = metadata[record + grad.TASK_VALUE_HEAD]
-            length = metadata[record + grad.TASK_LENGTH]
-            chunks = metadata[record + grad.TASK_CHUNKS]
-            origin = metadata[record + grad.TASK_COMPACT_TOKEN_START]
+            record = _metadata.HEADER_WORDS + task * _metadata.TASK_WORDS
+            sequence = metadata[record + _metadata.TASK_SEQUENCE]
+            head = metadata[record + _metadata.TASK_VALUE_HEAD]
+            length = metadata[record + _metadata.TASK_LENGTH]
+            chunks = metadata[record + _metadata.TASK_CHUNKS]
+            origin = metadata[record + _metadata.TASK_COMPACT_TOKEN_START]
             batch = 0
             if padded:
                 batch, origin = sequence, 0
             stop = origin + length
-            first = grad._metadata._staged_chunk_start(
+            first = _metadata._staged_chunk_start(
                 metadata, record, heads_per_key_head, block, cores
             )
             prep.sequence_length = length
@@ -1450,7 +1448,7 @@ def recompute_staged_tracks(
                 cube.compute_u_pre_and_w(prep, None)
         if padded:
             for task in range(block, task_count, cores):
-                record = grad.HEADER_WORDS + task * grad.TASK_WORDS
+                record = _metadata.HEADER_WORDS + task * _metadata.TASK_WORDS
                 _clear_padded_caches(
                     w,
                     u,
@@ -1458,9 +1456,9 @@ def recompute_staged_tracks(
                     qg,
                     kg,
                     gamma,
-                    metadata[record + grad.TASK_SEQUENCE],
-                    metadata[record + grad.TASK_VALUE_HEAD],
-                    metadata[record + grad.TASK_LENGTH],
+                    metadata[record + _metadata.TASK_SEQUENCE],
+                    metadata[record + _metadata.TASK_VALUE_HEAD],
+                    metadata[record + _metadata.TASK_LENGTH],
                     v.shape[2],
                     part,
                     caches.ub_cast_bf16,
@@ -1468,13 +1466,13 @@ def recompute_staged_tracks(
                 )
         # Stage one publishes only GM caches. Retire its channels and local
         # buffers before allocating the independent FP32 recurrence stage.
-        grad._sync_cube_vector_handoff(1, grid=True)
+        _sync_cube_vector_handoff(1, grid=True)
         operands = RingBuffer(
             MemLoc.L1, dtypes.bfloat16, make_layout((2 * D, D)), depth=1
         )
         result = RingBuffer(MemLoc.UB, dtypes.float32, make_layout((D, D)), depth=1)
         resources = _StagedState(D, operands, result)
-        if grad._metadata._staged_reverse_is_unsplit(task_count, cores):
+        if _metadata._staged_reverse_is_unsplit(task_count, cores):
             _recompute_staged_states(
                 w,
                 u,
@@ -1506,7 +1504,7 @@ def recompute_staged_tracks(
                 padded,
                 has_initial_state,
                 task_count,
-                grad._metadata.STAGED_SPLIT_VALUE_ROWS,
+                _metadata.STAGED_SPLIT_VALUE_ROWS,
                 operands,
                 result,
                 resources,

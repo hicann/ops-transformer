@@ -68,6 +68,12 @@ finally:
 
 integration = load_sample("flash_kda_grad/flash_kda_grad.py")
 metadata_module = load_sample("flash_kda_grad/flash_kda_grad_metadata.py")
+buffer_module = load_sample("flash_kda_grad/flash_kda_grad_buffer.py")
+kernel_module = load_sample("flash_kda_grad/flash_kda_grad_kernel.py")
+check_module = load_sample("flash_kda_grad/flash_kda_grad_check.py")
+chunk_module = load_sample("flash_kda_grad/flash_kda_grad_chunk.py")
+causal_module = load_sample("flash_kda_grad/flash_kda_grad_causal.py")
+outputs_module = load_sample("flash_kda_grad/flash_kda_grad_outputs.py")
 flash_kda_grad_npu = integration._flash_kda_grad_kernel_entry
 flash_kda_grad_metadata = metadata_module.flash_kda_grad_metadata
 
@@ -2074,9 +2080,9 @@ def _tnd_b31_fixture():
 metadata_capacity = metadata_module.metadata_capacity
 HEADER_STATUS = metadata_module.HEADER_STATUS
 STATUS_BAD_LENGTH = metadata_module.STATUS_BAD_LENGTH
-StageTwoResult = integration.StageTwoResult
-_prepare_stage_one = integration._prepare_stage_one
-_prepare_stage_two = integration._prepare_stage_two
+StateBackwardResult = integration.StateBackwardResult
+_prepare_chunk_backward = integration._prepare_chunk_backward
+_prepare_state_backward = integration._prepare_state_backward
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -2094,36 +2100,45 @@ def _register_npu_before_autograd(request):
 @pytest.mark.whitebox
 def test_vf_branches_are_compile_time_only():
     """Runtime switches belong outside VF; row boundaries use vector masks."""
-    source = ast.parse(inspect.getsource(integration))
     violations = []
-    for scope in ast.walk(source):
-        if not isinstance(scope, ast.With):
+    for path in Path(integration.__file__).parent.glob("flash_kda_grad_*.py"):
+        # Keep the scope of the original entry-file audit after splitting it.
+        if path.stem in {
+            "flash_kda_grad_metadata",
+            "flash_kda_grad_persistent",
+            "flash_kda_grad_recompute",
+            "flash_kda_grad_staged",
+        }:
             continue
-        if not any(
-            isinstance(item.context_expr, ast.Call)
-            and isinstance(item.context_expr.func, ast.Name)
-            and item.context_expr.func.id == "vf"
-            for item in scope.items
-        ):
-            continue
-        for branch in ast.walk(scope):
-            if isinstance(branch, ast.If) and not (
-                isinstance(branch.test, ast.Call)
-                and isinstance(branch.test.func, ast.Name)
-                and branch.test.func.id == "const_expr"
+        source = ast.parse(path.read_text(encoding="utf-8"))
+        for scope in ast.walk(source):
+            if not isinstance(scope, ast.With):
+                continue
+            if not any(
+                isinstance(item.context_expr, ast.Call)
+                and isinstance(item.context_expr.func, ast.Name)
+                and item.context_expr.func.id == "vf"
+                for item in scope.items
             ):
-                violations.append(branch.lineno)
-    assert not violations, f"runtime if inside VF at lines {violations}"
+                continue
+            for branch in ast.walk(scope):
+                if isinstance(branch, ast.If) and not (
+                    isinstance(branch.test, ast.Call)
+                    and isinstance(branch.test.func, ast.Name)
+                    and branch.test.func.id == "const_expr"
+                ):
+                    violations.append(f"{path.name}:{branch.lineno}")
+    assert not violations, f"runtime if inside VF: {violations}"
 
 
 @pytest.mark.whitebox
 def test_gate_reduction_assigns_one_half_per_aiv():
     """Each AIV owns disjoint gate channels and adds its own dA partial."""
-    source = ast.parse(inspect.getsource(integration))
+    source = ast.parse(inspect.getsource(outputs_module))
     vector = next(
         node
         for node in source.body
-        if isinstance(node, ast.ClassDef) and node.name == "StageOneVector"
+        if isinstance(node, ast.ClassDef) and node.name == "ChunkGradientVector"
     )
     finish = next(
         node
@@ -2171,7 +2186,7 @@ def test_gate_reduction_assigns_one_half_per_aiv():
 @pytest.mark.whitebox
 def test_fused_gate_reduction_keeps_chunk_sums_in_ub():
     """The fused path must avoid per-chunk gate-part writes and reloads."""
-    source = ast.parse(inspect.getsource(integration))
+    source = ast.parse(inspect.getsource(chunk_module))
     body = next(
         node
         for node in source.body
@@ -2189,7 +2204,7 @@ def test_fused_gate_reduction_keeps_chunk_sums_in_ub():
 
 @pytest.mark.whitebox
 def test_head_reduction_assigns_disjoint_token_rows_to_both_aivs():
-    source = ast.parse(inspect.getsource(integration))
+    source = ast.parse(inspect.getsource(chunk_module))
     body = next(
         node
         for node in source.body
@@ -2280,7 +2295,7 @@ def test_one_track_chunk_workspace_is_bounded_for_equal_and_grouped_heads(
     q = empty((length, qk_heads, 128))
     v = empty((length, value_heads, 128))
     matrix = empty((chunk_capacity, value_heads, 64, 64))
-    stage_two = StageTwoResult(
+    stage_two = StateBackwardResult(
         empty(v.shape, torch.float32),
         empty(matrix.shape, torch.float32),
         empty(v.shape, torch.float32),
@@ -2303,7 +2318,7 @@ def test_one_track_chunk_workspace_is_bounded_for_equal_and_grouped_heads(
         "compile",
         lambda *args: CaptureArguments(),
     )
-    prepared = _prepare_stage_one(
+    prepared = _prepare_chunk_backward(
         query=q,
         key=q,
         values=v,
@@ -2662,7 +2677,9 @@ def test_backward_reaps_completed_workspace_before_next_stage_two_allocation(
 
     monkeypatch.setattr(integration, "_validate_backward_inputs", lambda *args: None)
     monkeypatch.setattr(integration, "_device_block_num", lambda ref=None: 32)
-    monkeypatch.setattr(integration, "_prepare_stage_two", next_stage_two_allocation)
+    monkeypatch.setattr(
+        integration, "_prepare_state_backward", next_stage_two_allocation
+    )
     # ABI validation is isolated here: stop at the allocation boundary before
     # placeholders can reach any math, TensorSpec construction or device call.
     arguments = {
@@ -6064,14 +6081,17 @@ def test_public_kdag_defaults_reach_stage_two(
     monkeypatch.setattr(integration, "_validate_backward_inputs", validate)
     monkeypatch.setattr(integration, "_reap_backward_workspaces", lambda: None)
     monkeypatch.setattr(integration, "_device_block_num", lambda ref: 32)
-    monkeypatch.setattr(integration, "_track_chunk_plan", lambda *args: (False, True))
     monkeypatch.setattr(
-        integration, "_select_backward_template", lambda *args: "persistent"
+        integration,
+        "make_backward_plan",
+        lambda metadata, qh, vh, cores, **kw: integration.BackwardPlan(
+            cores, False, True, False, False, cores
+        ),
     )
     monkeypatch.setattr(
         integration._BACKWARD_SCRATCH, "acquire", lambda *args: nullcontext(None)
     )
-    monkeypatch.setattr(integration, "_prepare_stage_two", prepare)
+    monkeypatch.setattr(integration, "_prepare_state_backward", prepare)
     fixture = _make_host_abi_inputs(torch.float32, layout="TND")
     fixture.update(q_norm=fixture["q"], k_norm=fixture["k"])
     inputs = tuple(fixture[name] for name in ("q", "k", "v", "g", "beta", "do", "dht"))
@@ -6257,8 +6277,10 @@ def test_public_normalized_qk_reach_stage_one_without_rescaling(
     monkeypatch.setattr(
         integration._BACKWARD_SCRATCH, "acquire", lambda *a: nullcontext(None)
     )
-    monkeypatch.setattr(integration, "_prepare_stage_two", lambda **kw: (None, (), ()))
-    monkeypatch.setattr(integration, "_prepare_stage_one", prepare)
+    monkeypatch.setattr(
+        integration, "_prepare_state_backward", lambda **kw: (None, (), ())
+    )
+    monkeypatch.setattr(integration, "_prepare_chunk_backward", prepare)
     with pytest.raises(Prepared):
         integration._flash_kda_grad_kernel_entry(disable_recompute=True, **args)
 
@@ -6451,7 +6473,7 @@ def test_public_sequence_lengths_reach_compute_preparation(
     monkeypatch.setattr(
         integration._BACKWARD_SCRATCH, "acquire", lambda *a: nullcontext(None)
     )
-    monkeypatch.setattr(integration, "_prepare_stage_two", prepare)
+    monkeypatch.setattr(integration, "_prepare_state_backward", prepare)
     with pytest.raises(
         Prepared if supplied_metadata else ValueError,
         match=None if supplied_metadata else "metadata is required",
@@ -6578,7 +6600,7 @@ def test_public_invalid_lengths_stop_before_compute(
     args = _make_host_abi_inputs(gate_dtype=torch.float32)
     monkeypatch.setattr(
         integration,
-        "_prepare_stage_two",
+        "_prepare_state_backward",
         lambda **kw: pytest.fail("invalid length reached compute"),
     )
     with pytest.raises(ValueError, match="metadata status"):
@@ -6599,7 +6621,7 @@ def test_public_invalid_offsets_stop_before_compute(
     args.update(layout="TND")
     monkeypatch.setattr(
         integration,
-        "_prepare_stage_two",
+        "_prepare_state_backward",
         lambda **kw: pytest.fail("invalid offsets reached compute"),
     )
     with pytest.raises(ValueError, match="metadata status"):
@@ -6610,34 +6632,16 @@ def test_public_invalid_offsets_stop_before_compute(
         )
 
 
-@pytest.mark.parametrize("from_forward", (False, True))
-@pytest.mark.parametrize("missing", ("do", "dht", "both"))
-def test_public_entries_require_upstream_gradients(monkeypatch, from_forward, missing):
-    """Missing seeds must fail on the host before any allocation or launch."""
-    args = _make_host_abi_inputs()
-    if missing in ("do", "both"):
-        args["do"] = None
-    if missing in ("dht", "both"):
-        args["dht"] = None
-    monkeypatch.setattr(
-        integration,
-        "_prepare_stage_two",
-        lambda **kwargs: pytest.fail("missing gradient reached compute preparation"),
-    )
-    expected = "do" if missing in ("do", "both") else "dht"
-    with pytest.raises(ValueError, match=f"{expected} must be a Tensor"):
-        if from_forward:
-            integration.flash_kda_grad_from_forward(
-                *(args[name] for name in ("q", "k", "v", "g", "beta", "do", "dht")),
-                (None,) * 16,
-                None,
-                None,
-                args["metadata"],
-                disable_recompute=True,
-                use_qk_l2norm_in_kernel=False,
-            )
-        else:
-            integration._flash_kda_grad_kernel_entry(disable_recompute=True, **args)
+@pytest.mark.parametrize("dtype", (torch.bfloat16, torch.float32))
+def test_dma_gradient_view_preserves_aligned_strides(dtype):
+    gradient = torch.zeros((2, 3, 8, 128), dtype=dtype)
+    for view in (gradient, gradient.transpose(1, 2), gradient[:, :, ::2]):
+        assert integration._dma_gradient_view(view) is view
+
+    broadcast = gradient[:, :, :1, :1].expand_as(gradient)
+    packed = integration._dma_gradient_view(broadcast)
+    assert packed.is_contiguous()
+    torch.testing.assert_close(packed, broadcast, atol=0, rtol=0)
 
 
 @pytest.mark.whitebox
@@ -6656,8 +6660,8 @@ def test_public_entries_require_upstream_gradients(monkeypatch, from_forward, mi
         ("gate_shape", "V/g/beta physical shapes"),
         ("beta_shape", "V/g/beta physical shapes"),
         ("output_gradient_dtype", "do must"),
-        ("missing_output_gradient", "do must be a Tensor"),
-        ("output_gradient_not_tensor", "do must be a Tensor"),
+        ("missing_output_gradient", "do must be a BF16 Tensor"),
+        ("output_gradient_not_tensor", "do must be a BF16 Tensor"),
         ("metadata_dtype", "metadata must"),
         ("missing_metadata", "metadata is required"),
         ("metadata_capacity", "metadata must"),
@@ -6678,7 +6682,6 @@ def test_public_entries_require_upstream_gradients(monkeypatch, from_forward, mi
         ("inverse_shape", "Aqk/Akk"),
         ("state_shape", "chunk_states shape"),
         ("final_gradient_dtype", "dht must"),
-        ("missing_final_gradient", "dht must be a Tensor"),
         ("final_gradient_not_tensor", "dht must be a Tensor"),
         ("missing_query_rstd", "FP32 q_rstd and k_rstd caches"),
         ("missing_key_rstd", "FP32 q_rstd and k_rstd caches"),
@@ -6769,7 +6772,6 @@ def test_invalid_public_abi_rejected_before_compute(
             "chunk_states": fake_npu_empty((1, 1, 64, 128), torch.float32)
         },
         "final_gradient_dtype": lambda: {"dht": args["chunk_states"].bfloat16()},
-        "missing_final_gradient": lambda: {"dht": None},
         "final_gradient_not_tensor": lambda: {"dht": 0.0},
         "missing_query_rstd": lambda: {"q_rstd": None},
         "missing_key_rstd": lambda: {"k_rstd": None},
@@ -6942,7 +6944,7 @@ def test_public_rejects_nonforward_chunk_caches(
     )
     monkeypatch.setattr(
         integration,
-        "_prepare_stage_two",
+        "_prepare_state_backward",
         lambda **kw: pytest.fail("invalid cache reached backward"),
     )
     with pytest.raises(ValueError, match="Aqk/Akk|chunk_states shape"):
@@ -6960,7 +6962,7 @@ def test_public_rejects_compact_padded_token_caches(
     args[field] = args[field][1].transpose(0, 1)
     monkeypatch.setattr(
         integration,
-        "_prepare_stage_two",
+        "_prepare_state_backward",
         lambda **kw: pytest.fail("invalid cache reached backward"),
     )
     with pytest.raises(
@@ -7032,8 +7034,17 @@ def test_public_forward_views_and_launch_count(
         )
 
     def recompute(
-        device, tensors, config, scale, core_num, has_initial_state, round_rebuilt_u
+        device,
+        tensors,
+        config,
+        scale,
+        core_num,
+        has_initial_state,
+        round_rebuilt_u,
+        *,
+        has_dht,
     ):
+        assert has_dht
         launched.append("fused")
         assert has_initial_state == initial_present
         assert round_rebuilt_u == round_u_pre
@@ -7055,10 +7066,12 @@ def test_public_forward_views_and_launch_count(
     monkeypatch.setattr(
         integration._BACKWARD_SCRATCH, "acquire", lambda *a: nullcontext(None)
     )
-    monkeypatch.setattr(integration, "_prepare_stage_two", stage_two)
-    monkeypatch.setattr(integration, "_prepare_stage_one", stage_one)
+    monkeypatch.setattr(integration, "_prepare_state_backward", stage_two)
+    monkeypatch.setattr(integration, "_prepare_chunk_backward", stage_one)
     monkeypatch.setattr(
-        integration, "_launch_backward_program", lambda *a: launched.append("backward")
+        integration,
+        "_launch_backward_program",
+        lambda *a, **kw: launched.append("backward"),
     )
     monkeypatch.setattr(integration, "_launch_recompute_program", recompute)
     args["disable_recompute"] = disabled
@@ -7226,7 +7239,7 @@ def test_public_recompute_dispatch(monkeypatch, host_sequence_metadata, mode, su
     monkeypatch.setattr(
         integration._BACKWARD_SCRATCH, "acquire", lambda *a: nullcontext(None)
     )
-    monkeypatch.setattr(integration, "_prepare_stage_two", prepare)
+    monkeypatch.setattr(integration, "_prepare_state_backward", prepare)
     if mode is not False and not supplied:
         with pytest.raises(ValueError, match="requires all saved"):
             integration._flash_kda_grad_kernel_entry(**args)
@@ -7313,7 +7326,7 @@ def test_recompute_is_disabled_by_default_but_not_a_backward_kernel_argument():
         not in inspect.signature(integration.FlashKDAGrad.run).parameters
     )
     specs, scalars = integration.backward_dynamic_compile_request()
-    assert len(specs) == 89 and len(specs) + len(scalars) == 106
+    assert len(specs) == 89 and len(specs) + len(scalars) == 107
 
 
 @pytest.mark.parametrize("failure", (None, "launch", "record", "synchronize"))
@@ -7504,12 +7517,16 @@ def recompute_vector_cpu(monkeypatch):
         vstore_first=lambda t, off, x: t.view(-1)[int(off)].copy_(x[0]),
         vmem_bar=lambda *a: None,
     )
-    for name, implementation in operations.items():
-        monkeypatch.setattr(integration, name, implementation)
-    recompute = inspect.getmodule(integration._recompute_implementation().fn)
-    for name, implementation in operations.items():
-        if hasattr(recompute, name):
-            monkeypatch.setattr(recompute, name, implementation)
+    recompute = inspect.getmodule(kernel_module._recompute_implementation().fn)
+    for module in (
+        chunk_module,
+        causal_module,
+        outputs_module,
+        recompute,
+    ):
+        for name, implementation in operations.items():
+            if hasattr(module, name):
+                monkeypatch.setattr(module, name, implementation)
     monkeypatch.setattr(recompute, "dsl_range", range)
     monkeypatch.setattr(recompute, "vabs", lambda x, **kw: x.abs())
     monkeypatch.setattr(recompute, "vexp_sub", lambda x, y, **kw: (x - y).exp())
@@ -7718,36 +7735,85 @@ def test_recompute_state_recurrence_matches_forward(recompute_vector_cpu, zero_i
 
 
 def test_fused_phases_publish_caches_for_the_selected_owners():
-    source = ast.parse(inspect.getsource(integration))
-    kernel = next(
-        node
-        for node in source.body
-        if isinstance(node, ast.ClassDef) and node.name == "_RecomputeBackwardKernel"
+    tree = ast.parse(inspect.getsource(kernel_module))
+    entry = next(
+        n
+        for n in tree.body
+        if isinstance(n, ast.ClassDef) and n.name == "FlashKDAGradKernel"
     )
-    body = next(node for node in kernel.body if isinstance(node, ast.FunctionDef))
-    scope = body.body[0]
+    method = next(n for n in entry.body if isinstance(n, ast.FunctionDef))
+    scope = method.body[0]
     assert isinstance(scope, ast.With)
     assert ast.unparse(scope.items[0].context_expr) == "_SharedCubeScope()"
-    calls = [
-        node.value
-        for node in scope.body
-        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
-    ]
-    assert [ast.unparse(call.func) for call in calls] == [
-        "_initialize_backward_gradients",
-        "_recompute_tracks",
-        "_backward_template(staged)",
-    ]
-    assert calls[-1].args[-1].value is True
-    assert calls[1].args[-1].value is True  # common chunk/value schedule
-    handoff = next(node for node in scope.body if isinstance(node, ast.If))
-    assert ast.unparse(handoff.test) == (
-        "const_expr(use_full_chunks and needs_masked_chunks and cube_causal and (not staged))"
+    assert ast.unparse(scope.body[0].value.func) == "_initialize_backward_gradients"
+    assert ast.unparse(scope.body[0].value.args[-1]) == "has_dht"
+    assert (
+        ast.unparse(method.body[-1].value.func)
+        == "_finish_deterministic_gate_gradients"
     )
-    assert ast.unparse(handoff.body[0]) == (
-        "_sync_cube_vector_handoff(2, grid=True, reset_sync_id=True)"
+    rebuild = scope.body[1]
+    assert ast.unparse(rebuild.test) == "const_expr(recompute)"
+    binding = next(n for n in rebuild.body if isinstance(n, ast.Assign))
+    assert ast.unparse(binding.value.func) == "_recompute_implementation"
+    assert ast.dump(binding.value.args[0]) == ast.dump(
+        ast.parse(
+            "staged or needs_masked_chunks or not use_full_chunks", mode="eval"
+        ).body
+    )
+    handoff = next(n for n in rebuild.body if isinstance(n, ast.If))
+    assert ast.dump(handoff.test) == ast.dump(
+        ast.parse(
+            "const_expr(use_full_chunks and needs_masked_chunks and cube_causal and not staged)",
+            mode="eval",
+        ).body
+    )
+    assert (
+        ast.unparse(handoff.body[0])
+        == "_sync_cube_vector_handoff(2, grid=True, reset_sync_id=True)"
     )
     assert ast.unparse(handoff.orelse[0]) == "_sync_cube_vector_handoff(2, grid=True)"
+    backward = scope.body[-1].value
+    assert ast.unparse(backward.func) == "_backward_implementation(staged)"
+    assert ast.unparse(backward.args[-1]) == "recompute"
+
+
+@pytest.mark.parametrize("staged", (False, True))
+@pytest.mark.parametrize("recompute", (False, True))
+def test_host_launches_one_bound_template(monkeypatch, staged, recompute):
+    calls = []
+
+    class Kernel:
+        def __getitem__(self, core_num):
+            return lambda *args: calls.append((core_num, args))
+
+    monkeypatch.setattr(integration, "FlashKDAGradKernel", Kernel)
+    launcher = (
+        integration._RecomputeBackward() if recompute else integration.FlashKDAGrad()
+    )
+    launch = type(launcher).run.fn
+    arguments = {
+        name: object()
+        for name in inspect.signature(launch).parameters
+        if name != "self"
+    }
+    arguments.update(staged=staged, core_num=8)
+    launch(launcher, **arguments)
+    values = dict(arguments, recompute=recompute)
+    if not recompute:
+        values.update(
+            initial_state=arguments["stage_two_gm_final_state_gradient"],
+            recomputed_u=arguments["stage_two_gm_w"],
+            has_initial_state=0,
+            round_u_pre=0,
+        )
+    expected = tuple(
+        values[name]
+        for name in inspect.signature(
+            kernel_module.FlashKDAGradKernel.__call__
+        ).parameters
+        if name != "self"
+    )
+    assert calls == [(8, expected)]
 
 
 @pytest.mark.ascendc_toolchain
@@ -8247,15 +8313,15 @@ def test_public_gate_beta_storage_and_return_dtypes(
     )
     monkeypatch.setattr(
         integration,
-        "_prepare_stage_two",
+        "_prepare_state_backward",
         lambda **kw: (SimpleNamespace(dh0=args["dht"]), (), ()),
     )
-    monkeypatch.setattr(integration, "_prepare_stage_one", prepare)
+    monkeypatch.setattr(integration, "_prepare_chunk_backward", prepare)
     monkeypatch.setattr(
-        integration, "_launch_backward_program", lambda *a: launch("saved")
+        integration, "_launch_backward_program", lambda *a, **kw: launch("saved")
     )
     monkeypatch.setattr(
-        integration, "_launch_recompute_program", lambda *a: launch("recompute")
+        integration, "_launch_recompute_program", lambda *a, **kw: launch("recompute")
     )
     result = integration._flash_kda_grad_kernel_entry(
         **args, disable_recompute=disabled
@@ -8355,7 +8421,7 @@ def test_gate_backward_vf_matches_fp32_autograd(
 ):
     # Non-BF16-representable inputs detect accidental FP32 -> BF16 truncation.
     torch.manual_seed(184)
-    rows = integration.GATE_BATCH_ROWS if batched else 1
+    rows = buffer_module.GATE_BATCH_ROWS if batched else 1
     raw = torch.randn(rows, 64).to(torch.float32 if gate_fp32 else torch.bfloat16)
     bias = torch.randn(64) * 0.03
     base, pair = torch.randn(rows, 64) * 0.1, torch.randn(rows, 64) * 0.1
@@ -8381,7 +8447,7 @@ def test_gate_backward_vf_matches_fp32_autograd(
             torch.tensor(0.0),
             torch.zeros(64),
         )
-    vector = object.__new__(integration.StageOneVector)
+    vector = object.__new__(outputs_module.ChunkGradientVector)
     vector.fuse_base = False
     vector.gate_running = terminal.clone()
     vector.gate_bias_sum = torch.zeros(64)
@@ -8389,9 +8455,9 @@ def test_gate_backward_vf_matches_fp32_autograd(
     # Full/tail gate epilogues reuse the FP32 raw-gate plane after reading each row.
     out = raw.detach() if gate_fp32 and batched else torch.empty_like(raw)
     method = (
-        integration.StageOneVector._compute_gate_batch_constexpr
+        outputs_module.ChunkGradientVector._compute_gate_batch_constexpr
         if batched
-        else integration.StageOneVector._compute_gate_row_constexpr
+        else outputs_module.ChunkGradientVector._compute_gate_row_constexpr
     )
     method.fn(
         vector,
@@ -8431,7 +8497,7 @@ def test_beta_gradient_vector_preserves_output_precision(
     if fused:
         expected *= beta * (1.0 - beta * factor)
     expected[valid_rows:] = 0
-    vector = object.__new__(integration.BetaCombineVector)
+    vector = object.__new__(outputs_module.BetaCombineVector)
     vector.beta_gradient_sum = wy.clone()
     # The FP32 path publishes its running-sum buffer directly.
     out = (
@@ -8439,7 +8505,7 @@ def test_beta_gradient_vector_preserves_output_precision(
         if dtype == torch.float32
         else torch.empty(64, dtype=dtype)
     )
-    integration.BetaCombineVector._combine_single_pair_constexpr.fn(
+    outputs_module.BetaCombineVector._combine_single_pair_constexpr.fn(
         vector, beta, pair, _cpu_dsl_input(out), valid_rows, fused, factor
     )
     torch.testing.assert_close(out, expected.to(dtype), rtol=0, atol=0)
@@ -8452,11 +8518,11 @@ def test_beta_gradient_vector_preserves_output_precision(
 def test_short_softplus_beta_gradient_preserves_output_precision(
     recompute_vector_cpu, dtype, fused, factor
 ):
-    vector = object.__new__(integration.SingleChunkGateSensitivity)
+    vector = object.__new__(outputs_module.SingleChunkGateSensitivity)
     vector.beta_work = torch.full((3, 64), 0.1234567)
     vector.beta = torch.full((1, 64), 0.654321 / factor)
     out = torch.full((1, 8), float("nan"), dtype=dtype)
-    integration.SingleChunkGateSensitivity._cast_beta_gradient_constexpr.fn(
+    outputs_module.SingleChunkGateSensitivity._cast_beta_gradient_constexpr.fn(
         vector, _cpu_dsl_input(out), 17, fused, factor
     )
     expected = vector.beta_work[2, 17].clone()
@@ -8553,7 +8619,7 @@ def _prepare_backward_request(profile):
     scalar = empty(token_shape[:-1], torch.float32)
     qk_scalar = empty(q.shape[:-1], torch.float32)
     scale = d**-0.5
-    stage_two, _, two_specs = integration._prepare_stage_two(
+    stage_two, _, two_specs = integration._prepare_state_backward(
         aqk=inverse,
         qg=token,
         kg=token,
@@ -8571,7 +8637,7 @@ def _prepare_backward_request(profile):
     )
     bound, fused_gate = p["lower_bound"], p["use_gate_in_kernel"]
     norm, fused_beta = p["use_qk_l2norm_in_kernel"], p["use_beta_sigmoid_in_kernel"]
-    _, _, one_specs, one_config = integration._prepare_stage_one(
+    _, _, one_specs, one_config = integration._prepare_chunk_backward(
         query=q,
         key=q,
         values=v,
@@ -8628,7 +8694,7 @@ def test_fused_runtime_abi_preserves_backward_arguments(layout, beta_fp32, has_i
     specs, scalars = integration._recompute_dynamic_compile_request(beta_fp32)
     saved, _ = integration.backward_dynamic_compile_request(beta_fp32)
     assert specs[:89] == saved
-    assert len(specs) == 91 and len(specs) + len(scalars) == 109
+    assert len(specs) == 91 and len(specs) + len(scalars) == 111
     signature = inspect.signature(integration._RecomputeBackward.run)
     constexpr = {
         "stage_one_beta_fp32",
@@ -8652,6 +8718,8 @@ def test_fused_runtime_abi_preserves_backward_arguments(layout, beta_fp32, has_i
         0.125,
         *integration._backward_runtime_config(config),
         int(has_initial),
+        0,  # round_u_pre
+        1,  # has_dht: dht present
         32,
     ).arguments
     assert bound["initial_state"] is initial and bound["recomputed_u"] is u
@@ -8691,7 +8759,7 @@ def test_dynamic_export_matches_pooled_workspace_abi(
     )
     names = [argument.arg for argument in run.args.args[1:]]
     assert names.index("stage_two_scale") == len(concrete) == len(dynamic) == 89
-    assert len(names) == len(dynamic) + len(scalars) == 106
+    assert len(names) == len(dynamic) + len(scalars) == 107
     specs = dict(zip(names, concrete))
     slots = integration.MAX_AIC_CORES
     rows = slots * integration.CHUNK_SIZE
@@ -8716,6 +8784,7 @@ def test_dynamic_export_matches_pooled_workspace_abi(
     assert scalars == (
         integration.dtypes.float32,
         *integration._backward_scalar_specs(config),
+        integration.dtypes.int64,
         integration.dtypes.int64,
     )
 
@@ -8873,15 +8942,22 @@ def test_export_collects_beta_and_chunk_path_variants_without_launch(monkeypatch
     variants = list(integration._backward_variants())
     assert len(variants) == 36
     assert set(variants) == expected_variants
-    recompute_variants = [v for v in variants if v[4] or not v[2]]
+    recompute_variants = list(integration._recompute_variants())
     assert len(recompute_variants) == 18
-    assert len(calls) == len(closed) == 54
-    for args, variant in zip(calls[:36], variants):
+    assert set(recompute_variants) == {
+        variant for variant in expected_variants if variant[4] or not variant[2]
+    }
+    saved_count = len(variants)
+    assert len(calls) == len(closed) == saved_count + len(recompute_variants)
+    for args, variant in zip(calls[:saved_count], variants):
         specs, scalars = integration.backward_dynamic_compile_request(*variant)
         assert args == (*specs, *scalars)
-    for args, variant in zip(calls[36:], recompute_variants):
+    for args, variant in zip(calls[saved_count:], recompute_variants):
         specs, scalars = integration._recompute_dynamic_compile_request(*variant)
         assert args == (*specs, *scalars)
+    assert list(integration._export_variant_calls()) == [
+        (False, *variant) for variant in variants
+    ] + [(True, *variant) for variant in recompute_variants]
 
 
 @pytest.mark.parametrize(
@@ -8940,14 +9016,15 @@ def test_export_closes_collected_program_if_second_variant_fails(monkeypatch):
     assert closed == [True]
 
 
-@pytest.mark.parametrize("shards", [1, 2, 3, 7, 8, 72])
+@pytest.mark.parametrize("shards", [1, 2, 3, 7, 8, 54])
 def test_native_export_shards_cover_every_variant_once(monkeypatch, shards):
     """Worker partitions must preserve both cache modes and every dtype/path."""
     variants = list(integration._backward_variants())
-    expected = [(False, variant) for variant in variants]
-    expected.extend(
+    cache_modes = [(False, variant) for variant in variants]
+    cache_modes.extend(
         (True, variant) for variant in variants if variant[4] or not variant[2]
     )
+    expected = cache_modes
     seen = []
     for shard in range(shards):
         calls = []
@@ -8962,10 +9039,10 @@ def test_native_export_shards_cover_every_variant_once(monkeypatch, shards):
         integration.export_flash_kda_grad()
         assert calls == expected[shard::shards]
         seen.extend(shard + i * shards for i in range(len(calls)))
-    assert sorted(seen) == list(range(54))
+    assert sorted(seen) == list(range(len(expected)))
 
 
-@pytest.mark.parametrize("shard", ["bad", "0/0", "-1/8", "8/8", "0/73", "0/1/2"])
+@pytest.mark.parametrize("shard", ["bad", "0/0", "-1/8", "8/8", "0/55", "0/1/2"])
 def test_native_export_rejects_invalid_shard_before_compiling(monkeypatch, shard):
     monkeypatch.setenv("CANNBOTDSL_FLASH_KDA_GRAD_EXPORT_SHARD", shard)
     monkeypatch.setattr(
@@ -9031,6 +9108,7 @@ def test_dynamic_specs_accept_prepared_layouts_and_cache_capacities(
         *([None] * len(concrete)),
         0.125,
         *integration._backward_runtime_config(config),
+        1,  # has_dht: dht present
         32,
     ).arguments
     assert runtime["padded_layout"] == int(layout != "TND")
@@ -9138,6 +9216,7 @@ def test_runtime_reuses_exported_request_across_shapes_and_switches(monkeypatch)
             *arguments,
             0.125,
             *integration._backward_runtime_config(config),
+            1,
             core_num,
         )
     assert len(compile_calls) == 3
@@ -9393,28 +9472,37 @@ def test_missing_metadata_obeys_native_policy(tmp_path, monkeypatch):
 
 @pytest.mark.whitebox
 @pytest.mark.ascendc_toolchain
-def test_native_backward_export_aot_compiles(monkeypatch, tmp_path):
-    """The production parallel build must publish all 54 loadable providers."""
+def test_native_backward_export_aot_compiles(monkeypatch, tmp_path, record_property):
+    """Build device objects from this checkout using the production collector."""
     import subprocess
     import sys
 
     monkeypatch.setenv("CANNBOTDSL_NATIVE_BINARY_MODE", "off")
-    if not os.environ.get("KDA_DSL_ROOT"):
-        pytest.skip("optional native package export requires KDA_DSL_ROOT")
-    project = Path(os.environ["KDA_DSL_ROOT"]).expanduser().resolve()
+    pytest.importorskip("opkit")
+    source = Path(integration.__file__).resolve()
+    project = source.parents[3]
+    output = tmp_path / "device"
+    scan_dir = tmp_path / "ascend950" / "bin"
     subprocess.run(
         [
             sys.executable,
-            str(project / "net/native_package/build.py"),
-            "--operator",
-            "flash_kda_grad",
-            "--output-root",
-            str(tmp_path / "output"),
-            "--work-root",
-            str(tmp_path / "work"),
+            str(project / "cmake/scripts/build_cannbotdsl.py"),
+            "--mode",
+            "kernel",
+            "--source",
+            str(source),
+            "--output",
+            str(output),
+            "--kernel-output",
+            str(scan_dir),
         ],
         check=True,
     )
+    sizes = [p.stat().st_size for p in scan_dir.rglob("*.o")]
+    assert sizes and all(sizes)
+    record_property("flash_kda_grad_object_count", len(sizes))
+    record_property("flash_kda_grad_object_total_bytes", sum(sizes))
+    record_property("flash_kda_grad_object_max_bytes", max(sizes))
     native = tmp_path / "output/operators/flash_kda_grad/native"
     index = json.loads((native / "index.json").read_text())
     inventory = json.loads(
@@ -9483,7 +9571,7 @@ def test_full_backward_single_kernel_aot(
         dtype=torch.float32,
     )
     metadata = _empty_metadata(1, 1)
-    stage_two, two_args, two_specs = _prepare_stage_two(
+    stage_two, two_args, two_specs = _prepare_state_backward(
         aqk=inverse,
         qg=token,
         kg=token,
@@ -9497,7 +9585,7 @@ def test_full_backward_single_kernel_aot(
         metadata=metadata,
         scale=0.125,
     )
-    _, one_args, one_specs, one_config = _prepare_stage_one(
+    _, one_args, one_specs, one_config = _prepare_chunk_backward(
         query=raw_token,
         key=raw_token,
         values=raw_token,
@@ -11248,7 +11336,9 @@ def _check_csv_host_exception(row, monkeypatch, builder, device=None):
         if layout != "TND"
         else None,
     )
-    monkeypatch.setattr(integration, "_prepare_stage_two", _exception_compute_guard)
+    monkeypatch.setattr(
+        integration, "_prepare_state_backward", _exception_compute_guard
+    )
     monkeypatch.setattr(
         integration, "_allocate_recompute_caches", _exception_compute_guard
     )
@@ -11490,7 +11580,9 @@ def test_exception_csv_special_contract(monkeypatch, number):
 def test_public_rejects_nontensor_arguments(host_sequence_metadata, monkeypatch, name):
     args = _make_host_abi_inputs(gate_dtype=torch.float32)
     args[name] = 1.0
-    monkeypatch.setattr(integration, "_prepare_stage_two", _exception_compute_guard)
+    monkeypatch.setattr(
+        integration, "_prepare_state_backward", _exception_compute_guard
+    )
     with pytest.raises(ValueError):
         integration._flash_kda_grad_kernel_entry(disable_recompute=True, **args)
 
@@ -11518,7 +11610,9 @@ def test_explicit_lengths_reject_nontensor_arguments(
 ):
     args = _make_host_abi_inputs(gate_dtype=torch.float32)
     args[name] = 1.0
-    monkeypatch.setattr(integration, "_prepare_stage_two", _exception_compute_guard)
+    monkeypatch.setattr(
+        integration, "_prepare_state_backward", _exception_compute_guard
+    )
     with pytest.raises(ValueError, match="must be Tensors"):
         integration._flash_kda_grad_kernel_entry(
             disable_recompute=True, **args, seqused=torch.tensor([2], dtype=torch.int32)
@@ -11530,7 +11624,9 @@ def test_explicit_lengths_reject_nontensor_arguments(
 def test_public_rejects_invalid_value_rank(host_sequence_metadata, monkeypatch, shape):
     args = _make_host_abi_inputs(gate_dtype=torch.float32)
     args["v"] = torch.empty(shape, dtype=torch.bfloat16)
-    monkeypatch.setattr(integration, "_prepare_stage_two", _exception_compute_guard)
+    monkeypatch.setattr(
+        integration, "_prepare_state_backward", _exception_compute_guard
+    )
     with pytest.raises(ValueError, match="V rank"):
         integration._flash_kda_grad_kernel_entry(disable_recompute=True, **args)
 

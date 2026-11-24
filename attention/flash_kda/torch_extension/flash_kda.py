@@ -17,12 +17,15 @@ import torch
 from cann_ops_transformer.op_builder import get_as_library
 
 
+_DEFAULT_HEAD_DIM = 128
+_DEFAULT_SCALE = _DEFAULT_HEAD_DIM**-0.5
+
 _library = get_as_library()
 _forward_args = (
     "Tensor q, Tensor k, Tensor v, Tensor g, Tensor beta, Tensor? metadata, "
     "Tensor? initial_state=None, Tensor? A_log=None, Tensor? dt_bias=None, "
     "Tensor? cu_seqlens=None, int[]? cu_seqlens_cpu=None, Tensor? seqused=None, *, "
-    "float? scale=0.08838834764831845, bool output_final_state=False, "
+    f"float? scale={_DEFAULT_SCALE!r}, bool output_final_state=False, "
     "bool return_intermediate_states=False, bool use_qk_l2norm_in_kernel=True, "
     "bool use_gate_in_kernel=True, bool use_beta_sigmoid_in_kernel=True, "
     'bool allow_neg_eigval=False, bool disable_recompute=False, float? lower_bound=None, str layout="TND"'
@@ -79,37 +82,19 @@ def _grad_ops():
     return namespace
 
 
-def _split_metadata(v, metadata, cu_seqlens, layout):
+def _split_metadata(q, metadata, spec):
+    batch, _, heads, length, layout = spec
     metadata_capacity_upper_bound = _dsl_module(
-        "flash_kda_metadata", v
+        "flash_kda_metadata", q
     ).metadata_capacity_upper_bound
-
-    if metadata is None:
-        raise ValueError("metadata is required")
-    if layout == "TND":
-        if cu_seqlens is None:
-            raise ValueError("cu_seqlens is required for TND")
-        batch, length, heads = cu_seqlens.numel() - 1, v.shape[0], v.shape[1]
-    elif layout == "BNSD":
-        batch, heads, length, _ = v.shape
-    elif layout == "BSND":
-        batch, length, heads, _ = v.shape
-    else:
-        raise ValueError(f"unsupported FlashKDA layout: {layout}")
     capacity = metadata_capacity_upper_bound(
         batch,
         length,
         is_packed=layout == "TND",
         value_heads=heads,
     )
-    if (
-        metadata.ndim != 1
-        or metadata.dtype != torch.int32
-        or not metadata.is_contiguous()
-    ):
-        raise ValueError("metadata must be a contiguous one-dimensional int32 tensor")
     if metadata.numel() == capacity:
-        return metadata, None
+        raise ValueError("training requires flash_kda_metadata(enable_grad=True)")
     if metadata.numel() != capacity + 8 + batch * heads * 7:
         raise ValueError("metadata size does not match FlashKDA input dimensions")
     forward, backward = metadata.split((capacity, metadata.numel() - capacity))
@@ -136,14 +121,13 @@ def _flash_kda_fwd(
 ):
     flash_kda_fwd = _dsl_module("flash_kda", q).flash_kda_fwd
 
-    forward, _ = _split_metadata(v, metadata, cu_seqlens, options.get("layout", "TND"))
     return flash_kda_fwd(
         q,
         k,
         v,
         g,
         beta,
-        forward,
+        metadata,
         initial_state,
         A_log,
         dt_bias,
@@ -193,18 +177,33 @@ def _metadata(
     )
     if not enable_grad:
         return forward
+    schedule = getattr(forward, "_flash_kda_schedule", None)
     if forward.is_meta:
         backward = forward.new_empty(8 + batch_size * nheads_v * 7)
     else:
+        backward_cu, backward_used = cu_seqlens, seqused
+        if layout == "TND":
+            # Forward already checked that seqused agrees with cu_seqlens.
+            backward_used = None
+        elif cu_seqlens is not None:
+            # Forward accepts padded prefix lengths. Grad accepts per-batch lengths.
+            backward_cu = None
+            if backward_used is None:
+                backward_used = (
+                    torch.tensor(
+                        schedule["lengths"], dtype=torch.int32, device=forward.device
+                    )
+                    if schedule is not None
+                    else cu_seqlens.diff()
+                )
         backward = _grad_ops().flash_kda_grad_metadata(
-            cu_seqlens,
-            seqused,
-            n_heads_qk=nheads_qk,
-            n_heads_v=nheads_v,
+            backward_cu,
+            backward_used,
+            nheads_qk=nheads_qk,
+            nheads_v=nheads_v,
             **sizes,
         )
     metadata = torch.cat((forward, backward))
-    schedule = getattr(forward, "_flash_kda_schedule", None)
     if schedule is not None:
         metadata._flash_kda_schedule = dict(
             schedule,
@@ -233,10 +232,22 @@ class _FlashKDAEntry(torch.autograd.Function):
     ):
         forward_impl = _dsl_module("flash_kda", q).flash_kda_fwd
 
-        layout = options.get("layout", "TND")
-        forward, backward = _split_metadata(v, metadata, cu_seqlens, layout)
-        if backward is None:
-            raise ValueError("training requires flash_kda_metadata(enable_grad=True)")
+        validate_inputs = _dsl_module("flash_kda_validation", q).validate_inputs
+        spec = validate_inputs(
+            q,
+            k,
+            v,
+            g,
+            beta,
+            initial_state,
+            A_log,
+            dt_bias,
+            metadata=metadata,
+            cu_seqlens=cu_seqlens,
+            seqused=seqused,
+            **options,
+        )
+        forward, backward = _split_metadata(q, metadata, spec)
         outputs = forward_impl(
             q,
             k,
@@ -262,12 +273,11 @@ class _FlashKDAEntry(torch.autograd.Function):
             # With external normalization, q/k are already the operands
             # consumed by forward. The caller's graph owns the chain rule.
             q_rstd, k_rstd = None, None
-        heads = v.shape[2 if layout == "BSND" else 1]
+        batch, _, heads, length, layout = spec
         if layout == "TND":
-            matrix_shape = (heads, v.shape[0], 64)
+            matrix_shape = (heads, length, 64)
         else:
-            length = v.shape[2 if layout == "BNSD" else 1]
-            matrix_shape = (v.shape[0], heads, length, 64)
+            matrix_shape = (batch, heads, length, 64)
         if any(t is None or t.shape != matrix_shape for t in outputs[3:5]):
             raise RuntimeError(
                 "FlashKDA autograd requires forward Aqk/Akk in BNSC or NTC layout"
@@ -304,7 +314,6 @@ class _FlashKDAEntry(torch.autograd.Function):
             outputs[15],
         )
         ctx.options = options
-        ctx.batch = cu_seqlens.numel() - 1 if layout == "TND" else q.shape[0]
         ctx.set_materialize_grads(False)
         if outputs[2] is not None:
             ctx.mark_non_differentiable(outputs[2])
@@ -340,17 +349,10 @@ class _FlashKDAEntry(torch.autograd.Function):
         options.pop("output_final_state", None)
         options.pop("return_intermediate_states", None)
         options.pop("cu_seqlens_cpu", None)
-        layout = options.get("layout", "TND")
-        heads = v.shape[2 if layout == "BSND" else 1]
         if do is None:
-            do = torch.zeros_like(v.transpose(1, 2) if layout == "BNSD" else v)
-        if dht is None:
-            dht = v.new_zeros((ctx.batch, heads, 128, 128), dtype=torch.float32)
-        g_dtype, beta_dtype = g.dtype, beta.dtype
-        if not options.get("use_gate_in_kernel", True):
-            g = g.float()
-        if not options.get("use_beta_sigmoid_in_kernel", True):
-            beta = beta.float()
+            # Only the final state contributed to the loss. The grad op requires do.
+            output = v.transpose(1, 2) if options.get("layout") == "BNSD" else v
+            do = torch.zeros_like(output, memory_format=torch.contiguous_format)
         if getattr(ctx, "round_recomputed_u_pre", False):
             # This metadata slice belongs to this autograd invocation.
             metadata._flash_kda_round_recomputed_u_pre = True
@@ -360,11 +362,11 @@ class _FlashKDAEntry(torch.autograd.Function):
             v,
             g,
             beta,
-            do.contiguous(),
-            dht.contiguous(),
-            Aqk,
-            Akk,
-            metadata,
+            do,
+            dht=dht,
+            Aqk=Aqk,
+            Akk=Akk,
+            metadata=metadata,
             initial_state=initial_state,
             chunk_states=states,
             w=w,
@@ -384,8 +386,8 @@ class _FlashKDAEntry(torch.autograd.Function):
             dq,
             dk,
             dv,
-            dg.to(g_dtype),
-            dbeta.to(beta_dtype),
+            dg,
+            dbeta,
             None,
             dh0,
             da,
@@ -413,8 +415,30 @@ def _flash_kda_autograd(
     cu_seqlens=None,
     cu_seqlens_cpu=None,
     seqused=None,
-    **options,
+    *,
+    scale=_DEFAULT_SCALE,
+    output_final_state=False,
+    return_intermediate_states=False,
+    use_qk_l2norm_in_kernel=True,
+    use_gate_in_kernel=True,
+    use_beta_sigmoid_in_kernel=True,
+    allow_neg_eigval=False,
+    disable_recompute=False,
+    lower_bound=None,
+    layout="TND",
 ):
+    options = dict(
+        scale=scale,
+        output_final_state=output_final_state,
+        return_intermediate_states=return_intermediate_states,
+        use_qk_l2norm_in_kernel=use_qk_l2norm_in_kernel,
+        use_gate_in_kernel=use_gate_in_kernel,
+        use_beta_sigmoid_in_kernel=use_beta_sigmoid_in_kernel,
+        allow_neg_eigval=allow_neg_eigval,
+        disable_recompute=disable_recompute,
+        lower_bound=lower_bound,
+        layout=layout,
+    )
     inputs = (
         q,
         k,

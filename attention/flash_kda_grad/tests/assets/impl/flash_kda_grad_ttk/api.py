@@ -435,7 +435,7 @@ def npu(
     dt_bias: torch.Tensor,
     initial_state: torch.Tensor,
     do: torch.Tensor,
-    dht: torch.Tensor,
+    dht: Optional[torch.Tensor],
     cu_seqlens: Optional[torch.Tensor] = None,
     seqused: Optional[torch.Tensor] = None,
     *,
@@ -483,11 +483,14 @@ def npu(
         use_beta_sigmoid_in_kernel=bool(use_beta_sigmoid_in_kernel),
     )
 
-    cache_bias, dht = golden.normalize_backward_optionals(
-        q, v, initial_state, dt_bias, dht, layout, cu_seqlens
-    )
+    cache_bias = dt_bias
+    if dt_bias is not None and dt_bias.ndim == 1:
+        cache_bias = dt_bias.reshape(v.shape[2 if layout == "BSND" else 1], q.shape[-1])
     recompute = _RECOMPUTE if disable_recompute is None else not bool(disable_recompute)
     if q.device.type != "npu":
+        _, dht = golden.normalize_backward_optionals(
+            q, v, initial_state, None, dht, layout, cu_seqlens
+        )
         if recompute:
             return golden.bf16_peer(
                 q,
@@ -591,9 +594,6 @@ def npu(
     if layout == "BNSD":
         do = do.transpose(1, 2)
         g, beta = g.transpose(1, 2), beta.transpose(1, 2)
-    input_g_dtype, input_beta_dtype = g.dtype, beta.dtype
-    g = g if use_gate_in_kernel else g.float()
-    beta = beta if use_beta_sigmoid_in_kernel else beta.float()
     result = bwd(
         q=q_for_bwd,
         k=k_for_bwd,
@@ -630,10 +630,6 @@ def npu(
         disable_recompute=not recompute,
     )
     dq, dk, dv, dh0, dg, dbeta, da, dbias = result
-    # The public kernel takes activated inputs in FP32. Undo this adapter's
-    # input casts for their gradients, as autograd does through Tensor.float().
-    # TTK's golden and peer return gradients in the original input dtypes.
-    dg, dbeta = dg.to(input_g_dtype), dbeta.to(input_beta_dtype)
     if layout == "BNSD":
         dg, dbeta = dg.transpose(1, 2), dbeta.transpose(1, 2)
     return dq, dk, dv, dh0, dg, dbeta, da, dbias

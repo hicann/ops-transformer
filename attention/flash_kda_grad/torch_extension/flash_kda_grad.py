@@ -39,7 +39,7 @@ class FlashKdaGradOpBuilder(OpBuilder):
         return [
             (
                 "flash_kda_grad(Tensor q, Tensor k, Tensor v, Tensor g, Tensor beta, "
-                "Tensor do, Tensor dht, Tensor Aqk, Tensor Akk, Tensor? metadata=None, *, "
+                "Tensor do, Tensor? dht=None, *, Tensor Aqk, Tensor Akk, Tensor? metadata=None, "
                 "Tensor? initial_state=None, Tensor? chunk_states=None, Tensor? w=None, "
                 "Tensor? u=None, Tensor? v_new=None, Tensor? qg=None, Tensor? kg=None, "
                 "Tensor? g_cumsum=None, Tensor? q_rstd=None, Tensor? k_rstd=None, "
@@ -48,12 +48,13 @@ class FlashKdaGradOpBuilder(OpBuilder):
                 "bool use_qk_l2norm_in_kernel=True, bool use_gate_in_kernel=True, "
                 "bool use_beta_sigmoid_in_kernel=True, bool allow_neg_eigval=False, "
                 "bool disable_recompute=False, float? lower_bound=None, "
-                'str layout="TND") -> (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, '
+                'str layout="TND", ScalarType? dbeta_dtype=None) '
+                "-> (Tensor, Tensor, Tensor, Tensor?, Tensor, Tensor, "
                 "Tensor?, Tensor?)"
             ),
             (
                 "flash_kda_grad_metadata(Tensor? cu_seqlens=None, Tensor? seqused=None, *, "
-                "int batch_size, int n_heads_qk, int n_heads_v, int seqlens, "
+                "int batch_size, int nheads_qk, int nheads_v, int seqlens, "
                 "int headdim_qk=128, int headdim_v=128, str layout='TND') -> Tensor"
             ),
         ]
@@ -72,11 +73,11 @@ def _flash_kda_grad_meta(
     g: torch.Tensor,
     beta: torch.Tensor,
     do: torch.Tensor,
-    dht: torch.Tensor,
+    dht: Optional[torch.Tensor] = None,
+    *,
     Aqk: torch.Tensor,
     Akk: torch.Tensor,
     metadata: Optional[torch.Tensor] = None,
-    *,
     initial_state: Optional[torch.Tensor] = None,
     chunk_states: Optional[torch.Tensor] = None,
     w: Optional[torch.Tensor] = None,
@@ -101,9 +102,24 @@ def _flash_kda_grad_meta(
     disable_recompute: bool = False,
     lower_bound: Optional[float] = None,
     layout: str = "TND",
+    dbeta_dtype: Optional[torch.dtype] = None,
 ):
     if cu_seqlens_cpu is not None:
         raise ValueError("cu_seqlens_cpu must be None")
+    if not isinstance(do, torch.Tensor):
+        raise ValueError("do must be a Tensor")
+    if not isinstance(Aqk, torch.Tensor) or not isinstance(Akk, torch.Tensor):
+        raise ValueError("Aqk and Akk are required Tensors")
+    gate_dtype = torch.bfloat16 if use_gate_in_kernel else torch.float32
+    beta_dtype = torch.bfloat16 if use_beta_sigmoid_in_kernel else torch.float32
+    if g.dtype != gate_dtype:
+        raise ValueError(
+            f"g must have dtype {gate_dtype} for use_gate_in_kernel={use_gate_in_kernel}"
+        )
+    if beta.dtype != beta_dtype:
+        raise ValueError(
+            f"beta must have dtype {beta_dtype} for use_beta_sigmoid_in_kernel={use_beta_sigmoid_in_kernel}"
+        )
     torch._check(
         layout in ("TND", "BNSD", "BSND"), lambda: "unsupported FlashKDA layout"
     )
@@ -129,9 +145,22 @@ def _flash_kda_grad_meta(
     )
     torch._check(k.shape == q.shape, lambda: "k must match q")
     torch._check(do.shape == (*expected_beta, 128), lambda: "do must use BSND or TND")
-    batch = dht.shape[0] if layout == "TND" else v.shape[0]
+    batch = v.shape[0]
+    if layout == "TND":
+        if metadata is not None:
+            # Metadata ABI: eight header words, then seven per (sequence, head).
+            batch = (metadata.shape[0] - 8) // (heads * 7)
+        elif cu_seqlens is not None:
+            batch = cu_seqlens.numel() - 1
+        elif dht is not None:
+            batch = dht.shape[0]
+        else:
+            raise ValueError("TND requires metadata or cu_seqlens when dht is None")
     state_shape = (batch, heads, 128, 128)
-    torch._check(dht.shape == state_shape, lambda: "dht shape does not match layout")
+    if dht is not None:
+        torch._check(
+            dht.shape == state_shape, lambda: "dht shape does not match layout"
+        )
     chunks = (length + 63) // 64
     prefix = (chunks + batch, heads) if layout == "TND" else (batch, chunks, heads)
     q_heads = q.shape[2 if layout == "BSND" else 1]
@@ -160,7 +189,9 @@ def _flash_kda_grad_meta(
         torch._check(
             chunk_states.dtype == torch.bfloat16, lambda: "chunk_states must be BF16"
         )
-    dbeta = torch.empty_like(beta)
+    if dbeta_dtype not in (None, beta.dtype, torch.bfloat16):
+        raise ValueError("dbeta_dtype must match beta.dtype or be BF16")
+    dbeta = torch.empty_like(beta, dtype=dbeta_dtype)
     da = (
         torch.empty((heads, 8), dtype=torch.float32, device=q.device)[:, 0]
         if use_gate_in_kernel
@@ -180,7 +211,9 @@ def _flash_kda_grad_meta(
         torch.empty_like(q),
         torch.empty_like(k),
         torch.empty_like(v),
-        torch.empty(dht.shape, dtype=torch.float32, device=dht.device),
+        torch.empty(state_shape, dtype=torch.float32, device=q.device)
+        if initial_state is not None
+        else None,
         torch.empty_like(g),
         dbeta,
         da,
@@ -193,18 +226,18 @@ def _metadata_meta(
     seqused=None,
     *,
     batch_size,
-    n_heads_qk,
-    n_heads_v,
+    nheads_qk,
+    nheads_v,
     seqlens,
     headdim_qk=128,
     headdim_v=128,
     layout="TND",
 ):
     torch._check(batch_size > 0, lambda: "batch_size must be positive")
-    torch._check(n_heads_qk > 0, lambda: "n_heads_qk must be positive")
-    torch._check(n_heads_v > 0, lambda: "n_heads_v must be positive")
+    torch._check(nheads_qk > 0, lambda: "nheads_qk must be positive")
+    torch._check(nheads_v > 0, lambda: "nheads_v must be positive")
     torch._check(
-        n_heads_v % n_heads_qk == 0, lambda: "n_heads_v must be divisible by n_heads_qk"
+        nheads_v % nheads_qk == 0, lambda: "nheads_v must be divisible by nheads_qk"
     )
     torch._check(
         headdim_qk == 128 and headdim_v == 128,
@@ -217,7 +250,7 @@ def _metadata_meta(
     device = reference.device if reference is not None else torch.device("npu")
     # Metadata ABI: eight header words and seven words per (sequence, head).
     return torch.empty(
-        (8 + batch_size * n_heads_v * 7,), dtype=torch.int32, device=device
+        (8 + batch_size * nheads_v * 7,), dtype=torch.int32, device=device
     )
 
 
@@ -233,11 +266,11 @@ def _flash_kda_grad(
     g: torch.Tensor,
     beta: torch.Tensor,
     do: torch.Tensor,
-    dht: torch.Tensor,
+    dht: Optional[torch.Tensor] = None,
+    *,
     Aqk: torch.Tensor,
     Akk: torch.Tensor,
     metadata: Optional[torch.Tensor] = None,
-    *,
     initial_state: Optional[torch.Tensor] = None,
     chunk_states: Optional[torch.Tensor] = None,
     w: Optional[torch.Tensor] = None,
@@ -262,8 +295,13 @@ def _flash_kda_grad(
     disable_recompute: bool = False,
     lower_bound: Optional[float] = None,
     layout: str = "TND",
+    dbeta_dtype: Optional[torch.dtype] = None,
 ):
-    return _kernel_module("flash_kda_grad").flash_kda_grad_npu(
+    if not isinstance(Aqk, torch.Tensor) or not isinstance(Akk, torch.Tensor):
+        raise ValueError("Aqk and Akk are required Tensors")
+    dq, dk, dv, dh0, dg, dbeta, dA, dBias = _kernel_module(
+        "flash_kda_grad"
+    ).flash_kda_grad_npu(
         q=q,
         k=k,
         v=v,
@@ -298,7 +336,9 @@ def _flash_kda_grad(
         disable_recompute=disable_recompute,
         lower_bound=lower_bound,
         layout=layout,
+        dbeta_dtype=dbeta_dtype,
     )
+    return dq, dk, dv, dh0 if initial_state is not None else None, dg, dbeta, dA, dBias
 
 
 @torch.library.register_kernel("cann_ops_transformer::flash_kda_grad_metadata", None)
@@ -307,8 +347,8 @@ def _metadata(
     seqused=None,
     *,
     batch_size,
-    n_heads_qk,
-    n_heads_v,
+    nheads_qk,
+    nheads_v,
     seqlens,
     headdim_qk=128,
     headdim_v=128,
@@ -318,8 +358,8 @@ def _metadata(
         cu_seqlens,
         seqused,
         batch_size=batch_size,
-        n_heads_qk=n_heads_qk,
-        n_heads_v=n_heads_v,
+        n_heads_qk=nheads_qk,
+        n_heads_v=nheads_v,
         seqlens=seqlens,
         headdim_qk=headdim_qk,
         headdim_v=headdim_v,
@@ -334,11 +374,11 @@ def flash_kda_grad(
     g: torch.Tensor,
     beta: torch.Tensor,
     do: torch.Tensor,
-    dht: torch.Tensor,
+    dht: Optional[torch.Tensor] = None,
+    *,
     Aqk: torch.Tensor,
     Akk: torch.Tensor,
     metadata: Optional[torch.Tensor] = None,
-    *,
     initial_state: Optional[torch.Tensor] = None,
     chunk_states: Optional[torch.Tensor] = None,
     w: Optional[torch.Tensor] = None,
@@ -363,8 +403,9 @@ def flash_kda_grad(
     disable_recompute: bool = False,
     lower_bound: Optional[float] = None,
     layout: str = "TND",
+    dbeta_dtype: Optional[torch.dtype] = None,
 ):
-    """Return dq, dk, dv, dh0, dg, dbeta, dA, dBias using saved caches or recompute."""
+    """Return eight gradient slots. dh0 is None when initial_state is absent."""
     return torch.ops.cann_ops_transformer.flash_kda_grad(
         q=q,
         k=k,
@@ -400,6 +441,7 @@ def flash_kda_grad(
         disable_recompute=disable_recompute,
         lower_bound=lower_bound,
         layout=layout,
+        dbeta_dtype=dbeta_dtype,
     )
 
 
@@ -408,8 +450,8 @@ def flash_kda_grad_metadata(
     seqused: Optional[torch.Tensor] = None,
     *,
     batch_size: int,
-    n_heads_qk: int,
-    n_heads_v: int,
+    nheads_qk: int,
+    nheads_v: int,
     seqlens: int,
     headdim_qk: int = 128,
     headdim_v: int = 128,
@@ -420,8 +462,8 @@ def flash_kda_grad_metadata(
         cu_seqlens,
         seqused,
         batch_size=batch_size,
-        n_heads_qk=n_heads_qk,
-        n_heads_v=n_heads_v,
+        nheads_qk=nheads_qk,
+        nheads_v=nheads_v,
         seqlens=seqlens,
         headdim_qk=headdim_qk,
         headdim_v=headdim_v,

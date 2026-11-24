@@ -124,8 +124,8 @@ def native_compile_jobs(requested: int | str) -> int:
 
 
 def export_plan(source: Path):
-    """Read the two enumerators without importing Torch or initializing the DSL."""
-    names = {"_backward_variants", "_recompute_export_variants"}
+    """Read the runtime export plan without importing Torch or initializing the DSL."""
+    names = {"_all_export_variants", "_backward_variants", "_recompute_export_variants"}
     tree = ast.parse(source.read_text())
     functions = [
         node
@@ -137,14 +137,7 @@ def export_plan(source: Path):
         compile(ast.Module(body=functions, type_ignores=[]), str(source), "exec"),
         namespace,
     )
-    return [
-        (recompute, *variant)
-        for recompute, name in (
-            (False, "_backward_variants"),
-            (True, "_recompute_export_variants"),
-        )
-        for variant in namespace[name]()
-    ]
+    return namespace["_all_export_variants"]()
 
 
 def compile_schedule(plan, jobs):
