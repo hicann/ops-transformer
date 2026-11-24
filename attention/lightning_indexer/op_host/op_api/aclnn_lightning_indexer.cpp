@@ -77,7 +77,7 @@ aclnnStatus aclnnLightningIndexerGetWorkspaceSize(
 {
     if (query == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("aclnnLightningIndexerGetWorkspaceSize", "query");
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_NULLPTR;
     }
     DataType queryDataType = query->GetDataType();
     aclDataType queryAclDataType = ToAclDataType(queryDataType);
@@ -85,7 +85,7 @@ aclnnStatus aclnnLightningIndexerGetWorkspaceSize(
         if (sparseValuesOut == nullptr) {
             OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON("aclnnLightningIndexerGetWorkspaceSize", "sparseValuesOut",
                                                      "sparseValuesOut must be provided when returnValues is true.");
-            return ge::GRAPH_FAILED;
+            return ACLNN_ERR_PARAM_NULLPTR;
         }
     }
     auto sparseValuesOutHolder = LightningIndexerOutputHolder(sparseValuesOut, queryAclDataType);

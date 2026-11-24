@@ -50,7 +50,7 @@ TEST_F(lightning_indexer_opapi_ut, lightning_indexer_aclnn_0)
                                                                layoutQuery, layoutKey, 4, 3, INT64_MAX, INT64_MAX, true,
                                                                nullptr, nullptr, &workspaceSize, &executor);
 
-    EXPECT_NE(aclRet, ACL_SUCCESS);
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
     EXPECT_EQ(executor, nullptr);
 }
 
@@ -74,7 +74,7 @@ TEST_F(lightning_indexer_opapi_ut, lightning_indexer_aclnn_1)
         query.get(), key.get(), weights.get(), nullptr, nullptr, nullptr, layoutQuery, layoutKey, 4, 3, INT64_MAX,
         INT64_MAX, true, sparseIndicesOut.get(), nullptr, &workspaceSize, &executor);
 
-    EXPECT_NE(aclRet, ACL_SUCCESS);
+    EXPECT_EQ(aclRet, ACLNN_ERR_PARAM_NULLPTR);
     EXPECT_EQ(executor, nullptr);
 }
 
