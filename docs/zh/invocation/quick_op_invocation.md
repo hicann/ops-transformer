@@ -36,7 +36,7 @@
 - 基于**自定义算子包**执行算子样例，命令如下：
 
     ```bash
-    bash build.sh --run_example ${op} ${mode} ${pkg_mode} [--example_name=${example_name}] [--vendor_name=${vendor_name}] [--soc=${soc_version}] [--simulator=${simulator}] [--experimental=${experimental}]
+    bash build.sh --run_example ${op} ${mode} ${pkg_mode} [--example_name=${example_name}] [--vendor_name=${vendor_name}] [--soc=${soc_version}] [--simulator=${simulator}] [--experimental]
     # 以FlashAttentionScore算子example执行为例
     # bash build.sh --run_example flash_attention_score eager cust --vendor_name=custom
     ```
@@ -48,7 +48,7 @@
   - \$\{vendor\_name\}（可选）：与构建的自定义算子包设置一致，默认名为custom。
   - \$\{soc_version\}（可选）：表示NPU型号，默认"ascend910b"。当设置为"ascend950"时会运行"arch35"目录下的示例文件。产品名对应的取值参考[SoC 取值映射表](../../QUICKSTART.md#soc-version-mapping)，请按实际场景传参。
   - \$\{simulator\}（可选）：表示仿真模式，目前仅支持eager（aclnn调用）场景下使用。仿真模式下，会根据soc_version链接对应的仿真库。
-  - \$\{experimental\}（可选）：表示执行用户保存在experimental贡献目录下的算子。
+  - `--experimental`（可选）：执行用户保存在experimental贡献目录下的算子；该开关不接收参数值。
 
     说明：\$\{mode\}为graph时，不指定\$\{pkg_mode\}和\$\{vendor\_name\}
 
