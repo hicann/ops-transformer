@@ -610,10 +610,10 @@ static aclnnStatus CheckParams(const AclnnMhcPreSinkhornBackwardParams& params)
     // 2. 校验可选输入/输出组合: preMix+gradPre 成对; gradPreMix 单向联动
     //    (提前到 dim/shape/dtype 之前: 组合不合法时无需检查具体值, 避免误导性错误信息)
     if ((params.preMix == nullptr) != (params.gradPre == nullptr)) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR,
                 "Invalid optional input combination: preMix and gradPre must be passed together or omitted "
                 "together. Passing only one of preMix/gradPre is not supported.");
-        return ACLNN_ERR_PARAM_INVALID;
+        return ACLNN_ERR_PARAM_NULLPTR;
     }
     // gradPreMix 单向联动: preMix 在时 gradPreMix 必须在(否则 premix 梯度无处落盘);
     // preMix 缺省但 gradPreMix 传入是无害的——L2 内部按 hasPreMix=0 路径计算,
@@ -621,10 +621,10 @@ static aclnnStatus CheckParams(const AclnnMhcPreSinkhornBackwardParams& params)
     // "不传 gradPreMix"语义等价, 兼容存量调用方(如 atk 用例约定)传已分配
     // 缓冲区但不期望写入的用法
     if (params.preMix != nullptr && params.gradPreMix == nullptr) {
-        OP_LOGE(ACLNN_ERR_PARAM_INVALID,
+        OP_LOGE(ACLNN_ERR_PARAM_NULLPTR,
                 "Invalid optional output combination: gradPreMix must be provided when preMix is provided. "
                 "Passing preMix without gradPreMix is not supported.");
-        return ACLNN_ERR_PARAM_INVALID;
+        return ACLNN_ERR_PARAM_NULLPTR;
     }
 
     // 3. 校验输入、输出参数维度
