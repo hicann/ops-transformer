@@ -132,16 +132,14 @@ static aclnnStatus CheckShape(gmm_add_advanced::GroupedMatmulAddParams params, c
         auto yDimNum = params.yRef->GetViewShape().GetDimNum();
         if (yDimNum != Dim3) {
             OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
-                "aclnnGroupedMatmulAddGetWorkspaceSize", "y",
-                Ops::Transformer::Gmm::FormatString("%zu", yDimNum).c_str(),
+                opName, "y", Ops::Transformer::Gmm::FormatString("%zu", yDimNum).c_str(),
                 Ops::Transformer::Gmm::FormatString("The shape dim of %s must be %zu", "y", Dim3).c_str());
             return ACLNN_ERR_PARAM_INVALID;
         }
         auto groupNumY = params.yRef->GetViewShape().GetDim(0);
         if (groupNum != groupNumY) {
             OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
-                "aclnnGroupedMatmulAddGetWorkspaceSize", "groupList",
-                Ops::Transformer::Gmm::FormatString("%ld", groupNum).c_str(),
+                opName, "groupList", Ops::Transformer::Gmm::FormatString("%ld", groupNum).c_str(),
                 Ops::Transformer::Gmm::FormatString(
                     "When %s is %s, the shape size of %s must be equal to the size (%ld) of the %s axis of %s",
                     "groupType", "2", "groupList", groupNumY, "first", "y")
@@ -272,7 +270,7 @@ aclnnStatus aclnnGroupedMatmulAddGetWorkspaceSize(const aclTensor* x, const aclT
                                                   bool transposeWeight, int64_t groupType, uint64_t* workspaceSize,
                                                   aclOpExecutor** executor)
 {
-    const char* opName = "grouped_matmul_add";
+    const char* opName = "aclnnGroupedMatmulAddGetWorkspaceSize";
     gmm_add_advanced::GroupedMatmulAddParams params{x, weight, groupList, yRef, transposeX, transposeWeight, groupType};
     // Standard syntax, Check parameters.
     L2_DFX_PHASE_1(aclnnGroupedMatmulAdd, DFX_IN(x, weight, groupList, yRef, transposeX, transposeWeight, groupType),
@@ -285,7 +283,7 @@ aclnnStatus aclnnGroupedMatmulAddV2GetWorkspaceSize(const aclTensor* x, const ac
                                                     bool transposeWeight, int64_t groupType, int64_t groupListType,
                                                     uint64_t* workspaceSize, aclOpExecutor** executor)
 {
-    const char* opName = "grouped_matmul_add";
+    const char* opName = "aclnnGroupedMatmulAddV2GetWorkspaceSize";
     gmm_add_advanced::GroupedMatmulAddParams params{x,          weight,          groupList, yRef,
                                                     transposeX, transposeWeight, groupType, groupListType};
     // Standard syntax, Check parameters.

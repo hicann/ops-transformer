@@ -207,16 +207,14 @@ aclnnStatus aclnnGroupedMatmulAdd(
         <td>x, weight, groupList, or yRef is a null pointer.</td>
       </tr>
       <tr>
-        <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
-        <td rowspan="2">161002</td>
+        <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
+        <td rowspan="3">161002</td>
         <td>The data type or data format of x, weight, groupList, or yRef is not within the supported range.</td>
       </tr>
       <tr>
         <td>The data type of x is inconsistent with that of weight.</td>
       </tr>
       <tr>
-        <td>ACLNN_ERR_INNER_TILING_ERROR</td>
-        <td>561002</td>
         <td>The shapes of x, weight, or yRef do not meet the matmul constraint requirements.</td>
       </tr>
     </tbody>

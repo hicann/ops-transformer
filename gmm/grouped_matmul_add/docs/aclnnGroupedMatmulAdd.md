@@ -206,16 +206,14 @@ aclnnStatus aclnnGroupedMatmulAdd(
         <td>传入的x、weight、groupList、yRef是空指针。</td>
       </tr>
       <tr>
-        <td rowspan="2">ACLNN_ERR_PARAM_INVALID</td>
-        <td rowspan="2">161002</td>
+        <td rowspan="3">ACLNN_ERR_PARAM_INVALID</td>
+        <td rowspan="3">161002</td>
         <td>x、weight、groupList、yRef的数据类型或数据格式不在支持的范围之内。</td>
       </tr>
       <tr>
         <td>x与weight的数据类型不一致。</td>
       </tr>
       <tr>
-        <td>ACLNN_ERR_PARAM_NULLPTR</td>
-        <td>161001</td>
         <td>x、weight、yRef的shape不满足矩阵乘限制要求。</td>
       </tr>
     </tbody>

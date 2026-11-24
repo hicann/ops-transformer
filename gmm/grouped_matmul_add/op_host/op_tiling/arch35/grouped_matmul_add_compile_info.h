@@ -56,7 +56,7 @@ inline ge::graphStatus InitCompileInfo(fe::PlatFormInfos* platformInfo, GMMCompi
 
 inline ge::graphStatus InitCompileInfo(gert::TilingParseContext* context)
 {
-    OP_CHECK_IF(context == nullptr, OP_LOGE(context->GetNodeName(), "InitCompileInfo context is null"),
+    OP_CHECK_IF(context == nullptr, OP_LOGE("GroupedMatmulAdd", "InitCompileInfo context is null"),
                 return ge::GRAPH_FAILED);
     fe::PlatFormInfos* platformInfo = context->GetPlatformInfo();
     auto compileInfoPtr = context->GetCompiledInfo<GMMCompileInfo>();
