@@ -233,11 +233,13 @@ ge::graphStatus FfnWorkerBatchingTilingArch35::CheckInputParam()
                 return ge::GRAPH_FAILED);
     // 所有公共入口均需保护固定 1024B context 读取；Torch wrapper 的检查不能
     // 覆盖直接 ACLNN/GE 调用。空输入也必须在下发 kernel 前拒绝。
-    OP_CHECK_IF(
-        xShape.GetDim(0) < CONTEXT_BYTES,
-        OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "schedule_context dim[0]", std::to_string(xShape.GetDim(0)),
-                                  "at least " + std::to_string(CONTEXT_BYTES)),
-        return ge::GRAPH_FAILED);
+    // 未知维（-1）/未知秩（-2）不参与下界比较：def 声明 dynamicRank/dynamicShape
+    // 支持，图编译 desc shape 为动态时不得误拦（实际字节数由运行时具体 shape 保证）。
+    const int64_t contextDim = xShape.GetDim(0);
+    OP_CHECK_IF(contextDim != ge::UNKNOWN_DIM && contextDim != ge::UNKNOWN_DIM_NUM && contextDim < CONTEXT_BYTES,
+                OP_LOGE_FOR_INVALID_VALUE(context_->GetNodeName(), "schedule_context dim[0]",
+                                          std::to_string(contextDim), "at least " + std::to_string(CONTEXT_BYTES)),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 

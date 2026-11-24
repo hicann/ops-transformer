@@ -111,10 +111,10 @@ std::vector<gert::TilingContextPara::TensorDescription> MakeA5OutputDesc()
 } // namespace
 
 namespace {
-void CheckArch35(int64_t dtype, int64_t mode, int64_t a, int64_t bs, int64_t k, int64_t experts, int64_t ub,
-                 int64_t expectedCores, int64_t expectedSegments, int64_t expectedPerSegment)
+void CheckArch35WithInput(gert::StorageShape scShape, int64_t dtype, int64_t mode, int64_t a, int64_t bs, int64_t k,
+                          int64_t experts, int64_t ub, int64_t expectedCores, int64_t expectedSegments,
+                          int64_t expectedPerSegment)
 {
-    gert::StorageShape scShape = {{1024}, {1024}};
     FfnWorkerBatchingCompileInfo compileInfo = {};
     gert::TilingContextPara para(
         "FfnWorkerBatching", {{scShape, ge::DT_INT8, ge::FORMAT_ND}}, MakeA5OutputDesc(),
@@ -147,6 +147,13 @@ void CheckArch35(int64_t dtype, int64_t mode, int64_t a, int64_t bs, int64_t k, 
     EXPECT_LE(d.wsSortedIds + d.Y, d.wsGatherIdx);
     ASSERT_EQ(info.workspaceSizes.size(), 1u);
     EXPECT_GE(info.workspaceSizes[0], (d.wsGatherIdx + d.Y) * sizeof(int32_t));
+}
+
+void CheckArch35(int64_t dtype, int64_t mode, int64_t a, int64_t bs, int64_t k, int64_t experts, int64_t ub,
+                 int64_t expectedCores, int64_t expectedSegments, int64_t expectedPerSegment)
+{
+    CheckArch35WithInput({{1024}, {1024}}, dtype, mode, a, bs, k, experts, ub, expectedCores, expectedSegments,
+                         expectedPerSegment);
 }
 } // namespace
 
@@ -216,6 +223,25 @@ TEST_F(FfnWorkerBatchingTilingTest, ffn_worker_batching_tiling_ascend910_93_recv
     std::string expectTilingData = "1152 4096 0 8 32 261888 8160 1152 ";
     std::vector<size_t> expectWorkspaces = {16819232};
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData, expectWorkspaces);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 动态 shape 场景（skill rt2.0 加固：-1 未知维 / -2 未知秩，gert 编码为 1-D {-1}/{-2}），仅 arch35。
+// tiling 对 schedule_context 仅做"dim[0] >= 1024"下界校验：arch35 侧未知维/未知秩视为通配不误拦
+// （def 仅在 arch35 regbaseCfg 声明 dynamicRank/dynamicShape 支持；A2/A3 无此声明，GE 层即拦，
+//  monolithic 路径保持逐字不动，不构造 A2/A3 动态用例）。
+// ---------------------------------------------------------------------------------------------------------------------
+
+// arch35（Ascend950 + NORM）：-1 未知维输入，tiling 结果与 norm_key100 静态基线一致。
+TEST_F(FfnWorkerBatchingTilingTest, ffn_wb_tiling_arch35_dyn_dim_unknown_input)
+{
+    CheckArch35WithInput({{-1}, {-1}}, 0, 0, 16, 8, 9, 8, 262144, 36, 36, 32);
+}
+
+// arch35（Ascend950 + NORM）：-2 未知秩输入，tiling 结果与 norm_key100 静态基线一致。
+TEST_F(FfnWorkerBatchingTilingTest, ffn_wb_tiling_arch35_dyn_rank_unknown_input)
+{
+    CheckArch35WithInput({{-2}, {-2}}, 0, 0, 16, 8, 9, 8, 262144, 36, 36, 32);
 }
 
 // arch35 平台参数注入和参数构造。

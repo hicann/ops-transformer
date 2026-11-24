@@ -277,3 +277,69 @@ TEST_F(FfnWorkerBatchingInfershapeTest, ffn_worker_batching_infershape_shape_pro
          {"layer_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}});
     ExecuteTestCase(infershapeContextPara, ge::GRAPH_FAILED);
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 动态 shape 场景（skill rt2.0 加固：-1 未知维 / -2 未知秩）。
+// InferShape 输出全由 attr 推导、不读输入 shape：未知维/未知秩输入不得误拦，
+// 输出与静态基线 test01（max_out_shape={16,8,9,4096} -> Y=1152）逐项一致。
+// ---------------------------------------------------------------------------------------------------------------------
+
+// -1 未知维：desc shape 为 (-1,) 时正常推导。
+TEST_F(FfnWorkerBatchingInfershapeTest, ffn_worker_batching_infershape_dyn_dim)
+{
+    gert::StorageShape schedule_context_shape = {{-1}, {-1}};
+
+    gert::InfershapeContextPara infershapeContextPara(
+        "FfnWorkerBatching",
+        {// input
+         {schedule_context_shape, ge::DT_INT8, ge::FORMAT_ND}},
+        {
+            // output
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // y
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},   // group_list
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},   // session_ids
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},   // micro_batch_ids
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},   // token_ids
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},   // expert_offsets
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},   // dynamic_scale
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},   // actual_token_num
+        },
+        {{"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+         {"max_out_shape", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({16, 8, 9, 4096})},
+         {"token_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"need_schedule", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"layer_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}});
+    std::vector<std::vector<int64_t>> expectOutputShape = {{1152, 4096}, {8, 2}, {1152}, {1152},
+                                                           {1152},       {1152}, {1152}, {1}};
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
+}
+
+// -2 未知秩：StorageShape 按 {{-2}, {-2}} 写法（origin 同 -2），不误拦、不塌缩输出 rank。
+TEST_F(FfnWorkerBatchingInfershapeTest, ffn_worker_batching_infershape_dyn_rank)
+{
+    gert::StorageShape schedule_context_shape = {{-2}, {-2}};
+
+    gert::InfershapeContextPara infershapeContextPara(
+        "FfnWorkerBatching",
+        {// input
+         {schedule_context_shape, ge::DT_INT8, ge::FORMAT_ND}},
+        {
+            // output
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND}, // y
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},   // group_list
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},   // session_ids
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},   // micro_batch_ids
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},   // token_ids
+            {{{}, {}}, ge::DT_INT32, ge::FORMAT_ND},   // expert_offsets
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},   // dynamic_scale
+            {{{}, {}}, ge::DT_INT64, ge::FORMAT_ND},   // actual_token_num
+        },
+        {{"expert_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(8)},
+         {"max_out_shape", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>({16, 8, 9, 4096})},
+         {"token_dtype", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"need_schedule", Ops::Transformer::AnyValue::CreateFrom<int64_t>(0)},
+         {"layer_num", Ops::Transformer::AnyValue::CreateFrom<int64_t>(1)}});
+    std::vector<std::vector<int64_t>> expectOutputShape = {{1152, 4096}, {8, 2}, {1152}, {1152},
+                                                           {1152},       {1152}, {1152}, {1}};
+    ExecuteTestCase(infershapeContextPara, ge::GRAPH_SUCCESS, expectOutputShape);
+}
