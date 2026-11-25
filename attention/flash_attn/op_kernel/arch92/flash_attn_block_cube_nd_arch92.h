@@ -302,6 +302,7 @@ public:
         fixpipeParams.srcStride = (fixpipeParams.mSize + 15) >> 4 << 4;
         fixpipeParams.dstStride = s2BaseSize;
         fixpipeParams.dualDstCtl = 0;
+        fixpipeParams.unitFlag = UNITFLAG_EN_OUTER_LAST;
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;
@@ -328,19 +329,14 @@ public:
             MMParam param = MakeMMParam(runInfo.actMSize, runInfo.actSingleLoopS2Size, constInfo_.dSize, false, true);
             IterateBmmKnSplit(mm1ResUbTensor, qL1Tensor, kL1Tensor, param, 0, runInfo);
         } else {
-            Mutex::Lock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
             LocalTensor<MM_T> l0CSubTensor = l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
             MMParam param = MakeMMParam((uint32_t)runInfo.actMSize, (uint32_t)runInfo.actSingleLoopS2Size,
-                                        (uint32_t)(constInfo_.dSize), false, true);
+                                        (uint32_t)(constInfo_.dSize), false, true, true, true, UNITFLAG_EN_OUTER_LAST);
             MatmulBase<Q_T, KV_T, MM_T, 128, 128, dBaseSize, ABLayout::MK, ABLayout::KN>(
                 qL1Tensor, kL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
 
-            Mutex::Unlock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
-            Mutex::Lock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
-
             FixpipeMm1(mm1ResUbTensor, l0CSubTensor, runInfo);
 
-            Mutex::Unlock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
             l0cBufId_ = (l0cBufId_ + 1) % L0C_BUFCNT;
         }
         Mutex::Unlock<PIPE_MTE1>(KV_L1_BUFFER_ID0 + kvL1BufId_);
@@ -358,7 +354,6 @@ public:
                                              const LocalTensor<KV_T>& bL1, const MMParam& param, uint32_t firstL0C,
                                              RunInfo& runInfo)
     {
-        // TODO，unit_flag待开启
         // K、N 各切 128：每块 L0B 为 128x128，占 32 KiB，可乒乓复用。
         constexpr uint32_t baseK = 128;
         constexpr uint32_t baseN = 128;
@@ -366,9 +361,6 @@ public:
         const uint32_t nLoops = (param.singleN + baseN - 1) / baseN;
         const uint32_t aRowStride = AlignUp(param.singleM, 16U);
         const uint32_t bRowStride = AlignUp(param.isRightTranspose ? param.singleN : param.singleK, 16U);
-        for (uint32_t n = 0; n < nLoops; ++n) {
-            Mutex::Lock<PIPE_M>(L0C_BUFFER_ID0 + firstL0C + n);
-        }
         for (uint32_t k = 0; k < kLoops; ++k) {
             const uint32_t kStart = k * baseK;
             const uint32_t tileK = AttentionCommon::Min(baseK, param.singleK - kStart);
@@ -399,7 +391,7 @@ public:
                 mm.k = tileK;
                 mm.cmatrixInitVal = k == 0;
                 mm.cmatrixSource = false;
-                mm.unitFlag = 0;
+                mm.unitFlag = (k < kLoops - 1) ? UNITFLAG_ENABLE : UNITFLAG_EN_OUTER_LAST;
                 Mmad(cL0, aL0, bL0, mm);
                 bBuffer.template Set<HardEvent::M_MTE1>();
             }
@@ -407,13 +399,9 @@ public:
             aBuffer.template Set<HardEvent::M_MTE1>();
         }
         for (uint32_t n = 0; n < nLoops; ++n) {
-            const uint32_t cId = L0C_BUFFER_ID0 + firstL0C + n;
             auto cL0 = l0CBuffers_[(firstL0C + n) * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
-            Mutex::Unlock<PIPE_M>(cId);
-            Mutex::Lock<PIPE_FIX>(cId);
             // Both BMMs have a 256-element destination row stride on this path.
             FixpipeMm2PartialN(dstUb[n * baseN], cL0, AttentionCommon::Min(baseN, param.singleN - n * baseN), runInfo);
-            Mutex::Unlock<PIPE_FIX>(cId);
         }
     }
 
@@ -445,6 +433,7 @@ public:
         fixpipeParams.srcStride = (fixpipeParams.mSize + 15) >> 4 << 4;
         fixpipeParams.dstStride = (dVBaseSize + 15) >> 4 << 4;
         fixpipeParams.dualDstCtl = 0;
+        fixpipeParams.unitFlag = UNITFLAG_EN_OUTER_LAST;
         fixpipeParams.params.ndNum = 1;
         fixpipeParams.params.srcNdStride = 0;
         fixpipeParams.params.dstNdStride = 0;
@@ -465,7 +454,6 @@ public:
                                         true, 0, runInfo.actMSize);
             IterateBmmKnSplit(mm2ResUbTensor, pL1Tensor, vL1Tensor, param, 2, runInfo);
         } else {
-            Mutex::Lock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
             LocalTensor<MM_T> l0CSubTensor = l0CBuffers_[l0cBufId_ * L0C_BUF_BYTES].template ReinterpretCast<MM_T>();
             MMParam param = {
                 (uint32_t)mBaseSize,                   // singleM 128
@@ -475,6 +463,7 @@ public:
                 false                                  // isRightTranspose
             };
             param.realM = (uint32_t)runInfo.actMSize;
+            param.unitFlag = UNITFLAG_EN_OUTER_LAST;
 
             if constexpr (s2BaseSize == 128) {
                 MatmulFull<Q_T, KV_T, MM_T, 128, dVBaseSize, 128, ABLayout::MK, ABLayout::KN>(
@@ -483,12 +472,8 @@ public:
                 MatmulBase<Q_T, KV_T, MM_T, 128, dVBaseSize, 128, ABLayout::MK, ABLayout::KN>(
                     pL1Tensor, vL1Tensor, mmL0APolicy_, mmL0BPolicy_, l0CSubTensor, param);
             }
-            Mutex::Unlock<PIPE_M>(L0C_BUFFER_ID0 + l0cBufId_);
-            Mutex::Lock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
-
             FixpipeMm2PartialN(mm2ResUbTensor, l0CSubTensor, constInfo_.dSizeV, runInfo);
 
-            Mutex::Unlock<PIPE_FIX>(L0C_BUFFER_ID0 + l0cBufId_);
             l0cBufId_ = (l0cBufId_ + 1) % L0C_BUFCNT;
         }
         Mutex::Unlock<PIPE_MTE1>(KV_L1_BUFFER_ID0 + kvL1BufId_);
