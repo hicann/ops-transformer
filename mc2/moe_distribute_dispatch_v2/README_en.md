@@ -372,7 +372,11 @@ For details, see the following parameter description.
     - TP domain communication is not supported currently.
 
 - Communication mode constraints:
-    - <term>Ascend 950DT products</term>: Only UB Memory communication is supported.
+    - <term>Ascend 950DT products</term>: UB Memory is used by default. Setting `commAlg="hierarchy"` selects the A5 RoCE path, which uses UB Memory within each UB domain and RoCE between domains. This path is different from `hierarchy` on Atlas A3.
+        - Topology: The EP communication domain must contain multiple UB domains of equal size. Ranks must be numbered consecutively within each UB domain, and ranks with the same local rank number in different domains must have RoCE connectivity. A single UB domain is not supported, and this path does not fall back to UB Memory.
+        - `globalBs`: If `BS` differs across ranks, pass the same non-zero capacity, `globalBs = epWorldSize * maxBS`, to both Dispatch and Combine on all ranks. `maxBS` must be at least the largest `BS` across all ranks and must not exceed 512.
+        - Insufficient CCL window capacity: If the log contains `ROCE CCL window requires`, check the capacity of the intra-domain window and each inter-domain window partition against the logged requirements. Set `HCCL_BUFFSIZE` in MiB before creating the EP communication domain so that the window meets the requirements of both Dispatch and Combine.
+        - Insufficient UB or AIV cores: If the log contains `ROCE UB insufficient`, check the input shapes and on-chip buffer requirements. If it contains `ROCE requires 8 Count cores`, check the configured AIV core limit. At least `8 + min(serverNum, 8) + 2` AIV cores are required, where `serverNum` is the number of UB domains. Increasing `HCCL_BUFFSIZE` does not increase on-chip UB capacity or the number of AIV cores.
 
 - <term>Atlas A2 products</term>:
     - Parameter constraints:

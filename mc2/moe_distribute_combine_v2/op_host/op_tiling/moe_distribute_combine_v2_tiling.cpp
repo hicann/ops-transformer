@@ -266,6 +266,9 @@ static ge::graphStatus GetSharedAttrAndSetTilingData(const gert::TilingContext* 
                     return ge::GRAPH_FAILED);
     int64_t sharedExpertRankNum = *sharedExpertRankNumPtr;
     int64_t epWorldSize = *epWorldSizePtr;
+    OP_TILING_CHECK(config.isRoce && sharedExpertRankNum > 0,
+                    OP_LOGE(nodeName, "ROCE does not support shared experts: sharedExpertRankNum must be 0"),
+                    return ge::GRAPH_FAILED);
     if (isLayered) {
         OP_TILING_CHECK(
             (sharedExpertRankNum != 0),
@@ -1429,7 +1432,7 @@ static bool CheckFromDispatchTensorShape(const gert::TilingContext* context,
     int64_t minAssistInfoDim0 = static_cast<int64_t>(A) * ASSIST_NUM_PER_A;
     if (config.isRoce) {
         const auto& info = tilingData.moeDistributeCombineV2Info;
-        minAssistInfoDim0 = GetRoceAssistInfoSize(A, info.epWorldSize, info.globalBs / info.epWorldSize);
+        minAssistInfoDim0 = GetRoceAssistInfoSize(A, config.roceServerNum, info.globalBs / info.epWorldSize);
     }
     OP_TILING_CHECK(
         assistInfoDim0 < minAssistInfoDim0,
@@ -1862,6 +1865,7 @@ static uint32_t GetQuantCommDataBytes(uint32_t axisH, uint32_t expandXTypeSize, 
 struct RoceTokenLayout {
     uint64_t floatBytes;
     uint64_t inputStrideBytes;
+    uint64_t resultBytes;
     uint64_t scatterBlocks;
     uint64_t interServerBlocks;
     uint64_t quantUbBytes;
@@ -1901,6 +1905,13 @@ static RoceTokenLayout GetRoceTokenLayout(const gert::TilingContext* context, co
     if (mode == 0U || tiling.enablePreReduce) {
         layout.inputStrideBytes = std::max(layout.inputStrideBytes, layout.scatterBlocks * SPLIT_BLOCK_DATA_SIZE);
     }
+    layout.resultBytes = std::max(layout.interServerBlocks * SPLIT_BLOCK_DATA_SIZE, layout.inputStrideBytes);
+    if (mode == static_cast<uint32_t>(CommQuantMode::MXFP8_E5M2_QUANT) ||
+        mode == static_cast<uint32_t>(CommQuantMode::MXFP8_E4M3_QUANT)) {
+        // MX reads from the partial sum with pre-reduce and from the Scatter input slot otherwise.
+        uint64_t& mxInputBytes = tiling.enablePreReduce ? layout.resultBytes : layout.inputStrideBytes;
+        mxInputBytes = std::max(mxInputBytes, AlignRoceBytes(hidden, 256U) * DTYPE_SIZE_HALF);
+    }
     if (mode != 0U) {
         layout.quantUbBytes += layout.interServerBlocks * SPLIT_BLOCK_DATA_SIZE;
     }
@@ -1911,10 +1922,9 @@ static ge::graphStatus CheckRoceInputs(const gert::TilingContext* context, const
                                        const CombineV2Config& config)
 {
     auto nodeName = context->GetNodeName();
-    OP_TILING_CHECK(tiling.sharedExpertRankNum != 0U && tiling.sharedExpertRankNum != tiling.sharedExpertNum,
-                    OP_LOGE(nodeName, "ROCE requires one dedicated rank per shared expert"), return ge::GRAPH_FAILED);
-    const uint32_t unsupportedInputs[] = {config.elasticInfoIndex, config.performanceInfoIndex,
-                                          config.activationScaleIndex, config.weightScaleIndex, config.groupListIndex};
+    OP_TILING_CHECK(tiling.hasSharedExpertX, OP_LOGE(nodeName, "ROCE does not support shared_expert_x"),
+                    return ge::GRAPH_FAILED);
+    const uint32_t unsupportedInputs[] = {config.elasticInfoIndex, config.performanceInfoIndex};
     for (uint32_t index : unsupportedInputs) {
         OP_TILING_CHECK(context->GetOptionalInputShape(index) != nullptr,
                         OP_LOGE(nodeName, "ROCE does not support optional input at index %u", index),
@@ -1926,7 +1936,7 @@ static ge::graphStatus CheckRoceInputs(const gert::TilingContext* context, const
                         (std::to_string(tiling.globalBs) + " and " + std::to_string(tiling.epWorldSize)).c_str(),
                         "In ROCE mode, globalBs divided by epWorldSize must not exceed 512"),
                     return ge::GRAPH_FAILED);
-    if (!tiling.enablePreReduce || !tiling.hasExpertScales || tiling.epRankId < tiling.sharedExpertRankNum) {
+    if (!tiling.enablePreReduce || !tiling.hasExpertScales) {
         return ge::GRAPH_SUCCESS;
     }
     auto scales = context->GetOptionalInputShape(config.expandScalesIndex);
@@ -1953,8 +1963,15 @@ static ge::graphStatus CheckRoceInterServerWindow(const gert::TilingContext* con
     const uint64_t tokensPerRank = tiling.globalBs / tiling.epWorldSize;
     const uint64_t commSlots = tiling.k + (tiling.sharedExpertRankNum > 0U ? tiling.sharedExpertNum : 0U);
     const uint64_t sendSlots = config.roceServerNum * tokensPerRank * (tiling.enablePreReduce ? 1U : commSlots);
-    const uint64_t receiveSlots = tokensPerRank * commSlots;
-    const uint64_t combineBytes = (sendSlots + receiveSlots) * layout.interServerBlocks * 512U;
+    const uint64_t receiveSlots = tokensPerRank * (tiling.enablePreReduce ? config.roceServerNum : commSlots);
+    // A single-SGE group includes holes, so its span is bounded by the full per-rank capacity.
+    const uint64_t tokensPerWrite = tiling.enablePreReduce ? tokensPerRank : 1U;
+    OP_TILING_CHECK(tokensPerWrite * layout.interServerBlocks * 512U >= (uint64_t{1} << 31U),
+                    OP_LOGE(context->GetNodeName(), "ROCE grouped Write payload must be smaller than 2 GiB"),
+                    return ge::GRAPH_FAILED);
+    const uint64_t notifyBytes =
+        AlignRoceBytes(config.roceServerNum * AlignRoceBytes(tokensPerRank, 8U) * sizeof(uint64_t), 512U);
+    const uint64_t combineBytes = (sendSlots + receiveSlots) * layout.interServerBlocks * 512U + notifyBytes;
     const uint64_t dispatchBytes = GetRoceWindowLayout(tiling, config.roceServerNum).dispatchInterBytes;
     OP_TILING_CHECK(dispatchBytes + combineBytes > windowBytes / BUFFER_NUM,
                     OP_LOGE(context->GetNodeName(), "ROCE bank=%lu B, Dispatch reserve=%lu B, Combine=%lu B",
@@ -1988,120 +2005,219 @@ static ge::graphStatus CheckRoceWindow(const gert::TilingContext* context, MoeDi
 
 static uint64_t GetRoceFlagUbBytes(uint64_t blocks)
 {
-    const uint64_t flagCompareCount = AlignRoceBytes(blocks * SPLIT_BLOCK_FLAG_COUNT, NUM_PER_REP_FP32);
-    const uint64_t flagsBytes = flagCompareCount * sizeof(int32_t);
-    const uint64_t selectedFlagsBytes = flagsBytes;
+    const uint64_t flagsBytes = AlignRoceBytes(blocks * sizeof(uint64_t), 256U);
+    const uint64_t flagCompareCount = flagsBytes / sizeof(uint64_t);
+    const uint64_t selectedFlagsBytes = AlignRoceBytes(blocks * sizeof(uint32_t));
     const uint64_t compareMaskBytes = AlignRoceBytes(flagCompareCount / 8U);
     return flagsBytes + selectedFlagsBytes + compareMaskBytes;
 }
 
-static uint64_t GetRoceReceiveUbBytes(const RoceTokenLayout& layout, uint64_t blocks)
+static uint64_t GetRoceReceiveFlagSlotBytes(const MoeDistributeCombineV2Info& tiling, uint64_t blocks)
 {
-    const uint64_t inputBytes = BUFFER_NUM * blocks * SPLIT_BLOCK_DATA_SIZE;
-    const uint64_t resultBytes = std::max(layout.interServerBlocks * SPLIT_BLOCK_DATA_SIZE, layout.inputStrideBytes);
-    const uint64_t dequantFloatBytes = layout.quantUbBytes == 0U ? layout.floatBytes : 0U;
-    return inputBytes + layout.floatBytes + resultBytes + dequantFloatBytes + GetRoceFlagUbBytes(blocks);
+    const uint64_t slots = tiling.k + (tiling.sharedExpertRankNum > 0U ? tiling.sharedExpertNum : 0U);
+    return slots * AlignRoceBytes(blocks * sizeof(uint64_t));
 }
 
-static uint64_t GetRoceScatterUbBytes(const MoeDistributeCombineV2Info& tiling, const RoceTokenLayout& layout)
+static uint64_t GetRoceReceiveUbBytes(const RoceTokenLayout& layout, uint64_t blocks, uint32_t inputBuffers,
+                                      uint64_t flagSlotBytes, uint64_t tokenCount)
 {
-    const uint64_t inputBytes = BUFFER_NUM * layout.inputStrideBytes;
-    const uint64_t packetBytes = BUFFER_NUM * layout.scatterBlocks * 512U;
-    const uint64_t rowInfoBytes = TRIPLE * sizeof(int32_t);
+    const uint64_t inputBytes = inputBuffers * blocks * SPLIT_BLOCK_DATA_SIZE;
+    const uint64_t dequantFloatBytes = layout.quantUbBytes == 0U ? layout.floatBytes : 0U;
+    const uint64_t prefetchBytes = std::min<uint64_t>(inputBuffers, tokenCount) * flagSlotBytes;
+    return inputBytes + layout.floatBytes + layout.resultBytes + dequantFloatBytes + GetRoceFlagUbBytes(blocks) +
+           prefetchBytes;
+}
+
+static uint64_t GetRoceScatterUbBytes(const MoeDistributeCombineV2Info& tiling, const RoceTokenLayout& layout,
+                                      uint64_t serverNum)
+{
+    constexpr uint32_t scatterCardStateWords = 5U;
+    const uint64_t inputBytes = tiling.roceScatterInputBufferNum * layout.inputStrideBytes;
+    const uint64_t packetBytes = tiling.roceScatterBufferNum * layout.scatterBlocks * 512U;
+    const uint64_t phaseCards = std::max<uint64_t>(serverNum - 1U, 1U) * (tiling.epWorldSize / serverNum);
+    // One metadata allocation is reused across all experts and both source-server phases.
+    const uint64_t cardsPerCore = phaseCards;
+    const uint64_t cachedRows = cardsPerCore * 8U;
+    const uint64_t prefixBytes = AlignRoceBytes((tiling.epWorldSize + 8U) * sizeof(int32_t));
+    const uint64_t stateBytes = AlignRoceBytes(cardsPerCore * scatterCardStateWords * sizeof(uint32_t));
+    const uint64_t baseBytes = AlignRoceBytes(cardsPerCore * sizeof(uint64_t));
+    const uint64_t routeBytes = cachedRows * (TRIPLE + 1U) * sizeof(int32_t);
+    const uint64_t vectorScratchBytes = 32U;
     const auto sendExpertScales = tiling.enablePreReduce && tiling.hasExpertScales;
-    const uint64_t weightBytes = sendExpertScales ? sizeof(float) : 0U;
-    const uint64_t broadcastWeightBytes = sendExpertScales ? 32U : 0U;
-    const uint64_t minimumRowBatchBytes = 8U * (rowInfoBytes + weightBytes + broadcastWeightBytes);
+    const uint64_t weightBytes =
+        sendExpertScales ? cachedRows * sizeof(float) + tiling.roceScatterInputBufferNum * 8U * 32U : 0U;
     const uint64_t quantBytes = tiling.enablePreReduce ? 0U : layout.quantUbBytes;
-    return STATE_OFFSET + quantBytes + inputBytes + packetBytes + minimumRowBatchBytes;
+    return quantBytes + inputBytes + packetBytes + prefixBytes + stateBytes + baseBytes + routeBytes +
+           vectorScratchBytes + weightBytes;
 }
 
 static uint64_t GetRoceGatherUbBytes(const MoeDistributeCombineV2Info& tiling, const RoceTokenLayout& layout,
                                      uint64_t serverNum, uint64_t gatherCores)
 {
-    const uint64_t alignedTokens = AlignRoceBytes(tiling.globalBs / tiling.epWorldSize, 16U);
-    const uint64_t mapBlocks = serverNum * alignedTokens / 16U;
-    const uint64_t mapsPerCore = (mapBlocks + gatherCores - 1U) / gatherCores * 16U;
-    const uint64_t expectedMasksBytes = mapsPerCore * sizeof(uint32_t);
+    const uint64_t minCoresPerServer = std::max<uint64_t>(gatherCores / (serverNum - 1U), 1U);
+    const uint64_t tokensPerRank = tiling.globalBs / tiling.epWorldSize;
+    const uint64_t mapsPerCore = (tokensPerRank + minCoresPerServer - 1U) / minCoresPerServer;
+    const uint64_t expectedMasksBytes = AlignRoceBytes(mapsPerCore * sizeof(uint32_t));
     const uint64_t waitMasksBytes = expectedMasksBytes;
-    const uint64_t pendingTokensBytes = mapsPerCore * sizeof(uint32_t);
-    const uint64_t serverInfoBytes = std::min(mapsPerCore, alignedTokens) * sizeof(uint16_t) + UB_ALIGN;
-    const uint64_t packetsBytes = BUFFER_NUM * layout.interServerBlocks * 512U;
+    const uint64_t pendingTokensBytes = expectedMasksBytes;
+    const uint64_t packetsBytes = tiling.roceGatherBufferNum * layout.interServerBlocks * 512U;
     if (!tiling.enablePreReduce) {
         return GetRoceFlagUbBytes(layout.scatterBlocks) + packetsBytes + expectedMasksBytes + waitMasksBytes +
-               pendingTokensBytes + serverInfoBytes;
+               pendingTokensBytes;
     }
-    return layout.quantUbBytes + GetRoceReceiveUbBytes(layout, layout.scatterBlocks) + packetsBytes +
-           expectedMasksBytes + waitMasksBytes + pendingTokensBytes + serverInfoBytes;
+    const uint64_t flagSlotBytes = GetRoceReceiveFlagSlotBytes(tiling, layout.scatterBlocks);
+    return layout.quantUbBytes +
+           GetRoceReceiveUbBytes(layout, layout.scatterBlocks, tiling.roceGatherInputBufferNum, flagSlotBytes,
+                                 mapsPerCore) +
+           packetsBytes + expectedMasksBytes + waitMasksBytes + pendingTokensBytes + layout.floatBytes;
 }
 
 static uint64_t GetRoceFinalUbBytes(const MoeDistributeCombineV2Info& tiling, const RoceTokenLayout& layout,
-                                    uint64_t serverNum)
+                                    uint64_t serverNum, uint32_t commQuantMode)
 {
     const uint64_t tokensPerCore = (static_cast<uint64_t>(tiling.bs) + tiling.aivNum - 1U) / tiling.aivNum;
     const uint64_t routeBytes = AlignRoceBytes(tokensPerCore * tiling.k * sizeof(int32_t));
     const uint64_t expectedMasksBytes = AlignRoceBytes(tokensPerCore * sizeof(uint32_t));
     const uint64_t waitMasksBytes = expectedMasksBytes;
     const uint64_t pendingTokensBytes = AlignRoceBytes(tokensPerCore * sizeof(uint32_t));
-    const uint64_t outputBytes = BUFFER_NUM * AlignRoceBytes(static_cast<uint64_t>(tiling.h) * DTYPE_SIZE_HALF);
+    const uint64_t outputBytes = tiling.bufferNum * AlignRoceBytes(static_cast<uint64_t>(tiling.h) * DTYPE_SIZE_HALF);
     const uint64_t lastTokenByServerBytes = tiling.enablePreReduce ? AlignRoceBytes(serverNum * sizeof(int32_t)) : 0U;
     const auto hasLocalExpertCompute = tiling.copyExpertNum > 0U || tiling.constExpertNum > 0U;
     const uint64_t expertScalesBytes =
         tiling.hasExpertScales && (!tiling.enablePreReduce || hasLocalExpertCompute) ? routeBytes : 0U;
     const uint64_t specialMasksBytes = hasLocalExpertCompute ? expectedMasksBytes : 0U;
     const uint64_t originalTokenBytes = hasLocalExpertCompute ? layout.floatBytes : 0U;
-    const uint64_t constMixBytes = tiling.constExpertNum > 0U ? layout.floatBytes : 0U;
+    const bool reuseConstMix = tiling.enablePreReduce && commQuantMode == INT8_COMM_QUANT;
+    const uint64_t constMixBytes = tiling.constExpertNum > 0U && !reuseConstMix ? layout.floatBytes : 0U;
     const uint64_t routeFloatBytes = routeBytes;
     const uint64_t expertIdsBytes = routeBytes;
     const uint64_t maskCount = tiling.isExpertMask ? tokensPerCore * tiling.k : tokensPerCore;
     const uint64_t activeMaskBytes = tiling.isExpertMask || tiling.isTokenMask ? AlignRoceBytes(maskCount) : 0U;
-    const uint64_t quantBytes = layout.quantUbBytes == 0U ? 0U : layout.floatBytes + layout.dequantScaleBytes;
-    return quantBytes + GetRoceReceiveUbBytes(layout, layout.interServerBlocks) + routeBytes + expectedMasksBytes +
-           waitMasksBytes + pendingTokensBytes + outputBytes + lastTokenByServerBytes + routeFloatBytes +
-           expertIdsBytes + activeMaskBytes + expertScalesBytes + specialMasksBytes + originalTokenBytes +
-           constMixBytes;
+    const uint64_t quantBytes = tiling.enablePreReduce ?
+                                    layout.quantUbBytes :
+                                    (layout.quantUbBytes == 0U ? 0U : layout.floatBytes + layout.dequantScaleBytes);
+    const uint64_t localPartialBytes = tiling.enablePreReduce && layout.quantUbBytes == 0U ?
+                                           AlignRoceBytes(static_cast<uint64_t>(tiling.h) * DTYPE_SIZE_HALF) :
+                                           0U;
+    const uint64_t localMasksBytes = tiling.enablePreReduce ? expectedMasksBytes : 0U;
+    const uint64_t receiveBlocks = std::max(layout.scatterBlocks, layout.interServerBlocks);
+    const uint64_t flagSlotBytes = GetRoceReceiveFlagSlotBytes(tiling, receiveBlocks);
+    return quantBytes +
+           GetRoceReceiveUbBytes(layout, receiveBlocks, tiling.roceFinalInputBufferNum, flagSlotBytes, tokensPerCore) +
+           routeBytes + expectedMasksBytes + waitMasksBytes + pendingTokensBytes + outputBytes +
+           lastTokenByServerBytes + routeFloatBytes + expertIdsBytes + activeMaskBytes + expertScalesBytes +
+           specialMasksBytes + originalTokenBytes + constMixBytes + localPartialBytes + localMasksBytes;
 }
 
-static bool CheckRoceUb(const gert::TilingContext* context, const MoeDistributeCombineV2Info& tiling,
+static uint32_t GetRocePipelineBufferNum(uint64_t available, uint64_t baseline, uint64_t slotBytes, uint32_t limit)
+{
+    return std::min<uint64_t>(limit, BUFFER_NUM + (available - baseline) / slotBytes / 2U * 2U);
+}
+
+static uint32_t GetRoceReceiveBufferNum(uint64_t available, uint64_t baseline, uint64_t payloadBytes,
+                                        uint64_t flagSlotBytes, uint64_t tokenCount)
+{
+    uint32_t buffers = 1U;
+    // Six input slots leave one metadata event and one temporary event in each event domain.
+    for (uint32_t depth = 2U; depth <= 6U; ++depth) {
+        const uint64_t extraFlags =
+            (std::min<uint64_t>(depth, tokenCount) - std::min<uint64_t>(1U, tokenCount)) * flagSlotBytes;
+        if (baseline + (depth - 1U) * payloadBytes + extraFlags > available) {
+            break;
+        }
+        buffers = depth;
+    }
+    return buffers;
+}
+
+static void SetRocePipelineBuffers(MoeDistributeCombineV2Info& tiling, const RoceTokenLayout& layout,
+                                   uint64_t available, uint64_t scatterBytes, uint64_t gatherBytes, uint64_t finalBytes,
+                                   uint64_t serverNum)
+{
+    const uint64_t scatterInput =
+        layout.inputStrideBytes + (tiling.enablePreReduce && tiling.hasExpertScales ? 8U * 32U : 0U);
+    const uint64_t gatherInput = layout.scatterBlocks * SPLIT_BLOCK_DATA_SIZE;
+    const uint64_t finalInput = std::max(layout.scatterBlocks, layout.interServerBlocks) * SPLIT_BLOCK_DATA_SIZE;
+    const uint64_t scatterPacket = layout.scatterBlocks * 512U;
+    const uint64_t gatherPacket = layout.interServerBlocks * 512U;
+    const uint64_t finalOutput = AlignRoceBytes(static_cast<uint64_t>(tiling.h) * DTYPE_SIZE_HALF);
+    const uint64_t gatherCores = tiling.aivNum - tiling.aivNum / 2U - std::min<uint64_t>(serverNum, 8U);
+    const uint64_t minGatherCores = std::max<uint64_t>(gatherCores / std::max<uint64_t>(serverNum - 1U, 1U), 1U);
+    const uint64_t maps = (tiling.globalBs / tiling.epWorldSize + minGatherCores - 1U) / minGatherCores;
+    const uint64_t tokens = (static_cast<uint64_t>(tiling.bs) + tiling.aivNum - 1U) / tiling.aivNum;
+    tiling.roceScatterBufferNum = GetRocePipelineBufferNum(available, scatterBytes, scatterPacket, 8U);
+    tiling.roceScatterInputBufferNum = GetRocePipelineBufferNum(
+        available, scatterBytes + (tiling.roceScatterBufferNum - BUFFER_NUM) * scatterPacket, scatterInput, 6U);
+    tiling.roceGatherBufferNum =
+        GetRocePipelineBufferNum(available, gatherBytes, gatherPacket, tiling.enablePreReduce ? 6U : 8U);
+    tiling.roceGatherInputBufferNum =
+        tiling.enablePreReduce ?
+            GetRoceReceiveBufferNum(available, gatherBytes + (tiling.roceGatherBufferNum - BUFFER_NUM) * gatherPacket,
+                                    gatherInput, GetRoceReceiveFlagSlotBytes(tiling, layout.scatterBlocks), maps) :
+            0U;
+    tiling.bufferNum = GetRocePipelineBufferNum(available, finalBytes, finalOutput, 8U);
+    tiling.roceFinalInputBufferNum = GetRoceReceiveBufferNum(
+        available, finalBytes + (tiling.bufferNum - BUFFER_NUM) * finalOutput, finalInput,
+        GetRoceReceiveFlagSlotBytes(tiling, std::max(layout.scatterBlocks, layout.interServerBlocks)), tokens);
+}
+
+static bool CheckRoceUb(const gert::TilingContext* context, MoeDistributeCombineV2Info& tiling,
                         const CombineV2Config& config, const RoceTokenLayout& layout)
 {
     auto nodeName = context->GetNodeName();
     const uint64_t sendCores = std::min<uint64_t>(config.roceServerNum, 8U);
     const uint64_t forwardCores = tiling.aivNum - tiling.aivNum / 2U;
-    OP_TILING_CHECK(tiling.aivNum < 2U || forwardCores <= sendCores,
+    OP_TILING_CHECK(forwardCores <= sendCores,
                     OP_LOGE(nodeName, "ROCE requires Scatter and Gather cores in addition to inter-server send cores"),
                     return false);
-    const uint64_t scatterBytes = GetRoceScatterUbBytes(tiling, layout);
+    tiling.bufferNum = BUFFER_NUM;
+    tiling.roceScatterBufferNum = BUFFER_NUM;
+    tiling.roceScatterInputBufferNum = BUFFER_NUM;
+    tiling.roceGatherBufferNum = BUFFER_NUM;
+    tiling.roceGatherInputBufferNum = 1U;
+    tiling.roceFinalInputBufferNum = 1U;
+    const uint64_t scatterBytes = GetRoceScatterUbBytes(tiling, layout, config.roceServerNum);
     const uint64_t gatherBytes = GetRoceGatherUbBytes(tiling, layout, config.roceServerNum, forwardCores - sendCores);
-    const uint64_t finalBytes = GetRoceFinalUbBytes(tiling, layout, config.roceServerNum);
-    const uint64_t alignedTokens = AlignRoceBytes(tiling.globalBs / tiling.epWorldSize, 16U);
-    const uint64_t senderMapsBytes = alignedTokens * (3U * sizeof(uint32_t) + sizeof(uint16_t)) + UB_ALIGN;
+    const auto commQuantMode =
+        static_cast<uint32_t>(*context->GetAttrs()->GetAttrPointer<int64_t>(config.attrCommQuantModeIndex));
+    const uint64_t finalBytes = GetRoceFinalUbBytes(tiling, layout, config.roceServerNum, commQuantMode);
+    const uint64_t alignedTokens = AlignRoceBytes(tiling.globalBs / tiling.epWorldSize, 8U);
+    const uint64_t senderMapsBytes = alignedTokens * 4U * sizeof(uint32_t);
     const uint64_t hcommBytes = 512U;
-    const uint64_t batchBytes = (5U + 1U) * 64U;
-    const uint64_t senderBytes =
-        GetRoceFlagUbBytes(layout.interServerBlocks) + senderMapsBytes + hcommBytes + batchBytes;
-    OP_TILING_CHECK(std::max({scatterBytes, gatherBytes, finalBytes, senderBytes}) > tiling.totalUbSize,
+    const uint64_t batchCapacity = tiling.globalBs / tiling.epWorldSize;
+    constexpr uint64_t wqeBytes = 64U;
+    const uint64_t batchBytes = (batchCapacity + 1U) * wqeBytes;
+    const uint64_t flagCount = alignedTokens;
+    const uint64_t senderFlagBytes = flagCount * sizeof(uint64_t) + AlignRoceBytes(flagCount / 8U);
+    const uint64_t senderBytes = senderFlagBytes + senderMapsBytes + hcommBytes + batchBytes;
+    const uint64_t available = std::min<uint64_t>(tiling.totalUbSize, 248U * 1024U);
+    OP_TILING_CHECK(std::max({scatterBytes, gatherBytes, finalBytes, senderBytes}) > available,
                     OP_LOGE(nodeName, "ROCE UB=%lu B, needs Scatter=%lu, Gather=%lu, final=%lu, sender=%lu B",
-                            tiling.totalUbSize, scatterBytes, gatherBytes, finalBytes, senderBytes),
+                            available, scatterBytes, gatherBytes, finalBytes, senderBytes),
                     return false);
+    SetRocePipelineBuffers(tiling, layout, available, scatterBytes, gatherBytes, finalBytes, config.roceServerNum);
+    OP_LOGD(nodeName, "ROCE buffers: Scatter input=%u packet=%u, Gather input=%u packet=%u, final input=%u output=%u",
+            tiling.roceScatterInputBufferNum, tiling.roceScatterBufferNum, tiling.roceGatherInputBufferNum,
+            tiling.roceGatherBufferNum, tiling.roceFinalInputBufferNum, tiling.bufferNum);
     return true;
 }
 
 static ge::graphStatus CheckRoceTiling(const gert::TilingContext* context, MoeDistributeCombineV2Info& tiling,
                                        const CombineV2Config& config)
 {
-    auto nodeName = context->GetNodeName();
-    OP_TILING_CHECK(CheckRoceInputs(context, tiling, config) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "ROCE input check failed"), return ge::GRAPH_FAILED);
+    if (CheckRoceInputs(context, tiling, config) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     const auto layout = GetRoceTokenLayout(context, tiling, config);
-    OP_TILING_CHECK(CheckRoceWindow(context, tiling, config, layout) != ge::GRAPH_SUCCESS,
-                    OP_LOGE(nodeName, "ROCE window size check failed"), return ge::GRAPH_FAILED);
-    OP_TILING_CHECK(!CheckRoceUb(context, tiling, config, layout), OP_LOGE(nodeName, "ROCE UB size check failed"),
-                    return ge::GRAPH_FAILED);
+    if (CheckRoceWindow(context, tiling, config, layout) != ge::GRAPH_SUCCESS ||
+        !CheckRoceUb(context, tiling, config, layout)) {
+        return ge::GRAPH_FAILED;
+    }
     return ge::GRAPH_SUCCESS;
 }
 
-static ge::graphStatus SetWorkspace(gert::TilingContext* context, const char* nodeName, const CombineV2Config& config)
+static ge::graphStatus SetWorkspace(gert::TilingContext* context, const char* nodeName, const CombineV2Config& config,
+                                    const MoeDistributeCombineV2Info& info)
 {
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(context->GetPlatformInfo());
     uint64_t aivNum = ascendcPlatform.GetCoreNumAiv();
@@ -2112,6 +2228,9 @@ static ge::graphStatus SetWorkspace(gert::TilingContext* context, const char* no
     workspace[0] = SYSTEM_NEED_WORKSPACE;
     if (!config.isRoce) {
         workspace[0] += aivNum * MASK_CALC_NEED_WORKSPACE;
+    } else if (info.enablePreReduce) {
+        const uint64_t partialStrideBytes = AlignRoceBytes(static_cast<uint64_t>(info.h) * sizeof(float), 512U);
+        workspace[0] += config.roceServerNum * (info.globalBs / info.epWorldSize) * partialStrideBytes;
     }
     OP_LOGD(nodeName, "workspace[0] size is %ld", workspace[0]);
     return ge::GRAPH_SUCCESS;
@@ -2778,8 +2897,9 @@ ge::graphStatus CheckAndSetPlatformInfo(gert::TilingContext* context, MoeDistrib
     tilingData->moeDistributeCombineV2Info.aivNum = aivNum;
     tilingData->moeDistributeCombineV2Info.totalUbSize = ubSize;
     if (config.isRoce) {
-        OP_TILING_CHECK(CheckRoceTiling(context, tilingData->moeDistributeCombineV2Info, config) != ge::GRAPH_SUCCESS,
-                        OP_LOGE(nodeName, "ROCE tiling check failed"), return ge::GRAPH_FAILED);
+        if (CheckRoceTiling(context, tilingData->moeDistributeCombineV2Info, config) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
     } else {
         OP_TILING_CHECK(!UbUsedCal(ubSize, context, tilingData, config),
                         OP_LOGE_WITHOUT_REPORT(nodeName, "MoeDistributeCombineV2 UB usage exceeds available UB size"),
@@ -2794,9 +2914,9 @@ static ge::graphStatus FinalizeTiling(gert::TilingContext* context, MoeDistribut
                                       const char* nodeName, const std::string& groupEp, bool isLayered,
                                       uint64_t tilingKey, const CombineV2Config& config)
 {
-    OP_TILING_CHECK(SetWorkspace(context, nodeName, config) != ge::GRAPH_SUCCESS,
-                    OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "Tiling set workspace Failed"),
-                    return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(
+        SetWorkspace(context, nodeName, config, tilingData->moeDistributeCombineV2Info) != ge::GRAPH_SUCCESS,
+        OP_LOGE_WITHOUT_REPORT(context->GetNodeName(), "Tiling set workspace Failed"), return ge::GRAPH_FAILED);
     if (!config.isMc2Context) {
         OP_TILING_CHECK(SetHCommCfg(context, tilingData, groupEp, isLayered) != ge::GRAPH_SUCCESS,
                         OP_LOGE_WITHOUT_REPORT(nodeName, "SetHCommCfg failed."), return ge::GRAPH_FAILED);
@@ -2850,8 +2970,14 @@ ge::graphStatus MoeDistributeCombineV2TilingFuncBase::MoeDistributeCombineA3Tili
                                                          isLayered, config) != ge::GRAPH_SUCCESS,
                     OP_LOGE_WITHOUT_REPORT(nodeName, "Tiling check window size failed."), return ge::GRAPH_FAILED);
 
-    uint64_t tilingKey = config.isRoce ? GET_TPL_TILING_KEY(commQuantMode, TILINGKEY_TPL_ROCE, TILINGKEY_TPL_A5) :
-                                         CalTilingKey(commQuantMode, isLayered);
+    uint64_t tilingKey = CalTilingKey(commQuantMode, isLayered);
+    if (config.isRoce) {
+        const auto& info = tilingData->moeDistributeCombineV2Info;
+        OP_TILING_CHECK(info.globalBs == 0U || info.globalBs % info.epWorldSize != 0U,
+                        OP_LOGE(nodeName, "ROCE combine requires a nonzero integral common BS"),
+                        return ge::GRAPH_FAILED);
+        tilingKey = GET_TPL_TILING_KEY(commQuantMode, TILINGKEY_TPL_ROCE, TILINGKEY_TPL_A5);
+    }
 
     // rsw_buffer挡位决策(挡位超限或window不足时回退旧协议, 须在UbUsedCal之前)
     SetRswBufferSize(context, *tilingData, nodeName, isLayered, config);

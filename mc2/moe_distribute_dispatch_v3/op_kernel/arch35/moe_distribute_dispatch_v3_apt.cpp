@@ -38,12 +38,12 @@ __global__ __aicore__ void moe_distribute_dispatch_v3(GM_ADDR mc2Context, GM_ADD
                                                       GM_ADDR workspaceGM, GM_ADDR tilingGM)
 {
     REGISTER_TILING_DEFAULT(MoeDistributeDispatchV2TilingData);
-    GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchV2TilingData, tilingData, tilingGM);
     TPipe pipe;
     int64_t oriOverflowMode = AscendC::GetCtrlSpr<FLOAT_OVERFLOW_MODE_CTRL, FLOAT_OVERFLOW_MODE_CTRL>();
 #if ((ORIG_DTYPE_EXPAND_X == DT_BF16) || (ORIG_DTYPE_EXPAND_X == DT_FLOAT16))
     if constexpr (ArchTag == TILINGKEY_TPL_A5) {
         if constexpr (CommMode == TILINGKEY_TPL_MTE) {
+            GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchV2TilingData, tilingData, tilingGM);
             if constexpr (FullMesh == TILINGKEY_ENABLE_FULLMESH) {
                 MoeDistributeDispatchV2A5FullMesh<Mc2Kernel::Mc2MoeContextHolder, DTYPE_X, DTYPE_EXPAND_X,
                                                   Mc2Kernel::UNQUANT, false>
@@ -65,12 +65,14 @@ __global__ __aicore__ void moe_distribute_dispatch_v3(GM_ADDR mc2Context, GM_ADD
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
         else if constexpr (CommMode == TILINGKEY_TPL_ROCE) {
             if constexpr (FullMesh == TILINGKEY_ENABLE_HIERARCHY) {
+                GET_TILING_DATA_MEMBER(MoeDistributeDispatchV2TilingData, moeDistributeDispatchV2Info, dispatchV2Info,
+                                       tilingGM);
                 Mc2Kernel::MoeDistributeDispatchV2Roce<Mc2Kernel::Mc2MoeContextHolder, DTYPE_X, DTYPE_EXPAND_X,
                                                        Mc2Kernel::UNQUANT, false>
                     op;
                 op.Init(mc2Context, x, expertIds, scales, xActiveMask, expertScales, elasticInfo, expandXOut,
                         dynamicScalesOut, assistInfoOut, expertTokenNumsOut, epSendCountsOut, expandScalesOut,
-                        workspaceGM, &pipe, &tilingData);
+                        workspaceGM, &pipe, &dispatchV2Info);
                 op.Process();
             }
         }
@@ -83,6 +85,7 @@ __global__ __aicore__ void moe_distribute_dispatch_v3(GM_ADDR mc2Context, GM_ADD
     ((ORIG_DTYPE_X == DT_FLOAT4_E1M2) && (ORIG_DTYPE_EXPAND_X == DT_FLOAT4_E1M2))
     if constexpr (ArchTag == TILINGKEY_TPL_A5) {
         if constexpr (CommMode == TILINGKEY_TPL_MTE) {
+            GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchV2TilingData, tilingData, tilingGM);
             if constexpr (FullMesh == TILINGKEY_ENABLE_FULLMESH) {
                 MoeDistributeDispatchV2A5FullMesh<Mc2Kernel::Mc2MoeContextHolder, DTYPE_X, DTYPE_EXPAND_X,
                                                   Mc2Kernel::UNQUANT, true>
@@ -104,12 +107,14 @@ __global__ __aicore__ void moe_distribute_dispatch_v3(GM_ADDR mc2Context, GM_ADD
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
         else if constexpr (CommMode == TILINGKEY_TPL_ROCE) {
             if constexpr (FullMesh == TILINGKEY_ENABLE_HIERARCHY) {
+                GET_TILING_DATA_MEMBER(MoeDistributeDispatchV2TilingData, moeDistributeDispatchV2Info, dispatchV2Info,
+                                       tilingGM);
                 Mc2Kernel::MoeDistributeDispatchV2Roce<Mc2Kernel::Mc2MoeContextHolder, DTYPE_X, DTYPE_EXPAND_X,
                                                        Mc2Kernel::UNQUANT, true>
                     op;
                 op.Init(mc2Context, x, expertIds, scales, xActiveMask, expertScales, elasticInfo, expandXOut,
                         dynamicScalesOut, assistInfoOut, expertTokenNumsOut, epSendCountsOut, expandScalesOut,
-                        workspaceGM, &pipe, &tilingData);
+                        workspaceGM, &pipe, &dispatchV2Info);
                 op.Process();
             }
         }
@@ -121,6 +126,7 @@ __global__ __aicore__ void moe_distribute_dispatch_v3(GM_ADDR mc2Context, GM_ADD
     if constexpr (ArchTag == TILINGKEY_TPL_A5) {
         if constexpr (QuantMode != TILINGKEY_NO_QUANT) {
             if constexpr (CommMode == TILINGKEY_TPL_MTE) {
+                GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchV2TilingData, tilingData, tilingGM);
                 if constexpr (FullMesh == TILINGKEY_ENABLE_FULLMESH) {
                     MoeDistributeDispatchV2A5FullMesh<Mc2Kernel::Mc2MoeContextHolder, DTYPE_X, DTYPE_EXPAND_X,
                                                       QuantMode, ScaleMode>
@@ -143,12 +149,14 @@ __global__ __aicore__ void moe_distribute_dispatch_v3(GM_ADDR mc2Context, GM_ADD
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
             else if constexpr (CommMode == TILINGKEY_TPL_ROCE) {
                 if constexpr (FullMesh == TILINGKEY_ENABLE_HIERARCHY) {
+                    GET_TILING_DATA_MEMBER(MoeDistributeDispatchV2TilingData, moeDistributeDispatchV2Info,
+                                           dispatchV2Info, tilingGM);
                     Mc2Kernel::MoeDistributeDispatchV2Roce<Mc2Kernel::Mc2MoeContextHolder, DTYPE_X, DTYPE_EXPAND_X,
                                                            QuantMode, ScaleMode>
                         op;
                     op.Init(mc2Context, x, expertIds, scales, xActiveMask, expertScales, elasticInfo, expandXOut,
                             dynamicScalesOut, assistInfoOut, expertTokenNumsOut, epSendCountsOut, expandScalesOut,
-                            workspaceGM, &pipe, &tilingData);
+                            workspaceGM, &pipe, &dispatchV2Info);
                     op.Process();
                 }
             }
@@ -159,6 +167,7 @@ __global__ __aicore__ void moe_distribute_dispatch_v3(GM_ADDR mc2Context, GM_ADD
     ((ORIG_DTYPE_X == DT_FLOAT16) && (ORIG_DTYPE_EXPAND_X == DT_HIFLOAT8))
     if constexpr (ArchTag == TILINGKEY_TPL_A5) {
         if constexpr (CommMode == TILINGKEY_TPL_MTE) {
+            GET_TILING_DATA_WITH_STRUCT(MoeDistributeDispatchV2TilingData, tilingData, tilingGM);
             if constexpr (FullMesh == TILINGKEY_ENABLE_FULLMESH) {
                 MoeDistributeDispatchV2A5FullMesh<Mc2Kernel::Mc2MoeContextHolder, DTYPE_X, DTYPE_EXPAND_X, QuantMode,
                                                   ScaleMode>
@@ -179,12 +188,14 @@ __global__ __aicore__ void moe_distribute_dispatch_v3(GM_ADDR mc2Context, GM_ADD
 #if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
         else if constexpr (CommMode == TILINGKEY_TPL_ROCE) {
             if constexpr (FullMesh == TILINGKEY_ENABLE_HIERARCHY) {
+                GET_TILING_DATA_MEMBER(MoeDistributeDispatchV2TilingData, moeDistributeDispatchV2Info, dispatchV2Info,
+                                       tilingGM);
                 Mc2Kernel::MoeDistributeDispatchV2Roce<Mc2Kernel::Mc2MoeContextHolder, DTYPE_X, DTYPE_EXPAND_X,
                                                        QuantMode, ScaleMode>
                     op;
                 op.Init(mc2Context, x, expertIds, scales, xActiveMask, expertScales, elasticInfo, expandXOut,
                         dynamicScalesOut, assistInfoOut, expertTokenNumsOut, epSendCountsOut, expandScalesOut,
-                        workspaceGM, &pipe, &tilingData);
+                        workspaceGM, &pipe, &dispatchV2Info);
                 op.Process();
             }
         }

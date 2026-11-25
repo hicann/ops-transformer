@@ -31,6 +31,10 @@
   - Supports non-quantization, static quantization, pertoken dynamic quantization, pergroup dynamic quantization, mx dynamic quantization, and mx clip dynamic quantization use cases. Quantizes token data first (optional), then performs alltoallv communication in the EP (Expert Parallelism) domain;
   - Supports special expert use cases.
 
+<!-- npu="950" id20 -->
+- For <term>Ascend 950PR&950DT products</term>, `low_latency_dispatch` does not accept `comm_alg="hierarchy"`. To dispatch tokens over RoCE, call `torch_npu.npu_moe_distribute_dispatch_v2` with `comm_alg="hierarchy"`.
+<!-- end id20 -->
+
 - **Formula**:
 
   - Quantization use cases:

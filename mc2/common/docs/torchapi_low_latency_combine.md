@@ -29,6 +29,10 @@
   - 支持数据整合功能，进行alltoallv通信，最后将接收的数据整合（乘权重再相加）；
   - 支持特殊专家场景。
 
+<!-- npu="950" id14 -->
+- 对于<term>Ascend 950PR&950DT系列产品</term>，`low_latency_combine` 的 `comm_alg` 不支持取值 `"hierarchy"`。RoCE 合并请调用 `torch_npu.npu_moe_distribute_combine_v2`，并设置 `comm_alg="hierarchy"`。
+<!-- end id14 -->
+
 - **计算公式**：
 
   - 数据整合功能：

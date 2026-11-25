@@ -15,7 +15,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cerrno>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
@@ -23,8 +22,8 @@
 #include <set>
 #include <utility>
 #include <dlfcn.h>
-#include "acl/acl_rt.h"
 #include "mc2_context.h"
+#include "acl/acl_rt.h"
 #include "opdev/platform.h"
 #include "op_host/util/op_const_def.h"
 #if HCOMM_VERSION_NUM >= HCCL_CHANNEL_SUPPORT_VERSION
@@ -36,11 +35,6 @@ constexpr uint32_t HCCL_COMM_LAYERS_MTE_CCU = 1;
 constexpr uint32_t HCCL_COMM_LAYERS_UB_MEM = 0;
 constexpr uint32_t GET_LOCAL_SERVER_RANK_SIZE_LAYER = 0;
 constexpr uint32_t EP_RANK_OFFSET_STEP = 1024;
-constexpr uint64_t DEFAULT_HCCL_BUFFSIZE_MB = 200;
-constexpr uint64_t REGISTERED_WINDOW_BYTES_PER_MB = 2UL * 1024UL * 1024UL;
-constexpr const char* REGISTERED_WINDOWS_TAG = "mc2_registered_windows_v3";
-constexpr const char* UB_WINDOW_TAG = "mc2_ub_window_v3";
-constexpr const char* ROCE_WINDOW_TAG = "mc2_roce_window_v3";
 
 constexpr uint32_t GROUP_RANK_NUM = 4U;
 
@@ -155,17 +149,10 @@ aclnnStatus Mc2Context::OpenHcclLibrary()
 
 aclnnStatus Mc2Context::LoadProtocolSymbols(CommProtocol protocol)
 {
-    if (protocol == CommProtocol::COMM_PROTOCOL_ROCE) {
-        HcclCommMemReg = GetHcclLibFunc<decltype(HcclCommMemReg)>(hcclLibHandle_, "HcclCommMemReg");
-        HcclChannelGetRemoteMems =
-            GetHcclLibFunc<decltype(HcclChannelGetRemoteMems)>(hcclLibHandle_, "HcclChannelGetRemoteMems");
-        CHECK_RET(HcclCommMemReg != nullptr && HcclChannelGetRemoteMems != nullptr, ACLNN_ERR_INNER);
-    } else {
+    if (protocol != CommProtocol::COMM_PROTOCOL_ROCE) {
         HcclRankGraphGetRankSizeByLayer = GetHcclLibFunc<decltype(HcclRankGraphGetRankSizeByLayer)>(
             hcclLibHandle_, "HcclRankGraphGetRankSizeByLayer");
-        HcclChannelGetHcclBuffer =
-            GetHcclLibFunc<decltype(HcclChannelGetHcclBuffer)>(hcclLibHandle_, "HcclChannelGetHcclBuffer");
-        CHECK_RET(HcclRankGraphGetRankSizeByLayer != nullptr && HcclChannelGetHcclBuffer != nullptr, ACLNN_ERR_INNER);
+        CHECK_RET(HcclRankGraphGetRankSizeByLayer != nullptr, ACLNN_ERR_INNER);
     }
     return ACLNN_SUCCESS;
 }
@@ -192,6 +179,7 @@ aclnnStatus Mc2Context::LoadCommonHcclSymbols()
         {reinterpret_cast<void**>(&HcclRankGraphGetLayers), "HcclRankGraphGetLayers"},
         {reinterpret_cast<void**>(&HcclChannelAcquire), "HcclChannelAcquire"},
         {reinterpret_cast<void**>(&HcclGetHcclBuffer), "HcclGetHcclBuffer"},
+        {reinterpret_cast<void**>(&HcclChannelGetHcclBuffer), "HcclChannelGetHcclBuffer"},
         {reinterpret_cast<void**>(&HcclEngineCtxCreate), "HcclEngineCtxCreate"},
         {reinterpret_cast<void**>(&HcclEngineCtxGet), "HcclEngineCtxGet"},
         {reinterpret_cast<void**>(&HcclEngineCtxCopy), "HcclEngineCtxCopy"},
@@ -210,17 +198,6 @@ aclnnStatus Mc2Context::LoadCommonHcclSymbols()
         }
     }
     OP_LOGD("All HCCL symbols loaded successfully");
-    return ACLNN_SUCCESS;
-}
-
-aclnnStatus Mc2Context::LoadBarrierSymbols()
-{
-    auto ret = LoadCommonHcclSymbols();
-    CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    HcclCommMemReg = GetHcclLibFunc<decltype(HcclCommMemReg)>(hcclLibHandle_, "HcclCommMemReg");
-    HcclChannelGetRemoteMems =
-        GetHcclLibFunc<decltype(HcclChannelGetRemoteMems)>(hcclLibHandle_, "HcclChannelGetRemoteMems");
-    CHECK_RET(HcclCommMemReg != nullptr && HcclChannelGetRemoteMems != nullptr, ACLNN_ERR_INNER);
     return ACLNN_SUCCESS;
 }
 
@@ -307,9 +284,9 @@ aclnnStatus Mc2Context::GetNetLayers(const HcclComm& hcclHandle, uint32_t*& netL
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus Mc2Context::InitRegisteredChannel(const HcclComm& hcclHandle, uint32_t rankDim, uint32_t srcRankId,
-                                              const CommProtocol& protocol, uint32_t channelsPerPeer,
-                                              std::vector<HcclChannelDesc>& channelDesc)
+aclnnStatus Mc2Context::InitHcclChannel(const HcclComm& hcclHandle, uint32_t rankDim, uint32_t srcRankId,
+                                        const CommProtocol& protocol, uint32_t channelsPerPeer,
+                                        std::vector<HcclChannelDesc>& channelDesc)
 {
     HcclResult hcclRet = HcclChannelDescInit(channelDesc.data(), static_cast<uint32_t>(channelDesc.size()));
     if (hcclRet != HCCL_SUCCESS) {
@@ -335,9 +312,6 @@ aclnnStatus Mc2Context::InitRegisteredChannel(const HcclComm& hcclHandle, uint32
         desc.remoteRank = dstRank;
         desc.localEndpoint = links->srcEndpointDesc;
         desc.remoteEndpoint = links->dstEndpointDesc;
-        desc.memHandles = protocol == CommProtocol::COMM_PROTOCOL_UB_MEM ? &registeredWindows_->ub.handle :
-                                                                           &registeredWindows_->roce.handle;
-        desc.memHandleNum = 1;
         // 同一对端连续占用 channelsPerPeer 个通道。
         for (uint32_t i = 1; i < channelsPerPeer; ++i) {
             channelDesc[channelId + i] = desc;
@@ -348,9 +322,9 @@ aclnnStatus Mc2Context::InitRegisteredChannel(const HcclComm& hcclHandle, uint32
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus Mc2Context::GetRegisteredCommChannels(const HcclComm& hcclHandle, uint32_t rankDim, uint32_t srcRankId,
-                                                  const CommEngine& engine, const CommProtocol& protocol,
-                                                  std::vector<ChannelHandle>& channels)
+aclnnStatus Mc2Context::GetHcclCommChannel(const HcclComm& hcclHandle, uint32_t rankDim, uint32_t srcRankId,
+                                           const CommEngine& engine, const CommProtocol& protocol,
+                                           std::vector<ChannelHandle>& channels)
 {
     OP_LOGD("Start to get HCCL communication channel, protocol: %d", protocol);
     // RoCE 每个对端要两条通道：token 通道与专家计数通道分离，避免两类核并发操作同一通道的SQ/CQ。
@@ -368,152 +342,54 @@ aclnnStatus Mc2Context::GetRegisteredCommChannels(const HcclComm& hcclHandle, ui
         return ACLNN_SUCCESS;
     }
     std::vector<HcclChannelDesc> channelDesc(channelNum);
-    aclnnStatus ret = InitRegisteredChannel(hcclHandle, rankDim, srcRankId, protocol, channelsPerPeer, channelDesc);
+    aclnnStatus ret = InitHcclChannel(hcclHandle, rankDim, srcRankId, protocol, channelsPerPeer, channelDesc);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    HcclResult hcclRet = HcclChannelAcquire(hcclHandle, engine, channelDesc.data(), channelNum, channels.data());
-    if (hcclRet != HCCL_SUCCESS) {
-        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Acquire HCCL channel failed, protocol: %d", protocol);
-        return ACLNN_ERR_INNER;
-    }
-    return ACLNN_SUCCESS;
+    return AcquireHcclChannels(hcclHandle, engine, channelDesc, channels.data());
 }
 
-aclnnStatus Mc2Context::InitRegisteredBuffer(const HcclComm& hcclHandle, const char* tag, RegisteredBuffer& buffer)
+aclnnStatus Mc2Context::AcquireHcclChannels(const HcclComm& hcclHandle, CommEngine engine,
+                                            const std::vector<HcclChannelDesc>& descs, ChannelHandle* channels)
 {
-    if (buffer.handle != nullptr) {
-        CHECK_RET(buffer.addr != nullptr && buffer.size == hcclBuffSize_, ACLNN_ERR_INNER);
+    if (descs.empty()) {
         return ACLNN_SUCCESS;
     }
-    // Engine contexts keep the allocation alive until the communication domain is destroyed.
-    if (buffer.addr == nullptr) {
-        HcclResult ret = HcclEngineCtxGet(hcclHandle, tag, CommEngine::COMM_ENGINE_AIV, &buffer.addr, &buffer.size);
-        if (ret == HCCL_E_NOT_FOUND) {
-            buffer.size = hcclBuffSize_;
-            ret = HcclEngineCtxCreate(hcclHandle, tag, CommEngine::COMM_ENGINE_AIV, buffer.size, &buffer.addr);
-        }
-        CHECK_RET(ret == HCCL_SUCCESS, ACLNN_ERR_INNER);
-    }
-    CHECK_RET(buffer.addr != nullptr && buffer.size == hcclBuffSize_, ACLNN_ERR_INNER);
-    // Only unregistered buffers are cleared; cached windows contain live sequence state.
-    CHECK_RET(aclrtMemset(buffer.addr, buffer.size, 0, buffer.size) == ACL_SUCCESS, ACLNN_ERR_INNER);
-    CommMem mem{};
-    mem.type = COMM_MEM_TYPE_DEVICE;
-    mem.addr = buffer.addr;
-    mem.size = buffer.size;
-    HcclMemHandle handle = nullptr;
-    HcclResult ret = HcclCommMemReg(hcclHandle, tag, &mem, &handle);
-    CHECK_RET(ret == HCCL_SUCCESS && handle != nullptr, ACLNN_ERR_INNER);
-    buffer.handle = handle;
-    return ACLNN_SUCCESS;
-}
-
-aclnnStatus Mc2Context::GetConfiguredWindowSize(uint64_t& windowSize) const
-{
-    windowSize = 0;
-    uint64_t bufferSizeMb = DEFAULT_HCCL_BUFFSIZE_MB;
-    const char* env = std::getenv("HCCL_BUFFSIZE");
-    if (env != nullptr) {
-        if (*env == '\0' || std::strspn(env, "0123456789") != std::strlen(env)) {
-            OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "HCCL_BUFFSIZE must be a positive integer in MB");
-            return ACLNN_ERR_PARAM_INVALID;
-        }
-        errno = 0;
-        bufferSizeMb = std::strtoull(env, nullptr, 10);
-        if (errno == ERANGE) {
-            OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "HCCL_BUFFSIZE exceeds the supported integer range");
-            return ACLNN_ERR_PARAM_INVALID;
-        }
-    }
-    // GetMaxWindowSize in A5 tiling stores the configured MB value in uint16_t.
-    const uint64_t maxBufferSizeMb = std::numeric_limits<uint16_t>::max();
-    if (bufferSizeMb == 0 || bufferSizeMb > maxBufferSizeMb) {
-        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "HCCL_BUFFSIZE is out of range: %lu MB", bufferSizeMb);
-        return ACLNN_ERR_PARAM_INVALID;
-    }
-    // Match the test script and A5 tiling: the configured MB value describes half of each window.
-    windowSize = bufferSizeMb * REGISTERED_WINDOW_BYTES_PER_MB;
-    OP_LOGI("HCCL_BUFFSIZE: %lu MB; each registered UB/RoCE window: %lu bytes", bufferSizeMb, windowSize);
-    return ACLNN_SUCCESS;
-}
-
-aclnnStatus Mc2Context::CheckRegisteredWindowSize(const HcclComm& hcclHandle, uint64_t& hcclBuffSize)
-{
-    hcclBuffSize = 0;
-    uint64_t expectedSize = 0;
-    aclnnStatus ret = GetConfiguredWindowSize(expectedSize);
-    CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    void* defaultBuffer = nullptr;
-    uint64_t reportedSize = 0;
-    HcclResult hcclRet = HcclGetHcclBuffer(hcclHandle, &defaultBuffer, &reportedSize);
-    if (hcclRet != HCCL_SUCCESS || defaultBuffer == nullptr || reportedSize == 0) {
-        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Get HCCL buffer size failed, ret: %d, size: %lu", hcclRet, reportedSize);
+    const auto channelNum = static_cast<uint32_t>(descs.size());
+    HcclResult hcclRet = HcclChannelAcquire(hcclHandle, engine, descs.data(), channelNum, channels);
+    if (hcclRet != HCCL_SUCCESS) {
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Acquire HCCL channels failed, count=%u, protocol=%d, ret=%d", channelNum,
+                                static_cast<int32_t>(descs.front().channelProtocol), static_cast<int32_t>(hcclRet));
         return ACLNN_ERR_INNER;
     }
-    if (reportedSize != expectedSize) {
-        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "HCCL buffer size %lu differs from 2 * HCCL_BUFFSIZE: %lu bytes",
-                                reportedSize, expectedSize);
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::GetLocalHcclBuffer(const HcclComm& hcclHandle, void*& buffer, uint64_t& bufferSize)
+{
+    HcclResult hcclRet = HcclGetHcclBuffer(hcclHandle, &buffer, &bufferSize);
+    if (hcclRet != HCCL_SUCCESS || buffer == nullptr || bufferSize == 0 || bufferSize % 2U != 0U ||
+        reinterpret_cast<uint64_t>(buffer) > std::numeric_limits<uint64_t>::max() - bufferSize) {
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Invalid HCCL buffer, ret: %d, size: %lu", hcclRet, bufferSize);
         return ACLNN_ERR_INNER;
     }
-    // The API supplies the size; its default buffer address is not one of our registered windows.
-    hcclBuffSize = reportedSize;
+    hcclBuffSize_ = bufferSize / 2U;
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus Mc2Context::InitRegisteredWindows(const HcclComm& hcclHandle)
+aclnnStatus Mc2Context::GetPeerHcclBuffer(const HcclComm& hcclHandle, ChannelHandle channel, void*& buffer,
+                                          uint64_t& bufferSize)
 {
-    aclnnStatus ret = CheckRegisteredWindowSize(hcclHandle, hcclBuffSize_);
-    CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    void* cache = nullptr;
-    uint64_t cacheSize = 0;
-    HcclResult hcclRet =
-        HcclEngineCtxGet(hcclHandle, REGISTERED_WINDOWS_TAG, CommEngine::COMM_ENGINE_CPU, &cache, &cacheSize);
-    if (hcclRet == HCCL_E_NOT_FOUND) {
-        cacheSize = sizeof(RegisteredWindows);
-        hcclRet =
-            HcclEngineCtxCreate(hcclHandle, REGISTERED_WINDOWS_TAG, CommEngine::COMM_ENGINE_CPU, cacheSize, &cache);
-        if (hcclRet == HCCL_SUCCESS && cache != nullptr) {
-            *static_cast<RegisteredWindows*>(cache) = {};
-        }
-    }
-    CHECK_RET(hcclRet == HCCL_SUCCESS && cache != nullptr && cacheSize == sizeof(RegisteredWindows), ACLNN_ERR_INNER);
-    registeredWindows_ = static_cast<RegisteredWindows*>(cache);
-    ret = InitRegisteredBuffer(hcclHandle, UB_WINDOW_TAG, registeredWindows_->ub);
-    CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    ret = InitRegisteredBuffer(hcclHandle, ROCE_WINDOW_TAG, registeredWindows_->roce);
-    CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    CHECK_RET(registeredWindows_->ub.addr != registeredWindows_->roce.addr, ACLNN_ERR_INNER);
+    const HcclResult ret = HcclChannelGetHcclBuffer(hcclHandle, channel, &buffer, &bufferSize);
+    CHECK_RET(ret == HCCL_SUCCESS, ACLNN_ERR_INNER);
     return ACLNN_SUCCESS;
-}
-
-aclnnStatus Mc2Context::GetRegisteredRemoteBuffer(const HcclComm& hcclHandle, ChannelHandle channel, const char* tag,
-                                                  void*& buffer, uint64_t& bufferSize)
-{
-    uint32_t memNum = 0;
-    CommMem* remoteMems = nullptr;
-    char** memTags = nullptr;
-    HcclResult ret = HcclChannelGetRemoteMems(hcclHandle, channel, &memNum, &remoteMems, &memTags);
-    CHECK_RET(ret == HCCL_SUCCESS && remoteMems != nullptr && memTags != nullptr, ACLNN_ERR_INNER);
-    for (uint32_t i = 0; i < memNum; ++i) {
-        if (memTags[i] != nullptr && std::strcmp(memTags[i], tag) == 0) {
-            // Match the registered tag as in Mega context; remote type metadata is not a DEVICE guarantee.
-            buffer = remoteMems[i].addr;
-            bufferSize = remoteMems[i].size;
-            OP_LOGI("Registered remote buffer tag: %s, reported type: %d, size: %lu", tag,
-                    static_cast<int>(remoteMems[i].type), bufferSize);
-            return ACLNN_SUCCESS;
-        }
-    }
-    OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Registered remote buffer not found, tag: %s", tag);
-    return ACLNN_ERR_INNER;
 }
 
 aclnnStatus Mc2Context::CheckHcclBuffer(uint32_t srcRankId, uint32_t peer, const void* buffer,
                                         uint64_t bufferSize) const
 {
     const uint64_t addr = reinterpret_cast<uint64_t>(buffer);
-    if (peer >= epRankSize_ || buffer == nullptr || bufferSize != hcclBuffSize_ ||
-        addr > std::numeric_limits<uint64_t>::max() - bufferSize) {
-        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Invalid registered buffer, src: %u, dst: %u", srcRankId, peer);
+    if (peer >= epRankSize_ || buffer == nullptr || bufferSize == 0 || bufferSize % 2U != 0U ||
+        bufferSize / 2U != hcclBuffSize_ || addr > std::numeric_limits<uint64_t>::max() - bufferSize) {
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Invalid HCCL buffer, src: %u, dst: %u", srcRankId, peer);
         return ACLNN_ERR_INNER;
     }
     return ACLNN_SUCCESS;
@@ -525,8 +401,8 @@ aclnnStatus Mc2Context::SetHcclBufferAddress(uint32_t srcRankId, uint32_t peer, 
     aclnnStatus ret = CheckHcclBuffer(srcRankId, peer, buffer, bufferSize);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     const uint64_t offset = static_cast<uint64_t>(peer) * EP_RANK_OFFSET_STEP;
-    if (bufferSize <= offset) {
-        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "HCCL buffer size %lu is too small for rank %u", bufferSize, peer);
+    if (hcclBuffSize_ <= offset) {
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "UB region size %lu is too small for rank %u", hcclBuffSize_, peer);
         return ACLNN_ERR_INNER;
     }
     bufferAddr = reinterpret_cast<uint64_t>(buffer) + offset;
@@ -538,18 +414,18 @@ aclnnStatus Mc2Context::SetRoceBufferAddress(uint32_t srcRankId, uint32_t peer, 
 {
     aclnnStatus ret = CheckHcclBuffer(srcRankId, peer, buffer, bufferSize);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    bufferAddr = reinterpret_cast<uint64_t>(buffer);
-    roceBufferSize_ = bufferSize;
+    bufferAddr = reinterpret_cast<uint64_t>(buffer) + hcclBuffSize_;
     return ACLNN_SUCCESS;
 }
 
 aclnnStatus Mc2Context::GetHcclUbMemResource(const HcclComm& hcclHandle, const CommEngine& engine,
-                                             Mc2MoeContext* mc2ContextStruct)
+                                             Mc2MoeContext* mc2ContextStruct, void* localBuffer,
+                                             uint64_t localBufferSize)
 {
     const uint32_t rankId = mc2ContextStruct->epRankId;
     std::vector<ChannelHandle> channels;
-    aclnnStatus ret = GetRegisteredCommChannels(hcclHandle, epRankSize_, rankId, engine,
-                                                CommProtocol::COMM_PROTOCOL_UB_MEM, channels);
+    aclnnStatus ret =
+        GetHcclCommChannel(hcclHandle, epRankSize_, rankId, engine, CommProtocol::COMM_PROTOCOL_UB_MEM, channels);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     uint32_t channelId = 0;
     const uint32_t firstRank = rankId / rankSizePerServer_ * rankSizePerServer_;
@@ -557,11 +433,10 @@ aclnnStatus Mc2Context::GetHcclUbMemResource(const HcclComm& hcclHandle, const C
         void* buffer = nullptr;
         uint64_t bufferSize = 0;
         if (peer == rankId) {
-            // Match Mega: local DEVICE memory retains its address; peers use the IPC-imported address.
-            buffer = registeredWindows_->ub.addr;
-            bufferSize = registeredWindows_->ub.size;
+            buffer = localBuffer;
+            bufferSize = localBufferSize;
         } else {
-            ret = GetRegisteredRemoteBuffer(hcclHandle, channels[channelId++], UB_WINDOW_TAG, buffer, bufferSize);
+            ret = GetPeerHcclBuffer(hcclHandle, channels[channelId++], buffer, bufferSize);
             CHECK_RET(ret == ACLNN_SUCCESS, ret);
         }
         ret = SetHcclBufferAddress(rankId, peer, buffer, bufferSize, mc2ContextStruct->epHcclBuffer_[peer]);
@@ -578,7 +453,7 @@ aclnnStatus Mc2Context::GetHcclRoceResource(const HcclComm& hcclHandle, const Co
     const uint32_t localIndex = rankId % rankSizePerServer_;
     std::vector<ChannelHandle> channels;
     aclnnStatus ret =
-        GetRegisteredCommChannels(hcclHandle, epRankSize_, rankId, engine, CommProtocol::COMM_PROTOCOL_ROCE, channels);
+        GetHcclCommChannel(hcclHandle, epRankSize_, rankId, engine, CommProtocol::COMM_PROTOCOL_ROCE, channels);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     uint32_t channelId = 0;
     for (uint32_t server = 0; server < epRankSize_ / rankSizePerServer_; ++server) {
@@ -589,7 +464,7 @@ aclnnStatus Mc2Context::GetHcclRoceResource(const HcclComm& hcclHandle, const Co
         const uint32_t firstChannel = channelId * ROCE_CHANNEL_PER_SERVER;
         void* buffer = nullptr;
         uint64_t bufferSize = 0;
-        ret = GetRegisteredRemoteBuffer(hcclHandle, channels[firstChannel], ROCE_WINDOW_TAG, buffer, bufferSize);
+        ret = GetPeerHcclBuffer(hcclHandle, channels[firstChannel], buffer, bufferSize);
         CHECK_RET(ret == ACLNN_SUCCESS, ret);
         ret = SetRoceBufferAddress(rankId, peer, buffer, bufferSize, mc2ContextStruct->roceHcclBuffer_[server]);
         CHECK_RET(ret == ACLNN_SUCCESS, ret);
@@ -602,25 +477,23 @@ aclnnStatus Mc2Context::GetHcclRoceResource(const HcclComm& hcclHandle, const Co
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus Mc2Context::GetRegisteredCommResource(const HcclComm& hcclHandle, const CommEngine& engine,
-                                                  Mc2MoeContext* mc2ContextStruct)
+aclnnStatus Mc2Context::GetHcclCommResource(const HcclComm& hcclHandle, const CommEngine& engine,
+                                            Mc2MoeContext* mc2ContextStruct)
 {
     mc2ContextStruct->rankSizePerServer = rankSizePerServer_;
-    aclnnStatus ret = InitRegisteredWindows(hcclHandle);
+    void* localBuffer = nullptr;
+    uint64_t bufferSize = 0;
+    aclnnStatus ret = GetLocalHcclBuffer(hcclHandle, localBuffer, bufferSize);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    ret = GetHcclUbMemResource(hcclHandle, engine, mc2ContextStruct);
+    ret = GetHcclUbMemResource(hcclHandle, engine, mc2ContextStruct, localBuffer, bufferSize);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     const uint32_t rankId = mc2ContextStruct->epRankId;
-    // 两个独立分配分别注册；RoCE 地址不叠加 UB 窗的 rank 偏移。
-    ret = SetRoceBufferAddress(rankId, rankId, registeredWindows_->roce.addr, registeredWindows_->roce.size,
+    ret = SetRoceBufferAddress(rankId, rankId, localBuffer, bufferSize,
                                mc2ContextStruct->roceHcclBuffer_[rankId / rankSizePerServer_]);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    if (rankSizePerServer_ != epRankSize_) {
-        ret = GetHcclRoceResource(hcclHandle, engine, mc2ContextStruct);
-        CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    }
-    // 各端窗口已校验为相同容量。
-    mc2ContextStruct->roceBufferSize = roceBufferSize_;
+    ret = GetHcclRoceResource(hcclHandle, engine, mc2ContextStruct);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    mc2ContextStruct->roceBufferSize = hcclBuffSize_;
     return ACLNN_SUCCESS;
 }
 
@@ -995,7 +868,7 @@ aclnnStatus Mc2Context::CreatMc2Context(const HcclComm& hcclHandle, const std::s
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     CHECK_RET(mc2ContextStruct->epRankId < epRankSize_, ACLNN_ERR_INNER);
     ret = protocol == CommProtocol::COMM_PROTOCOL_ROCE ?
-              GetRegisteredCommResource(hcclHandle, engine, mc2ContextStruct) :
+              GetHcclCommResource(hcclHandle, engine, mc2ContextStruct) :
               GetHcclCommResource(hcclHandle, engine, protocol, mc2ContextStruct);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     InitGroupSend(hcclHandle, protocol, mc2ContextStruct);
@@ -1193,18 +1066,15 @@ aclnnStatus Mc2Context::CheckRoceProtocolSupport(const HcclComm& hcclHandle, con
         return ACLNN_ERR_INNER;
     }
     rankSizePerServer_ = static_cast<uint32_t>(ubDomain.ranks.size());
-    if (rankSizePerServer_ == 0 || rankSizePerServer_ > epRankSize_ || epRankSize_ % rankSizePerServer_ != 0 ||
+    if (rankSizePerServer_ == 0 || rankSizePerServer_ >= epRankSize_ || epRankSize_ % rankSizePerServer_ != 0 ||
         rankLinkMap_.size() != rankSizePerServer_ - 1) {
-        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Invalid UB domain size %u for rank size %u", rankSizePerServer_,
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Invalid UB domain size %u for ROCE rank size %u", rankSizePerServer_,
                                 epRankSize_);
         return ACLNN_ERR_INNER;
     }
     ret = ValidateRankLinkMap(epRankSize_, srcRankId);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     OP_LOGI("Layer %u is current rank's UB domain, rankSizePerServer_: %u", ubDomain.layer, rankSizePerServer_);
-    if (rankSizePerServer_ == epRankSize_) {
-        return ACLNN_SUCCESS;
-    }
     if (!CheckCrossUbDomainProtocols(hcclHandle, layerIds.data(), layerNum, srcRankId)) {
         OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Missing required cross-domain ROCE links for rank %u", srcRankId);
         return ACLNN_ERR_INNER;
@@ -1279,19 +1149,11 @@ aclnnStatus Mc2Context::CheckContextCache(const HcclComm& hcclHandle, const std:
     if (protocol != CommProtocol::COMM_PROTOCOL_ROCE) {
         return GetHcclBufferSize(hcclHandle, hcclBuffSize);
     }
-    auto aclnnRet = CheckRegisteredWindowSize(hcclHandle, hcclBuffSize);
+    void* buffer = nullptr;
+    uint64_t bufferSize = 0;
+    auto aclnnRet = GetLocalHcclBuffer(hcclHandle, buffer, bufferSize);
     CHECK_RET(aclnnRet == ACLNN_SUCCESS, aclnnRet);
-    void* cache = nullptr;
-    uint64_t cacheSize = 0;
-    hcclRet = HcclEngineCtxGet(hcclHandle, REGISTERED_WINDOWS_TAG, CommEngine::COMM_ENGINE_CPU, &cache, &cacheSize);
-    CHECK_RET(hcclRet == HCCL_SUCCESS && cache != nullptr && cacheSize == sizeof(RegisteredWindows), ACLNN_ERR_INNER);
-    const RegisteredWindows* windows = static_cast<const RegisteredWindows*>(cache);
-    if (windows->ub.addr == nullptr || windows->roce.addr == nullptr || windows->ub.handle == nullptr ||
-        windows->roce.handle == nullptr || windows->ub.size != hcclBuffSize || windows->roce.size != hcclBuffSize) {
-        OP_LOGE_LIBOPAPI_REPORT("Mc2Context",
-                                "Registered window cache differs from HCCL_BUFFSIZE; recreate the domain");
-        return ACLNN_ERR_INNER;
-    }
+    hcclBuffSize = hcclBuffSize_;
     return ACLNN_SUCCESS;
 }
 
@@ -1411,7 +1273,8 @@ aclnnStatus Mc2Context::GetMc2ContextTensor(const char* groupEp, const char* opN
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     ret = instance.PrepareContextTopology(hcclHandle, protocol);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    const std::string tag = std::string(groupEp) + opName + "_context_v5_" + std::to_string(static_cast<int>(protocol));
+    const char* contextVersion = protocol == CommProtocol::COMM_PROTOCOL_ROCE ? "_context_v6_" : "_context_v5_";
+    const std::string tag = std::string(groupEp) + opName + contextVersion + std::to_string(static_cast<int>(protocol));
     ret = instance.ValidateContextTag(tag);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     const CommEngine engine = CommEngine::COMM_ENGINE_AIV;
@@ -1496,11 +1359,9 @@ aclnnStatus Mc2Context::BarrierContext::CreateContext(const std::string& tag, vo
     auto stateRet = owner.HcclEngineCtxCreate(comm, tag.c_str(), CommEngine::COMM_ENGINE_CPU, sizeof(State), &state);
     CHECK_RET(stateRet == HCCL_SUCCESS && state != nullptr, ACLNN_ERR_INNER);
     auto& cached = *new (state) State{nullptr, context.localSize, context.railSize};
-    HcclMemHandle memHandle = nullptr;
-    const std::string windowTag = tag + "_buffer";
-    ret = RegisterWindow(windowTag, context, memHandle);
+    ret = InitWindow(tag, context);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    ret = BuildChannels(context, windowTag, memHandle);
+    ret = BuildChannels(context);
     if (ret != ACLNN_SUCCESS) {
         OP_LOGE_LIBOPAPI_REPORT("Mc2Context",
                                 "Failed to build barrier channels; recreate the communication domain, "
@@ -1711,23 +1572,33 @@ aclnnStatus Mc2Context::BarrierContext::CheckTransportSupport(uint32_t railSize)
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus Mc2Context::BarrierContext::RegisterWindow(const std::string& tag, Mc2Barrier::Context& context,
-                                                       HcclMemHandle& memHandle)
+aclnnStatus Mc2Context::BarrierContext::GetWindowAddress(const void* buffer, uint64_t capacity, uint64_t required,
+                                                         uint64_t& window) const
 {
-    constexpr uint64_t alignment = 2UL * 1024UL * 1024UL;
-    const uint64_t required = Mc2Barrier::WindowBytes(context.localSize, context.railSize);
-    context.windowBytes = (required + alignment - 1) / alignment * alignment;
-    void* window = nullptr;
-    auto ret = owner.HcclEngineCtxCreate(comm, tag.c_str(), CommEngine::COMM_ENGINE_AIV, context.windowBytes, &window);
-    if (ret != HCCL_SUCCESS || window == nullptr) {
-        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Failed to allocate barrier window, rank=%u, tag=%s, bytes=%lu, ret=%d",
-                                rank, tag.c_str(), context.windowBytes, static_cast<int32_t>(ret));
+    const auto base = reinterpret_cast<uint64_t>(buffer);
+    if (buffer == nullptr || capacity < required || base > std::numeric_limits<uint64_t>::max() - capacity) {
+        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Invalid HCCL buffer for Barrier, rank=%u, capacity=%lu, required=%lu",
+                                rank, capacity, required);
         return ACLNN_ERR_INNER;
     }
+    const uint64_t offset = (capacity - required) / Mc2Barrier::SLOT_BYTES * Mc2Barrier::SLOT_BYTES;
+    window = base + offset;
+    return ACLNN_SUCCESS;
+}
+
+aclnnStatus Mc2Context::BarrierContext::InitWindow(const std::string& tag, Mc2Barrier::Context& context)
+{
+    context.windowBytes = Mc2Barrier::WindowBytes(context.localSize, context.railSize);
+    void* buffer = nullptr;
+    uint64_t capacity = 0;
+    auto ret = owner.GetLocalHcclBuffer(comm, buffer, capacity);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    ret = GetWindowAddress(buffer, capacity, context.windowBytes, context.window);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
     aclmdlRICaptureMode mode = ACL_MODEL_RI_CAPTURE_MODE_RELAXED;
     auto aclRet = aclmdlRICaptureThreadExchangeMode(&mode);
     CHECK_RET(aclRet == ACL_SUCCESS, ACLNN_ERR_INNER);
-    aclRet = aclrtMemset(window, context.windowBytes, 0, context.windowBytes);
+    aclRet = aclrtMemset(reinterpret_cast<void*>(context.window), context.windowBytes, 0, context.windowBytes);
     const auto restoreRet = aclmdlRICaptureThreadExchangeMode(&mode);
     CHECK_RET(restoreRet == ACL_SUCCESS, ACLNN_ERR_INNER);
     if (aclRet != ACL_SUCCESS) {
@@ -1735,39 +1606,20 @@ aclnnStatus Mc2Context::BarrierContext::RegisterWindow(const std::string& tag, M
                                 tag.c_str(), static_cast<int32_t>(aclRet));
         return ACLNN_ERR_INNER;
     }
-    CommMem memory{};
-    memory.type = COMM_MEM_TYPE_DEVICE;
-    memory.addr = window;
-    memory.size = context.windowBytes;
-    ret = owner.HcclCommMemReg(comm, tag.c_str(), &memory, &memHandle);
-    if (ret != HCCL_SUCCESS) {
-        OP_LOGE_LIBOPAPI_REPORT("Mc2Context", "Failed to register barrier window, rank=%u, tag=%s, ret=%d", rank,
-                                tag.c_str(), static_cast<int32_t>(ret));
-        return ACLNN_ERR_INNER;
-    }
-    context.window = reinterpret_cast<uint64_t>(window);
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus Mc2Context::BarrierContext::ResolvePeerWindow(Mc2Barrier::Peer& peer, const std::string& tag,
-                                                          uint64_t required)
+aclnnStatus Mc2Context::BarrierContext::ResolvePeerWindow(Mc2Barrier::Peer& peer, uint64_t required)
 {
-    uint32_t count = 0;
-    CommMem* memories = nullptr;
-    char** tags = nullptr;
-    auto ret = owner.HcclChannelGetRemoteMems(comm, peer.handle, &count, &memories, &tags);
-    CHECK_RET(ret == HCCL_SUCCESS, ACLNN_ERR_INNER);
-    for (uint32_t i = 0; i < count && memories != nullptr && tags != nullptr; ++i) {
-        if (tags[i] != nullptr && tag == tags[i] && memories[i].size >= required) {
-            peer.window = reinterpret_cast<uint64_t>(memories[i].addr);
-            break;
-        }
-    }
-    CHECK_RET(peer.window != 0 && peer.handle != 0, ACLNN_ERR_INNER);
-    return ACLNN_SUCCESS;
+    CHECK_RET(peer.handle != 0, ACLNN_ERR_INNER);
+    void* buffer = nullptr;
+    uint64_t capacity = 0;
+    auto ret = owner.GetPeerHcclBuffer(comm, peer.handle, buffer, capacity);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+    return GetWindowAddress(buffer, capacity, required, peer.window);
 }
 
-aclnnStatus Mc2Context::BarrierContext::DescribeChannels(Mc2Barrier::Context& context, HcclMemHandle& memHandle,
+aclnnStatus Mc2Context::BarrierContext::DescribeChannels(Mc2Barrier::Context& context,
                                                          std::vector<HcclChannelDesc>& descs)
 {
     auto* peers = reinterpret_cast<Mc2Barrier::Peer*>(&context + 1);
@@ -1798,37 +1650,26 @@ aclnnStatus Mc2Context::BarrierContext::DescribeChannels(Mc2Barrier::Context& co
         desc.channelProtocol = protocol;
         desc.localEndpoint = link.srcEndpointDesc;
         desc.remoteEndpoint = link.dstEndpointDesc;
-        desc.memHandles = &memHandle;
-        desc.memHandleNum = 1;
     }
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus Mc2Context::BarrierContext::AcquireBatch(const std::string& tag, const std::vector<HcclChannelDesc>& descs,
+aclnnStatus Mc2Context::BarrierContext::AcquireBatch(const std::vector<HcclChannelDesc>& descs,
                                                      const std::vector<Mc2Barrier::Peer*>& peers, uint64_t required)
 {
-    if (descs.empty()) {
-        return ACLNN_SUCCESS;
-    }
     std::vector<ChannelHandle> handles(descs.size());
-    auto ret = owner.HcclChannelAcquire(comm, CommEngine::COMM_ENGINE_AIV, descs.data(), descs.size(), handles.data());
-    if (ret != HCCL_SUCCESS) {
-        OP_LOGE_LIBOPAPI_REPORT(
-            "Mc2Context", "Failed to acquire barrier channels, rank=%u, count=%zu, protocol=%d, ret=%d", rank,
-            descs.size(), static_cast<int32_t>(descs.front().channelProtocol), static_cast<int32_t>(ret));
-        return ACLNN_ERR_INNER;
-    }
+    auto ret = owner.AcquireHcclChannels(comm, CommEngine::COMM_ENGINE_AIV, descs, handles.data());
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
     for (size_t i = 0; i < handles.size(); ++i) {
         peers[i]->handle = handles[i];
-        auto aclnnRet = ResolvePeerWindow(*peers[i], tag, required);
+        auto aclnnRet = ResolvePeerWindow(*peers[i], required);
         CHECK_RET(aclnnRet == ACLNN_SUCCESS, aclnnRet);
     }
     return ACLNN_SUCCESS;
 }
 
 aclnnStatus Mc2Context::BarrierContext::AcquireGroup(Mc2Barrier::Peer* entries, uint32_t count, uint32_t selfSlot,
-                                                     const HcclChannelDesc* descs, const std::string& tag,
-                                                     uint64_t required)
+                                                     const HcclChannelDesc* descs, uint64_t required)
 {
     const uint32_t rounds = Mc2Barrier::ChannelBatchRounds(count);
     for (CommProtocol protocol : g_barrierProtocols) {
@@ -1843,25 +1684,23 @@ aclnnStatus Mc2Context::BarrierContext::AcquireGroup(Mc2Barrier::Peer* entries, 
                     peers.push_back(&entries[i]);
                 }
             }
-            auto ret = AcquireBatch(tag, selected, peers, required);
+            auto ret = AcquireBatch(selected, peers, required);
             CHECK_RET(ret == ACLNN_SUCCESS, ret);
         }
     }
     return ACLNN_SUCCESS;
 }
 
-aclnnStatus Mc2Context::BarrierContext::BuildChannels(Mc2Barrier::Context& context, const std::string& tag,
-                                                      HcclMemHandle memHandle)
+aclnnStatus Mc2Context::BarrierContext::BuildChannels(Mc2Barrier::Context& context)
 {
     std::vector<HcclChannelDesc> descs;
-    auto ret = DescribeChannels(context, memHandle, descs);
+    auto ret = DescribeChannels(context, descs);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     auto* peers = reinterpret_cast<Mc2Barrier::Peer*>(&context + 1);
-    const uint64_t required = Mc2Barrier::WindowBytes(context.localSize, context.railSize);
-    ret = AcquireGroup(peers, context.localSize, context.localSlot, descs.data(), tag, required);
+    ret = AcquireGroup(peers, context.localSize, context.localSlot, descs.data(), context.windowBytes);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     return AcquireGroup(peers + context.localSize, context.railSize, context.railSlot, descs.data() + context.localSize,
-                        tag, required);
+                        context.windowBytes);
 }
 
 bool Mc2Context::BarrierContext::SupportsStaticGraph(int64_t worldSize)
@@ -1873,7 +1712,7 @@ bool Mc2Context::BarrierContext::SupportsStaticGraph(int64_t worldSize)
 bool Mc2Context::SupportsBarrierStaticGraph(const char* groupEp, int64_t worldSize)
 {
     Mc2Context instance;
-    if (groupEp == nullptr || instance.LoadBarrierSymbols() != ACLNN_SUCCESS) {
+    if (groupEp == nullptr || instance.LoadCommonHcclSymbols() != ACLNN_SUCCESS) {
         return false;
     }
     HcclComm comm;
@@ -1890,7 +1729,7 @@ aclnnStatus Mc2Context::GetBarrierContextTensor(const char* groupEp, int64_t wor
     Mc2Context instance;
     mc2Context = nullptr;
     CHECK_RET(groupEp != nullptr, ACLNN_ERR_PARAM_NULLPTR);
-    auto ret = instance.LoadBarrierSymbols();
+    auto ret = instance.LoadCommonHcclSymbols();
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     HcclComm hcclHandle;
     ret = instance.GetCommHandle(groupEp, hcclHandle);
@@ -1899,8 +1738,8 @@ aclnnStatus Mc2Context::GetBarrierContextTensor(const char* groupEp, int64_t wor
     barrier.allowMixedProtocols = op::GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510;
     ret = barrier.Init(worldSize);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
-    const std::string tag = std::string(groupEp) + "_distribute_barrier_context_v6";
-    ret = instance.ValidateContextTag(tag + "_buffer");
+    const std::string tag = std::string(groupEp) + "_distribute_barrier_ccl_context_v6";
+    ret = instance.ValidateContextTag(tag);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     void* ctx = nullptr;
     uint64_t bytes = 0;

@@ -31,6 +31,10 @@
   - Supports data combine, performs alltoallv communication, and finally combines the received data (multiplied by weights and then added);
   - Supports special expert scenarios.
 
+<!-- npu="950" id14 -->
+- For <term>Ascend 950PR&950DT products</term>, `low_latency_combine` does not accept `comm_alg="hierarchy"`. To combine tokens over RoCE, call `torch_npu.npu_moe_distribute_combine_v2` with `comm_alg="hierarchy"`.
+<!-- end id14 -->
+
 - **Formula**:
 
   - Data combination function:

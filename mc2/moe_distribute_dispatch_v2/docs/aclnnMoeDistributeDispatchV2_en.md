@@ -381,7 +381,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
     <td>dynamicScalesOut</td>
     <td>Output</td>
     <td>Scaling parameter.</td>
-    <td>Must be a 1D or 2D tensor. Output exists when quantMode is 2, 3, or 4; output also exists when quantMode is 0 and the data type of `x` is `HIFLOAT8`, `FLOAT8_E5M2`, `FLOAT8_E4M3FN`, `FLOAT4_E2M1`, `FLOAT4_E1M2`, or `INT32`.</td>
+    <td>Must be a 1D or 2D tensor. Output exists when quantMode is 2, 3, 4, or 5; output also exists when quantMode is 0 and the data type of `x` is `HIFLOAT8`, `FLOAT8_E5M2`, `FLOAT8_E4M3FN`, `FLOAT4_E2M1`, `FLOAT4_E1M2`, or `INT32`.</td>
     <td>FLOAT32, FLOAT8_E8M0</td>
     <td>-</td>
     <td>-</td>
@@ -498,12 +498,16 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
     <!-- end id10 -->
     <!-- npu="950" id11 -->
     - <term>Ascend 950PR&950DT products</term>:
-        - `dynamicScalesOut` has an output when quantMode is 2, 3, or 4. It also has an output when quantMode is 0 and the data type of `x` is `HIFLOAT8`, `FLOAT8_E5M2`, `FLOAT8_E4M3FN`, `FLOAT4_E2M1`, or `FLOAT4_E1M2`.
-        - `commAlg` is not supported in the current version. Pass a null pointer.
+        - `dynamicScalesOut` has an output when quantMode is 2, 3, 4, or 5. It also has an output when quantMode is 0 and the data type of `x` is `HIFLOAT8`, `FLOAT8_E5M2`, `FLOAT8_E4M3FN`, `FLOAT4_E2M1`, or `FLOAT4_E1M2`.
+        - commAlg supports "", "fullmesh_v1", "fullmesh_v2", and "hierarchy". "hierarchy" uses intra-server UB Memory and inter-server RoCE communication.
         - `xActiveMaskOptional` must be a 1D or 2D tensor (1D shape: (BS,); 2D shape: (BS, K)). In the 1D case, true must be placed before false (for example, {true, false, true} is invalid). In the 2D case, if all K values corresponding to a token are false, the token does not participate in communication.
         - `expertScalesOptional` accepts a valid tensor or a null pointer. When a valid tensor is passed, the expertScales expert weight function is enabled, and the valid tensor is a 2D tensor with shape (BS, K). When a null pointer is passed, the expertScales expert weight function is disabled. Empty tensors are not supported.
         - `epWorldSize` value range: [2, 1024].
-        - `moeExpertNum` value range: (0, 1024].
+        - `moeExpertNum` has a value range of (0, 2048]. This limit applies to MoE experts only; shared experts are not added to this count.
+        - For RoCE (`commAlg="hierarchy"`), shared experts are not supported: `sharedExpertRankNum > 0` is rejected. With `sharedExpertRankNum=0`, `sharedExpertNum=0` or the default value 1 both mean no shared experts.
+        - RoCE is not supported by the `low_latency_dispatch` or `low_latency_combine` APIs. Use the ACLNN or torch_npu V2 interface.
+        - For RoCE (`commAlg="hierarchy"`), `quantMode` must be 0 (`NON_QUANT`), 4 (`MX_QUANT`), or 5 (`MX_QUANT_CLIP`); all other values are rejected. For modes 4 and 5, `scalesOptional` must be a null pointer.
+        - For RoCE (`commAlg="hierarchy"`), `expertScalesOptional` must be a valid FP32 ND tensor of shape `(BS, K)`. Pass null pointers for `elasticInfoOptional` and `performanceInfoOptional`.
         - `groupTp` is not supported in the current version. Pass an empty string.
         - `tpWorldSize` is not supported in the current version. Pass 0.
         - `tpRankId` is not supported in the current version. Pass 0.
@@ -513,7 +517,7 @@ aclnnStatus aclnnMoeDistributeDispatchV2(
         - `epRecvCountsOut` has a shape of (epWorldSize \* localExpertNum,).
         - `tpRecvCountsOut`: This output is not supported in the current version.
         - `expandScalesOut` is valid when the `expertScales` expert weight feature is enabled; otherwise, it is invalid.
-        - `quantMode` supports 0 (non-quantized), 1 (static quantization), 2 (pertoken dynamic quantization), 3 (pergroup dynamic quantization), and 4 (mx dynamic quantization).
+        - `quantMode` supports 0 (non-quantized), 1 (static quantization), 2 (pertoken dynamic quantization), 3 (pergroup dynamic quantization), 4 (MX_QUANT), and 5 (MX_QUANT_CLIP).
 
     <!-- end id11 -->
 
@@ -687,6 +691,8 @@ aclnnStatus: return status code. For details, see [aclnn Return Codes](../../../
           - If valid data is passed in `scalesOptional` and there are no shared expert cards, the shape is (`moeExpertNum`, `H`).
           - The shape of output `dynamicScalesOut` is `(A, Ceil(H, 128))`, where `Ceil(H, 128) = (H + 128 - 1) / 128`
       - When `quantMode` is 4, it indicates the mx quantization scenario. The data types supported by `expandX` are `FLOAT8_E4M3FN`, `FLOAT8_E5M2`, `FLOAT4_E2M1`, and `FLOAT4_E1M2`, and an empty pointer must be passed in for input `scalesOptional`. The shape of output `dynamicScalesOut` is `(A, Ceil(H, 64))`, where `Ceil(H, 64) = (H + 64 - 1) / 64`. If the data type of `expandX` is `FLOAT4_E2M1` or `FLOAT4_E1M2`, H must be an even number.
+
+      - When `quantMode` is 5 (`MX_QUANT_CLIP`), the output data type supports `FLOAT8_E4M3FN` and `FLOAT8_E5M2`. `scalesOptional` must be a null pointer. `dynamicScalesOut` has data type `FLOAT8_E8M0` and shape `(A, ((H + 31) // 32 + 1) // 2 * 2)`, where `//` denotes integer division.
 
   <!-- end id15 -->
 

@@ -587,14 +587,16 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     <summary><term>Ascend 950PR&950DT products</term>:</summary>
 
     - expertScales can be used to optionally enable the expert weight function. Passing a valid tensor with shape (BS, K) for expertScales enables the function and performs weighted summation; passing an empty tensor disables the function and directly sums the expert outputs.
-    - commAlg is not supported in the current version; simply pass a null pointer.
+    - commAlg supports the default UB Memory mode and "hierarchy" for RoCE. "hierarchy" uses intra-server UB Memory and inter-server RoCE communication.
     - The shape of epSendCounts is (epWorldSize \* localExpertNum, ).
     - TP domain communication is not supported currently.
     - xActiveMaskOptional is required to be a 1D or 2D tensor (shape (BS, ) for 1D and shape (BS, K) for 2D). For 1D, true must be placed before false; for 2D, a token does not participate in communication if all of the K values corresponding to the token are false.
     - expandScalesOptional is a reserved parameter, which is not supported in the current version; simply pass a null pointer.
     - sharedExpertXOptional is required to be a 2D or 3D tensor (shape (BS, H) for 2D; for 3D, the product of the first two dimensions is BS and the third dimension is H). This parameter can be passed or omitted; if it is passed, sharedExpertRankNum must be 0.
     - The supported value range of epWorldSize is [2, 1024].
-    - The value range of moeExpertNum is (0, 1024].
+    - `moeExpertNum` has a value range of (0, 2048]. This limit applies to MoE experts only; shared experts are not added to this count.
+    - For RoCE (`commAlg="hierarchy"`), shared experts are not supported: `sharedExpertRankNum > 0` is rejected. With `sharedExpertRankNum=0`, `sharedExpertNum=0` or the default value 1 both mean no shared experts. `sharedExpertXOptional` must be a null pointer.
+    - RoCE is not supported by the `low_latency_dispatch` or `low_latency_combine` APIs. Use the ACLNN or torch_npu V2 interface.
     - groupTp is not supported in the current version; pass an empty string.
     - tpWorldSize is not supported in the current version; pass 0.
     - tpRankId is not supported in the current version; pass 0.
@@ -602,7 +604,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     - The current value range of sharedExpertNum is [0, 4].
     - The value range of sharedExpertRankNum is [0, epWorldSize); when the value is 0, sharedExpertNum must be 0 or 1; when the value is not 0, sharedExpertRankNum % sharedExpertNum = 0 must be satisfied.
     - The value range of commQuantMode is 0, 2, 3, or 4 (0 indicates no quantization, 2 indicates int8 quantization, 3 indicates mxfp8 quantization (e5m2), and 4 indicates mxfp8 quantization (e4m3)).
-    - expandScalesOptional is a reserved parameter and is not supported in the current version; pass a null pointer.
+    - When RoCE pre-reduction is enabled and expert weights are provided, pass Dispatch's `expandScalesOut` to `expandScalesOptional`. It must be a 1D FP32 ND tensor with at least `A` elements. In the default UB Memory mode, pass a null pointer.
     - elasticInfoOptional is a reserved parameter, which is not supported in the current version. Pass a null pointer.
     - constExpertAlpha1Optional can be set to valid data or a null pointer. Valid input must be passed when constExpertNum is not 0. If valid data is passed, it must be a 2D tensor with shape <code>(constExpertNum, H)</code>, and its data type must be the same as that of expandX.
     - constExpertAlpha2Optional can be set to valid data or a null pointer. Valid input must be passed when constExpertNum is not 0. If valid data is passed, it must be a 2D tensor with shape <code>(constExpertNum, H)</code>, and its data type must be the same as that of expandX.

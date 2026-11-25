@@ -370,7 +370,11 @@ English | [简体中文](./README.md)
     - TP domain communication is currently not supported.
 
 - Communication mode constraints:
-    - <term>Ascend 950DT products</term>: Only UB Memory communication is supported.
+    - <term>Ascend 950DT products</term>: UB Memory is used by default. Setting `commAlg="hierarchy"` selects the A5 RoCE path, which uses UB Memory within each UB domain and RoCE between domains. This path is different from `hierarchy` on Atlas A3.
+        - Topology: The EP communication domain must contain multiple UB domains of equal size. Ranks must be numbered consecutively within each UB domain, and ranks with the same local rank number in different domains must have RoCE connectivity. A single UB domain is not supported, and this path does not fall back to UB Memory.
+        - `globalBs`: If `BS` differs across ranks, pass the same non-zero capacity, `globalBs = epWorldSize * maxBS`, to both Dispatch and Combine on all ranks. `maxBS` must be at least the largest `BS` across all ranks and must not exceed 512.
+        - Insufficient CCL window capacity: If the log contains `ROCE ccl_buffer_size` or `ROCE bank=`, check the capacity of the intra-domain window and the inter-domain partition shared by Dispatch and Combine against the logged requirements. Set `HCCL_BUFFSIZE` in MiB before creating the EP communication domain so that the window meets the requirements of both Dispatch and Combine.
+        - Insufficient UB or AIV cores: If the log contains `ROCE UB=`, check the logged on-chip buffer requirements for Scatter, Gather, Sender, and final reduction. If it contains `ROCE requires Scatter and Gather cores`, check the configured AIV core limit and leave enough cores for roles other than inter-domain sending. Increasing `HCCL_BUFFSIZE` does not increase on-chip UB capacity or the number of AIV cores.
 
 - <term>Atlas A2 products</term>:
     - `commAlg`: The current version supports four input values: nullptr, "", "fullmesh", and "hierarchy". If "hierarchy" is configured, it is recommended to use a driver of version 25.0.RC1.1 or later.

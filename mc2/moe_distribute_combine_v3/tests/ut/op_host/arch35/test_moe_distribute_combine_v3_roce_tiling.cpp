@@ -15,6 +15,9 @@ namespace {
 using Attr = gert::TilingContextPara::OpAttr;
 using Tensor = gert::TilingContextPara::TensorDescription;
 
+// 256 route rows and two UB domains with 16 tokens per rank.
+constexpr int64_t MIN_ASSIST_INFO_SIZE = 816;
+
 std::vector<Attr> GetRoceCombineAttrs(bool preReduce, int64_t quantMode, int64_t ranksPerServer)
 {
     const std::vector<std::pair<std::string, int64_t>> values = {{"ep_world_size", 8},
@@ -83,26 +86,26 @@ TEST(MoeDistributeCombineV3RoceTiling, PreReduceAndForwardQuantModes)
 {
     for (bool preReduce : {true, false}) {
         for (int64_t quantMode : {0, 2, 3, 4}) {
-            RunRoceCombineCase(preReduce, quantMode, 4, 836, 256, ge::GRAPH_SUCCESS);
+            RunRoceCombineCase(preReduce, quantMode, 4, MIN_ASSIST_INFO_SIZE, 256, ge::GRAPH_SUCCESS);
         }
     }
 }
 
 TEST(MoeDistributeCombineV3RoceTiling, RejectsSingleServer)
 {
-    RunRoceCombineCase(true, 0, 8, 836, 256, ge::GRAPH_FAILED);
-    RunRoceCombineCase(false, 0, 8, 836, 256, ge::GRAPH_FAILED);
+    RunRoceCombineCase(true, 0, 8, MIN_ASSIST_INFO_SIZE, 256, ge::GRAPH_FAILED);
+    RunRoceCombineCase(false, 0, 8, MIN_ASSIST_INFO_SIZE, 256, ge::GRAPH_FAILED);
 }
 
 TEST(MoeDistributeCombineV3RoceTiling, RejectsInvalidTopologyAndTruncatedAssist)
 {
-    RunRoceCombineCase(true, 0, 3, 836, 256, ge::GRAPH_FAILED);
-    RunRoceCombineCase(true, 0, 4, 835, 256, ge::GRAPH_FAILED);
+    RunRoceCombineCase(true, 0, 3, MIN_ASSIST_INFO_SIZE, 256, ge::GRAPH_FAILED);
+    RunRoceCombineCase(true, 0, 4, MIN_ASSIST_INFO_SIZE - 1, 256, ge::GRAPH_FAILED);
 }
 
 TEST(MoeDistributeCombineV3RoceTiling, OnlyPreReduceRequiresExpandedWeights)
 {
-    RunRoceCombineCase(true, 0, 4, 836, 0, ge::GRAPH_FAILED);
-    RunRoceCombineCase(false, 0, 4, 836, 0, ge::GRAPH_SUCCESS);
+    RunRoceCombineCase(true, 0, 4, MIN_ASSIST_INFO_SIZE, 0, ge::GRAPH_FAILED);
+    RunRoceCombineCase(false, 0, 4, MIN_ASSIST_INFO_SIZE, 0, ge::GRAPH_SUCCESS);
 }
 } // namespace

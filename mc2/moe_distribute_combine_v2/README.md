@@ -368,7 +368,11 @@
     - 当前不支持TP域通信。
 
 - 通信方式约束：
-    - <term>Ascend 950DT系列产品</term>：仅支持UB Memory通信。
+    - <term>Ascend 950DT系列产品</term>：默认支持 UB Memory。设置 `commAlg="hierarchy"` 时走 A5 RoCE 路径，域内使用 UB Memory，域间使用 RoCE，与 Atlas A3 的 `hierarchy` 路径不同。
+        - 拓扑：EP 通信域必须包含多个等规模 UB 域，各域内 rank 连续编号，跨域相同局部 rank 之间必须有可用的 RoCE 链路。只包含一个 UB 域时不支持此路径，不会自动回退到 UB Memory。
+        - `globalBs`：各 rank 的 `BS` 不一致时，Dispatch 和 Combine 均需配置相同的非零容量 `globalBs = epWorldSize * maxBS`。`maxBS` 须覆盖所有 rank 的 `BS`，且不超过 512。
+        - CCL 窗口不足：出现 `ROCE ccl_buffer_size` 或 `ROCE bank=` 时，按日志核对域内窗口和域间 Dispatch、Combine 共用分区的容量。创建 EP 通信域前按 MiB 配置 `HCCL_BUFFSIZE`，确保窗口同时满足 Dispatch 和 Combine 的需求。
+        - UB 或分核不足：出现 `ROCE UB=` 时按日志核对 Scatter、Gather、Sender 和最终归约各阶段的片上缓冲需求；出现 `ROCE requires Scatter and Gather cores` 时检查 AIV 限核设置，为域间发送之外的角色保留足够的核。增加 `HCCL_BUFFSIZE` 不会增加片上 UB 或 AIV 核数。
 
 - <term>Atlas A2系列产品</term>：
     - `commAlg`：当前版本支持nullptr，""，"fullmesh"，"hierarchy"四种输入方式，若配置"hierarchy"，建议搭配25.0.RC1.1及以上版本驱动使用。

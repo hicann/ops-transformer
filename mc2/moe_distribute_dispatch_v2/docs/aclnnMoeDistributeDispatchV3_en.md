@@ -388,7 +388,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
     <td>dynamicScalesOut</td>
     <td>Output</td>
     <td>Scaling parameters.</td>
-    <td>Must be a 1D or 2D tensor. Output exists when quantMode is 2, 3, or 4. Output also exists when quantMode is 0 and the data type of `x` is `HIFLOAT8`, `FLOAT8_E5M2`, `FLOAT8_E4M3FN`, `FLOAT4_E2M1`, `FLOAT4_E1M2`, or `INT32`.</td>
+    <td>Must be a 1D or 2D tensor. Output exists when quantMode is 2, 3, 4, or 5. Output also exists when quantMode is 0 and the data type of `x` is `HIFLOAT8`, `FLOAT8_E5M2`, `FLOAT8_E4M3FN`, `FLOAT4_E2M1`, `FLOAT4_E1M2`, or `INT32`.</td>
     <td>FLOAT32, FLOAT8_E8M0</td>
     <td>-</td>
     <td>-</td>
@@ -523,12 +523,16 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
     <details>
     <summary><term>Ascend 950PR&950DT products</term>:</summary>
 
-    - dynamicScalesOut has output when quantMode is 2, 3, or 4. It also has output when quantMode is 0 and the data type of `x` is `HIFLOAT8`, `FLOAT8_E5M2`, `FLOAT8_E4M3FN`, `FLOAT4_E2M1`, or `FLOAT4_E1M2`.
-    - commAlg supports "", "fullmesh_v1", and "fullmesh_v2". "": default value, enables the fullmesh_v1 template. "fullmesh_v1": enables the fullmesh_v1 template. "fullmesh_v2": enables the fullmesh_v2 template.
+    - dynamicScalesOut has output when quantMode is 2, 3, 4, or 5. It also has output when quantMode is 0 and the data type of `x` is `HIFLOAT8`, `FLOAT8_E5M2`, `FLOAT8_E4M3FN`, `FLOAT4_E2M1`, or `FLOAT4_E1M2`.
+    - commAlg supports "", "fullmesh_v1", "fullmesh_v2", and "hierarchy". "hierarchy" uses intra-server UB Memory and inter-server RoCE communication.
     - xActiveMaskOptional must be a 1D or 2D Tensor (1D: shape (BS, ); 2D: shape (BS, K)). For 1D, true must be placed before false. For 2D, a token does not participate in communication if all its K values are false.
     - expertScalesOptional can be a valid Tensor or a null pointer. If a valid Tensor is passed, the expertScales expert weight feature is enabled. The valid Tensor is a 2D Tensor with shape (BS, K). If a null pointer is passed, the expertScales expert weight feature is disabled. Empty Tensors are not supported.
     - epWorldSize: value range [2, 1024].
-    - moeExpertNum: value range (0, 1024].
+    - `moeExpertNum` has a value range of (0, 2048]. This limit applies to MoE experts only; shared experts are not added to this count.
+    - For RoCE (`commAlg="hierarchy"`), shared experts are not supported: `sharedExpertRankNum > 0` is rejected. With `sharedExpertRankNum=0`, `sharedExpertNum=0` or the default value 1 both mean no shared experts.
+    - RoCE is not supported by the `low_latency_dispatch` or `low_latency_combine` APIs. Use the ACLNN or torch_npu V2 interface.
+    - For RoCE (`commAlg="hierarchy"`), `quantMode` must be 0 (`NON_QUANT`), 4 (`MX_QUANT`), or 5 (`MX_QUANT_CLIP`); all other values are rejected. For modes 4 and 5, `scalesOptional` must be a null pointer.
+    - For RoCE (`commAlg="hierarchy"`), `expertScalesOptional` must be a valid FP32 ND tensor of shape `(BS, K)`. Pass null pointers for `elasticInfoOptional` and `performanceInfoOptional`.
     - groupTp: Not supported in the current version. Pass an empty string.
     - tpWorldSize: Not supported in the current version. Pass 0.
     - tpRankId: Not supported in the current version. Pass 0.
@@ -538,12 +542,12 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
     - The shape of epRecvCountsOut is (epWorldSize \* localExpertNum,).
     - tpRecvCountsOut (reserved output. Not supported in the current version. Pass a null pointer.)
     - expandScalesOut: Valid when the expertScales expert weight function is enabled; invalid when disabled.
-    - quantMode supports 0 (non-quantized), 1 (static quantization), 2 (pertoken dynamic quantization), 3 (pergroup dynamic quantization), and 4 (mx dynamic quantization).
+    - quantMode supports 0 (non-quantized), 1 (static quantization), 2 (pertoken dynamic quantization), 3 (pergroup dynamic quantization), 4 (MX_QUANT), and 5 (MX_QUANT_CLIP).
     - elasticInfoOptional: Not supported in the current version. Pass a null pointer.
     - zeroExpertNum: value range [0, MAX_INT32), where MAX_INT32 = 2^31 - 1. Valid zero expert IDs are <code>[moeExpertNum, moeExpertNum + zeroExpertNum)</code>.
     - copyExpertNum: value range [0, MAX_INT32), where MAX_INT32 = 2^31 - 1. Valid expert IDs are <code>[moeExpertNum + zeroExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum)</code>.
     - constExpertNum: value range [0, MAX_INT32), where MAX_INT32 = 2^31 - 1. Valid expert IDs are <code>[moeExpertNum + zeroExpertNum + copyExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum)</code>.
-    - scalesOptional: When quantMode is 0, pass a null pointer if the data type of `x` is `FLOAT16` or `BFLOAT16`; pass valid data if the data type of `x` is `HIFLOAT8`, `FLOAT8_E5M2`, `FLOAT8_E4M3FN`, `FLOAT4_E2M1`, or `FLOAT4_E1M2`. When quantMode is 1, pass valid data. When quantMode is 2 or 3, pass valid data or a null pointer. When quantMode is 4, pass a null pointer.
+    - scalesOptional: When quantMode is 0, pass a null pointer if the data type of `x` is `FLOAT16` or `BFLOAT16`; pass valid data if the data type of `x` is `HIFLOAT8`, `FLOAT8_E5M2`, `FLOAT8_E4M3FN`, `FLOAT4_E2M1`, or `FLOAT4_E1M2`. When quantMode is 1, pass valid data. When quantMode is 2 or 3, pass valid data or a null pointer. When quantMode is 4 or 5, pass a null pointer.
     </details>
     <!-- end id11 -->
 
@@ -718,6 +722,8 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
           - If input `scalesOptional` is passed with valid data and no shared expert cards exist, its shape is (`moeExpertNum`, `H`).
           - The shape of output `dynamicScalesOut` is `(A, Ceil(H, 128))`, where `Ceil(H, 128) = (H + 128 - 1) / 128`
       - When `quantMode` is 4, mx quantization is used. `expandX` supports the data types `FLOAT8_E4M3FN`, `FLOAT8_E5M2`, `FLOAT4_E2M1`, and `FLOAT4_E1M2`. Input `scalesOptional` must be a null pointer. The shape of output `dynamicScalesOut` is `(A, Ceil(H, 64))`, where `Ceil(H, 64) = (H + 64 - 1) / 64`. If the data type of `expandX` is `FLOAT4_E2M1` or `FLOAT4_E1M2`, H must be an even number.
+
+      - When `quantMode` is 5 (`MX_QUANT_CLIP`), the output data type supports `FLOAT8_E4M3FN` and `FLOAT8_E5M2`. `scalesOptional` must be a null pointer. `dynamicScalesOut` has data type `FLOAT8_E8M0` and shape `(A, ((H + 31) // 32 + 1) // 2 * 2)`, where `//` denotes integer division.
 
   <!-- end id15 -->
 

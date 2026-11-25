@@ -40,10 +40,15 @@ inline uint64_t AlignRoceBytes(uint64_t bytes, uint64_t alignment = 32U)
     return (bytes + alignment - 1U) / alignment * alignment;
 }
 
+inline uint64_t GetRoceMaskBytes(uint64_t tokensPerRank, uint64_t topK)
+{
+    return AlignRoceBytes((tokensPerRank * topK + 7U) / 8U);
+}
+
 inline uint64_t GetRoceAssistInfoSize(uint64_t expertRows, uint64_t epWorldSize, uint64_t tokensPerRank)
 {
     const uint64_t tripleBytes = expertRows * 3U * sizeof(int32_t);
-    const uint64_t serverInfoBytes = epWorldSize * (AlignRoceBytes(tokensPerRank, 16U) + 1U) * sizeof(uint16_t);
+    const uint64_t serverInfoBytes = epWorldSize * (UB_ALIGN + AlignRoceBytes(tokensPerRank * sizeof(uint32_t)));
     return AlignRoceBytes(tripleBytes + serverInfoBytes, sizeof(int32_t)) / sizeof(int32_t);
 }
 
@@ -67,24 +72,29 @@ inline RoceWindowLayout GetRoceWindowLayout(const TilingInfo& info, uint64_t ser
         AlignRoceBytes(rawTokenBytes + sizeof(float), FULL_MESH_DATA_ALIGN) / FULL_MESH_DATA_ALIGN * WIN_ADDR_ALIGN;
     const uint64_t dispatchPacketBytes =
         AlignRoceBytes(rawTokenBytes + 2U * UB_ALIGN, FULL_MESH_DATA_ALIGN) / FULL_MESH_DATA_ALIGN * WIN_ADDR_ALIGN;
-    const uint64_t countPacketBytes =
-        AlignRoceBytes(expertsPerRank * ranksPerServer * sizeof(int32_t), FULL_MESH_DATA_ALIGN) / FULL_MESH_DATA_ALIGN *
-        WIN_ADDR_ALIGN;
+    const uint64_t maskPacketBytes =
+        ranksPerServer *
+        AlignRoceBytes(expertsPerRank * (UB_ALIGN + GetRoceMaskBytes(tokensPerRank, info.k)), FULL_MESH_DATA_ALIGN) /
+        FULL_MESH_DATA_ALIGN * WIN_ADDR_ALIGN;
     // 框间 Dispatch 按 FP32 工作载荷上界预留，保证不依赖两算子各自的量化模式。
     const uint64_t tokenBytes = AlignRoceBytes(static_cast<uint64_t>(info.h) * sizeof(float), WIN_ADDR_ALIGN);
     const uint64_t expertIdsBytes = AlignRoceBytes(static_cast<uint64_t>(info.k) * sizeof(int32_t));
-    const uint64_t expertCountsBytes = AlignRoceBytes(static_cast<uint64_t>(info.k) * sizeof(int16_t));
     const uint64_t expertScalesBytes = AlignRoceBytes(static_cast<uint64_t>(info.k) * sizeof(float));
-    const uint64_t serverRecordBytes = tokenBytes + UB_ALIGN + expertIdsBytes + expertCountsBytes + expertScalesBytes;
+    const uint64_t serverRecordBytes = tokenBytes + UB_ALIGN + expertIdsBytes + expertScalesBytes;
     const uint64_t serverPacketBytes =
         AlignRoceBytes(serverRecordBytes, FULL_MESH_DATA_ALIGN) / FULL_MESH_DATA_ALIGN * WIN_ADDR_ALIGN;
     RoceWindowLayout layout;
     layout.dispatchPacketBytes = dispatchPacketBytes;
     layout.serverPacketBytes = serverPacketBytes;
     layout.combineIntraBytes = serverNum * tokensPerRank * (info.k + sharedSlots) * combinePacketBytes;
-    layout.dispatchIntraBytes = info.epWorldSize * tokensPerRank * expertsPerRank * dispatchPacketBytes;
+    const uint64_t expertCapacity = expertsPerRank > 0U ? expertsPerRank : 1U;
+    const uint64_t dispatchMaskOffset = info.epWorldSize * tokensPerRank * expertCapacity * dispatchPacketBytes;
+    const uint64_t expertMaskPacketBytes =
+        AlignRoceBytes(UB_ALIGN + GetRoceMaskBytes(tokensPerRank, info.k), FULL_MESH_DATA_ALIGN) /
+        FULL_MESH_DATA_ALIGN * WIN_ADDR_ALIGN;
+    layout.dispatchIntraBytes = dispatchMaskOffset + info.epWorldSize * expertCapacity * expertMaskPacketBytes;
     layout.dispatchInterBytes =
-        serverNum * (2U * WIN_ADDR_ALIGN + tokensPerRank * serverPacketBytes + 2U * countPacketBytes);
+        serverNum * (2U * WIN_ADDR_ALIGN + tokensPerRank * serverPacketBytes + 2U * maskPacketBytes);
     return layout;
 }
 

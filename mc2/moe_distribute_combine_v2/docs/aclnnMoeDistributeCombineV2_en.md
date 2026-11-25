@@ -464,14 +464,16 @@ aclnnStatus aclnnMoeDistributeCombineV2(
     <!-- npu="950" id9 -->
     - <term>Ascend 950PR&950DT products</term>:
         - `expertScales` optionally enables the expert weight function. Pass a valid Tensor of shape (BS, K) to enable it and apply weighting. Pass an empty Tensor to disable it and directly sum the expert outputs.
-        - `commAlg` is not supported in the current version. Simply pass a null pointer.
+        - commAlg supports the default UB Memory mode and "hierarchy" for RoCE. "hierarchy" uses intra-server UB Memory and inter-server RoCE communication.
         - The shape of `epSendCounts` is (epWorldSize \* max(tpWorldSize, 1) \* localExpertNum, ).
         - `tpSendCountsOptional` is not supported in the current version. Simply pass a null pointer.
         - `xActiveMaskOptional`: Requirement is a 1D or 2D tensor (shape (BS, ) for 1D tensors, shape (BS, K) for 2D tensors); for 1D tensors, true values must be placed before false values (e.g., {true, false, true} is invalid); for 2D tensors, a token whose K values are all false does not participate in communication.
         - `expandScalesOptional`: Reserved parameter. Not supported in the current version. Simply pass a null pointer.
         - `sharedExpertXOptional`: Requirement is a 2D or 3D tensor (shape (BS, H) for 2D tensors; for 3D tensors, the product of the first two dimensions equals BS and the third dimension equals H). The parameter is optional. If passed, sharedExpertRankNum must be 0.
         - `epWorldSize`: Supported values: [2, 1024].
-        - `moeExpertNum`: Value range: (0, 1024].
+        - `moeExpertNum` has a value range of (0, 2048]. This limit applies to MoE experts only; shared experts are not added to this count.
+        - For RoCE (`commAlg="hierarchy"`), shared experts are not supported: `sharedExpertRankNum > 0` is rejected. With `sharedExpertRankNum=0`, `sharedExpertNum=0` or the default value 1 both mean no shared experts. `sharedExpertXOptional` must be a null pointer.
+        - RoCE is not supported by the `low_latency_dispatch` or `low_latency_combine` APIs. Use the ACLNN or torch_npu V2 interface.
         - `groupTp` is not supported in the current version. Pass an empty string.
         - `tpWorldSize`: Not supported in the current version. Simply pass 0.
         - `tpRankId` is not supported in the current version. Pass 0.

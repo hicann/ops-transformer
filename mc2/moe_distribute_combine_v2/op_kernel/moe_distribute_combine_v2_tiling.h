@@ -55,6 +55,11 @@ struct MoeDistributeCombineV2Info {
     uint32_t clearFlagBytes; // 普通A5 MTE共享清flag零源字节数；0保留完整零源
     uint64_t roceCombineOffset;
     uint64_t rswBufferSize; // 0=旧协议(480/512 flag)；非0=rsw_buffer挡位(16KB~2MB，每slot一个)
+    uint32_t roceScatterBufferNum;
+    uint32_t roceScatterInputBufferNum;
+    uint32_t roceGatherBufferNum;
+    uint32_t roceGatherInputBufferNum;
+    uint32_t roceFinalInputBufferNum;
 };
 struct MoeDistributeCombineV2TilingData {
     Mc2InitTiling mc2InitTiling;

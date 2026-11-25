@@ -585,14 +585,16 @@ aclnnStatus aclnnMoeDistributeCombineV3(
     <summary><term>Ascend 950PR&950DT products</term>:</summary>
 
     - expertScales determines whether to enable the expert weight function. If expertScales is a valid tensor of shape (BS, K), weighting is enabled. If expertScales is an empty tensor, weighting is disabled and expert outputs are directly summed.
-    - commAlg is not supported in the current version. Pass a null pointer.
+    - commAlg supports the default UB Memory mode and "hierarchy" for RoCE. "hierarchy" uses intra-server UB Memory and inter-server RoCE communication.
     - The shape of epSendCounts is (epWorldSize \* localExpertNum, ).
     - TP domain communication is not supported currently.
     - xActiveMaskOptional must be a 1D or 2D tensor (1D shape: (BS, ); 2D shape: (BS, K)). For a 1D tensor, true values must be placed before false values. For a 2D tensor, if all K values corresponding to a token are false, the token does not participate in communication.
     - expandScalesOptional is a reserved parameter and is not supported in the current version. Pass a null pointer.
     - sharedExpertXOptional must be a 2D or 3D tensor (2D shape: (BS, H); for 3D, the product of the first two dimensions is BS and the third dimension is H). This parameter is optional. If passed in, sharedExpertRankNum must be 0.
     - epWorldSize supports values in [2, 1024].
-    - The value range of moeExpertNum is (0, 1024].
+    - `moeExpertNum` has a value range of (0, 2048]. This limit applies to MoE experts only; shared experts are not added to this count.
+    - For RoCE (`commAlg="hierarchy"`), shared experts are not supported: `sharedExpertRankNum > 0` is rejected. With `sharedExpertRankNum=0`, `sharedExpertNum=0` or the default value 1 both mean no shared experts. `sharedExpertXOptional` must be a null pointer.
+    - RoCE is not supported by the `low_latency_dispatch` or `low_latency_combine` APIs. Use the ACLNN or torch_npu V2 interface.
     - groupTp is not supported in the current version. Pass an empty string.
     - tpWorldSize is not supported in the current version. Pass 0.
     - tpRankId is not supported in the current version. Pass 0.
