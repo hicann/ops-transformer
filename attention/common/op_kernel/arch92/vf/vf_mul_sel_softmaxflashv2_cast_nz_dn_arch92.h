@@ -257,32 +257,6 @@ __aicore__ inline void ResetSoftmaxBuffer(const LocalTensor<T>& sumTensor, const
     ResetSoftmaxBufferVF<T, static_cast<uint16_t>(elementCount)>(sum_ub, max_ub, sumValue, minValue);
 }
 
-#ifndef MUL_SEL_SOFTMAXFLASHV2_CAST_NZ_DN_H_
-template <typename T>
-__simd_vf__ inline void BroadCastMaxSumVF(__ubuf__ float* out_ub, __ubuf__ float* ori_ub, const uint16_t loopM)
-{
-    RegTensor<float> broadcast_reg;
-    MaskReg preg_all = CreateMask<T, MaskPattern::ALL>();
-    for (uint16_t i = 0; i < loopM; ++i) {
-        LoadAlign<T, Reg::LoadDist::DIST_E2B_B32>(broadcast_reg, ori_ub + i * 8);
-        StoreAlign<T, Reg::StoreDist::DIST_NORM_B32>((__ubuf__ T*&)out_ub + i * 64, broadcast_reg, preg_all);
-    }
-}
-
-template <typename T>
-__aicore__ inline void BroadcastMaxSum(const LocalTensor<T>& outTensor, const LocalTensor<T>& oriTensor,
-                                       uint32_t vecS1RealSize)
-{
-    __ubuf__ float* out_ub = (__ubuf__ T*)outTensor.GetPhyAddr();
-    __ubuf__ float* ori_ub = (__ubuf__ T*)oriTensor.GetPhyAddr();
-
-    // Align8, broadcast one element to 8 elements, one register can store 64 elements,
-    // so we can handle 64 / 8 = 8 elements per loop.
-    uint16_t loopM = (vecS1RealSize + 7) >> 3;
-    BroadCastMaxSumVF<T>(out_ub, ori_ub, loopM);
-}
-#endif
-
 template <typename T, typename T2, uint16_t s2BaseSize = 128, bool isUpdate = false, bool hasAtten = 0,
           bool hasDrop = false, PseTypeEnum pseMode = PseTypeEnum::PSE_NONE_TYPE, bool hasSink = false>
 __simd_vf__ inline void ProcessVec1Dn64VF(__ubuf__ T2* x_exp, __ubuf__ float* input_x_local_UB, __ubuf__ float* exp_max,

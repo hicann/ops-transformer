@@ -17,6 +17,8 @@
 
 #include <limits>
 #include "../../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
+#include "../../../common/op_kernel/arch35/vf/vf_basic_block_utils.h"
+#include "../../../common/op_kernel/arch35/vf/vf_mul_sel_softmaxflashv2_cast_nz_dn.h"
 #include "../../../common/op_kernel/arch92/vf/vf_mul_sel_softmaxflashv2_cast_nz_dn_arch92.h"
 #include "../../../common/op_kernel/arch35/vf/vf_flashupdate_new.h"
 #include "../../../common/op_kernel/arch35/vf/vf_div_cast_arch35.h"

@@ -31,6 +31,11 @@ static constexpr uint32_t BUFFER_SIZE_BYTE_16K = 16384;
 static constexpr uint32_t BUFFER_SIZE_BYTE_32K = 32768;
 static constexpr uint32_t BUFFER_SIZE_BYTE_64K = 65536;
 
+// V/输出 head dim
+static constexpr uint32_t V_HEAD_DIM_64 = 64;
+static constexpr uint32_t V_HEAD_DIM_128 = 128;
+static constexpr uint32_t V_HEAD_DIM_256 = 256;
+
 #define ASCENDC_TPL_3_BW 3
 
 enum class FA_LAYOUT : uint32_t {

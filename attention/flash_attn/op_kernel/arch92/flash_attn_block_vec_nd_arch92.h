@@ -205,8 +205,8 @@ public:
         struct UbLayout {
             uint8_t mm2ResBuffers[UB_MM2_RES_BUFCNT][UB_MM2_RES_BUF_BYTES]; // BMM2->VEC communication
             uint8_t mm1ResBuffers[UB_MM1_RES_BUFCNT][UB_MM1_RES_BUF_BYTES]; // BMM1->VEC communication
-            uint8_t maskBuffers[UB_MASK_BUFCNT][UB_MASK_BUF_BYTES];         // D256: one 96x256 INT8 mask, 24 KiB
-            uint8_t vec2Res[UB_VEC2_RES_BUF_BYTES];                         // FP32 accumulator, reused for output Cast
+            uint8_t maskBuffers[UB_MASK_BUFCNT][UB_MASK_BUF_BYTES]; // mask 输入 BUF，每块 mBaseSize*s2BaseSize 字节
+            uint8_t vec2Res[UB_VEC2_RES_BUF_BYTES];                 // FP32 accumulator, reused for output Cast
             uint8_t vec1ResBuffers[UB_VEC1_RES_BUFCNT][UB_VEC1_RES_BUF_BYTES];       // Softmax P staging, copied to L1
             uint8_t softmaxSumBuf_[UB_SOFTMAX_SUM_BUFCNT][UB_SOFTMAX_SUM_BUF_BYTES]; // 3 * 0.5K = 1.5K, sum常驻BUF
             uint8_t softmaxMaxBuf_[UB_SOFTMAX_MAX_BUFCNT][UB_SOFTMAX_MAX_BUF_BYTES]; // 3 * 0.5K = 1.5K, max常驻BUF
@@ -228,7 +228,7 @@ public:
                          .template ReinterpretCast<T>();
         ubVec1ResBuffers_ = LocalTensor<uint8_t>(TPosition::VECIN, OFFSET_OF_MEMBER(UbLayout, vec1ResBuffers),
                                                  SIZE_OF_MEMBER(UbLayout, vec1ResBuffers));
-        // M=96 pads every max/sum/exp slot to 128 FP32 elements for vector loads.
+        // 各统计槽按 STAT_ROWS_REG_ALIGNED 个 FP32 元素分配，供共享 VF 以 64 行一组读写。
         softmaxSumBuf_ = LocalTensor<uint8_t>(TPosition::VECIN, OFFSET_OF_MEMBER(UbLayout, softmaxSumBuf_),
                                               SIZE_OF_MEMBER(UbLayout, softmaxSumBuf_))
                              .template ReinterpretCast<T>();
@@ -465,7 +465,7 @@ public:
         LocalTensor<T> expUb =
             softmaxExpBuf_[(runInfo.loop % UB_SOFTMAX_EXP_BUFCNT) * (UB_SOFTMAX_EXP_BUF_BYTES / sizeof(T))];
 
-        // mask buffer 数量由 config 提供：D256 M=96 为 1 块，其余档位为 2 块（BAND 需 main/pre 乒乓）。
+        // mask buffer 数量由 config 决定
         const uint32_t maskBufId = runInfo.loop & (UB_MASK_BUFCNT - 1U);
         if constexpr (HAS_MASK) {
             attenMaskUb = ubMaskBuffers_[maskBufId * UB_MASK_BUF_BYTES];

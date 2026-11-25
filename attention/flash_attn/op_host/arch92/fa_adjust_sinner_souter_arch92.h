@@ -19,19 +19,19 @@ namespace optiling {
 namespace flash_attn {
 namespace fa_tiling_util {
 
-inline void SetMBaseSize(uint32_t vHeadDim, uint32_t maskMode, uint32_t& mBaseSize)
+inline void SetMBaseSize(uint32_t vHeadDim, FAMaskMode maskMode, uint32_t& mBaseSize)
 {
-    if (vHeadDim == 128) {
+    if (vHeadDim == V_HEAD_DIM_128) {
         mBaseSize = 128;
-    } else if (vHeadDim == 256) {
-        // mask_mode=4(BAND) 继续使用基线 64 行切块，其余 D=256 走 M=96 新方案
-        mBaseSize = (maskMode == 4U) ? 64U : 96U;
+    } else if (vHeadDim == V_HEAD_DIM_256) {
+        // mask_mode=BAND 继续使用基线 64 行切块，其余 D=256 走 M=96 新方案
+        mBaseSize = (maskMode == FAMaskMode::BAND) ? 64U : 96U;
     } else {
         mBaseSize = 64;
     }
 }
 
-inline void SetKernelTemplateId(uint32_t vHeadDim, int32_t maxSeqQ, uint32_t mBaseSize, uint32_t maskMode,
+inline void SetKernelTemplateId(uint32_t vHeadDim, int32_t maxSeqQ, uint32_t mBaseSize, FAMaskMode maskMode,
                                 uint32_t& templateId)
 {
     if (maxSeqQ == -1) { // 默认走ND模板，GS1合轴
@@ -39,15 +39,15 @@ inline void SetKernelTemplateId(uint32_t vHeadDim, int32_t maxSeqQ, uint32_t mBa
         return;
     }
 
-    if (vHeadDim == 128) {
+    if (vHeadDim == V_HEAD_DIM_128) {
         if (maxSeqQ < mBaseSize) { // maxSeqQ < mBaseSize时，走ND模板，GS1合轴打满mBase，达成cube bound
             templateId = FA_Template_ND;
-        } else if (maskMode == 4U) { // MaskMode::BAND: DN模板S2切256，band模式ub不足，走ND模板
+        } else if (maskMode == FAMaskMode::BAND) { // BAND: DN模板S2切256，band模式ub不足，走ND模板
             templateId = FA_Template_ND;
         } else {
             templateId = FA_Template_DN_Unmerged;
         }
-    } else if (vHeadDim == 64) {
+    } else if (vHeadDim == V_HEAD_DIM_64) {
         templateId = FA_Template_ND;
     } else { // D=256
         templateId = FA_Template_ND;
@@ -58,11 +58,11 @@ inline void SetS2BaseSize(uint32_t templateId, uint32_t vHeadDim, uint32_t& s2Ba
 {
     s2BaseSize = 128;
     if (templateId == FA_Template_ND) {
-        if (vHeadDim == 256 || vHeadDim == 64) {
+        if (vHeadDim == V_HEAD_DIM_256 || vHeadDim == V_HEAD_DIM_64) {
             s2BaseSize = 256;
         }
     } else {
-        if (vHeadDim == 128) {
+        if (vHeadDim == V_HEAD_DIM_128) {
             s2BaseSize = 256;
         }
     }
@@ -81,8 +81,9 @@ inline void SetS2BaseSize(uint32_t templateId, uint32_t vHeadDim, uint32_t& s2Ba
 inline void GetConfigInfo(uint32_t vHeadDim, int32_t maskMode, int32_t maxSeqQ, uint32_t& templateId,
                           uint32_t& mBaseSize, uint32_t& s2BaseSize)
 {
-    SetMBaseSize(vHeadDim, static_cast<uint32_t>(maskMode), mBaseSize);
-    SetKernelTemplateId(vHeadDim, maxSeqQ, mBaseSize, maskMode, templateId);
+    const FAMaskMode mask = static_cast<FAMaskMode>(maskMode);
+    SetMBaseSize(vHeadDim, mask, mBaseSize);
+    SetKernelTemplateId(vHeadDim, maxSeqQ, mBaseSize, mask, templateId);
     SetS2BaseSize(templateId, vHeadDim, s2BaseSize);
 }
 

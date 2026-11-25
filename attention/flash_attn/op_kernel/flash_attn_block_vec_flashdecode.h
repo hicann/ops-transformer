@@ -23,6 +23,7 @@
 #endif
 #include "memory_copy_arch35.h"
 #include "../../common/op_kernel/vector_common.h"
+#include "../../common/op_kernel/arch_info.h"
 
 namespace FlashAttnKernel {
 struct TaskInfo {
@@ -75,13 +76,33 @@ private:
     static constexpr uint64_t SYNC_FDOUTPUT_BUF_FLAG = 2;
     static constexpr uint64_t SYNC_LSEOUTPUT_BUF_FLAG = 4;
 
-    static constexpr uint32_t BUFFER_SIZE_BYTE_256B = 256;
     static constexpr uint32_t BLOCK_ELEMENT_NUM = BYTE_BLOCK / sizeof(T); // 32/4=8
     static constexpr uint32_t FP32_BLOCK_ELEMENT_NUM = BYTE_BLOCK / sizeof(float);
 
     // FD 每轮规约的行数（与 ReduceFd 里的 fdBalanceMBaseSize 同源）
     static constexpr uint32_t FD_BALANCE_M_BASE = 8U;
     static constexpr uint32_t FP32_REPEAT_ELEMENT_NUM = REPEAT_BLOCK_BYTE / sizeof(float);
+
+    // ================================UB Buffer 常量区====================================
+    // lse 槽沿用原 6,144B：每个 split = FD_BALANCE_M_BASE 行 × FP32_BLOCK_ELEMENT_NUM 个 float，
+    // 故 FD_SPLIT_MAX = 6,144 / 256 = 24
+    static constexpr uint32_t FD_SPLIT_MAX = 24U;
+    // LSE max/sum 缓冲区：每个 256B，存储 FD_BALANCE_M_BASE 行的 LSE 值
+    static constexpr uint32_t FD_LSE_MAX_UB_BUF_BYTES = FD_BALANCE_M_BASE * BYTE_BLOCK;
+    // Sum/Max/Exp 缓冲区，存储 combineLoop 维度的 softmax 中间结果
+    static constexpr uint32_t FD_SUM_MAX_BUF_BYTES =
+        FD_SPLIT_MAX * FD_BALANCE_M_BASE * FP32_BLOCK_ELEMENT_NUM * sizeof(T);
+    // dV 按 64 对齐后的元素数，与 dSizeV_Align_ 的推导保持一致
+    static constexpr uint32_t FD_DV_ALIGN64 = ((uint32_t)dVBaseSize + 63U) / 64U * 64U;
+    // MM2 结果缓冲区：存储 dealRowCount 行的 accumOut 数据
+    static constexpr uint32_t FD_MM2_RES_BUF_BYTES = FD_BALANCE_M_BASE * FD_DV_ALIGN64 * sizeof(T);
+    // Reduce 缓冲区：存储规约结果
+    static constexpr uint32_t FD_REDUCE_BUF_BYTES = FD_BALANCE_M_BASE * FD_DV_ALIGN64 * sizeof(T);
+    // Output 缓冲区：存储 FD_BALANCE_M_BASE 行的最终输出
+    static constexpr uint32_t FD_OUTPUT_BUF_BYTES = FD_BALANCE_M_BASE * FD_DV_ALIGN64 * sizeof(OUTPUT_T);
+
+    // UB 总容量限制
+    static constexpr uint32_t UB_SIZE_LIMIT = (ArchInfo::CV_RATIO == 1) ? 376 * 1024 : 248 * 1024;
 
     static constexpr float FLOAT_INF = 3e+99;
     uint32_t preLoadNum_ = 2U;
@@ -166,59 +187,68 @@ public:
     __aicore__ inline void InitBuffers()
     {
         if ASCEND_IS_AIV {
-            // FD 业务区从 matmul 输出区之后开始，区内布局与尺寸由 FD 自管；不得回写 matmul 输出区
-            // （AIC 不参与 SyncAll，FD 运行期间 AIC 可能正在写该区）。
-            // 各块用绝对字节偏移直接构造 LocalTensor，不依赖线性分配器。
+            // 与 FA block 共享UB布局：bmm1/bmm2 区域在前，FD 业务缓冲区紧随其后。
+            // 使用 LocalTensor 构造函数直接指定绝对字节偏移，实现内存完全自主管理，
+            // 无需 LocalMemAllocator 线性分配器。
+            // FD 业务区起始字节偏移（跳过 FA 侧 bmm1/bmm2 区域），
+            // 以模板参数传入（取值为 FA vec block 的 GetFdBaseOffset()），避免两侧重复推导漂移
             constexpr uint32_t BASE = UB_FD_BASE_OFFSET;
 
-            // lse 槽沿用原 6,144B：每个 split = FD_BALANCE_M_BASE 行 × FP32_BLOCK_ELEMENT_NUM 个 float，
-            // 故 FD_SPLIT_MAX = 6,144 / 256 = 24
-            constexpr uint32_t FD_DV_ALIGN64 = ((uint32_t)dVBaseSize + 63U) / 64U * 64U;
-            constexpr uint32_t FD_SPLIT_MAX = 24U;
-            constexpr uint32_t FD_SPLIT_LSE_BYTES = FD_BALANCE_M_BASE * FP32_BLOCK_ELEMENT_NUM * sizeof(T);
-            constexpr uint32_t FD_LSE_BUF_BYTES = FD_SPLIT_MAX * FD_SPLIT_LSE_BYTES;
-            constexpr uint32_t FD_MM2_BUF_BYTES = FD_BALANCE_M_BASE * FD_DV_ALIGN64 * sizeof(T);
-            constexpr uint32_t FD_OUT_BUF_BYTES = FD_BALANCE_M_BASE * FD_DV_ALIGN64 * sizeof(OUTPUT_T);
+            struct FdUbLayout {
+                uint8_t fdLseMaxBuf1[FD_LSE_MAX_UB_BUF_BYTES];
+                uint8_t fdLseMaxBuf2[FD_LSE_MAX_UB_BUF_BYTES];
+                uint8_t fdLseBuf[FD_LSE_MAX_UB_BUF_BYTES];
+                uint8_t fdSumBuf1[FD_SUM_MAX_BUF_BYTES];
+                uint8_t fdSumBuf2[FD_SUM_MAX_BUF_BYTES];
+                uint8_t fdMaxBuf1[FD_SUM_MAX_BUF_BYTES];
+                uint8_t fdMaxBuf2[FD_SUM_MAX_BUF_BYTES];
+                uint8_t fdLseExpBuf[FD_SUM_MAX_BUF_BYTES];
+                uint8_t fdMm2ResBuf1[FD_MM2_RES_BUF_BYTES];
+                uint8_t fdMm2ResBuf2[FD_MM2_RES_BUF_BYTES];
+                uint8_t fdReduceBuf[FD_REDUCE_BUF_BYTES];
+                uint8_t fdOutputBuf[FD_OUTPUT_BUF_BYTES];
+            };
 
-            // 区内偏移
-            constexpr uint32_t OFF_LSEMAX1 = BASE;
-            constexpr uint32_t OFF_LSEMAX2 = OFF_LSEMAX1 + BUFFER_SIZE_BYTE_256B;
-            constexpr uint32_t OFF_LSEUB = OFF_LSEMAX2 + BUFFER_SIZE_BYTE_256B;
-            constexpr uint32_t OFF_SUM1 = OFF_LSEUB + BUFFER_SIZE_BYTE_256B;
-            constexpr uint32_t OFF_SUM2 = OFF_SUM1 + FD_LSE_BUF_BYTES;
-            constexpr uint32_t OFF_MAX1 = OFF_SUM2 + FD_LSE_BUF_BYTES;
-            constexpr uint32_t OFF_MAX2 = OFF_MAX1 + FD_LSE_BUF_BYTES;
-            constexpr uint32_t OFF_LSEEXP = OFF_MAX2 + FD_LSE_BUF_BYTES;
-            constexpr uint32_t OFF_MM2RES1 = OFF_LSEEXP + FD_LSE_BUF_BYTES;
-            constexpr uint32_t OFF_MM2RES2 = OFF_MM2RES1 + FD_MM2_BUF_BYTES;
-            constexpr uint32_t OFF_REDUCE = OFF_MM2RES2 + FD_MM2_BUF_BYTES;
-            constexpr uint32_t OFF_OUTPUT = OFF_REDUCE + FD_MM2_BUF_BYTES;
+            static_assert(BASE + sizeof(FdUbLayout) <= UB_SIZE_LIMIT, "FD UB buffer too large");
 
-            fdLseMaxUbBuf1_ = LocalTensor<uint8_t>(TPosition::VECIN, OFF_LSEMAX1, BUFFER_SIZE_BYTE_256B)
+            fdLseMaxUbBuf1_ = LocalTensor<uint8_t>(TPosition::VECIN, BASE + OFFSET_OF_MEMBER(FdUbLayout, fdLseMaxBuf1),
+                                                   SIZE_OF_MEMBER(FdUbLayout, fdLseMaxBuf1))
                                   .template ReinterpretCast<T>();
-            fdLseMaxUbBuf2_ = LocalTensor<uint8_t>(TPosition::VECIN, OFF_LSEMAX2, BUFFER_SIZE_BYTE_256B)
+            fdLseMaxUbBuf2_ = LocalTensor<uint8_t>(TPosition::VECIN, BASE + OFFSET_OF_MEMBER(FdUbLayout, fdLseMaxBuf2),
+                                                   SIZE_OF_MEMBER(FdUbLayout, fdLseMaxBuf2))
                                   .template ReinterpretCast<T>();
-            fdLseUbBuf_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_LSEUB, BUFFER_SIZE_BYTE_256B).template ReinterpretCast<T>();
+            fdLseUbBuf_ = LocalTensor<uint8_t>(TPosition::VECIN, BASE + OFFSET_OF_MEMBER(FdUbLayout, fdLseBuf),
+                                               SIZE_OF_MEMBER(FdUbLayout, fdLseBuf))
+                              .template ReinterpretCast<T>();
 
-            fdSumBuf1_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_SUM1, FD_LSE_BUF_BYTES).template ReinterpretCast<T>();
-            fdSumBuf2_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_SUM2, FD_LSE_BUF_BYTES).template ReinterpretCast<T>();
-            fdMaxBuf1_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_MAX1, FD_LSE_BUF_BYTES).template ReinterpretCast<T>();
-            fdMaxBuf2_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_MAX2, FD_LSE_BUF_BYTES).template ReinterpretCast<T>();
-            fdLseExpBuf_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_LSEEXP, FD_LSE_BUF_BYTES).template ReinterpretCast<T>();
+            fdSumBuf1_ = LocalTensor<uint8_t>(TPosition::VECIN, BASE + OFFSET_OF_MEMBER(FdUbLayout, fdSumBuf1),
+                                              SIZE_OF_MEMBER(FdUbLayout, fdSumBuf1))
+                             .template ReinterpretCast<T>();
+            fdSumBuf2_ = LocalTensor<uint8_t>(TPosition::VECIN, BASE + OFFSET_OF_MEMBER(FdUbLayout, fdSumBuf2),
+                                              SIZE_OF_MEMBER(FdUbLayout, fdSumBuf2))
+                             .template ReinterpretCast<T>();
+            fdMaxBuf1_ = LocalTensor<uint8_t>(TPosition::VECIN, BASE + OFFSET_OF_MEMBER(FdUbLayout, fdMaxBuf1),
+                                              SIZE_OF_MEMBER(FdUbLayout, fdMaxBuf1))
+                             .template ReinterpretCast<T>();
+            fdMaxBuf2_ = LocalTensor<uint8_t>(TPosition::VECIN, BASE + OFFSET_OF_MEMBER(FdUbLayout, fdMaxBuf2),
+                                              SIZE_OF_MEMBER(FdUbLayout, fdMaxBuf2))
+                             .template ReinterpretCast<T>();
+            fdLseExpBuf_ = LocalTensor<uint8_t>(TPosition::VECIN, BASE + OFFSET_OF_MEMBER(FdUbLayout, fdLseExpBuf),
+                                                SIZE_OF_MEMBER(FdUbLayout, fdLseExpBuf))
+                               .template ReinterpretCast<T>();
 
-            fdMm2ResBuf1_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_MM2RES1, FD_MM2_BUF_BYTES).template ReinterpretCast<T>();
-            fdMm2ResBuf2_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_MM2RES2, FD_MM2_BUF_BYTES).template ReinterpretCast<T>();
-            fdReduceBuf_ =
-                LocalTensor<uint8_t>(TPosition::VECIN, OFF_REDUCE, FD_MM2_BUF_BYTES).template ReinterpretCast<T>();
-            fdOutputBuf_ = LocalTensor<uint8_t>(TPosition::VECIN, OFF_OUTPUT, FD_OUT_BUF_BYTES)
+            fdMm2ResBuf1_ = LocalTensor<uint8_t>(TPosition::VECIN, BASE + OFFSET_OF_MEMBER(FdUbLayout, fdMm2ResBuf1),
+                                                 SIZE_OF_MEMBER(FdUbLayout, fdMm2ResBuf1))
+                                .template ReinterpretCast<T>();
+            fdMm2ResBuf2_ = LocalTensor<uint8_t>(TPosition::VECIN, BASE + OFFSET_OF_MEMBER(FdUbLayout, fdMm2ResBuf2),
+                                                 SIZE_OF_MEMBER(FdUbLayout, fdMm2ResBuf2))
+                                .template ReinterpretCast<T>();
+
+            fdReduceBuf_ = LocalTensor<uint8_t>(TPosition::VECIN, BASE + OFFSET_OF_MEMBER(FdUbLayout, fdReduceBuf),
+                                                SIZE_OF_MEMBER(FdUbLayout, fdReduceBuf))
+                               .template ReinterpretCast<T>();
+            fdOutputBuf_ = LocalTensor<uint8_t>(TPosition::VECIN, BASE + OFFSET_OF_MEMBER(FdUbLayout, fdOutputBuf),
+                                                SIZE_OF_MEMBER(FdUbLayout, fdOutputBuf))
                                .template ReinterpretCast<OUTPUT_T>();
         }
     }
