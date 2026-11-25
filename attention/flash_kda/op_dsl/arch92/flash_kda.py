@@ -18,8 +18,7 @@ from typing import Optional, Tuple
 
 import cannbotdsl
 from cannbotdsl import Tensor, dtypes
-from cannbotdsl.aot import export
-from cannbotdsl.aot.runtime import COLLECTOR
+from cannbotdsl.aot import compile_cache, export
 from cannbotdsl.lang.host import host
 from cannbotdsl.lang.kernel import kernel
 from cannbotdsl.ops.arch import get_block_num
@@ -55,20 +54,6 @@ from .flash_kda_validation import (
 
 LOW_DTYPE = torch.bfloat16
 HIGH_DTYPE = torch.float32
-
-
-def compile_environment():
-    """使用框架完整的工厂环境标识和进程号作为缓存标识。"""
-    environment = tuple(
-        sorted(
-            (
-            (name, value)
-            for name, value in os.environ.items()
-            if name.startswith("CANNBOTDSL_") or name == "ASCEND_HOME_PATH"
-        ),
-        ),
-    )
-    return os.getpid(), environment
 
 
 _STAGED_PROFILE = cannbotdsl.ProfileSpec(
@@ -390,9 +375,9 @@ class PersistentFlashKDAFwdArch92:
         )
 
 
-_COMPILED_KERNEL = {}
+# Serialize compilation while staged._COMPILE_DV_SPLITS is temporarily changed.
 _COMPILED_KERNEL_LOCK = threading.Lock()
-_COMPILED_KERNEL_ENVIRONMENT = None
+_COMPILED_KERNEL_PID = os.getpid()
 
 
 def _sequence_spec(dtype, physical_batches, length, heads, width, stride_prefix):
@@ -412,8 +397,92 @@ def _chunk_cache_spec(dtype, batches, heads, chunks, width, stride_prefix):
     )
 
 
+@compile_cache
+def _compile_kernel(template, dv_splits, persistent_dv, persistent_group):
+    """Compile one variant while the caller holds _COMPILED_KERNEL_LOCK."""
+    expected = (0, 0) if template == TEMPLATE_STAGED else (
+        persistent.PERSISTENT_DV_BASE, persistent.PERSISTENT_CHUNK_GROUP,
+    )
+    require((persistent_dv, persistent_group) == expected,
+            "persistent compile configuration changed")
+    physical_batches = cannbotdsl.Dim("P")
+    storage_length = cannbotdsl.Dim("L")
+    output_length = cannbotdsl.Dim("OL")
+    batch = cannbotdsl.Dim("B")
+    state_batches = cannbotdsl.Dim("STATE_B")
+    state_chunks = cannbotdsl.Dim("STATE_CHUNKS")
+    n_qk = cannbotdsl.Dim("NQK")
+    n_v = cannbotdsl.Dim("NV")
+    metadata_capacity = cannbotdsl.Dim("META")
+    core_num = cannbotdsl.Dim("CORE_NUM", min=1, max=MAX_AIC_CORES)
+    scratch_tokens = WORKSPACE_SLOTS * CHUNK_SIZE
+    gamma_rows = WORKSPACE_SLOTS * SUPPORTED_HEAD_DIM
+    fake = cannbotdsl.TensorSpec
+    qk_spec = _sequence_spec(dtypes.bfloat16, physical_batches, storage_length, n_qk, SUPPORTED_HEAD_DIM, "QK")
+    v_spec = _sequence_spec(dtypes.bfloat16, physical_batches, storage_length, n_v, SUPPORTED_HEAD_DIM, "V")
+    # v2 接口的 gate 和缓存可采用与 V 不同的物理布局。
+    # 分别使用独立的符号步长，兼容未启用缓存时传入的占位张量。
+    def value_spec(prefix):
+        return _sequence_spec(dtypes.bfloat16, physical_batches, storage_length,
+                              n_v, SUPPORTED_HEAD_DIM, prefix)
+    gate_spec = value_spec("GATE")
+    kg_spec, u_spec, w_spec, qg_spec, vnew_spec = (
+        value_spec(prefix) for prefix in ("KG", "U", "W", "QG", "VNEW")
+    )
+    beta_spec = _sequence_spec(dtypes.float32, physical_batches, storage_length, n_v, 1, "BETA")
+    output_spec = _sequence_spec(dtypes.bfloat16, physical_batches, output_length, n_v, SUPPORTED_HEAD_DIM, "OUT")
+    state_spec = fake((batch, n_v, SUPPORTED_HEAD_DIM, SUPPORTED_HEAD_DIM), dtypes.float32)
+    rstd_spec = _sequence_spec(dtypes.float32, physical_batches, storage_length, n_qk, 1, "RSTD")
+    activated_spec = _sequence_spec(dtypes.float32, physical_batches, storage_length, n_v, 1, "ACT")
+    matrix_spec = _sequence_spec(
+        dtypes.bfloat16, cannbotdsl.Dim("MATRIX_B"), cannbotdsl.Dim("MATRIX_L"),
+        cannbotdsl.Dim("MATRIX_N"), CHUNK_SIZE, "MATRIX",
+    )
+    gate_cumsum_spec = _sequence_spec(
+        dtypes.float32, cannbotdsl.Dim("G_B"), cannbotdsl.Dim("G_L"), cannbotdsl.Dim("G_N"), SUPPORTED_HEAD_DIM, "G_CUMSUM",
+    )
+    h_spec = _chunk_cache_spec(dtypes.float32, state_batches, n_v, state_chunks, SUPPORTED_HEAD_DIM, "H")
+    # Select in ordinary Python before tracing; one Host and one device template.
+    if template == TEMPLATE_STAGED:
+        entry = StagedFlashKDAFwdArch92(dv_splits).run_staged_arch92
+        compile_options = {"compile_dv_splits": dv_splits}
+    else:
+        entry = PersistentFlashKDAFwdArch92().run_persistent_arch92
+        compile_options = {}
+    previous_dv = staged._COMPILE_DV_SPLITS
+    staged._COMPILE_DV_SPLITS = dv_splits
+    try:
+        return cannbotdsl.compile(
+            entry, qk_spec, v_spec, qk_spec, beta_spec, gate_spec, fake((core_num, 2, 2, CHUNK_SIZE), dtypes.float32),
+            fake((n_v,), dtypes.float32), fake((n_v, SUPPORTED_HEAD_DIM), dtypes.float32), kg_spec,
+            fake((gamma_rows, 1), dtypes.float32), fake((scratch_tokens, SUPPORTED_HEAD_DIM), dtypes.bfloat16), u_spec,
+            w_spec, qg_spec, gate_cumsum_spec, vnew_spec, h_spec, output_spec, state_spec, state_spec,
+            fake((16, 16), dtypes.float16), qk_spec, qk_spec, rstd_spec, rstd_spec, activated_spec, matrix_spec,
+            matrix_spec, fake((metadata_capacity,), dtypes.int32), dtypes.float32, dtypes.float32, dtypes.int64,
+            dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64,
+            dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64,
+            **compile_options,
+        )
+    finally:
+        staged._COMPILE_DV_SPLITS = previous_dv
+
+
+def _get_cached_kernel(compile_args):
+    """Look up an open SDK provider without compiling or waiting for a build."""
+    message = "warm up FlashKDA arch92 with the current compile configuration before capture"
+    # CompileFactory has no public lookup-only API. Mirror its __call__ key and
+    # lock here, including resolved OPP roots, without invoking the factory.
+    require(_compile_kernel._pid == os.getpid(), message)
+    config_key, _, _, _ = _compile_kernel._bind(compile_args, {})
+    key = (config_key, _compile_kernel._environment())
+    with _compile_kernel._lock:
+        cached = _compile_kernel._cache.get(key)
+        require(cached is not None and not cached.closed, message)
+        return cached
+
+
 def _get_compiled_kernel(template, dv_splits=4, *, capture=False):
-    global _COMPILED_KERNEL, _COMPILED_KERNEL_ENVIRONMENT, _COMPILED_KERNEL_LOCK
+    global _COMPILED_KERNEL_LOCK, _COMPILED_KERNEL_PID
 
     require(type(template) is int and template in (TEMPLATE_STAGED, TEMPLATE_PERSISTENT),
             "compile requires an explicit staged or persistent template from metadata")
@@ -426,98 +495,15 @@ def _get_compiled_kernel(template, dv_splits=4, *, capture=False):
     persistent_group = (
         persistent.PERSISTENT_CHUNK_GROUP if template != TEMPLATE_STAGED else 0
     )
-    cache_key = (template, dv_splits, persistent_dv, persistent_group)
-    current_collection = COLLECTOR.get
-    environment = compile_environment()
-    if capture:
-        message = "warm up the selected FlashKDA arch92 template and DV split before capture"
-        require(_COMPILED_KERNEL_ENVIRONMENT == environment, message)
-        with _COMPILED_KERNEL_LOCK:
-            cached = _COMPILED_KERNEL.get(cache_key)
-            require(_COMPILED_KERNEL_ENVIRONMENT == environment
-                    and cached is not None and not cached.closed, message)
-            return cached
-    if (
-        _COMPILED_KERNEL_ENVIRONMENT is not None
-        and _COMPILED_KERNEL_ENVIRONMENT[0] != environment[0]
-    ):
-        _COMPILED_KERNEL = {}
+    compile_args = (template, dv_splits, persistent_dv, persistent_group)
+    pid = os.getpid()
+    if _COMPILED_KERNEL_PID != pid:
         _COMPILED_KERNEL_LOCK = threading.Lock()
+        _COMPILED_KERNEL_PID = pid
     with _COMPILED_KERNEL_LOCK:
-        if _COMPILED_KERNEL_ENVIRONMENT != environment:
-            for cached in _COMPILED_KERNEL.values():
-                cached.close()
-            _COMPILED_KERNEL.clear()
-            _COMPILED_KERNEL_ENVIRONMENT = environment
-        collecting = current_collection() is not None
-        if (
-            not collecting
-            and cache_key in _COMPILED_KERNEL
-            and not _COMPILED_KERNEL[cache_key].closed
-        ):
-            return _COMPILED_KERNEL[cache_key]
-        physical_batches = cannbotdsl.Dim("P")
-        storage_length = cannbotdsl.Dim("L")
-        output_length = cannbotdsl.Dim("OL")
-        batch = cannbotdsl.Dim("B")
-        state_batches = cannbotdsl.Dim("STATE_B")
-        state_chunks = cannbotdsl.Dim("STATE_CHUNKS")
-        n_qk = cannbotdsl.Dim("NQK")
-        n_v = cannbotdsl.Dim("NV")
-        metadata_capacity = cannbotdsl.Dim("META")
-        core_num = cannbotdsl.Dim("CORE_NUM", min=1, max=MAX_AIC_CORES)
-        scratch_tokens = WORKSPACE_SLOTS * CHUNK_SIZE
-        gamma_rows = WORKSPACE_SLOTS * SUPPORTED_HEAD_DIM
-        fake = cannbotdsl.TensorSpec
-        qk_spec = _sequence_spec(dtypes.bfloat16, physical_batches, storage_length, n_qk, SUPPORTED_HEAD_DIM, "QK")
-        v_spec = _sequence_spec(dtypes.bfloat16, physical_batches, storage_length, n_v, SUPPORTED_HEAD_DIM, "V")
-        # v2 接口的 gate 和缓存可采用与 V 不同的物理布局。
-        # 分别使用独立的符号步长，兼容未启用缓存时传入的占位张量。
-        def value_spec(prefix):
-            return _sequence_spec(dtypes.bfloat16, physical_batches, storage_length,
-                                  n_v, SUPPORTED_HEAD_DIM, prefix)
-        gate_spec = value_spec("GATE")
-        kg_spec, u_spec, w_spec, qg_spec, vnew_spec = (
-            value_spec(prefix) for prefix in ("KG", "U", "W", "QG", "VNEW")
-        )
-        beta_spec = _sequence_spec(dtypes.float32, physical_batches, storage_length, n_v, 1, "BETA")
-        output_spec = _sequence_spec(dtypes.bfloat16, physical_batches, output_length, n_v, SUPPORTED_HEAD_DIM, "OUT")
-        state_spec = fake((batch, n_v, SUPPORTED_HEAD_DIM, SUPPORTED_HEAD_DIM), dtypes.float32)
-        rstd_spec = _sequence_spec(dtypes.float32, physical_batches, storage_length, n_qk, 1, "RSTD")
-        activated_spec = _sequence_spec(dtypes.float32, physical_batches, storage_length, n_v, 1, "ACT")
-        matrix_spec = _sequence_spec(
-            dtypes.bfloat16, cannbotdsl.Dim("MATRIX_B"), cannbotdsl.Dim("MATRIX_L"),
-            cannbotdsl.Dim("MATRIX_N"), CHUNK_SIZE, "MATRIX",
-        )
-        gate_cumsum_spec = _sequence_spec(
-            dtypes.float32, cannbotdsl.Dim("G_B"), cannbotdsl.Dim("G_L"), cannbotdsl.Dim("G_N"), SUPPORTED_HEAD_DIM, "G_CUMSUM",
-        )
-        h_spec = _chunk_cache_spec(dtypes.float32, state_batches, n_v, state_chunks, SUPPORTED_HEAD_DIM, "H")
-        # Select in ordinary Python before tracing; one Host and one device template.
-        if template == TEMPLATE_STAGED:
-            entry = StagedFlashKDAFwdArch92(dv_splits).run_staged_arch92
-            compile_options = {"compile_dv_splits": dv_splits}
-        else:
-            entry = PersistentFlashKDAFwdArch92().run_persistent_arch92
-            compile_options = {}
-        previous_dv = staged._COMPILE_DV_SPLITS
-        staged._COMPILE_DV_SPLITS = dv_splits
-        try:
-            compiled_kernel = cannbotdsl.compile(
-                entry, qk_spec, v_spec, qk_spec, beta_spec, gate_spec, fake((core_num, 2, 2, CHUNK_SIZE), dtypes.float32),
-                fake((n_v,), dtypes.float32), fake((n_v, SUPPORTED_HEAD_DIM), dtypes.float32), kg_spec,
-                fake((gamma_rows, 1), dtypes.float32), fake((scratch_tokens, SUPPORTED_HEAD_DIM), dtypes.bfloat16), u_spec,
-                w_spec, qg_spec, gate_cumsum_spec, vnew_spec, h_spec, output_spec, state_spec, state_spec,
-                fake((16, 16), dtypes.float16), qk_spec, qk_spec, rstd_spec, rstd_spec, activated_spec, matrix_spec,
-                matrix_spec, fake((metadata_capacity,), dtypes.int32), dtypes.float32, dtypes.float32, dtypes.int64,
-                dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64,
-                dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64,
-                **compile_options,
-            )
-        finally:
-            staged._COMPILE_DV_SPLITS = previous_dv
-        _COMPILED_KERNEL[cache_key] = compiled_kernel
-        return compiled_kernel
+        if capture:
+            return _get_cached_kernel(compile_args)
+        return _compile_kernel(*compile_args)
 
 
 def _allocate_output(spec, device):
@@ -903,19 +889,16 @@ def flash_kda_fwd(
 
 
 def clear_caches():
-    global _COMPILED_KERNEL, _COMPILED_KERNEL_ENVIRONMENT, _COMPILED_KERNEL_LOCK
-    environment = compile_environment()
-    if (
-        _COMPILED_KERNEL_ENVIRONMENT is not None
-        and _COMPILED_KERNEL_ENVIRONMENT[0] != environment[0]
-    ):
-        _COMPILED_KERNEL = {}
+    global _COMPILED_KERNEL_LOCK, _COMPILED_KERNEL_PID
+    pid = os.getpid()
+    if _COMPILED_KERNEL_PID != pid:
         _COMPILED_KERNEL_LOCK = threading.Lock()
-        _COMPILED_KERNEL_ENVIRONMENT = environment
+        _COMPILED_KERNEL_PID = pid
+    # Do not acquire an inherited SDK lock; its next normal call resets the cache.
+    if _compile_kernel._pid != pid:
+        return
     with _COMPILED_KERNEL_LOCK:
-        for compiled_kernel in _COMPILED_KERNEL.values():
-            compiled_kernel.close()
-        _COMPILED_KERNEL.clear()
+        _compile_kernel.cache_clear()
 
 
 def _forward_variant_calls():

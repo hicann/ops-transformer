@@ -12,14 +12,11 @@
 
 """训练前向入口，根据 metadata 选择 staged 或 persistent 设备模板。"""
 
-import os
-import threading
 from typing import Optional, Tuple
 
 import cannbotdsl
 from cannbotdsl import Tensor, dtypes
-from cannbotdsl.aot import export
-from cannbotdsl.aot.runtime import COLLECTOR
+from cannbotdsl.aot import compile_cache, export
 from cannbotdsl.lang.host import host
 from cannbotdsl.lang.kernel import kernel
 from cannbotdsl.ops.arch import get_block_num
@@ -53,20 +50,6 @@ from .flash_kda_validation import (
 
 LOW_DTYPE = torch.bfloat16
 HIGH_DTYPE = torch.float32
-
-
-def compile_environment():
-    """使用框架完整的工厂环境标识和进程号作为缓存标识。"""
-    environment = tuple(
-        sorted(
-            (
-            (name, value)
-            for name, value in os.environ.items()
-            if name.startswith("CANNBOTDSL_") or name == "ASCEND_HOME_PATH"
-        ),
-        ),
-    )
-    return os.getpid(), environment
 
 
 @kernel(
@@ -515,11 +498,6 @@ class PersistentFlashKDAFwd:
         )
 
 
-_COMPILED_KERNEL = {}
-_COMPILED_KERNEL_LOCK = threading.Lock()
-_COMPILED_KERNEL_ENVIRONMENT = None
-
-
 def _sequence_spec(dtype, physical_batches, length, heads, width, stride_prefix):
     minimum_stride = 0 if stride_prefix in ("RSTD", "ACT", "G_CUMSUM") else 1
     stride_0 = cannbotdsl.Dim(f"{stride_prefix}_S0", min=minimum_stride)
@@ -537,84 +515,61 @@ def _chunk_cache_spec(dtype, batches, heads, chunks, width, stride_prefix):
     )
 
 
+@compile_cache
 def _get_compiled_kernel(template=TEMPLATE_AUTO):
-    global _COMPILED_KERNEL, _COMPILED_KERNEL_ENVIRONMENT, _COMPILED_KERNEL_LOCK
-
-    current_collection = COLLECTOR.get
-    environment = compile_environment()
-    if (
-        _COMPILED_KERNEL_ENVIRONMENT is not None
-        and _COMPILED_KERNEL_ENVIRONMENT[0] != environment[0]
-    ):
-        _COMPILED_KERNEL = {}
-        _COMPILED_KERNEL_LOCK = threading.Lock()
-    with _COMPILED_KERNEL_LOCK:
-        if _COMPILED_KERNEL_ENVIRONMENT != environment:
-            for cached in _COMPILED_KERNEL.values():
-                cached.close()
-            _COMPILED_KERNEL.clear()
-            _COMPILED_KERNEL_ENVIRONMENT = environment
-        collecting = current_collection() is not None
-        if (
-            not collecting
-            and template in _COMPILED_KERNEL
-            and not _COMPILED_KERNEL[template].closed
-        ):
-            return _COMPILED_KERNEL[template]
-        physical_batches = cannbotdsl.Dim("P")
-        storage_length = cannbotdsl.Dim("L")
-        output_length = cannbotdsl.Dim("OL")
-        batch = cannbotdsl.Dim("B")
-        state_batches = cannbotdsl.Dim("STATE_B")
-        state_chunks = cannbotdsl.Dim("STATE_CHUNKS")
-        n_qk = cannbotdsl.Dim("NQK")
-        n_v = cannbotdsl.Dim("NV")
-        metadata_capacity = cannbotdsl.Dim("META")
-        core_num = cannbotdsl.Dim("CORE_NUM", min=1, max=MAX_AIC_CORES)
-        scratch_tokens = WORKSPACE_SLOTS * CHUNK_SIZE
-        gamma_rows = WORKSPACE_SLOTS * SUPPORTED_HEAD_DIM
-        fake = cannbotdsl.TensorSpec
-        qk_spec = _sequence_spec(dtypes.bfloat16, physical_batches, storage_length, n_qk, SUPPORTED_HEAD_DIM, "QK")
-        v_spec = _sequence_spec(dtypes.bfloat16, physical_batches, storage_length, n_v, SUPPORTED_HEAD_DIM, "V")
-        # v2 接口的 gate 和缓存可采用与 V 不同的物理布局。
-        # 分别使用独立的符号步长，兼容未启用缓存时传入的占位张量。
-        def value_spec(prefix):
-            return _sequence_spec(dtypes.bfloat16, physical_batches, storage_length,
-                                  n_v, SUPPORTED_HEAD_DIM, prefix)
-        gate_spec = value_spec("GATE")
-        kg_spec, u_spec, w_spec, qg_spec, vnew_spec = (
-            value_spec(prefix) for prefix in ("KG", "U", "W", "QG", "VNEW")
-        )
-        beta_spec = _sequence_spec(dtypes.float32, physical_batches, storage_length, n_v, 1, "BETA")
-        output_spec = _sequence_spec(dtypes.bfloat16, physical_batches, output_length, n_v, SUPPORTED_HEAD_DIM, "OUT")
-        state_spec = fake((batch, n_v, SUPPORTED_HEAD_DIM, SUPPORTED_HEAD_DIM), dtypes.float32)
-        rstd_spec = _sequence_spec(dtypes.float32, physical_batches, storage_length, n_qk, 1, "RSTD")
-        activated_spec = _sequence_spec(dtypes.float32, physical_batches, storage_length, n_v, 1, "ACT")
-        matrix_spec = _sequence_spec(
-            dtypes.bfloat16, cannbotdsl.Dim("MATRIX_B"), cannbotdsl.Dim("MATRIX_L"),
-            cannbotdsl.Dim("MATRIX_N"), CHUNK_SIZE, "MATRIX",
-        )
-        gate_cumsum_spec = _sequence_spec(
-            dtypes.float32, cannbotdsl.Dim("G_B"), cannbotdsl.Dim("G_L"), cannbotdsl.Dim("G_N"), SUPPORTED_HEAD_DIM, "G_CUMSUM",
-        )
-        h_spec = _chunk_cache_spec(dtypes.float32, state_batches, n_v, state_chunks, SUPPORTED_HEAD_DIM, "H")
-        entry = (
-            FlashKDAFwd().run_flash_kda,
-            StagedFlashKDAFwd().run_staged_flash_kda,
-            PersistentFlashKDAFwd().run_persistent_flash_kda,
-        )[template]
-        compiled_kernel = cannbotdsl.compile(
-            entry, qk_spec, v_spec, qk_spec, beta_spec, gate_spec, fake((core_num, 2, 2, CHUNK_SIZE), dtypes.float32),
-            fake((n_v,), dtypes.float32), fake((n_v, SUPPORTED_HEAD_DIM), dtypes.float32), kg_spec,
-            fake((gamma_rows, 1), dtypes.float32), fake((scratch_tokens, SUPPORTED_HEAD_DIM), dtypes.bfloat16), u_spec,
-            w_spec, qg_spec, gate_cumsum_spec, vnew_spec, h_spec, output_spec, state_spec, state_spec,
-            fake((16, 16), dtypes.float16), qk_spec, qk_spec, rstd_spec, rstd_spec, activated_spec, matrix_spec,
-            matrix_spec, fake((metadata_capacity,), dtypes.int32), dtypes.float32, dtypes.float32, dtypes.int64,
-            dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64,
-            dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64,
-        )
-        _COMPILED_KERNEL[template] = compiled_kernel
-        return compiled_kernel
+    """Cache each dynamic template; the SDK manages environment and Native collection."""
+    physical_batches = cannbotdsl.Dim("P")
+    storage_length = cannbotdsl.Dim("L")
+    output_length = cannbotdsl.Dim("OL")
+    batch = cannbotdsl.Dim("B")
+    state_batches = cannbotdsl.Dim("STATE_B")
+    state_chunks = cannbotdsl.Dim("STATE_CHUNKS")
+    n_qk = cannbotdsl.Dim("NQK")
+    n_v = cannbotdsl.Dim("NV")
+    metadata_capacity = cannbotdsl.Dim("META")
+    core_num = cannbotdsl.Dim("CORE_NUM", min=1, max=MAX_AIC_CORES)
+    scratch_tokens = WORKSPACE_SLOTS * CHUNK_SIZE
+    gamma_rows = WORKSPACE_SLOTS * SUPPORTED_HEAD_DIM
+    fake = cannbotdsl.TensorSpec
+    qk_spec = _sequence_spec(dtypes.bfloat16, physical_batches, storage_length, n_qk, SUPPORTED_HEAD_DIM, "QK")
+    v_spec = _sequence_spec(dtypes.bfloat16, physical_batches, storage_length, n_v, SUPPORTED_HEAD_DIM, "V")
+    # v2 接口的 gate 和缓存可采用与 V 不同的物理布局。
+    # 分别使用独立的符号步长，兼容未启用缓存时传入的占位张量。
+    def value_spec(prefix):
+        return _sequence_spec(dtypes.bfloat16, physical_batches, storage_length,
+                              n_v, SUPPORTED_HEAD_DIM, prefix)
+    gate_spec = value_spec("GATE")
+    kg_spec, u_spec, w_spec, qg_spec, vnew_spec = (
+        value_spec(prefix) for prefix in ("KG", "U", "W", "QG", "VNEW")
+    )
+    beta_spec = _sequence_spec(dtypes.float32, physical_batches, storage_length, n_v, 1, "BETA")
+    output_spec = _sequence_spec(dtypes.bfloat16, physical_batches, output_length, n_v, SUPPORTED_HEAD_DIM, "OUT")
+    state_spec = fake((batch, n_v, SUPPORTED_HEAD_DIM, SUPPORTED_HEAD_DIM), dtypes.float32)
+    rstd_spec = _sequence_spec(dtypes.float32, physical_batches, storage_length, n_qk, 1, "RSTD")
+    activated_spec = _sequence_spec(dtypes.float32, physical_batches, storage_length, n_v, 1, "ACT")
+    matrix_spec = _sequence_spec(
+        dtypes.bfloat16, cannbotdsl.Dim("MATRIX_B"), cannbotdsl.Dim("MATRIX_L"),
+        cannbotdsl.Dim("MATRIX_N"), CHUNK_SIZE, "MATRIX",
+    )
+    gate_cumsum_spec = _sequence_spec(
+        dtypes.float32, cannbotdsl.Dim("G_B"), cannbotdsl.Dim("G_L"), cannbotdsl.Dim("G_N"), SUPPORTED_HEAD_DIM, "G_CUMSUM",
+    )
+    h_spec = _chunk_cache_spec(dtypes.float32, state_batches, n_v, state_chunks, SUPPORTED_HEAD_DIM, "H")
+    entry = (
+        FlashKDAFwd().run_flash_kda,
+        StagedFlashKDAFwd().run_staged_flash_kda,
+        PersistentFlashKDAFwd().run_persistent_flash_kda,
+    )[template]
+    return cannbotdsl.compile(
+        entry, qk_spec, v_spec, qk_spec, beta_spec, gate_spec, fake((core_num, 2, 2, CHUNK_SIZE), dtypes.float32),
+        fake((n_v,), dtypes.float32), fake((n_v, SUPPORTED_HEAD_DIM), dtypes.float32), kg_spec,
+        fake((gamma_rows, 1), dtypes.float32), fake((scratch_tokens, SUPPORTED_HEAD_DIM), dtypes.bfloat16), u_spec,
+        w_spec, qg_spec, gate_cumsum_spec, vnew_spec, h_spec, output_spec, state_spec, state_spec,
+        fake((16, 16), dtypes.float16), qk_spec, qk_spec, rstd_spec, rstd_spec, activated_spec, matrix_spec,
+        matrix_spec, fake((metadata_capacity,), dtypes.int32), dtypes.float32, dtypes.float32, dtypes.int64,
+        dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64,
+        dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64, dtypes.int64,
+    )
 
 
 def _allocate_output(spec, device):
@@ -985,19 +940,8 @@ def flash_kda_fwd(
 
 
 def clear_caches():
-    global _COMPILED_KERNEL, _COMPILED_KERNEL_ENVIRONMENT, _COMPILED_KERNEL_LOCK
-    environment = compile_environment()
-    if (
-        _COMPILED_KERNEL_ENVIRONMENT is not None
-        and _COMPILED_KERNEL_ENVIRONMENT[0] != environment[0]
-    ):
-        _COMPILED_KERNEL = {}
-        _COMPILED_KERNEL_LOCK = threading.Lock()
-        _COMPILED_KERNEL_ENVIRONMENT = environment
-    with _COMPILED_KERNEL_LOCK:
-        for compiled_kernel in _COMPILED_KERNEL.values():
-            compiled_kernel.close()
-        _COMPILED_KERNEL.clear()
+    """Release the compiled providers owned by the SDK compile factory."""
+    _get_compiled_kernel.cache_clear()
 
 
 @export("flash_kda_fwd")
