@@ -391,7 +391,7 @@ aclnnStatus aclnnUndGenQkvRmsNormRopeCache(
   </tbody>
   </table>
 
-  > 数据类型、shape与属性取值的完整校验统一收敛在tiling一层实现（aclnn单算子路径与图模式最终都会走tiling，避免同一条约束在多处重复实现导致漂移）。代价是这类非法入参不在第一段接口报错，而是在第二段接口`aclnnUndGenQkvRmsNormRopeCache`执行阶段由tiling返回失败，具体原因见Host侧日志。
+  > 数据类型、shape与属性取值的完整校验统一收敛在tiling一层实现（aclnn单算子路径与图模式最终都会走tiling，避免同一条约束在多处重复实现导致漂移）。代价是这类非法入参不在第一段接口报错，而是在第二段接口`aclnnUndGenQkvRmsNormRopeCache`执行阶段由tiling返回失败，具体原因见Host侧日志。例外：`num_heads_q`/`num_heads_k`/`num_heads_v`为非正值（0或负数）属于推导前提错误，在InferShape阶段即返回失败并记录Host侧日志（图模式发生在图构建阶段；aclnn单算子路径发生在`aclnnUndGenQkvRmsNormRopeCacheGetWorkspaceSize`第一段接口内）。
 
 ## aclnnUndGenQkvRmsNormRopeCache
 

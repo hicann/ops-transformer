@@ -80,7 +80,9 @@
   Host侧看不到tensor内容、无法校验，由调用方保证。
 - 入参校验统一收敛在tiling一层（aclnn L2只查空指针、InferShape只查推导前提），
   因此非法入参不在`aclnnUndGenQkvRmsNormRopeCacheGetWorkspaceSize`阶段报错，
-  而是在执行阶段由tiling返回失败。
+  而是在执行阶段由tiling返回失败。例外：`num_heads_q`/`num_heads_k`/`num_heads_v`
+  为非正值（0或负数）属于推导前提错误，在InferShape阶段即返回失败并记录Host侧日志
+  （图模式发生在图构建阶段；aclnn单算子路径发生在`aclnnUndGenQkvRmsNormRopeCacheGetWorkspaceSize`第一段接口内）。
 - **当前实现要求`gen_qkv`、`gen_weights_q`、`gen_weights_k`、`cat_indices`四个可选输入全部提供，
   且`gen_len > 0`**；缺省的退化路径（纯prefill、单序列恒等映射）暂不支持，tiling会直接拦截。
   IR/OpDef保留OPTIONAL声明，后续放开时删掉`CheckSupportRange`中对应校验即可。

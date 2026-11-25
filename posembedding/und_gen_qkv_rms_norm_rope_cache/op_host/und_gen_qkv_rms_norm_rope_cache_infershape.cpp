@@ -51,7 +51,7 @@ constexpr size_t DIM_NUM_FOUR = 4;
 constexpr int64_t UNKNOWN_DIM_VALUE = -1LL;
 
 // 各输入的 rank 是确定的：非未知 rank 时 rank 必须与此表一致，否则直接判失败。
-// 维度取值、跨输入一致性与支持范围的校验仍统一在 tiling 侧。
+// 输入维度取值、跨输入一致性与支持范围的校验仍统一在 tiling 侧。
 struct InputSpec {
     size_t idx;
     const char* name;
@@ -246,6 +246,16 @@ graphStatus InferShape4UndGenQkvRmsNormRopeCache(gert::InferShapeContext* contex
     OP_CHECK_NULL_WITH_CONTEXT(context, numHeadsK);
     const int64_t* numHeadsV = attrs->GetInt(ATTR_NUM_HEADS_V);
     OP_CHECK_NULL_WITH_CONTEXT(context, numHeadsV);
+
+    // 属性是已知常量，非正头数不能作为输出维度或未知维继续传播。
+    if (*numHeadsQ <= 0 || *numHeadsK <= 0 || *numHeadsV <= 0) {
+        const std::string headCounts = "(" + std::to_string(*numHeadsQ) + ", " + std::to_string(*numHeadsK) + ", " +
+                                       std::to_string(*numHeadsV) + ")";
+        OP_LOGE_FOR_INVALID_VALUES_WITH_REASON(context->GetNodeName(), "num_heads_q, num_heads_k, num_heads_v",
+                                               headCounts.c_str(),
+                                               "num_heads_q, num_heads_k and num_heads_v must all be positive");
+        return ge::GRAPH_FAILED;
+    }
 
     // 三个输出的 rank 恒定、头数恒由属性给出，其余维度能推则推、推不出才置 -1
 

@@ -11,6 +11,7 @@
 #include <gtest/gtest.h>
 #include <iostream>
 #include <vector>
+#include <tuple>
 #include "infer_shape_context_faker.h"
 #include "infer_shape_case_executor.h"
 #include "infer_datatype_context_faker.h"
@@ -609,3 +610,17 @@ INSTANTIATE_TEST_SUITE_P(AllHeadDimSources, UndGenQkvRmsNormRopeCacheInferShapeH
                          [](const testing::TestParamInfo<HeadDimSourceCase>& info) {
                              return std::string(info.param.name);
                          });
+
+class UndGenQkvRmsNormRopeCacheInferShapeHeadCount : public testing::TestWithParam<std::tuple<size_t, int64_t>> {};
+
+TEST_P(UndGenQkvRmsNormRopeCacheInferShapeHeadCount, rejects_non_positive_head_count)
+{
+    const auto [attrIndex, headCount] = GetParam();
+    auto para = BuildInferShapeContext(5, 3, 8, 1, 1);
+    // 保持所有输入 shape 合法，仅修改被测属性。
+    para.attrs_[attrIndex].attr_ = Ops::Transformer::AnyValue::CreateFrom<int64_t>(headCount);
+    ExecuteTestCase(para, ge::GRAPH_FAILED, {});
+}
+
+INSTANTIATE_TEST_SUITE_P(AllHeadCounts, UndGenQkvRmsNormRopeCacheInferShapeHeadCount,
+                         testing::Combine(testing::Values<size_t>(0, 1, 2), testing::Values<int64_t>(0, -1, -2)));
