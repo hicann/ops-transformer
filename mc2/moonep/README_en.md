@@ -82,13 +82,13 @@ grad_expert_output_nvsh, _, _, _ = dispatch(grad_output_sh, plan=plan)
 
 | Parameter | Input/Output | Description | Data Type | Data Format |
 | :--- | :--- | :--- | :--- | :--- |
-| `hidden_sh` | Input | Forward token / backward output gradient, shape `(S, H)` | BFLOAT16, FLOAT16 | ND |
+| `hidden_sh` | Input | Forward token / backward output gradient, shape `(S, H)`; pass `(x_fp8, scales)` for FP8 passthrough | BFLOAT16, FLOAT16, FLOAT8_E4M3FN, FLOAT8_E5M2 | ND |
 | `route_weights_sk` | Optional input | Forward routing weights, shape `(S, K)`, converted to fp32 internally | FLOAT32 | ND |
 | `topk_experts_sk` | Optional input | Forward top-k expert indices, shape `(S, K)` | INT32 | ND |
 | `tokens_per_expert` | Optional input | Forward per-expert counts, shape `(E,)` | INT32 | ND |
 | `plan` | Optional input | Backward reuse of the forward plan; mutually exclusive with routing arguments | MoonepPlan | - |
 | `do_cpu_sync` | Optional input | True (default) allocates the receive area exactly; False allocates the worst-case capacity `cap = R × S × min(K, 2·epn)` | BOOL | - |
-| `hidden_nvsh` | Output | Receive area, shape `(cap, H)`; same dtype as the input | Same as input | ND |
+| `hidden_nvsh` | Output | Receive area, shape `(cap, H)`; same dtype as the input; for FP8 it returns `(hidden_nvsh, scales)` with scales shape `(cap, H1)` | Same as input | ND |
 | `route_weights_nvs` | Output | Routing weights of the received rows, shape `(cap,)`; None on the backward pass | FLOAT32 | ND |
 | `cu_seqlens` | Output | Segment offsets of the forward plan (`plan.cu_seqlens`) | INT32 | ND |
 | `plan` | Output | `MoonepPlan` created by the forward pass / returned unchanged by the backward pass | MoonepPlan | - |
@@ -98,7 +98,9 @@ Return shapes (forward and backward):
 | Scenario | Return value |
 | :--- | :--- |
 | Forward | `hidden_nvsh (cap, H)`, `route_weights_nvs (cap,)` (`None` when routing weights are not passed), `cu_seqlens (2*epn,)`, and the new `plan` |
+| Forward (FP8) | `(hidden_nvsh, scales)`: `hidden_nvsh (cap, H)`, `scales (cap, H1)`; the other return values are the same as forward |
 | Backward (`plan=` passed) | `grad_expert_output_nvsh (cap, H)`, `None`, `plan.cu_seqlens (2*epn,)`, and the same `plan` |
+| Backward (FP8, `plan=` passed) | `(grad_expert_output_nvsh, scales)`: `grad_expert_output_nvsh (cap, H)`, `scales (cap, H1)`; the other return values are the same as backward |
 
 Value of `cap`:
 
@@ -112,9 +114,12 @@ The first dim of `hidden_nvsh` in the backward dispatch and in combine must equa
 Interface constraints:
 
 - The forward pass must pass `topk_experts_sk` and `tokens_per_expert`; `route_weights_sk` is optional. The backward pass must pass `plan=` and no routing arguments.
-- `hidden_sh` must be exactly `(S, H)`; `route_weights_sk` / `topk_experts_sk` must be exactly `(S, K)`; tensors must reside on the NPU.
+- A `hidden_sh` tensor must be exactly `(S, H)`; `route_weights_sk` / `topk_experts_sk` must be exactly `(S, K)`; tensors must reside on the NPU.
+- FP8 passthrough: `hidden_sh=(x_fp8, scales)`, where `x_fp8` supports `float8_e4m3fn` / `float8_e5m2` and `scales` is contiguous `float32` / `float8_e8m0`, with shape `(S, H1)`; the output is also `(hidden_nvsh, scales)`.
+- FP8 `H1` rules: `float32` scales use `ceil(H / 128)`; `float8_e8m0` scales use `Align2(ceil(H / 32))`. The scales returned by the receive side must keep the same dtype and `H1` mapping as the dispatch input.
+- FP8 dispatch returns `(recv_x_fp8, recv_scales)`; expert computation/GMM must use `recv_scales` to dequantize. The `hidden_nvsh` passed to `combine` is the expert output in `bf16/fp16`, not a direct cast of the raw `x_fp8`.
 - Internally `plan.vtopk` is used as `topk_idx`, with `num_experts = 2E` and per-rank capacity `nmtr = S`.
-- `hidden_sh` must be bf16/fp16 and contiguous (same rule as `combine`'s `hidden_nvsh`).
+- `hidden_sh` must be contiguous (same rule as `combine`'s `hidden_nvsh`); both tensors in an FP8 tuple must be contiguous.
 
 ### MoonepPlan Structure
 

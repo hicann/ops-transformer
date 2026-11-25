@@ -170,6 +170,12 @@ def _normalize_weight_dtype(weight_dtype):
     )
 
 
+def _fp8_scale_width(hidden: int, dtype: torch.dtype) -> int:
+    if dtype == torch.float32:
+        return (int(hidden) + 127) // 128
+    return ((int(hidden) + 31) // 32 + 1) // 2 * 2
+
+
 def _scale_upper_bytes(w_elems):
     """单组 scale 行宽上界（字节）：ceil(W/32) 个 ue8m0 block scale、32B 对齐。"""
     raw = (int(w_elems) + _UE8M0_BLOCK - 1) // _UE8M0_BLOCK
@@ -364,33 +370,81 @@ class Buffer:
 
     def dispatch(
         self,
-        hidden_sh: torch.Tensor,
+        hidden_sh: torch.Tensor | tuple[torch.Tensor, torch.Tensor],
         route_weights_sk: torch.Tensor | None = None,
         topk_experts_sk: torch.Tensor | None = None,
         tokens_per_expert: torch.Tensor | None = None,
         *,
         plan: MoonepPlan | None = None,
         do_cpu_sync: bool = True,
-    ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor, MoonepPlan]:
+    ) -> tuple[
+        torch.Tensor | tuple[torch.Tensor, torch.Tensor],
+        torch.Tensor | None,
+        torch.Tensor,
+        MoonepPlan,
+    ]:
         """前向（建 plan）或反向（复用 plan）的 token 分发。
 
         前向：传 ``topk_experts_sk`` + ``tokens_per_expert``（``plan`` 为空），
         内部生成 plan；返回 ``(hidden_nvsh, route_weights_nvs, cu_seqlens, plan)``。
         复用规划：传 ``plan=`` + ``route_weights_sk`` 为同路由前向重分发；
         只传 ``plan=``（无权重）为反向梯度重分发。
+
+        ``hidden_sh`` 支持 ``bf16/fp16`` 张量，或 FP8 透传 ``(x_fp8, scales)``
+        tuple；FP8 tuple 的格式与 scales 约束由本层校验。
         """
         self._require_alive()
-        if hidden_sh.dtype not in (torch.bfloat16, torch.float16):
-            raise TypeError(
-                f"hidden_sh dtype 须为 bfloat16/float16，got {hidden_sh.dtype}"
-            )
-        if not hidden_sh.is_contiguous():
-            raise ValueError("hidden_sh 须为连续张量")
-        if tuple(hidden_sh.shape) != (self._S, self._H):
-            raise ValueError(
-                f"hidden_sh.shape={tuple(hidden_sh.shape)} 须为 (S, H)="
-                f"({self._S}, {self._H})"
-            )
+        if isinstance(hidden_sh, tuple):
+            if len(hidden_sh) != 2 or not all(
+                isinstance(item, torch.Tensor) for item in hidden_sh
+            ):
+                raise TypeError("hidden_sh 须为 Tensor 或 (x_fp8, scales) tuple")
+            hidden_tensor, hidden_scales = hidden_sh
+            if hidden_tensor.dtype not in (
+                torch.float8_e4m3fn,
+                torch.float8_e5m2,
+            ):
+                raise TypeError(
+                    "hidden_sh tuple 的第一个元素须为 float8_e4m3fn/float8_e5m2，"
+                    f"got {hidden_tensor.dtype}"
+                )
+            if hidden_scales.dtype not in (
+                torch.float32,
+                torch.float8_e8m0fnu,
+                torch.uint8,
+            ):
+                raise TypeError(
+                    "hidden_sh scales 须为 float32/float8_e8m0/uint8，"
+                    f"got {hidden_scales.dtype}"
+                )
+            if not hidden_tensor.is_contiguous():
+                raise ValueError("hidden_sh x_fp8 须为连续张量")
+            if not hidden_scales.is_contiguous():
+                raise ValueError("hidden_sh scales 须为连续张量")
+            if tuple(hidden_tensor.shape) != (self._S, self._H):
+                raise ValueError(
+                    f"hidden_sh x_fp8.shape={tuple(hidden_tensor.shape)} "
+                    f"须为 (S, H)=({self._S}, {self._H})"
+                )
+            expected_h1 = _fp8_scale_width(self._H, hidden_scales.dtype)
+            if tuple(hidden_scales.shape) != (self._S, expected_h1):
+                raise ValueError(
+                    f"hidden_sh scales.shape={tuple(hidden_scales.shape)} "
+                    f"须为 (S, H1)=({self._S}, {expected_h1})"
+                )
+        else:
+            if hidden_sh.dtype not in (torch.bfloat16, torch.float16):
+                raise TypeError(
+                    "hidden_sh dtype 须为 bfloat16/float16，或 FP8 tuple，"
+                    f"got {hidden_sh.dtype}"
+                )
+            if not hidden_sh.is_contiguous():
+                raise ValueError("hidden_sh 须为连续张量")
+            if tuple(hidden_sh.shape) != (self._S, self._H):
+                raise ValueError(
+                    f"hidden_sh.shape={tuple(hidden_sh.shape)} 须为 (S, H)="
+                    f"({self._S}, {self._H})"
+                )
         if plan is not None:
             if topk_experts_sk is not None or tokens_per_expert is not None:
                 raise ValueError("传 plan（复用规划）时不能再传 topk/tpe")
