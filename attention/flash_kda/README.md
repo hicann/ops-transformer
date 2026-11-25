@@ -75,7 +75,7 @@
 ## 约束说明
 
 - `B`、`S`或`T`为正数；head数满足`1 <= Nqk <= Nv <= 96`且`Nv % Nqk == 0`，Q/K和V的head维度均为128。
-- 输入张量须连续。实际计算在NPU上执行，Meta张量仅用于输出规格推导。
+- 所有参与计算的输入张量须连续且非空。实际计算在NPU上执行，Meta张量仅用于输出规格推导。
 - TND布局中，`cu_seqlens`从0开始、严格递增，末项等于`T`。定长布局中若提供`cu_seqlens`，相邻差值必须大于0且不超过`S`。`seqused`必须大于0且不超过存储长度；与`cu_seqlens`同时提供时，须等于对应的相邻差值。
 - metadata必须与本次调用的布局、存储维度、head数及有效长度一致；输入规格或长度改变后需要重新生成。
 - 训练或推理由`torch.is_inference_mode_enabled()`决定。使用`torch.inference_mode()`进入推理；`torch.no_grad()`仍采用训练输出协议。`flash_kda`的返回条件见[PyTorch接口说明](docs/torchapi_flash_kda.md)。

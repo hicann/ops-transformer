@@ -77,7 +77,7 @@ For fixed-length layouts, the sequence dimension of `g` and `beta` precedes the 
 ## Constraints
 
 - `B` and the applicable storage length `S` or `T` are positive. Head counts satisfy `1 <= Nqk <= Nv <= 96` and `Nv % Nqk == 0`. The Q/K and V head dimensions are both 128.
-- Input tensors must be contiguous. Compute runs on an NPU. Meta tensors are used only for output specification inference.
+- All computational input tensors must be contiguous and non-empty. Compute runs on an NPU. Meta tensors are used only for output specification inference.
 - For TND, `cu_seqlens` starts at zero, is strictly increasing, and ends at `T`. In fixed-length layouts, when `cu_seqlens` is supplied, consecutive differences must be positive and at most `S`. Each `seqused` value must be positive and at most the storage length; if `cu_seqlens` is also supplied, it must equal the corresponding adjacent difference.
 - Metadata must match the layout, storage dimensions, head counts, and effective lengths of the current call. Regenerate metadata when these change.
 - `torch.is_inference_mode_enabled()` determines training or inference behavior. Use `torch.inference_mode()` for inference. `torch.no_grad()` still uses the training output contract. See the [PyTorch API reference](docs/torchapi_flash_kda_en.md) for the return conditions of `flash_kda`.

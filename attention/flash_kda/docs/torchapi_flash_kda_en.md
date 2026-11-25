@@ -180,7 +180,9 @@ Returns `(out, final_state, chunk_states)`. Unrequested optional outputs are `No
 
 - Supports training and inference in eager mode.
 - `B` and `S` or `T` must be positive. Head counts satisfy `1 <= Nqk <= Nv <= 96` and `Nv % Nqk == 0`; Q/K and V head dimensions are 128. Metadata integer dimensions and the sum of valid sequence lengths must fit in int32.
-- Computational inputs must be contiguous. Prepare inputs and metadata on the same NPU and set the current device before calling. Meta tensors are for shape inference only.
+- Non-contiguous tensors: None of the computational tensor inputs (for both `flash_kda_metadata` and `flash_kda`) support non-contiguous tensors; passing a non-contiguous tensor raises a validation error.
+- Empty tensors: None of the computational tensor inputs (for both `flash_kda_metadata` and `flash_kda`) support empty tensors (any dimension equal to 0 or zero elements); passing an empty tensor raises a validation error. Pass `None` when omitting an optional tensor argument.
+- Prepare inputs and metadata on the same NPU and set the current device before calling. Meta tensors are for shape inference only.
 - For TND, `cu_seqlens` starts at zero, is strictly increasing, and ends at `T`. For dense layouts, any supplied adjacent differences must be positive and at most `S`. `seqused` entries must be positive and at most the storage length. If both length tensors are supplied, each `seqused` entry must equal the corresponding adjacent difference; smaller values cannot truncate the interval.
 - Metadata must match layout, storage dimensions, head counts, valid lengths, mode, and device. Regenerate it when these change; do not reuse it across devices or implementation versions. Always pass storage length `S` for dense layouts or total length `T` for TND.
 - `torch.is_inference_mode_enabled()` controls the forward output/cache protocol. Use `torch.inference_mode()` with `enable_grad=False` for inference; `torch.no_grad()` retains the training protocol. Training uses `enable_grad=True`; `disable_recompute=False` retains necessary caches and recomputes during backward, while `True` retains additional caches.

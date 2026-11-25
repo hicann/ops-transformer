@@ -180,7 +180,9 @@ cann_ops_transformer.flash_kda(
 
 - 该接口支持训练、推理场景下的单算子模式调用。
 - `B`、`S`或`T`必须为正数；`1 <= Nqk <= Nv <= 96`且`Nv % Nqk == 0`，Q/K和V的head维度均为128。metadata接口的整数维度及有效序列长度之和不得超过int32范围。
-- 参与计算的输入张量须连续；在同一NPU上准备输入和metadata，调用前设置当前设备。Meta张量仅用于输出规格推导。
+- 非连续张量支持情况：所有参与计算的输入张量（包括`flash_kda_metadata`与`flash_kda`的张量输入）均不支持非连续张量，传入非连续张量会校验报错。
+- 空张量支持情况：所有参与计算的输入张量（包括`flash_kda_metadata`与`flash_kda`的张量输入）均不支持空张量（任意维度为0或元素数为0），传入空张量会校验报错。未提供可选张量参数时应传入`None`。
+- 在同一NPU上准备输入和metadata，调用前设置当前设备；Meta张量仅用于输出规格推导。
 - TND布局中，`cu_seqlens`从0开始、严格递增，末项等于`T`。定长布局中若提供`cu_seqlens`，相邻差值必须大于0且不超过`S`。`seqused`必须大于0且不超过存储长度；与`cu_seqlens`同时提供时，每一项必须等于对应的相邻差值，不支持用较小的`seqused`截断该区间。
 - metadata必须与本次调用的布局、存储维度、head数、有效长度、运行模式和设备一致。上述条件变化后重新生成；不得跨设备或跨实现版本复用。定长布局的`seqlens`始终传`S`，TND始终传`T`。
 - 前向输出及缓存的训练/推理协议由`torch.is_inference_mode_enabled()`决定。推理应使用`torch.inference_mode()`并设置`enable_grad=False`；`torch.no_grad()`不会切换为推理协议。训练使用`enable_grad=True`，`disable_recompute=False`保存必要缓存并在反向时重计算，取`True`时保存额外缓存。
