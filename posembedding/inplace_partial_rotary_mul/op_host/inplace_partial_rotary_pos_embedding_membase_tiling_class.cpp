@@ -42,7 +42,9 @@ ge::graphStatus InplacePartialRotaryPosEmbeddingMembaseTilingClass::GetShapeAttr
 {
     auto attrs = context_->GetAttrs();
     OP_CHECK_NULL_WITH_CONTEXT(context_, attrs);
-    const uint32_t inputMode = *(attrs->GetAttrPointer<uint32_t>(MODE_ATTR_IDX));
+    const uint32_t* inputModePtr = attrs->GetAttrPointer<uint32_t>(MODE_ATTR_IDX);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, inputModePtr);
+    const uint32_t inputMode = *inputModePtr;
     OP_LOGI(context_->GetNodeName(), "[mode]: %d", inputMode);
     inputMode_ = inputMode;
     return ge::GRAPH_SUCCESS;

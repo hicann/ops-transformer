@@ -115,9 +115,12 @@ ge::graphStatus ApplyRotaryPosEmbTilingAB::PostTiling()
     context_->SetTilingKey(GetTilingKey());
     context_->SetBlockDim(blockNum_);
     size_t* workspaces = context_->GetWorkspaceSizes(1);
+    OP_CHECK_NULL_WITH_CONTEXT(context_, workspaces);
     workspaces[0] = DEFAULT_WORKSPACE_SIZE;
-    tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
-    context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());
+    auto* rawTilingData = context_->GetRawTilingData();
+    OP_CHECK_NULL_WITH_CONTEXT(context_, rawTilingData);
+    tilingData_.SaveToBuffer(rawTilingData->GetData(), rawTilingData->GetCapacity());
+    rawTilingData->SetDataSize(tilingData_.GetDataSize());
 
     OP_LOGI(context_->GetNodeName(),
             "ApplyRotaryPosEmbAB tilingData is B: %ld, CosB: %ld, S: %ld, D: %ld, QN: %ld, KN: %ld, kAlign: %ld, "
