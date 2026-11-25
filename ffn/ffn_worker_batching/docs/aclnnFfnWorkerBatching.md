@@ -136,7 +136,7 @@ aclnnStatus aclnnFfnWorkerBatching(
     <tr>
       <td>maxOutShape</td>
       <td>输入</td>
-      <td>输出shape上限，格式为 {A, BS, topK+1, H}，用于推导y输出的shape上限 Y = A × BS × (topK+1)，以及H值。</td>
+      <td>输出shape上限，格式为 {A, BS, topK+1, H}，用于推导y输出的shape上限Y = A × BS × (topK+1)，以及H值。</td>
       <td>数组长度必须为4。其中A取值范围为(0, 1024]，BS大于0，topK+1取值范围为(0, 64]，H大于0。tokenDtype=5时H须为偶数。</td>
       <td>LIST_INT64</td>
       <td>-</td>
@@ -146,8 +146,8 @@ aclnnStatus aclnnFfnWorkerBatching(
     <tr>
       <td>tokenDtype</td>
       <td>输入</td>
-      <td>输入token的数据类型：0为FP16；1为BF16；2为INT8动态量化，每行一个FP32 scale；3为FLOAT8_E5M2；4为FLOAT8_E4M3FN（float8_e4m3）；5为FLOAT4_E2M1。3、4、5每32个逻辑hidden state元素对应一个FLOAT8_E8M0 scale，全部scale紧跟整行token数据。</td>
-      <td>取值为0～5。</td>
+      <td>输入token的数据类型：0为FP16；1为BF16；2为INT8动态量化，每行一个FP32 scale；3为FLOAT8_E5M2；4为FLOAT8_E4M3FN（float8_e4m3）；5为FLOAT4_E2M1。tokenDtype=3、4、5时，每32个逻辑hidden state元素对应一个FLOAT8_E8M0 scale，全部scale紧跟整行token数据。</td>
+      <td>取值为0～5，取值范围见表格下方说明。</td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
@@ -275,6 +275,13 @@ aclnnStatus aclnnFfnWorkerBatching(
     </tr>
   </tbody>
   </table>
+
+  <!-- npu="950" id8 -->
+- <term>Ascend 950PR&950DT系列产品</term>：tokenDtype取值范围为0～5，支持FLOAT8_E5M2、FLOAT8_E4M3FN、FLOAT4_E2M1，每32个逻辑hidden state元素对应一个FLOAT8_E8M0 scale。
+<!-- end id8 -->
+<!-- npu="A3,910b" id9 -->
+- <term>Atlas A3系列产品</term>、<term>Atlas A2系列产品</term>：tokenDtype取值范围为0～2。
+<!-- end id9 -->
 
 - **返回值：**
 
@@ -602,10 +609,10 @@ int main()
     std::vector<int64_t> scheduleContextShape = {1024};
     void *scheduleContextDeviceAddr = nullptr;
     aclTensor *scheduleContextRef = nullptr;
-    // ==== FfnArea 中的扁平 id 缓冲 ====
-    // 这四个字段是二级指针:context 里存的是 device 地址,由 kernel 自行解引用。框架看不到内层缓冲,
-    // 不填也能通过 tiling 校验,只在 kernel 访存时暴露为 errcode:(95) MTE 访问 DDR 越界。
-    // NORM 路径(needSchedule=0)两代实现都会读它们,必须提供。
+    // ==== FfnArea中的扁平id缓冲 ====
+    // 这四个字段是二级指针:context里存的是device地址,由kernel自行解引用。框架看不到内层缓冲,
+    // 不填也能通过tiling校验,只在kernel访存时暴露为errcode:(95)MTE访问DDR越界。
+    // NORM路径(needSchedule=0)两代实现都会读它们,必须提供。
     std::vector<int32_t> hostExpertIds(Y);
     for (int64_t i = 0; i < Y; ++i) {
         hostExpertIds[i] = static_cast<int32_t>(i % expertNum);
@@ -651,7 +658,7 @@ int main()
                           &scheduleContextRef);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    // 创建输出 aclTensor
+    // 创建输出aclTensor
     std::vector<int64_t> yShape = {Y, H};
     void *yDeviceAddr = nullptr;
     aclTensor *yRef = nullptr;
