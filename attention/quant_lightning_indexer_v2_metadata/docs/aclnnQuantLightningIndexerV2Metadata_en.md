@@ -614,7 +614,7 @@ aclnnStatus CreateArgs(const ArgScenario &scenario, ArgContext &context)
     context.numHeadsQ = 1;
     context.numHeadsK = 1;
     context.headDim = 128;
-    context.topk = 0;
+    context.topk = 512;
     context.quantMode = 2; // 2: per-token-head / 3: group-scaling
     ret = aclrtGetResInCurrentThread(ACL_RT_DEV_RES_CUBE_CORE, &aicCoreNum);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Failed to query AIC count\n");
@@ -670,8 +670,8 @@ int main() {
 
     // 2. Construct the input and output based on the API definition.
     ArgScenario scenario {};
-    scenario.hasCuSeq = true;
-    scenario.hasSeqused = true;
+    scenario.hasCuSeq = false;
+    scenario.hasSeqused = false;
     ArgContext context {};
     ret = CreateArgs(scenario, context);
     CHECK_LOG_RET(ret == ACL_SUCCESS, ret, "Create input arguments failed. ERROR: %d", ret);

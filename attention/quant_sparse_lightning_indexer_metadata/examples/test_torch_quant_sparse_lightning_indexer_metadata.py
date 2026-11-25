@@ -10,27 +10,32 @@
 
 import torch
 import torch_npu
-import torchair
-import numpy as np
-import torch.nn as nn
-import cann_ops_transformer
+import cann_ops_transformer as cot
 
-metadata = torch.ops.cann_ops_transformer.quant_lightning_indexer_metadata(
-    cu_seqlens_q=None,
-    cu_seqlens_k=None,
-    seqused_q=None,
-    seqused_k=None,
-    cmp_residual_k=torch.tensor([3, 3, 3, 3, 3, 3, 3, 3], dtype=torch.int32).npu(),
-    batch_size=8,
-    max_seqlen_q=10,
-    max_seqlen_k=10,
-    num_heads_q=64,
-    num_heads_k=1,
-    head_dim=128,
-    topk=2048,
-    quant_mode=1,
-    mask_mode=3,
-    layout_q="BSND",
-    layout_k="BSND",
-    cmp_ratio=128,
+torch.npu.set_device(0)
+device = "npu:0"
+batch, key_length = 2, 2048
+# 每个batch包含一个Query，每行有256个有效候选逻辑块，块大小为8。
+lengths = torch.full((batch, 1), 256, dtype=torch.int32, device=device)
+cu_q = torch.arange(batch + 1, dtype=torch.int32, device=device)
+used_k = torch.full((batch,), key_length, dtype=torch.int32, device=device)
+metadata = cot.quant_sparse_lightning_indexer_metadata(
+    32,
+    1,
+    128,
+    512,
+    5,
+    cu_seqlens_q=cu_q,
+    seqused_k=used_k,
+    batch_size=batch,
+    max_seqlen_q=1,
+    max_seqlen_k=key_length,
+    candidate_block_length=lengths,
+    candidate_block_size=8,
+    layout_q="TND",
+    layout_k="PA_BBND",
+    mask_mode=0,
+    cmp_ratio=1,
 )
+torch.npu.synchronize()
+print(metadata.shape)  # (1024,)

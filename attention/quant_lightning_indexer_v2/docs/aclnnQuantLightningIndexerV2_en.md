@@ -37,9 +37,9 @@ $$
 
 The main computation process is as follows:
 
-1. Multiply the input parameter `query` of a token ($Q_{index}^{Quant}\in\R^{g\times d}$) by the given context `key` ($K_{index}^{Quant}\in\R^{S_{k}\times d}$) to obtain the relevance.
-2. Multiply the relevance result by the dequantization coefficients `query_dequant_scale` ($Scale_Q$) and `key_dequant_scale` ($Scale_K^T$) corresponding to `query` and `key`, and filter invalid negative relevance signals through the activation function $ReLU$ to obtain the relevance score vector between the current token and all preceding tokens.
-3. Multiply it by the weight coefficient `weights` ($W$), and select the first $Top-k$ index values along the g direction to obtain the output $out$, which serves as the input to Attention.
+1. Multiply the input parameter `q` of a token ($Q_{index}^{Quant}\in\R^{g\times d}$) by the given context `k` ($K_{index}^{Quant}\in\R^{S_{k}\times d}$) to obtain the relevance.
+2. Multiply the relevance result by the dequantization coefficients `qDescale` ($Scale_Q$) and `kDescale` ($Scale_K^T$) corresponding to `q` and `k`, and filter invalid negative relevance signals through the activation function $ReLU$ to obtain the relevance score vector between the current token and all preceding tokens.
+3. Multiply it by the weight coefficient `w` ($W$), and select the first $Top-k$ index values along the g direction to obtain the output $sparseIndicesOut$, which serves as the input to Attention.
 
 ## Function Prototype
 
@@ -47,13 +47,13 @@ Each operator uses a [two-phase API](../../../docs/en/context/two_phase_api.md).
 
 ```Cpp
 aclnnStatus aclnnQuantLightningIndexerV2GetWorkspaceSize(
-    const aclTensor *query,
-    const aclTensor *key,
-    const aclTensor *weights,
-    const aclTensor *queryDequantScale,
-    const aclTensor *keyDequantScale,
-    const aclTensor *cuSeqLensQOptional,
-    const aclTensor *cuSeqLensKOptional,
+    const aclTensor *q,
+    const aclTensor *k,
+    const aclTensor *w,
+    const aclTensor *qDescale,
+    const aclTensor *kDescale,
+    const aclTensor *cuSeqlensQOptional,
+    const aclTensor *cuSeqlensKOptional,
     const aclTensor *sequsedQOptional,
     const aclTensor *sequsedKOptional,
     const aclTensor *cmpResidualKOptional,
@@ -62,12 +62,12 @@ aclnnStatus aclnnQuantLightningIndexerV2GetWorkspaceSize(
     const aclTensor *metadataOptional,
     int64_t          topk,
     int64_t          quantMode,
-    int64_t          maxSeqlenQOptional,
+    int64_t          maxSeqlenQ,
     char            *layoutQOptional,
     char            *layoutKOptional,
-    int64_t          maskModeOptional,
-    int64_t          cmpRatioOptional,
-    int64_t          returnValueOptional,
+    int64_t          maskMode,
+    int64_t          cmpRatio,
+    int64_t          returnValue,
     const aclTensor *sparseIndicesOut,
     const aclTensor *sparseValuesOut,
     uint64_t        *workspaceSize,
@@ -115,7 +115,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
     </tr></thead>
   <tbody>
     <tr>
-      <td>query</td>
+      <td>q</td>
       <td>Input</td>
       <td>Quantized query in the formula.</td>
       <td>Empty tensors are not supported.</td>
@@ -129,7 +129,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>x</td>
     </tr>
     <tr>
-      <td>key</td>
+      <td>k</td>
       <td>Input</td>
       <td>The quantized Key in the formula.</td>
       <td>          <ul>
@@ -146,7 +146,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>Supports non-contiguous tensors on axis 0</td>
     </tr>
     <tr>
-      <td>weights</td>
+      <td>w</td>
       <td>Input</td>
       <td>The weight coefficient W in the formula.</td>
       <td>Empty tensors are not supported.</td>
@@ -160,7 +160,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>x</td>
     </tr>
     <tr>
-      <td>queryDequantScale</td>
+      <td>qDescale</td>
       <td>Input</td>
       <td>Dequantization scale of Query in the formula.</td>
       <td>Empty tensors are not supported.</td>
@@ -175,7 +175,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>x</td>
     </tr>
     <tr>
-      <td>keyDequantScale</td>
+      <td>kDescale</td>
       <td>Input</td>
       <td>The Key dequantization coefficient in the formula.</td>
       <td>Empty tensors are not supported.</td>
@@ -190,7 +190,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>Supports non-contiguity on the 0th axis.</td>
     </tr>
     <tr>
-      <td>cuSeqLensQOptional</td>
+      <td>cuSeqlensQOptional</td>
       <td>Input</td>
       <td>Number of valid Query tokens in each batch (the cu_seqlens format is used in TND use cases).</td>
       <td>          <ul>
@@ -203,7 +203,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>x</td>
     </tr>
     <tr>
-      <td>cuSeqLensKOptional</td>
+      <td>cuSeqlensKOptional</td>
       <td>Input</td>
       <td>Number of valid tokens of Key in each Batch (the cu_seqlens format is used in the TND use case).</td>
       <td>          <ul>
@@ -243,7 +243,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>cmpResidualKOptional</td>
       <td>Input</td>
       <td>Residual length of Key in compression use cases.</td>
-      <td>Must satisfy 0 <= cmpResidualKOptional[i] < cmpRatioOptional.</td>
+      <td>Must satisfy 0 <= cmpResidualKOptional[i] < cmpRatio.</td>
       <td>INT32</td>
       <td>ND</td>
       <td>(B,)</td>
@@ -311,7 +311,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>maxSeqlenQOptional</td>
+      <td>maxSeqlenQ</td>
       <td>Input</td>
       <td>Maximum sequence length of Query.</td>
       <td>-</td>
@@ -347,7 +347,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>maskModeOptional</td>
+      <td>maskMode</td>
       <td>Input</td>
       <td>Specifies the sparse mode.</td>
       <td>          <ul>
@@ -361,7 +361,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>cmpRatioOptional</td>
+      <td>cmpRatio</td>
       <td>Input</td>
       <td>Compression ratio of key.</td>
       <td>          <ul>
@@ -374,7 +374,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>-</td>
     </tr>
     <tr>
-      <td>returnValueOptional</td>
+      <td>returnValue</td>
       <td>Input</td>
       <td>Indicates whether to output sparseValuesOut.</td>
       <td>          <ul>
@@ -405,12 +405,12 @@ aclnnStatus aclnnQuantLightningIndexerV2(
       <td>Output</td>
       <td>Values corresponding to the Indices output in the formula.</td>
       <td>          <ul>
-                <li>If returnValueOptional is 1, valid values are output and invalid parts are filled with negative infinity in bf16; if returnValueOptional is 0, an empty tensor with shape (0,) is output.</li>
+                <li>If returnValue is 1, valid values are output and invalid parts are filled with negative infinity in bf16; if returnValue is 0, an empty tensor with shape (0,) is output.</li>
           </ul>
       </td>
       <td>BFLOAT16</td>
       <td>ND</td>
-      <td>If returnValueOptional is 1, the shape is the same as that of sparseIndicesOut; if returnValueOptional is 0, the shape is (0,).</td>
+      <td>If returnValue is 1, the shape is the same as that of sparseIndicesOut; if returnValue is 0, the shape is (0,).</td>
       <td>x</td>
     </tr>
     <tr>
@@ -440,24 +440,24 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 - <term>Ascend 950PR&950DT products</term>:
   - `layoutKOptional` additionally supports BSND and TND; PA_BBND, BSND, and TND are supported.
   - `quantMode` supports 1 (FLOAT8_e4m3fn quantization), 2 (INT8 quantization), 3 (MXFP8 quantization), 4 (HIFLOAT8 quantization), and 5 (MXFP4 quantization).
-  - `cmpRatioOptional` supports any positive integer in (0, 128].
-  - `returnValueOptional` is supported.
+  - `cmpRatio` supports any positive integer in (0, 128].
+  - `returnValue` is supported.
   - query and key: FLOAT8_e4m3fn is supported when `quantMode` is 1/3, INT8 is supported when `quantMode` is 2, HIFLOAT8 is supported when `quantMode` is 4, and FLOAT4_e2m1 is supported when `quantMode` is 5.
-  - queryDequantScale and keyDequantScale: FLOAT32 is supported when `quantMode` is 1/4, FLOAT16 is supported when `quantMode` is 2, and FLOAT8_e8m0 is supported when `quantMode` is 3/5.
+  - qDescale and kDescale: FLOAT32 is supported when `quantMode` is 1/4, FLOAT16 is supported when `quantMode` is 2, and FLOAT8_e8m0 is supported when `quantMode` is 3/5.
   - weights: FLOAT16 is supported when `quantMode` is 2, and FLOAT32 is supported when `quantMode` is 1/3/4/5.
   - query: N1 supports [1, 64]; key: N2 supports only 1.
-  - cuSeqLensQOptional cannot be passed in when layoutQOptional is BSND; cuSeqLensKOptional cannot be passed in when layoutKOptional is BSND or PA_BBND.
+  - cuSeqlensQOptional cannot be passed in when layoutQOptional is BSND; cuSeqlensKOptional cannot be passed in when layoutKOptional is BSND or PA_BBND.
   - When layoutKOptional is PA_BBND, blockTableOptional must be passed in; otherwise, it must not be passed in.
 <!-- end id10 -->
 <!-- npu="A3,910b" id11 -->
 - x1 is INT8, x2 is INT8, x1Scale is FLOAT32, and x2Scale is FLOAT32.
-  - `layoutKOptional` supports PA_BBND and TND: when q N1 is 64, only PA_BBND is supported (sequsedKOptional must be passed in); when N1 is 24/32, PA_BBND (sequsedKOptional must be passed in) or TND (cuSeqLensKOptional must be passed in, and sequsedKOptional is not supported) is supported.
+  - `layoutKOptional` supports PA_BBND and TND: when q N1 is 64, only PA_BBND is supported (sequsedKOptional must be passed in); when N1 is 24/32, PA_BBND (sequsedKOptional must be passed in) or TND (cuSeqlensKOptional must be passed in, and sequsedKOptional is not supported) is supported.
   - `quantMode` supports only 2 (Per-Token-Head quantization).
-  - `cmpRatioOptional` supports only powers of 2 in the range of [1, 128], namely 1/2/4/8/16/32/64/128; only 1 is supported when N1 is 24/32.
+  - `cmpRatio` supports only powers of 2 in the range of [1, 128], namely 1/2/4/8/16/32/64/128; only 1 is supported when N1 is 24/32.
   - `outputIdxOffsetOptional` is not supported.
-  - `returnValueOptional` is not supported.
+  - `returnValue` is not supported.
   - query and key: INT8 is supported, while FLOAT8_e4m3fn, HIFLOAT8, and FLOAT4_e2m1 are not supported.
-  - queryDequantScale and keyDequantScale: FLOAT16 is supported, while FLOAT32 and FLOAT8_e8m0 are not supported.
+  - qDescale and kDescale: FLOAT16 is supported, while FLOAT32 and FLOAT8_e8m0 are not supported.
   - weights: FLOAT16 is supported, while FLOAT32 is not supported.
   - query N1 supports 64, 32, and 24: when N1 is 24/32, `layoutQOptional` must be TND, `maskMode` must be 3, `cmpRatio` must be 1, and `returnValue` must not be passed in; otherwise the API reports an error.
   - topk supports only [1, 2048].
@@ -489,7 +489,7 @@ aclnnStatus aclnnQuantLightningIndexerV2(
             <tr>
                 <td>ACLNN_ERR_PARAM_INVALID</td>
                 <td>161002</td>
-                <td>The data types and data formats of query, key, weights, queryDequantScale, keyDequantScale, cuSeqLensQOptional, cuSeqLensKOptional, sequsedQOptional, sequsedKOptional, cmpResidualKOptional, blockTableOptional, metadataOptional, layoutQOptional, layoutKOptional, topk, quantMode, maskModeOptional, cmpRatioOptional, returnValueOptional, sparseIndicesOut, and sparseValuesOut are not within the supported range.</td>
+                <td>The data types and data formats of q, k, w, qDescale, kDescale, cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional, cmpResidualKOptional, blockTableOptional, metadataOptional, layoutQOptional, layoutKOptional, topk, quantMode, maskMode, cmpRatio, returnValue, sparseIndicesOut, and sparseValuesOut are not within the supported range.</td>
             </tr>
         </tbody>
     </table>
@@ -542,8 +542,8 @@ aclnnStatus aclnnQuantLightningIndexerV2(
 - headdim supports 128.
 - block_size must be a multiple of 16, with a maximum supported value of 1024.
 - When `layoutKOptional` is not PA_BBND, `layoutQOptional` and `layoutKOptional` must be consistent.
-- When `quantMode` is 3/5, `queryDequantScale` and `keyDequantScale` have 1 more dimension than `query` and `key` respectively, with consistent prefix dimensions and the last two dimensions of (D/64, 2); D must be a multiple of 64, and each scale corresponds to 32 consecutive logical elements along the D dimension.
-- When the input parameter layoutQOptional is TND, cuSeqLensQOptional must be passed in. If sequsedQOptional is also passed in, ensure that the query length of each batch passed in by sequsedQOptional does not exceed the q sequence length of each batch calculated based on cuSeqLensQOptional. When the q sequence length seqlen1 passed in by sequsedQOptional for a batch is less than the query length seqlen2 calculated based on cuSeqLensQOptional, the TND Padding feature is enabled, and the sparseIndices and sparseValues of the query output for the difference between seqlen2 and seqlen1 in that batch are all set to invalid values. In some long-sequence use cases, if too much invalid data needs to be padded, aicore execution may time out due to hardware limitations. Calculate the amount of data to be padded using (seqlen2 - seqlen1) * topk. It is recommended to keep this amount within 400 million. The TND Padding feature is not supported when q N1 is 24 or 32; do not pass in sequsedQOptional, and passing it causes the API to report an error.
+- When `quantMode` is 3/5, `qDescale` and `kDescale` have 1 more dimension than `q` and `k` respectively, with consistent prefix dimensions and the last two dimensions of (D/64, 2); D must be a multiple of 64, and each scale corresponds to 32 consecutive logical elements along the D dimension.
+- When the input parameter layoutQOptional is TND, cuSeqlensQOptional must be passed in. If sequsedQOptional is also passed in, ensure that the query length of each batch passed in by sequsedQOptional does not exceed the q sequence length of each batch calculated based on cuSeqlensQOptional. When the q sequence length seqlen1 passed in by sequsedQOptional for a batch is less than the query length seqlen2 calculated based on cuSeqlensQOptional, the TND Padding feature is enabled, and the sparseIndicesOut and sparseValuesOut of the query output for the difference between seqlen2 and seqlen1 in that batch are all set to invalid values. In some long-sequence use cases, if too much invalid data needs to be padded, aicore execution may time out due to hardware limitations. Calculate the amount of data to be padded using (seqlen2 - seqlen1) * topk. It is recommended to keep this amount within 400 million. The TND Padding feature is not supported when q N1 is 24 or 32; do not pass in sequsedQOptional, and passing it causes the API to report an error.
 - **Deterministic computation:** aclnnQuantLightningIndexerV2 defaults to a deterministic implementation.
 
 ## Example
@@ -840,9 +840,6 @@ void CleanupResources(TensorResources& resources, void* workspaceAddr,
 } // namespace
 
 int main() {
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
-        return 0;
-    }
     int32_t deviceId = 0;
     aclrtStream stream = nullptr;
     TensorResources resources = {};
@@ -859,6 +856,12 @@ int main() {
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         LOG_PRINT("Init acl failed. ERROR: %d\n", ret);
         return ret;
+    }
+
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+        LOG_PRINT("This example requires Ascend 950.\n");
+        CleanupResources(resources, workspaceAddr, stream, deviceId);
+        return 0;
     }
 
     ret = InitializeTensors(resources);

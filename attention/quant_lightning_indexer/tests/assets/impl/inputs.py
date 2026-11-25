@@ -263,6 +263,15 @@ class QuantLightningIndexerInputAdapter:
                 f"{name} is present in CSV but pytest generator returned None"
             )
         src_cpu = src.detach().cpu() if torch.is_tensor(src) else torch.as_tensor(src)
+        if (
+            name == "block_table"
+            and len(dst.shape) == src_cpu.ndim == 2
+            and dst.shape[0] == src_cpu.shape[0]
+            and dst.shape[1] > src_cpu.shape[1]
+        ):
+            src_cpu = torch.nn.functional.pad(
+                src_cpu, (0, dst.shape[1] - src_cpu.shape[1]), value=-1
+            )
         if tuple(dst.shape) != tuple(src_cpu.shape):
             raise ValueError(
                 f"{name} shape mismatch: TTK={tuple(dst.shape)} "

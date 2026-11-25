@@ -471,6 +471,15 @@ class QuantLightningIndexerV2InputAdapter:
             and src_cpu.element_size() == 1
         ):
             src_cpu = src_cpu.view(torch.uint8)
+        if (
+            name == "block_table"
+            and len(dst.shape) == src_cpu.ndim == 2
+            and dst.shape[0] == src_cpu.shape[0]
+            and dst.shape[1] > src_cpu.shape[1]
+        ):
+            src_cpu = torch.nn.functional.pad(
+                src_cpu, (0, dst.shape[1] - src_cpu.shape[1]), value=-1
+            )
         if tuple(dst.shape) != tuple(src_cpu.shape):
             raise ValueError(
                 f"{name} shape mismatch: TTK={tuple(dst.shape)} "

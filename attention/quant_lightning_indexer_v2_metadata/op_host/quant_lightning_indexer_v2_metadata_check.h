@@ -145,7 +145,7 @@ aclnnStatus CheckSingleParamQliV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t 
     }
     // head_dim 校验
     if (headDim != 128) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "head_dim", std::to_string(numHeadsK),
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(QLI_V2_ACLNN_OP_NAME, "head_dim", std::to_string(headDim),
                                               "The value of head_dim should be 128");
         return ACLNN_ERR_PARAM_INVALID;
     }

@@ -205,8 +205,8 @@ int GenerateMetadata(TensorResources& resources, aclrtStream stream, int64_t B, 
     aclOpExecutor* executor;
     uint64_t workspaceSize = 0;
     int ret = aclnnLightningIndexerV2MetadataGetWorkspaceSize(
-        nullptr, nullptr, nullptr, nullptr, nullptr, N1, N2, D, topk, B, S1, S2, layoutQCopy, layoutKCopy, maskMode,
-        cmpRatio, resources.metadataTensor, &workspaceSize, &executor);
+        nullptr, nullptr, nullptr, nullptr, resources.cmpResidualKTensor, N1, N2, D, topk, B, S1, S2, layoutQCopy,
+        layoutKCopy, maskMode, cmpRatio, resources.metadataTensor, &workspaceSize, &executor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         LOG_PRINT("aclnnLightningIndexerV2MetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
         return ret;

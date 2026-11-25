@@ -539,9 +539,9 @@ struct TensorResources {
 };
 
 int InitializeTensors(TensorResources& resources) {
-    std::vector<int64_t> queryShape = {1, 2, 1, 128};
+    std::vector<int64_t> queryShape = {1, 2, 64, 128};
     std::vector<int64_t> keyShape = {1, 2, 1, 128};
-    std::vector<int64_t> weightsShape = {1, 2, 1};
+    std::vector<int64_t> weightsShape = {1, 2, 64};
     std::vector<int64_t> sparseIndicesShape = {1, 2, 1, 2048};
     std::vector<int64_t> sparseValuesShape = {1, 2, 1, 2048};
 

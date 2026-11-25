@@ -58,8 +58,8 @@ aclnnStatus aclnnLightningIndexerV2GetWorkspaceSize(
     const aclTensor     *metadataOptional,
     int64_t              topk,
     int64_t              maxSeqlenQ,
-    char                *layoutQ,
-    char                *layoutK,
+    char                *layoutQOptional,
+    char                *layoutKOptional,
     int64_t              maskMode,
     int64_t              cmpRatio,
     int64_t              returnValue,
@@ -110,7 +110,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>Empty tensor not supported.</td>
     <td>BFLOAT16, FLOAT16</td>
     <td>ND</td>
-    <td><ul><li>When layoutQ is BSND, the shape is (B,S1,N1,D).</li><li>When layoutQ is TND, the shape is (T1,N1,D).</li><li>Empty tensor not supported.</li></ul></td>
+    <td><ul><li>When layoutQOptional is BSND, the shape is (B,S1,N1,D).</li><li>When layoutQOptional is TND, the shape is (T1,N1,D).</li><li>Empty tensor not supported.</li></ul></td>
     <td>x</td>
     </tr>
     <tr>
@@ -120,7 +120,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td><ul><li>Empty tensors are not supported.</li><li>block_num is the total number of blocks in PageAttention, and block_size is the number of tokens in a block.</li></ul></td>
     <td>BFLOAT16, FLOAT16</td>
     <td>ND</td>
-    <td><ul><li>If layoutK is PA_BBND, the shape is (block_num, block_size, N2, D).</li><li>If layoutK is BSND, the shape is (B, S2, N2, D).</li><li>If layoutK is TND, the shape is (T2, N2, D).</li></ul>
+    <td><ul><li>If layoutKOptional is PA_BBND, the shape is (block_num, block_size, N2, D).</li><li>If layoutKOptional is BSND, the shape is (B, S2, N2, D).</li><li>If layoutKOptional is TND, the shape is (T2, N2, D).</li></ul>
     </td>
     <td>✓</td>
     </tr>
@@ -131,7 +131,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>Empty tensors are not supported.</td>
     <td>FLOAT</td>
     <td>ND</td>
-    <td><ul><li>When layoutQ is BSND, the shape is (B,S1,N1).</li><li>When layoutQ is TND, the shape is (T1,N1).</li></ul></td>
+    <td><ul><li>When layoutQOptional is BSND, the shape is (B,S1,N1).</li><li>When layoutQOptional is TND, the shape is (T1,N1).</li></ul></td>
     <td>x</td>
     </tr>
     <tr>
@@ -168,7 +168,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>sequsedKOptional (aclTensor*)</td>
     <td>Input</td>
     <td>The actual used length of k in different batches.</td>
-    <td><ul><li>Shape is constrained to length B, one-dimensional tensor.</li><li>Negative values cannot appear.</li><li>When layoutK is PA_BBND, this parameter must be passed in.</li></ul></td>
+    <td><ul><li>Shape is constrained to length B, one-dimensional tensor.</li><li>Negative values cannot appear.</li><li>When layoutKOptional is PA_BBND, this parameter must be passed in.</li></ul></td>
     <td>INT32</td>
     <td>ND</td>
     <td>(B,)</td>
@@ -201,7 +201,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td><ul><li>The value must be greater than or equal to 0.</li><li>After the offset is added, the topK index cannot exceed the maximum value of int32.</li></ul></td>
     <td>INT32</td>
     <td>ND</td>
-    <td><ul><li>When layoutQ is "BSND", the shape is [B, S1, N2].</li><li>When layoutQ is "TND", the shape is [T1, N2].</li></ul></td>
+    <td><ul><li>When layoutQOptional is "BSND", the shape is [B, S1, N2].</li><li>When layoutQOptional is "TND", the shape is [T1, N2].</li></ul></td>
     <td>x</td>
     </tr>
     <tr>
@@ -236,7 +236,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>-</td>
     </tr>
     <tr>
-    <td>layoutQ (char*)</td>
+    <td>layoutQOptional (char*)</td>
     <td>Input</td>
     <td>Identifies the data layout format of the input q.</td>
     <td><ul><li>Currently supported: BSND and TND.</li><li>Recommended value is BSND.</li></ul></td>
@@ -246,7 +246,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>-</td>
     </tr>
     <tr>
-    <td>layoutK (char*)</td>
+    <td>layoutKOptional (char*)</td>
     <td>Input</td>
     <td>Indicates the data layout format of input k.</td>
     <td><ul><li>Currently supported: PA_BBND, BSND, TND.</li><li>Recommended value is BSND.</li></ul></td>
@@ -292,7 +292,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>Empty tensor not supported.</td>
     <td>INT32</td>
     <td>ND</td>
-    <td><ul><li>Output shape is [B, S1, N2, topk] when layoutQ is "BSND".</li><li>Output shape is [T1, N2, topk] when layoutQ is "TND".</li></ul></td>
+    <td><ul><li>Output shape is [B, S1, N2, topk] when layoutQOptional is "BSND".</li><li>Output shape is [T1, N2, topk] when layoutQOptional is "TND".</li></ul></td>
     <td>x</td>
     </tr>
     <tr>
@@ -302,7 +302,7 @@ aclnnStatus aclnnLightningIndexerV2(
     <td>Outputs the corresponding value when returnValue is 1; outputs an empty tensor with shape (0,) when returnValue is 0.</td>
     <td>FLOAT</td>
     <td>ND</td>
-    <td><ul><li>When returnValue is 1 and layoutQ is "BSND", the output shape is [B, S1, N2, topk].</li><li>When returnValue is 1 and layoutQ is "TND", the output shape is [T1, N2, topk].</li></ul></td>
+    <td><ul><li>When returnValue is 1 and layoutQOptional is "BSND", the output shape is [B, S1, N2, topk].</li><li>When returnValue is 1 and layoutQOptional is "TND", the output shape is [T1, N2, topk].</li></ul></td>
     <td>x</td>
     </tr>
     <tr>
@@ -419,15 +419,15 @@ aclnnStatus aclnnLightningIndexerV2(
 - x1 is INT8, x2 is INT8, x1Scale is FLOAT32, and x2Scale is FLOAT32.
   - The value range of topk currently supports only [1, 2048], as well as 3072, 4096, 5120, 6144, 7168, and 8192.
   - The sequsedQOptional, outputIdxOffsetOptional, and maxSeqlenQ functions are currently not supported. Passing in these parameters is not recommended.
-  - When layoutK is PA_BBND, sequsedKOptional must be passed in; when layoutK is BSND or TND, sequsedKOptional is optional.
+  - When layoutKOptional is PA_BBND, sequsedKOptional must be passed in; when layoutKOptional is BSND or TND, sequsedKOptional is optional.
 <!-- end id7 -->
 <!-- npu="950" id8 -->
 - <term>Ascend 950PR&950DT products</term>:
-  - When the passed parameter layoutQ is BSND, passing in cuSeqlensQOptional is not supported; when layoutK is BSND or PA_BBND, passing in cuSeqlensKOptional is not supported.
+  - When the passed parameter layoutQOptional is BSND, passing in cuSeqlensQOptional is not supported; when layoutKOptional is BSND or PA_BBND, passing in cuSeqlensKOptional is not supported.
   - When the parameter outputIdxOffsetOptional is passed in, index offset values greater than or equal to 0 are supported. The following constraint must be met: after the passed index offset is added, the resulting sparseIndice value must not exceed the maximum value of INT32.
-  - When the passed parameter layoutQ is TND, cuSeqlensQOptional must be passed in. If sequsedQOptional is also passed in, ensure that the query length of each batch passed in by sequsedQOptional does not exceed the q sequence length of each batch calculated based on cuSeqlensQOptional. When the q sequence length seqlen1 passed in by sequsedQOptional for a batch is less than the query length seqlen2 calculated based on cuSeqlensQOptional, the TND Padding feature is enabled, and the sparseIndices and sparseValues outputs of the queries in the part corresponding to the difference between seqlen2 and seqlen1 in the batch are all set to invalid values. In some long sequence use cases, if too much invalid data needs to be padded, aicore execution may time out due to hardware limitations. You can calculate the amount of data to be padded using (seqlen2 - seqlen1) * topk. It is recommended to keep this amount within 400 million.
+  - When the passed parameter layoutQOptional is TND, cuSeqlensQOptional must be passed in. If sequsedQOptional is also passed in, ensure that the query length of each batch passed in by sequsedQOptional does not exceed the q sequence length of each batch calculated based on cuSeqlensQOptional. When the q sequence length seqlen1 passed in by sequsedQOptional for a batch is less than the query length seqlen2 calculated based on cuSeqlensQOptional, the TND Padding feature is enabled, and the sparseIndices and sparseValues outputs of the queries in the part corresponding to the difference between seqlen2 and seqlen1 in the batch are all set to invalid values. In some long sequence use cases, if too much invalid data needs to be padded, aicore execution may time out due to hardware limitations. You can calculate the amount of data to be padded using (seqlen2 - seqlen1) * topk. It is recommended to keep this amount within 400 million.
   - When the passed cmpRatio > 1 and maskMode = 3, cmpResidualKOptional must be passed in. In other cases, do not pass it in.
-  - When the passed parameter layoutK is PA_BBND, sequsedKOptional must be passed in.
+  - When the passed parameter layoutKOptional is PA_BBND, sequsedKOptional must be passed in.
   - Parameter metadataOptional must be passed in.
 
 <!-- end id8 -->
@@ -549,7 +549,7 @@ int InitializeTensors(TensorResources &resources)
     std::vector<int64_t> keyShape = {B, S2Compressed, N2, D};
     std::vector<int64_t> weightsShape = {B, S1, N1};
     std::vector<int64_t> cmpResidualKShape = {B};
-    std::vector<int64_t> metadataShape = {1024};
+    std::vector<int64_t> metadataShape = {2048};
     std::vector<int64_t> sparseIndicesShape = {B, S1, N2, topk};
     std::vector<int64_t> sparseValuesShape = {B, S1, N2, topk};
 
@@ -634,8 +634,8 @@ int GenerateMetadata(TensorResources &resources, aclrtStream stream, int64_t B, 
     aclOpExecutor *executor;
     uint64_t workspaceSize = 0;
     int ret = aclnnLightningIndexerV2MetadataGetWorkspaceSize(
-        nullptr, nullptr, nullptr, nullptr, nullptr, N1, N2, D, topk, B, S1, S2, layoutQCopy, layoutKCopy, maskMode,
-        cmpRatio, resources.metadataTensor, &workspaceSize, &executor);
+        nullptr, nullptr, nullptr, nullptr, resources.cmpResidualKTensor, N1, N2, D, topk, B, S1, S2, layoutQCopy,
+        layoutKCopy, maskMode, cmpRatio, resources.metadataTensor, &workspaceSize, &executor);
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         LOG_PRINT("aclnnLightningIndexerV2MetadataGetWorkspaceSize failed. ERROR: %d\n", ret);
         return ret;
@@ -800,9 +800,6 @@ void CleanupResources(TensorResources &resources, void *workspaceAddr, aclrtStre
 
 int main()
 {
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
-        return 0;
-    }
     int32_t deviceId = 0;
     aclrtStream stream = nullptr;
     TensorResources resources = {};
@@ -822,6 +819,12 @@ int main()
     if (!CHECK_RET(ret == ACL_SUCCESS)) {
         LOG_PRINT("Init acl failed. ERROR: %d\n", ret);
         return ret;
+    }
+
+    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+        LOG_PRINT("This example requires Ascend 950.\n");
+        CleanupResources(resources, workspaceAddr, stream, deviceId);
+        return 0;
     }
 
     ret = InitializeTensors(resources);
