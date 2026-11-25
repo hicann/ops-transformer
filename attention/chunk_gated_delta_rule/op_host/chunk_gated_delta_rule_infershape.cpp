@@ -62,12 +62,15 @@ static ge::graphStatus InferShapeChunkGatedDeltaRule(InferShapeContext* context)
 
     // GetDim 之前先校验 value 和 initialState 的 DimNum 是否符合要求
     OP_CHECK_IF(shapeValue->GetDimNum() != VALUE_DIM,
-                OP_LOGE(opName, "value dim num should be %zu, but got %zu", VALUE_DIM, shapeValue->GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    opName, "value", (std::to_string(shapeValue->GetDimNum()) + "D").c_str(),
+                    ("the dim num of value must be " + std::to_string(VALUE_DIM)).c_str()),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        shapeInitialState->GetDimNum() != STATE_DIM,
-        OP_LOGE(opName, "initial_state dim num should be %zu, but got %zu", STATE_DIM, shapeInitialState->GetDimNum()),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(shapeInitialState->GetDimNum() != STATE_DIM,
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    opName, "initial_state", (std::to_string(shapeInitialState->GetDimNum()) + "D").c_str(),
+                    ("the dim num of initial_state must be " + std::to_string(STATE_DIM)).c_str()),
+                return ge::GRAPH_FAILED);
 
     // out 形状来自 value 的前三维 (T, Nv, Dv)
     shapeOut->SetDimNum(VALUE_DIM);

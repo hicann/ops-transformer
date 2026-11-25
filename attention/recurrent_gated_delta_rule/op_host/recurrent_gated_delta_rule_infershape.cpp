@@ -55,8 +55,9 @@ static ge::graphStatus InferShapeRecurrentGatedDeltaRule(InferShapeContext* cont
     }
 
     OP_CHECK_IF(shapeInitialState->GetDimNum() != STATE_DIM,
-                OP_LOGE("RecurrentGatedDeltaRule", "The number of dimensions of state should be %zu, but it is %zu.",
-                        STATE_DIM, shapeInitialState->GetDimNum()),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+                    "RecurrentGatedDeltaRule", "state", (std::to_string(shapeInitialState->GetDimNum()) + "D").c_str(),
+                    ("the dim num of state must be " + std::to_string(STATE_DIM)).c_str()),
                 return ge::GRAPH_FAILED);
 
     shapeOut->SetDimNum(VALUE_DIM);

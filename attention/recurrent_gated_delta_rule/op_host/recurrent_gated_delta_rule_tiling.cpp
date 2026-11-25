@@ -214,44 +214,71 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeDtype()
     auto keyDtype = context_->GetInputDesc(KEY_INDEX)->GetDataType();
     auto valueDtype = context_->GetInputDesc(VALUE_INDEX)->GetDataType();
     OP_CHECK_IF(queryDtype != ge::DT_BF16 || keyDtype != ge::DT_BF16 || valueDtype != ge::DT_BF16,
-                OP_LOGE(context_->GetNodeName(), "query dtype, key dtype and value dtype should be bfloat16."),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "query/key/value",
+                                                      (std::string(ge::TypeUtils::DataTypeToSerialString(queryDtype)) +
+                                                       "/" + ge::TypeUtils::DataTypeToSerialString(keyDtype) + "/" +
+                                                       ge::TypeUtils::DataTypeToSerialString(valueDtype))
+                                                          .c_str(),
+                                                      "the dtypes of query, key and value must be bfloat16"),
                 return ge::GRAPH_FAILED);
 
     auto betaDtype = context_->GetInputDesc(BETA_INDEX)->GetDataType();
     auto stateDtype = context_->GetInputDesc(STATE_INDEX)->GetDataType();
-    OP_CHECK_IF(betaDtype != ge::DT_BF16, OP_LOGE(context_->GetNodeName(), "beta dtype should be bfloat16."),
+    OP_CHECK_IF(betaDtype != ge::DT_BF16,
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "beta",
+                                                      ge::TypeUtils::DataTypeToSerialString(betaDtype).c_str(),
+                                                      "the dtype of beta must be bfloat16"),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(stateDtype != ge::DT_BF16 && stateDtype != ge::DT_FLOAT,
-                OP_LOGE(context_->GetNodeName(), "state dtype should be bfloat16 or float32."),
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "state",
+                                                      ge::TypeUtils::DataTypeToSerialString(stateDtype).c_str(),
+                                                      "the dtype of state must be bfloat16 or float32"),
                 return ge::GRAPH_FAILED);
     stateDtype_ = stateDtype;
 
     auto actSeqlensDtype = context_->GetInputDesc(ACTUAL_SEQ_LENGTHS_INDEX)->GetDataType();
     auto ssmStateIndicesDtype = context_->GetInputDesc(SSM_STATE_INDICES_INDEX)->GetDataType();
-    OP_CHECK_IF(actSeqlensDtype != ge::DT_INT32 || ssmStateIndicesDtype != ge::DT_INT32,
-                OP_LOGE(context_->GetNodeName(), "actual_seq_lengths dtype and ssmStateIndices dtype should be int32."),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        actSeqlensDtype != ge::DT_INT32 || ssmStateIndicesDtype != ge::DT_INT32,
+        OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "actual_seq_lengths/ssm_state_indices",
+                                              (std::string(ge::TypeUtils::DataTypeToSerialString(actSeqlensDtype)) +
+                                               "/" + ge::TypeUtils::DataTypeToSerialString(ssmStateIndicesDtype))
+                                                  .c_str(),
+                                              "the dtypes of actual_seq_lengths and ssm_state_indices must be int32"),
+        return ge::GRAPH_FAILED);
 
     if (tilingData_.hasGama == 1) {
         auto gamaDtype = context_->GetOptionalInputDesc(G_INDEX)->GetDataType();
-        OP_CHECK_IF(gamaDtype != ge::DT_FLOAT, OP_LOGE(context_->GetNodeName(), "g dtype should be float32."),
+        OP_CHECK_IF(gamaDtype != ge::DT_FLOAT,
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "g",
+                                                          ge::TypeUtils::DataTypeToSerialString(gamaDtype).c_str(),
+                                                          "the dtype of g must be float32"),
                     return ge::GRAPH_FAILED);
     }
 
     if (tilingData_.hasGamaK == 1) {
         auto gamaKDtype = context_->GetOptionalInputDesc(GK_INDEX)->GetDataType();
-        OP_CHECK_IF(gamaKDtype != ge::DT_FLOAT, OP_LOGE(context_->GetNodeName(), "gk dtype should be float32."),
+        OP_CHECK_IF(gamaKDtype != ge::DT_FLOAT,
+                    OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "gk",
+                                                          ge::TypeUtils::DataTypeToSerialString(gamaKDtype).c_str(),
+                                                          "the dtype of gk must be float32"),
                     return ge::GRAPH_FAILED);
     }
 
     if (context_->GetOptionalInputDesc(NUM_ACCEPTED_TOKENS_INDEX) != nullptr) {
         auto numAcceptedTokensDtype = context_->GetOptionalInputDesc(NUM_ACCEPTED_TOKENS_INDEX)->GetDataType();
-        OP_CHECK_IF(numAcceptedTokensDtype != ge::DT_INT32,
-                    OP_LOGE(context_->GetNodeName(), "num_accepted_tokens dtype should be int32."),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            numAcceptedTokensDtype != ge::DT_INT32,
+            OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "num_accepted_tokens",
+                                                  ge::TypeUtils::DataTypeToSerialString(numAcceptedTokensDtype).c_str(),
+                                                  "the dtype of num_accepted_tokens must be int32"),
+            return ge::GRAPH_FAILED);
     }
     auto outDtype = context_->GetOutputDesc(OUT_INDEX)->GetDataType();
-    OP_CHECK_IF(outDtype != ge::DT_BF16, OP_LOGE(context_->GetNodeName(), "out dtype should be bfloat16."),
+    OP_CHECK_IF(outDtype != ge::DT_BF16,
+                OP_LOGE_FOR_INVALID_DTYPE_WITH_REASON(context_->GetNodeName(), "out",
+                                                      ge::TypeUtils::DataTypeToSerialString(outDtype).c_str(),
+                                                      "the dtype of out must be bfloat16"),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -261,8 +288,9 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeDtype()
 bool RecurrentGatedDeltaRuleTiling::CheckDim(const gert::Shape shape, const size_t dim, const std::string& dimDesc)
 {
     if (shape.GetDimNum() != dim) {
-        OP_LOGE(context_->GetNodeName(), "The number of dimensions of %s should be %zu, but it is %zu.",
-                dimDesc.c_str(), dim, shape.GetDimNum());
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(
+            context_->GetNodeName(), dimDesc.c_str(), (std::to_string(shape.GetDimNum()) + "D").c_str(),
+            ("the dim num of " + dimDesc + " must be " + std::to_string(dim)).c_str());
         return false;
     }
     return true;
@@ -284,42 +312,47 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeShapesParser()
     int64_t b = actSeqlensShape.GetDim(DIM_0);
 
     // T>0
-    OP_CHECK_IF(t <= 0, OP_LOGE(inputParams_.opName, "T should be greater than 0, but T is %ld.", t),
+    OP_CHECK_IF(t <= 0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "T", std::to_string(t).c_str(),
+                                                      "T must be greater than 0"),
                 return ge::GRAPH_FAILED);
     // // B>=0
-    OP_CHECK_IF(b <= 0, OP_LOGE(inputParams_.opName, "B should be greater than 0, but B is %ld.", b),
+    OP_CHECK_IF(b <= 0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "B", std::to_string(b).c_str(),
+                                                      "B must be greater than 0"),
                 return ge::GRAPH_FAILED);
     // nk>0 nk<=256
-    OP_CHECK_IF(
-        nk <= 0 || nk > 256,
-        OP_LOGE(inputParams_.opName, "Nk should be greater than 0 and less than or equal to 256, but Nk is %ld.", nk),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(nk <= 0 || nk > 256,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "Nk", std::to_string(nk).c_str(),
+                                                      "Nk must be greater than 0 and less than or equal to 256"),
+                return ge::GRAPH_FAILED);
     // nv>0 nv<=256
-    OP_CHECK_IF(
-        nv <= 0 || nv > 256,
-        OP_LOGE(inputParams_.opName, "Nv should be greater than 0 and less than or equal to 256, but Nv is %ld.", nv),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(nv <= 0 || nv > 256,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "Nv", std::to_string(nv).c_str(),
+                                                      "Nv must be greater than 0 and less than or equal to 256"),
+                return ge::GRAPH_FAILED);
     // dk>0 dk<=512
-    OP_CHECK_IF(
-        dk <= 0 || dk > 512,
-        OP_LOGE(inputParams_.opName, "Dk should be greater than 0 and less than or equal to 512, but Dk is %ld.", dk),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(dk <= 0 || dk > 512,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "Dk", std::to_string(dk).c_str(),
+                                                      "Dk must be greater than 0 and less than or equal to 512"),
+                return ge::GRAPH_FAILED);
     // dv>0 dv<=512
-    OP_CHECK_IF(
-        dv <= 0 || dv > 512,
-        OP_LOGE(inputParams_.opName, "Dv should be greater than 0 and less than or equal to 512, but Dv is %ld.", dv),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(dv <= 0 || dv > 512,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "Dv", std::to_string(dv).c_str(),
+                                                      "Dv must be greater than 0 and less than or equal to 512"),
+                return ge::GRAPH_FAILED);
     // nv>=nk
-    OP_CHECK_IF(
-        nv % nk != 0,
-        OP_LOGE(inputParams_.opName, "Nv should be an integer multiple of Nk, but Nv is %ld, Nk is %ld.", nv, nk),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(nv % nk != 0,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "Nv/Nk",
+                                                      (std::to_string(nv) + "/" + std::to_string(nk)).c_str(),
+                                                      "Nv must be an integer multiple of Nk"),
+                return ge::GRAPH_FAILED);
     // blockNum >= T
-    OP_CHECK_IF(
-        sBlockNum < t,
-        OP_LOGE(inputParams_.opName,
-                "BlockNum should be greater than or equal to T, Current values: BlockNum=%ld, T=%ld.", sBlockNum, t),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(sBlockNum < t,
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "sBlockNum",
+                                                      (std::to_string(sBlockNum) + "/" + std::to_string(t)).c_str(),
+                                                      "BlockNum must be greater than or equal to T"),
+                return ge::GRAPH_FAILED);
 
     tilingData_.t = static_cast<uint32_t>(t);
     tilingData_.nk = static_cast<uint32_t>(nk);
@@ -339,31 +372,51 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeShapesParser()
 
 ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeEmptyTensor()
 {
-    OP_CHECK_IF(context_->GetInputShape(QUERY_INDEX)->GetStorageShape().GetShapeSize() == 0,
-                OP_LOGE(inputParams_.opName, "query not support empty tensor."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->GetInputShape(KEY_INDEX)->GetStorageShape().GetShapeSize() == 0,
-                OP_LOGE(inputParams_.opName, "key not support empty tensor."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->GetInputShape(VALUE_INDEX)->GetStorageShape().GetShapeSize() == 0,
-                OP_LOGE(inputParams_.opName, "value not support empty tensor."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->GetInputShape(BETA_INDEX)->GetStorageShape().GetShapeSize() == 0,
-                OP_LOGE(inputParams_.opName, "beta not support empty tensor."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->GetInputShape(STATE_INDEX)->GetStorageShape().GetShapeSize() == 0,
-                OP_LOGE(inputParams_.opName, "state not support empty tensor."), return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        context_->GetInputShape(QUERY_INDEX)->GetStorageShape().GetShapeSize() == 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "query", "0", "query can not be an empty tensor"),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        context_->GetInputShape(KEY_INDEX)->GetStorageShape().GetShapeSize() == 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "key", "0", "key can not be an empty tensor"),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        context_->GetInputShape(VALUE_INDEX)->GetStorageShape().GetShapeSize() == 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "value", "0", "value can not be an empty tensor"),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        context_->GetInputShape(BETA_INDEX)->GetStorageShape().GetShapeSize() == 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "beta", "0", "beta can not be an empty tensor"),
+        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        context_->GetInputShape(STATE_INDEX)->GetStorageShape().GetShapeSize() == 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "state", "0", "state can not be an empty tensor"),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->GetInputShape(ACTUAL_SEQ_LENGTHS_INDEX)->GetStorageShape().GetShapeSize() == 0,
-                OP_LOGE(inputParams_.opName, "actual_seq_lengths not support empty tensor."), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "actual_seq_lengths", "0",
+                                                      "actual_seq_lengths can not be an empty tensor"),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(context_->GetInputShape(SSM_STATE_INDICES_INDEX)->GetStorageShape().GetShapeSize() == 0,
-                OP_LOGE(inputParams_.opName, "ssm_state_indices not support empty tensor."), return ge::GRAPH_FAILED);
-    OP_CHECK_IF(context_->GetOutputShape(OUT_INDEX)->GetStorageShape().GetShapeSize() == 0,
-                OP_LOGE(inputParams_.opName, "out not support empty tensor."), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "ssm_state_indices", "0",
+                                                      "ssm_state_indices can not be an empty tensor"),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        context_->GetOutputShape(OUT_INDEX)->GetStorageShape().GetShapeSize() == 0,
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "out", "0", "out can not be an empty tensor"),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         tilingData_.hasGama == 1 && context_->GetOptionalInputShape(G_INDEX)->GetStorageShape().GetShapeSize() == 0,
-        OP_LOGE(inputParams_.opName, "g not support empty tensor."), return ge::GRAPH_FAILED);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "g", "0", "g can not be an empty tensor"),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         tilingData_.hasGamaK == 1 && context_->GetOptionalInputShape(GK_INDEX)->GetStorageShape().GetShapeSize() == 0,
-        OP_LOGE(inputParams_.opName, "gk not support empty tensor."), return ge::GRAPH_FAILED);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "gk", "0", "gk can not be an empty tensor"),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(tilingData_.hasAcceptedTokens == 1 &&
                     context_->GetOptionalInputShape(NUM_ACCEPTED_TOKENS_INDEX)->GetStorageShape().GetShapeSize() == 0,
-                OP_LOGE(inputParams_.opName, "num_accepted_tokens not support empty tensor."), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(inputParams_.opName, "num_accepted_tokens", "0",
+                                                      "num_accepted_tokens can not be an empty tensor"),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -380,11 +433,11 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeOptionalShapes()
         if (!CheckDim(gShape, G_DIM_NUM, "g")) {
             return ge::GRAPH_FAILED;
         }
-        OP_CHECK_IF(
-            gShape != expectGShape,
-            OP_LOGE(context_->GetNodeName(), "The shape of g parameter[%ld, %ld] is not expected, Expect [%ld, %ld].",
-                    gShape.GetDim(DIM_0), gShape.GetDim(DIM_1), expectGShape.GetDim(DIM_0), expectGShape.GetDim(DIM_1)),
-            return ge::GRAPH_FAILED);
+        OP_CHECK_IF(gShape != expectGShape,
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        context_->GetNodeName(), "g", Ops::Base::ToString(gShape).c_str(),
+                        ("the shape of g must be [" + Ops::Base::ToString(expectGShape) + "]").c_str()),
+                    return ge::GRAPH_FAILED);
     }
     if (tilingData_.hasGamaK == 1) {
         const auto& gkShape = context_->GetOptionalInputShape(GK_INDEX)->GetStorageShape();
@@ -392,10 +445,9 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeOptionalShapes()
             return ge::GRAPH_FAILED;
         }
         OP_CHECK_IF(gkShape != expectGkShape,
-                    OP_LOGE(context_->GetNodeName(),
-                            "The shape of gk parameter[%ld, %ld, %ld] is not expected, Expect [%ld, %ld %ld].",
-                            gkShape.GetDim(DIM_0), gkShape.GetDim(DIM_1), gkShape.GetDim(DIM_2),
-                            expectGkShape.GetDim(DIM_0), expectGkShape.GetDim(DIM_1), expectGkShape.GetDim(DIM_2)),
+                    OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                        context_->GetNodeName(), "gk", Ops::Base::ToString(gkShape).c_str(),
+                        ("the shape of gk must be [" + Ops::Base::ToString(expectGkShape) + "]").c_str()),
                     return ge::GRAPH_FAILED);
     }
     if (tilingData_.hasAcceptedTokens == 1) {
@@ -403,11 +455,13 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeOptionalShapes()
         if (!CheckDim(numAcceptedShape, NUM_ACCEPTED_TOKENS_DIM_NUM, "num_accepted_tokens")) {
             return ge::GRAPH_FAILED;
         }
-        OP_CHECK_IF(numAcceptedShape != expectNumAcceptedShape,
-                    OP_LOGE(context_->GetNodeName(),
-                            "The shape of num_accepted_tokens parameter[%ld] is not expected, Expect [%ld].",
-                            numAcceptedShape.GetDim(DIM_0), expectNumAcceptedShape.GetDim(DIM_0)),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            numAcceptedShape != expectNumAcceptedShape,
+            OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                context_->GetNodeName(), "num_accepted_tokens", Ops::Base::ToString(numAcceptedShape).c_str(),
+                ("the shape of num_accepted_tokens must be [" + Ops::Base::ToString(expectNumAcceptedShape) + "]")
+                    .c_str()),
+            return ge::GRAPH_FAILED);
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -451,52 +505,46 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeShapes()
     gert::Shape expectSsmStateShape = gert::Shape({tilingData_.t});
 
     OP_CHECK_IF(queryShape != expectQKShape,
-                OP_LOGE(context_->GetNodeName(),
-                        "The shape of query parameter[%ld, %ld, %ld] is not expected, Expect [%ld, %ld, %ld].",
-                        queryShape.GetDim(DIM_0), queryShape.GetDim(DIM_1), queryShape.GetDim(DIM_2),
-                        expectQKShape.GetDim(DIM_0), expectQKShape.GetDim(DIM_1), expectQKShape.GetDim(DIM_2)),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "query", Ops::Base::ToString(queryShape).c_str(),
+                    ("the shape of query must be [" + Ops::Base::ToString(expectQKShape) + "]").c_str()),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(keyShape != expectQKShape,
-                OP_LOGE(context_->GetNodeName(),
-                        "The shape of key parameter[%ld, %ld, %ld] is not expected, Expect [%ld, %ld, %ld].",
-                        keyShape.GetDim(DIM_0), keyShape.GetDim(DIM_1), keyShape.GetDim(DIM_2),
-                        expectQKShape.GetDim(DIM_0), expectQKShape.GetDim(DIM_1), expectQKShape.GetDim(DIM_2)),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "key", Ops::Base::ToString(keyShape).c_str(),
+                    ("the shape of key must be [" + Ops::Base::ToString(expectQKShape) + "]").c_str()),
                 return ge::GRAPH_FAILED);
     OP_CHECK_IF(valueShape != expectValueShape,
-                OP_LOGE(context_->GetNodeName(),
-                        "The shape of value parameter[%ld, %ld, %ld] is not expected, Expect [%ld, %ld, %ld].",
-                        valueShape.GetDim(DIM_0), valueShape.GetDim(DIM_1), valueShape.GetDim(DIM_2),
-                        expectValueShape.GetDim(DIM_0), expectValueShape.GetDim(DIM_1), expectValueShape.GetDim(DIM_2)),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "value", Ops::Base::ToString(valueShape).c_str(),
+                    ("the shape of value must be [" + Ops::Base::ToString(expectValueShape) + "]").c_str()),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        stateShape != expectStateShape,
-        OP_LOGE(context_->GetNodeName(),
-                "The shape of state parameter[%ld, %ld, %ld, %ld] is not expected, Expect [%ld, %ld, %ld, %ld].",
-                stateShape.GetDim(DIM_0), stateShape.GetDim(DIM_1), stateShape.GetDim(DIM_2), stateShape.GetDim(DIM_3),
-                expectStateShape.GetDim(DIM_0), expectStateShape.GetDim(DIM_1), expectStateShape.GetDim(DIM_2),
-                expectStateShape.GetDim(DIM_3)),
-        return ge::GRAPH_FAILED);
-    OP_CHECK_IF(
-        betaShape != expectBetaShape,
-        OP_LOGE(context_->GetNodeName(), "The shape of beta parameter[%ld, %ld] is not expected, Expect [%ld, %ld].",
-                betaShape.GetDim(DIM_0), betaShape.GetDim(DIM_1), expectBetaShape.GetDim(DIM_0),
-                expectBetaShape.GetDim(DIM_1)),
-        return ge::GRAPH_FAILED);
+    OP_CHECK_IF(stateShape != expectStateShape,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "state", Ops::Base::ToString(stateShape).c_str(),
+                    ("the shape of state must be [" + Ops::Base::ToString(expectStateShape) + "]").c_str()),
+                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(betaShape != expectBetaShape,
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "beta", Ops::Base::ToString(betaShape).c_str(),
+                    ("the shape of beta must be [" + Ops::Base::ToString(expectBetaShape) + "]").c_str()),
+                return ge::GRAPH_FAILED);
     OP_CHECK_IF(outShape != expectOutShape,
-                OP_LOGE(context_->GetNodeName(),
-                        "The shape of out parameter[%ld, %ld, %ld] is not expected, Expect [%ld, %ld, %ld].",
-                        outShape.GetDim(DIM_0), outShape.GetDim(DIM_1), outShape.GetDim(DIM_2),
-                        expectOutShape.GetDim(DIM_0), expectOutShape.GetDim(DIM_1), expectOutShape.GetDim(DIM_2)),
+                OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+                    context_->GetNodeName(), "out", Ops::Base::ToString(outShape).c_str(),
+                    ("the shape of out must be [" + Ops::Base::ToString(expectOutShape) + "]").c_str()),
                 return ge::GRAPH_FAILED);
-    OP_CHECK_IF(actSeqlensShape != expectActSeqlensShape,
-                OP_LOGE(context_->GetNodeName(),
-                        "The shape of actual_seq_lengths parameter[%ld] is not expected, Expect [%ld].",
-                        actSeqlensShape.GetDim(DIM_0), expectActSeqlensShape.GetDim(DIM_0)),
-                return ge::GRAPH_FAILED);
+    OP_CHECK_IF(
+        actSeqlensShape != expectActSeqlensShape,
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context_->GetNodeName(), "actual_seq_lengths", Ops::Base::ToString(actSeqlensShape).c_str(),
+            ("the shape of actual_seq_lengths must be [" + Ops::Base::ToString(expectActSeqlensShape) + "]").c_str()),
+        return ge::GRAPH_FAILED);
     OP_CHECK_IF(
         ssmStateShape != expectSsmStateShape,
-        OP_LOGE(context_->GetNodeName(), "The shape of ssm_state_indices parameter[%ld] is not expected, Expect [%ld].",
-                ssmStateShape.GetDim(DIM_0), expectSsmStateShape.GetDim(DIM_0)),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context_->GetNodeName(), "ssm_state_indices", Ops::Base::ToString(ssmStateShape).c_str(),
+            ("the shape of ssm_state_indices must be [" + Ops::Base::ToString(expectSsmStateShape) + "]").c_str()),
         return ge::GRAPH_FAILED);
 
     if (AnalyzeOptionalShapes() != ge::GRAPH_SUCCESS) {
@@ -514,7 +562,9 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeShapes()
 bool RecurrentGatedDeltaRuleTiling::CheckFormat(ge::Format format, const std::string& Desc)
 {
     if (format == ge::FORMAT_FRACTAL_NZ) {
-        OP_LOGE(context_->GetNodeName(), "%s format not support NZ", Desc.c_str());
+        OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(context_->GetNodeName(), Desc.c_str(),
+                                               ge::TypeUtils::FormatToSerialString(format).c_str(),
+                                               ("the format of " + Desc + " can not be FRACTAL_NZ").c_str());
         return false;
     }
     return true;
@@ -533,19 +583,28 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::AnalyzeFormat()
 
     if (tilingData_.hasGama == 1) {
         auto gamaFormat = context_->GetOptionalInputDesc(G_INDEX)->GetStorageFormat();
-        OP_CHECK_IF(gamaFormat == ge::FORMAT_FRACTAL_NZ, OP_LOGE(context_->GetNodeName(), "g format not support NZ."),
+        OP_CHECK_IF(gamaFormat == ge::FORMAT_FRACTAL_NZ,
+                    OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(context_->GetNodeName(), "g",
+                                                           ge::TypeUtils::FormatToSerialString(gamaFormat).c_str(),
+                                                           "the format of g can not be FRACTAL_NZ"),
                     return ge::GRAPH_FAILED);
     }
     if (tilingData_.hasGamaK == 1) {
         auto gamaKFormat = context_->GetOptionalInputDesc(GK_INDEX)->GetStorageFormat();
-        OP_CHECK_IF(gamaKFormat == ge::FORMAT_FRACTAL_NZ, OP_LOGE(context_->GetNodeName(), "gk format not support NZ."),
+        OP_CHECK_IF(gamaKFormat == ge::FORMAT_FRACTAL_NZ,
+                    OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(context_->GetNodeName(), "gk",
+                                                           ge::TypeUtils::FormatToSerialString(gamaKFormat).c_str(),
+                                                           "the format of gk can not be FRACTAL_NZ"),
                     return ge::GRAPH_FAILED);
     }
     if (context_->GetOptionalInputDesc(NUM_ACCEPTED_TOKENS_INDEX) != nullptr) {
         auto numAcceptedTokensFormat = context_->GetOptionalInputDesc(NUM_ACCEPTED_TOKENS_INDEX)->GetStorageFormat();
-        OP_CHECK_IF(numAcceptedTokensFormat == ge::FORMAT_FRACTAL_NZ,
-                    OP_LOGE(context_->GetNodeName(), "num_accepted_tokens format not support NZ."),
-                    return ge::GRAPH_FAILED);
+        OP_CHECK_IF(
+            numAcceptedTokensFormat == ge::FORMAT_FRACTAL_NZ,
+            OP_LOGE_FOR_INVALID_FORMAT_WITH_REASON(context_->GetNodeName(), "num_accepted_tokens",
+                                                   ge::TypeUtils::FormatToSerialString(numAcceptedTokensFormat).c_str(),
+                                                   "the format of num_accepted_tokens can not be FRACTAL_NZ"),
+            return ge::GRAPH_FAILED);
     }
 
     return ge::GRAPH_SUCCESS;
@@ -592,10 +651,13 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::GetStrides()
         int64_t stride3 = strideState->GetStride(3);
         uint64_t expectStride2 = static_cast<uint64_t>(tilingData_.dk);
         OP_CHECK_IF(stride2 != static_cast<int64_t>(expectStride2) || stride3 != 1,
-                    OP_LOGE(inputParams_.opName,
-                            "State only supports non-contiguous on dim 0 and dim 1, the innermost two dims must be "
-                            "contiguous, but got stride[%ld, %ld, %ld, %ld], expected stride2=%lu, stride3=1.",
-                            stride0, stride1, stride2, stride3, expectStride2),
+                    OP_LOGE_FOR_INVALID_STRIDE(inputParams_.opName, "state",
+                                               (std::to_string(stride0) + ", " + std::to_string(stride1) + ", " +
+                                                std::to_string(stride2) + ", " + std::to_string(stride3))
+                                                   .c_str(),
+                                               ("stride2=" + std::to_string(expectStride2) +
+                                                ", stride3=1 (only dim 0 and dim 1 can be non-contiguous)")
+                                                   .c_str()),
                     return ge::GRAPH_FAILED);
         tilingData_.stateStride0 = static_cast<uint64_t>(stride0);
         tilingData_.stateStride1 = static_cast<uint64_t>(stride1);
@@ -650,7 +712,12 @@ ge::graphStatus RecurrentGatedDeltaRuleTiling::CalUbSize()
     coeff += (4 + 4) * aDk + 4 + 4;                                   // 4 for qInUb, kInUb, vInUb, deltaInUb, attnInUb
     int64_t vStep = (ubSize - usedUbBytes) / coeff / 8 * 8;           // 8 * sizeof(float) = 32
     if (vStep < 8) {                                                  // vStep不小于8
-        OP_LOGE(context_->GetNodeName(), "vStep should be bigger than 8, shape is too big.");
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context_->GetNodeName(), "query/value",
+            (Ops::Base::ToString(context_->GetInputShape(QUERY_INDEX)->GetOriginShape()) + "/" +
+             Ops::Base::ToString(context_->GetInputShape(VALUE_INDEX)->GetOriginShape()))
+                .c_str(),
+            "the shape is too large for the current platform, reduce T, Nv, Dv or Dk");
         return ge::GRAPH_FAILED;
     }
     int64_t rptime = Ops::Base::CeilDiv(tilingData_.dv, static_cast<uint32_t>(vStep));

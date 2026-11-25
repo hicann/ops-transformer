@@ -692,8 +692,18 @@ ge::graphStatus QkvRmsNormRopeCacheWithKScaleBaseTiling::ValidateStrides() const
     const bool vNonOverlapping = IsNonOverlappingPositiveStrides(
         4U, [this](std::size_t index) { return input_.vCache.shape.GetDim(index); },
         [&vStride](std::size_t index) { return vStride.GetStride(index); });
+    const std::string kvOverlapStrideValue = std::to_string(GetStrideDimOrZero(input_.kCache.stride, 0)) + ", " +
+                                             std::to_string(GetStrideDimOrZero(input_.kCache.stride, 1)) + ", " +
+                                             std::to_string(GetStrideDimOrZero(input_.kCache.stride, 2)) + ", " +
+                                             std::to_string(GetStrideDimOrZero(input_.kCache.stride, 3)) + " and " +
+                                             std::to_string(GetStrideDimOrZero(input_.vCache.stride, 0)) + ", " +
+                                             std::to_string(GetStrideDimOrZero(input_.vCache.stride, 1)) + ", " +
+                                             std::to_string(GetStrideDimOrZero(input_.vCache.stride, 2)) + ", " +
+                                             std::to_string(GetStrideDimOrZero(input_.vCache.stride, 3));
     OP_CHECK_IF(!kNonOverlapping || !vNonOverlapping,
-                OP_LOGE(context_, "K/V cache views overlap or their checked span overflows."), return ge::GRAPH_FAILED);
+                OP_LOGE_FOR_INVALID_STRIDE(opName_, "kCache/vCache", kvOverlapStrideValue.c_str(),
+                                           "positive non-overlapping strides for the given cache shapes"),
+                return ge::GRAPH_FAILED);
     const bool invalidKScaleStride = !input_.kScaleCache.stridePresent || kScaleStride.GetDimNum() != 4 ||
                                      kScaleStride.GetStride(0) <= 0 || kScaleStride.GetStride(1) <= 0 ||
                                      kScaleStride.GetStride(2) < minKScaleTokenStride || kScaleStride.GetStride(3) != 1;
@@ -710,7 +720,9 @@ ge::graphStatus QkvRmsNormRopeCacheWithKScaleBaseTiling::ValidateStrides() const
     const bool kScaleNonOverlapping = IsNonOverlappingPositiveStrides(
         4U, [this](std::size_t index) { return input_.kScaleCache.shape.GetDim(index); },
         [&kScaleStride](std::size_t index) { return kScaleStride.GetStride(index); });
-    OP_CHECK_IF(!kScaleNonOverlapping, OP_LOGE(context_, "K scale cache view overlaps or its checked span overflows."),
+    OP_CHECK_IF(!kScaleNonOverlapping,
+                OP_LOGE_FOR_INVALID_STRIDE(opName_, "kScaleCache", kScaleStrideValue.c_str(),
+                                           "positive non-overlapping strides for the given cache shape"),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -942,7 +954,6 @@ ge::graphStatus QkvRmsNormRopeCacheWithKScaleBaseTiling::ValidateParsedInput() c
     status = ValidateScalarInputs();
     OP_CHECK_IF(status != ge::GRAPH_SUCCESS,
                 OP_LOGE(context_, "QkvRmsNormRopeCacheWithKScale scalar validation failed."), return ge::GRAPH_FAILED);
-
     status = ValidateDtypes();
     OP_CHECK_IF(status != ge::GRAPH_SUCCESS,
                 OP_LOGE(context_, "QkvRmsNormRopeCacheWithKScale dtype validation failed."), return ge::GRAPH_FAILED);
