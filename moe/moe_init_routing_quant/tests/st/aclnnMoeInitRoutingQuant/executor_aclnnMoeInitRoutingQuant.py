@@ -70,13 +70,11 @@ class FunctionApi(BaseApi):
         )
 
     def init_by_input_data(self, input_data: InputDataset):
+        expert_idx = input_data.kwargs["expertIdx"]
+        num_rows, k = expert_idx.shape
         input_data.kwargs["rowIdx"] = (
-            torch.arange(input_data.kwargs["expertIdx"].size(0))
-            .reshape(-1, 1)
-            .expand(
-                input_data.kwargs["expertIdx"].size(0),
-                input_data.kwargs["expertIdx"].size(1),
-            )
-            .to(torch.int32)
-            .to(input_data.kwargs["expertIdx"].device)
+            torch.arange(num_rows * k, dtype=torch.int32, device=expert_idx.device)
+            .reshape(k, num_rows)
+            .transpose(0, 1)
+            .contiguous()
         )
