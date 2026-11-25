@@ -78,13 +78,13 @@ grad_expert_output_nvsh, _, _, _ = dispatch(grad_output_sh, plan=plan)
 
 | 参数名 | 输入/输出 | 描述 | 数据类型 | 数据格式 |
 | :--- | :--- | :--- | :--- | :--- |
-| `hidden_sh` | 输入 | 前向 token / 反向输出梯度，shape `(S, H)` | BFLOAT16、FLOAT16 | ND |
+| `hidden_sh` | 输入 | 前向 token / 反向输出梯度，shape `(S, H)`；FP8 透传时传 `(x_fp8, scales)` | BFLOAT16、FLOAT16、FLOAT8_E4M3FN、FLOAT8_E5M2 | ND |
 | `route_weights_sk` | 可选输入 | 前向路由权重，shape `(S, K)`，内部转 fp32 | FLOAT32 | ND |
 | `topk_experts_sk` | 可选输入 | 前向 top-k 专家索引，shape `(S, K)` | INT32 | ND |
 | `tokens_per_expert` | 可选输入 | 前向专家计数，shape `(E,)` | INT32 | ND |
 | `plan` | 可选输入 | 反向复用前向 plan；与路由参数互斥 | MoonepPlan | - |
 | `do_cpu_sync` | 可选输入 | True（缺省）精确分配接收区；False 按最坏容量 `cap = R × S × min(K, 2·epn)` 分配 | BOOL | - |
-| `hidden_nvsh` | 输出 | 接收区，shape `(cap, H)`；dtype 同输入 | 同输入 | ND |
+| `hidden_nvsh` | 输出 | 接收区，shape `(cap, H)`；dtype 同输入；FP8 时返回 `(hidden_nvsh, scales)`，scales shape 为 `(cap, H1)` | 同输入 | ND |
 | `route_weights_nvs` | 输出 | 接收行路由权重，shape `(cap,)`；反向为 None | FLOAT32 | ND |
 | `cu_seqlens` | 输出 | 前向 plan 的分段偏移（`plan.cu_seqlens`） | INT32 | ND |
 | `plan` | 输出 | 前向新建 / 反向原样返回的 `MoonepPlan` | MoonepPlan | - |
@@ -94,7 +94,9 @@ grad_expert_output_nvsh, _, _, _ = dispatch(grad_output_sh, plan=plan)
 | 场景 | 返回值 |
 | :--- | :--- |
 | 前向 | `hidden_nvsh (cap, H)`、`route_weights_nvs (cap,)`（未传路由权重时为 `None`）、`cu_seqlens (2*epn,)`、新建的 `plan` |
+| 前向（FP8） | `(hidden_nvsh, scales)`：`hidden_nvsh (cap, H)`、`scales (cap, H1)`；其余返回值同前向 |
 | 反向（传 `plan=`） | `grad_expert_output_nvsh (cap, H)`、`None`、`plan.cu_seqlens (2*epn,)`、原样返回的 `plan` |
+| 反向（FP8，传 `plan=`） | `(grad_expert_output_nvsh, scales)`：`grad_expert_output_nvsh (cap, H)`、`scales (cap, H1)`；其余返回值同反向 |
 
 `cap` 的取值：
 
@@ -106,9 +108,12 @@ grad_expert_output_nvsh, _, _, _ = dispatch(grad_output_sh, plan=plan)
 接口约束：
 
 - 前向须传 `topk_experts_sk` 与 `tokens_per_expert`，`route_weights_sk` 可选；反向必须传 `plan=` 且路由参数为空。
-- `hidden_sh` 严格为 `(S, H)`；`route_weights_sk` / `topk_experts_sk` 严格为 `(S, K)`；张量须在 NPU 上。
+- `hidden_sh` 张量严格为 `(S, H)`；`route_weights_sk` / `topk_experts_sk` 严格为 `(S, K)`；张量须在 NPU 上。
+- FP8 透传：`hidden_sh=(x_fp8, scales)`，`x_fp8` 支持 `float8_e4m3fn` / `float8_e5m2`，`scales` 为连续 `float32` / `float8_e8m0`，shape 为 `(S, H1)`；输出同样为 `(hidden_nvsh, scales)`。
+- FP8 `H1` 规则：`float32` scales 为 `ceil(H / 128)`；`float8_e8m0` scales 为 `Align2(ceil(H / 32))`。接收侧返回的 scales 必须保持与 dispatch 输入一致的 dtype 和 `H1` 映射。
+- FP8 dispatch 返回 `(recv_x_fp8, recv_scales)`；专家计算/GMM 必须使用 `recv_scales` 完成反量化。`combine` 的 `hidden_nvsh` 只接收专家计算后的 `bf16/fp16` 结果，不是直接 cast 的原始 `x_fp8`。
 - 内部用 `plan.vtopk` 作为 `topk_idx`、`num_experts = 2E`、每 rank 容量 `nmtr = S`。
-- `hidden_sh` 须为 bf16/fp16 且连续（与 `combine` 的 `hidden_nvsh` 同规则）。
+- `hidden_sh` 须连续（与 `combine` 的 `hidden_nvsh` 同规则）；FP8 tuple 的两个张量都须连续。
 
 ### MoonepPlan 结构
 
