@@ -64,6 +64,10 @@
         quantResult = round((x * scaleOptional) + offsetOptional)
         $$
 
+        <!-- npu="A3,910b" id8 -->
+        在<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>上，当quantMode为0且x的数据类型为FLOAT32时，静态量化按FLOAT16精度执行乘法和加法，再舍入为INT8。
+        <!-- end id8 -->
+
     - 动态quant：
         - 若不输入scale：
 

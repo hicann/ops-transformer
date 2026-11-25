@@ -66,6 +66,10 @@
         quantResult = round((x * scaleOptional) + offsetOptional)
         $$
 
+        <!-- npu="A3,910b" id8 -->
+        On <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, when quantMode is 0 and x is FLOAT32, static quantization performs multiplication and addition in FLOAT16 before rounding to INT8.
+        <!-- end id8 -->
+
     - dynamic quant:
         - If scale is not provided:
 
