@@ -39,11 +39,11 @@
 aclnnStatus aclnnBandwidthTestGetWorkspaceSize(
     const aclTensor* x,
     const aclTensor* dstRankId,
-    const char*      group,
+    char*            group,
     int64_t          worldSize,
     int64_t          maxBs,
     int64_t          mode,
-    const char*      commAlg,
+    char*            commAlg,
     int64_t          aivNum,
     aclTensor*       y,
     aclTensor*       receiveCnt,
