@@ -5,7 +5,7 @@
 ## Applicable Products
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR&950DT products</term>: Not supported
+- <term>Ascend 950PR&950DT products</term>: Supported
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
 - <term>Atlas A3 products</term>: Supported
@@ -28,6 +28,10 @@
 - **Description**:
 
     This API must be used together with [low_latency_dispatch](torchapi_low_latency_dispatch_en.md) and [low_latency_combine](torchapi_low_latency_combine_en.md) to compute the size (unit: MB) of the HCCL communication buffer required by the dispatch_v3 and combine_v3 operators. This API is a static method and can be called before `MoeDistributeBuffer` is initialized.
+
+<!-- npu="950" id7 -->
+- For <term>Ascend 950PR&950DT products</term>, passing `comm_alg="hierarchy"` to `get_low_latency_ccl_buffer_size` raises `ValueError`.
+<!-- end id7 -->
 
 - **Formula**:
 

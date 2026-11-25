@@ -51,13 +51,16 @@ struct MoeDistributeDispatchV2Info {
     uint64_t scalesCount;
     uint32_t cumsumTmpMinSize; // cumsum min tmp size, 0 means no cumsum
     uint64_t roceDispatchOffset;
-    uint64_t roceExpertOffset;
-    uint64_t roceTokenMapOffset;
     uint32_t useL0Layout; // Full-size layout selected by Host UB accounting.
     // combine接收区rsw_buffer挡位(0=旧协议480/512槽位), 与combine侧同口径决策, 决定dispatch区起始偏移
     uint64_t rswBufferSize;
     uint32_t rswBufferIdx;
     uint32_t tokenNumPerSlot;
+    uint32_t roceQuantBufferNum;
+    uint32_t roceGatherBufferNum;
+    uint32_t roceCopyBufferNum;
+    uint32_t roceCountMaskBufferNum;
+    uint32_t roceSenderMaskBufferNum;
 };
 
 struct MoeDistributeDispatchV2TilingData {

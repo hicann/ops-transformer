@@ -584,14 +584,13 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     <summary><term>Ascend 950DT系列产品</term>：</summary>
 
     - expertScales可选择是否使能专家权重功能；expertScales传形状为(BS, K)的有效Tensor时使能并进行加权，传空Tensor时不使能并直接对专家输出求和。
-    - commAlg当前版本不支持，传空指针即可。
+    - commAlg支持默认的 UB Memory 模式和用于 RoCE 分层通信的"hierarchy"；"hierarchy"使用域内 UB Memory、域间 RoCE 通信。
     - epSendCounts的shape为(epWorldSize \* localExpertNum, )。
     - 当前不支持TP域通信。
     - xActiveMaskOptional要求为1D或2D Tensor（1D时shape为(BS, )，2D时shape为(BS, K)）；1D时true需排在false前，2D时token对应K个值全为false则不参与通信。
-    - expandScalesOptional预留参数，当前版本不支持，传空指针即可。
     - sharedExpertXOptional要求为2D或3D Tensor（2D时shape为(BS, H)；3D时前两位乘积等于BS、第三维等于H）；可传或不传，传入时sharedExpertRankNum需为0。
     - epWorldSize取值支持[2, 1024]。
-    - moeExpertNum取值范围(0, 2048]。
+    - `moeExpertNum`取值范围(0, 2048]，仅统计MoE专家数，不与共享专家数相加后判断上限。
     - groupTp当前版本不支持，传空字符即可。
     - tpWorldSize当前版本不支持，传0即可。
     - tpRankId当前版本不支持，传0即可。
@@ -599,7 +598,6 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     - sharedExpertNum当前取值范围[0, 4]。
     - sharedExpertRankNum取值范围[0, epWorldSize)；为0时需满足sharedExpertNum为0或1，不为0时需满足sharedExpertRankNum % sharedExpertNum = 0。
     - commQuantMode取值范围0、2、3或4（0表示不量化，2表示int8量化，3表示mxfp8量化e5m2，4表示mxfp8量化e4m3）。
-    - expandScalesOptional预留参数，当前版本不支持，传空指针即可。
     - elasticInfoOptional预留参数，当前版本不支持，传空指针即可。
     - constExpertAlpha1Optional可选择传入有效数据或空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为<code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
     - constExpertAlpha2Optional可选择传入有效数据或空指针，当constExpertNum不为0时必须传入有效输入；当传入有效数据时，要求是一个2D的Tensor，shape为<code>(constExpertNum, H)</code>，数据类型需与expandX保持一致。
@@ -608,6 +606,16 @@ aclnnStatus aclnnMoeDistributeCombineV4(
     - copyExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，合法的拷贝专家的ID的值是[<code>moeExpertNum + zeroExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum</code>)。
     - constExpertNum取值范围:[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的常量专家的ID的值是[<code>moeExpertNum + zeroExpertNum + copyExpertNum</code>, <code>moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum</code>)。
     - performanceInfoOptional可选择传入有效数据或空指针，传入空指针时表示不开启记录通信耗时功能；当传入有效数据时，要求是一个1D的Tensor，shape为(epWorldSize,)，数据类型支持int64；数据格式要求为ND。
+    - RoCE 预聚合使用专家权重时，expandScalesOptional必须传入 Dispatch 输出的 FP32 ND 一维 expandScalesOut，长度至少为A；默认 UB Memory 模式仍不支持该参数。
+
+    **RoCE 约束（commAlg="hierarchy"）**：
+
+    - EP 通信域包含多个等规模 UB 通信域，各域内 rank 连续编号，域间相同局部 rank 具有 RoCE 链路。通信上下文从拓扑获取每个域的 rank 数。
+    - 不支持共享专家，`sharedExpertRankNum > 0`直接报错；`sharedExpertRankNum=0`时，`sharedExpertNum=0`或默认值1均表示未启用共享专家。elasticInfoOptional和performanceInfoOptional传空指针。
+    - RoCE不支持`low_latency_dispatch`和`low_latency_combine`接口，请使用ACLNN或torch_npu V2接口。
+    - 各 rank 的 BS 不一致时，配置相同且非0的容量globalBs=epWorldSize*maxBS，其中maxBS不超过512。Dispatch、Combine 的拓扑、容量和通信模式保持一致。
+    - sharedExpertXOptional传空指针。本 V4 接口启用预聚合，在域内聚合同一 token 的专家结果后通过 RoCE 发送。
+    - 创建通信域前配置HCCL_BUFFSIZE，单位为MiB，窗口容量需同时满足 Dispatch 与 Combine 的需求。
     </details>
     <!-- end id9 -->
 
@@ -814,7 +822,7 @@ aclnnStatus aclnnMoeDistributeCombineV4(
 - **通信方式约束**：
 
   <!-- npu="950" id18 -->
-  - <term>Ascend 950DT系列产品</term>：仅支持UB Memory通信。
+  - <term>Ascend 950DT系列产品</term>：支持 UB Memory 通信；commAlg="hierarchy"时使用域内 UB Memory、域间 RoCE 通信。
 
   <!-- end id18 -->
 

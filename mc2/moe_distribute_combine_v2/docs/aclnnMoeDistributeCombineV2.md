@@ -462,14 +462,16 @@ aclnnStatus aclnnMoeDistributeCombineV2(
     <!-- npu="950" id9 -->
     - <term>Ascend 950DT系列产品</term>：
         - `expertScales`可选择是否使能专家权重功能；`expertScales`传形状为(BS, K)的有效Tensor时使能并进行加权，传空Tensor时不使能并直接对专家输出求和。
-        - `commAlg`当前版本不支持，传空指针即可。
+        - commAlg支持默认的 UB Memory 模式和用于 RoCE 分层通信的"hierarchy"；"hierarchy"使用域内 UB Memory、域间 RoCE 通信。
         - `epSendCounts`的shape为(epWorldSize \* max(tpWorldSize, 1) \* localExpertNum, )。
         - `tpSendCountsOptional`当前版本不支持，传空指针即可。
         - `xActiveMaskOptional`要求为1D或2D Tensor（1D时shape为(BS, )，2D时shape为(BS, K)）；1D时true需排在false前（例：{true, false, true}非法），2D时token对应K个值全为false则不参与通信。
         - `expandScalesOptional`预留参数，当前版本不支持，传空指针即可。
         - `sharedExpertXOptional`要求为2D或3D Tensor（2D时shape为(BS, H)；3D时前两位乘积等于BS、第三维等于H）；可传或不传，传入时sharedExpertRankNum需为0。
         - `epWorldSize`取值支持[2, 1024]。
-        - `moeExpertNum`取值范围(0, 2048]。
+        - `moeExpertNum`取值范围(0, 2048]，仅统计MoE专家数，不与共享专家数相加后判断上限。
+        - RoCE（`commAlg="hierarchy"`）不支持共享专家，`sharedExpertRankNum > 0`直接报错；`sharedExpertRankNum=0`时，`sharedExpertNum=0`或默认值1均表示未启用共享专家。`sharedExpertXOptional`必须传空指针。
+        - RoCE不支持`low_latency_dispatch`和`low_latency_combine`接口，请使用ACLNN或torch_npu V2接口。
         - `groupTp`当前版本不支持，传空字符即可。
         - `tpWorldSize`当前版本不支持，传0即可。
         - `tpRankId`当前版本不支持，传0即可。

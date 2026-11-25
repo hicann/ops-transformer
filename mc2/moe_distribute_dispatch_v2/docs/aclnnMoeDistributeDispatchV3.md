@@ -386,7 +386,7 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
     <td>dynamicScalesOut</td>
     <td>输出</td>
     <td>缩放参数。</td>
-    <td>要求为1D或2D Tensor。quantMode取值为2、3、4时有输出；quantMode取值为0且`x`的数据类型为`HIFLOAT8`、`FLOAT8_E5M2`、`FLOAT8_E4M3FN`、`FLOAT4_E2M1`、`FLOAT4_E1M2`、`INT32`时也有输出。</td>
+    <td>要求为1D或2D Tensor。quantMode取值为2、3、4、5时有输出；quantMode取值为0且`x`的数据类型为`HIFLOAT8`、`FLOAT8_E5M2`、`FLOAT8_E4M3FN`、`FLOAT4_E2M1`、`FLOAT4_E1M2`、`INT32`时也有输出。</td>
     <td>FLOAT32、FLOAT8_E8M0</td>
     <td>-</td>
     <td>-</td>
@@ -521,12 +521,16 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
     <details>
     <summary><term>Ascend 950DT系列产品</term>：</summary>
 
-    - dynamicScalesOut quantMode取值为2、3、4时有输出；quantMode取值为0且`x`的数据类型为`HIFLOAT8`、`FLOAT8_E5M2`、`FLOAT8_E4M3FN`、`FLOAT4_E2M1`、`FLOAT4_E1M2`时也有输出。
-    - commAlg支持""、"fullmesh_v1"、"fullmesh_v2"三种输入方式。""：默认值，开启fullmesh_v1模板；"fullmesh_v1"：开启fullmesh_v1模板；"fullmesh_v2"：开启fullmesh_v2模板。
+    - dynamicScalesOut quantMode取值为2、3、4、5时有输出；quantMode取值为0且`x`的数据类型为`HIFLOAT8`、`FLOAT8_E5M2`、`FLOAT8_E4M3FN`、`FLOAT4_E2M1`、`FLOAT4_E1M2`时也有输出。
+    - commAlg支持""、"fullmesh_v1"、"fullmesh_v2"和"hierarchy"；"hierarchy"使用域内 UB Memory、域间 RoCE 通信。
     - xActiveMaskOptional要求为1D或2D Tensor（1D时shape为(BS, )，2D时shape为(BS, K)）；1D时true需排在false前，2D时token对应K个值全为false则不参与通信。
     - expertScalesOptional可传有效Tensor或空指针。传有效Tensor时使能expertScales专家权重功能，有效Tensor为2D Tensor，shape为(BS, K)；传空指针时不使能expertScales专家权重功能。不支持空Tensor。
     - epWorldSize取值范围[2, 1024]。
-    - moeExpertNum取值范围(0, 2048]。
+    - `moeExpertNum`取值范围(0, 2048]，仅统计MoE专家数，不与共享专家数相加后判断上限。
+    - RoCE（`commAlg="hierarchy"`）不支持共享专家，`sharedExpertRankNum > 0`直接报错；`sharedExpertRankNum=0`时，`sharedExpertNum=0`或默认值1均表示未启用共享专家。
+    - RoCE不支持`low_latency_dispatch`和`low_latency_combine`接口，请使用ACLNN或torch_npu V2接口。
+    - RoCE（`commAlg="hierarchy"`）仅支持`quantMode=0`（非量化）、`quantMode=4`（`MX_QUANT`）或`quantMode=5`（`MX_QUANT_CLIP`）；其他取值均直接报错。模式4和5的`scalesOptional`必须传空指针。
+    - 对于 RoCE（`commAlg="hierarchy"`），`expertScalesOptional` 必须传入形状为 `(BS, K)` 的有效 FP32 ND Tensor，`elasticInfoOptional` 和 `performanceInfoOptional` 必须传空指针。
     - groupTp当前版本不支持，传空字符串即可。
     - tpWorldSize当前版本不支持，传0即可。
     - tpRankId当前版本不支持，传0即可。
@@ -536,12 +540,12 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
     - epRecvCountsOut的shape为(epWorldSize \* localExpertNum,)。
     - tpRecvCountsOut（预留输出，当前版本不支持，传空指针即可）。
     - expandScalesOut当使能expertScales专家权重功能时，输出有效；不使能时，该输出无效。
-    - quantMode支持0（非量化）、1（静态量化）、2（pertoken动态量化）、3（pergroup动态量化）、4（mx动态量化）。
+    - quantMode支持0（非量化）、1（静态量化）、2（pertoken动态量化）、3（pergroup动态量化）、4（MX_QUANT）、5（MX_QUANT_CLIP）。
     - elasticInfoOptional当前版本不支持，传空指针即可。
     - zeroExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1,合法的零专家的ID的值是<code>[moeExpertNum, moeExpertNum + zeroExpertNum)</code>。
     - copyExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum)</code>。
     - constExpertNum取值范围：[0, MAX_INT32)，MAX_INT32 = 2^31 - 1，专家ID范围<code>[moeExpertNum + zeroExpertNum + copyExpertNum, moeExpertNum + zeroExpertNum + copyExpertNum + constExpertNum)</code>。
-    - scalesOptional quantMode取值为0时，若`x`的数据类型为`FLOAT16`或`BFLOAT16`则传空指针，若`x`的数据类型为`HIFLOAT8`、`FLOAT8_E5M2`、`FLOAT8_E4M3FN`、`FLOAT4_E2M1`、`FLOAT4_E1M2`则必传有效数据；quantMode取值为1时必传有效数据；quantMode取值为2或3时可传有效数据或空指针；quantMode取值为4时传空指针。
+    - scalesOptional quantMode取值为0时，若`x`的数据类型为`FLOAT16`或`BFLOAT16`则传空指针，若`x`的数据类型为`HIFLOAT8`、`FLOAT8_E5M2`、`FLOAT8_E4M3FN`、`FLOAT4_E2M1`、`FLOAT4_E1M2`则必传有效数据；quantMode取值为1时必传有效数据；quantMode取值为2或3时可传有效数据或空指针；quantMode取值为4或5时传空指针。
     </details>
     <!-- end id11 -->
 
@@ -741,6 +745,8 @@ aclnnStatus aclnnMoeDistributeDispatchV3(
           - 若输入`scalesOptional`传入有效数据且不存在共享专家卡时，其shape为(`moeExpertNum`, `H`)。
           - 输出`dynamicScalesOut`shape为`(A, Ceil(H, 128))`，其中`Ceil(H, 128) = (H + 128 - 1) / 128`。
       - `quantMode`取值为4时，表示mx量化场景，`expandX`的数据类型支持`FLOAT8_E4M3FN`、`FLOAT8_E5M2`、`FLOAT4_E2M1`、`FLOAT4_E1M2`，输入`scalesOptional`必须传入空指针。输出`dynamicScalesOut`shape为`(A, CeilAlign(Ceil(H, 32), 2))`，其中`Ceil(H, 32) = (H + 32 - 1) / 32`，`CeilAlign(N, 2) = ((N + 1) / 2) * 2`，除法向下取整。当`expandX`的数据类型为`FLOAT4_E2M1`或`FLOAT4_E1M2`时，H必须为偶数。
+
+      - `quantMode`取值为5（`MX_QUANT_CLIP`）时，输出数据类型支持`FLOAT8_E4M3FN`和`FLOAT8_E5M2`，`scalesOptional`必须传空指针。`dynamicScalesOut`的数据类型为`FLOAT8_E8M0`，shape为`(A, ((H + 31) // 32 + 1) // 2 * 2)`，其中`//`表示整数除法。
 
   <!-- end id15 -->
 

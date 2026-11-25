@@ -16,6 +16,9 @@ namespace {
 using Attr = gert::TilingContextPara::OpAttr;
 using Tensor = gert::TilingContextPara::TensorDescription;
 
+// 256 route rows and two UB domains with 16 tokens per rank.
+constexpr int64_t MIN_ASSIST_INFO_SIZE = 816;
+
 std::vector<Attr> GetRoceDispatchAttrs(int64_t ranksPerServer, int64_t windowBytes)
 {
     const std::vector<std::pair<std::string, int64_t>> values = {
@@ -62,28 +65,28 @@ void RunRoceDispatchCase(int64_t ranksPerServer, int64_t assistSize, int64_t win
 
 TEST(MoeDistributeDispatchV3RoceTiling, Topk16AndCompactAssist)
 {
-    RunRoceDispatchCase(4, 836, 64U * 1024U * 1024U, ge::GRAPH_SUCCESS);
+    RunRoceDispatchCase(4, MIN_ASSIST_INFO_SIZE, 64U * 1024U * 1024U, ge::GRAPH_SUCCESS);
 }
 
 TEST(MoeDistributeDispatchV3RoceTiling, RejectsSingleServer)
 {
-    RunRoceDispatchCase(8, 836, 64U * 1024U * 1024U, ge::GRAPH_FAILED);
+    RunRoceDispatchCase(8, MIN_ASSIST_INFO_SIZE, 64U * 1024U * 1024U, ge::GRAPH_FAILED);
 }
 
-TEST(MoeDistributeDispatchV3RoceTiling, RejectsTruncatedSharedCount)
+TEST(MoeDistributeDispatchV3RoceTiling, RejectsTruncatedAssist)
 {
-    RunRoceDispatchCase(4, 835, 64U * 1024U * 1024U, ge::GRAPH_FAILED);
+    RunRoceDispatchCase(4, MIN_ASSIST_INFO_SIZE - 1, 64U * 1024U * 1024U, ge::GRAPH_FAILED);
 }
 
 TEST(MoeDistributeDispatchV3RoceTiling, RejectsInvalidTopologyAndSmallWindow)
 {
-    RunRoceDispatchCase(3, 836, 64U * 1024U * 1024U, ge::GRAPH_FAILED);
-    RunRoceDispatchCase(4, 836, 1024U * 1024U, ge::GRAPH_FAILED);
+    RunRoceDispatchCase(3, MIN_ASSIST_INFO_SIZE, 64U * 1024U * 1024U, ge::GRAPH_FAILED);
+    RunRoceDispatchCase(4, MIN_ASSIST_INFO_SIZE, 1024U * 1024U, ge::GRAPH_FAILED);
 }
 
 TEST(MoeDistributeDispatchV3RoceTiling, AssistIncludesCountAndInt32TailPadding)
 {
-    EXPECT_EQ(Mc2Tiling::GetRoceAssistInfoSize(256, 8, 16), 836U);
-    EXPECT_EQ(Mc2Tiling::GetRoceAssistInfoSize(1, 3, 17), 53U);
+    EXPECT_EQ(Mc2Tiling::GetRoceAssistInfoSize(256, 8, 16), 960U);
+    EXPECT_EQ(Mc2Tiling::GetRoceAssistInfoSize(1, 3, 17), 99U);
 }
 } // namespace

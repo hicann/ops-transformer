@@ -3,7 +3,7 @@
 ## 产品支持情况
 
 <!-- npu="950" id1 -->
-- <term>Ascend 950PR&950DT系列产品</term>：不支持
+- <term>Ascend 950PR&950DT系列产品</term>：支持
 <!-- end id1 -->
 <!-- npu="A3" id2 -->
 - <term>Atlas A3系列产品</term>：支持
@@ -26,6 +26,10 @@
 - **接口功能**：
 
     需与[low_latency_dispatch](torchapi_low_latency_dispatch.md)和[low_latency_combine](torchapi_low_latency_combine.md)配套使用，用于计算dispatch_v3和combine_v3算子所需的HCCL通信buffer_size大小（单位：MB）。该接口为静态方法，可在初始化`MoeDistributeBuffer`前调用。
+
+<!-- npu="950" id7 -->
+- 对于<term>Ascend 950PR&950DT系列产品</term>，`get_low_latency_ccl_buffer_size` 的 `comm_alg` 不支持取值 `"hierarchy"`。传入该取值会抛出 `ValueError`。
+<!-- end id7 -->
 
 - **计算公式**：
 

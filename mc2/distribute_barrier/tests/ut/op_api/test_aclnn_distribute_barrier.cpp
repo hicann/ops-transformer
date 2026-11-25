@@ -64,6 +64,7 @@ struct BarrierCaptureRuntime {
     aclmdlRICaptureMode mode = ACL_MODEL_RI_CAPTURE_MODE_GLOBAL;
     aclError clearStatus = ACL_SUCCESS;
     uint32_t clears = 0;
+    std::vector<uint64_t> cclBuffer;
 };
 } // namespace
 
@@ -270,16 +271,9 @@ protected:
             }
             return HCCL_SUCCESS;
         };
-        owner_.HcclChannelGetRemoteMems = [](HcclComm, ChannelHandle channel, uint32_t* count, CommMem** memories,
-                                             char*** tags) {
-            static CommMem memory{};
-            static char tag[] = "barrier_buffer";
-            static char* tagPtr = tag;
-            memory.addr = reinterpret_cast<void*>(0x100000000ULL + channel * 0x200000ULL);
-            memory.size = 0x200000ULL;
-            *count = 1;
-            *memories = &memory;
-            *tags = &tagPtr;
+        owner_.HcclChannelGetHcclBuffer = [](HcclComm, ChannelHandle channel, void** buffer, uint64_t* capacity) {
+            *buffer = reinterpret_cast<void*>(0x100000000ULL + channel * 0x200000ULL);
+            *capacity = 0x200000ULL;
             return HCCL_SUCCESS;
         };
     }
@@ -516,9 +510,8 @@ TEST_F(Mc2BarrierContextTest, PreservesTransportAndSelectsDeviceBackend)
         context.localSize = 4;
         context.railSize = 2;
         builder.InitPeers(context);
-        HcclMemHandle memory = nullptr;
         std::vector<HcclChannelDesc> descs;
-        ASSERT_EQ(builder.DescribeChannels(context, memory, descs), ACLNN_SUCCESS);
+        ASSERT_EQ(builder.DescribeChannels(context, descs), ACLNN_SUCCESS);
         EXPECT_EQ(descs[1].channelProtocol, COMM_PROTOCOL_UB_MEM);
         EXPECT_EQ(descs[5].channelProtocol, protocol);
         auto* peers = reinterpret_cast<Mc2Barrier::Peer*>(&context + 1);
@@ -568,10 +561,11 @@ TEST_F(Mc2BarrierContextTest, ReusesContextAfterTopologyBecomesLocalOnly)
     context.rank = initial.rank;
     context.localSize = 16;
     context.railSize = 2;
-    std::vector<uint64_t> window(Mc2Barrier::WindowBytes(16, 2) / sizeof(uint64_t), 1234U);
+    context.windowBytes = Mc2Barrier::WindowBytes(context.localSize, context.railSize);
+    std::vector<uint64_t> window(context.windowBytes / sizeof(uint64_t), 1234U);
     context.window = reinterpret_cast<uint64_t>(window.data());
     initial.InitPeers(context);
-    ASSERT_EQ(initial.BuildChannels(context, "barrier_buffer", reinterpret_cast<void*>(1)), ACLNN_SUCCESS);
+    ASSERT_EQ(initial.BuildChannels(context), ACLNN_SUCCESS);
     EXPECT_EQ(channels_.at(31), protocols_.front());
     EXPECT_EQ(channels_.at(1), COMM_PROTOCOL_UB_MEM);
     const auto* peers = reinterpret_cast<const Mc2Barrier::Peer*>(&context + 1);
@@ -622,9 +616,13 @@ TEST_F(Mc2BarrierContextTest, InitializesWindowDuringGlobalCaptureAndRestoresMod
     MockContextStorage();
     MockChannels();
     BarrierCaptureRuntime runtime;
-    owner_.HcclCommMemReg = [](HcclComm, const char*, const CommMem*, HcclMemHandle* handle) {
-        EXPECT_EQ(g_barrierCaptureRuntime->mode, ACL_MODEL_RI_CAPTURE_MODE_GLOBAL);
-        *handle = reinterpret_cast<HcclMemHandle>(1);
+    const uint64_t windowBytes = Mc2Barrier::WindowBytes(localSize_, ranks_.size() / localSize_);
+    runtime.cclBuffer.resize((windowBytes + Mc2Barrier::SLOT_BYTES) / sizeof(uint64_t), 1234U);
+    owner_.HcclGetHcclBuffer = [](HcclComm, void** buffer, uint64_t* capacity) {
+        auto& runtime = *g_barrierCaptureRuntime;
+        EXPECT_EQ(runtime.mode, ACL_MODEL_RI_CAPTURE_MODE_GLOBAL);
+        *buffer = runtime.cclBuffer.data();
+        *capacity = runtime.cclBuffer.size() * sizeof(uint64_t);
         return HCCL_SUCCESS;
     };
     Builder builder{owner_, this};
@@ -634,6 +632,9 @@ TEST_F(Mc2BarrierContextTest, InitializesWindowDuringGlobalCaptureAndRestoresMod
     EXPECT_EQ(runtime.mode, ACL_MODEL_RI_CAPTURE_MODE_GLOBAL);
     auto* context = static_cast<Mc2Barrier::Context*>(cached);
     auto* window = reinterpret_cast<uint64_t*>(context->window);
+    ASSERT_EQ(context->windowBytes, windowBytes);
+    ASSERT_EQ(window, runtime.cclBuffer.data() + Mc2Barrier::SLOT_BYTES / sizeof(uint64_t));
+    EXPECT_EQ(runtime.cclBuffer.front(), 1234U);
     EXPECT_TRUE(std::all_of(window, window + context->windowBytes / sizeof(uint64_t),
                             [](uint64_t value) { return value == 0; }));
     window[0] = 1234U;
@@ -660,7 +661,7 @@ TEST_F(Mc2BarrierContextTest, SplitsFullScaleRailIntoChannelBatches)
     }
     Builder builder{owner_, this};
     builder.rank = self;
-    ASSERT_EQ(builder.AcquireGroup(peers.data(), count, self, descs.data(), "barrier_buffer", 1024), ACLNN_SUCCESS);
+    ASSERT_EQ(builder.AcquireGroup(peers.data(), count, self, descs.data(), 1024), ACLNN_SUCCESS);
     EXPECT_EQ(channels_.size(), count - 1U);
     EXPECT_EQ(acquireCalls_, 25U);
     EXPECT_EQ(peers[self].handle, 0U);

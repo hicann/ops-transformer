@@ -29,6 +29,10 @@
   - 支持非量化、静态量化、pertoken动态量化、pergroup动态量化、mx动态量化和mx clip动态量化场景，对token数据先进行量化（可选），进行EP（Expert Parallelism）域的alltoallv通信；
   - 支持特殊专家场景。
 
+<!-- npu="950" id20 -->
+- 对于<term>Ascend 950PR&950DT系列产品</term>，`low_latency_dispatch` 的 `comm_alg` 不支持取值 `"hierarchy"`。RoCE 分发请调用 `torch_npu.npu_moe_distribute_dispatch_v2`，并设置 `comm_alg="hierarchy"`。
+<!-- end id20 -->
+
 - **计算公式**：
 
   - 量化场景：

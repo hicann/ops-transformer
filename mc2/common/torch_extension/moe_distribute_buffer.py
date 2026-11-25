@@ -21,6 +21,13 @@ def _is_a5_device():
     return "Ascend950" in torch_npu.npu.get_device_name()
 
 
+def _check_low_latency_comm_alg(is_a5, comm_alg):
+    if is_a5 and comm_alg == "hierarchy":
+        raise ValueError(
+            "RoCE does not support low_latency APIs; use the ACLNN or torch_npu V2 interface."
+        )
+
+
 def _get_hccl_comm_name(group, rank_id):
     if hasattr(group, "get_hccl_comm_name"):
         return group.get_hccl_comm_name(rank_id, init_comm=False)
@@ -31,16 +38,15 @@ def _get_hccl_comm_name(group, rank_id):
 class MoeDistributeBuffer:
     def __init__(self, group, ccl_buffer_size: int = 0, comm_alg: str = ""):
         """A5 上正数 ccl_buffer_size 表示 HCCL 配置容量，单位为 MB。"""
+        self._is_a5 = _is_a5_device()
+        _check_low_latency_comm_alg(self._is_a5, comm_alg)
         self.group = group
         self.rank_id = torch.distributed.get_rank(group)
         self.world_size = torch.distributed.get_world_size(group)
         self.group_name = _get_hccl_comm_name(group, self.rank_id)
-        self._is_a5 = _is_a5_device()
         self._ctx_manager = None
         self.context = None
         self.ccl_buffer_size = ccl_buffer_size
-        if self._is_a5 and comm_alg == "hierarchy":
-            return
         ccl_buffer_size_bytes = ccl_buffer_size
         if self._is_a5 and ccl_buffer_size > 0:
             # A5 实际窗口容量为估算接口返回的 HCCL MB 配置容量的两倍。
@@ -73,6 +79,7 @@ class MoeDistributeBuffer:
             return (value + base - 1) // base * base
 
         is_a5 = _is_a5_device()
+        _check_low_latency_comm_alg(is_a5, comm_alg)
         max_world_size = 1024 if is_a5 else 768
         max_moe_expert = 2048 if is_a5 else 1024
         max_local_expert_product = 4096 if is_a5 else 2048
@@ -252,6 +259,7 @@ class MoeDistributeBuffer:
         x_dtype=None,
         x_smooth_scales_dtype=None,
     ):
+        _check_low_latency_comm_alg(self._is_a5, comm_alg)
         dispatch_kwargs = dict(
             x=x,
             expert_ids=topk_idx,
@@ -277,20 +285,11 @@ class MoeDistributeBuffer:
             x_dtype=x_dtype,
             x_smooth_scales_dtype=x_smooth_scales_dtype,
         )
-        if self._is_a5 and comm_alg == "hierarchy":
-            outputs = torch.ops.cann_ops_transformer.npu_moe_distribute_dispatch_v2(
-                group_ep=self.group_name, **dispatch_kwargs
-            )
-        else:
-            if self._ctx_manager is None:
-                raise ValueError(
-                    'An A5 hierarchy buffer requires comm_alg="hierarchy" for dispatch.'
-                )
-            outputs = torch.ops.cann_ops_transformer.npu_moe_distribute_dispatch(
-                context=self.context,
-                ccl_buffer_size=self.ccl_buffer_size,
-                **dispatch_kwargs,
-            )
+        outputs = torch.ops.cann_ops_transformer.npu_moe_distribute_dispatch(
+            context=self.context,
+            ccl_buffer_size=self.ccl_buffer_size,
+            **dispatch_kwargs,
+        )
         (
             expand_x,
             dynamic_scales,
@@ -337,6 +336,7 @@ class MoeDistributeBuffer:
         num_max_dispatch_tokens_per_rank=0,
         enable_pre_reduce=None,
     ):
+        _check_low_latency_comm_alg(self._is_a5, comm_alg)
         if assist_info_for_combine is None:
             raise ValueError("assist_info_for_combine must be provided.")
         if ep_send_counts is None:
@@ -373,20 +373,10 @@ class MoeDistributeBuffer:
             comm_quant_mode=comm_quant_mode,
             global_bs=num_max_dispatch_tokens_per_rank * self.world_size,
         )
-        if self._ctx_manager is None and comm_alg != "hierarchy":
-            raise ValueError(
-                'An A5 hierarchy buffer requires comm_alg="hierarchy" for combine.'
-            )
-        if self._is_a5 and comm_alg == "hierarchy":
-            return torch.ops.cann_ops_transformer.npu_moe_distribute_combine_v2(
-                group_ep=self.group_name,
-                enable_pre_reduce=True
-                if enable_pre_reduce is None
-                else enable_pre_reduce,
-                **combine_kwargs,
-            )
         if enable_pre_reduce is not None and not enable_pre_reduce:
-            raise ValueError("enable_pre_reduce=False requires A5 hierarchy.")
+            raise ValueError(
+                "low_latency_combine does not support enable_pre_reduce=False."
+            )
         return torch.ops.cann_ops_transformer.npu_moe_distribute_combine(
             context=self.context, ccl_buffer_size=self.ccl_buffer_size, **combine_kwargs
         )
