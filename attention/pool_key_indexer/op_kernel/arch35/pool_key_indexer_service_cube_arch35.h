@@ -51,6 +51,8 @@ public:
     __aicore__ inline void FreeEventID();
     __aicore__ inline void ComputeMm1(const PkiCommon::RunInfo& runInfo);
 
+    // merged-M 半区交错装载的半区数(与 kernel SPLITM_HALVES 镜像)
+    static constexpr uint32_t SPLITM_HALVES = 2;
     static constexpr uint64_t KEY_BUF_NUM = 3;
     static constexpr uint64_t QUERY_BUF_NUM = 2;
     static constexpr uint64_t L0_BUF_NUM = 2;
@@ -265,7 +267,11 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::ComputeMm1(const PkiCommo
                                                  s1gL1SizeAlign2G - s1gL1Offset :
                                                  constInfo_.mBaseSize;
                     if (constInfo_.splitMFlag) {
-                        s1gL0RealSize = 128; // g=64, topK=2k时固定m=128
+                        // splitM: 每 pass 的 L0 行数 = l0Stride(前/后半区交错条带各 strip 行)
+                        s1gL0RealSize = s1gL1SizeAlign2G - s1gL1Offset;
+                        if (s1gL0RealSize > l0Stride) {
+                            s1gL0RealSize = l0Stride;
+                        }
                     }
                     LoadQueryToL0a(s1gGmOffset, s1gL1Offset, s1gL1SizeAlign2G, s1gL0RealSize, runInfo);
                     if (s1gL1Offset == 0) {
@@ -456,25 +462,31 @@ __aicore__ inline void PoolKeyIndexerServiceCube<LIT>::LoadQueryToL0a(uint64_t s
                                                                       const PkiCommon::RunInfo& runInfo)
 {
     LoadData2DParamsV2 loadData2DParamsV2;
-    if (constInfo_.splitMFlag && runInfo.actMBaseSize > 128) { // 非尾块，切M
+    if (constInfo_.splitMFlag) { // 尾块同样切M: 交错装载保证 dualDst 半区与 Vec 行二分对齐
+        // 半区交错装载: AIV 对按有效行对半(halfRows = CeilDiv(actMBaseSize,2*gSize)*gSize),
+        // 每 pass 的 L0A = 前半区 strip 行 + 后半区 strip 行交错, dualDst M/2 拆分按半区对齐。
+        uint64_t halfRows = CeilDiv(runInfo.actMBaseSize, SPLITM_HALVES * constInfo_.gSize) * constInfo_.gSize;
+        uint64_t strip = s1gL0RealSize / SPLITM_HALVES;
         uint64_t dstOffset = 0;
         loadData2DParamsV2.kStartPosition = 0;
-        loadData2DParamsV2.mStep = CeilDiv(64, BLOCK_CUBE);
+        loadData2DParamsV2.mStep = CeilDiv(strip, BLOCK_CUBE);
         loadData2DParamsV2.kStep = CeilDiv(constInfo_.headDim, QK_BLOCK_CUBE);
         loadData2DParamsV2.srcStride = CeilDiv(s1gL1RealSize, BLOCK_CUBE);
         loadData2DParamsV2.dstStride = CeilDiv(s1gL0RealSize, BLOCK_CUBE);
         loadData2DParamsV2.ifTranspose = false;
-        for (int i = 0; i < 2; i++) {
-            loadData2DParamsV2.mStartPosition = CeilDiv((s1gL1Offset / 2) + i * 128, BLOCK_CUBE);
-            dstOffset = i * 64 * 16;
+        for (int i = 0; i < SPLITM_HALVES; i++) {
+            loadData2DParamsV2.mStartPosition = CeilDiv((s1gL1Offset / SPLITM_HALVES) + i * halfRows, BLOCK_CUBE);
+            // L0A 为 K-outer 分形布局(k 带步长 dstStride*16*C0, m 分形步长 16*C0):
+            // 子块 i 的平坦元素偏移 = strip 行 * C0 = strip*QK_BLOCK_CUBE(dtype 感知)
+            dstOffset = i * strip * QK_BLOCK_CUBE;
 
             if constexpr (LIT::isMxFp8) {
                 // splitM 分支同样走 MX 5 参变体(dst mx_fp8_e4m3_t != src fp8_e4m3fn_t,
                 // 2 参模板要求同型)
                 LoadData2DMxParams loadDataMxParams;
-                loadDataMxParams.xStartPosition = CeilDiv((s1gL1Offset / 2) + i * 128, BLOCK_CUBE);
+                loadDataMxParams.xStartPosition = CeilDiv((s1gL1Offset / SPLITM_HALVES) + i * halfRows, BLOCK_CUBE);
                 loadDataMxParams.yStartPosition = 0;
-                loadDataMxParams.xStep = CeilDiv(64, BLOCK_CUBE);
+                loadDataMxParams.xStep = CeilDiv(strip, BLOCK_CUBE);
                 loadDataMxParams.yStep = MX_SCALE_PER_TOKEN / FP8_TWO;
                 loadDataMxParams.srcStride = loadDataMxParams.yStep;
                 loadDataMxParams.dstStride = loadDataMxParams.yStep;

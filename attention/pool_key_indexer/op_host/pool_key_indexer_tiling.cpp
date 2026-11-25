@@ -1151,6 +1151,12 @@ ge::graphStatus PoolKeyIndexerTiling::CalcWorkspaceSize(PoolKeyIndexerTilingInfo
     constexpr uint64_t PKI35_S2_BASE_SIZE = 128;
     constexpr uint64_t PKI35_S1_BASE_SIZE = 4;
     constexpr uint64_t PKI35_S1_BASE_SIZE_SMALL = 2;
+    // fp8 量化 gSize<=32 时 kernel 侧组深度(kernel_arch35.h 同名常量镜像)
+    constexpr uint64_t PKI35_S1_BASE_SIZE_MERGED_M = 6;
+    // 与 kernel_arch35.h 的 merged-M 门常量镜像
+    constexpr uint64_t PKI35_SPLITM_HALVES = 2;
+    constexpr uint32_t PKI35_MERGED_M_GSIZE_MAX = 32;
+    constexpr uint64_t PKI35_MERGED_M_MIN_BLOCKS_PER_CORE = 64;
 
     uint64_t offset = 0;
     uint32_t aicNum = info.aicNum;
@@ -1176,6 +1182,20 @@ ge::graphStatus PoolKeyIndexerTiling::CalcWorkspaceSize(PoolKeyIndexerTilingInfo
     // bf16 换算); mode2(INT8)=4B uint32 fp32 直接稳定排序 —— 误将 int8 替换为 2B 会导致
     // workspace 欠配且静默越界
     uint64_t s1BaseSize35 = (info.sparseCount > PKI_BASE_TOPK) ? PKI35_S1_BASE_SIZE_SMALL : PKI35_S1_BASE_SIZE;
+    // kernel 侧组深度门镜像(判据同 kernel_arch35.h): FP8 家族且 gSize<=32 且并行度
+    // 充足时组深度为 6, score/ldTail 区须按 6 行配置防越界; g64-fp8 维持钳制 2
+    // 与 kernel 门镜像: merged-M 仅 mode0(per-token fp8), mxFP8 维持
+    // s1BaseSize=4 的 legacy 路径
+    if (info.sparseCount <= PKI_BASE_TOPK && info.gSize <= PKI35_MERGED_M_GSIZE_MAX &&
+        info.quantMode == PKI_QUANT_FP8_PER_TOKEN) {
+        uint64_t estBlocks = (info.s1Size + PKI35_S1_BASE_SIZE_MERGED_M - 1) / PKI35_S1_BASE_SIZE_MERGED_M *
+                             info.bSize * ((info.s2Size + PKI35_S2_BASE_SIZE - 1) / PKI35_S2_BASE_SIZE);
+        uint64_t strip = PKI35_S1_BASE_SIZE_MERGED_M * info.gSize / PKI35_SPLITM_HALVES;
+        if (estBlocks >= PKI35_MERGED_M_MIN_BLOCKS_PER_CORE * static_cast<uint64_t>(info.aicNum) &&
+            strip % PKI_BLOCK_CUBE_SIZE == 0) {
+            s1BaseSize35 = PKI35_S1_BASE_SIZE_MERGED_M;
+        }
+    }
     uint64_t s2Size35Align = (info.s2Size + PKI35_S2_BASE_SIZE - 1) / PKI35_S2_BASE_SIZE * PKI35_S2_BASE_SIZE;
     const uint64_t scoreElemSize35 = (info.quantMode == PKI_QUANT_FP8_PER_TOKEN || info.quantMode == PKI_QUANT_MXFP8) ?
                                          PKI_SCORE_T_SIZE_FP8 :

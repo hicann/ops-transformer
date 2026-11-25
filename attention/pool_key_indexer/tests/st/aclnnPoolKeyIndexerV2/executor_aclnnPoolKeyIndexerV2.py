@@ -1570,9 +1570,10 @@ def _reference_npu_blocked(
                 if ks is not None:
                     # mode=0: k_scale 乘入聚合和(每池标量, 块内切片)
                     s_blk *= ks[lo:hi]
-                if not is_int8:
-                    # [键域对齐 QLIV2] FP8 家族(mode0/1)排序域 = bf16(与稠密金标
-                    # _compute_batch/_compute_batch_vec 及 kernel uint16 键同域)
+                if quant_mode in (0, 1):
+                    # [键域对齐 QLIV2] 仅 FP8 家族(mode0/1)排序域 = bf16(与稠密金标
+                    # _compute_batch/_compute_batch_vec 及 kernel uint16 键同域);
+                    # 非量化为 fp32 键域, 不做 bf16 round-trip
                     s_blk = s_blk.to(torch.bfloat16).to(torch.float32)
             # 布尔 AdvancedIndex setitem 在 torch_npu 上走 NonZero/动态索引
             # 路径, 大 shape 下有 AICPU 超时/vector core 异常前科(见

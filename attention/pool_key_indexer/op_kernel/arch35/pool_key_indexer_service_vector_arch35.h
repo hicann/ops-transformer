@@ -1136,16 +1136,19 @@ __aicore__ inline void PoolKeyIndexerServiceVector<LIT>::ProcessTopK(const PkiCo
                     // 如果是tok > trunklen, 第一轮每调用topk，是直接拷贝的，所以不需要刷零
                     bool isZeroPadding = (topkCount_ > trunkLen_) ? (loopIdx > 1) : true;
                     if (topkCountAlign256_ != topkCount_ && isZeroPadding) {
-                        // masked Duplicate 单块粒度随键宽变化: u32=64 lane, u16=128 lane
-                        uint32_t dGran = (sizeof(SCORE_T) == 4) ? 64u : 128u;
-                        uint64_t mask[1];
-                        mask[0] = ~0;
-                        mask[0] = mask[0] << (topkCount_ % dGran);
+                        // 首段用 mask 形式(count 形式要求 dst 32B 对齐); arch35 消费
+                        // mask[0..1] 两字, 高字须显式补全且防 shift>=64 回绕
+                        constexpr uint32_t MASK_WORD_BITS = 64; // 单掩码字位宽
+                        constexpr uint32_t DUP_BLK_U32 = 64;    // u32 键单 repeat lane 数
+                        constexpr uint32_t DUP_BLK_U16 = 128;   // u16 键单 repeat lane 数(掩码 2 字)
+                        uint32_t dGran = (sizeof(SCORE_T) == 4) ? DUP_BLK_U32 : DUP_BLK_U16;
+                        uint32_t off = topkCount_ % dGran;
+                        uint64_t mask[2];
+                        mask[0] = (off < MASK_WORD_BITS) ? (~0ULL << off) : 0ULL;
+                        mask[1] = (off < MASK_WORD_BITS) ? ~0ULL : (~0ULL << (off - MASK_WORD_BITS));
                         PipeBarrier<PIPE_V>();
-                        // 把topkCount_对齐到dGran刷0，此处由于duplicate的限制mask[0]刷dGran个数
                         Duplicate(mrgValueLocal_[topkCount_ / dGran * dGran], zero, mask, 1, 1, 0);
                         PipeBarrier<PIPE_V>();
-                        // 把topk剩余对齐到256的部分刷0
                         Duplicate(mrgValueLocal_[topkCount_ / dGran * dGran + dGran], zero,
                                   topkCountAlign256_ - (topkCount_ / dGran * dGran + dGran));
                         SetFlag<HardEvent::V_MTE2>(V_MTE2_EVENT3);

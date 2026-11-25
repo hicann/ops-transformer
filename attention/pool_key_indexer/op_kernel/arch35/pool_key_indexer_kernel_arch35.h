@@ -82,6 +82,18 @@ public:
     static constexpr uint32_t M_BASE_SIZE = 256;
     static constexpr uint32_t S1_BASE_SIZE = 4;
     static constexpr uint32_t S1_BASE_SIZE_SMALL = 2;
+    // fp8 量化 gSize<=32 时的组深度(mBaseSize=6*gSize, >128 经 splitM 双 pass 消化);
+    // 不取 8: resMm1Buf 等缓冲随 mBaseSize 放大, 256 在 poolSize>1 形态下超出 AIV UB 256KB
+    static constexpr uint32_t S1_BASE_SIZE_MERGED_M = 6;
+    // merged-M 半区交错装载的半区数: dualDstCtl 将 mBase 对半拆分给双 AIV
+    static constexpr uint32_t SPLITM_HALVES = 2;
+    // merged-M 启用门上限: gSize 与 sparseCount 超限回退常规分块
+    static constexpr uint32_t MERGED_M_GSIZE_MAX = 32;
+    static constexpr uint32_t MERGED_M_SPARSE_MAX = 2048;
+    // 块级并行度门限: 每核 >= 64 块(按静态 shape 上界估算)
+    static constexpr uint32_t MERGED_M_MIN_BLOCKS_PER_CORE = 64;
+    // L0A 单 pass 行容量(双 pass 分界与禁用钳制基准)
+    static constexpr uint32_t L0A_ROW_CAPACITY = 128;
     static constexpr uint32_t S2_BASE_SIZE = 128;
     static constexpr uint32_t HEAD_DIM = 128;
     static constexpr uint32_t K_HEAD_NUM = 1;
@@ -201,16 +213,38 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::InitTilingData(const PoolKeyIn
         constInfo.mBaseSize = S1_BASE_SIZE * constInfo.gSize;
         constInfo.s1BaseSize = S1_BASE_SIZE;
     }
+    // fp8 量化 gSize<=32 时组深度提升为 6: gS1 组数减少, 每 (bN2,s2) 的 K 搬运次数
+    // 随组数下降; mBaseSize>128 经 splitM 双 pass 消化, gSize<32 走既有单块路径。
     constInfo.s2BaseSize = S2_BASE_SIZE;
     constInfo.returnValue = tilingData->returnValue;
     constInfo.splitMFlag = (constInfo.gSize == 64 && constInfo.sparseCount <= 2048);
     if constexpr (LIT::isQuant) {
-        // 量化路径禁用 splitM: splitM 的 LoadData2D dst 布局按 fp16 M 切分推导,
+        // 量化路径默认禁用 splitM: splitM 的 LoadData2D dst 布局按 fp16 M 切分推导,
         // fp8 的 L1 NZ 行深变化后布局错位, 量化场景走常规单块路径
         constInfo.splitMFlag = false;
-        // 禁用后 mBaseSize 必须钳到 L0 容量(128 行), 且能被 gSize 整除,
-        // 否则 L0 越界或 Fixpipe 半区行与 Vec 读取行距错位
-        if (constInfo.mBaseSize > 128) {
+        bool mergedM = false;
+        // 仅 mode 0(per-token)启用: mode 1(mxFP8) 的 splitM 交错装载与 MX scale
+        // 取址布局未闭环, mxFP8 维持 s1BaseSize=4 的 legacy 路径
+        if constexpr (LIT::isFp8PerToken) {
+            // 启用门: 组数减少会放大小并行度场景的核间负载不均衡, 块级并行度充足
+            // (总块数 >= 64*核数, 按静态 shape 上界估算)才启用
+            uint64_t estBlocks = CeilDiv((uint64_t)tilingData->s1Size, (uint64_t)S1_BASE_SIZE_MERGED_M) *
+                                 constInfo.batchSize * CeilDiv((uint64_t)constInfo.kSeqSize, (uint64_t)S2_BASE_SIZE);
+            uint64_t strip = S1_BASE_SIZE_MERGED_M * constInfo.gSize / SPLITM_HALVES;
+            if (constInfo.gSize <= MERGED_M_GSIZE_MAX && constInfo.sparseCount <= MERGED_M_SPARSE_MAX &&
+                estBlocks >= MERGED_M_MIN_BLOCKS_PER_CORE * usedCoreNum && strip % BLOCK_CUBE == 0) {
+                constInfo.s1BaseSize = S1_BASE_SIZE_MERGED_M;
+                constInfo.mBaseSize = constInfo.s1BaseSize * constInfo.gSize;
+                mergedM = true;
+            }
+        }
+        // fp8 的 splitM 装载布局已按 dtype 泛化(见 LoadQueryToL0a), 仅 mBaseSize>128
+        // 时启用双 pass; <=128 保持单块路径不变
+        if (mergedM && constInfo.mBaseSize > L0A_ROW_CAPACITY) {
+            constInfo.splitMFlag = true;
+        } else if (constInfo.mBaseSize > L0A_ROW_CAPACITY) {
+            // 禁用后 mBaseSize 必须钳到 L0 容量(128 行), 且能被 gSize 整除,
+            // 否则 L0 越界或 Fixpipe 半区行与 Vec 读取行距错位
             uint32_t s1PerL0 = 128 / constInfo.gSize; // L0 128 行可容纳的 s1 行数(整除截断)
             if (s1PerL0 == 0) {
                 s1PerL0 = 1; // gSize>128 时兜底(N1<=64, 正常不触达)

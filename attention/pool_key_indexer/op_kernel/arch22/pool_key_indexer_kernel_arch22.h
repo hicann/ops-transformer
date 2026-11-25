@@ -61,44 +61,19 @@ using AscendC::CrossCoreWaitFlag;
 constexpr uint32_t PKI_SEQ_Q = 0U;
 constexpr uint32_t PKI_SEQ_K = 1U;
 
-// int8-only LD gate: 仅当 quantMode==2(int8) && sparseIndicesMode==1(compact) 且组原子装箱
-// 损失 lossInd 达阈值 τ=10% 时, 放开 S2 跨核切分(isLDOpen=true)。放开后复用现行通路:
-// SplitCore 的规避分支(`!isLDOpen` 守卫)自然旁路、isLD 置位、ProcessDecode/ProcessLD、
-// InitLDBuffers/InitSortOutBuf 与展开事件机不动。
-// 判据为 device 侧精确式(host 静态上界易误判, 禁用):
-//   lossInd = ⌈G/C⌉·Nmax/(T/C) − 1,  C = usedCoreNum(下发原值, SplitCore 收敛前读取)
-//   G/Nmax/T 与 GetTotalBaseBlockNum 同源一趟推导(同一个 GetS1S2ActualSeqLen/
-//   GetS2BaseBlockNumOnMask 调用与实参), 逐核读同一份 tiling/actual_seq ⇒ 全核一致,
-//   SyncAll 不会半参与。
-// τ 用定点整数比较(无浮点): lossInd×100 ≥ 10 ⇔ 10·⌈G/C⌉·Nmax·C ≥ 11·T。
-// over2K 否决在本判据之外(over2K 下 s2Loop≡1 无切分对象)。
-// 1=本 gate 生效; 0=新增代码全部不生成(#if 隔离), isLDOpen 仅由既有 unitUB+over2K 判据
-//   决定 ⇒ 行为与该 gate 引入前等价。
-// 与 PKI_DECODE_LD_GATE 正交: 那是对既有 gate 的调用门, 本开关是 gate 的判定条件,
-//   两者独立开/关。
-// bf16/fp16 实例化: Refine/计数调用点包在 if constexpr (LIT::isInt8) 内 ⇒ 非 int8 模板
-//   不生成该代码; V1/over2K 在运行时判据第一道即返回 ⇒ 输出不变。
-#ifndef PKI_INT8_LD_GATE
-#define PKI_INT8_LD_GATE 0
+// pack-loss LD gate(非量化 + int8): !isLDOpen 且 !over2K 时, 组原子装箱损失
+// lossInd = ⌈G/C⌉·Nmax/(T/C) − 1 ≥ τ(10%) 则放开 S2 跨核切分。
+#ifndef PKI_PACK_LOSS_LD_GATE
+#define PKI_PACK_LOSS_LD_GATE 1
 #endif
-// gate 调试计数的独立开关(与 gate 判定本体拆分): 调试计数 = 每 AIV 8×int32 落盘到
-// ldIdx 区专属槽 + ProcessMain 尾 1 条 PipeBarrier<PIPE_ALL>。gate 的判定/生效语义
-// 两值完全相同, DBG=0 仅失去上板取证能力:
-//   1=调试形态(gate 命中计数 + 组统计落盘);
-//   0=发布形态: 零计数区/零落盘/零额外 PipeBarrier, gate 未开全域也无本设施的开销。
-#ifndef PKI_LD_GATE_DBG
-#define PKI_LD_GATE_DBG 0
-#endif
+// 覆盖域(存储 quantMode): 非量化(0)与 int8(3), int8 不限定 compact;
+// FP8 家族(1/2) arch22 tiling 层拒绝不可达, 显式排除。
+constexpr int32_t PKI_QUANT_MODE_NONE_STORED = 0;
 // τ=10% 的定点比较系数: lossInd≥τ ⇔ LOSS_NUM·⌈G/C⌉·Nmax·C ≥ LOSS_DEN·T
 #define PKI_LD_GATE_LOSS_NUM 10ULL
 #define PKI_LD_GATE_LOSS_DEN 11ULL
 // quantMode 的存储口径: host -1/0/1/2 → tiling 存值 +1(SetTilingData), int8(用户值 2)⇒ 3
 #define PKI_QUANT_MODE_INT8_STORED 3
-#if PKI_LD_GATE_DBG
-// gate 调试计数区 magic("PKLD"): 落在 host 预留的 ldIdx 区起点(wsOffLdIdx), kernel 自有
-// 布局从不触及该区(见 FlushLdGateDbg 注释), 零 host/tiling 改动
-constexpr int32_t PKI_LD_DBG_MAGIC = 0x504B4C44;
-#endif
 
 // 由于S2循环前，RunInfo还没有赋值，使用TempLoopInfo临时存放B、N、S1轴相关的信息；同时减少重复计算
 struct TempLoopInfo {
@@ -261,24 +236,11 @@ protected:
                                                bool appendTail = false);
     // S2 跨核切分启用判定((bN2,gS1) 并行单元静态上界 < 核对数)
     __aicore__ inline uint32_t CalcS1ParallelUnitUpperBound();
-#if PKI_INT8_LD_GATE
-    // ================================int8-only LD gate=================
-    // gate 追加判定(仅 int8 实例化被调用): 现行 unitUB 项关闭时, 按组装箱损失补开。
+#if PKI_PACK_LOSS_LD_GATE
+    // ============================pack-loss LD gate=================
+    // unitUB 项关闭且装箱损失 ≥ τ 时放开 S2 跨核切分
     __aicore__ inline void RefineLDGateByPackLoss();
-    // 一趟组统计(G=有块组数, Nmax=最大组块数, T=总块数, 与 GetTotalBaseBlockNum 同源同式),
-    // 返回 lossInd×100 ≥ 10 的定点判定; DBG=1 时统计值顺手存入 dbgG_/dbgNmax_/dbgT_/dbgPct_ 供调试读取。
     __aicore__ inline bool CalcPackLossOpen();
-#if PKI_LD_GATE_DBG
-    // 轻量 gate 调试计数(随 PKI_LD_GATE_DBG 编译掉): 本 AIV 落 8 个 int32 到 host
-    // 预留 ldIdx 区起点(wsOffLdIdx)的专属槽位 —— 块数/flags/组统计/magic。
-    __aicore__ inline void FlushLdGateDbg(uint32_t blockCnt);
-    __gm__ int32_t* pkiDbgBase_ = nullptr; // = workspace + wsOffLdIdx, 仅 AIV&&int8&&!over2K 时非空
-    uint32_t ldGateSrc_ = 0U;              // 0=关, 1=unitUB 开, 2=loss 开(hit), 3=over2K 否决
-    uint64_t dbgG_ = 0ULL;
-    uint64_t dbgNmax_ = 0ULL;
-    uint64_t dbgT_ = 0ULL;
-    uint32_t dbgPct_ = 0xFFFFFFFFU; // lossInd×100(截断整数值); 未参与判定=0xFFFFFFFF
-#endif
 #endif
 };
 
@@ -346,53 +308,29 @@ __aicore__ inline uint32_t PoolKeyIndexerKernel<LIT>::CalcS1ParallelUnitUpperBou
     }
 }
 
-#if PKI_INT8_LD_GATE
-// gate 追加判定。组合语义 =
-//   isLDOpen = (unitUB < C || (int8 && compact && lossInd≥τ)) && !over2K
-// 其中 unitUB 项已由 InitTilingData 算入, 本函数只在其关闭时补开 loss 项;
-// over2K 否决由本函数第一道复刻, 与 InitTilingData 侧独立成立。
-// 调用点: Init() 中 InitParamResident 之后、SplitCore 之前 —— usedCoreNum 尚未被
-// SplitCore 的 coreNum 收敛改写, 此处读到的仍是 host 下发原值 C=aicNum;
-// 常驻已建好(组统计经 GetS1S2ActualSeqLen 走常驻/GetValue 原式, 与 SplitCore 内部的
-// GetTotalBaseBlockNum 逐值同源 ⇒ 全核一致)。
+#if PKI_PACK_LOSS_LD_GATE
+// pack-loss LD gate: unitUB 项关闭时按装箱损失补开; 调用须在 InitParamResident 之后、
+// SplitCore 之前(C 为 host 原值), 组统计与 GetTotalBaseBlockNum 同源保证全核一致。
 template <typename LIT>
 __aicore__ inline void PoolKeyIndexerKernel<LIT>::RefineLDGateByPackLoss()
 {
     if (constInfo.isLDOpen) {
-#if PKI_LD_GATE_DBG
-        ldGateSrc_ = 1U; // unitUB 项已开(decode 形态恒如此) ⇒ 不重复计算, 也永不计 hit
-#endif
         return;
     }
     if (constInfo.isSparseCountOver2K) {
-#if PKI_LD_GATE_DBG
-        ldGateSrc_ = 3U; // over2K 否决(括号外), 与 :281 的同一否决语义一致
-#endif
         return;
     }
-    // quantMode 存储值 = 用户值 +1: 用户值 2(int8) ⇒ 存储 3。调用点已有 if constexpr
-    // (LIT::isInt8), 本条为防御性复核(判据使用用户口径的 2, 存储值为 3)。
-    if (constInfo.quantMode != static_cast<int32_t>(PKI_QUANT_MODE_INT8_STORED)) {
+    // dtype 域: 非量化(存储 0)与 int8(存储 3); FP8 家族(存储 1/2)arch22 不可达, 排除
+    if (constInfo.quantMode != PKI_QUANT_MODE_NONE_STORED && constInfo.quantMode != PKI_QUANT_MODE_INT8_STORED) {
         return;
-    }
-    if (constInfo.sparseIndicesMode != 1U) {
-        return; // V1 保护: sparseIndicesMode 缺省 0(legacy), 非 compact 不进本判据
     }
     if (CalcPackLossOpen()) {
         constInfo.isLDOpen = true;
-#if PKI_LD_GATE_DBG
-        ldGateSrc_ = 2U;
-#endif
     }
 }
 
-// 组统计一趟推导: 与 GetTotalBaseBlockNum 同源同式(同一个 GetS1S2ActualSeqLen /
-// CeilDiv / GetS2BaseBlockNumOnMask 调用与实参), 额外累计 G(有块组数)与 Nmax(最大组块数)。
-// 本函数只在 !over2K 域被调用(Refine 已否决 over2K), 镜像其 else 分支即可;
-// kHeadNum(恒 1)按原式计入, 与块枚举保持同一公式。
-// lossInd×100 ≥ 10 的定点比较(无浮点): 10·⌈G/C⌉·Nmax·C ≥ 11·T。
-// 溢出界: ⌈G/C⌉·C ≤ G+C ≤ 2^33 量级实远小于; Nmax ≤ actS2Size/s2BaseSize; 全程 uint64,
-// 乘积上限远小于 2^64(任何可寻址 shape 下 G·Nmax·10·C ≪ 2^64)。
+// 组统计一趟推导: G(有块组数)/Nmax(最大组块数)/T(总块数)与 GetTotalBaseBlockNum
+// 同源同式, 保证全核一致。
 template <typename LIT>
 __aicore__ inline bool PoolKeyIndexerKernel<LIT>::CalcPackLossOpen()
 {
@@ -403,10 +341,16 @@ __aicore__ inline bool PoolKeyIndexerKernel<LIT>::CalcPackLossOpen()
     uint64_t G = 0ULL;
     uint64_t T = 0ULL;
     uint64_t Nmax = 0ULL;
+    bool hasZeroPoolBatch = false;
     uint32_t actS1Size, actS2Size, actS2SizeOrig;
     uint32_t s1GBaseNum, s2BaseNum;
     for (uint32_t bIdx = 0; bIdx < constInfo.batchSize; bIdx++) {
         GetS1S2ActualSeqLen(bIdx, actS1Size, actS2Size, actS2SizeOrig);
+        if (actS2Size == 0U) {
+            // 存在零池 batch: LD 归并与空 batch 清理分支(DealActSeqLenIsZero)交互
+            // 未验证, 条件化开启在此类退化形态下保守关闭
+            hasZeroPoolBatch = true;
+        }
         s1GBaseNum = CeilDiv(actS1Size, constInfo.s1BaseSize);
         if (!constInfo.attenMaskFlag) {
             s2BaseNum = CeilDiv(actS2Size, constInfo.s2BaseSize);
@@ -426,65 +370,13 @@ __aicore__ inline bool PoolKeyIndexerKernel<LIT>::CalcPackLossOpen()
             }
         }
     }
-#if PKI_LD_GATE_DBG
-    dbgG_ = G;
-    dbgNmax_ = Nmax;
-    dbgT_ = T;
-#endif
-    if (G == 0ULL || T == 0ULL) {
+    if (G == 0ULL || T == 0ULL || hasZeroPoolBatch) {
         return false;
     }
     const uint64_t groupRounds = (G + C - 1ULL) / C; // ⌈G/C⌉
     const uint64_t num = groupRounds * Nmax * C;     // lossInd 的分子(分母 = T)
-#if PKI_LD_GATE_DBG
-    // 记录 lossInd×100 截断值(供调试): pct = floor(100·num/T) − 100, 下限截 0。
-    const uint64_t pct100 = (num * 100ULL) / T;
-    dbgPct_ = (pct100 >= 100ULL) ? static_cast<uint32_t>(pct100 - 100ULL) : 0U;
-#endif
     return PKI_LD_GATE_LOSS_NUM * num >= PKI_LD_GATE_LOSS_DEN * T;
 }
-
-#if PKI_LD_GATE_DBG
-// 轻量 gate 调试计数(调试形态内置, 随 PKI_LD_GATE_DBG 编译掉; DBG=0 ⇒ 零计数区/零落盘/
-// 无本函数尾部的 PipeBarrier<PIPE_ALL>)。
-// 落点: host 预留 ldIdx 区起点 `workspace + wsOffLdIdx`。kernel 自有三区布局中 vec1Param
-// 基址 = mm1Res_k + vec1Res_k, 与 host 布局的 wsOffLdIdx(= scoreGm_h + ldScore_h)相差至少
-// (ldScore_h − vec1Res_k)(int8 非 over2K 域; ldScore 按 TOPK_MAX=8192 常数上界预留), 而
-// vec1Param_k 区长 = host ldIdxSize 恰等 ⇒ [wsOffLdIdx, wsOffLdIdx+ldIdxSize) 整段是 host
-// 已分配、kernel 数据流从不触及的区域; 区容量 40,960B(A2)/49,152B(A3) ≥ 计数区上界
-// 64槽×64B=4,096B, 且总 ws ≥ wsOffLdIdx+ldIdxSize ⇒ 零越界、零 host/tiling 改动。
-// 标量 SetValue 走 S pipe + 收尾 PipeBarrier<PIPE_ALL> 排干, 后写覆盖前写; 每 AIV 只写
-// 自己的 8×int32 槽, 核间无写冲突。
-template <typename LIT>
-__aicore__ inline void PoolKeyIndexerKernel<LIT>::FlushLdGateDbg(uint32_t blockCnt)
-{
-    if (pkiDbgBase_ == nullptr) {
-        return;
-    }
-    GlobalTensor<int32_t> dbg;
-    dbg.SetGlobalBuffer(pkiDbgBase_);
-    // 槽距 16×int32=64B: 每个 AIV 独占一条 64B GM cache line。
-    // (arch22 标量 GM 写按 line 粒度 posted, 同一 64B 行内两个 AIV 同时写会相互丢失,
-    //  槽距必须按整行隔离。)
-    const uint64_t slot = static_cast<uint64_t>(tmpBlockIdx) * 16ULL;
-    int32_t flags = 0;
-    flags |= (ldGateSrc_ == 2U) ? 1 : 0;        // bit0: gate 由 loss 项打开(hit) —— bf16/V1/decode 恒 0
-    flags |= splitCoreInfo.isLD ? 2 : 0;        // bit1: 本 AIV 为 LD 归并核(fan-in 头核)
-    flags |= constInfo.isLDOpen ? 4 : 0;        // bit2: 生效 isLDOpen
-    flags |= (aiCoreIdx < usedCoreNum) ? 8 : 0; // bit3: 本核有主(非 SplitCore 收敛后的空槽)
-    flags |= (constInfo.sparseIndicesMode == 1U) ? 16 : 0;                        // bit4
-    flags |= constInfo.attenMaskFlag ? 32 : 0;                                    // bit5: mask_mode==3
-    dbg.SetValue(static_cast<int64_t>(slot) + 0, static_cast<int32_t>(blockCnt)); // 本 AIV 最终块数(直方图)
-    dbg.SetValue(static_cast<int64_t>(slot) + 1, flags);
-    dbg.SetValue(static_cast<int64_t>(slot) + 2, static_cast<int32_t>(dbgG_));    // G(参与判定才有值)
-    dbg.SetValue(static_cast<int64_t>(slot) + 3, static_cast<int32_t>(dbgNmax_)); // Nmax
-    dbg.SetValue(static_cast<int64_t>(slot) + 4, static_cast<int32_t>(dbgT_));    // T
-    dbg.SetValue(static_cast<int64_t>(slot) + 5, static_cast<int32_t>(usedCoreNum));
-    dbg.SetValue(static_cast<int64_t>(slot) + 6, static_cast<int32_t>(dbgPct_)); // lossInd×100
-    dbg.SetValue(static_cast<int64_t>(slot) + 7, PKI_LD_DBG_MAGIC);              // "PKLD"
-    AscendC::PipeBarrier<PIPE_ALL>(); // S 写排干(arch22 无 PIPE_S, 用 PIPE_ALL)
-}
-#endif // PKI_LD_GATE_DBG
 #endif
 
 template <typename LIT>
@@ -888,24 +780,10 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::Init(
     // 三张量的 SetGlobalBuffer 均已完成(上面两行 + InitActualSeqLen)。
     InitParamResident();
 #endif
-#if PKI_INT8_LD_GATE
-    // int8-only LD gate 追加判定。位置约束: ① 在 InitActualSeqLen/InitParamResident 之后
-    // (组统计要读 actual_seq, 且与 SplitCore 同样走常驻 ⇒ 全核逐值一致);
-    // ② 在 SplitCore 之前(isLDOpen 是 SplitCore 规避分支的输入; 且 usedCoreNum 尚未被
-    // coreNum 收敛改写, 此处 C 仍是 host 下发原值 aicNum)。仅 int8 实例化生成调用。
-    // 仅 int8 实例化生成调用(bf16/fp16 模板逐字不含此路径)。
-    if constexpr (LIT::isInt8) {
+#if PKI_PACK_LOSS_LD_GATE
+    // pack-loss LD gate 追加判定(非量化与 int8; FP8 家族 arch22 不可达, 不实例化)
+    if constexpr (!LIT::isQuant || LIT::isInt8) {
         RefineLDGateByPackLoss();
-        // 计数区接线: AIV && !over2K 才启用(over2K 下 ldScore 预留与 kernel 实写宽度恰等,
-        // 尾部空闲区可能为 0 ⇒ 必须排除; 该排除与 gate 的 over2K 否决同域, 不损失调试取证面)。
-        // ASCEND_IS_AIV 展开为 `constexpr(...)`, 不能作 && 操作数, 只能独立成 if(与本文件既有用法一致)
-#if PKI_LD_GATE_DBG
-        if ASCEND_IS_AIV {
-            if (!constInfo.isSparseCountOver2K) {
-                pkiDbgBase_ = reinterpret_cast<__gm__ int32_t*>(workspace + constInfo.wsOffLdIdx);
-            }
-        }
-#endif
     }
 #endif
 
@@ -1164,12 +1042,6 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::ProcessMain()
 {
     if (aiCoreIdx >= usedCoreNum) {
         // 无任务核直接返回
-#if PKI_INT8_LD_GATE && PKI_LD_GATE_DBG
-        // 调试计数: 无任务核也要落槽(块数=0, flags bit3=0), 否则空槽残留 ws 旧值
-        if constexpr (LIT::isInt8) {
-            FlushLdGateDbg(0U);
-        }
-#endif
         return;
     }
 
@@ -1205,13 +1077,6 @@ __aicore__ inline void PoolKeyIndexerKernel<LIT>::ProcessMain()
 
     if ASCEND_IS_AIV {
         vectorService.FreeEventID();
-#if PKI_INT8_LD_GATE && PKI_LD_GATE_DBG
-        // 调试计数: 本 AIV 主相最终块数(gloop = ProcessBaseBlock 调用次数)落槽。
-        // 在 FreeEventID 之后写: 事件机收尾次序不变, 只是追加标量 S 写 + 末尾 PIPE_ALL。
-        if constexpr (LIT::isInt8) {
-            FlushLdGateDbg(gloop);
-        }
-#endif
     } else {
         matmulService.FreeEventID();
         CrossCoreWaitFlag(constInfo.syncV1C1);
