@@ -377,7 +377,7 @@ bool FiaTilingNonQuantArch35::CheckS1OutSplit()
     // isCapable阶段，platformInfo_中还没有l2Size和aicNum，额外获取一次
     auto platformInfoPtr = context_->GetPlatformInfo();
     OP_CHECK_IF(platformInfoPtr == nullptr, ReportTilingFailure(context_, "The platformInfoPtr is null!"),
-                return ge::GRAPH_FAILED);
+                return false);
     auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
     platformInfo_.aicNum = ascendcPlatform.GetCoreNumAic();
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, platformInfo_.l2Size);
