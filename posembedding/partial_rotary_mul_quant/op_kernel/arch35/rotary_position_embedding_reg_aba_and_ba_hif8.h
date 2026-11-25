@@ -393,9 +393,9 @@ __aicore__ inline void RotaryPositionEmbeddingABAAndBA<T, IsBBoardcast, roundMod
     __local_mem__ hifloat8_t* nopeAddr = (__local_mem__ hifloat8_t*)nopeH8.GetPhyAddr();
     __local_mem__ T* inAddr = (__local_mem__ T*)inUb.GetPhyAddr();
     uint16_t nopeLoop = ops::CeilDiv(static_cast<int32_t>(sliceStart), static_cast<int32_t>(VL_FLOAT32_SIZE));
-    uint16_t rows = static_cast<uint16_t>(sLength * bLength * nLength);
-    uint32_t validS = static_cast<uint32_t>(sLength);
-    uint32_t validN = static_cast<uint32_t>(nLength);
+    uint16_t validB = static_cast<uint16_t>(bLength);
+    uint16_t validN = static_cast<uint16_t>(nLength);
+    uint16_t validS = static_cast<uint16_t>(sLength);
     uint32_t strideS = static_cast<uint32_t>(ubFactorS_);
     uint32_t strideN = static_cast<uint32_t>(ubFactorN_);
     __VEC_SCOPE__
@@ -403,16 +403,21 @@ __aicore__ inline void RotaryPositionEmbeddingABAAndBA<T, IsBBoardcast, roundMod
         RegTensor<float> xReg;
         RegTensor<hifloat8_t> h8Tmp;
         MaskReg preg;
-        for (uint16_t i = 0; i < rows; i++) {
-            uint32_t row = (i / (validS * validN) * strideN + i / validS % validN) * strideS + i % validS;
-            uint32_t sreg = static_cast<uint32_t>(sliceStart);
-            for (uint16_t j = 0; j < nopeLoop; j++) {
-                preg = UpdateMask<float>(sreg);
-                ops::LoadOneTensorForDtypeT<T>(inAddr, xReg, preg, row * dAlignNope_ + j * VL_FLOAT32_SIZE);
-                Muls(xReg, xReg, scale_, preg);
-                Cast<hifloat8_t, float, Hif8CastTrait<roundMode>>(h8Tmp, xReg, preg);
-                DataCopy<hifloat8_t, AscendC::MicroAPI::StoreDist::DIST_PACK4_B32>(
-                    nopeAddr + row * dAlignH8Nope_ + j * VL_FLOAT32_SIZE, h8Tmp, preg);
+        // Traverse the tile directly to avoid division and remainder in the vector scope.
+        for (uint16_t b = 0; b < validB; ++b) {
+            for (uint16_t n = 0; n < validN; ++n) {
+                for (uint16_t s = 0; s < validS; ++s) {
+                    uint32_t row = (b * strideN + n) * strideS + s;
+                    uint32_t sreg = static_cast<uint32_t>(sliceStart);
+                    for (uint16_t j = 0; j < nopeLoop; j++) {
+                        preg = UpdateMask<float>(sreg);
+                        ops::LoadOneTensorForDtypeT<T>(inAddr, xReg, preg, row * dAlignNope_ + j * VL_FLOAT32_SIZE);
+                        Muls(xReg, xReg, scale_, preg);
+                        Cast<hifloat8_t, float, Hif8CastTrait<roundMode>>(h8Tmp, xReg, preg);
+                        DataCopy<hifloat8_t, AscendC::MicroAPI::StoreDist::DIST_PACK4_B32>(
+                            nopeAddr + row * dAlignH8Nope_ + j * VL_FLOAT32_SIZE, h8Tmp, preg);
+                    }
+                }
             }
         }
     }
