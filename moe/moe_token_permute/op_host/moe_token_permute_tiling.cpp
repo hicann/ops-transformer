@@ -298,8 +298,13 @@ ge::graphStatus MoeTokenPermuteTilingBase::GetShapeAttrsInfo()
     OP_LOGD(opName, "MoeTokenPermute Tiling initing.");
 
     // 获取输入shape
-    const gert::Shape tokensShape = context_->GetInputShape(0)->GetStorageShape();
-    const gert::Shape IndicesShape = context_->GetInputShape(1)->GetStorageShape();
+    const auto* tokensStorageShape = context_->GetInputShape(0);
+    const auto* indicesStorageShape = context_->GetInputShape(1);
+    OP_CHECK_IF(tokensStorageShape == nullptr || indicesStorageShape == nullptr,
+                OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "tokens or indices shape"),
+                return ge::GRAPH_FAILED);
+    const gert::Shape tokensShape = tokensStorageShape->GetStorageShape();
+    const gert::Shape IndicesShape = indicesStorageShape->GetStorageShape();
     auto attrs = context_->GetAttrs();
     OP_CHECK_IF(attrs == nullptr,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
@@ -309,6 +314,9 @@ ge::graphStatus MoeTokenPermuteTilingBase::GetShapeAttrsInfo()
     int64_t id = 0;
     const int64_t* numOutTokensPtr = attrs->GetAttrPointer<int64_t>(id++);
     const bool* paddedModePtr = attrs->GetAttrPointer<bool>(id);
+    OP_CHECK_IF(numOutTokensPtr == nullptr || paddedModePtr == nullptr,
+                OP_LOGE_WITH_INVALID_INPUT(context_->GetNodeName(), "num_out_tokens or padded_mode"),
+                return ge::GRAPH_FAILED);
     numOutTokens = *numOutTokensPtr;
     paddedMode = *paddedModePtr;
 

@@ -330,7 +330,10 @@ ge::graphStatus PermuteTilingCompute(gert::TilingContext* context, const int64_t
 
 static ge::graphStatus Tiling4MoeTokenPermuteGrad(gert::TilingContext* context)
 {
-    const int64_t* top_k = context->GetAttrs()->GetAttrPointer<int64_t>(0);
+    OP_CHECK_IF(context == nullptr, OP_LOGE("MoeTokenPermuteGrad", "context is nullptr."), return ge::GRAPH_FAILED);
+    const auto* attrs = context->GetAttrs();
+    const int64_t* top_k = (attrs != nullptr) ? attrs->GetAttrPointer<int64_t>(0) : nullptr;
+    OP_CHECK_IF(top_k == nullptr, OP_LOGE_WITH_INVALID_INPUT(context->GetNodeName(), "top_k"), return ge::GRAPH_FAILED);
     int64_t topk = *top_k;
     return PermuteTilingCompute(context, topk);
 }
