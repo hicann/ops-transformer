@@ -63,8 +63,6 @@ static constexpr size_t GROUP_LIST_DIM_LIMIT = 1UL;
 static constexpr size_t QUANTOUT_DIM_LIMIT = 2UL;
 static constexpr size_t QUANTSCALEOUT_DIM_LIMIT = 1UL;
 static constexpr size_t INT4_PER_INT32 = 8UL;
-bool isEnableWeightAssistanceMatrix = false;
-int dequantMode = 0;
 
 static const std::vector<DataType> X_DTYPE_SUPPORT_LIST = {DataType::DT_INT8};
 static const std::vector<DataType> WEIGHT_DTYPE_SUPPORT_LIST = {DataType::DT_INT8, DataType::DT_INT4};
@@ -488,14 +486,15 @@ static aclnnStatus aclnnGroupedMatmulSwigluQuantGetWorkspaceSizeCommon(
     groupList = l0op::Contiguous(groupList, uniqueExecutor.get());
     CHECK_RET(groupList != nullptr, ACLNN_ERR_INNER_NULLPTR);
     // 调用L0算子能力
-    if (bias != nullptr) {
-        isEnableWeightAssistanceMatrix = true;
+    const bool isEnableWeightAssistanceMatrix = (bias != nullptr);
+    if (isEnableWeightAssistanceMatrix) {
         bias = l0op::Contiguous(bias, uniqueExecutor.get());
         CHECK_RET(bias != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
-    if (isEnableWeightAssistanceMatrix && weightScale->GetViewShape().GetDimNum() == WEIGHT_SCALE_PERGROUP_DIM_LIMIT) {
-        dequantMode = 1;
-    }
+    const int dequantMode =
+        (isEnableWeightAssistanceMatrix && weightScale->GetViewShape().GetDimNum() == WEIGHT_SCALE_PERGROUP_DIM_LIMIT) ?
+            1 :
+            0;
     auto ret_0 = l0op::GroupedMatmulSwigluQuant(x, weight, weightScale, xScale, groupList, bias,
                                                 isEnableWeightAssistanceMatrix, dequantMode, uniqueExecutor.get());
     CHECK_RET(ret_0 != std::tuple(nullptr, nullptr), ACLNN_ERR_INNER_NULLPTR);
