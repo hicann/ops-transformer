@@ -99,4 +99,4 @@ Note: micro_batch_num, micro_batch_size, selected_expert_num, run_flag, and micr
 
 | Invocation method  | Sample code                                                                | Description                                                                                          |
 | ----------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| aclnn interface | [test_aclnn_inplace_attention_worker_scheduler](./examples/test_aclnn_inplace_attention_worker_scheduler.cpp) | Invokes the AttentionWorkScheduler operator through the [aclnnInplaceAttentionWorkerScheduler](docs/aclnnInplaceAttentionWorkerScheduler_en.md) interface. |
+| aclnn interface | [test_aclnn_inplace_attention_worker_scheduler](./examples/test_aclnn_inplace_attention_worker_scheduler.cpp) | Invokes the AttentionWorkerScheduler operator through the [aclnnInplaceAttentionWorkerScheduler](docs/aclnnInplaceAttentionWorkerScheduler_en.md) interface. |

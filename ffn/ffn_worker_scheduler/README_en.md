@@ -178,4 +178,4 @@ None.
 
 | Invocation method  | Sample code                                                                | Description                                                                                          |
 | ----------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| aclnn interface | [test_aclnn_inplace_ffn_worker_scheduler](./examples/test_aclnn_inplace_ffn_worker_scheduler.cpp) | Invokes the FfnWorkScheduler operator through the [`aclnnInplaceFfnWorkerScheduler`](docs/aclnnInplaceFfnWorkerScheduler_en.md) interface. |
+| aclnn interface | [test_aclnn_inplace_ffn_worker_scheduler](./examples/test_aclnn_inplace_ffn_worker_scheduler.cpp) | Invokes the FfnWorkerScheduler operator through the [`aclnnInplaceFfnWorkerScheduler`](docs/aclnnInplaceFfnWorkerScheduler_en.md) interface. |

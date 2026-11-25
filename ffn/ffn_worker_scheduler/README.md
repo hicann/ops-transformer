@@ -176,4 +176,4 @@ $$
 
 | 调用方式  | 样例代码                                                                | 说明                                                                                          |
 | ----------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| aclnn接口 | [test_aclnn_inplace_ffn_worker_scheduler](./examples/test_aclnn_inplace_ffn_worker_scheduler.cpp) | 通过[`aclnnInplaceFfnWorkerScheduler`](./docs/aclnnInplaceFfnWorkerScheduler.md)接口方式调用FfnWorkScheduler算子。 |
+| aclnn接口 | [test_aclnn_inplace_ffn_worker_scheduler](./examples/test_aclnn_inplace_ffn_worker_scheduler.cpp) | 通过[`aclnnInplaceFfnWorkerScheduler`](./docs/aclnnInplaceFfnWorkerScheduler.md)接口方式调用FfnWorkerScheduler算子。 |
