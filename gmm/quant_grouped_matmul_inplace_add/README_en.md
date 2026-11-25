@@ -75,7 +75,7 @@ English | [简体中文](./README.md)
   </tr>
   <tr>
     <td>scale1</td>
-    <td rowspan="1">Input</td>
+    <td rowspan="1">Optional input</td>
     <td>Scaling factor introduced by x1 quantization in the quantization parameters. For comprehensive constraints, see <a href="#constraints">Constraints</a>.</td>
     <td>FLOAT32, FLOAT8_E8M0</td>
     <td>ND</td>
@@ -103,15 +103,15 @@ English | [简体中文](./README.md)
   </tr>
   <tr>
     <td>group_list_type</td>
-    <td rowspan="1">Attribute</td>
-    <td>Integer attribute, specifying how group_list is parsed: 0 indicates cumulative sum (cumsum), and 1 indicates the size of each group (count).</td>
+    <td rowspan="1">Optional attribute</td>
+    <td>Integer attribute, specifying how group_list is parsed: 0 indicates cumulative sum (cumsum), and 1 indicates the size of each group (count). The default value is 0.</td>
     <td>INT64</td>
     <td>-</td>
   </tr>
   <tr>
     <td>group_size</td>
-    <td rowspan="1">Attribute</td>
-    <td>Integer attribute, specifying the quantization group size along the m/n/k directions.</td>
+    <td rowspan="1">Optional attribute</td>
+    <td>Integer attribute, specifying the quantization group size along the m/n/k directions. The default value is 0.</td>
     <td>INT64</td>
     <td>-</td>
   </tr>
@@ -124,30 +124,30 @@ English | [简体中文](./README.md)
     - The input types supported in the dynamic quantization (T-T/T-C quantization) scenario are:
       - For non-empty parameters, the supported data type combinations must satisfy the following table:
 
-        | x1       | x2  | scale2 | scale1Optional |yRef     |
+        | x1       | x2  | scale2 | scale1 |y     |
         |:-------:|:-------:| :------      | :------   | :------ |
         |HIFLOAT8  |HIFLOAT8| FLOAT32    | FLOAT32   | FLOAT32 |
 
-      - scale1Optional/scale2 must satisfy the following constraints (where g is the number of matmul groups, that is, the number of groups):
+      - scale1/scale2 must satisfy the following constraints (where g is the number of matmul groups, that is, the number of groups):
 
         | Parameter | Shape Restriction |
         |:---------:| :------ |
-        |scale1Optional| A 2D tensor or a 1D tensor, with shape (g, 1) or (g,)|
+        |scale1| A 2D tensor or a 1D tensor, with shape (g, 1) or (g,)|
         |scale2| In the pertensor scenario: a 2D tensor or a 1D tensor, with shape (g, 1) or (g,); in the perchannel scenario: a 2D tensor, with shape (g, N)|
 
     - The data types supported in the dynamic quantization (mx quantization) scenario are:
       - The data type combinations must satisfy the following table:
 
-        | x1       | x2  |  scale2  | scale1Optional |yRef     |
+        | x1       | x2  |  scale2  | scale1 |y     |
         |:-------:|:-------:| :-------    | :------   | :------ |
         |FLOAT8_E5M2/FLOAT8_E4M3FN  |FLOAT8_E5M2/FLOAT8_E4M3FN| FLOAT8_E8M0   | FLOAT8_E8M0    | FLOAT32 |
 
-      - scale1Optional/scale2 must satisfy the following constraints (where g is the number of matmul groups, that is, the number of groups, and g\_i is the i-th group, with the subscript starting from 0):
+      - scale1/scale2 must satisfy the following constraints (where g is the number of matmul groups, that is, the number of groups, and g\_i is the i-th group, with the subscript starting from 0):
 
         | Parameter | Shape Restriction |
         |:---------:| :------ |
-        |scale1Optional| A 3D tensor with shape ((K / 64) + g, M, 2). The start address offset of scale\_i is ((K\_0 + K\_1 + ...+ K\_{i-1})/ 64 + g\_i) \* M \* 2, that is, the start address offset of scale_0 is 0, the start address offset of scale_1 is (K\_0 / 64 + 1) \* M \* 2, the start address offset of scale_2 is ((K\_0 + K\_1) / 64 + 2) \* M \* 2, and so on|
-        |scale2| A 3D tensor with shape ((K / 64) + g, N, 2). The start address offset is determined in the same way as scale1Optional|
+        |scale1| A 3D tensor with shape ((K / 64) + g, M, 2). The start address offset of scale\_i is ((K\_0 + K\_1 + ...+ K\_{i-1})/ 64 + g\_i) \* M \* 2, that is, the start address offset of scale_0 is 0, the start address offset of scale_1 is (K\_0 / 64 + 1) \* M \* 2, the start address offset of scale_2 is ((K\_0 + K\_1) / 64 + 2) \* M \* 2, and so on|
+        |scale2| A 3D tensor with shape ((K / 64) + g, N, 2). The start address offset is determined in the same way as scale1|
 
       - In mxfp4, x1/x2 must both be FLOAT4_E2M1 and scale1/scale2 must both be FLOAT8_E8M0; the M axis of x1 and the N axis of x2 must be even; K \* M != 2 and K \* N != 2.
 

@@ -444,19 +444,19 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZ(
   - <term>Ascend 950PR&950DT products</term>:
     - groupList is a one-dimensional tensor whose length equals the number of experts E. It supports up to 1024 groups.
     - groupList must be a nonnegative, monotonically nondecreasing sequence of cumulative sums. Its last value must not exceed M.
-  - The A8W8 per-token quantization scenario has the following constraints:
-    - The data types must match the following table.
+    - The A8W8 per-token quantization scenario has the following constraints:
+      - The data types must match the following table.
 
-      | Quantization Scenario | x | weight | weightScale | xScale | output | outputScale |
-      | --- | --- | --- | --- | --- | --- | --- |
-      | Per-token quantization (K-C) | INT8 | INT8 | FLOAT, FLOAT16, and BFLOAT16 | FLOAT | INT8 | FLOAT |
+        | Quantization Scenario | x | weight | weightScale | xScale | output | outputScale |
+        | --- | --- | --- | --- | --- | --- | --- |
+        | Per-token quantization (K-C) | INT8 | INT8 | FLOAT, FLOAT16, and BFLOAT16 | FLOAT | INT8 | FLOAT |
 
-    - The shapes must match the following table.
+      - The shapes must match the following table.
 
-      | Quantization Scenario | x | weight | weight_scale | x_scale | output | output_scale |
-      | --- | --- | --- | --- | --- | --- | --- |
-      | Per-token quantization (K-C) | (M, K) | weight supports transposed and non-transposed input. Both use the view shape (E, K, N).<br>Non-transposed input uses a contiguous stride and the FRACTAL_NZ storage shape (E, ceil(N/32), ceil(K/16), 16, 32).<br>Transposed input uses the stride (K * N, 1, K) and the FRACTAL_NZ storage shape (E, ceil(K/32), ceil(N/16), 16, 32). | Shape {(E, N)} | (M, ) | (M, N / 2) | (M, ) |
-    - N must be positive and a multiple of 64.
+        | Quantization Scenario | x | weight | weight_scale | x_scale | output | output_scale |
+        | --- | --- | --- | --- | --- | --- | --- |
+        | Per-token quantization (K-C) | (M, K) | weight supports transposed and non-transposed input. Both use the view shape (E, K, N).<br>Non-transposed input uses a contiguous stride and the FRACTAL_NZ storage shape (E, ceil(N/32), ceil(K/16), 16, 32).<br>Transposed input uses the stride (K * N, 1, K) and the FRACTAL_NZ storage shape (E, ceil(K/32), ceil(N/16), 16, 32). | Shape {(E, N)} | (M, ) | (M, N / 2) | (M, ) |
+      - N must be positive and a multiple of 64.
 
   <!-- end id11 -->
 

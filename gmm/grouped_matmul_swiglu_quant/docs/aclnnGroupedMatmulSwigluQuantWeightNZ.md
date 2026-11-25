@@ -442,19 +442,19 @@ aclnnStatus aclnnGroupedMatmulSwigluQuantWeightNZ(
   - <term>Ascend 950PR&950DT系列产品</term>：
     - groupList为一维Tensor，长度等于专家数E，groupList第1维最大支持1024，即最多支持1024个group
     - groupList必须为非负单调非递减数列（累计和），最后一个值不大于M。
-  - A8W8 pertoken量化场景需满足以下约束条件：
-    - 数据类型需要满足下表：
+    - A8W8 pertoken量化场景需满足以下约束条件：
+      - 数据类型需要满足下表：
 
-      | 量化场景 | x | weight | weightScale | xScale | output | outputScale |
-      | --- | --- | --- | --- | --- | --- | --- |
-      | pertoken量化（K-C） | INT8 | INT8 | FLOAT、FLOAT16、BFLOAT16 | FLOAT | INT8 | FLOAT |
+        | 量化场景 | x | weight | weightScale | xScale | output | outputScale |
+        | --- | --- | --- | --- | --- | --- | --- |
+        | pertoken量化（K-C） | INT8 | INT8 | FLOAT、FLOAT16、BFLOAT16 | FLOAT | INT8 | FLOAT |
 
-    - shape约束需要满足下表：
+      - shape约束需要满足下表：
 
-      | 量化场景 | x | weight | weight_scale | x_scale | output | output_scale |
-      | --- | --- | --- | --- | --- | --- | --- |
-      | pertoken量化（K-C） | (M, K) | 支持非转置和转置，view shape统一为(E, K, N)，<br>非转置使用连续stride，FRACTAL_NZ storage shape为(E, ceil(N/32), ceil(K/16), 16, 32)；<br>转置使用stride (K * N, 1, K)，FRACTAL_NZ storage shape为(E, ceil(K/32), ceil(N/16), 16, 32)。 | shape形如{(E, N)} | (M, ) | (M, N / 2) | (M, ) |
-    - N必须大于0且为64的整数倍。
+        | 量化场景 | x | weight | weight_scale | x_scale | output | output_scale |
+        | --- | --- | --- | --- | --- | --- | --- |
+        | pertoken量化（K-C） | (M, K) | 支持非转置和转置，view shape统一为(E, K, N)，<br>非转置使用连续stride，FRACTAL_NZ storage shape为(E, ceil(N/32), ceil(K/16), 16, 32)；<br>转置使用stride (K * N, 1, K)，FRACTAL_NZ storage shape为(E, ceil(K/32), ceil(N/16), 16, 32)。 | shape形如{(E, N)} | (M, ) | (M, N / 2) | (M, ) |
+      - N必须大于0且为64的整数倍。
 
   <!-- end id11 -->
 
