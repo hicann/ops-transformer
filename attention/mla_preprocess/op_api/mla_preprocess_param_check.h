@@ -287,10 +287,8 @@ inline aclnnStatus CheckMlaPreprocessApiParams(
     int64_t wdqkvRows = 0;
     int64_t wdqkvCols = 0;
     const bool wdqkvDtypeOk = wdqkvView.ok && (wdqkvView.dtype == ACL_INT8 || wdqkvView.dtype == dtype);
-    if (!wdqkvDtypeOk || !DecodeNzMatrix(wdqkvView, wdqkvRows, wdqkvCols) || wdqkvRows != rows0 ||
-        wdqkvCols != hiddenSize) {
-        return Invalid("wdqkv dtype must be INT8 or the same as input, format NZ, "
-                       "shape [qLoraRank + 576, hiddenSize].");
+    if (!wdqkvDtypeOk) {
+        return Invalid("wdqkv dtype must be INT8 or the same as input, format NZ");
     }
 
     status = CheckSameDtypeNd(TensorView(gamma1), "gamma1", dtype, {qLoraRank});
@@ -336,10 +334,8 @@ inline aclnnStatus CheckMlaPreprocessApiParams(
     int64_t wuqDecodedRows = 0;
     int64_t wuqDecodedCols = 0;
     const bool wuqDtypeOk = wuqView.ok && (wuqView.dtype == ACL_INT8 || wuqView.dtype == dtype);
-    if (!wuqDtypeOk || !DecodeNzMatrix(wuqView, wuqDecodedRows, wuqDecodedCols) || wuqDecodedRows != wuqRows ||
-        wuqDecodedCols != qLoraRank) {
-        return Invalid("wuq dtype must be INT8 or the same as input, format NZ, "
-                       "shape [headNum * (nopeDim + 64), qLoraRank].");
+    if (!wuqDtypeOk) {
+        return Invalid("wuq dtype must be INT8 or the same as input, format NZ");
     }
     status = CheckSameDtypeNd(TensorView(deScale1), "deScale1", deScaleDtype, {wuqRows});
     if (status != ACLNN_SUCCESS) {
@@ -417,19 +413,9 @@ inline aclnnStatus CheckMlaPreprocessApiParams(
         if (status != ACLNN_SUCCESS) {
             return status;
         }
-        status = CheckSameDtypeNd(TensorView(qNopeScale), "qNopeScale", dtype, {1});
-        if (status != ACLNN_SUCCESS) {
-            return status;
-        }
     } else {
         if (ctkvScale != nullptr) {
             status = CheckSameDtypeNd(TensorView(ctkvScale), "ctkvScale", dtype, {1});
-            if (status != ACLNN_SUCCESS) {
-                return status;
-            }
-        }
-        if (qNopeScale != nullptr) {
-            status = CheckSameDtypeNd(TensorView(qNopeScale), "qNopeScale", dtype, {1});
             if (status != ACLNN_SUCCESS) {
                 return status;
             }
