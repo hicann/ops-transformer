@@ -225,7 +225,8 @@ __aicore__ inline T AlignTo(const T n, const T alignSize)
     X(SPARSE_MODE, SLISparseMode, SLISparseMode::RightDown) \
     X(HAS_ROPE, bool, false) \
     X(IS_DETER, bool, false) \
-    X(HAS_SINK, bool, false)
+    X(HAS_SINK, bool, false) \
+    X(BATCH_LOSS, bool, false)
 
 /* 1. 生成带默认值的模版Template */
 #define GEN_TYPE_PARAM(name) typename name,

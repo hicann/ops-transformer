@@ -116,8 +116,9 @@ protected:
     bool SetSparseStartIdx(const std::vector<int64_t>& sparseValidArray, int64_t maxCoreNum);
     void SetSparseParamsRegbase(int64_t maxCoreNum);
     int64_t CalcTotalSize();
+    int32_t GetPairedDKeyMinRows(int64_t queryCount) const;
     void SetMultiCoreParamsRegbase(int64_t totalSize, int64_t coreNum, uint32_t syKTotalSize, uint32_t pkTotalSize);
-    void InitOutputSplit();
+    void InitOutputSplit(uint32_t launchGroups);
 
     // 基础输入参数
     int32_t bSize;
@@ -156,6 +157,7 @@ protected:
     bool deterministic;
     bool hasRope = false;
     bool hasSink = false;
+    uint32_t batchLossSlots = 0;
 
     const char* opName;
     const char* inputLayout;

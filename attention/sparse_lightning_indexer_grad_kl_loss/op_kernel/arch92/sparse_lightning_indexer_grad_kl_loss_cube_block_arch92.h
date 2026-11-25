@@ -88,6 +88,11 @@ public:
                                       Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& reluGradResL1Buf,
                                       SLIGradKLLossRunInfo& runInfo, SLIGradKLLossConstInfo& constInfo,
                                       SLIGradKLLossKRunInfo& pRunInfo);
+    __aicore__ inline void WaitForSharedRelu();
+    __aicore__ inline void ComputeHelperMm3(BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm3Buf,
+                                            Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& reluGradResL1Buf,
+                                            SLIGradKLLossRunInfo& runInfo, SLIGradKLLossConstInfo& constInfo,
+                                            SLIGradKLLossKRunInfo& dkRunInfo, bool isLastSplitTile);
     __aicore__ inline void ComputeMm4(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& reluGradResL1Buf,
                                       SLIGradKLLossRunInfo& runInfo, SLIGradKLLossConstInfo& constInfo,
                                       SLIGradKLLossKRunInfo& pRunInfo, bool isFixOut);
@@ -99,8 +104,7 @@ private:
                                           SLIGradKLLossConstInfo& constInfo);
     __aicore__ inline void CopyInMm1ARopeToL1(LocalTensor<INPUT_T>& l1Tensor, const SLIGradKLLossRunInfo& info,
                                               SLIGradKLLossConstInfo& constInfo);
-    __aicore__ inline void CopyInMm2AToL1(LocalTensor<INPUT_T>& l1Tensor, const SLIGradKLLossRunInfo& info,
-                                          SLIGradKLLossConstInfo& constInfo);
+    __aicore__ inline void LoadQueryIndex(const SLIGradKLLossRunInfo& info, SLIGradKLLossConstInfo& constInfo);
     __aicore__ inline void CopyInMm4BToL1(LocalTensor<INPUT_T>& l1Tensor, uint64_t gatherOffset, uint32_t mSizeAct,
                                           uint32_t realDSize, uint32_t headOffset);
 };
@@ -185,12 +189,16 @@ __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::CopyInMm1ARopeToL1(Lo
 }
 
 TEMPLATES_DEF_NO_DEFAULT
-__aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::CopyInMm2AToL1(LocalTensor<INPUT_T>& l1Tensor,
-                                                                          const SLIGradKLLossRunInfo& info,
+__aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::LoadQueryIndex(const SLIGradKLLossRunInfo& info,
                                                                           SLIGradKLLossConstInfo& constInfo)
 {
+    sYQL1Buffer = sYQueryL1Buf.Get();
+    sYQL1Buffer.Wait<HardEvent::MTE1_MTE2>();
+    sYQL1Tensor = sYQL1Buffer.GetTensor<INPUT_T>();
     auto srcGm = queryIndexGm[info.queryIndexTensorOffset];
-    CopyGmToL1(l1Tensor, srcGm, constInfo.gSizeQueryIndex, constInfo.dSizeQueryIndex, constInfo.dSizeQueryIndex);
+    CopyGmToL1(sYQL1Tensor, srcGm, constInfo.gSizeQueryIndex, constInfo.dSizeQueryIndex, constInfo.dSizeQueryIndex);
+    sYQL1Buffer.Set<HardEvent::MTE2_MTE1>();
+    sYQL1Buffer.Wait<HardEvent::MTE2_MTE1>();
 }
 
 TEMPLATES_DEF_NO_DEFAULT
@@ -215,15 +223,14 @@ __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::ComputeMmP(
     uint32_t tailLoopKSize = kSize - (kLoopTimes - 1) * VEC_P_BASESIZE; // 尾块大小
 
     LocalTensor<T> outTensor = bmm1ResBuf.template GetTensor<T>();
-    Buffer<BufferType::L1> pQL1Buffer;
-    LocalTensor<INPUT_T> pQL1Tensor;
+    // Every P tile reads the same resident query; only the first tile populates the L1 slot.
+    Buffer<BufferType::L1> pQL1Buffer = queryBuf.Get();
+    LocalTensor<INPUT_T> pQL1Tensor = pQL1Buffer.GetTensor<INPUT_T>();
     LocalTensor<INPUT_T> pQRopeL1Tensor;
     MMParam mmParam = {constInfo.gSizeQuery, N_SPLIT_SIZE, dSizeTotal, false, true, true, true, UNITFLAG_DISABLE};
 
     // query 从gm拷贝到L1
     if (pRunInfo.kTaskId == 0) {
-        pQL1Buffer = queryBuf.Get();
-        pQL1Tensor = pQL1Buffer.GetTensor<INPUT_T>();
         CopyInMm1AToL1(pQL1Tensor, runInfo, constInfo);
         if (HAS_ROPE) {
             pQRopeL1Tensor =
@@ -284,12 +291,7 @@ __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::ComputeMmSy(
     MMParam mmParam = {constInfo.gSizeQueryIndex, VEC_SY_BASESIZE, constInfo.dSizeQueryIndex, false, true, true, true,
                        UNITFLAG_DISABLE};
     if (syRunInfo.kTaskId == 0) { // 首次搬运query_index
-        sYQL1Buffer = sYQueryL1Buf.Get();
-        sYQL1Buffer.Wait<HardEvent::MTE1_MTE2>();
-        sYQL1Tensor = sYQL1Buffer.GetTensor<INPUT_T>();
-        CopyInMm2AToL1(sYQL1Tensor, runInfo, constInfo);
-        sYQL1Buffer.Set<HardEvent::MTE2_MTE1>();
-        sYQL1Buffer.Wait<HardEvent::MTE2_MTE1>();
+        LoadQueryIndex(runInfo, constInfo);
     }
     Buffer<BufferType::L0C> mm2L0CBuffer = commonL0CBuf.Get();
     LocalTensor<T> mm2L0CTensor = mm2L0CBuffer.GetTensor<T>();
@@ -341,6 +343,35 @@ __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::ComputeMmSy(
 };
 
 TEMPLATES_DEF_NO_DEFAULT
+__aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::WaitForSharedRelu()
+{
+    // SY signals its local V before issuing the ReLU Fixpipe to GM. Complete that write
+    // before joining the mixed barrier that publishes this owner's data to its helper.
+    event_t eventId = static_cast<event_t>(pipe->FetchEventID(HardEvent::FIX_S));
+    SetFlag<HardEvent::FIX_S>(eventId);
+    WaitFlag<HardEvent::FIX_S>(eventId);
+}
+
+TEMPLATES_DEF_NO_DEFAULT
+__aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::ComputeHelperMm3(
+    BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm3Buf,
+    Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& reluGradResL1Buf, SLIGradKLLossRunInfo& runInfo,
+    SLIGradKLLossConstInfo& constInfo, SLIGradKLLossKRunInfo& dkRunInfo, bool isLastSplitTile)
+{
+    if (dkRunInfo.kTaskId == 0) {
+        // The helper ran P instead of SY and needs its own resident query index.
+        LoadQueryIndex(runInfo, constInfo);
+    }
+    ComputeMm3(bmm3Buf, reluGradResL1Buf, runInfo, constInfo, dkRunInfo);
+    if (isLastSplitTile && dkRunInfo.kTaskId + 1 < runInfo.s2LoopTimes) {
+        // A short final tile is owner-only. ComputeMm3 releases the L1 slot on a split final tile.
+        sYQL1Buffer.Set<HardEvent::MTE1_MTE2>();
+    }
+    // The helper has no MM4 consumer. MM3 has issued the last MTE1 read of its gradient planes.
+    CrossCoreSetFlag<SYNC_MODE, PIPE_MTE1>(SYNC_V6_TO_C3_FLAG);
+}
+
+TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::ComputeMm3(
     BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm3Buf,
     Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& reluGradResL1Buf, SLIGradKLLossRunInfo& runInfo,
@@ -365,8 +396,16 @@ __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::ComputeMm3(
         // 拷贝左矩阵
         Buffer<BufferType::L0C> mm3L0CBuffer = commonL0CBuf.Get();
         mm3L0CBuffer.Wait<HardEvent::FIX_M>();
+        mmParam.isOutKFisrt = true;
         MatmulBase<INPUT_T, INPUT_T, T, M_SPLIT_SIZE, N_SPLIT_SIZE, QUERY_INDEX_SIZE, ABLayout::MK, ABLayout::KN>(
             reluGradL1Tensor[reluGradOffset], sYQL1Tensor, l0aBuf, l0bBuf, mm3L0CBuffer.GetTensor<T>(), mmParam);
+        // Accumulate the unscaled rounding residual before the single dK writeback.
+        const uint32_t residualL1Offset =
+            constInfo.pKBaseSize * AlignTo(constInfo.gSizeQueryIndex, static_cast<uint32_t>(C0_SIZE));
+        mmParam.isOutKFisrt = false;
+        MatmulBase<INPUT_T, INPUT_T, T, M_SPLIT_SIZE, N_SPLIT_SIZE, QUERY_INDEX_SIZE, ABLayout::MK, ABLayout::KN>(
+            reluGradL1Tensor[residualL1Offset + reluGradOffset], sYQL1Tensor, l0aBuf, l0bBuf,
+            mm3L0CBuffer.GetTensor<T>(), mmParam);
         mm3L0CBuffer.Set<HardEvent::M_FIX>();
         mm3L0CBuffer.Wait<HardEvent::M_FIX>();
         // fix2ub
@@ -449,6 +488,14 @@ __aicore__ inline void SligKlLossBlockCube<TEMPLATE_ARGS>::ComputeMm4(
         }
         MatmulBase<INPUT_T, INPUT_T, T, QUERY_INDEX_SIZE, N_SPLIT_SIZE, K_SPLIT_SIZE, ABLayout::MK, ABLayout::KN>(
             reluGradL1Tensor[reluGradOffset], sYGatherResTensor, l0aBuf, l0bBuf, mm4L0CBuffer.GetTensor<T>(), mmParam);
+        if constexpr (IsSameType<INPUT_T, bfloat16_t>::value) {
+            const uint32_t residualL1Offset =
+                constInfo.pKBaseSize * AlignTo(constInfo.gSizeQueryIndex, static_cast<uint32_t>(C0_SIZE));
+            mmParam.isOutKFisrt = false;
+            MatmulBase<INPUT_T, INPUT_T, T, QUERY_INDEX_SIZE, N_SPLIT_SIZE, K_SPLIT_SIZE, ABLayout::MK, ABLayout::KN>(
+                reluGradL1Tensor[residualL1Offset + reluGradOffset], sYGatherResTensor, l0aBuf, l0bBuf,
+                mm4L0CBuffer.GetTensor<T>(), mmParam);
+        }
         sYGatherL1Buffer.Set<HardEvent::MTE1_MTE2>();
     }
     mm4L0CBuffer.Set<HardEvent::M_FIX>();
@@ -496,6 +543,11 @@ public:
                                       Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& reluGradResL1Buf,
                                       SLIGradKLLossRunInfo& runInfo, SLIGradKLLossConstInfo& constInfo,
                                       SLIGradKLLossKRunInfo& pRunInfo) {};
+    __aicore__ inline void WaitForSharedRelu() {};
+    __aicore__ inline void ComputeHelperMm3(BuffersPolicyDB<BufferType::UB, SyncType::CROSS_CORE_SYNC_BOTH>& bmm3Buf,
+                                            Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& reluGradResL1Buf,
+                                            SLIGradKLLossRunInfo& runInfo, SLIGradKLLossConstInfo& constInfo,
+                                            SLIGradKLLossKRunInfo& dkRunInfo, bool isLastSplitTile) {};
     __aicore__ inline void ComputeMm4(Buffer<BufferType::L1, SyncType::CROSS_CORE_SYNC_BOTH>& reluGradResL1Buf,
                                       SLIGradKLLossRunInfo& runInfo, SLIGradKLLossConstInfo& constInfo,
                                       SLIGradKLLossKRunInfo& pRunInfo, bool isFixOut) {};

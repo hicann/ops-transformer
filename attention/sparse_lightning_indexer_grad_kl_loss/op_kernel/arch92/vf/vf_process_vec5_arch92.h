@@ -16,11 +16,67 @@
 #define VF_PROCESS_VEC5_ARCH92_H
 
 #include "kernel_tensor.h"
+#include "../sparse_lightning_indexer_grad_kl_loss_batch_loss_arch92.h"
 
 namespace AscendC {
 using namespace Reg;
 
-template <typename T, bool isAlign, bool hasOther = true>
+// TwoSum keeps the rounding error of each tile or partial in a second FP32 register.
+__simd_callee__ inline void AddLossComponent(RegTensor<float>& sum, RegTensor<float>& correction,
+                                             RegTensor<float>& value, MaskReg& mask)
+{
+    RegTensor<float> next, delta, sumError, valueError;
+    Add(next, sum, value, mask);
+    Sub(delta, next, sum, mask);
+    Sub(sumError, next, delta, mask);
+    Sub(sumError, sum, sumError, mask);
+    Sub(valueError, value, delta, mask);
+    Add(sumError, sumError, valueError, mask);
+    Add(correction, correction, sumError, mask);
+    sum = next;
+}
+
+__simd_vf__ inline void InitBatchLossVF(__ubuf__ float* slot, float batchTag)
+{
+    MaskReg mask = CreateMask<float, MaskPattern::ALL>();
+    RegTensor<float> zero, tag;
+    Duplicate(zero, 0.0F);
+    Duplicate(tag, batchTag);
+    StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(slot, zero, mask);
+    StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(slot + 1, zero, mask);
+    StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(slot + 2, tag, mask);
+}
+
+__simd_vf__ inline void MergeBatchLossVF(__ubuf__ float* out, __ubuf__ float* slots, uint16_t count)
+{
+    MaskReg mask = CreateMask<float, MaskPattern::ALL>();
+    MaskReg valid, changed;
+    RegTensor<float> sum, correction, zero, previous, tag, high, low, rounded;
+    Duplicate(zero, 0.0F);
+    Duplicate(sum, 0.0F);
+    Duplicate(correction, 0.0F);
+    Duplicate(previous, 0.0F);
+    for (uint16_t i = 0; i < count; ++i) {
+        __ubuf__ float* slot = slots + i * SligBatchLoss::SLOT_FLOATS;
+        LoadAlign<float, LoadDist::DIST_BRC_B32>(high, slot);
+        LoadAlign<float, LoadDist::DIST_BRC_B32>(low, slot + 1);
+        LoadAlign<float, LoadDist::DIST_BRC_B32>(tag, slot + 2);
+        // Slots without a segment are zero. Round the running loss once per actual batch.
+        Compare<float, CMPMODE::NE>(valid, tag, zero, mask);
+        Select(tag, tag, previous, valid);
+        Compare<float, CMPMODE::NE>(changed, tag, previous, mask);
+        Add(rounded, sum, correction, mask);
+        Select(sum, rounded, sum, changed);
+        Select(correction, zero, correction, changed);
+        previous = tag;
+        AddLossComponent(sum, correction, high, mask);
+        AddLossComponent(sum, correction, low, mask);
+    }
+    Add(rounded, sum, correction, mask);
+    StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(out, rounded, mask);
+}
+
+template <typename T, bool isAlign, bool hasOther = true, bool batchLoss = false>
 __simd_vf__ inline void ProcessVec5BasicVF(__ubuf__ T* dstUb, __ubuf__ T* srcUb, __ubuf__ T* srcOtherUb,
                                            __ubuf__ T* reduceSumUb, uint32_t alignCnt, uint32_t tailSize,
                                            float maxValue, uint32_t lossSize)
@@ -90,11 +146,19 @@ __simd_vf__ inline void ProcessVec5BasicVF(__ubuf__ T* dstUb, __ubuf__ T* srcUb,
         Add(vreg_output_x, vreg_output_x_new, vreg_output_x, preg_all_b32);
     }
     Reduce<Reg::ReduceType::SUM, float, float, Reg::MaskMergeMode::ZEROING>(vreg_output, vreg_output_x, preg_all_b32);
-    Add(vreg_dst, vreg_output, vreg_dst, preg_all_b32);
-    StoreAlign(((__ubuf__ T*&)dstUb), vreg_dst, preg_loss);
+    if constexpr (batchLoss) {
+        RegTensor<float> correction;
+        LoadAlign<float, LoadDist::DIST_BRC_B32>(correction, dstUb + 1);
+        AddLossComponent(vreg_dst, correction, vreg_output, preg_all_b32);
+        StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(dstUb, vreg_dst, preg_loss);
+        StoreAlign<float, StoreDist::DIST_FIRST_ELEMENT_B32>(dstUb + 1, correction, preg_loss);
+    } else {
+        Add(vreg_dst, vreg_output, vreg_dst, preg_all_b32);
+        StoreAlign(((__ubuf__ T*&)dstUb), vreg_dst, preg_loss);
+    }
 }
 
-template <typename T, bool isAlign, bool hasOther = true>
+template <typename T, bool isAlign, bool hasOther = true, bool batchLoss = false>
 __aicore__ inline void ProcessVec5Vf(const LocalTensor<T>& dstTensor, const LocalTensor<T>& srcTensor,
                                      const LocalTensor<T>& srcOtherTensor, const LocalTensor<T>& reduceSumTensor,
                                      const uint32_t m)
@@ -108,8 +172,8 @@ __aicore__ inline void ProcessVec5Vf(const LocalTensor<T>& dstTensor, const Loca
     float maxValue = 1e-8;
     uint32_t lossSize = 1;
 
-    ProcessVec5BasicVF<T, isAlign, hasOther>(dstUb, srcUb, srcOtherUb, reduceSumUb, alignCnt, tailSize, maxValue,
-                                             lossSize);
+    ProcessVec5BasicVF<T, isAlign, hasOther, batchLoss>(dstUb, srcUb, srcOtherUb, reduceSumUb, alignCnt, tailSize,
+                                                        maxValue, lossSize);
 }
 } // namespace AscendC
 

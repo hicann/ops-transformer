@@ -23,14 +23,15 @@ using namespace Reg;
 static constexpr uint32_t FLOAT_REP_SIZE_128 = 128;
 
 template <typename INPUT_T>
-__simd_vf__ inline void Ub2UbNd2Nz128(__ubuf__ INPUT_T* dstUb, __ubuf__ INPUT_T* srcUb, uint32_t m, uint32_t n)
+__simd_vf__ inline void Ub2UbNd2Nz128(__ubuf__ INPUT_T* dstUb, __ubuf__ INPUT_T* srcUb, uint32_t validRows,
+                                      uint32_t strideRows, uint32_t n)
 {
     RegTensor<INPUT_T> vreg_input_x1;
-    uint32_t blockStride = m;
+    uint32_t blockStride = strideRows;
     uint32_t repeatStride = 1;
-    uint32_t repeatSize = (uint32_t)128ULL;
+    uint32_t repeatSize = n;
     MaskReg preg16 = UpdateMask<uint16_t>(repeatSize);
-    for (uint16_t i = 0; i < m; ++i) {
+    for (uint16_t i = 0; i < validRows; ++i) {
         LoadAlign(vreg_input_x1, srcUb + i * n);
         StoreAlign<INPUT_T, Reg::DataCopyMode::DATA_BLOCK_COPY, Reg::PostLiteral::POST_MODE_UPDATE>(
             ((__ubuf__ INPUT_T*&)dstUb), vreg_input_x1, blockStride, repeatStride, preg16);
@@ -38,20 +39,21 @@ __simd_vf__ inline void Ub2UbNd2Nz128(__ubuf__ INPUT_T* dstUb, __ubuf__ INPUT_T*
 }
 
 template <typename INPUT_T>
-__simd_vf__ inline void Ub2UbNd2Nz512(__ubuf__ INPUT_T* dstUb, __ubuf__ INPUT_T* srcUb, uint32_t m, uint32_t n)
+__simd_vf__ inline void Ub2UbNd2Nz512(__ubuf__ INPUT_T* dstUb, __ubuf__ INPUT_T* srcUb, uint32_t validRows,
+                                      uint32_t strideRows, uint32_t n)
 {
     RegTensor<INPUT_T> vreg_input_x1;
     RegTensor<INPUT_T> vreg_input_x2;
     RegTensor<INPUT_T> vreg_input_x3;
     RegTensor<INPUT_T> vreg_input_x4;
-    uint32_t blockStride = m;
+    uint32_t blockStride = strideRows;
     uint32_t repeatStride = 1;
     uint32_t repeatSize = (uint32_t)128ULL;
     MaskReg preg16 = UpdateMask<uint16_t>(repeatSize);
-    __ubuf__ INPUT_T* dstUb2 = dstUb + m * FLOAT_REP_SIZE_128;
-    __ubuf__ INPUT_T* dstUb3 = dstUb + m * FLOAT_REP_SIZE_128 * 2;
-    __ubuf__ INPUT_T* dstUb4 = dstUb + m * FLOAT_REP_SIZE_128 * 3;
-    for (uint16_t i = 0; i < m; ++i) {
+    __ubuf__ INPUT_T* dstUb2 = dstUb + strideRows * FLOAT_REP_SIZE_128;
+    __ubuf__ INPUT_T* dstUb3 = dstUb + strideRows * FLOAT_REP_SIZE_128 * 2;
+    __ubuf__ INPUT_T* dstUb4 = dstUb + strideRows * FLOAT_REP_SIZE_128 * 3;
+    for (uint16_t i = 0; i < validRows; ++i) {
         LoadAlign(vreg_input_x1, srcUb + i * n);
         LoadAlign(vreg_input_x2, srcUb + i * n + FLOAT_REP_SIZE_128);
         LoadAlign(vreg_input_x3, srcUb + i * n + FLOAT_REP_SIZE_128 * 2);
@@ -69,15 +71,15 @@ __simd_vf__ inline void Ub2UbNd2Nz512(__ubuf__ INPUT_T* dstUb, __ubuf__ INPUT_T*
 
 template <typename INPUT_T>
 __aicore__ inline void Ub2UbNd2Nz(const LocalTensor<INPUT_T>& dstTensor, const LocalTensor<INPUT_T>& srcTensor,
-                                  uint32_t m, uint32_t n)
+                                  uint32_t validRows, uint32_t strideRows, uint32_t n)
 {
     __ubuf__ INPUT_T* dstUb = (__ubuf__ INPUT_T*)dstTensor.GetPhyAddr();
     __ubuf__ INPUT_T* srcUb = (__ubuf__ INPUT_T*)srcTensor.GetPhyAddr();
     if (n == 512) {
-        Ub2UbNd2Nz512<INPUT_T>(dstUb, srcUb, m, n);
+        Ub2UbNd2Nz512<INPUT_T>(dstUb, srcUb, validRows, strideRows, n);
     }
     if (n == 64 || n == 128) {
-        Ub2UbNd2Nz128<INPUT_T>(dstUb, srcUb, m, n);
+        Ub2UbNd2Nz128<INPUT_T>(dstUb, srcUb, validRows, strideRows, n);
     }
 }
 

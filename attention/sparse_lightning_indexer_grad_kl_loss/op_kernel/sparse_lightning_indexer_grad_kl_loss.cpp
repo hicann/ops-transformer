@@ -33,6 +33,31 @@ using namespace AscendC;
 
 #if (defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))) || (__CCE_AICORE__ == 310)
 using namespace SligKlLoss;
+#define SLI_RUN_OP(tiling_data) \
+    op.Init(query, key, queryIndex, keyIndex, weight, sparseIndices, softmaxMax, softmaxMum, queryRope, keyRope, \
+            actualSeqLengthsQuery, actualSeqLengthsKey, sinks, dQueryIndex, dKeyIndex, dWeight, loss, user, \
+            tiling_data, &tPipe); \
+    op.Process()
+
+#if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
+#define SLI_LOAD_TILING_AND_RUN_OP(tilingdataClass) \
+    if constexpr (Deterministic) { \
+        GET_TILING_DATA_WITH_STRUCT(tilingdataClass, tiling_data_in, tiling); \
+        const tilingdataClass* __restrict tiling_data = &tiling_data_in; \
+        SLI_RUN_OP(tiling_data); \
+    } else { \
+        GET_TILING_DATA_PTR_WITH_STRUCT(tilingdataClass, tiling_wire, tiling); \
+        const auto tiling_data_in = LoadSligTilingCache<false>(tiling_wire, GetBlockIdx()); \
+        const auto* __restrict tiling_data = &tiling_data_in; \
+        SLI_RUN_OP(tiling_data); \
+    }
+#else
+#define SLI_LOAD_TILING_AND_RUN_OP(tilingdataClass) \
+    GET_TILING_DATA_WITH_STRUCT(tilingdataClass, tiling_data_in, tiling); \
+    const tilingdataClass* __restrict tiling_data = &tiling_data_in; \
+    SLI_RUN_OP(tiling_data)
+#endif
+
 #define SLI_OP_IMPL(templateClass, tilingdataClass, ...) \
     do { \
         using CubeBlockType = \
@@ -42,12 +67,7 @@ using namespace SligKlLoss;
             typename std::conditional<g_coreType == AscendC::AIV, SligKlLoss::SligKlLossBlockVec<__VA_ARGS__>, \
                                       SligKlLoss::SligKlLossBlockVecDummy<__VA_ARGS__>>::type; \
         templateClass<CubeBlockType, VecBlockType> op; \
-        GET_TILING_DATA_WITH_STRUCT(tilingdataClass, tiling_data_in, tiling); \
-        const tilingdataClass* __restrict tiling_data = &tiling_data_in; \
-        op.Init(query, key, queryIndex, keyIndex, weight, sparseIndices, softmaxMax, softmaxMum, queryRope, keyRope, \
-                actualSeqLengthsQuery, actualSeqLengthsKey, sinks, dQueryIndex, dKeyIndex, dWeight, loss, user, \
-                tiling_data, &tPipe); \
-        op.Process(); \
+        SLI_LOAD_TILING_AND_RUN_OP(tilingdataClass); \
     } while (0)
 
 #else
@@ -67,7 +87,8 @@ using namespace SligKlLoss;
 #endif
 
 #if defined(__NPU_ARCH__) && ((__NPU_ARCH__ == 9201) || (__NPU_ARCH__ == 9202))
-template <bool HasRope, int TopKRange, int LayoutT_QT, int LayoutT_KT, int SparseMode, bool Deterministic, bool HasSink>
+template <bool HasRope, int TopKRange, int LayoutT_QT, int LayoutT_KT, int SparseMode, bool Deterministic, bool HasSink,
+          bool BatchLoss>
 __global__ __aicore__ void sparse_lightning_indexer_grad_kl_loss(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* queryIndex, __gm__ uint8_t* keyIndex,
     __gm__ uint8_t* weight, __gm__ uint8_t* sparseIndices, __gm__ uint8_t* softmaxMax, __gm__ uint8_t* softmaxMum,
@@ -84,13 +105,13 @@ __global__ __aicore__ void sparse_lightning_indexer_grad_kl_loss(
         SLI_OP_IMPL(SparseLightningIndexerGradKLLossKernelBase,
                     optiling::SparseLightningIndexerGradKLLossRegBaseTilingData, half, half, DTYPE_WEIGHT, float,
                     static_cast<SLILayout>(LayoutT_QT), static_cast<SLILayout>(LayoutT_KT), SLISparseMode::RightDown,
-                    HasRope, Deterministic, HasSink);
+                    HasRope, Deterministic, HasSink, BatchLoss);
     }
     if constexpr (ORIG_DTYPE_QUERY == DT_BF16 && ORIG_DTYPE_KEY == DT_BF16) {
         SLI_OP_IMPL(SparseLightningIndexerGradKLLossKernelBase,
                     optiling::SparseLightningIndexerGradKLLossRegBaseTilingData, bfloat16_t, bfloat16_t, DTYPE_WEIGHT,
                     float, static_cast<SLILayout>(LayoutT_QT), static_cast<SLILayout>(LayoutT_KT),
-                    SLISparseMode::RightDown, HasRope, Deterministic, HasSink);
+                    SLISparseMode::RightDown, HasRope, Deterministic, HasSink, BatchLoss);
     }
 }
 #elif __CCE_AICORE__ == 310

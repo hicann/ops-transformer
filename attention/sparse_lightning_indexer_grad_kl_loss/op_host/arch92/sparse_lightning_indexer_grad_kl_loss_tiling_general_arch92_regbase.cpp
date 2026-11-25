@@ -13,6 +13,7 @@
  * \brief
  */
 
+#include "../../op_kernel/arch92/sparse_lightning_indexer_grad_kl_loss_batch_loss_arch92.h"
 #include "sparse_lightning_indexer_grad_kl_loss_tiling_general_arch92_regbase.h"
 #include "op_host/tiling_templates_registry.h"
 #include <tiling/tiling_api.h>
@@ -60,6 +61,7 @@ static constexpr uint32_t D_SIZE_512 = 512;
 static constexpr uint32_t DINDEX_SIZE_128 = 128;
 static constexpr uint32_t DROPE_SIZE_64 = 64;
 static constexpr uint32_t TOPK_SIZE_2048 = 2048;
+static constexpr int64_t MAX_HELPER_KV_LENGTH = 512;
 static constexpr int64_t SPARSE_MODE_SIZE_3 = 3;
 
 template <typename T>
@@ -1247,7 +1249,7 @@ void SparseLightningIndexerGradKLLossTilingBaseArch92Regbase::SetMultiCoreParams
     sliGradkllossMultiCoreParams_->set_pKTotalSize(pKTotalSize);
 }
 
-void SparseLightningIndexerGradKLLossTilingBaseArch92Regbase::InitOutputSplit()
+void SparseLightningIndexerGradKLLossTilingBaseArch92Regbase::InitOutputSplit(uint32_t launchGroups)
 {
     SLIGradKLLossInitOutputParamsRegbase* initoutput = &tilingData->initOutputParams;
     auto& dKeyIndexShape = context_->GetOutputShape(1)->GetStorageShape();
@@ -1267,11 +1269,34 @@ void SparseLightningIndexerGradKLLossTilingBaseArch92Regbase::InitOutputSplit()
         CeilDivision(totalsize, static_cast<int64_t>(aivNum))); // 输出k-index总大小TD或者BSD 除以 总的aiv核数 向上取整
     // 实际使用的AIV核数 = 实际使用的AIC核数 * 单个AIC配对的AIV核数（由平台核数比推导，适配950/950PR等不同型号）
     int32_t perAicAivNum = aicNum > 0 ? static_cast<int32_t>(aivNum / aicNum) : 1;
-    int32_t actualAivNum = static_cast<int32_t>(sliGradkllossMultiCoreParams_->get_coreNum()) * perAicAivNum;
+    int32_t actualAivNum = static_cast<int32_t>(launchGroups) * perAicAivNum;
     sliGradkllossBaseParams_->set_totalAivNum(actualAivNum);
     OP_LOGD(context_, "init output split: aiv[%u] outputSize[%ld] perCore[%u]", aivNum, totalsize, singlecoresize);
     initoutput->set_singleCoreSize(singlecoresize);
     initoutput->set_totalOutputSize(totalsize);
+}
+
+int32_t SparseLightningIndexerGradKLLossTilingBaseArch92Regbase::GetPairedDKeyMinRows(int64_t queryCount) const
+{
+    if (sparseMode != SPARSE_MODE_SIZE_3 || s2Size < SLIG_DKEY_MIN_SPLIT_ROWS || queryCount <= 0) {
+        return 0;
+    }
+    int64_t sum = 0;
+    int64_t peak = 0;
+    for (int32_t batch = 0; batch < bSize; ++batch) {
+        const int64_t q = actualSeqLenData[batch];
+        const int64_t kv = actualSeqLenKData[batch];
+        for (int64_t slot = 0; slot < q; ++slot) {
+            const int64_t rows = std::min<int64_t>(kSize, kv - q + slot + 1);
+            sum += rows;
+            peak = std::max(peak, rows);
+        }
+    }
+    // The selected query must have at least twice the mean work of the remaining queries.
+    const int64_t threshold = queryCount == 1 ?
+                                  SLIG_DKEY_MIN_SPLIT_ROWS :
+                                  std::max<int64_t>(SLIG_DKEY_MIN_SPLIT_ROWS, CeilDivision(2 * sum, queryCount + 1));
+    return peak >= threshold ? static_cast<int32_t>(threshold) : 0;
 }
 
 ge::graphStatus SparseLightningIndexerGradKLLossTilingBaseArch92Regbase::DoOpTiling()
@@ -1282,7 +1307,19 @@ ge::graphStatus SparseLightningIndexerGradKLLossTilingBaseArch92Regbase::DoOpTil
     uint32_t syKTotalSize = gSizeQueryIndex == NQUERYINDEX_SIZE_24 ? 12288 : 16384;
     uint32_t pKTotalSize = gSizeQuery == NQUERY_SIZE_48 ? 12288 : 16384;
     SetMultiCoreParamsRegbase(totalSize, static_cast<int64_t>(aicNum), syKTotalSize, pKTotalSize);
-    context_->SetBlockDim(sliGradkllossMultiCoreParams_->get_coreNum()); // 使用的核数确定
+    batchLossSlots = deterministic ? 0 :
+                                     SligBatchLoss::SlotCount(totalSize, s1Size, bSize,
+                                                              sliGradkllossMultiCoreParams_->get_coreNum());
+    // Only query owners need private workspace. PRE and POST use all launched groups.
+    const bool spareGroups = !deterministic && !hasSink && tilingKeyLayout == LayoutTypeRegbase::LAYOUT_TND &&
+                             aicNum == aivNum && totalSize > 0 && totalSize <= aicNum / 2 &&
+                             totalSize <= MAX_CORE_NUM_REGBASE / 2;
+    const int32_t minRows = spareGroups ? GetPairedDKeyMinRows(totalSize) : 0;
+    sliGradkllossBaseParams_->pairedDKeyMinRows = minRows;
+    const bool useHelpers = spareGroups && (s2Size <= MAX_HELPER_KV_LENGTH || minRows > 0);
+    const uint32_t launchGroups =
+        useHelpers ? static_cast<uint32_t>(2 * totalSize) : sliGradkllossMultiCoreParams_->get_coreNum();
+    context_->SetBlockDim(launchGroups);
     context_->SetScheduleMode(1);
 
     std::vector<int64_t> shapeVec = {1, kSize};
@@ -1293,8 +1330,15 @@ ge::graphStatus SparseLightningIndexerGradKLLossTilingBaseArch92Regbase::DoOpTil
     }
     SoftMaxTilingFunc(srcShape, 4, softmaxTmpBufferSize, tilingData->vectorParams.softmaxYTilingData);
 
-    SetSparseParamsRegbase(static_cast<int64_t>(aicNum));
-    InitOutputSplit(); // output分核
+    if (useHelpers) {
+        auto* starts = sliGradkllossMultiCoreParams_->get_bS1Ptr();
+        for (int64_t rank = 0; rank < MAX_CORE_NUM_REGBASE; ++rank) {
+            starts[rank] = std::min(rank, totalSize);
+        }
+    } else {
+        SetSparseParamsRegbase(static_cast<int64_t>(aicNum));
+    }
+    InitOutputSplit(launchGroups);
     OP_LOGD(context_, "ending template[%s]", templateName);
     return ge::GRAPH_SUCCESS;
 }
@@ -1314,13 +1358,13 @@ uint64_t SparseLightningIndexerGradKLLossTilingBaseArch92Regbase::GetTilingKey()
     return GET_TPL_TILING_KEY(static_cast<uint8_t>(hasRope), static_cast<uint8_t>(topKRange),
                               static_cast<uint8_t>(tilingKeyLayout), static_cast<uint8_t>(tilingKeyLayout),
                               static_cast<uint8_t>(sparseMode), static_cast<uint8_t>(deterministic),
-                              static_cast<uint8_t>(hasSink));
+                              static_cast<uint8_t>(hasSink), static_cast<uint8_t>(batchLossSlots != 0));
 }
 
 ge::graphStatus SparseLightningIndexerGradKLLossTilingBaseArch92Regbase::GetWorkspaceSize()
 {
     size_t* workspaces = context_->GetWorkspaceSizes(1);
-    int64_t reduceSumOffset = kSize * sizeof(float);
+    int64_t reduceSumOffset = sliGradkllossBaseParams_->get_pairedPWorkspaceElements() * sizeof(float);
     int64_t reluOffset = gSizeQueryIndex * kSize * sizeof(float);
     int64_t gatherSYOffset = kSize * dSizeQueryIndex * 2; // 2代表输入D类型大小
     int64_t scatterAddOutSize;
@@ -1343,6 +1387,10 @@ ge::graphStatus SparseLightningIndexerGradKLLossTilingBaseArch92Regbase::GetWork
             singlecoreTotalSize * usedCoreNum + scatterAddOutSize * 2 + lossSize + bmm3Size * usedCoreNum;
     } else {
         multicoreTotalsize = singlecoreTotalSize * usedCoreNum + scatterAddOutSize;
+        if (batchLossSlots != 0) {
+            multicoreTotalsize =
+                SligBatchLoss::AlignedOffset(multicoreTotalsize) + batchLossSlots * SligBatchLoss::SLOT_BYTES;
+        }
     }
     workspaces[0] = static_cast<size_t>(multicoreTotalsize) + WORK_SPACE_RESERVE_SIZE; // 预留16M空间必须加;
     return ge::GRAPH_SUCCESS;

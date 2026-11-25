@@ -22,6 +22,21 @@ namespace optiling {
 // ------------------公共定义--------------------------
 const uint32_t SLI_MAX_AIC_CORE_NUM_REGBASE = 80;
 constexpr uint32_t MAX_CORE_NUM_REGBASE = 80; // 目前使用AIC核的最大值为80
+constexpr int32_t SLIG_P_TILE_ROWS = 128;
+constexpr int32_t SLIG_DKEY_HALF_ROWS = SLIG_P_TILE_ROWS / 2;
+// Split only when over half of the second 64-lane VF repeat has work.
+constexpr int32_t SLIG_DKEY_MIN_SPLIT_ROWS = SLIG_DKEY_HALF_ROWS + SLIG_DKEY_HALF_ROWS / 2 + 1;
+
+#ifdef __host_aicore__
+#define SLIG_TILING_HOST_DEVICE __host_aicore__
+#else
+#define SLIG_TILING_HOST_DEVICE
+#endif
+
+SLIG_TILING_HOST_DEVICE constexpr int32_t GetSligDKeyYBase(int32_t rows)
+{
+    return (rows + SLIG_P_TILE_ROWS - 1) / SLIG_P_TILE_ROWS * SLIG_P_TILE_ROWS;
+}
 
 // -----------算子TilingData定义---------------
 class SLIGradKLLossBaseParamsRegbase {
@@ -37,7 +52,7 @@ public:
     int32_t dSizeQueryIndex;
     int32_t kSize;
     int32_t sparseMode;
-    int32_t rsvd;
+    int32_t pairedDKeyMinRows; // Zero disables dK sharing. Uses the previously reserved wire slot.
     float scaleValue;
 
     int64_t t1Size;
@@ -136,13 +151,15 @@ public:
         this->sparseMode = sparseModeParam;
     }
 
-    int32_t get_rsvd() const
+    SLIG_TILING_HOST_DEVICE constexpr int32_t get_pairedPWorkspaceElements() const
     {
-        return rsvd;
-    }
-    void set_rsvd(int32_t rsvdParam)
-    {
-        this->rsvd = rsvdParam;
+        if (pairedDKeyMinRows == 0) {
+            return kSize;
+        }
+        const int32_t rows = s2Size < kSize ? s2Size : kSize;
+        const int32_t paddedRows = GetSligDKeyYBase(rows);
+        const int32_t elements = paddedRows + paddedRows / 2;
+        return elements > kSize ? elements : kSize;
     }
 
     float get_scaleValue() const
@@ -283,4 +300,5 @@ public:
 };
 
 } // namespace optiling
+#undef SLIG_TILING_HOST_DEVICE
 #endif // SPARSE_LIGHTNING_INDEXER_GRAD_KL_LOSS_TILING_ARCH92_H
