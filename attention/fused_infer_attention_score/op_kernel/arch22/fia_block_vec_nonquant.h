@@ -1021,7 +1021,16 @@ template <typename FIAT, bool ENABLE_COMPACT_GQA_PIPELINE>
 __aicore__ inline void FiaBlockVecNonQuant<FIAT, ENABLE_COMPACT_GQA_PIPELINE>::CopyAttentionOut(
     FaUbTensor<OUT_T>& ubTensor, GmCoordGs1Merge& gmCoord)
 {
-    if (constInfo.outputLayout == FIA_LAYOUT::BSH) {
+    if constexpr (ENABLE_COMPACT_GQA_PIPELINE) {
+        constexpr GmFormat OUT_FORMAT = GmFormat::BSNGD;
+        FaGmTensor<OUT_T, OUT_FORMAT> outGmTensor;
+        outGmTensor.gmTensor = attentionOutGm;
+        outGmTensor.offsetCalculator.Init(constInfo.batchSize, constInfo.kvHeadNum, constInfo.gSize, constInfo.qSeqSize,
+                                          constInfo.headDim, actualSeqLengthsGmQ, constInfo.actualLenQDims,
+                                          constInfo.isQHasLeftPadding, constInfo.qLeftPaddingSize);
+        CopyAttenOutUbToGm<OUT_T, OUT_FORMAT, GetOutUbFormat<LAYOUT_T>()> copyAttenOutUbToGm;
+        copyAttenOutUbToGm(outGmTensor, ubTensor, gmCoord);
+    } else if (constInfo.outputLayout == FIA_LAYOUT::BSH) {
         constexpr GmFormat OUT_FORMAT = GmFormat::BSNGD;
         FaGmTensor<OUT_T, OUT_FORMAT> outGmTensor;
         outGmTensor.gmTensor = attentionOutGm;

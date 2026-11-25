@@ -88,23 +88,6 @@ using namespace AscendC;
     GET_TILING_DATA_WITH_STRUCT(tilingDataStruct, tiling_data_in, tiling); \
     const tilingDataStruct* __restrict tiling_data = &tiling_data_in;
 
-template <typename TilingDataType>
-__aicore__ inline bool ShouldUseCompactGqaPipeline(const TilingDataType* __restrict tilingData,
-                                                   __gm__ uint8_t* queryRope, __gm__ uint8_t* learnableSink)
-{
-    const auto& base = tilingData->baseParams;
-    const auto& mask = tilingData->maskParams;
-    const auto& pse = tilingData->pseParams;
-    const auto& padding = tilingData->leftPaddingParams;
-    const auto& prefix = tilingData->prefixParams;
-    return (base.gSize * base.n2Size == base.usedCoreNum) &&
-           (static_cast<FIA_LAYOUT>(base.outputLayout) == FIA_LAYOUT::BSH) && base.batchContinuous &&
-           (base.actualSeqS1Dims == 0U) && (base.actualSeqS2Dims == 0U) && (!base.accumQSeqFlag) &&
-           (!base.accumKVSeqFlag) && (!pse.pseShiftFlag) && (!mask.attenMaskFlag) && (!base.softmaxLseFlag) &&
-           (!padding.qPaddingFlag) && (!padding.kvPaddingFlag) && (!prefix.prefixFlag) && (queryRope == nullptr) &&
-           (mask.sparseMode == 0U) && (learnableSink == nullptr);
-}
-
 extern "C" __global__ __aicore__ void fused_infer_attention(
     __gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
     __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengthsQ, __gm__ uint8_t* actualSeqLengths,
@@ -393,6 +376,7 @@ extern "C" __global__ __aicore__ void fused_infer_attention(
     TILING_KEY_IS(103000000200000000);
     TILING_KEY_IS(103000000010000001);
     TILING_KEY_IS(103000000210000001);
+    TILING_KEY_IS(106000000010000001);
     TILING_KEY_IS(103000000030000003);
     TILING_KEY_IS(103000000230000003);
     TILING_KEY_IS(103000000050000005);
@@ -1045,17 +1029,12 @@ extern "C" __global__ __aicore__ void fused_infer_attention(
                                half, half, half, half, false, false, FIA_LAYOUT::BNSD, false, false, FIA_LAYOUT::BNSD,
                                false, true);
 #elif TILING_KEY_VAR == 103000000010000001
-    {
-        FIA_COPY_TILING_DATA(FusedInferAttentionScoreTilingData, tiling);
-        if (likely(ShouldUseCompactGqaPipeline(tiling_data, queryRope, learnableSink))) {
-            INVOKE_FIA_OP_COMPACT_GQA_IMPL(FiaKernelNonQuant, half, half, half, half, false, false, FIA_LAYOUT::BSH,
-                                           false, false, FIA_LAYOUT::BSH, false);
-        } else {
-            INVOKE_FIA_OP_GENERAL_IMPL(FiaKernelNonQuant, FiaBlockCubeNonQuantGqa, FiaBlockVecNonQuant,
-                                       FiaBlockVecFlashDecode, half, half, half, half, false, false, FIA_LAYOUT::BSH,
-                                       false, false, FIA_LAYOUT::BSH, false);
-        }
-    }
+    INVOKE_FIA_OP_GENERAL_IMPL(FiaKernelNonQuant, FiaBlockCubeNonQuantGqa, FiaBlockVecNonQuant, FiaBlockVecFlashDecode,
+                               half, half, half, half, false, false, FIA_LAYOUT::BSH, false, false, FIA_LAYOUT::BSH,
+                               false);
+#elif TILING_KEY_VAR == 106000000010000001
+    INVOKE_FIA_OP_COMPACT_GQA_IMPL(FiaKernelNonQuant, half, half, half, half, false, false, FIA_LAYOUT::BSH, false,
+                                   false, FIA_LAYOUT::BSH, false);
 #elif TILING_KEY_VAR == 103000000210000001
     INVOKE_FIA_OP_GENERAL_IMPL(FiaKernelNonQuant, FiaBlockCubeNonQuantGqa, FiaBlockVecNonQuant, FiaBlockVecFlashDecode,
                                half, half, half, half, false, false, FIA_LAYOUT::BSH, false, false, FIA_LAYOUT::BSH,
@@ -1714,6 +1693,7 @@ extern "C" __global__ __aicore__ void fused_infer_attention(
     TILING_KEY_IS(103000000200022220);
     TILING_KEY_IS(103000000010022221);
     TILING_KEY_IS(103000000210022221);
+    TILING_KEY_IS(106000000010022221);
     TILING_KEY_IS(103000000030022223);
     TILING_KEY_IS(103000000230022223);
     TILING_KEY_IS(103000000050022223);
@@ -2605,17 +2585,12 @@ extern "C" __global__ __aicore__ void fused_infer_attention(
                                bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false, FIA_LAYOUT::BNSD, false,
                                false, FIA_LAYOUT::BNSD, false, true);
 #elif TILING_KEY_VAR == 103000000010022221
-    {
-        FIA_COPY_TILING_DATA(FusedInferAttentionScoreTilingData, tiling);
-        if (likely(ShouldUseCompactGqaPipeline(tiling_data, queryRope, learnableSink))) {
-            INVOKE_FIA_OP_COMPACT_GQA_IMPL(FiaKernelNonQuant, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false,
-                                           false, FIA_LAYOUT::BSH, false, false, FIA_LAYOUT::BSH);
-        } else {
-            INVOKE_FIA_OP_GENERAL_IMPL(FiaKernelNonQuant, FiaBlockCubeNonQuantGqa, FiaBlockVecNonQuant,
-                                       FiaBlockVecFlashDecode, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false,
-                                       false, FIA_LAYOUT::BSH, false, false, FIA_LAYOUT::BSH);
-        }
-    }
+    INVOKE_FIA_OP_GENERAL_IMPL(FiaKernelNonQuant, FiaBlockCubeNonQuantGqa, FiaBlockVecNonQuant, FiaBlockVecFlashDecode,
+                               bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false, FIA_LAYOUT::BSH, false,
+                               false, FIA_LAYOUT::BSH);
+#elif TILING_KEY_VAR == 106000000010022221
+    INVOKE_FIA_OP_COMPACT_GQA_IMPL(FiaKernelNonQuant, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false,
+                                   FIA_LAYOUT::BSH, false, false, FIA_LAYOUT::BSH);
 #elif TILING_KEY_VAR == 103000000210022221
     INVOKE_FIA_OP_GENERAL_IMPL(FiaKernelNonQuant, FiaBlockCubeNonQuantGqa, FiaBlockVecNonQuant, FiaBlockVecFlashDecode,
                                bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false, FIA_LAYOUT::BSH, false,
