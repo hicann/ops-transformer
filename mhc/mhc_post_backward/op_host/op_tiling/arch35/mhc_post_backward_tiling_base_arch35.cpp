@@ -244,14 +244,16 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckShapeAllPositive()
     const int64_t requiredIndices[] = {GRAD_Y_INPUT_INDEX, X_INPUT_INDEX, H_OUT_INPUT_INDEX, H_POST_INPUT_INDEX};
     for (auto i : requiredIndices) {
         if (CheckShapeAllPositive(i) != ge::GRAPH_SUCCESS) {
-            OP_LOGE(context_, "input %ld has non-positive shape", i);
+            OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(),
+                                   "input has non-positive shape; propagate the lower-layer first error");
             return ge::GRAPH_FAILED;
         }
     }
 
     if (isHResActive_) {
         if (CheckShapeAllPositive(H_RES_INPUT_INDEX) != ge::GRAPH_SUCCESS) {
-            OP_LOGE(context_, "input %ld has non-positive shape", H_RES_INPUT_INDEX);
+            OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(),
+                                   "input has non-positive shape; propagate the lower-layer first error");
             return ge::GRAPH_FAILED;
         }
     }
@@ -718,7 +720,8 @@ ge::graphStatus MhcPostBackwardTilingBaseArch35::CheckParam()
     }
 
     if (CheckShapeAllPositive() != ge::GRAPH_SUCCESS) {
-        OP_LOGE(context_, "CheckShapeAllPositive failed");
+        OP_LOGE_WITHOUT_REPORT(context_->GetNodeName(),
+                               "CheckShapeAllPositive failed; propagate the lower-layer first error");
         return ge::GRAPH_FAILED;
     }
 

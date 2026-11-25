@@ -11,6 +11,15 @@
 if(UT_TEST_ALL OR OP_HOST_UT)
     add_modules_ut_sources(UT_NAME ${OP_TILING_MODULE_NAME} MODE PRIVATE DIR ${CMAKE_CURRENT_SOURCE_DIR})
     add_modules_ut_sources(UT_NAME ${OP_INFERSHAPE_MODULE_NAME} MODE PRIVATE DIR ${CMAKE_CURRENT_SOURCE_DIR})
+    # The shared host UT target is created after operator test sources are registered.
+    # errmsg negative cases read raw messages from liberror_manager.so.
+    set_property(
+        DIRECTORY "${CMAKE_SOURCE_DIR}"
+        APPEND PROPERTY LINK_LIBRARIES
+        "$<$<STREQUAL:$<TARGET_PROPERTY:NAME>,${PKG_NAME}_op_host_ut>:-Wl,--no-as-needed>"
+        "$<$<STREQUAL:$<TARGET_PROPERTY:NAME>,${PKG_NAME}_op_host_ut>:error_manager>"
+        "$<$<STREQUAL:$<TARGET_PROPERTY:NAME>,${PKG_NAME}_op_host_ut>:nnopbase>"
+        "$<$<STREQUAL:$<TARGET_PROPERTY:NAME>,${PKG_NAME}_op_host_ut>:-Wl,--as-needed>")
 endif()
 
 file(GLOB CURRENT_DIRS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/*)

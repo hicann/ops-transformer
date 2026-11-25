@@ -69,17 +69,20 @@ static ge::graphStatus InferShapeForStemOamPrepVarlenQ(gert::InferShapeContext* 
     }
 
     if (qShape->GetDimNum() != Q_DIM_NUM) {
-        OP_LOGE(context, "q shape dim num must be %ld, but got %zu.", Q_DIM_NUM, qShape->GetDimNum());
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "q", std::to_string(qShape->GetDimNum()),
+                                                 "the dim num of q must be 4");
         return ge::GRAPH_FAILED;
     }
     int64_t dimD = qShape->GetDim(Q_LAST_DIM_INDEX);
     if (dimD != UNKNOWN_DIM_VALUE && dimD != DIM_QK) {
-        OP_LOGE(context, "q last dim must be %ld, but got %ld.", DIM_QK, dimD);
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(context->GetNodeName(), "q", std::to_string(dimD),
+                                                  "the last dim of q must be 128");
         return ge::GRAPH_FAILED;
     }
     if (qSeqLensShape->GetDimNum() != Q_SEQ_LENS_DIM_NUM) {
-        OP_LOGE(context, "qSeqLens shape dim num must be %ld, but got %zu.", Q_SEQ_LENS_DIM_NUM,
-                qSeqLensShape->GetDimNum());
+        OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "q_seq_lens",
+                                                 std::to_string(qSeqLensShape->GetDimNum()),
+                                                 "the dim num of q_seq_lens must be 1");
         return ge::GRAPH_FAILED;
     }
 
@@ -91,7 +94,8 @@ static ge::graphStatus InferShapeForStemOamPrepVarlenQ(gert::InferShapeContext* 
     OP_CHECK_NULL_WITH_CONTEXT(context, stemBlockSizePtr);
     int64_t stemBlockSize = *stemBlockSizePtr;
     if (stemBlockSize != SUPPORTED_STEM_BLOCK_SIZE) {
-        OP_LOGE(context, "stemBlockSize only supports %ld, but got %ld.", SUPPORTED_STEM_BLOCK_SIZE, stemBlockSize);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "stem_block_size", std::to_string(stemBlockSize),
+                                              "stem_block_size only supports 64");
         return ge::GRAPH_FAILED;
     }
 
@@ -99,7 +103,8 @@ static ge::graphStatus InferShapeForStemOamPrepVarlenQ(gert::InferShapeContext* 
     OP_CHECK_NULL_WITH_CONTEXT(context, stemStridePtr);
     int64_t stemStride = *stemStridePtr;
     if (stemStride != SUPPORTED_STEM_STRIDE) {
-        OP_LOGE(context, "stemStride only supports %ld, but got %ld.", SUPPORTED_STEM_STRIDE, stemStride);
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "stem_stride", std::to_string(stemStride),
+                                              "stem_stride only supports 16");
         return ge::GRAPH_FAILED;
     }
     int64_t kflat_dim = stemStride * DIM_QK;
