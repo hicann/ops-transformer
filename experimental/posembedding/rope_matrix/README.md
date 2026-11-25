@@ -1,15 +1,15 @@
 Rope-Matrix
-Compile and test:
+Compile and test from the repository root:
 
 ```bash
-# How to run this sub-project$, please first read the readme at "experimental/npu_ops_transformer_ext"
-path="path for experimental"
-cd $path$/npu_ops_transformer_ext
+# Read experimental/npu_ops_transformer_ext/README.md for the prerequisites.
+experimental_dir="$(pwd)/experimental"
+cd "${experimental_dir}/npu_ops_transformer_ext"
 python -m build --wheel -n
 cd dist
 pip install *.whl --force-reinstall --no-deps
-cd $path$/posembedding/rope_matrix/tests
-python ./test_rope.py # full code can be find at the last of readme.
+cd "${experimental_dir}/posembedding/rope_matrix/tests"
+python ./test_rope.py
 ```
 
 Support limitation:
