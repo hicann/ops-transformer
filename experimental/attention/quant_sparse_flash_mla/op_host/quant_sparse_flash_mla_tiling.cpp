@@ -164,6 +164,9 @@ ge::graphStatus QSMLAInfoParser::GetOpParaInfo()
 
 ge::graphStatus QSMLAInfoParser::GetInOutDataType()
 {
+    if (opParamInfo_.q.desc == nullptr || opParamInfo_.attnOut.desc == nullptr) {
+        return ge::GRAPH_FAILED;
+    }
     qType_ = opParamInfo_.q.desc->GetDataType();
     outputType_ = opParamInfo_.attnOut.desc->GetDataType();
     if (opParamInfo_.oriKv.desc != nullptr) {
@@ -216,33 +219,33 @@ ge::graphStatus QSMLAInfoParser::GetKvLayout()
 
 // =============Parser function====================
 
-bool QSMLAInfoParser::HasAxis(const QSMLAAxis &axis, const QSMLALayout &layout, const gert::Shape &shape) const
+bool QSMLAInfoParser::HasAxis(const QSMLAAxis& axis, const QSMLALayout& layout, const gert::Shape& shape) const
 {
-    const auto &layoutIt = QSMLA_LAYOUT_AXIS_MAP.find(layout);
+    const auto& layoutIt = QSMLA_LAYOUT_AXIS_MAP.find(layout);
     if (layoutIt == QSMLA_LAYOUT_AXIS_MAP.end()) {
         return false;
     }
 
-    const std::vector<QSMLAAxis> &axes = layoutIt->second;
-    const auto &axisIt = std::find(axes.begin(), axes.end(), axis);
+    const std::vector<QSMLAAxis>& axes = layoutIt->second;
+    const auto& axisIt = std::find(axes.begin(), axes.end(), axis);
     if (axisIt == axes.end()) {
         return false;
     }
-    const auto &dimIt = QSMLA_LAYOUT_DIM_MAP.find(layout);
+    const auto& dimIt = QSMLA_LAYOUT_DIM_MAP.find(layout);
     if (dimIt == QSMLA_LAYOUT_DIM_MAP.end() || dimIt->second != shape.GetDimNum()) {
         return false;
     }
     return true;
 }
 
-size_t QSMLAInfoParser::GetAxisIdx(const QSMLAAxis &axis, const QSMLALayout &layout) const
+size_t QSMLAInfoParser::GetAxisIdx(const QSMLAAxis& axis, const QSMLALayout& layout) const
 {
-    const std::vector<QSMLAAxis> &axes = QSMLA_LAYOUT_AXIS_MAP.find(layout)->second;
-    const auto &axisIt = std::find(axes.begin(), axes.end(), axis);
+    const std::vector<QSMLAAxis>& axes = QSMLA_LAYOUT_AXIS_MAP.find(layout)->second;
+    const auto& axisIt = std::find(axes.begin(), axes.end(), axis);
     return std::distance(axes.begin(), axisIt);
 }
 
-uint32_t QSMLAInfoParser::GetAxisNum(const gert::Shape &shape, const QSMLAAxis &axis, const QSMLALayout &layout) const
+uint32_t QSMLAInfoParser::GetAxisNum(const gert::Shape& shape, const QSMLAAxis& axis, const QSMLALayout& layout) const
 {
     return HasAxis(axis, layout, shape) ? shape.GetDim(GetAxisIdx(axis, layout)) : invalidDimValue_;
 }
@@ -285,8 +288,8 @@ ge::graphStatus QSMLAInfoParser::GetGSize()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QSMLAInfoParser::GetActualSeqLenSize(uint32_t &size, const gert::Tensor *tensor, QSMLALayout &layout,
-                                                     const std::string &name) const
+ge::graphStatus QSMLAInfoParser::GetActualSeqLenSize(uint32_t& size, const gert::Tensor* tensor, QSMLALayout& layout,
+                                                     const std::string& name) const
 {
     if ((tensor == nullptr)) {
         OP_LOGE(opName_, "when layout of q is %s, %s must be provided.", QSMLALayoutToSerialString(layout).c_str(),
@@ -302,7 +305,7 @@ ge::graphStatus QSMLAInfoParser::GetActualSeqLenSize(uint32_t &size, const gert:
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus QSMLAInfoParser::GetActualSeqLenQSize(uint32_t &size)
+ge::graphStatus QSMLAInfoParser::GetActualSeqLenQSize(uint32_t& size)
 {
     return GetActualSeqLenSize(size, opParamInfo_.sequsedOriKv.tensor, qLayout_, "cuSeqLensQ");
 }
@@ -458,7 +461,7 @@ ge::graphStatus QSMLAInfoParser::GetKvstride()
     return ge::GRAPH_SUCCESS;
 }
 
-void QSMLAInfoParser::GenerateInfo(QSMLATilingInfo &qsmlaInfo)
+void QSMLAInfoParser::GenerateInfo(QSMLATilingInfo& qsmlaInfo)
 {
     qsmlaInfo.opName = opName_;
     qsmlaInfo.platformInfo = platformInfo_;
@@ -509,7 +512,7 @@ void QSMLAInfoParser::GenerateInfo(QSMLATilingInfo &qsmlaInfo)
     qsmlaInfo.outLayout = outLayout_;
 }
 
-ge::graphStatus QSMLAInfoParser::Parse(QSMLATilingInfo &qsmlaInfo)
+ge::graphStatus QSMLAInfoParser::Parse(QSMLATilingInfo& qsmlaInfo)
 {
     if (context_ == nullptr) {
         OP_LOGE("SparseFlashAttention", "tiling context is nullptr!");
@@ -544,13 +547,13 @@ ge::graphStatus QSMLAInfoParser::Parse(QSMLATilingInfo &qsmlaInfo)
 }
 
 // --------------------------TilingPrepare函数定义-------------------------------------
-static ge::graphStatus TilingPrepareForQuantSparseFlashMla(gert::TilingParseContext * /* context */)
+static ge::graphStatus TilingPrepareForQuantSparseFlashMla(gert::TilingParseContext* /* context */)
 {
     return ge::GRAPH_SUCCESS;
 }
 
 // --------------------------QuantSparseFlashMlaTiling类成员函数定义-----------------------
-ge::graphStatus QuantSparseFlashMlaTiling::DoOpTiling(QSMLATilingInfo *tilingInfo)
+ge::graphStatus QuantSparseFlashMlaTiling::DoOpTiling(QSMLATilingInfo* tilingInfo)
 {
     if (tilingInfo->opParamInfo.cmpKv.tensor == nullptr) {
         OP_CHECK_IF(tilingInfo->opParamInfo.cmpSparseIndices.tensor != nullptr,
@@ -581,7 +584,7 @@ ge::graphStatus QuantSparseFlashMlaTiling::DoOpTiling(QSMLATilingInfo *tilingInf
     if (tilingInfo->gSize > 64) {
         workspaceSize += (S2_BASE_SIZE * D_SIZE * VEC_RES_ELEM_SIZE * TRIPLE_BUFFER_NUM * (aicNum >> 1));
     }
-    size_t *workSpaces = context_->GetWorkspaceSizes(1);
+    size_t* workSpaces = context_->GetWorkspaceSizes(1);
     workSpaces[0] = workspaceSize;
 
     // -------------set tilingdata-----------------
@@ -626,7 +629,7 @@ ge::graphStatus QuantSparseFlashMlaTiling::DoOpTiling(QSMLATilingInfo *tilingInf
 }
 
 // --------------------------Tiling函数定义---------------------------
-ge::graphStatus TilingQuantSparseFlashMla(gert::TilingContext *context)
+ge::graphStatus TilingQuantSparseFlashMla(gert::TilingContext* context)
 {
     OP_CHECK_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("QuantSparseFlashMla", "Tiling context is null."),
                 return ge::GRAPH_FAILED);
