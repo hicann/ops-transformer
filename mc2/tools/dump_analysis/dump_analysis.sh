@@ -13,7 +13,9 @@
 
 
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python3
-chmod 777 *
+
+# 说明：脚本及调用的 .py 会在当前工作目录写入分析结果（win_all_card_data.csv、errors_plog.csv 等），
+# 请在当前用户可写的目录下执行，不要通过放开工具目录权限（如 chmod 777）来规避。
 
 # 文件运行使用方法 #####################
 # 使用方法
@@ -469,7 +471,7 @@ else
         echo "warning:profiling数据指定的路径 $PROFILING_PATH 下未找到profiling文件,不进行profiling数据解析"
     else
         echo "在指定的路径 $PROFILING_PATH 下找到 $folder_count 张卡的profiling数据"
-        python3 profiling_analysis.py $PROFILING_PATH $folder_count
+        python3 $SCRIPT_DIR/profiling_analysis.py $PROFILING_PATH $folder_count
     fi
 fi
 
@@ -537,4 +539,4 @@ else
 fi
 [ -z "$PLOG_PATH" ] && PLOG_PATH="NA"
 [ -z "$GRAPH_PATH" ] && GRAPH_PATH="NA"
-python3 log_graph_analysis.py $PLOG_PATH $GRAPH_PATH
+python3 $SCRIPT_DIR/log_graph_analysis.py $PLOG_PATH $GRAPH_PATH
