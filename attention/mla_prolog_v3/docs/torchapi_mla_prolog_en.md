@@ -223,7 +223,7 @@ cann_ops_transformer.mla_prolog(
 | query_quant_mode | int | Optional| Quantization mode of a query. 0: non-quantization; 1: per-token-head quantization. The default value is 0.| int | - |
 | ckvkr_repo_mode | int | Optional| Storage mode of kv_cache and kr_cache. 0: separate storage; 1: combined storage. The default value is 0.| int | - |
 | quant_scale_repo_mode | int | Optional| Storage mode of the quantization scale. 0: scale and data are stored separately. 1: scale and data are stored together. The default value is 0.| int | - |
-| tile_size | int | Optional| Size of each tile during per-token-per-group quantization. This parameter is valid only when `kv_cache_quant_mode=3` is used. The default value is 128. No value needs to be assigned when `kv_cache_quant_mode=1/2` is used.| int | - |
+| tile_size | int | Optional| Size of each tile during per-token-per-group quantization. This parameter is valid only when `kv_cache_quant_mode=3` is used. Currently only 128 is supported. No value needs to be assigned when `kv_cache_quant_mode=1/2` is used.| int | - |
 | qc_qr_scale | float | Optional| Scale correction coefficient of the query. The default value is 1.0.| float | - |
 | kc_scale | float | Optional| Scale correction coefficient of the key. The default value is 1.0.| float | - |
 | token_x_dtype | int | Optional| The input dtype of token_x is `torch_npu.hifloat8` (enumerated value: 290) in the HiF8 full quantization scenario and is None in other scenarios.| int | - |

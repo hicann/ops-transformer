@@ -636,7 +636,7 @@ aclnnStatus aclnnMlaPrologV4WeightNz(
         <td>tileSize</td>
         <td>Input</td>
         <td>Indicates the size of each tile during pertoken-pergroup quantization. Valid only when kvCacheQuantMode is 3.</td>
-        <td>Default value is 128</td>
+        <td>Currently only 128 is supported</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -966,7 +966,7 @@ aclnnStatus aclnnMlaPrologV4WeightNz(
         <td>Size of the D dimension of kvCache</td>
         <td>
           <ul>
-            <li>In the pertoken-pergroup quantization scenario, the fixed value is 656, which equals 512(Hckv) + 64(Dr)*2 + 4(Hckv/tileSize)*4.</li>
+            <li>In the pertoken-pergroup quantization scenario, the fixed value is 656, which equals 512(Hckv) + 64(Dr)*2 + (Hckv/tileSize)*4.</li>
             <li>In other scenarios, the fixed value is Hckv (512).</li>
           </ul>
         </td>

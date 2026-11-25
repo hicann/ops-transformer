@@ -652,7 +652,7 @@ aclnnStatus aclnnMlaPrologV4WeightNz(
         <td>tileSize</td>
         <td>输入</td>
         <td>表示pertoken-pergroup量化时每个tile的大小，仅在kvCacheQuantMode为3时有效。</td>
-        <td>默认值为128</td>
+        <td>当前仅支持128</td>
         <td>INT64</td>
         <td>-</td>
         <td>-</td>
@@ -987,7 +987,7 @@ aclnnStatus aclnnMlaPrologV4WeightNz(
         <td>kvCache的D维度的大小</td>
         <td>
           <ul>
-            <li>pertoken-pergroup量化场景下，取值固定为656，即等于512(Hckv) + 64(Dr)*2 + 4(Hckv/tileSize)*4</li>
+            <li>pertoken-pergroup量化场景下，取值固定为656，即等于512(Hckv) + 64(Dr)*2 + (Hckv/tileSize)*4</li>
             <li>其他场景下，取值固定为Hckv（512）</li>
           </ul>
         </td>

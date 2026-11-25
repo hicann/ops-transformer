@@ -198,7 +198,7 @@ aclnnStatus aclnnCompressor(
       <td>stateBlockTableOptional (const aclTensor*)</td>
       <td>Optional input</td>
       <td>Indicates the block mapping table used for state_cache storage.</td>
-      <td><ul><li>When cacheMode=1, the shape is [B, ceil(Smax/block_size)], where Smax is the maximum Sequence Length in each batch. When the shape of x is [B,S,H], Smax=max(start_pos)+S; when the shape of x is [T,H], Smax=max(start_pos)+max(cuSeqlensOptional[n+1] - cuSeqlensOptional[n]).</li><li>When cacheMode=2, the shape is [B].</li></ul></td>
+      <td><ul><li>When cacheMode=1, the shape is [B, ceil(Smax/block_size)], where Smax is the maximum Sequence Length in each batch. When the shape of x is [B,S,H], Smax=max(start_pos)+S; when the shape of x is [T,H], Smax=max(start_pos)+max(cuSeqlensOptional[n+1] - cuSeqlensOptional[n]).</li><li>When cacheMode=2, the shape is [B].</li><li>In the cacheMode=1/2 scenarios supported by the current operator, this parameter is mandatory.</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>When cacheMode=1: [B, ceil(Smax/block_size)]<br>When cacheMode=2: [B]</td>

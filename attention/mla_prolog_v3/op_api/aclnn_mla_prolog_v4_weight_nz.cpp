@@ -219,13 +219,13 @@ aclnnStatus aclnnMlaPrologV4WeightNzGetWorkspaceSize(
     const int KV_CACHE_QUANT_MODE_PER_CHANNEL = 2;
     const int KV_CACHE_QUANT_MODE_PER_TILE = 3;
     if (!CheckWeightQuantModeValidity(weightQuantMode)) {
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_INVALID;
     };
     if (!CheckKvCacheQuantModeValidity(weightQuantMode, kvCacheQuantMode)) {
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_INVALID;
     };
     if (!CheckQueryQuantModeValidity(queryQuantMode)) {
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_INVALID;
     };
 
     // do_rope 作为 attr 透传 inner，tiling 通过 do_rope attr 判断 RoPE 开关；
@@ -237,22 +237,22 @@ aclnnStatus aclnnMlaPrologV4WeightNzGetWorkspaceSize(
     if (doRope) {
         if (IsRopeInputEmpty(ropeSin)) {
             OP_LOGE_WITH_INVALID_INPUT("aclnnMlaPrologV4", "ropeSin");
-            return ge::GRAPH_FAILED;
+            return ACLNN_ERR_PARAM_INVALID;
         }
         if (IsRopeInputEmpty(ropeCos)) {
             OP_LOGE_WITH_INVALID_INPUT("aclnnMlaPrologV4", "ropeCos");
-            return ge::GRAPH_FAILED;
+            return ACLNN_ERR_PARAM_INVALID;
         }
     } else {
         if (!IsRopeInputEmpty(ropeSin)) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                     "Parameter ropeSin of aclnnMlaPrologV4 required nullptr when doRope is false, but got non-null.");
-            return ge::GRAPH_FAILED;
+            return ACLNN_ERR_PARAM_INVALID;
         }
         if (!IsRopeInputEmpty(ropeCos)) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                     "Parameter ropeCos of aclnnMlaPrologV4 required nullptr when doRope is false, but got non-null.");
-            return ge::GRAPH_FAILED;
+            return ACLNN_ERR_PARAM_INVALID;
         }
         ropeSinHolder = std::make_unique<TensorHolder>(ropeSin, aclDataType::ACL_BF16, std::string("ropeSin"));
         ropeCosHolder = std::make_unique<TensorHolder>(ropeCos, aclDataType::ACL_BF16, std::string("ropeCos"));
@@ -273,15 +273,15 @@ aclnnStatus aclnnMlaPrologV4WeightNzGetWorkspaceSize(
         TensorHolder(dequantScaleQNormOutOptional, dequantScaleQNormDataType, std::string("dequantScaleQNormOut"));
     if (dequantScaleQNopeOutOptional == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("aclnnMlaPrologV4", "dequantScaleQNopeOut");
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_INVALID;
     }
     if (queryNormOutOptional == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("aclnnMlaPrologV4", "queryNormOut");
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_INVALID;
     }
     if (dequantScaleQNormOutOptional == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("aclnnMlaPrologV4", "dequantScaleQNormOut");
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_INVALID;
     }
     // weightQuantMode == 2,4,5:全量化场景(int8,fp8,hif8)
     // weightQuantMode == 3:mxfp8全量化场景
@@ -291,13 +291,13 @@ aclnnStatus aclnnMlaPrologV4WeightNzGetWorkspaceSize(
                                                                 weightQuantMode == WEIGHT_QUANT_MODE_FULL_QUANT_FP8 ||
                                                                 weightQuantMode == WEIGHT_QUANT_MODE_FULL_QUANT_HIF8) &&
                                                                kvCacheQuantMode == KV_CACHE_QUANT_MODE_PER_TENSOR)) {
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_INVALID;
     }
     bool queryNormFlag = queryNormHolder.IsTensorNotNull();
     // weightQuantMode != 0:量化场景
     if (!dequantScaleQNormHolder.CheckTensorConditionalNotNull(weightQuantMode != WEIGHT_QUANT_MODE_NO_QUANT &&
                                                                queryNormFlag)) {
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_INVALID;
     }
 
     return aclnnInnerMlaPrologV3GetWorkspaceSize(

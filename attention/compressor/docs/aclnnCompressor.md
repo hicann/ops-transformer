@@ -196,7 +196,7 @@ aclnnStatus aclnnCompressor(
       <td>stateBlockTableOptional（const aclTensor*）</td>
       <td>可选输入</td>
       <td>表示state_cache存储使用的block映射表。</td>
-      <td><ul><li>cacheMode=1时，shape为[B, ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length。当x的shape为[B,S,H]时，Smax=max(start_pos)+S；当x的shape为[T,H]时，Smax=max(start_pos)+max(cuSeqlensOptional[n+1] - cuSeqlensOptional[n])。</li><li>cacheMode=2时，shape为[B]。</li></ul></td>
+      <td><ul><li>cacheMode=1时，shape为[B, ceil(Smax/block_size)]，Smax为每个Batch中最大的Sequence Length。当x的shape为[B,S,H]时，Smax=max(start_pos)+S；当x的shape为[T,H]时，Smax=max(start_pos)+max(cuSeqlensOptional[n+1] - cuSeqlensOptional[n])。</li><li>cacheMode=2时，shape为[B]。</li><li>在当前算子支持的cachemode=1/2场景下，该参数为必选。</li></ul></td>
       <td>INT32</td>
       <td>ND</td>
       <td>cacheMode=1时：[B, ceil(Smax/block_size)]<br>cacheMode=2时：[B]</td>

@@ -217,13 +217,13 @@ aclnnStatus aclnnMlaPrologV3WeightNzGetWorkspaceSize(
     const int WEIGHT_QUANT_MODE_FULL_QUANT_FP8 = 4;
     const int WEIGHT_QUANT_MODE_FULL_QUANT_HIF8 = 5;
     if (!CheckQueryQuantModeValidity(queryQuantMode)) {
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_INVALID;
     };
     if (!CheckWeightQuantModeValidity(weightQuantMode)) {
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_INVALID;
     };
     if (!CheckKvCacheQuantModeValidity(weightQuantMode, kvCacheQuantMode)) {
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_INVALID;
     };
 
     aclDataType queryNormDataType =
@@ -242,15 +242,15 @@ aclnnStatus aclnnMlaPrologV3WeightNzGetWorkspaceSize(
         TensorHolder(dequantScaleQNormOutOptional, dequantScaleQNormDataType, std::string("dequantScaleQNormOut"));
     if (queryNormOutOptional == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("MlaPrologV3", "queryNormOut");
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_INVALID;
     }
     if (dequantScaleQNormOutOptional == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("MlaPrologV3", "dequantScaleQNormOut");
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_INVALID;
     }
     if (dequantScaleQNopeOutOptional == nullptr) {
         OP_LOGE_WITH_INVALID_INPUT("MlaPrologV3", "dequantScaleQNopeOut");
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_INVALID;
     }
     // weightQuantMode == 2,4,5:全量化场景(int8,fp8,hif8)
     // weightQuantMode == 3:mxfp8全量化场景
@@ -259,14 +259,14 @@ aclnnStatus aclnnMlaPrologV3WeightNzGetWorkspaceSize(
     // weightQuantMode != 0:量化场景
     if (!dequantScaleQNormHolder.CheckTensorConditionalNotNull(weightQuantMode != WEIGHT_QUANT_MODE_NO_QUANT &&
                                                                queryNormFlag)) {
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_INVALID;
     }
     if (!dequantScaleQNopeHolder.CheckTensorConditionalNotNull((weightQuantMode == WEIGHT_QUANT_MODE_FULL_QUANT ||
                                                                 weightQuantMode == WEIGHT_QUANT_MODE_MXFP8_FULL_QUANT ||
                                                                 weightQuantMode == WEIGHT_QUANT_MODE_FULL_QUANT_FP8 ||
                                                                 weightQuantMode == WEIGHT_QUANT_MODE_FULL_QUANT_HIF8) &&
                                                                kvCacheQuantMode == KV_CACHE_QUANT_MODE_PER_TENSOR)) {
-        return ge::GRAPH_FAILED;
+        return ACLNN_ERR_PARAM_INVALID;
     }
     return aclnnInnerMlaPrologV3GetWorkspaceSize(
         tokenX, weightDq, weightUqQr, weightUk, weightDkvKr, rmsnormGammaCq, rmsnormGammaCkv, ropeSin, ropeCos,

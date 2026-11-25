@@ -223,7 +223,7 @@ cann_ops_transformer.mla_prolog(
 | query_quant_mode | int | 可选 | query 的量化模式。0：非量化；1：per-token-head 量化。默认值为 0。 | int | - |
 | ckvkr_repo_mode | int | 可选 | kv_cache 和 kr_cache 的存储模式。0：分别存储；1：合并存储。默认值为 0。值为 1 时`kr_cache`必须为空 Tensor，支持 shape 为`(0)`。 | int | - |
 | quant_scale_repo_mode | int | 可选 | 量化 scale 的存储模式。0：scale 和数据分别存储；1：scale 和数据合并存储。默认值为 0。 | int | - |
-| tile_size | int | 可选 | per-token-per-group 量化时每个 tile 的大小，仅在`kv_cache_quant_mode=3`时有效，默认值为 128；`kv_cache_quant_mode=1/2`时无需赋值。 | int | - |
+| tile_size | int | 可选 | per-token-per-group 量化时每个 tile 的大小，仅在`kv_cache_quant_mode=3`时有效，当前仅支持 128；`kv_cache_quant_mode=1/2`时无需赋值。 | int | - |
 | qc_qr_scale | float | 可选 | Query 的尺度校正系数，默认值为 1.0。 | float | - |
 | kc_scale | float | 可选 | Key 的尺度校正系数，默认值为 1.0。 | float | - |
 | token_x_dtype | int | 可选 | 参数 token_x 的传入 dtype，在 hif8 全量化场景为`torch_npu.hifloat8`（枚举值 290），其他场景为 None。 | int | - |

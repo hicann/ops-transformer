@@ -129,7 +129,7 @@ English | [简体中文](./README.md)
   <tr>
     <td>state_block_table</td>
     <td>Optional input</td>
-    <td>Indicates the block mapping table used for state_cache storage.</td>
+    <td>Indicates the block mapping table used for state_cache storage. In the cacheMode=1/2 scenarios supported by the current operator, this parameter is mandatory.</td>
     <td>INT32</td>
     <td>ND</td>
   </tr>

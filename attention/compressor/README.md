@@ -127,7 +127,7 @@
   <tr>
     <td>state_block_table</td>
     <td>可选输入</td>
-    <td>表示state_cache存储使用的block映射表。</td>
+    <td>表示state_cache存储使用的block映射表。在当前算子支持的cachemode=1/2场景下，该参数为必选。</td>
     <td>INT32</td>
     <td>ND</td>
   </tr>
