@@ -31,7 +31,9 @@ std::tuple<int64_t, int64_t, int64_t, int64_t> QkvRmsNormRopeCacheTilingBase::Ge
                 return std::make_tuple(0, 0, 0, 0));
     // check shape length is DIM_SIZE
     OP_CHECK_IF(shapePtr->GetStorageShape().GetDimNum() != DIM_SIZE,
-                OP_LOGE(context->GetNodeName(), "the number of dimensions must be 4."),
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "input " + std::to_string(index),
+                                                         std::to_string(shapePtr->GetStorageShape().GetDimNum()),
+                                                         "the number of dimensions must be 4"),
                 return std::make_tuple(0, 0, 0, 0));
     return std::make_tuple(shapePtr->GetStorageShape().GetDim(DIM_ZERO), shapePtr->GetStorageShape().GetDim(DIM_ONE),
                            shapePtr->GetStorageShape().GetDim(DIM_TWO), shapePtr->GetStorageShape().GetDim(DIM_THREE));
@@ -45,7 +47,10 @@ std::tuple<int64_t, int64_t> QkvRmsNormRopeCacheTilingBase::GetShapeTupleOfTH(co
                 return std::make_tuple(0, 0));
     // check shape length is DIM_SIZE
     OP_CHECK_IF(shapePtr->GetStorageShape().GetDimNum() != DIM_TWO,
-                OP_LOGE(context->GetNodeName(), "the number of dimensions must be 2."), return std::make_tuple(0, 0));
+                OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "input " + std::to_string(index),
+                                                         std::to_string(shapePtr->GetStorageShape().GetDimNum()),
+                                                         "the number of dimensions must be 2"),
+                return std::make_tuple(0, 0));
     return std::make_tuple(shapePtr->GetStorageShape().GetDim(SHAPE_IDX_BS),
                            shapePtr->GetStorageShape().GetDim(SHAPE_IDX_ND));
 }

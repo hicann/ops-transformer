@@ -113,7 +113,8 @@ graphStatus InferShape4QkvRmsNormRopeCache(gert::InferShapeContext* context)
         // 非-2场景校验输入shape为2维
     } else {
         if (qkvDimSize != Q_EXPECT_DIM_NUM) {
-            OP_LOGE(context, "don't support qkv dimSize != 2 , infershape failed");
+            OP_LOGE_FOR_INVALID_SHAPEDIM_WITH_REASON(context->GetNodeName(), "qkv", std::to_string(qkvDimSize),
+                                                     "the dim number of qkv must be 2");
             return ge::GRAPH_FAILED;
         }
     }

@@ -16,6 +16,32 @@
 #include <iostream>
 #include <gtest/gtest.h>
 #include "tiling_context_faker.h"
+
+#include <map>
+#include <string>
+#include "experiment/metadef/common/util/error_manager/error_manager.h"
+
+namespace {
+namespace errmsg_test {
+inline void ClearErrorMessages()
+{
+    (void)ErrorManager::GetInstance().GetRawErrorMessages();
+}
+
+inline void ExpectFirstError(const std::string& expectedCode, const std::map<std::string, std::string>& expectedArgs)
+{
+    auto errors = ErrorManager::GetInstance().GetRawErrorMessages();
+    ASSERT_FALSE(errors.empty());
+    EXPECT_EQ(errors.front().error_id, expectedCode);
+    for (const auto& expected : expectedArgs) {
+        const auto actual = errors.front().args_map.find(expected.first);
+        ASSERT_NE(actual, errors.front().args_map.end());
+        EXPECT_EQ(actual->second, expected.second);
+    }
+}
+} // namespace errmsg_test
+} // namespace
+
 #include "tiling_case_executor.h"
 #include "../../../op_host/qkv_rms_norm_rope_cache_tiling.h"
 
@@ -3263,4 +3289,176 @@ TEST_F(QkvRmsNormRopeCacheTiling, test_QkvRmsNormRopeCache_headNums_shape_wrong2
     uint64_t expectTilingKey = 3;
     string expectTilingData = "";
     ExecuteTestCase(tilingContextPara, ge::GRAPH_FAILED, expectTilingKey, expectTilingData);
+}
+
+// ============================================================================
+// 错误码负向用例: 校验 E*9*** 整改后上报的结构化错误码
+// ============================================================================
+
+static gert::TilingContextPara MakeValidQkvTilingContext(void* compileInfo)
+{
+    batch_size = 72;
+    seq_len = 2;
+    Nqkv = 18;
+    Nq = 16;
+    Nk = 1;
+    Nv = 1;
+    dim = 128;
+    block_num = 72;
+    block_size = 128;
+    string cache_mode("PA_NZ");
+    vector<int64_t> qkv_size = {batch_size, seq_len, Nqkv, dim};
+    vector<int64_t> head_nums = {Nq, Nk, Nv};
+    return gert::TilingContextPara(
+        "QkvRmsNormRopeCache",
+        {
+            {{{batch_size * seq_len, Nqkv * dim}, {batch_size * seq_len, Nqkv * dim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{dim}, {dim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{dim}, {dim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{batch_size * seq_len, dim}, {batch_size * seq_len, dim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{batch_size * seq_len, dim}, {batch_size * seq_len, dim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{batch_size * seq_len}, {batch_size * seq_len}}, ge::DT_INT64, ge::FORMAT_ND},
+            {{{batch_size * seq_len, Nq * dim}, {batch_size * seq_len, Nq * dim}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{block_num, Nk * dim / 16, block_size, 16}, {block_num, Nk * dim / 16, block_size, 16}},
+             ge::DT_FLOAT16,
+             ge::FORMAT_ND},
+            {{{block_num, Nv * dim / 16, block_size, 16}, {block_num, Nv * dim / 16, block_size, 16}},
+             ge::DT_FLOAT16,
+             ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT, ge::FORMAT_ND},
+        },
+        {
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+            {{{}, {}}, ge::DT_FLOAT16, ge::FORMAT_ND},
+        },
+        {
+            {"qkv_size", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(qkv_size)},
+            {"head_nums", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(head_nums)},
+            {"epsilon", Ops::Transformer::AnyValue::CreateFrom<float>(1e-06)},
+            {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>(cache_mode)},
+            {"is_output_qkv", Ops::Transformer::AnyValue::CreateFrom<bool>(true)},
+        },
+        compileInfo);
+}
+
+// qkv dtype 非法 → EZ0020
+TEST_F(QkvRmsNormRopeCacheTiling, errmsg_qkv_dtype_unsupported_ez0020)
+{
+    optiling::QkvRmsNormRopeCacheCompileInfo compileInfo = {};
+    auto para = MakeValidQkvTilingContext(&compileInfo);
+    para.inputTensorDesc_[0] = {
+        gert::StorageShape({batch_size * seq_len, Nqkv * dim}, {batch_size * seq_len, Nqkv * dim}), ge::DT_INT32,
+        ge::FORMAT_ND};
+    errmsg_test::ClearErrorMessages();
+    ExecuteTestCase(para, ge::GRAPH_FAILED);
+    errmsg_test::ExpectFirstError("EZ0020", {{"param_name", "qkv"},
+                                             {"op_name", "QkvRmsNormRopeCache"},
+                                             {"incorrect_dtype", "DT_INT32"},
+                                             {"reason", "qkv only supports DT_FLOAT16 and DT_BF16"}});
+}
+
+// index dtype 非 int64 → EZ0020
+TEST_F(QkvRmsNormRopeCacheTiling, errmsg_index_dtype_unsupported_ez0020)
+{
+    optiling::QkvRmsNormRopeCacheCompileInfo compileInfo = {};
+    auto para = MakeValidQkvTilingContext(&compileInfo);
+    para.inputTensorDesc_[5] = {gert::StorageShape({batch_size * seq_len}, {batch_size * seq_len}), ge::DT_FLOAT,
+                                ge::FORMAT_ND};
+    errmsg_test::ClearErrorMessages();
+    ExecuteTestCase(para, ge::GRAPH_FAILED);
+    errmsg_test::ExpectFirstError("EZ0020", {{"param_name", "index"},
+                                             {"op_name", "QkvRmsNormRopeCache"},
+                                             {"incorrect_dtype", "DT_FLOAT"},
+                                             {"reason", "index only supports DT_INT64"}});
+}
+
+// qkv_size 中 Dqkv != 128 → EZ0026
+TEST_F(QkvRmsNormRopeCacheTiling, errmsg_qkv_size_dim_not_128_ez0026)
+{
+    optiling::QkvRmsNormRopeCacheCompileInfo compileInfo = {};
+    auto para = MakeValidQkvTilingContext(&compileInfo);
+    vector<int64_t> badQkvSize = {72, 2, 18, 64};
+    para.attrs_[0] = {"qkv_size", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(badQkvSize)};
+    errmsg_test::ClearErrorMessages();
+    ExecuteTestCase(para, ge::GRAPH_FAILED);
+    errmsg_test::ExpectFirstError("EZ0026", {{"param_name", "qkv_size"},
+                                             {"op_name", "QkvRmsNormRopeCache"},
+                                             {"incorrect_value", "64"},
+                                             {"reason", "Dqkv must be 128"}});
+}
+
+// cache_mode 非法 → EZ0026
+TEST_F(QkvRmsNormRopeCacheTiling, errmsg_cache_mode_unsupported_ez0026)
+{
+    optiling::QkvRmsNormRopeCacheCompileInfo compileInfo = {};
+    auto para = MakeValidQkvTilingContext(&compileInfo);
+    string badMode("INVALID_MODE");
+    para.attrs_[3] = {"cache_mode", Ops::Transformer::AnyValue::CreateFrom<std::string>(badMode)};
+    errmsg_test::ClearErrorMessages();
+    ExecuteTestCase(para, ge::GRAPH_FAILED);
+    errmsg_test::ExpectFirstError("EZ0026", {{"param_name", "cache_mode"},
+                                             {"op_name", "QkvRmsNormRopeCache"},
+                                             {"incorrect_value", "INVALID_MODE"},
+                                             {"reason", "cache_mode only supports PA_NZ now"}});
+}
+
+// head_nums N != Nq + Nk + Nv → EZ0026
+TEST_F(QkvRmsNormRopeCacheTiling, errmsg_head_nums_sum_mismatch_ez0026)
+{
+    optiling::QkvRmsNormRopeCacheCompileInfo compileInfo = {};
+    auto para = MakeValidQkvTilingContext(&compileInfo);
+    vector<int64_t> badHeadNums = {16, 1, 2};
+    para.attrs_[1] = {"head_nums", Ops::Transformer::AnyValue::CreateFrom<std::vector<int64_t>>(badHeadNums)};
+    errmsg_test::ClearErrorMessages();
+    ExecuteTestCase(para, ge::GRAPH_FAILED);
+    errmsg_test::ExpectFirstError("EZ0026", {{"param_name", "head_nums"},
+                                             {"op_name", "QkvRmsNormRopeCache"},
+                                             {"incorrect_value", "N=18, Nq=16, Nk=1, Nv=2"},
+                                             {"reason", "N must equal Nq + Nk + Nv"}});
+}
+
+// q_out 非 2D → EZ0012
+TEST_F(QkvRmsNormRopeCacheTiling, errmsg_q_out_rank_not_2d_ez0012)
+{
+    optiling::QkvRmsNormRopeCacheCompileInfo compileInfo = {};
+    auto para = MakeValidQkvTilingContext(&compileInfo);
+    para.inputTensorDesc_[6] = {gert::StorageShape({batch_size * seq_len, Nq, dim}, {batch_size * seq_len, Nq, dim}),
+                                ge::DT_FLOAT16, ge::FORMAT_ND};
+    errmsg_test::ClearErrorMessages();
+    ExecuteTestCase(para, ge::GRAPH_FAILED);
+    errmsg_test::ExpectFirstError("EZ0012", {{"param_name", "q_out"},
+                                             {"op_name", "QkvRmsNormRopeCache"},
+                                             {"incorrect_dim", "3"},
+                                             {"reason", "q_out must be a 2D tensor"}});
+}
+
+// index shape size != B*S → EZ0015
+TEST_F(QkvRmsNormRopeCacheTiling, errmsg_index_shape_size_mismatch_ez0015)
+{
+    optiling::QkvRmsNormRopeCacheCompileInfo compileInfo = {};
+    auto para = MakeValidQkvTilingContext(&compileInfo);
+    para.inputTensorDesc_[5] = {gert::StorageShape({batch_size * seq_len + 1}, {batch_size * seq_len + 1}),
+                                ge::DT_INT64, ge::FORMAT_ND};
+    errmsg_test::ClearErrorMessages();
+    ExecuteTestCase(para, ge::GRAPH_FAILED);
+    errmsg_test::ExpectFirstError("EZ0015", {{"param_name", "index"},
+                                             {"op_name", "QkvRmsNormRopeCache"},
+                                             {"incorrect_size", std::to_string(batch_size * seq_len + 1)},
+                                             {"reason", "index must be 1D and its shape size must equal B*S"}});
+}
+
+// 合法输入不产生任何错误码上报
+TEST_F(QkvRmsNormRopeCacheTiling, errmsg_valid_input_reports_no_error)
+{
+    optiling::QkvRmsNormRopeCacheCompileInfo compileInfo = {};
+    auto para = MakeValidQkvTilingContext(&compileInfo);
+    errmsg_test::ClearErrorMessages();
+    ExecuteTestCase(para, ge::GRAPH_SUCCESS, 3, "");
+    auto errors = ErrorManager::GetInstance().GetRawErrorMessages();
+    EXPECT_TRUE(errors.empty());
 }

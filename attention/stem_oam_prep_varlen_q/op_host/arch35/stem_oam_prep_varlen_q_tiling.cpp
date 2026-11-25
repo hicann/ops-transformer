@@ -391,7 +391,8 @@ ge::graphStatus StemOamPrepVarlenQTiling::ValidateCuSeqLens(const int64_t* cuSeq
                                                             uint32_t batchU32)
 {
     if (cuSeqLensData[0] != 0) {
-        OP_LOGE(opName_, "cuSeqLensQ[0] must be 0");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(opName_, "cu_seq_lens_q", std::to_string(cuSeqLensData[0]),
+                                              "cuSeqLensQ[0] must be 0");
         return ge::GRAPH_FAILED;
     }
     int64_t sumQSeqLens = 0;

@@ -27,6 +27,7 @@
 #include "opdev/op_dfx.h"
 #include "opdev/op_executor.h"
 #include "opdev/op_log.h"
+#include "log/log.h"
 #include "opdev/platform.h"
 #include "opdev/shape_utils.h"
 #include "opdev/tensor_view_utils.h"
@@ -493,7 +494,8 @@ aclnnStatus aclnnMhcPostBackwardGetWorkspaceSize(const aclTensor* gradOutput, co
     // Check if input tensors are empty
     if (gradOutput->IsEmpty() || x->IsEmpty() || hOut->IsEmpty() || hPost->IsEmpty() ||
         (hRes != nullptr && hRes->IsEmpty())) {
-        OP_LOGE(ACLNN_ERR_INNER, "aclnn_mhc_post_backward do not support empty tensor!");
+        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON("aclnnMhcPostBackward", "gradOutput, x, hOut, hPost, hRes",
+                                              "contains an empty tensor", "empty tensors are not supported");
         return ACLNN_ERR_PARAM_INVALID;
     }
     MhcPostBackwardParams params{gradOutput, x, hRes, hOut, hPost, gradX, gradHres, gradHout, gradHpost};
@@ -560,7 +562,9 @@ aclnnStatus aclnnMhcPostBackward(void* workspace, uint64_t workspaceSize, aclOpE
     L2_DFX_PHASE_2(aclnnMhcPostBackward);
     auto ret = CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
     if (ret != ACLNN_SUCCESS) {
-        OP_LOGE(ACLNN_ERR_INNER, "This is an error in MhcPostBackward launch aicore");
+        REPORT_PREDEFINED_ERR_MSG(
+            "EZ1009", (std::vector<const char*>{"opName", "reason"}),
+            (std::vector<const char*>{"MhcPostBackward", "failed to launch the aicore execution"}));
         return ACLNN_ERR_INNER;
     }
     return ACLNN_SUCCESS;
