@@ -188,7 +188,14 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>maxQSeqLen</td>
       <td>输入</td>
       <td>主算子Query的最大Sequence Length。</td>
-      <td>TND允许-1或非负值；BSND/BNSD必须为Q的shape容量Sq且大于0，详见<a href="#其他约束">其他约束</a>。</td>
+      <td>
+        <ul>
+          <li>TND下，-1或0表示不检查上限；传正数时，各batch的有效Q长度均不能超过该值。</li>
+          <li>有效Q长度优先取sequsedQOptional；未传时，等于cuSeqLengthsQOptional相邻元素的差值，即Q的存储长度。因此，未传sequsedQOptional时，正数maxQSeqLen不得小于各batch的存储长度。</li>
+          <li>maskType=3时，检查的是有效Q长度除以8并向上取整后的组数。</li>
+          <li>BSND/BNSD下，本参数必须大于0，且等于Q的shape容量Sq，详见<a href="#其他约束">其他约束</a>。</li>
+        </ul>
+      </td>
       <td>INT64</td>
       <td>-</td>
       <td>-</td>
