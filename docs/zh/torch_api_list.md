@@ -31,7 +31,6 @@
 
 |    接口名   |   说明     |  确定性说明（A2/A3）  | 确定性说明（Ascend 950） |
 | ----------- | ------------------- | ------------------- | ------------------- |
-|[flash_kda_grad](../../attention/flash_kda_grad/docs/torchapi_flash_kda_grad.md)|FlashKDA DSL训练反向，支持保存缓存和重计算。|-|沿用DSL算子实现|
 |[block_attn_res_prepare](../../attention/block_attn_res_prepare/docs/torchapi_block_attn_res_prepare.md)|完成 Attention Residuals 历史残差注意力两阶段计算的第一阶段，返回 softmax 加权分子及统计量。|-|默认支持确定性计算|
 |[block_attn_res_update](../../attention/block_attn_res_update/docs/torchapi_block_attn_res_update.md)|将`delta`原地累加到`partial_block`，计算归一化score并与历史online softmax状态合并，支持通过可选权重对BF16混合结果执行输出RMSNorm，返回当前层结果`h`。|-|默认支持确定性计算|
 |[block_attention_residuals](../../mhc/block_attention_residuals/docs/torchapi_block_attention_residuals.md)|将 `partial_block` 与 `block_res` 拼接后完成 RMS、投影打分与 Softmax 加权融合，输出 `hidden_states`。|默认支持确定性计算|默认支持确定性计算|
@@ -59,6 +58,7 @@
 |[flash_attn_grad](../../attention/flash_attn_grad/docs/torchapi_flash_attn_grad.md)| 调用`FlashAttnGrad`算子计算Flash Attention的反向梯度，根据前向`softmax_lse`、`attn_out`和上游梯度`dout`计算`dq`、`dk`、`dv`。需与`flash_attn_metadata`（is_grad_enabled=True）配套使用。 | - | 默认支持确定性计算  |
 |[ffn_to_attention](../../mc2/ffn_to_attention_v2/docs/torchapi_ffn_to_attention.md)| 一个通信域内的FFN节点对Attention节点发送数据并写状态位，以检测通信链路是否正常。 | - | 默认支持确定性计算  |
 |[flash_kda](../../attention/flash_kda/docs/torchapi_flash_kda.md)|计算Kimi Delta Attention（KDA）前向输出及可选状态；先通过`flash_kda_metadata`生成调度信息，再调用`flash_kda`，支持自动求导。|-|默认不支持确定性计算|
+|[flash_kda_grad](../../attention/flash_kda_grad/docs/torchapi_flash_kda_grad.md)|计算Kimi Delta Attention（KDA）的训练反向，支持保存缓存与重算；先通过`flash_kda_grad_metadata`生成反向调度信息，再调用`flash_kda_grad`。|-|默认支持反向确定性计算；端到端训练还受前向确定性约束。|
 |[fused_causal_conv1d](../../attention/fused_causal_conv1d/docs/torchapi_fused_causal_conv1d.md)|对序列执行因果一维卷积，沿序列维度使用缓存数据（长度为卷积核宽减1）对各序列头部进行padding，确保输出依赖当前及历史输入；卷积完成后，将当前序列部分数据更新到缓存；在因果一维卷积输出的基础上，将原始输入加到输出上以实现残差连接。支持APC（Automatic Prefix Caching）、MTP（投机解码）、残差连接等特性。| - | 默认支持确定性计算 |
 |[fused_causal_conv1d_](../../attention/inplace_fused_causal_conv1d/docs/torchapi_fused_causal_conv1d_.md)|对序列执行因果一维卷积，沿序列维度使用缓存数据（长度为卷积核宽减1）对各序列头部进行padding，确保输出依赖当前及历史输入；卷积完成后，将当前序列部分数据更新到缓存；在因果一维卷积输出的基础上，将原始输入加到输出上以实现残差连接。支持APC（Automatic Prefix Caching）、MTP（投机解码）、残差连接等特性，且支持原地更新。| - | 默认支持确定性计算 |
 |[get_low_latency_ccl_buffer_size](../../mc2/common/docs/torchapi_get_low_latency_ccl_buffer_size.md)|计算low_latency_dispatch/low_latency_combine所需的HCCL通信buffer_size（单位MB），为MoeDistributeBuffer的静态方法，可在初始化前调用。|默认支持确定性计算|默认支持确定性计算|

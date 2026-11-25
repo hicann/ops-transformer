@@ -245,6 +245,16 @@
   </tr>
   <tr>
     <td>attention</td>
+    <td><a href="../../attention/flash_kda_grad/README.md">flash_kda_grad</a></td>
+    <td>✓</td>
+    <td>✓</td>
+    <td>✗</td>
+    <td>✗</td>
+    <td>AI Core</td>
+    <td>计算Kimi Delta Attention（KDA）的训练反向，返回输入、初始状态及gate参数的梯度，支持变长序列、分组查询注意力（GQA）、融合激活反向、保存缓存和重算。基于CANNBot DSL实现，通过PyTorch接口调用。</td>
+  </tr>
+  <tr>
+    <td>attention</td>
     <td><a href="../../attention/fused_causal_conv1d/README.md">fused_causal_conv1d</a></td>
     <td>✓</td>
     <td>✓</td>
