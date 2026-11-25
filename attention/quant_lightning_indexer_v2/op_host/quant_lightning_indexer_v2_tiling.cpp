@@ -1421,7 +1421,7 @@ ge::graphStatus QLIV2InfoParser::ValidateInputShapesMatch()
     OP_CHECK_IF((qliV2Params_.metadata.tensor->GetShapeSize() < metadataSize),
                 OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(
                     opName_, "metadata", std::to_string(qliV2Params_.metadata.tensor->GetShapeSize()).c_str(),
-                    "The shape size of metadata must be at least " + std::to_string(metadataSize)),
+                    "The shape size of metadata must be " + std::to_string(metadataSize)),
                 return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }

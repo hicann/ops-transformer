@@ -87,7 +87,6 @@ constexpr uint32_t SPARSE_MODE_LOWER = 3;
 constexpr uint32_t TOPK_MAX = 8192;
 constexpr uint32_t TOPK_MULTIPLE = 1024;
 constexpr uint32_t G_SIZE_LIMIT = 64;
-constexpr uint32_t METADATA_LIMIT = 2048;
 constexpr int32_t BATCH_CONSISTENCY_LEVEL = 3;
 // ------------------candidate 两级TopK 常量（与 kernel common_arch22.h 保持一致）------------------
 constexpr int32_t CANDIDATE_TOPK_BLOCKS_OFF = -1;    // 关闭 candidate（默认值）
@@ -127,6 +126,8 @@ TILING_DATA_FIELD_DEF(uint32_t, candidateBlockSize) // [2,64] 2 的幂，默认 
 TILING_DATA_FIELD_DEF(uint32_t, batchInvariant)
 TILING_DATA_FIELD_DEF(uint32_t, fastPathCandidate)
 TILING_DATA_FIELD_DEF(uint32_t, s1BaseSize) // fast模版自适应 s1BaseSize(N1泛化)
+TILING_DATA_FIELD_DEF(uint32_t, aicNum)
+TILING_DATA_FIELD_DEF(uint32_t, aivNum)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(LightningIndexerV2, LIV2TilingData)
 

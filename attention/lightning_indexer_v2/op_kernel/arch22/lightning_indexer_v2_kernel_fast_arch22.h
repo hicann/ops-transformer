@@ -139,7 +139,7 @@ protected:
     __aicore__ inline uint32_t GetS2BaseBlockNumOnMask(uint32_t s1gIdx, uint32_t actS1Size, uint32_t actS2SizeOrig);
     // ================================ Process functions ================================
     __aicore__ inline void InitCubeFillVector(__gm__ uint8_t* metadata, __gm__ uint8_t* workspace,
-                                              __gm__ uint8_t* weights);
+                                              __gm__ uint8_t* weights, const LIV2TilingData* tiling);
     __aicore__ inline void ProcessCubeFillVector();
     // ================================ Params Calc ================================
     __aicore__ inline void CalcGS1LoopParams(uint32_t bN2Idx);
@@ -325,7 +325,7 @@ __aicore__ inline void LightningIndexerV2KernelFast<LIT>::Init(
         isCmpResidualKValid = true;
     }
     pipe = tPipe;
-    InitCubeFillVector(metadata, workspace, weights);
+    InitCubeFillVector(metadata, workspace, weights, tiling);
     if (aiCoreIdx >= usedCoreNum) {
         return;
     }
@@ -479,10 +479,14 @@ __aicore__ inline void LightningIndexerV2KernelFast<LIT>::CalcRunInfo(uint32_t l
 template <typename LIT>
 __aicore__ inline void LightningIndexerV2KernelFast<LIT>::InitCubeFillVector(__gm__ uint8_t* metadata,
                                                                              __gm__ uint8_t* workspace,
-                                                                             __gm__ uint8_t* weights)
+                                                                             __gm__ uint8_t* weights,
+                                                                             const LIV2TilingData* tiling)
 {
     GlobalTensor<uint32_t> metadataGm;
-    metadataGm.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(metadata));
+    const uint32_t aicNum = tiling->aicNum;
+    const uint32_t aivNum = tiling->aivNum;
+    metadataGm.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(metadata) +
+                               optiling::GetLiV2MetadataExtensionOffset(aicNum, aivNum));
     usedCoreNum = metadataGm.GetValue(optiling::LI_V2_FAST_CORE_NUM_INDEX);
     if (aiCoreIdx >= usedCoreNum) {
         return;

@@ -431,7 +431,11 @@ int main()
         return ret;
     }
 
-    if (op::GetCurrentPlatformInfo().GetCurNpuArch() != NpuArch::DAV_3510) {
+    const NpuArch npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
+    if (npuArch != NpuArch::DAV_3510 && npuArch != NpuArch::DAV_9201 && npuArch != NpuArch::DAV_9202) {
+        LOG_PRINT("skip: requires DAV_3510, DAV_9201 or DAV_9202, current arch = %u.\n",
+                  static_cast<uint32_t>(npuArch));
+        CleanupResources(resources, workspaceAddr, stream, deviceId);
         return 0;
     }
 

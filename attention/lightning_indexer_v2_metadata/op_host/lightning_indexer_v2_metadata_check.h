@@ -15,6 +15,7 @@
 
 #include "log/log.h"
 #include "opdev/format_utils.h"
+#include "opdev/platform.h"
 #include "opdev/op_log.h"
 #include "opdev/data_type_utils.h"
 #include "opdev/tensor_view_utils.h"
@@ -222,11 +223,7 @@ aclnnStatus CheckSingleParamLiV2(int64_t numHeadsQ, int64_t numHeadsK, int64_t h
     }
     // 核心数校验
     CHECK_COND(aicCoreNum > 0, ACLNN_ERR_PARAM_INVALID, "AIC num should be larger than 0, but got %u", aicCoreNum);
-    CHECK_COND(aicCoreNum <= optiling::AIC_CORE_MAX_NUM, ACLNN_ERR_PARAM_INVALID,
-               "The maximum supported AIC num is %u, but got %u", optiling::AIC_CORE_MAX_NUM, aicCoreNum);
     CHECK_COND(aivCoreNum > 0, ACLNN_ERR_PARAM_INVALID, "AIV num should be larger than 0, but got %u", aivCoreNum);
-    CHECK_COND(aivCoreNum <= optiling::AIV_CORE_MAX_NUM, ACLNN_ERR_PARAM_INVALID,
-               "The maximum supported AIV num is %u, but got %u", optiling::AIV_CORE_MAX_NUM, aivCoreNum);
     return ACLNN_SUCCESS;
 }
 
@@ -287,7 +284,8 @@ aclnnStatus CheckExistenceLiV2(int64_t maskMode, int64_t cmpRatio, const aclTens
 aclnnStatus CheckConsistencyLiV2(int64_t batchSize, const aclTensor* cuSeqlensQOptional,
                                  const aclTensor* cuSeqlensKOptional, const aclTensor* sequsedQOptional,
                                  const aclTensor* sequsedKOptional, const aclTensor* cmpResidualKOptional,
-                                 const char* layoutQOptional, const char* layoutKOptional, const aclTensor* metadata)
+                                 const char* layoutQOptional, const char* layoutKOptional, const aclTensor* metadata,
+                                 uint32_t aicCoreNum, uint32_t aivCoreNum)
 {
     int64_t dimNum = -1;
     aclDataType dataType = aclDataType::ACL_DT_UNDEFINED;
@@ -376,10 +374,11 @@ aclnnStatus CheckConsistencyLiV2(int64_t batchSize, const aclTensor* cuSeqlensQO
             return ACLNN_ERR_PARAM_INVALID;
         }
         // 校验 metadata 元素数
-        if (metadata->GetViewShape().GetDim(0) != optiling::LI_V2_METADATA_TOTAL_SIZE) {
-            OP_LOGE_FOR_INVALID_SHAPESIZE(LI_V2_ACLNN_OP_NAME, "metadata",
-                                          std::to_string(metadata->GetViewShape().GetDim(0)).c_str(),
-                                          std::to_string(optiling::LI_V2_METADATA_TOTAL_SIZE).c_str());
+        if (metadata->GetViewShape().GetDim(0) !=
+            static_cast<int64_t>(optiling::GetLiV2MetadataSize(aicCoreNum, aivCoreNum))) {
+            OP_LOGE_FOR_INVALID_SHAPESIZE(
+                LI_V2_ACLNN_OP_NAME, "metadata", std::to_string(metadata->GetViewShape().GetDim(0)).c_str(),
+                std::to_string(optiling::GetLiV2MetadataSize(aicCoreNum, aivCoreNum)).c_str());
             return ACLNN_ERR_PARAM_INVALID;
         }
     }
@@ -478,8 +477,9 @@ aclnnStatus ParamsCheckLiV2(const aclTensor* cuSeqlensQOptional, const aclTensor
                              layoutKOptional, metadata);
     CHECK_RET(ret == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
-    ret = CheckConsistencyLiV2(batchSize, cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional,
-                               cmpResidualKOptional, layoutQOptional, layoutKOptional, metadata);
+    ret =
+        CheckConsistencyLiV2(batchSize, cuSeqlensQOptional, cuSeqlensKOptional, sequsedQOptional, sequsedKOptional,
+                             cmpResidualKOptional, layoutQOptional, layoutKOptional, metadata, aicCoreNum, aivCoreNum);
     CHECK_RET(ret == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     return ACLNN_SUCCESS;

@@ -29,10 +29,17 @@
 #define INVOKE_LI_V2_FAST(...) \
     do { \
         GlobalTensor<uint32_t> fastMetadata; \
-        if (tiling_data->fastPathCandidate != 0U && metadata != nullptr) { \
-            fastMetadata.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(metadata)); \
+        if (tiling_data->fastPathCandidate != 0U && metadata != nullptr && \
+            optiling::GetLiV2MetadataExtensionCapacity(tiling_data->aicNum, tiling_data->aivNum) >= \
+                sizeof(optiling::detail::LiV2FastMetadata) / sizeof(uint32_t)) { \
+            const uint32_t aicNum = tiling_data->aicNum; \
+            const uint32_t aivNum = tiling_data->aivNum; \
+            fastMetadata.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(metadata) + \
+                                         optiling::GetLiV2MetadataExtensionOffset(aicNum, aivNum)); \
         } \
         if (tiling_data->fastPathCandidate != 0U && metadata != nullptr && \
+            optiling::GetLiV2MetadataExtensionCapacity(tiling_data->aicNum, tiling_data->aivNum) >= \
+                sizeof(optiling::detail::LiV2FastMetadata) / sizeof(uint32_t) && \
             fastMetadata.GetValue(optiling::LI_V2_FAST_ENABLE_INDEX) != 0U) { \
             RunLightningIndexerV2FastPath<LIV2Type<__VA_ARGS__>>(q, k, w, sparseIndices, sparseValues, user, \
                                                                  tiling_data, &tPipe, cuSeqlensQ, cuSeqlensK, \
@@ -44,9 +51,14 @@
 #include "arch22/lightning_indexer_v2_kernel_fast_arch22.h"
 #define INVOKE_LI_V2_FAST(...) \
     do { \
-        if (tiling_data->fastPathCandidate != 0U && metadata != nullptr) { \
+        if (tiling_data->fastPathCandidate != 0U && metadata != nullptr && \
+            optiling::GetLiV2MetadataExtensionCapacity(tiling_data->aicNum, tiling_data->aivNum) >= \
+                sizeof(optiling::detail::LiV2FastMetadataArch22) / sizeof(uint32_t)) { \
             GlobalTensor<uint32_t> fastMetadata; \
-            fastMetadata.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(metadata)); \
+            const uint32_t aicNum = tiling_data->aicNum; \
+            const uint32_t aivNum = tiling_data->aivNum; \
+            fastMetadata.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(metadata) + \
+                                         optiling::GetLiV2MetadataExtensionOffset(aicNum, aivNum)); \
             if (fastMetadata.GetValue(optiling::LI_V2_FAST_ENABLE_INDEX) != 0U) { \
                 LightningIndexerV2KernelFast<LIV2FastCommon::LIV2Type<__VA_ARGS__, true>> fastOp; \
                 fastOp.Init(q, k, w, cuSeqlensQ, cuSeqlensK, sequsedQ, sequsedK, cmpResidualK, blocktable, \

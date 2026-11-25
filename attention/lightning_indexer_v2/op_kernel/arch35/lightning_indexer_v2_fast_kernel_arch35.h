@@ -38,7 +38,10 @@ public:
                                 __gm__ uint8_t* actualSeqLengthsK, __gm__ uint8_t* blockTable,
                                 __gm__ uint8_t* usedKeyLengths, __gm__ uint8_t* metadata)
     {
-        fastMetadataGm_.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(metadata));
+        const uint32_t aicNum = tiling->aicNum;
+        const uint32_t aivNum = tiling->aivNum;
+        fastMetadataGm_.SetGlobalBuffer(reinterpret_cast<__gm__ uint32_t*>(metadata) +
+                                        optiling::GetLiV2MetadataExtensionOffset(aicNum, aivNum));
         InitParams(tiling);
         returnValue_ = tiling->returnValue;
         sequencePlan_.Init(tiling, actualSeqLengthsQ, actualSeqLengthsK, usedKeyLengths);

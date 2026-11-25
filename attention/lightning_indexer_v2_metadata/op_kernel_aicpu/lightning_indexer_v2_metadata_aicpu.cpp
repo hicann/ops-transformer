@@ -10,8 +10,8 @@
 
 #include "lightning_indexer_v2_metadata_aicpu.h"
 #include <cstdio>
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 #include "status.h"
 
 using namespace optiling;
@@ -25,9 +25,11 @@ uint32_t LightningIndexerV2MetadataCpuKernel::Compute(CpuKernelContext& ctx)
     }
     const auto soc = ProcessSocVersion();
     if (soc == ValidSocVersion::ASCEND910B) {
-        auto* metadata = static_cast<optiling::detail::LiV2MetadataArch22*>(metadata_->GetData());
-        // A3 普通路径自行分核，Fast 不准入时输出禁用标志并正常返回
-        metadata->fastMetadata = {};
+        auto* metadata = static_cast<uint32_t*>(metadata_->GetData());
+        // A3 普通路径自行分核，只初始化动态布局并尝试生成 Fast 分核。
+        std::fill_n(metadata, GetLiV2MetadataSize(aicCoreNum_, aivCoreNum_), 0U);
+
+        // Fast 不准入时保持 enable 为 0，并正常返回。
         GenFastMetadataArch22();
         return KERNEL_STATUS_OK;
     }
@@ -79,6 +81,11 @@ bool LightningIndexerV2MetadataCpuKernel::ParamsCheck()
         return false;
     } else if (metadata_->GetData() == nullptr) {
         KERNEL_LOG_ERROR("Output metadata data is nullptr");
+        return false;
+    }
+    if (aicCoreNum_ == 0 || aivCoreNum_ == 0 ||
+        metadata_->NumElements() < GetLiV2MetadataSize(aicCoreNum_, aivCoreNum_)) {
+        KERNEL_LOG_ERROR("Invalid core count or insufficient metadata capacity");
         return false;
     }
     const int32_t batchSize = GetQueryBatchSize();
@@ -911,41 +918,46 @@ bool LightningIndexerV2MetadataCpuKernel::BalanceSchedule(SplitResult& splitRes)
 
 bool LightningIndexerV2MetadataCpuKernel::GenMetadata(SplitResult& splitRes)
 {
-    optiling::detail::LiV2Metadata* metadataPtr = static_cast<optiling::detail::LiV2Metadata*>(metadata_->GetData());
-    *metadataPtr = {};
+    const uint64_t metadataSize = GetLiV2MetadataSize(aicCoreNum_, aivCoreNum_);
+    auto* metadataPtr = static_cast<uint32_t*>(metadata_->GetData());
+    std::fill_n(metadataPtr, metadataSize, 0U);
+
+    auto* liMetadata = metadataPtr;
+    auto* ldMetadata = liMetadata + static_cast<uint64_t>(aicCoreNum_) * LI_V2_METADATA_SIZE;
     // LI Metadata Generate
     for (size_t i = 0; i < aicCoreNum_; ++i) {
         if (i >= splitRes.usedCoreNum) {
-            metadataPtr->liV2Metadata[i][LI_V2_CORE_ENABLE_INDEX] = 0; // AIC disenable
+            liMetadata[i * LI_V2_METADATA_SIZE + LI_V2_CORE_ENABLE_INDEX] = 0; // AIC disenable
             continue;
         }
-        metadataPtr->liV2Metadata[i][LI_V2_CORE_ENABLE_INDEX] = 1; // AIC enable
+        liMetadata[i * LI_V2_METADATA_SIZE + LI_V2_CORE_ENABLE_INDEX] = 1; // AIC enable
         // FA START
-        metadataPtr->liV2Metadata[i][LI_V2_BN2_START_INDEX] = i == 0 ? 0 : splitRes.bN2End[i - 1];
-        metadataPtr->liV2Metadata[i][LI_V2_M_START_INDEX] = i == 0 ? 0 : splitRes.gS1End[i - 1];
-        metadataPtr->liV2Metadata[i][LI_V2_S2_START_INDEX] = i == 0 ? 0 : splitRes.s2End[i - 1];
+        liMetadata[i * LI_V2_METADATA_SIZE + LI_V2_BN2_START_INDEX] = i == 0 ? 0 : splitRes.bN2End[i - 1];
+        liMetadata[i * LI_V2_METADATA_SIZE + LI_V2_M_START_INDEX] = i == 0 ? 0 : splitRes.gS1End[i - 1];
+        liMetadata[i * LI_V2_METADATA_SIZE + LI_V2_S2_START_INDEX] = i == 0 ? 0 : splitRes.s2End[i - 1];
         // FA END
-        metadataPtr->liV2Metadata[i][LI_V2_BN2_END_INDEX] = splitRes.bN2End[i];
-        metadataPtr->liV2Metadata[i][LI_V2_M_END_INDEX] = splitRes.gS1End[i];
-        metadataPtr->liV2Metadata[i][LI_V2_S2_END_INDEX] = splitRes.s2End[i];
+        liMetadata[i * LI_V2_METADATA_SIZE + LI_V2_BN2_END_INDEX] = splitRes.bN2End[i];
+        liMetadata[i * LI_V2_METADATA_SIZE + LI_V2_M_END_INDEX] = splitRes.gS1End[i];
+        liMetadata[i * LI_V2_METADATA_SIZE + LI_V2_S2_END_INDEX] = splitRes.s2End[i];
         //
-        metadataPtr->liV2Metadata[i][LI_V2_FIRST_LD_V2_DATA_WORKSPACE_IDX_INDEX] = splitRes.firstFdDataWorkspaceIdx[i];
+        liMetadata[i * LI_V2_METADATA_SIZE + LI_V2_FIRST_LD_V2_DATA_WORKSPACE_IDX_INDEX] =
+            splitRes.firstFdDataWorkspaceIdx[i];
     }
 
     // LD Metadata Generate
     for (size_t i = 0; i < aivCoreNum_; ++i) {
         if (i >= splitRes.fdRes.fdUsedVecNum) {
-            metadataPtr->ldV2Metadata[i][LD_V2_CORE_ENABLE_INDEX] = 0; // AIV disenable
+            ldMetadata[i * LD_V2_METADATA_SIZE + LD_V2_CORE_ENABLE_INDEX] = 0; // AIV disenable
             continue;
         }
-        metadataPtr->ldV2Metadata[i][LD_V2_CORE_ENABLE_INDEX] = 1; // AIV enable
+        ldMetadata[i * LD_V2_METADATA_SIZE + LD_V2_CORE_ENABLE_INDEX] = 1; // AIV enable
         uint32_t curFdIdx = splitRes.fdRes.fdIdx[i];
-        metadataPtr->ldV2Metadata[i][LD_V2_BN2_IDX_INDEX] = splitRes.fdRes.fdBN2Idx[curFdIdx];
-        metadataPtr->ldV2Metadata[i][LD_V2_M_IDX_INDEX] = splitRes.fdRes.fdMIdx[curFdIdx];
-        metadataPtr->ldV2Metadata[i][LD_V2_WORKSPACE_IDX_INDEX] = splitRes.fdRes.fdWorkspaceIdx[curFdIdx];
-        metadataPtr->ldV2Metadata[i][LD_V2_WORKSPACE_NUM_INDEX] = splitRes.fdRes.fdS2SplitNum[curFdIdx];
-        metadataPtr->ldV2Metadata[i][LD_V2_M_START_INDEX] = splitRes.fdRes.fdMStart[i];
-        metadataPtr->ldV2Metadata[i][LD_V2_M_NUM_INDEX] = splitRes.fdRes.fdMNum[i];
+        ldMetadata[i * LD_V2_METADATA_SIZE + LD_V2_BN2_IDX_INDEX] = splitRes.fdRes.fdBN2Idx[curFdIdx];
+        ldMetadata[i * LD_V2_METADATA_SIZE + LD_V2_M_IDX_INDEX] = splitRes.fdRes.fdMIdx[curFdIdx];
+        ldMetadata[i * LD_V2_METADATA_SIZE + LD_V2_WORKSPACE_IDX_INDEX] = splitRes.fdRes.fdWorkspaceIdx[curFdIdx];
+        ldMetadata[i * LD_V2_METADATA_SIZE + LD_V2_WORKSPACE_NUM_INDEX] = splitRes.fdRes.fdS2SplitNum[curFdIdx];
+        ldMetadata[i * LD_V2_METADATA_SIZE + LD_V2_M_START_INDEX] = splitRes.fdRes.fdMStart[i];
+        ldMetadata[i * LD_V2_METADATA_SIZE + LD_V2_M_NUM_INDEX] = splitRes.fdRes.fdMNum[i];
     }
     return true;
 }
@@ -1179,10 +1191,9 @@ bool LightningIndexerV2MetadataCpuKernel::GetFastSequenceWork(uint32_t batch, co
            static_cast<uint64_t>(k) + 1U >= static_cast<uint64_t>(q) + LiV2FastConfig::TOPK_STATE_SIZE;
 }
 
-inline void LiV2PublishFastPartition(optiling::detail::LiV2Metadata& metadata, const LiV2FastPartition& plan,
+inline void LiV2PublishFastPartition(optiling::detail::LiV2FastMetadata& fast, const LiV2FastPartition& plan,
                                      uint32_t cores)
 {
-    auto& fast = metadata.fastMetadata;
     fast.coreNum = cores;
     for (uint32_t core = 0; core < cores; ++core) {
         fast.tileStart[core] = plan.tileStart[core];
@@ -1193,6 +1204,10 @@ inline void LiV2PublishFastPartition(optiling::detail::LiV2Metadata& metadata, c
 
 void LightningIndexerV2MetadataCpuKernel::GenFastMetadata()
 {
+    if (GetLiV2MetadataExtensionCapacity(aicCoreNum_, aivCoreNum_) <
+        sizeof(detail::LiV2FastMetadata) / sizeof(uint32_t)) {
+        return;
+    }
     if (!IsFastMetadataCandidate()) {
         return;
     }
@@ -1233,7 +1248,9 @@ void LightningIndexerV2MetadataCpuKernel::GenFastMetadata()
         !LiV2FastPerformanceSupported(performance, plan)) {
         return;
     }
-    auto* metadata = static_cast<optiling::detail::LiV2Metadata*>(metadata_->GetData());
+    auto* metadataWords = static_cast<uint32_t*>(metadata_->GetData());
+    auto* metadata = reinterpret_cast<optiling::detail::LiV2FastMetadata*>(
+        metadataWords + GetLiV2MetadataExtensionOffset(aicCoreNum_, aivCoreNum_));
     LiV2PublishFastPartition(*metadata, plan, cores);
 }
 

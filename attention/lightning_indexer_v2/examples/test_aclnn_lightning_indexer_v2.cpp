@@ -120,7 +120,19 @@ int InitializeTensors(TensorResources& resources)
     std::vector<int64_t> keyShape = {B, S2Compressed, N2, D};
     std::vector<int64_t> weightsShape = {B, S1, N1};
     std::vector<int64_t> cmpResidualKShape = {B};
-    std::vector<int64_t> metadataShape = {2048};
+    uint32_t aicCoreNum = 0;
+    uint32_t aivCoreNum = 0;
+    if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_CUBE_CORE, &aicCoreNum) != ACL_SUCCESS) {
+        LOG_PRINT("Failed to query AIC count\n");
+        return ACL_ERROR_INVALID_PARAM;
+    }
+    if (aclrtGetResInCurrentThread(ACL_RT_DEV_RES_VECTOR_CORE, &aivCoreNum) != ACL_SUCCESS) {
+        LOG_PRINT("Failed to query AIV count\n");
+        return ACL_ERROR_INVALID_PARAM;
+    }
+    constexpr uint32_t alignment = 1024U;
+    const int64_t usedSize = 8 * (static_cast<int64_t>(aicCoreNum) + aivCoreNum);
+    std::vector<int64_t> metadataShape = {(usedSize + alignment - 1) / alignment * alignment};
     std::vector<int64_t> sparseIndicesShape = {B, S1, N2, topk};
     std::vector<int64_t> sparseValuesShape = {B, S1, N2, topk};
 
@@ -393,13 +405,14 @@ int main()
         return ret;
     }
 
-    // 本算子支持 ascend950（arch35，metadata 前置分核流程）与 ascend910b/ascend910_93（arch22）；
+    // DAV_3510/DAV_9201/DAV_9202 走 metadata 前置分核流程，DAV_2201 保留原流程；
     // candidate（两级 TopK source）能力由 aclnnLightningIndexerV3 提供，见
     // test_aclnn_lightning_indexer_v3.cpp。平台信息须在设备初始化后读取（设备初始化前
     // GetCurNpuArch() 返回无效值，门控将恒命中早退导致示例空跑）。
     const NpuArch npuArch = op::GetCurrentPlatformInfo().GetCurNpuArch();
-    if (npuArch != NpuArch::DAV_3510 && npuArch != NpuArch::DAV_2201) {
-        LOG_PRINT("skip: requires DAV_3510 (ascend950) or DAV_2201 (ascend910b/ascend910_93), current arch = %u.\n",
+    if (npuArch != NpuArch::DAV_3510 && npuArch != NpuArch::DAV_9201 && npuArch != NpuArch::DAV_9202 &&
+        npuArch != NpuArch::DAV_2201) {
+        LOG_PRINT("skip: requires DAV_3510, DAV_9201, DAV_9202 or DAV_2201, current arch = %u.\n",
                   static_cast<uint32_t>(npuArch));
         CleanupResources(resources, workspaceAddr, stream, deviceId);
         return 0;
@@ -410,8 +423,8 @@ int main()
         CleanupResources(resources, workspaceAddr, stream, deviceId);
         return ret;
     }
-    if (npuArch == NpuArch::DAV_3510) {
-        // 950（arch35）：metadata 前置算子必传，先完成分核信息生成（既有流程）
+    if (npuArch == NpuArch::DAV_3510 || npuArch == NpuArch::DAV_9201 || npuArch == NpuArch::DAV_9202) {
+        // 先调用 metadata 前置算子，完成分核信息生成。
         ret = GenerateMetadata(resources, stream, B, S1, S2, N1, N2, D, topk, 3, 4);
         if (!CHECK_RET(ret == ACL_SUCCESS)) {
             LOG_PRINT("GenerateMetadata failed. ERROR: %d\n", ret);

@@ -26,7 +26,6 @@ constexpr int64_t HEAD_DIM = 128;
 constexpr int64_t HEAD_GROUP_LIMIT = 64;
 constexpr int64_t TOPK_8K = 8192;
 constexpr int64_t TOPK_MIN = 1;
-constexpr int64_t METADATA_SIZE = 2048;
 constexpr int64_t MAX_SEQLEN_Q = std::numeric_limits<int32_t>::max();
 constexpr int64_t MAX_SEQLEN_Q_DEFAULT = -1;
 constexpr int64_t MASK_MODE_NONE = 0;
@@ -334,12 +333,7 @@ ge::graphStatus CommonChecker::CheckMultiPara(const LightningIndexerV2CheckerInf
     if (CheckMainShapes(info) != ge::GRAPH_SUCCESS || CheckOutputShapes(info) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    // Quantized V2 validates its platform-dependent metadata capacity in its parser.
-    if (!info.quantized && info.metadata.IsPresent() && info.metadata.GetShape()->GetShapeSize() != METADATA_SIZE) {
-        const std::string actual = ShapeToString(info.metadata);
-        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(info.opName, "metadata", actual.c_str(), "Metadata size must be 2048");
-        return ge::GRAPH_FAILED;
-    }
+    // LI and QLI V2 validate platform-dependent metadata capacity in their parsers.
     return ge::GRAPH_SUCCESS;
 }
 
