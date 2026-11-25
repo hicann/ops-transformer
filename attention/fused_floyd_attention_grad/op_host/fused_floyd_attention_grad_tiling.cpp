@@ -171,36 +171,32 @@ static ge::graphStatus CheckBaseInput(gert::TilingContext* context)
     auto& queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
     auto& keyShape = context->GetInputShape(KEY1_INPUT_INDEX)->GetStorageShape();
     OP_CHECK_IF((queryShape.GetDim(0) != keyShape.GetDim(0) || queryShape.GetDim(1) != keyShape.GetDim(1) ||
-                 queryShape.GetDim(4) != keyShape.GetDim(4)),
+                 queryShape.GetDim(2) != keyShape.GetDim(2) || queryShape.GetDim(4) != keyShape.GetDim(4)),
                 OP_LOGE_FOR_INVALID_SHAPES_WITH_REASON(
                     context->GetNodeName(), "query and key1",
-                    (std::to_string(queryShape.GetDim(0)) + "," + std::to_string(queryShape.GetDim(1)) + "," +
-                     std::to_string(queryShape.GetDim(4)) + " and " + std::to_string(keyShape.GetDim(0)) + "," +
-                     std::to_string(keyShape.GetDim(1)) + "," + std::to_string(keyShape.GetDim(4)))
-                        .c_str(),
-                    "query and key1 must have the same dims 0, 1 and 4"),
+                    std::to_string(queryShape.GetDim(0)) + "," + std::to_string(queryShape.GetDim(1)) + "," +
+                        std::to_string(queryShape.GetDim(2)) + "," + std::to_string(queryShape.GetDim(4)) + " and " +
+                        std::to_string(keyShape.GetDim(0)) + "," + std::to_string(keyShape.GetDim(1)) + "," +
+                        std::to_string(keyShape.GetDim(2)) + "," + std::to_string(keyShape.GetDim(4)),
+                    "query and key1 must have the same dims 0, 1, 2 and 4 (B, H, N and D)"),
                 return ge::GRAPH_FAILED);
 
-    // issue #7529: dim 2 (G) mismatch used to be silently ignored, leaving part of dqOut unwritten.
-    // Only warn here to keep compatibility with existing callers.
-    if (queryShape.GetDim(2) != keyShape.GetDim(2)) {
-        OP_LOGW(context->GetNodeName(),
-                "query dim 2 (G=%ld) differs from key1 dim 2 (G=%ld), part of dqOut will not be written.",
-                queryShape.GetDim(2), keyShape.GetDim(2));
-    }
-
-    // issue #7530: key2 must be [B, N2, S2, S1, D] derived from query/key1; mismatch used to leave part of
-    // dk2Out/dv2Out unwritten. Only warn here to keep compatibility with existing callers.
+    // key2/value2 use [B, H, K, M, D]; K and M map to different axes in key1/query.
+    // CheckSupportShape additionally requires key2 and value2 to have identical shapes.
     auto& key2Shape = context->GetInputShape(KEY2_INPUT_INDEX)->GetStorageShape();
-    if (key2Shape.GetDim(0) != queryShape.GetDim(0) || key2Shape.GetDim(1) != queryShape.GetDim(1) ||
-        key2Shape.GetDim(4) != queryShape.GetDim(4) || key2Shape.GetDim(2) != keyShape.GetDim(3) ||
-        key2Shape.GetDim(3) != queryShape.GetDim(3)) {
-        OP_LOGW(context->GetNodeName(),
-                "key2 shape [%ld,%ld,%ld,%ld,%ld] does not match [B, N2, S2, S1, D] derived from query/key1, "
-                "part of dk2Out/dv2Out will not be written.",
-                key2Shape.GetDim(0), key2Shape.GetDim(1), key2Shape.GetDim(2), key2Shape.GetDim(3),
-                key2Shape.GetDim(4));
-    }
+    OP_CHECK_IF(
+        (key2Shape.GetDim(0) != queryShape.GetDim(0) || key2Shape.GetDim(1) != queryShape.GetDim(1) ||
+         key2Shape.GetDim(2) != keyShape.GetDim(3) || key2Shape.GetDim(3) != queryShape.GetDim(3) ||
+         key2Shape.GetDim(4) != queryShape.GetDim(4)),
+        OP_LOGE_FOR_INVALID_SHAPE_WITH_REASON(
+            context->GetNodeName(), "key2",
+            "[" + std::to_string(key2Shape.GetDim(0)) + "," + std::to_string(key2Shape.GetDim(1)) + "," +
+                std::to_string(key2Shape.GetDim(2)) + "," + std::to_string(key2Shape.GetDim(3)) + "," +
+                std::to_string(key2Shape.GetDim(4)) + "]",
+            "key2 must have shape [B,H,K,M,D] derived from query/key1: [" + std::to_string(queryShape.GetDim(0)) + "," +
+                std::to_string(queryShape.GetDim(1)) + "," + std::to_string(keyShape.GetDim(3)) + "," +
+                std::to_string(queryShape.GetDim(3)) + "," + std::to_string(queryShape.GetDim(4)) + "]"),
+        return ge::GRAPH_FAILED);
 
     return ge::SUCCESS;
 }
