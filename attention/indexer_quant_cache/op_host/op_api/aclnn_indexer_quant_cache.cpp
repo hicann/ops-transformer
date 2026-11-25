@@ -97,7 +97,8 @@ aclnnStatus aclnnIndexerQuantCacheGetWorkspaceSize(aclTensor* cacheRef, aclTenso
     OP_CHECK_NULL(slotMapping, return ACLNN_ERR_PARAM_NULLPTR);
 
     if (quantMode == indexer_quant_cache::HIFP4_QUANT_MODE) {
-        if (GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_9201 ||
+        if ((GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_9201 &&
+             GetCurrentPlatformInfo().GetCurNpuArch() != Ops::Base::DAV_9202) ||
             cacheRef->GetDataType() != Ops::Transformer::DT_HIFLOAT4 ||
             cacheScaleRef->GetDataType() != Ops::Transformer::DT_HIFLOAT4_SCALE) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "HiFloat4 requires ASCEND960DT and HIFLOAT4/HIFLOAT4_SCALE.");
