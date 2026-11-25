@@ -863,7 +863,8 @@ def run_backward_direct_case(
 
     校验反向 4 输出：compare_mode=2 两方（vs compressor_grad_golden two）；
     compare_mode=3 三方（vs NPU 小算子 two + float64 高精度 high）。
-    enable_ape=False 时走共享反向接口并跳过 d_ape，仅校验其余三梯度。
+    enable_ape=False 时正向走 v2 接口（ape=None，不传 ape）、反向走共享反向
+    接口并跳过 d_ape，仅校验其余三梯度。
     """
     batchSize, seqSize, headDim, hiddenSize = p["B"], p["S1"], p["D"], p["H"]
     cmpRatio, coff = p["cr"], p["coff"]
@@ -879,21 +880,44 @@ def run_backward_direct_case(
 
     if fwd is None:
         # 先直调一次真实正向拿中间量（不经 autograd）
-        cmp_kv, softmax_score, kv = _compressor_forward(
-            inputs["x"],
-            wkvInp,
-            wgateInp,
-            b["state_cache_npu"],
-            b["ape_npu"],
-            state_block_table=b["block_table_npu"],
-            cu_seqlens=cuArg,
-            seqused=sqNpu,
-            start_pos=spNpu,
-            cmp_ratio=cmpRatio,
-            coff=coff,
-            cache_mode=b["cache_mode"],
-            grad_enabled=True,
-        )
+        if enable_ape:
+            cmp_kv, softmax_score, kv = _compressor_forward(
+                inputs["x"],
+                wkvInp,
+                wgateInp,
+                b["state_cache_npu"],
+                b["ape_npu"],
+                state_block_table=b["block_table_npu"],
+                cu_seqlens=cuArg,
+                seqused=sqNpu,
+                start_pos=spNpu,
+                cmp_ratio=cmpRatio,
+                coff=coff,
+                cache_mode=b["cache_mode"],
+                grad_enabled=True,
+            )
+        else:
+            # v2 正向：ape 可省略，enable_ape=False 时正向也不传 ape。
+            # 仅在路径 6 延迟导入，避免旧版 custom 包缺该符号时拖垮其它路径。
+            from cann_ops_transformer.ops.attention.compressor.compressor import (
+                _compressor_v2_forward,
+            )
+
+            cmp_kv, softmax_score, kv = _compressor_v2_forward(
+                inputs["x"],
+                wkvInp,
+                wgateInp,
+                b["state_cache_npu"],
+                cmpRatio,
+                ape=None,
+                state_block_table=b["block_table_npu"],
+                cu_seqlens=cuArg,
+                seqused=sqNpu,
+                start_pos=spNpu,
+                coff=coff,
+                cache_mode=b["cache_mode"],
+                grad_enabled=True,
+            )
         torch.npu.synchronize()
     else:
         cmp_kv, softmax_score, kv = fwd["cmp_kv"], fwd["softmax_score"], fwd["kv"]
@@ -1665,13 +1689,14 @@ def test_compressor_grad_backward_direct(case, request):
     ids=[c["testcase_name"] for c in REDLINE_CASES if c.get("enable", True)],
 )
 def test_compressor_grad_v2_no_ape(case, request):
-    """通路 6：v2反向路径 enable_ape=False——复用共享反向接口，不生成dApe，仅校验其余三梯度。
+    """通路 6：v2 正反向 enable_ape=False——正向走 _compressor_v2_forward 且
+    ape=None（不传 ape），反向不生成 dApe，仅校验其余三梯度。
 
     运行：pytest test_compressor_grad.py --pathway 6 -k <case名子串> -q
     """
     if _pathway(request) != 6:
         pytest.skip(f"pathway={_pathway(request)}")
-    device = f"npu:{DEVICE_ID}"
+    device = f"npu:{_device(request)}"
     torch.npu.set_device(device)
     p, totalValid, cuNpu, sps, sqs, seed = _prepare_case(case, device)
     b = _build_inputs(

@@ -20,7 +20,7 @@ def pytest_addoption(parser):
         type=int,
         default=1,
         help="验证通路: 1=全链路(默认) 2=单反向PyPTO直跑 3=小算子拼接golden "
-        "4=单反向直调 5=单正向直调 6=v2反向不生成dApe",
+        "4=单反向直调 5=单正向直调 6=v2正向不传ape且反向不生成dApe",
     )
     parser.addoption(
         "--compare-mode",
