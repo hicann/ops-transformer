@@ -618,6 +618,16 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::AsyncAndMte2CopyBeforeReCompu
 TEMPLATES_DEF_NO_DEFAULT
 __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::CopyDpToTmpBuf(LocalTensor<T2>& mm1ResQueInTensor)
 {
+    if constexpr (SPLIT_AXIS == BN2) {
+        // Finish post-processing GM->UB writes and UB->GM reads before the
+        // vector copy replaces the shared buffer with FP32 dP.
+        event_t mte2ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
+        SetFlag<HardEvent::MTE2_V>(mte2ToV);
+        WaitFlag<HardEvent::MTE2_V>(mte2ToV);
+        event_t mte3ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_V));
+        SetFlag<HardEvent::MTE3_V>(mte3ToV);
+        WaitFlag<HardEvent::MTE3_V>(mte3ToV);
+    }
     LocalTensor<T2> DpDropTensor = postBuf[0].Get<T2>();
     DataCopy(DpDropTensor, mm1ResQueInTensor, VECTOR_BASEM * VECTOR_BASEN);
 }
@@ -643,6 +653,13 @@ __aicore__ inline void FAGBlockVec<TEMPLATE_ARGS>::ProcessVecSink(LocalTensor<T2
                                                            sumTensor, sinkScale,
                                                            static_cast<uint16_t>(runInfo.commonRunInfo.halfS1RealSize),
                                                            static_cast<uint16_t>(runInfo.commonRunInfo.s2RealSize));
+    if constexpr (SPLIT_AXIS == BN2) {
+        // Let subsequent post-processing GM->UB copies overwrite postBuf[0]
+        // only after sink has finished reading it. Do not consume post events.
+        event_t vToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
+        SetFlag<HardEvent::V_MTE2>(vToMte2);
+        WaitFlag<HardEvent::V_MTE2>(vToMte2);
+    }
     dsinkResOutQue[dsinkPingpong].EnQue(dsinkOutTensor);
     dsinkResOutQue[dsinkPingpong].DeQue<T2>();
     SetFlag<HardEvent::V_S>(GetTPipePtr()->FetchEventID(HardEvent::V_S));

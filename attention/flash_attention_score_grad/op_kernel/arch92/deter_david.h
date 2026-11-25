@@ -1566,6 +1566,7 @@ __aicore__ inline void CalTNDCausalIndex(const __gm__ uint8_t* actualSeqQlenAddr
         GetSeqQlenKvlenByBidx(actualSeqQlenAddr, actualSeqKvlenAddr, batch_id, actualS1Len, actualS2Len);
         m = (actualS1Len + CUBE_BASEM - 1) / CUBE_BASEM;
         n = (actualS2Len + CUBE_BASEN - 1) / CUBE_BASEN;
+        n = Min(m, n);
         round_batch = (NUM_TWO * m - n + 1) * n / NUM_TWO;
 
         while (a > round_batch * N10) {
@@ -1576,6 +1577,7 @@ __aicore__ inline void CalTNDCausalIndex(const __gm__ uint8_t* actualSeqQlenAddr
             GetSeqQlenKvlenByBidx(actualSeqQlenAddr, actualSeqKvlenAddr, batch_id, actualS1Len, actualS2Len);
             m = (actualS1Len + CUBE_BASEM - 1) / CUBE_BASEM;
             n = (actualS2Len + CUBE_BASEN - 1) / CUBE_BASEN;
+            n = Min(m, n);
             a = a - round_batch * N10;
             round_batch = (NUM_TWO * m - n + 1) * n / NUM_TWO;
         }
@@ -1592,7 +1594,7 @@ __aicore__ inline void CalTNDCausalIndex(const __gm__ uint8_t* actualSeqQlenAddr
         batch_id = batch_id * N1 + w;
         coordinateInfo.batchId = batch_id;
         coordinateInfo.s1Outer = m;
-        coordinateInfo.s2Outer = n;
+        coordinateInfo.s2Outer = (actualS2Len + CUBE_BASEN - 1) / CUBE_BASEN;
         coordinateInfo.actualS1Len = actualS1Len;
         coordinateInfo.actualS2Len = actualS2Len;
         return;
@@ -1604,6 +1606,9 @@ __aicore__ inline void CalTNDCausalIndex(const __gm__ uint8_t* actualSeqQlenAddr
             return;
         }
         int64_t m{coordinateInfo.s1Outer}, n{coordinateInfo.s2Outer}, x{coordinateInfo.s1Idx}, y{coordinateInfo.s2Idx};
+        // Use the same clipped causal domain as the host prefix and CalVirtualIndex.
+        // Keep s2Outer unchanged: it describes the physical KV tail for copy/matmul.
+        n = Min(m, n);
         int64_t batch_id1 = Ceil<int64_t>(coordinateInfo.batchId, N11);
         int64_t batch_id2 = coordinateInfo.batchId % N11;
         batch_id2 = batch_id2 != 0 ? batch_id2 : N11;
@@ -1628,6 +1633,7 @@ __aicore__ inline void CalTNDCausalIndex(const __gm__ uint8_t* actualSeqQlenAddr
             return;
         }
         int64_t m{coordinateInfo.s1Outer}, n{coordinateInfo.s2Outer}, x{coordinateInfo.s1Idx}, y{coordinateInfo.s2Idx};
+        n = Min(m, n);
         int64_t x_new;
         if (x >= y + m - n + 1) {
             x_new = x - (m - n + 1);
@@ -1646,7 +1652,7 @@ __aicore__ inline void CalTNDCausalIndex(const __gm__ uint8_t* actualSeqQlenAddr
         if (coordinateInfo.batchId < 0) {
             return;
         }
-        coordinateInfo.s1Idx += coordinateInfo.s2Outer / NUM_TWO;
+        coordinateInfo.s1Idx += Min(coordinateInfo.s1Outer, coordinateInfo.s2Outer) / NUM_TWO;
 
         coordinateInfo.batchId = coordinateInfo.batchId * N1;
         coordinateInfo.s1Idx = coordinateInfo.s1Idx;
