@@ -156,10 +156,13 @@ TEST(FiaTilingShapeTest, CheckHasShapeFailures)
     EXPECT_EQ(ge::GRAPH_FAILED, bsh.CheckHasShapeBlockNum("CheckHasShapeBlockNum"));
     EXPECT_EQ(ge::GRAPH_FAILED, bsh.CheckHasShapeBlockSize("CheckHasShapeBlockSize"));
 
-    FiaTilingShape tnd(MakeShape({6, 4, 8}), FiaLayout::TND, "shape", "QuantFlashMla");
+    // FiaTilingShape 以 const gert::Shape& 保存 shape, 临时对象必须落到具名局部变量, 否则析构后使用
+    gert::Shape tndShape = MakeShape({6, 4, 8});
+    FiaTilingShape tnd(tndShape, FiaLayout::TND, "shape", "QuantFlashMla");
     EXPECT_EQ(ge::GRAPH_SUCCESS, tnd.CheckHasShapeT("CheckHasShapeT"));
 
-    FiaTilingShape paBnbd(MakeShape({5, 4, 128, 8}), FiaLayout::PA_BNBD, "shape", "QuantFlashMla");
+    gert::Shape paBnbdShape = MakeShape({5, 4, 128, 8});
+    FiaTilingShape paBnbd(paBnbdShape, FiaLayout::PA_BNBD, "shape", "QuantFlashMla");
     EXPECT_EQ(ge::GRAPH_SUCCESS, paBnbd.CheckHasShapeBlockNum("CheckHasShapeBlockNum"));
     EXPECT_EQ(ge::GRAPH_SUCCESS, paBnbd.CheckHasShapeBlockSize("CheckHasShapeBlockSize"));
 
@@ -171,7 +174,9 @@ TEST(FiaTilingShapeTest, CheckHasShapeFailures)
 
 TEST(FiaTilingShapeTest, CompareTypeSerialStrings)
 {
-    FiaTilingShapeCompare compare(MakeShape({2, 3, 4, 8}), FiaLayout::BSND, "shape", "QuantFlashMla");
+    // 同上: 先落到具名局部变量, 避免 FiaTilingShapeCompare::shape_ 悬空
+    gert::Shape compareShape = MakeShape({2, 3, 4, 8});
+    FiaTilingShapeCompare compare(compareShape, FiaLayout::BSND, "shape", "QuantFlashMla");
     EXPECT_EQ(compare.CompareTypeToSerialString(FiaCompareType::EQUAL), "EQUAL");
     EXPECT_EQ(compare.CompareTypeToSerialString(FiaCompareType::GREATER), "GREATER");
     EXPECT_EQ(compare.CompareTypeToSerialString(FiaCompareType::GREATER_EQUAL), "GREATER_EQUAL");
