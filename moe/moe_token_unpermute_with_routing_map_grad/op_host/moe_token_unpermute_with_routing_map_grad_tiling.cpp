@@ -44,6 +44,7 @@ constexpr size_t INPUT_SORTED_TWICE_INDICES_IDX = 2;
 constexpr size_t INPUT_ROUTING_MAP_IDX = 3;
 constexpr size_t INPUT_PERMUTED_TOKENS_IDX = 4;
 constexpr size_t INPUT_PROB_IDX = 5;
+constexpr size_t OUTPUT_PROBS_GRAD_IDX = 1;
 constexpr size_t ATTR_PADDEDMODE_IDX = 0;
 constexpr size_t DIM_0 = 0;
 constexpr size_t DIM_1 = 1;
@@ -199,7 +200,12 @@ static ge::graphStatus TilingForProbNotNonePadTrue(const gert::TilingContext* co
     int64_t formerCoreNum = GetRem(numOutTokens, totalCoreNum);
     int64_t rowIdMapEachCore = formerCoreNum == 0 ? rowIdMapTailCore : rowIdMapTailCore + 1;
     int64_t tailCoreNum = totalCoreNum - formerCoreNum;
-    int64_t capacity = GetDiv(numOutTokens, tiling.get_numExpert());
+    const int64_t numExpert = tiling.get_numExpert();
+    if (GetRem(numOutTokens, numExpert) != 0) {
+        OP_LOGW(context->GetNodeName(), "For dropAndPad=true, numOutTokens (%ld) must be divisible by numExpert (%ld).",
+                numOutTokens, numExpert);
+    }
+    int64_t capacity = GetDiv(numOutTokens, numExpert);
     int64_t tokensNum = tiling.get_tokensNum();
     OP_CHECK_IF(capacity > tokensNum,
                 OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
@@ -428,11 +434,49 @@ static ge::graphStatus CheckInputForProbIsNotNone(gert::TilingContext* context,
     return ge::GRAPH_SUCCESS;
 }
 
+static void WarnIfUnsupportedFloatDtype(const char* nodeName, const char* name, const gert::CompileTimeTensorDesc* desc)
+{
+    if (desc == nullptr) {
+        return;
+    }
+    const auto dtype = desc->GetDataType();
+    if (dtype != ge::DT_BF16 && dtype != ge::DT_FLOAT16 && dtype != ge::DT_FLOAT) {
+        OP_LOGW(nodeName, "%s supports BFLOAT16, FLOAT16 and FLOAT, but got %s.", name,
+                Ops::Base::ToString(dtype).c_str());
+    }
+}
+
+static ge::graphStatus CheckOptionalTensors(const gert::TilingContext* context, bool hasProbs)
+{
+    const char* nodeName = context->GetNodeName();
+    const bool hasProbsGrad = context->GetOutputShape(OUTPUT_PROBS_GRAD_IDX) != nullptr;
+    OP_CHECK_IF(hasProbs && !hasProbsGrad,
+                OP_LOGE_FOR_INVALID_ARGUMENT_WITH_REASON(
+                    nodeName, "probs_grad", "probsGradOutOptional is required when probsOptional is provided."),
+                return ge::GRAPH_FAILED);
+
+    const auto* routingMapDesc = context->GetOptionalInputDesc(INPUT_ROUTING_MAP_IDX);
+    if (routingMapDesc != nullptr && routingMapDesc->GetDataType() != ge::DT_INT8 &&
+        routingMapDesc->GetDataType() != ge::DT_BOOL) {
+        OP_LOGW(nodeName, "routingMapOptional supports INT8 and BOOL, but got %s.",
+                Ops::Base::ToString(routingMapDesc->GetDataType()).c_str());
+    }
+    WarnIfUnsupportedFloatDtype(nodeName, "permutedTokensOptional",
+                                context->GetOptionalInputDesc(INPUT_PERMUTED_TOKENS_IDX));
+    if (hasProbsGrad) {
+        WarnIfUnsupportedFloatDtype(nodeName, "probsGradOutOptional", context->GetOutputDesc(OUTPUT_PROBS_GRAD_IDX));
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
 static ge::graphStatus Tiling4MoeTokenUnpermuteWithRoutingMapGrad(gert::TilingContext* context)
 {
     OP_LOGD(context->GetNodeName(), "MoeTokenUnpermuteWithRoutingMapGradTiling tiling start");
     auto tokenDtype = context->GetInputDesc(INPUT_UNPERMUTEDOUTPUTD_IDX)->GetDataType();
     auto probTensor = context->GetOptionalInputTensor(INPUT_PROB_IDX);
+    if (CheckOptionalTensors(context, probTensor != nullptr) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
     auto probDtype = (probTensor == nullptr) ? tokenDtype : context->GetInputDesc(INPUT_PROB_IDX)->GetDataType();
     OP_CHECK_IF(tokenDtype != probDtype && (tokenDtype != ge::DataType::DT_BF16 || probDtype != ge::DataType::DT_FLOAT),
                 OP_LOGE_FOR_INVALID_DTYPES_WITH_REASON(

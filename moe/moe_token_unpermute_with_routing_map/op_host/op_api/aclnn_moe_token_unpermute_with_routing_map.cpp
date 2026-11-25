@@ -257,14 +257,15 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMapGetWorkspaceSize(
     aclTensor* unpermutedTokens, aclTensor* outIndex, aclTensor* permuteTokenId, aclTensor* permuteProbs,
     uint64_t* workspaceSize, aclOpExecutor** executor)
 {
+    auto ret = CheckParams(permutedTokens, sortedIndices, routingMapOptional, probsOptional, restoreShapeOptional,
+                           unpermutedTokens, outIndex, permuteTokenId, permuteProbs);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
+
     L2_DFX_PHASE_1(
         aclnnMoeTokenUnpermuteWithRoutingMap,
         DFX_IN(permutedTokens, sortedIndices, routingMapOptional, probsOptional, paddedMode, restoreShapeOptional),
         DFX_OUT(unpermutedTokens, outIndex, permuteTokenId, permuteProbs));
 
-    auto ret = CheckParams(permutedTokens, sortedIndices, routingMapOptional, probsOptional, restoreShapeOptional,
-                           unpermutedTokens, outIndex, permuteTokenId, permuteProbs);
-    CHECK_RET(ret == ACLNN_SUCCESS, ret);
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
@@ -312,6 +313,7 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMapGetWorkspaceSize(
     std::tuple<aclTensor*, aclTensor*, aclTensor*, aclTensor*> permuteprob;
     if (probsOptional != nullptr) {
         auto probsOptionalContiguous = l0op::Contiguous(probsOptional, uniqueExecutor.get());
+        CHECK_RET(routingMapOptionalContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
         CHECK_RET(probsOptionalContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
         permuteprob = l0op::MoeTokenUnpermuteWithRoutingMap(
             permuteTokensContiguous, sortedIndicesContiguous, routingMapOptionalContiguous, probsOptionalContiguous,
@@ -343,6 +345,9 @@ aclnnStatus aclnnMoeTokenUnpermuteWithRoutingMapGetWorkspaceSize(
         constexpr bool stable = true;
         auto unpermutedTokensContiguous = l0op::Contiguous(unpermutedTokens, uniqueExecutor.get());
         CHECK_RET(unpermutedTokensContiguous != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        CHECK_RET(outIndex != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        CHECK_RET(permuteTokenId != nullptr, ACLNN_ERR_INNER_NULLPTR);
+        CHECK_RET(probsOptional == nullptr || permuteProbs != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
         const aclTensor* unpermutedTokensOut = nullptr;
         unpermutedTokensOut = l0op::ZerosLike(unpermutedTokensContiguous, uniqueExecutor.get());
