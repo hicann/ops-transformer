@@ -125,7 +125,7 @@ Fused operators usually contain both Vector computation and Cube computation. Fo
 
   Under the pipeline characteristics of this scenario, there are few Vector computation nodes and the computation is fast. In the case of <term>Atlas A2 training products</term> with C:V=1:2, the Cube movement duration is sufficient to cover the Vector computation duration, so only the Cube MTE2 time consumption needs attention, ultimately achieving MTE2 bound. Under the Cube dual-issue mechanism, two Cube computations are issued in advance, and the Cube1 and Cube2 computations can be connected, maximizing Cube utilization and achieving Cube bound.
 
-  ![FA pipeline.jpg](../../../docs/zh/figures/fa_pipeline.png)
+  ![FA pipeline.jpg](../../../docs/en/figures/fa_pipeline.png)
 
 - Total time consumed on the C side < Total time consumed on the V side
 
