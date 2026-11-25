@@ -340,6 +340,16 @@ TEST_F(generic_block_sparse_attention_tiling_ut, int8_external_scales_910b)
     }
 }
 
+TEST_F(generic_block_sparse_attention_tiling_ut, int8_tnd_seqused_q)
+{
+    auto inputs = MakeInt8Inputs();
+    inputs[13] = {{{kBatch}, {kBatch}}, ge::DT_INT32, ge::FORMAT_ND};
+    GenericBlockSparseAttentionCompileInfo compileInfo;
+    gert::TilingContextPara context("GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false, 256),
+                                    MakeAttrs(1, 7, 0, 0), &compileInfo, "Ascend910B", 40, 196608);
+    ExecuteTestCase(context, ge::GRAPH_SUCCESS, 9200000071001032ULL);
+}
+
 TEST_F(generic_block_sparse_attention_tiling_ut, int8_rejects_token_head_scale_layout)
 {
     auto inputs = MakeInt8Inputs();
@@ -531,17 +541,13 @@ TEST_F(generic_block_sparse_attention_tiling_ut, int8_rejects_unsupported_shapes
 
 TEST_F(generic_block_sparse_attention_tiling_ut, int8_rejects_unimplemented_options)
 {
-    for (uint32_t option : {0U, 2U, 3U}) {
+    for (uint32_t option : {0U, 2U}) {
         auto inputs = MakeInt8Inputs();
-        if (option == 3) {
-            inputs[13] = {{{kBatch}, {kBatch}}, ge::DT_INT32, ge::FORMAT_ND};
-        }
         GenericBlockSparseAttentionCompileInfo compileInfo;
-        gert::TilingContextPara context("GenericBlockSparseAttention", inputs,
-                                        MakeOutputs(ge::DT_FLOAT16, option == 1, 256),
-                                        MakeAttrs(1, option == 0 ? 0 : 7, 0, option == 1 ? 1 : 0, 0.0f, -1, -1, 4,
-                                                  "TND", "PA_BBND", option == 2 ? 2 : 0),
-                                        &compileInfo, "Ascend910B", 40, 196608);
+        gert::TilingContextPara context(
+            "GenericBlockSparseAttention", inputs, MakeOutputs(ge::DT_FLOAT16, false, 256),
+            MakeAttrs(1, option == 0 ? 0 : 7, 0, 0, 0.0f, -1, -1, 4, "TND", "PA_BBND", option == 2 ? 2 : 0),
+            &compileInfo, "Ascend910B", 40, 196608);
         ExecuteTestCase(context, ge::GRAPH_FAILED);
     }
 }

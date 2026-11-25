@@ -148,7 +148,7 @@
     <tr>
       <td>sequsedQOptional</td>
       <td>条件必选输入</td>
-      <td>各batch中query实际有效长度，shape为[B,]；BSND/BNSD必传，非量化TND可选且不传时按cu差分得到的存储长度处理；INT8的TND Q必须传入nullptr。</td>
+      <td>各batch中query实际有效长度，shape为[B,]；BSND/BNSD必传，TND Q可选，不传时使用cu差分得到的存储长度。</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -325,7 +325,7 @@
 
 `A8C8`的Q/K采用D维group-32 E8M0缩放，V采用per-channel E8M0缩放并由调用方repeat到kernel所需布局，P采用外部per-tensor缩放。详细shape与约束见[`A8C8`量化契约](./docs/aclnnGenericBlockSparseAttention.md#a8c8quanttype6)。
 
-- <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>的INT8全量化场景：`quantType=7`，Q/K/V的数据类型为INT8；`headDim`为1～256，Q head数必须是KV head数的整数倍，分组大小为1～128；Q支持TND、BSND、BNSD，KV为与Q相同的非PA布局或PA_BBND/PA_BNBD；PA的`blockSize=128`；`blockShape=[1,Y]`，Y为1、2、4、8、16、32、64、128；`maskType=0/1`、`residualBlockMode=0/1`、`softmaxPrecision=0`。mode=1隐式追加可见范围末尾的不完整块，不占用topK及`sparseBlockCount`。
+- <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term>的INT8全量化场景：`quantType=7`，Q/K/V的数据类型为INT8；`headDim`为1～256，Q head数必须是KV head数的整数倍，分组大小为1～128；Q支持TND、BSND、BNSD，KV为与Q相同的非PA布局或PA_BBND/PA_BNBD；PA的`blockSize=128`；`blockShape=[1,Y]`，Y为1、2、4、8、16、32、64、128；`maskType=0/1`、`residualBlockMode=0/1`、`softmaxPrecision=0`。TND Q可选传入`sequsedQOptional`，用于指定各batch存储段内的有效token数。mode=1隐式追加可见范围末尾的不完整块，不占用topK及`sparseBlockCount`。
 
 ## 调用说明
 

@@ -157,11 +157,12 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>sequsedQOptional</td>
       <td>Input</td>
       <td>Actual sequence length of the query in each batch.</td>
-      <td>        <ul>
-          <li>If the actual length is not specified, nullptr can be passed in, indicating that the storage length is the same as that obtained by differencing cuSeqLengthsQOptional.</li>
-          <li>When passed in, the shape is (B,), and each element must be ≥0 and ≤ the cu storage length of the corresponding batch. For the dual-length semantics when coexisting with cu, see <a href="#other-constraints">Other Constraints</a>.</li>
+      <td>
+        <ul>
+          <li>If the actual length is not specified, nullptr can be passed in, indicating that the storage length is the same as that obtained by differencing cuSeqLengthsQOptional. BSND/BNSD must pass sequsedQ and does not use the cu difference.</li>
+          <li>When passed in, the shape is (B,), and each element must be ≥0 and ≤ the cu storage length of the corresponding batch for TND, or ≤Sq for BSND/BNSD. For the dual-length semantics when coexisting with cu, see <a href="#other-constraints">Other Constraints</a>.</li>
         </ul>
-       For INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7), TND Q requires nullptr; BSND/BNSD still require this input.</td>
+      </td>
       <td>INT32</td>
       <td>ND</td>
       <td>(B,)</td>
@@ -171,7 +172,8 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
       <td>sequsedKvOptional</td>
       <td>Input</td>
       <td>Actual sequence length of kv in each batch.</td>
-      <td>        <ul>
+      <td>
+        <ul>
           <li>Must be passed in when layoutKv is PA_BBND. Shape is (B,), and each element must be ≥ 0.</li>
           <li>When layoutKv is TND: pass in nullptr if the actual length is not specified, indicating that the storage length is the same as that obtained by differencing cuSeqLengthsKvOptional; if passed in, the shape is (B,), and each element must be ≥ 0 and ≤ the cu storage length of the corresponding batch. For dual-length semantics when coexisting with cu, see <a href="#other-constraints">Other Constraints</a>.</li>
         </ul>
@@ -466,7 +468,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
 ## Constraints
 
 - A4C4 (quantType=4) on <term>Ascend 950PR&950DT products</term>: D=192/256, blockShape=[1,Y] with Y in {4,8,16,32,64,128}, GQA group size 1–16, maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. Match the Attention inputs and attributes. [A4C4 API constraints](#a4c4metadataquanttype4).
-- INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7): D is 1..256 and the GQA group size is 1..16. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, sequsedQ must be nullptr. Metadata and attention must use matching inputs and attributes.
+- INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7): D is 1..256 and the GQA group size is 1..16. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, optional sequsedQ specifies the valid token count in each storage segment. Metadata and attention must use matching inputs and attributes.
 
 ### Baseline Description
 

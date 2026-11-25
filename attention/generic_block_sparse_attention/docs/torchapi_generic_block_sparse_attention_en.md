@@ -171,7 +171,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 | block_shape | list[int] | Required | Sparse block shape `[block_x, block_y]`. A4C4 uses [1,Y], Y in {4,8,16,32,64,128}. | int64 | - | Length of 2 |
 | cu_seqlens_q | Tensor | Conditional | Required for TND Q. Cumulative sequence lengths, used to process variable-length sequences. The first element must be 0. | int64 | ND | (B+1,) |
 | cu_seqlens_kv | Tensor | Conditional | Required for TND KV. Pass `None` for paged KV. Cumulative sequence lengths, used to process variable-length sequences. The first element must be 0. | int64 | ND | (B+1,) |
-| seqused_q | Tensor | Conditional | Required for BSND/BNSD. For TND Q, this is optional with non-quantized inputs or `quant_mode=8`. Pass `None` for INT8 TND. | int32 | ND | (B,) |
+| seqused_q | Tensor | Conditional | Required for BSND/BNSD. For TND Q, this is optional. Specifies the actual Q length of each batch. | int32 | ND | (B,) |
 | seqused_kv | Tensor | Conditional | Actual KV length for each batch. Required for BSND, BNSD, PA_BBND, and PA_BNBD KV. Optional for TND KV. | int32 | ND | (B,) |
 | max_seqlen_q | int | Optional | Specifies the upper limit of the query q sequence length. | int32 | - | - |
 | max_seqlen_kv | int | Optional | Specifies the upper limit of the key k and value v sequence lengths. | int32 | - | - |
@@ -206,7 +206,7 @@ D in the table denotes the logical head dimension. A4C4 Torch tensors use a phys
 | p_quant_scale | Tensor | Required for INT8; conditional for other modes |P quantization scale factor; INT8 (quant_mode=7) requires a contiguous, positive, finite float32 Tensor | float32 | ND | INT8: [1] |
 | cu_seqlens_q | Tensor | Conditional | Required for TND Q. Cumulative sequence length, used to process variable-length sequences. The first element must be 0 | int64 | ND | (B+1,) |
 | cu_seqlens_kv | Tensor | Conditional | Required for TND KV. Pass `None` for paged KV. Cumulative sequence length, used to process variable-length sequences. The first element must be 0 | int64 | ND | (B+1,) |
-| seqused_q | Tensor | Conditional | Required for BSND/BNSD. For TND Q, this is optional with non-quantized inputs or `quant_mode=8`. Pass `None` for INT8 TND. | int32 | ND | (B,) |
+| seqused_q | Tensor | Conditional | Required for BSND/BNSD. For TND Q, this is optional. Specifies the actual Q length of each batch. | int32 | ND | (B,) |
 | seqused_kv | Tensor | Conditional | Actual KV length for each batch. Required for BSND, BNSD, PA_BBND, and PA_BNBD KV. Optional for TND KV. | int32 | ND | (B,) |
 | block_table | Tensor | Optional | Block index mapping used in Paged Attention computation | int32 | ND | (B, max_num_blocks_per_seq) |
 | layout_q | string | Optional | Defines the layout format of the input query tensor | string | - | - |
@@ -246,7 +246,7 @@ D in the table denotes the logical head dimension. A4C4 Torch tensors use a phys
 
 ## Constraints
 
-- INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quant_mode=7): D is 1..256 and the GQA group size is 1..128. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. block_shape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; mask_mode=0/1, residual_block_mode=0/1, and softmax_precision=0. For TND Q, `seqused_q` must be `None`. Metadata and attention must use matching inputs and attributes.
+- INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quant_mode=7): D is 1..256 and the GQA group size is 1..128. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. block_shape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; mask_mode=0/1, residual_block_mode=0/1, and softmax_precision=0. For TND Q, optional `seqused_q` specifies the valid token count in each storage segment. Metadata and attention must use matching inputs and attributes.
 
 - Parameters cu_seqlens_q, cu_seqlens_kv, seqused_q, seqused_kv, sparse_block_idx, sparse_block_count, and block_table are tensors. The operator cannot obtain the specific values of these tensors during the Tiling phase. Therefore, the tiling side does not validate the values, and users must ensure their correctness. If invalid values are passed for the preceding parameters, undefined behavior may occur (such as accuracy issues or program crashes caused by invalid memory access).
 - The input parameters of generic_block_sparse_attention_metadata and generic_block_sparse_attention must be consistent during the call. The operator is called in two phases through two APIs and cannot perform the check itself. Customers must ensure correctness. If the parameters passed to the APIs are inconsistent, undefined behavior may occur (such as accuracy issues or program crashes caused by invalid memory access).
@@ -669,7 +669,7 @@ For details about the mask_mode parameter, see "mask_mode Enumeration".
                     <li>Values in seqused_kv must be less than or equal to KV_S.</li>
                 </ul>
             </td>
-            <td rowspan="2">Optional parameter</td>
+            <td rowspan="2">Required for BSND/BNSD; optional for TND</td>
             <td rowspan="4">None</td>
             <td rowspan="4">None</td>
         </tr>

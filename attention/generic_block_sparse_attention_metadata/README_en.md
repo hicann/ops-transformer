@@ -76,7 +76,7 @@ English | [简体中文](./README.md)
     <tr>
       <td>sequsedQOptional</td>
       <td>Conditionally Required Input</td>
-      <td>Actual sequence length of Query in each batch. The shape is (B,). This parameter is required for BSND/BNSD and optional for TND; when it is not passed in for TND, the Query storage length is used. For INT8 on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7), TND Q requires nullptr; BSND/BNSD still require this input.</td>
+      <td>Actual sequence length of Query in each batch. The shape is (B,). This parameter is required for BSND/BNSD and optional for TND; when it is not passed in for TND, the Query storage length is used.</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -240,7 +240,7 @@ English | [简体中文](./README.md)
 - `softmaxPrecision`: In non-Union scenarios (maskType=0/1) on <term>Ascend 950PR&950DT products</term>, non-quantized FLOAT16/BFLOAT16 supports 0 or 1, FP8 with `quantType=5` supports 0 or 1, and `A8C8` supports only 0 (FP32 scores and Softmax); value 1 is rejected. In Union scenarios (maskType=3), both non-quantized and FP8 support only 0; on <term>Atlas A2 products</term> and <term>Atlas A3 products</term>, FLOAT16 supports 0 or 1 and BFLOAT16 supports only 0.
 - On <term>Ascend 950PR&950DT products</term>, regular FP8 (`quantType=5`, `maskType=1`) with `softmaxPrecision=0` requires `headDim=128` and `1≤groupSize≤16`. Supported Q/KV layouts are `TND/TND`, `BSND/BSND`, `BNSD/BNSD`, and each Q layout paired with `PA_BBND` or `PA_BNBD`. Low precision (`softmaxPrecision=1`) supports only `TND/PA_BBND` with LSE disabled.
 
-- INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7): D is 1..256 and the GQA group size is 1..16. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, sequsedQ must be nullptr. Metadata and attention must use matching inputs and attributes.
+- INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7): D is 1..256 and the GQA group size is 1..16. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, optional sequsedQ specifies the valid token count in each storage segment. Metadata and attention must use matching inputs and attributes.
 
 ## Calling Instructions
 

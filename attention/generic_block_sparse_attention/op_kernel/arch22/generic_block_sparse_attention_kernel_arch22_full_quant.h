@@ -234,6 +234,31 @@ private:
             vector.InitPageBufferEvents();
         }
         typename decltype(vector)::EpilogueRescaleO rescaleO{vector};
+        if (!batchedQ && params.sequsedQ != nullptr) {
+            uint64_t paddingTask = 0U;
+            for (uint32_t batchIdx = 0U; batchIdx < tiling.batch; ++batchIdx) {
+                const int64_t storageStart = cuSeqLengthsQ_.GetValue(batchIdx);
+                const int64_t storageEnd = cuSeqLengthsQ_.GetValue(batchIdx + 1U);
+                const int64_t actualLenValue = static_cast<int64_t>(sequsedQ_.GetValue(batchIdx));
+                if (storageStart < 0 || storageEnd < storageStart || actualLenValue < 0) {
+                    continue;
+                }
+                const int64_t storageLen = storageEnd - storageStart;
+                const int64_t actualLen = actualLenValue < storageLen ? actualLenValue : storageLen;
+                for (int64_t token = actualLen; token < storageLen; ++token) {
+                    for (uint32_t kvHeadIdx = 0U; kvHeadIdx < tiling.kvHeads; ++kvHeadIdx, ++paddingTask) {
+                        if (paddingTask % AscendC::GetBlockNum() != core) {
+                            continue;
+                        }
+                        const uint64_t row =
+                            (static_cast<uint64_t>(storageStart + token) * tiling.kvHeads + kvHeadIdx) *
+                            tiling.groupSize;
+                        rescaleO.template WriteEmptyOutput<outputLse>(output_[row * tiling.embeddingSize], lse[row],
+                                                                      tiling.groupSize, tiling.embeddingSize);
+                    }
+                }
+            }
+        }
 #else
         GbsaFullQuantCubeArch22<singleRowTile> cube(resource_, tiling.embeddingSize, tiling.kvHeads, headMajorKv);
         typename decltype(cube)::BlockMmadQK qk{cube};

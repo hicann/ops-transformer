@@ -193,7 +193,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 | block_shape | list[int] | 必选 | 稀疏块形状 `[block_x, block_y]`；A4C4使用[1,Y]，Y∈{4,8,16,32,64,128}。 | int64 | - | 长度为2 |
 | cu_seqlens_q | Tensor | 条件必选 | TND必须传入Q存储长度前缀和；BSND/BNSD不使用，建议传入None；第一个元素为0 | int64 | ND | (B+1,) |
 | cu_seqlens_kv | Tensor | 条件必选 | TND KV必须传入KV存储长度前缀和；BSND/BNSD不使用，建议传入None；PA_BBND/PA_BNBD必须为None | int64 | ND | (B+1,) |
-| seqused_q | Tensor | 条件必选 | BSND/BNSD 必传。TND 下，非量化或 `quant_mode=8` 时可选，INT8 时传 `None`。表示每个 batch 的实际 Q 长度。 | int32 | ND | (B,) |
+| seqused_q | Tensor | 条件必选 | BSND/BNSD 必传。TND 下可选。表示每个 batch 的实际 Q 长度。 | int32 | ND | (B,) |
 | seqused_kv | Tensor | 条件必选 | PA_BBND/PA_BNBD及BSND/BNSD KV必须传入；TND KV可选，指定每batch实际KV长度 | int32 | ND | (B,) |
 | max_seqlen_q | int | 条件必选 | BSND/BNSD必须传入Q的shape容量Sq；TND为可选长度上限 | int32 | - | - |
 | max_seqlen_kv | int | 可选 | 允许-1或非负值，不用于推导BSND/BNSD的实际KV长度 | int32 | - | - |
@@ -228,7 +228,7 @@ cann_ops_transformer.generic_block_sparse_attention(
 | p_quant_scale | Tensor | INT8必传 | quant_mode=0/5/8为None；INT8全量化（quant_mode=7）须传连续、有限且大于0的float32 Tensor | float32 | ND | [1] |
 | cu_seqlens_q | Tensor | 条件必选 | TND必须传入Q存储长度前缀和；BSND/BNSD不使用，建议传入None；第一个元素为0 | int64 | ND | (B+1,) |
 | cu_seqlens_kv | Tensor | 条件必选 | TND KV必须传入KV存储长度前缀和；BSND/BNSD不使用，建议传入None；PA_BBND/PA_BNBD必须为None | int64 | ND | (B+1,) |
-| seqused_q | Tensor | 条件必选 | BSND/BNSD 必传。TND 下，非量化或 `quant_mode=8` 时可选，INT8 时传 `None`。表示每个 batch 的实际 Q 长度。 | int32 | ND | (B,) |
+| seqused_q | Tensor | 条件必选 | BSND/BNSD 必传。TND 下可选。表示每个 batch 的实际 Q 长度。 | int32 | ND | (B,) |
 | seqused_kv | Tensor | 条件必选 | PA_BBND/PA_BNBD及BSND/BNSD KV必须传入；TND KV可选，指定每batch实际KV长度 | int32 | ND | (B,) |
 | block_table | Tensor | 条件必选 | PA_BBND/PA_BNBD必须传入页表；TND/BSND/BNSD KV必须为None | int32 | ND | (B, max_num_blocks_per_seq) |
 | layout_q | string | 可选 | 定义输入query张量的布局格式 | string | - | - |
@@ -733,7 +733,7 @@ mask_mode参数解释见「mask_mode 枚举」。
                     <li>seqused_kv中的值需小于等于KV_S</li>
                 </ul>
             </td>
-            <td>BSND/BNSD必须传入；TND非量化时可选，INT8时必须为None</td>
+            <td>BSND/BNSD必须传入；TND时可选</td>
             <td rowspan="4">无</td>
             <td rowspan="4">无</td>
         </tr>
@@ -831,7 +831,7 @@ mask_mode参数解释见「mask_mode 枚举」。
 
 #### Quant参数组
 
-<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8全量化设置`quant_mode=7`、`softmax_precision=0`，Q/K/V均为int8，GQA分组为1～128，D为1～256，Y为1/2/4/8/16/32/64/128。四个scale均必传，形状见上方参数表，要求float32、连续、有限且大于0；`attention_out_dtype`必须指定为torch.float16或torch.bfloat16。TND Q的`seqused_q`必须为None。量化公式和PA scale示例见[aclnn接口的量化相关说明](aclnnGenericBlockSparseAttention.md#量化相关说明)。
+<term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8全量化设置`quant_mode=7`、`softmax_precision=0`，Q/K/V均为int8，GQA分组为1～128，D为1～256，Y为1/2/4/8/16/32/64/128。四个scale均必传，形状见上方参数表，要求float32、连续、有限且大于0；`attention_out_dtype`必须指定为torch.float16或torch.bfloat16。TND Q可传入`seqused_q`指定每个batch的有效长度。量化公式和PA scale示例见[aclnn接口的量化相关说明](aclnnGenericBlockSparseAttention.md#量化相关说明)。
 
 quant_mode参数解释见「quant_mode 枚举」。
 

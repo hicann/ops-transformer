@@ -274,6 +274,39 @@ struct GbsaFullQuantVectorArch22<ElementO, singleRowTile, compactUb, fullPage>::
         }
         AscendC::PipeBarrier<PIPE_V>();
     }
+
+    template <bool withLse>
+    __aicore__ inline void WriteEmptyOutput(AscendC::GlobalTensor<ElementO> gOutput, AscendC::GlobalTensor<float> gLse,
+                                            uint32_t groupSize, uint32_t embed)
+    {
+        const uint32_t subBlockIdx = AscendC::GetSubBlockIdx();
+        const uint32_t rowSplit = groupSize == 1U ? 0U : groupSize / AscendC::GetSubBlockNum();
+        const uint32_t rowNum = subBlockIdx == 0U ? rowSplit : groupSize - rowSplit;
+        const uint32_t rowOffset = subBlockIdx == 0U ? 0U : rowSplit;
+        if (rowNum == 0U) {
+            return;
+        }
+        const uint32_t colStride = (embed + 15U) / 16U * 16U;
+        auto dst = state.template Ub<ElementO>(BufferLayout::O_TEMP);
+        // A previous task may still be copying from the shared output UB.
+        state.template Sync<AscendC::HardEvent::MTE3_V>();
+        AscendC::Duplicate(dst, static_cast<ElementO>(0), colStride);
+        if constexpr (withLse) {
+            AscendC::Duplicate(state.template Ub<float>(BufferLayout::REDUCE_MAX), -3.402823466e38f, 8U);
+        }
+        AscendC::PipeBarrier<PIPE_V>();
+        state.template Sync<AscendC::HardEvent::V_MTE3>();
+        for (uint32_t r = 0U; r < rowNum; ++r) {
+            AscendC::DataCopyPad(gOutput[static_cast<uint64_t>(rowOffset + r) * embed],
+                                 state.template Ub<ElementO>(BufferLayout::O_TEMP),
+                                 AscendC::DataCopyExtParams(1, embed * sizeof(ElementO), 0, 0, 0));
+        }
+        if constexpr (withLse) {
+            AscendC::DataCopyPad(gLse[rowOffset], state.template Ub<float>(BufferLayout::REDUCE_MAX),
+                                 AscendC::DataCopyExtParams(1, rowNum * sizeof(float), 0, 0, 0));
+        }
+        state.template Sync<AscendC::HardEvent::MTE3_V>();
+    }
 };
 
 } // namespace GbsaKernelArch22::Int8

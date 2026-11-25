@@ -1503,11 +1503,6 @@ ge::graphStatus GBSATiling::CheckInt8Config(gert::TilingContext* context)
                                               "INT8 quantization requires softmaxPrecision=0 (FP32 Softmax)");
         return ge::GRAPH_FAILED;
     }
-    if (layoutQ_ == "TND" && context->GetOptionalInputTensor(SEQUSED_Q_INDEX) != nullptr) {
-        OP_LOGE_FOR_INVALID_VALUE_WITH_REASON(context->GetNodeName(), "sequsedQ", "provided",
-                                              "INT8 quantization with TND Q requires sequsedQ=nullptr");
-        return ge::GRAPH_FAILED;
-    }
     // Reuse the FP16 metadata split-K schedule and FP32 partial-output merge.
     fdStaticEnabled_ = topK_ >= 12U;
     return ge::GRAPH_SUCCESS;

@@ -162,7 +162,7 @@ aclnnStatus aclnnGenericBlockSparseAttentionMetadata(
           <li>TND下不指定实际长度可传入nullptr，表示与cuSeqLengthsQOptional差分得到的存储长度相同；BSND/BNSD下必须传入sequsedQ，不使用cu差分。</li>
           <li>传入时shape为(B,)，每个元素须≥0；TND下须≤对应batch的cu存储长度，BSND/BNSD下须≤Sq。与cu并存时的双长度语义见<a href="#其他约束">其他约束</a>。</li>
         </ul>
-       <term>Atlas A2系列产品</term>和<term>Atlas A3系列产品</term> INT8（quantType=7）例外：TND Q必须传入nullptr；BSND/BNSD仍为必传。</td>
+      </td>
       <td>INT32</td>
       <td>ND</td>
       <td>(B,)</td>

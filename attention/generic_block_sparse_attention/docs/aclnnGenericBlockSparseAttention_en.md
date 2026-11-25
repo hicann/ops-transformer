@@ -268,11 +268,12 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>sequsedQOptional</td>
       <td>Input</td>
       <td>Actual sequence length of the query in each batch.</td>
-      <td>        <ul>
-          <li>If the actual length is not specified, nullptr can be passed in, indicating that the storage length is the same as that obtained by difference from cuSeqLengthsQOptional.</li>
-          <li>If passed, the shape is (B,), and each element must be ≥0 and ≤ the storage length of cu in the corresponding batch. See <a href="#other-constraints">Other Constraints</a> for the dual-length semantics when coexisting with cu.</li>
+      <td>
+        <ul>
+          <li>If the actual length is not specified, nullptr can be passed in, indicating that the storage length is the same as that obtained by difference from cuSeqLengthsQOptional. BSND/BNSD must pass sequsedQ and does not use the cu difference.</li>
+          <li>If passed, the shape is (B,), and each element must be ≥0 and ≤ the storage length of cu in the corresponding batch for TND, or ≤Sq for BSND/BNSD. See <a href="#other-constraints">Other Constraints</a> for the dual-length semantics when coexisting with cu.</li>
         </ul>
-       For INT8 (quantType=7), TND Q requires nullptr; BSND/BNSD still require this input.</td>
+      </td>
       <td>INT32</td>
       <td>ND</td>
       <td>(B,)</td>
@@ -282,7 +283,8 @@ aclnnStatus aclnnGenericBlockSparseAttention(
       <td>sequsedKvOptional</td>
       <td>Input</td>
       <td>Actual sequence length of KV in each batch.</td>
-      <td>        <ul>
+      <td>
+        <ul>
           <li>Must be passed in when layoutKv is PA_BBND/PA_BNBD, with shape (B,); each element must be ≥ 0.</li>
           <li>When layoutKv is TND: if the actual length is not specified, nullptr can be passed in, indicating that the storage length is the same as that obtained by difference from cuSeqLengthsKvOptional; if passed in, shape is (B,) and each element must be ≥ 0 and ≤ the storage length of cu in the corresponding batch. For the dual-length semantics when coexisting with cu, see <a href="#other-constraints">Other Constraints</a>.</li>
         </ul>

@@ -152,7 +152,7 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
     <tr>
       <td>sequsedQOptional</td>
       <td>Conditionally required input</td>
-      <td>Actual valid query length in each batch. The shape is [B,]. It is required for BSND/BNSD and optional for TND. If it is not passed for TND, the storage length obtained by differencing cu is used. For INT8 (quantType=7), TND Q requires nullptr; BSND/BNSD still require this input.</td>
+      <td>Actual valid query length in each batch. The shape is [B,]. It is required for BSND/BNSD and optional for TND. If it is not passed for TND, the storage length obtained by differencing cu is used.</td>
       <td>INT32</td>
       <td>ND</td>
     </tr>
@@ -298,7 +298,7 @@ For INT8 shapes, qHeadNum denotes the Q head count, kvHeadNum the KV head count,
 
 ## Constraints
 
-- INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7): D is 1..256 and the GQA group size is 1..128. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, sequsedQ must be nullptr. Metadata and attention must use matching inputs and attributes.
+- INT8 quantization on <term>Atlas A2 products</term> and <term>Atlas A3 products</term> (quantType=7): D is 1..256 and the GQA group size is 1..128. Q supports TND, BSND, and BNSD; KV uses the same nonpaged layout as Q or PA_BBND/PA_BNBD with 128-token pages. blockShape=[1,Y], with Y in {1,2,4,8,16,32,64,128}; maskType=0/1, residualBlockMode=0/1, and softmaxPrecision=0. For TND Q, optional sequsedQ specifies the valid token count in each storage segment. Metadata and attention must use matching inputs and attributes.
 
 - For INT8 quantization, all four scale tensors are required. They must be FLOAT32, contiguous, finite, and positive; their shapes are specified in the parameter table.
 

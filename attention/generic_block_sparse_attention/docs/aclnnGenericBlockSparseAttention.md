@@ -274,7 +274,7 @@ aclnnStatus aclnnGenericBlockSparseAttention(
           <li>TND下不指定实际长度可传入nullptr，表示与cuSeqLengthsQOptional差分得到的存储长度相同；BSND/BNSD下必须传入sequsedQ，不使用cu差分。</li>
           <li>传入时shape为(B,)，每个元素须≥0；TND下须≤对应batch的cu存储长度，BSND/BNSD下须≤Sq。与cu并存时的双长度语义见<a href="#其他约束">其他约束</a>。</li>
         </ul>
-       INT8（quantType=7）例外：TND Q必须传入nullptr；BSND/BNSD仍为必传。</td>
+      </td>
       <td>INT32</td>
       <td>ND</td>
       <td>(B,)</td>
@@ -839,7 +839,7 @@ INT8计算中，`S=scaleValue×(Q_int8×K_int8ᵀ)×q_scale×k_scale`，`E=exp(S
 | pQuantScaleOptional | [1] | 未归一化指数权重E的量化乘数：P=clip(round_even(E×p_scale),0,127) |
 
 PA下K scale的第一维与K/V的物理页编号一致，两种PA布局均使用[numBlocks,kvHeadNum,128]。例如B=4、kvHeadNum=2、Sk=16384、D=64时，BSND/BNSD的K scale为[4,2,16384]，TND的K scale为[2,65536]，V scale均为[2,64]；使用128-token分页、共512个物理页时，K scale为[512,2,128]。
-INT8使用FP32 Softmax（`softmaxPrecision=0`）。PV结果乘V scale并除以P scale，最终用P量化前的指数权重E之和归一化；P的取整会引入量化误差。TND Q不接受`sequsedQOptional`，BSND/BNSD必须提供`sequsedQOptional`和`sequsedKvOptional`。支持`returnSoftmaxlse=0/1`；LSE基于QK反量化后的Softmax分数计算，不受P的INT8取整影响。
+INT8使用FP32 Softmax（`softmaxPrecision=0`）。PV结果乘V scale并除以P scale，最终用P量化前的指数权重E之和归一化；P的取整会引入量化误差。TND Q可通过`sequsedQOptional`指定各batch的有效长度，BSND/BNSD必须提供`sequsedQOptional`和`sequsedKvOptional`。支持`returnSoftmaxlse=0/1`；LSE基于QK反量化后的Softmax分数计算，不受P的INT8取整影响。
 
 <!-- npu="950" id17 -->
 下列量化配置按<term>Ascend 950PR&950DT系列产品</term>代际描述；当前可用quantType=0，<term>Ascend 950PR&950DT系列产品</term>上可选quantType=4、5、6或8；下表中1~3仅为预留配置。
