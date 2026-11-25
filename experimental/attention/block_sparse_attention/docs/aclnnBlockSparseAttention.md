@@ -187,7 +187,6 @@ aclnnStatus aclnnBlockSparseAttention(
       <td>×</td>
     </tr>
     <tr>
-    <tr>
       <td>blockShapeOptional</td>
       <td>输入</td>
       <td>稀疏块形状数组。</td>
@@ -208,6 +207,7 @@ aclnnStatus aclnnBlockSparseAttention(
       <td>1</td>
       <td>-</td>
     </tr>
+    <tr>
       <td>actualSeqLengthsOptional</td>
       <td>输入</td>
       <td>描述每个Batch对应的query序列长度。</td>
