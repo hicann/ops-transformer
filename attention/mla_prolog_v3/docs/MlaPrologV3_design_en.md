@@ -10,7 +10,7 @@ Against this background, the DeepSeek team proposed the Mla operator requirement
 
 Figure 1 Computation flow diagram:
 
-![MlaProlog computation flow diagram](../../../docs/zh/figures/mla_prolog_compute_flow.png)
+![MlaProlog computation flow diagram](../../../docs/en/figures/mla_prolog_compute_flow.png)
 
 The implementation follows the computation flow defined by Multi-Head Latent Attention. The overall computation flow is as follows:
 
@@ -55,7 +55,7 @@ Otherwise, the C side and the V side are likely to execute in a serial pipeline,
 
 Figure 2 Pipeline control diagram:
 
-![MlaProlog pipeline control diagram](../../../docs/zh/figures/mla_prolog_pipeline_control.png)
+![MlaProlog pipeline control diagram](../../../docs/en/figures/mla_prolog_pipeline_control.png)
 
 1. During MatmulCq computation, Hcq is split among cores, and a single core does not compute a complete token. Therefore, synchronization control between AIC and AIV (SYNC_MMCQ_NOMRCQ) is required before RmsNormCq computation.
 
@@ -234,7 +234,7 @@ Currently, two quantization types are included:
     $$
     where $Q_{max}$ is the maximum value of the quantized output type: INT8 uses 127, FLOAT8_E4M3FN uses 448, and HIFLOAT8 uses 32768. Outputs such as queryOut and queryNorm use this method. Smoothing makes the data smoother so that the data is easier to quantize, as shown in the following figure:
 
-    ![smooth concept](../../../docs/zh/figures/smooth_concept.png)
+    ![smooth concept](../../../docs/en/figures/smooth_concept.png)
 
   - Dynamic quantization (pergroup, mxfp8): Computes the scale with every 32 elements as a group. The scale is of the FLOAT8_E8M0 type. The corresponding formula is
     $$
@@ -430,11 +430,11 @@ PA scenario
 
   - Assume that the Token/sequence length in the Query is S1. A specific value in the second dimension of cacheIndex indicates the row of KVCache to which the KVCache obtained in this round of computation is to be updated. For example, 11 in the figure indicates that the update is to the position of row 11, which is located in Block2.
   - Figure 3 KVCacheScatter operation (PA scenario - ND format)
-  ![KVCacheScatter_PA_ND](../../../docs/zh/figures/KVCacheScatter_PA_ND.jpg)
+  ![KVCacheScatter_PA_ND](../../../docs/en/figures/KVCacheScatter_PA_ND.jpg)
 - KVCache uses NZ format storage, and its update process is shown in Figure 4. For the introduction to the fractal data format, see the guide [Data Layout Format](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/80RC3alpha003/devguide/opdevg/ascendcopdevg/atlas_ascendc_10_0104.html) on the official website.
   - Currently, when KVCache is stored in NZ format, the entire Block is stored in NZ format. Within a small block, the layout is row-major and shaped like the letter Z. Between blocks, the layout is column-major and shaped like the letter N. After the complete H (Hidden States) is divided into small blocks of 32B length, the small blocks that are stored contiguously in ND format need to be stored with a jump of $32B * BlockSize$ in NZ format, that is, the stride needs to be set to $32B * BlockSize$.
   - Figure 4 KVCacheScatter operation (PA scenario - NZ format)
-  ![PA_NZ](../../../docs/zh/figures/PA_NZ.jpg)
+  ![PA_NZ](../../../docs/en/figures/PA_NZ.jpg)
 
 ### KRCache
 
