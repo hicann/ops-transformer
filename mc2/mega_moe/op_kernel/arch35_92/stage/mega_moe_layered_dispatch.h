@@ -890,10 +890,14 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::EnsureDis
         Channel channel = comm_.GetChannel(relayRank);
         // 只使用独立 GM 快照，不覆盖尚待消费的 Gather 结果或批次 metadata。
         // Drain 确认本次 DMA 已完成；GmRead 绕过 Scalar DCache 读取最新标志。
-        do {
+        while (true) {
             comm_.ReadNbi(channel, snapshotAddr, readyAddr, sizeof(uint64_t));
             comm_.Drain(channel);
-        } while (GmRead(reinterpret_cast<__gm__ uint64_t*>(snapshotAddr)) == 0U);
+            if (GmRead(reinterpret_cast<__gm__ uint64_t*>(snapshotAddr)) != 0U) {
+                break;
+            }
+            BackoffBeforeGmPollRetry();
+        }
     }
     // 仅在等待成功后置位，后续专家和 wave 复用确认结果。
     dispatchSourceReadyBitsUb_[cacheWord] = readySources | cacheBit;

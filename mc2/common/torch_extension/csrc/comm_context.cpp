@@ -47,9 +47,10 @@ constexpr uint32_t MIX_CLOS_CHANNEL_PARTS = 2U;
 constexpr uint32_t MIX_CHANNEL_PARTS_TOTAL = 3U;
 
 enum class TopoType : uint32_t {
-    INTRA_SUPER_NODE = 0,     // 超节点内通信（默认）
-    CROSS_SUPER_NODE = 1,     // 跨超节点通信
-    CROSS_SUPER_NODE_UBX = 2, // UB域内UB_CTP，域间RoCE；可位于同一物理主机
+    INTRA_SUPER_NODE = 0,      // 超节点内通信（默认）
+    CROSS_SUPER_NODE = 1,      // 跨超节点通信
+    CROSS_SUPER_NODE_UBX = 2,  // UB域内UB_CTP，域间RoCE；可位于同一物理主机
+    CROSS_SUPER_NODE_UBOE = 3, // UB域内UB_CTP，域间UBoE
 };
 
 struct RankLinkInfo {
@@ -429,17 +430,25 @@ public:
 
         TORCH_CHECK(CheckIntraUbDomainProtocol(commHandle, layerList, layerNum, srcRankId), "Rank ", srcRankId,
                     " does not support UB_CTP with peers inside its UB domain");
-        if (CheckCrossUbDomainProtocols(commHandle, layerList, layerNum, srcRankId,
-                                        CommProtocol::COMM_PROTOCOL_UB_RTP)) {
+        // Each candidate must cover every remote peer; discard partial links before the next probe.
+        const auto intraDomainLinks = rankLinkMap_;
+        auto tryCrossProtocol = [&](CommProtocol candidate) {
+            rankLinkMap_ = intraDomainLinks;
+            if (!CheckCrossUbDomainProtocols(commHandle, layerList, layerNum, srcRankId, candidate) ||
+                rankLinkMap_.size() != rankSize - 1) {
+                rankLinkMap_ = intraDomainLinks;
+                return false;
+            }
             ValidateRankLinkMap(rankSize, srcRankId);
-            TORCH_CHECK(rankLinkMap_.size() == rankSize - 1, "Incomplete topology info for rank ", srcRankId,
-                        ", recorded ", rankLinkMap_.size(), " of ", rankSize - 1);
+            return true;
+        };
+        if (tryCrossProtocol(CommProtocol::COMM_PROTOCOL_UB_RTP)) {
             topoType_ = TopoType::CROSS_SUPER_NODE;
             ASCEND_LOGI("Cross-server confirmed, use UB_CTP inside UB domain and UBG across UB domains");
             return;
         }
 
-        // No cross-domain UBG link was found; try the UBX topology.
+        // RoCE and UBoE use single-channel Layered with contiguous ranks in each UB domain.
         if (!multiChannel_) {
             const uint32_t begin = srcRankId / rankNumPerUbDomain_ * rankNumPerUbDomain_;
             for (uint32_t peer = 0; peer < rankSize; ++peer) {
@@ -451,11 +460,14 @@ public:
                             "Layered requires Server-contiguous UB-domain group ranks, rank=", srcRankId,
                             " peer=", peer);
             }
-            if (CheckCrossUbDomainProtocols(commHandle, layerList, layerNum, srcRankId,
-                                            CommProtocol::COMM_PROTOCOL_ROCE) &&
-                rankLinkMap_.size() == rankSize - 1) {
-                ValidateRankLinkMap(rankSize, srcRankId);
+            if (tryCrossProtocol(CommProtocol::COMM_PROTOCOL_ROCE)) {
                 topoType_ = TopoType::CROSS_SUPER_NODE_UBX;
+                ASCEND_LOGI("Cross-server confirmed, use UB_CTP inside UB domain and RoCE across UB domains");
+                return;
+            }
+            if (tryCrossProtocol(CommProtocol::COMM_PROTOCOL_UBOE)) {
+                topoType_ = TopoType::CROSS_SUPER_NODE_UBOE;
+                ASCEND_LOGI("Cross-server confirmed, use UB_CTP inside UB domain and UBoE across UB domains");
                 return;
             }
         }
@@ -917,8 +929,8 @@ public:
         return {protocol, netLayerList[HCCL_COMM_LAYERS_UB_MEM]};
     }
 
-    void AcquireUbxChannels(const HcclComm& commHandle, const CommEngine& engine,
-                            std::vector<HcclChannelDesc>& channelDesc, ChannelHandle* channels)
+    void AcquireChannelsByProtocol(const HcclComm& commHandle, const CommEngine& engine,
+                                   std::vector<HcclChannelDesc>& channelDesc, ChannelHandle* channels)
     {
         std::vector<CommProtocol> protocols;
         for (const auto& desc : channelDesc) {
@@ -969,8 +981,8 @@ public:
 
             InitHcclChannel(commHandle, rankDim, srcRankId, 1U, protocol, channelDesc);
 
-            if (topoType_ == TopoType::CROSS_SUPER_NODE_UBX) {
-                AcquireUbxChannels(commHandle, engine, channelDesc, commContextStruct->hcommHandle_);
+            if (topoType_ == TopoType::CROSS_SUPER_NODE_UBX || topoType_ == TopoType::CROSS_SUPER_NODE_UBOE) {
+                AcquireChannelsByProtocol(commHandle, engine, channelDesc, commContextStruct->hcommHandle_);
             } else {
                 auto ret = HcclChannelAcquireFunc(commHandle, engine, channelDesc.data(), channelNum,
                                                   commContextStruct->hcommHandle_);

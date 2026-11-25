@@ -56,7 +56,7 @@ static ge::graphStatus CheckAndSetUrmaDedupMode(int64_t combineCommMode, MegaMoe
 {
     OP_TILING_CHECK(combineCommMode != COMBINE_COMM_MODE_NO_DEDUP && combineCommMode != COMBINE_COMM_MODE_SERVER_DEDUP,
                     OP_LOGE_FOR_INVALID_VALUE(nodeName, "combine_comm_mode", std::to_string(combineCommMode).c_str(),
-                                              "0 or 2 on Layered topology (topo_type=1 or 2)"),
+                                              "0 or 2 on Layered topology (topo_type=1, 2 or 3)"),
                     return ge::GRAPH_FAILED);
     OP_TILING_CHECK(combineCommMode == COMBINE_COMM_MODE_SERVER_DEDUP &&
                         tilingData->combineQuantMode != COMBINE_QUANT_OUT_TYPE_NO_QUANT,
@@ -121,7 +121,7 @@ static ge::graphStatus CheckAndSetDedupMode(const gert::TilingContext* context, 
         return CheckAndSetMteDedupMode(context, config, combineCommMode, tilingData, nodeName);
     }
     OP_LOGE_FOR_INVALID_VALUE(nodeName, "topo_type", std::to_string(tilingData->compute.topoType).c_str(),
-                              "MTE(0), URMA(1) or UBX(2)");
+                              "MTE(0), URMA(1), UBX(2) or UBoE(3)");
     return ge::GRAPH_FAILED;
 }
 

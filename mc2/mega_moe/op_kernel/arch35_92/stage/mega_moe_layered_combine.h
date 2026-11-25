@@ -113,9 +113,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::CombineTo
         uint32_t syncSlotCount = 0;
         GetGroupSyncSlotRange(targetGroup, slotLayout, firstSyncSlot, syncSlotCount);
         __gm__ int32_t* counterAddr = GetCombineSyncCounterAddress(expertCounterBase, firstSyncSlot);
-        if (GmRead(counterAddr) < static_cast<int32_t>(nTilesPerGroup)) {
-            continue;
-        }
+        WaitUntilGmFlagAtLeast(counterAddr, static_cast<int32_t>(nTilesPerGroup));
 
         uint32_t groupEndRow = (targetGroup + 1U) * L1_TILE_M_256;
         groupEndRow = groupEndRow < mExpert ? groupEndRow : mExpert;

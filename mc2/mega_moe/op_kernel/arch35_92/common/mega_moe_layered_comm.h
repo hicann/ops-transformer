@@ -28,6 +28,9 @@ constexpr uint32_t LAYERED_URMA_WRITE_CHUNK_BYTES = LAYERED_URMA_WRITE_BYTES_LIM
 #if defined(ENABLE_MEGA_MOE_LAYERED_ROCE_KERNEL)
 constexpr uint32_t LAYERED_ROCE_WRITE_BYTES_LIMIT = uint32_t(1) << 31U;
 constexpr uint32_t LAYERED_ROCE_WRITE_CHUNK_BYTES = LAYERED_ROCE_WRITE_BYTES_LIMIT - 512U;
+// UBoE 与 URMA 使用相同的写入分块大小。
+constexpr uint32_t LAYERED_UBOE_WRITE_BYTES_LIMIT = LAYERED_URMA_WRITE_BYTES_LIMIT;
+constexpr uint32_t LAYERED_UBOE_WRITE_CHUNK_BYTES = LAYERED_URMA_WRITE_CHUNK_BYTES;
 #endif
 
 // 两种 Layered 通信策略共用的 URMA 写配置。
@@ -341,6 +344,159 @@ private:
     uint32_t batchBufferBytes_ = 0U;
     Hcomm<COMM_PROTOCOL_UB_CTP> urma_;
     Hcomm<COMM_PROTOCOL_ROCE> roce_;
+};
+
+// UB 域内使用 URMA（UB_CTP），跨 UB 域使用 AIV 直驱 UBoE。
+class LayeredUboeComm {
+public:
+    struct Channel {
+        ChannelHandle native{};
+        bool uboe = false;
+    };
+    struct BatchHandle {
+        AscendC::BatchHandle<ChannelHandle> native{};
+        bool uboe = false;
+    };
+    __aicore__ inline LayeredUboeComm(__gm__ Mc2Aclnn::Mc2MoeContext* context)
+        : ctx_(context),
+          rank_(context->epRankId),
+          rankNumPerServer_(context->rankSizePerServer),
+          serverId_(rank_ / rankNumPerServer_)
+    {}
+    __aicore__ inline int32_t Init(const LocalTensor<uint8_t>& scratch, uint32_t bytes)
+    {
+        const int32_t urmaRet = urma_.Init(scratch, bytes);
+        const int32_t uboeRet = uboe_.Init(scratch, bytes);
+        return urmaRet != HCOMM_SUCCESS ? urmaRet : uboeRet;
+    }
+    __aicore__ inline Channel GetChannel(uint32_t peer) const
+    {
+        // 保存 peer 所属域，后续调用据此选择通信协议。
+        return {ctx_->hcommHandle_[peer > rank_ ? peer - 1 : peer], peer / rankNumPerServer_ != serverId_};
+    }
+    __aicore__ inline int32_t Lock(Channel ch)
+    {
+        return ch.uboe ? uboe_.Lock(ch.native) : urma_.Lock(ch.native);
+    }
+    __aicore__ inline int32_t Unlock(Channel ch)
+    {
+        return ch.uboe ? uboe_.Unlock(ch.native) : urma_.Unlock(ch.native);
+    }
+    /*
+     * 两种协议共用本核固定的批量描述符工作区，不改变各自的 Init 临时区。
+     */
+    __aicore__ inline void BindBatchBuffer(const LocalTensor<uint8_t>& buffer, uint32_t bytes)
+    {
+        batchBuffer_ = buffer;
+        batchBufferBytes_ = bytes;
+    }
+
+    /*
+     * 为目标通道及远端注册内存新建批量句柄。
+     */
+    __aicore__ inline BatchHandle MakeBatchHandle(Channel ch, GM_ADDR remote)
+    {
+        BatchHandle b{};
+        b.uboe = ch.uboe;
+        // 批量句柄只需指定远端注册内存。
+        b.native = b.uboe ? uboe_.MakeBatchHandle(ch.native, batchBuffer_, batchBufferBytes_, remote) :
+                            urma_.MakeBatchHandle(ch.native, batchBuffer_, batchBufferBytes_, remote);
+        return b;
+    }
+    __aicore__ inline int32_t WriteNbi(Channel ch, GM_ADDR dst, GM_ADDR src, uint64_t bytes)
+    {
+        return ch.uboe ? uboe_.WriteNbi(ch.native, dst, src, bytes) : urma_.WriteNbi(ch.native, dst, src, bytes);
+    }
+    // 自动拆分超长连续写，不等待完成；完成依赖仍由调用方通过 Drain 建立。
+    __aicore__ inline void WriteNbiChunked(Channel channel, GM_ADDR dst, GM_ADDR src, uint64_t bytes)
+    {
+        const uint64_t bytesLimit = channel.uboe ? LAYERED_UBOE_WRITE_BYTES_LIMIT : LAYERED_URMA_WRITE_BYTES_LIMIT;
+        const uint32_t maxChunkBytes = channel.uboe ? LAYERED_UBOE_WRITE_CHUNK_BYTES : LAYERED_URMA_WRITE_CHUNK_BYTES;
+        while (bytes != 0U) {
+            const uint64_t chunkBytes = bytes < bytesLimit ? bytes : maxChunkBytes;
+            WriteNbi(channel, dst, src, chunkBytes);
+            dst += chunkBytes;
+            src += chunkBytes;
+            bytes -= chunkBytes;
+        }
+    }
+
+    /*
+     * 与普通 channel 使用相同分段规则，弱保序追加请求并在满批时 Commit；不等待通信完成。
+     * 返回未提交尾批的请求数，可继续追加下一段；调用方负责尾批提交及最终 ready 通知。
+     */
+    __aicore__ inline uint32_t WriteRelaxedNbiChunked(BatchHandle& batch, GM_ADDR dst, GM_ADDR src, uint64_t bytes,
+                                                      uint32_t pendingWqes = 0U)
+    {
+        const uint64_t bytesLimit = batch.uboe ? LAYERED_UBOE_WRITE_BYTES_LIMIT : LAYERED_URMA_WRITE_BYTES_LIMIT;
+        const uint32_t maxChunkBytes = batch.uboe ? LAYERED_UBOE_WRITE_CHUNK_BYTES : LAYERED_URMA_WRITE_CHUNK_BYTES;
+        const uint32_t maxWqes = batchBufferBytes_ / HCOMM_BATCH_WQE_BYTES;
+        while (bytes != 0U) {
+            const uint32_t chunkBytes = static_cast<uint32_t>(bytes < bytesLimit ? bytes : maxChunkBytes);
+            WriteRelaxedNbi(batch, dst, src, chunkBytes);
+            if (++pendingWqes == maxWqes) {
+                BatchCommit(batch);
+                pendingWqes = 0U;
+            }
+            dst += chunkBytes;
+            src += chunkBytes;
+            bytes -= chunkBytes;
+        }
+        return pendingWqes;
+    }
+
+    __aicore__ inline int32_t WriteNbi(BatchHandle& b, GM_ADDR dst, GM_ADDR src, uint32_t bytes)
+    {
+        return b.uboe ? uboe_.WriteNbi(b.native, dst, src, bytes) : urma_.WriteNbi(b.native, dst, src, bytes);
+    }
+    // Server combine 归并只向域内 peer 写入。
+    __aicore__ inline int32_t WriteWithNotifyNbi(BatchHandle& b, GM_ADDR dst, GM_ADDR src, uint32_t bytes,
+                                                 GM_ADDR notifyAddr, uint64_t notifyValue)
+    {
+        return urma_.WriteWithNotifyNbi(b.native, dst, src, bytes, notifyAddr, notifyValue);
+    }
+    __aicore__ inline int32_t WriteRelaxedNbi(BatchHandle& b, GM_ADDR dst, GM_ADDR src, uint32_t bytes)
+    {
+        return b.uboe ? uboe_.WriteNbi<LAYERED_RELAXED_WRITE_WQE_CONFIG>(b.native, dst, src, bytes) :
+                        urma_.WriteNbi<LAYERED_RELAXED_WRITE_WQE_CONFIG>(b.native, dst, src, bytes);
+    }
+    __aicore__ inline int32_t WriteStrongNbiWithCqe(BatchHandle& b, GM_ADDR dst, GM_ADDR src, uint32_t bytes)
+    {
+        // 尾写使用强保序并生成 CQE，供 Drain 等待此前的写入完成。
+        return b.uboe ? uboe_.WriteNbi<LAYERED_STRONG_COMPLETION_WRITE_WQE_CONFIG>(b.native, dst, src, bytes) :
+                        urma_.WriteNbi<LAYERED_STRONG_COMPLETION_WRITE_WQE_CONFIG>(b.native, dst, src, bytes);
+    }
+    __aicore__ inline int32_t ReadNbi(Channel ch, GM_ADDR dst, GM_ADDR src, uint64_t bytes)
+    {
+        return ch.uboe ? uboe_.ReadNbi(ch.native, dst, src, bytes) : urma_.ReadNbi(ch.native, dst, src, bytes);
+    }
+    __aicore__ inline int32_t ReadNbi(BatchHandle& b, GM_ADDR dst, GM_ADDR src, uint32_t bytes)
+    {
+        return b.uboe ? uboe_.ReadNbi(b.native, dst, src, bytes) : urma_.ReadNbi(b.native, dst, src, bytes);
+    }
+    __aicore__ inline int32_t BatchCommit(BatchHandle& b)
+    {
+        return b.uboe ? uboe_.BatchCommit(b.native) : urma_.BatchCommit(b.native);
+    }
+    __aicore__ inline int32_t Drain(BatchHandle& b)
+    {
+        return b.uboe ? uboe_.Drain(b.native) : urma_.Drain(b.native);
+    }
+
+    __aicore__ inline int32_t Drain(Channel ch)
+    {
+        return ch.uboe ? uboe_.Drain(ch.native) : urma_.Drain(ch.native);
+    }
+
+private:
+    __gm__ Mc2Aclnn::Mc2MoeContext* ctx_;
+    uint32_t rank_;
+    const uint32_t rankNumPerServer_;
+    const uint32_t serverId_;
+    LocalTensor<uint8_t> batchBuffer_;
+    uint32_t batchBufferBytes_ = 0U;
+    Hcomm<COMM_PROTOCOL_UB_CTP> urma_;
+    Hcomm<COMM_PROTOCOL_UBOE> uboe_;
 };
 
 #endif // ENABLE_MEGA_MOE_LAYERED_ROCE_KERNEL

@@ -107,6 +107,7 @@ constexpr int64_t PEERMEM_SYNC_SLOT_SIZE = static_cast<int64_t>(MemoryLayoutDeta
 constexpr int64_t TOPO_TYPE_MTE = 0U;
 constexpr int64_t TOPO_TYPE_URMA = 1U;
 constexpr int64_t TOPO_TYPE_URMA_ROCE = 2U;
+constexpr int64_t TOPO_TYPE_UBOE = 3U;
 
 HOST_DEVICE constexpr bool IsW4GmmMode(uint8_t gmmMode)
 {
@@ -135,7 +136,7 @@ HOST_DEVICE constexpr int64_t GetActivationOutputWidth(int64_t hiddenDim, uint8_
 
 HOST_DEVICE constexpr bool IsLayeredTopology(int64_t topo)
 {
-    return topo == TOPO_TYPE_URMA || topo == TOPO_TYPE_URMA_ROCE;
+    return topo == TOPO_TYPE_URMA || topo == TOPO_TYPE_URMA_ROCE || topo == TOPO_TYPE_UBOE;
 }
 
 HOST_DEVICE constexpr int64_t CalcUrmaRankSyncSize(int64_t epWorldSize)

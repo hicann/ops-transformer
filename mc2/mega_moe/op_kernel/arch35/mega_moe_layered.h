@@ -893,7 +893,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::CrossRank
         }
         Channel channel = comm_.GetChannel(rankIndex);
         auto syncCheck = syncRank + rankIndex * 16;
-        GmSignalWaitBarrier(syncCheck, syncRound);
+        WaitUntilGmFlagEquals(syncCheck, syncRound);
         // 等待完成后释放通道锁：复用调用方已持有的锁时由本函数统一释放，否则释放本函数取得的锁。
         comm_.Drain(channel);
         comm_.Unlock(channel);

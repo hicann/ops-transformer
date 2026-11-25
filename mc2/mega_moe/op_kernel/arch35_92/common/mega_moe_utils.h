@@ -357,15 +357,6 @@ __aicore__ inline uint64_t GetExpertCountWorkspaceOffset(const BlockWorkspaceCon
            static_cast<uint64_t>(INT32_PER_256B) * workspace.blockIdx;
 }
 
-__aicore__ inline void GmSignalWaitBarrier(__gm__ int32_t* sigAddr, int32_t compareValue)
-{
-    do {
-        if (GmRead(sigAddr) == compareValue) {
-            return;
-        }
-    } while (true);
-}
-
 __aicore__ inline uint64_t GetUrmaCommHandle(__gm__ Mc2MoeContext* mc2Context, uint32_t rankId, uint32_t epRankId)
 {
     uint32_t index = rankId > epRankId ? rankId - 1U : rankId;
@@ -461,15 +452,22 @@ __aicore__ inline uint32_t AdvanceExpertTokenPositionInWave(uint32_t expertToken
     return sliceTokenCount;
 }
 
-// 轮询 GM 中的 ready flag，并在两次读取之间加入短暂退避。
-template <typename FlagType>
-__aicore__ inline void WaitUntilGmFlagIsNonZero(__gm__ FlagType* flagAddr)
+__aicore__ inline void BackoffBeforeGmPollRetry()
 {
-    while (GmRead(flagAddr) == 0) {
-        int64_t startCycle = GetDeviceCycle();
-        while (GetDeviceCycle() - startCycle < GM_FLAG_POLL_BACKOFF_CYCLES) {
-        }
+    const int64_t startCycle = GetDeviceCycle();
+    while (GetDeviceCycle() - startCycle < GM_FLAG_POLL_BACKOFF_CYCLES) {
     }
+}
+
+// 返回首次观察到的非零值，供携带计数的 ready flag 直接使用。
+template <typename FlagType>
+__aicore__ inline FlagType WaitUntilGmFlagIsNonZero(__gm__ FlagType* flagAddr)
+{
+    FlagType value;
+    while ((value = GmRead(flagAddr)) == 0) {
+        BackoffBeforeGmPollRetry();
+    }
+    return value;
 }
 
 /*
@@ -536,7 +534,9 @@ __aicore__ inline int32_t CrossRankHandshakeInWorldSize(GM_ADDR rankSyncInWorldP
     for (uint32_t rankIdx = syncJob.jobIndex; rankIdx < worldSize; rankIdx += syncJob.totalJobs) {
         auto* remoteSyncAddr = reinterpret_cast<__gm__ int32_t*>(g_winRankAddr_[rankIdx]) + rankId * INT_CACHELINE;
         GmWrite(remoteSyncAddr, count);
-        GmSignalWaitBarrier(syncRank + rankIdx * INT_CACHELINE, count);
+        auto* localSyncAddr = syncRank + rankIdx * INT_CACHELINE;
+        while (GmRead(localSyncAddr) != count) {
+        }
     }
     GmWrite(syncCount, count);
     /*

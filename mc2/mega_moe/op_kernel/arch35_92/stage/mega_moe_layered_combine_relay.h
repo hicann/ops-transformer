@@ -82,9 +82,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::BuildServ
     for (uint32_t originServer = blockIdx_; originServer < serverNum_; originServer += blockNum_) {
         auto tokenCountAddr = reinterpret_cast<__gm__ uint64_t*>(peermem.dispatchFlag.get_ptr(commBuffer) +
                                                                  RelayFlagOffset(originServer, maxTokensPerRank));
-        uint64_t encodedTokenCount = 0U;
-        while ((encodedTokenCount = GmRead(tokenCountAddr)) == 0U) {
-        }
+        const uint64_t encodedTokenCount = WaitUntilGmFlagIsNonZero(tokenCountAddr);
         const uint32_t expectedTokenCount = static_cast<uint32_t>(encodedTokenCount - 1U);
         auto tokenListPtr =
             reinterpret_cast<__gm__ int32_t*>(workspace.urma.serverCombine.tokenIds.get_ptr(buffer) +
@@ -117,6 +115,9 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::BuildServ
                                static_cast<uint32_t>(selectedTokenCount * sizeof(uint32_t)));
                     collectedTokenCount += static_cast<uint32_t>(selectedTokenCount);
                 }
+            }
+            if (collectedTokenCount != expectedTokenCount) {
+                BackoffBeforeGmPollRetry();
             }
         }
         // 重扫时由 MTE3_V 保护输出缓冲复用，仅发布行头前等待全部列表搬出。
@@ -184,10 +185,7 @@ __aicore__ inline uint64_t MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::WaitF
         auto tokenListPtr =
             reinterpret_cast<__gm__ int32_t*>(workspace.urma.serverCombine.tokenIds.get_ptr(buffer) +
                                               static_cast<uint64_t>(originServer) * tokenListStrideBytes);
-        int32_t encodedCount;
-        do {
-            encodedCount = GmRead(tokenListPtr);
-        } while (encodedCount == 0);
+        const int32_t encodedCount = WaitUntilGmFlagIsNonZero(tokenListPtr);
         const uint32_t count = static_cast<uint32_t>(encodedCount - 1);
         tokenCountsTensor.SetValue(originServer, count);
         totalTokenCount += count;
@@ -313,6 +311,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::ReduceRel
     // 整批搬入并比较所有 token 的 ready，全部到齐后再按列表顺序归约。
     while (!IsServerContributionsReady(originServer, tokenIdsTensor, expectedTopkBitmapsTensor, batchRange.count,
                                        workUbOffset)) {
+        BackoffBeforeGmPollRetry();
     }
     SelectRuntimeBool(
         params_.tilingData->isTopkWeightsPrefetch, [&](auto prefetchTag) __attribute__((always_inline, cce_aicore)) {
@@ -421,10 +420,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendServe
         auto tokenListPtr = reinterpret_cast<__gm__ int32_t*>(workspace.urma.serverCombine.tokenIds.get_ptr(buffer) +
                                                               static_cast<uint64_t>(targetServer) *
                                                                   CalcServerCombineTokenListStrideBytes(capacity));
-        int32_t encodedCount;
-        do {
-            encodedCount = GmRead(tokenListPtr);
-        } while (encodedCount == 0);
+        const int32_t encodedCount = WaitUntilGmFlagIsNonZero(tokenListPtr);
         const uint32_t count = static_cast<uint32_t>(encodedCount - 1);
         if (count == 0U) {
             continue;
@@ -432,8 +428,7 @@ __aicore__ inline void MegaMoeLayered<TemplateMegaMoeLayeredTypeFunc>::SendServe
         auto completedCountPtr =
             reinterpret_cast<__gm__ int32_t*>(workspace.urma.serverCombine.completedCounts.get_ptr(buffer) +
                                               static_cast<uint64_t>(targetServer) * INT_CACHELINE * sizeof(int32_t));
-        while (GmRead(completedCountPtr) != static_cast<int32_t>(count)) {
-        }
+        WaitUntilGmFlagEquals(completedCountPtr, static_cast<int32_t>(count));
         __gm__ uint32_t* tokenIdsGlobalTensor = nullptr;
         tokenIdsGlobalTensor = reinterpret_cast<__gm__ uint32_t*>(tokenListPtr + TOKEN_LIST_HEADER_ELEMENTS);
         SendRelayResultsToTargetRank(targetServer, targetRank, count, BATCH_TOKENS, tokenIdsGlobalTensor,

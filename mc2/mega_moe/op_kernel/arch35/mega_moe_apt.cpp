@@ -120,7 +120,15 @@ __global__ __aicore__ void mega_moe(GM_ADDR context, GM_ADDR x, GM_ADDR topkIds,
 #if defined(ENABLE_MEGA_MOE_LAYERED_KERNEL) && (ORIG_DTYPE_X == DT_BF16)
         if (tilingData.dispatchQuantMode == DISPATCH_QUANT_MODE_MXFP) {
 #if defined(ENABLE_MEGA_MOE_LAYERED_ROCE_KERNEL)
-            if (tilingData.compute.topoType == MegaMoeImpl::TOPO_TYPE_URMA_ROCE) {
+            if (tilingData.compute.topoType == MegaMoeImpl::TOPO_TYPE_UBOE) {
+                MegaMoeImpl::MegaMoeLayered<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType,
+                                            FORMAT_WEIGHT1, FORMAT_WEIGHT2, MegaMoeImpl::LayeredUboeComm>
+                    op(context);
+                op.Init(x, topkIds, topkWeights, weight1, weight2, xActiveMask, weightScales1, weightScales2, scales,
+                        sharedWeight1, sharedWeight2, sharedWeightScales1, sharedWeightScales2, yOut,
+                        expertTokenNumsOut, workspaceGM, &tilingData);
+                op.Process();
+            } else if (tilingData.compute.topoType == MegaMoeImpl::TOPO_TYPE_URMA_ROCE) {
                 MegaMoeImpl::MegaMoeLayered<DTYPE_X, DTYPE_Y, DTYPE_TOPK_WEIGHTS, DTYPE_WEIGHT1, DispatchQuantOutType,
                                             FORMAT_WEIGHT1, FORMAT_WEIGHT2, MegaMoeImpl::LayeredUbxComm>
                     op(context);

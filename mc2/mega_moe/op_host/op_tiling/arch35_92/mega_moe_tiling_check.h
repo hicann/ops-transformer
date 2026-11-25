@@ -1873,10 +1873,10 @@ static ge::graphStatus CheckAndSetTopoType(const gert::TilingContext* context, c
                                            MegaMoeTilingData* tilingData, const char* nodeName)
 {
     int64_t topoType = *context->GetAttrs()->GetAttrPointer<int64_t>(config.attrTopoTypeIndex);
-    OP_TILING_CHECK(
-        topoType != TOPO_TYPE_MTE && !IsLayeredTopology(topoType),
-        OP_LOGE_FOR_INVALID_VALUE(nodeName, "topo_type", std::to_string(topoType).c_str(), "MTE(0), URMA(1) or UBX(2)"),
-        return ge::GRAPH_FAILED);
+    OP_TILING_CHECK(topoType != TOPO_TYPE_MTE && !IsLayeredTopology(topoType),
+                    OP_LOGE_FOR_INVALID_VALUE(nodeName, "topo_type", std::to_string(topoType).c_str(),
+                                              "MTE(0), URMA(1), UBX(2) or UBoE(3)"),
+                    return ge::GRAPH_FAILED);
     tilingData->compute.topoType = topoType;
     return ge::GRAPH_SUCCESS;
 }
