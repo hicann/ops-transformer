@@ -988,18 +988,24 @@ void QuantLightningIndexerV2MetadataCpuKernel::AssignByBlock(const SplitContext&
         curCost = assignContext.s1GCache.s1GLastBlockCost;
     }
 
-    // (costLimit - curCostOnCore) * FA_TOLERANCE_RATIO > curCost；至少分配1块
-    while (IsWithinTolerance(assignContext.coreCache.costLimit, curCost / FA_TOLERANCE_RATIO,
-                             assignContext.coreCache.cost + curCost)) {
-        assignContext.coreCache.cost += curCost;
-        assignContext.coreCache.block++;
-        assignContext.curS2Idx++;
-        // 当前batch被分配一块出去，更新剩余负载
-        assignContext.bN2Cost = assignContext.bN2Cost - curCost;
-        // 当前行被分配一块出去，更新剩余负载
-        assignContext.s1GCache.s1GCost = assignContext.s1GCache.s1GCost - curCost;
-        assignContext.bN2Block--;
-        assignContext.s1GCache.s1GBlock--;
+    // A scheduled non-empty tile has positive cost; keep division guarded.
+    if (curCost <= 0) {
+        return;
+    }
+
+    // Calculate how many blocks can be assigned within the current tolerance.
+    const int64_t remainCapacity =
+        assignContext.coreCache.costLimit + curCost / FA_TOLERANCE_RATIO - assignContext.coreCache.cost;
+    if (remainCapacity >= curCost) {
+        const auto allocBlocks = static_cast<decltype(assignContext.coreCache.block)>(remainCapacity / curCost);
+        const int64_t totalAllocCost = curCost * allocBlocks;
+        assignContext.coreCache.cost += totalAllocCost;
+        assignContext.coreCache.block += allocBlocks;
+        assignContext.curS2Idx += allocBlocks;
+        assignContext.bN2Cost -= totalAllocCost;
+        assignContext.s1GCache.s1GCost -= totalAllocCost;
+        assignContext.bN2Block -= allocBlocks;
+        assignContext.s1GCache.s1GBlock -= allocBlocks;
     }
 }
 
