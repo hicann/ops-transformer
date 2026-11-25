@@ -21,13 +21,44 @@
 namespace optiling {
 
 // Constants
-constexpr uint32_t AIC_CORE_MAX_NUM = 80;
-constexpr uint32_t AIV_CORE_MAX_NUM = 80;
-constexpr uint32_t LI_V2_METADATA_TOTAL_SIZE = 2048;
+// Fast payload stays immediately after the dynamic core records.
+inline constexpr uint32_t LI_V2_METADATA_FAST_WORDS = 2U + 36U * 4U;
+inline constexpr uint32_t LI_V2_METADATA_ALIGNMENT = 1024U;
+
 using LI_V2_METADATA_T = int32_t;
 
 inline constexpr uint32_t LI_V2_METADATA_SIZE = 8;
 inline constexpr uint32_t LD_V2_METADATA_SIZE = 8;
+
+// 扩展区起点由实际核数确定，与调用方分配的缓冲区总长度无关
+#ifdef __CCE_AICORE__
+__aicore__ inline constexpr uint64_t GetLiV2MetadataExtensionOffset(uint32_t aicNum, uint32_t aivNum)
+#else
+inline constexpr uint64_t GetLiV2MetadataExtensionOffset(uint32_t aicNum, uint32_t aivNum)
+#endif
+{
+    return static_cast<uint64_t>(aicNum) * LI_V2_METADATA_SIZE + static_cast<uint64_t>(aivNum) * LD_V2_METADATA_SIZE;
+}
+
+#ifdef __CCE_AICORE__
+__aicore__ inline constexpr uint64_t GetLiV2MetadataSize(uint32_t aicNum, uint32_t aivNum)
+#else
+inline constexpr uint64_t GetLiV2MetadataSize(uint32_t aicNum, uint32_t aivNum)
+#endif
+{
+    const uint64_t usedSize = GetLiV2MetadataExtensionOffset(aicNum, aivNum);
+    return (usedSize + LI_V2_METADATA_ALIGNMENT - 1U) / LI_V2_METADATA_ALIGNMENT * LI_V2_METADATA_ALIGNMENT;
+}
+
+// Capacity available to fast payloads without extending the aligned output.
+#ifdef __CCE_AICORE__
+__aicore__ inline constexpr uint64_t GetLiV2MetadataExtensionCapacity(uint32_t aicNum, uint32_t aivNum)
+#else
+inline constexpr uint64_t GetLiV2MetadataExtensionCapacity(uint32_t aicNum, uint32_t aivNum)
+#endif
+{
+    return GetLiV2MetadataSize(aicNum, aivNum) - GetLiV2MetadataExtensionOffset(aicNum, aivNum);
+}
 
 // LI Metadata Index Definitions
 inline constexpr uint32_t LI_V2_CORE_ENABLE_INDEX = 0;
@@ -41,8 +72,9 @@ inline constexpr uint32_t LI_V2_FIRST_LD_V2_DATA_WORKSPACE_IDX_INDEX = 7;
 
 // Fast metadata is produced and consumed by the same package version.
 inline constexpr uint32_t LI_V2_FAST_CORE_MAX_NUM = 32U;
-inline constexpr uint32_t LI_V2_FAST_METADATA_OFFSET =
-    LI_V2_METADATA_SIZE * AIC_CORE_MAX_NUM + LD_V2_METADATA_SIZE * AIV_CORE_MAX_NUM;
+inline constexpr uint32_t FAST_ARCH22_CORE_MAX_NUM = 36U;
+// Fast indices are relative to the dynamic extension area.
+inline constexpr uint32_t LI_V2_FAST_METADATA_OFFSET = 0U;
 inline constexpr uint32_t LI_V2_FAST_ENABLE_INDEX = LI_V2_FAST_METADATA_OFFSET;
 inline constexpr uint32_t LI_V2_FAST_CORE_NUM_INDEX = LI_V2_FAST_METADATA_OFFSET + 1U;
 // The fast header contains two uint32_t words: enable and coreNum.
@@ -74,10 +106,10 @@ inline constexpr uint32_t LD_V2_M_NUM_INDEX = 6;
  * @return 返回属性的绝对索引
  */
 #ifdef __CCE_AICORE__
-__aicore__ inline uint32_t GetAttrAbsIndex(uint32_t coreIdx, uint32_t metaIdx, bool isAIV = false)
+__aicore__ inline uint32_t GetAttrAbsIndex(uint32_t coreIdx, uint32_t metaIdx, uint32_t aicNum, bool isAIV = false)
 {
     if (isAIV) {
-        return LI_V2_METADATA_SIZE * AIC_CORE_MAX_NUM + LD_V2_METADATA_SIZE * coreIdx + metaIdx;
+        return LI_V2_METADATA_SIZE * aicNum + LD_V2_METADATA_SIZE * coreIdx + metaIdx;
     } else {
         return LI_V2_METADATA_SIZE * coreIdx + metaIdx;
     }
@@ -96,28 +128,14 @@ struct LiV2FastMetadataArch22 {
     uint32_t enable;
     uint32_t coreNum;
     // Whole Q tiles own all visible K blocks, so K boundaries need no storage.
-    uint32_t coreInfo[AIC_CORE_MAX_NUM][LI_V2_FAST_CORE_INFO_SIZE];
-};
-
-struct LiV2Metadata {
-    uint32_t liV2Metadata[AIC_CORE_MAX_NUM][LI_V2_METADATA_SIZE];
-    uint32_t ldV2Metadata[AIV_CORE_MAX_NUM][LD_V2_METADATA_SIZE];
-    LiV2FastMetadata fastMetadata;
-};
-
-// AICPU 按 SoC 将同一输出地址转换为对应类型，两种格式的 Fast 区起始偏移保持一致
-struct LiV2MetadataArch22 {
-    uint32_t liV2Metadata[AIC_CORE_MAX_NUM][LI_V2_METADATA_SIZE];
-    uint32_t ldV2Metadata[AIV_CORE_MAX_NUM][LD_V2_METADATA_SIZE];
-    LiV2FastMetadataArch22 fastMetadata;
+    uint32_t coreInfo[FAST_ARCH22_CORE_MAX_NUM][LI_V2_FAST_CORE_INFO_SIZE];
 };
 }; // namespace detail
 
-static_assert(sizeof(detail::LiV2Metadata) == (LI_V2_FAST_TILE_END_INDEX + LI_V2_FAST_CORE_MAX_NUM) * sizeof(uint32_t));
-static_assert(sizeof(detail::LiV2MetadataArch22) ==
-              (LI_V2_FAST_CORE_INFO_INDEX + AIC_CORE_MAX_NUM * LI_V2_FAST_CORE_INFO_SIZE) * sizeof(uint32_t));
-static_assert(LI_V2_METADATA_TOTAL_SIZE * sizeof(LI_V2_METADATA_T) >= sizeof(detail::LiV2Metadata));
-static_assert(LI_V2_METADATA_TOTAL_SIZE * sizeof(LI_V2_METADATA_T) >= sizeof(detail::LiV2MetadataArch22));
+static_assert(sizeof(detail::LiV2FastMetadata) ==
+              (LI_V2_FAST_TILE_END_INDEX + LI_V2_FAST_CORE_MAX_NUM) * sizeof(uint32_t));
+static_assert(sizeof(detail::LiV2FastMetadata) <= LI_V2_METADATA_FAST_WORDS * sizeof(uint32_t));
+static_assert(sizeof(detail::LiV2FastMetadataArch22) <= LI_V2_METADATA_FAST_WORDS * sizeof(uint32_t));
 }; // namespace optiling
 
-#endif
+#endif // LIGHTNING_INDEXER_V2_METADATA_H

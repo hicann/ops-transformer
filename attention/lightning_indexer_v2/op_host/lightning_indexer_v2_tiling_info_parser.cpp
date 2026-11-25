@@ -17,6 +17,7 @@
 
 #include "checkers/checker_adapter_lightning_indexer_v2.h"
 #include "checkers/liv2_checker.h"
+#include "../op_kernel/lightning_indexer_v2_metadata.h"
 
 namespace optiling {
 namespace {
@@ -170,6 +171,15 @@ ge::graphStatus ParseAndCheckLIV2Arch35(gert::TilingContext* context, LIV2Tiling
     }
     const lightning_indexer_v2_checker::LIV2Checker checker(liV2CheckerInfo);
     if (checker.Process() != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
+    }
+    platform_ascendc::PlatformAscendC platform(tilingInfo.platformInfo);
+    const int64_t metadataSize =
+        static_cast<int64_t>(GetLiV2MetadataSize(platform.GetCoreNumAic(), platform.GetCoreNumAiv()));
+    if (liV2CheckerInfo.metadata.GetShape()->GetShapeSize() != metadataSize) {
+        const std::string actual = std::to_string(liV2CheckerInfo.metadata.GetShape()->GetShapeSize());
+        const std::string reason = "Metadata size must be " + std::to_string(metadataSize);
+        OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(tilingInfo.opName, "metadata", actual.c_str(), reason.c_str());
         return ge::GRAPH_FAILED;
     }
     PopulateTilingInfo(liV2CheckerInfo, tilingInfo);

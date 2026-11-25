@@ -295,15 +295,16 @@ template <typename LIT>
 __aicore__ inline void LightningIndexerV2Kernel<LIT>::SplitCoreByAICPU(uint32_t cubeCoreIdx, uint32_t vecCoreIdx,
                                                                        GlobalTensor<uint32_t>& metadataGm)
 {
-    uint32_t liV2CoreEnableIndex = GetAttrAbsIndex(cubeCoreIdx, LI_V2_CORE_ENABLE_INDEX);
-    uint32_t liV2BN2StartIndex = GetAttrAbsIndex(cubeCoreIdx, LI_V2_BN2_START_INDEX);
-    uint32_t liV2MStartIndex = GetAttrAbsIndex(cubeCoreIdx, LI_V2_M_START_INDEX);
-    uint32_t liV2S2StartIndex = GetAttrAbsIndex(cubeCoreIdx, LI_V2_S2_START_INDEX);
-    uint32_t liV2BN2EndIndex = GetAttrAbsIndex(cubeCoreIdx, LI_V2_BN2_END_INDEX);
-    uint32_t liV2MEndIndex = GetAttrAbsIndex(cubeCoreIdx, LI_V2_M_END_INDEX);
-    uint32_t liV2S2EndIndex = GetAttrAbsIndex(cubeCoreIdx, LI_V2_S2_END_INDEX);
+    const uint32_t aicNum = GetBlockNum();
+    uint32_t liV2CoreEnableIndex = GetAttrAbsIndex(cubeCoreIdx, LI_V2_CORE_ENABLE_INDEX, aicNum);
+    uint32_t liV2BN2StartIndex = GetAttrAbsIndex(cubeCoreIdx, LI_V2_BN2_START_INDEX, aicNum);
+    uint32_t liV2MStartIndex = GetAttrAbsIndex(cubeCoreIdx, LI_V2_M_START_INDEX, aicNum);
+    uint32_t liV2S2StartIndex = GetAttrAbsIndex(cubeCoreIdx, LI_V2_S2_START_INDEX, aicNum);
+    uint32_t liV2BN2EndIndex = GetAttrAbsIndex(cubeCoreIdx, LI_V2_BN2_END_INDEX, aicNum);
+    uint32_t liV2MEndIndex = GetAttrAbsIndex(cubeCoreIdx, LI_V2_M_END_INDEX, aicNum);
+    uint32_t liV2S2EndIndex = GetAttrAbsIndex(cubeCoreIdx, LI_V2_S2_END_INDEX, aicNum);
 
-    uint32_t liV2ZeroCoreEnableIndex = GetAttrAbsIndex(0, LI_V2_CORE_ENABLE_INDEX);
+    uint32_t liV2ZeroCoreEnableIndex = GetAttrAbsIndex(0, LI_V2_CORE_ENABLE_INDEX, aicNum);
     if (metadataGm.GetValue(liV2ZeroCoreEnableIndex) == 0) {
         isUsedCoreEqZero = true;
     }
@@ -366,22 +367,23 @@ __aicore__ inline void LightningIndexerV2Kernel<LIT>::SplitCoreByAICPU(uint32_t 
         }
     }
 
-    uint32_t ldFirstWorkSpaceIndex = GetAttrAbsIndex(cubeCoreIdx, LI_V2_FIRST_LD_V2_DATA_WORKSPACE_IDX_INDEX, false);
+    uint32_t ldFirstWorkSpaceIndex =
+        GetAttrAbsIndex(cubeCoreIdx, LI_V2_FIRST_LD_V2_DATA_WORKSPACE_IDX_INDEX, aicNum, false);
     liV2LoadInfo.saveWorkSpaceIdx = metadataGm.GetValue(ldFirstWorkSpaceIndex);
     if ASCEND_IS_AIV {
-        uint32_t ldCoreEnableIndex = GetAttrAbsIndex(vecCoreIdx, LD_V2_CORE_ENABLE_INDEX, true);
+        uint32_t ldCoreEnableIndex = GetAttrAbsIndex(vecCoreIdx, LD_V2_CORE_ENABLE_INDEX, aicNum, true);
         liV2LoadInfo.isLdCoreEnable = metadataGm.GetValue(ldCoreEnableIndex);
 
         if (!liV2LoadInfo.isLdCoreEnable) {
             return;
         }
 
-        uint32_t ldBn2IdxIndex = GetAttrAbsIndex(vecCoreIdx, LD_V2_BN2_IDX_INDEX, true);
-        uint32_t ldMIdxIndex = GetAttrAbsIndex(vecCoreIdx, LD_V2_M_IDX_INDEX, true);
-        uint32_t ldWorkspaceIdxIndex = GetAttrAbsIndex(vecCoreIdx, LD_V2_WORKSPACE_IDX_INDEX, true);
-        uint32_t ldWorkspaceNumIndex = GetAttrAbsIndex(vecCoreIdx, LD_V2_WORKSPACE_NUM_INDEX, true);
-        uint32_t ldMstartIndex = GetAttrAbsIndex(vecCoreIdx, LD_V2_M_START_INDEX, true);
-        uint32_t ldMNumIndex = GetAttrAbsIndex(vecCoreIdx, LD_V2_M_NUM_INDEX, true);
+        uint32_t ldBn2IdxIndex = GetAttrAbsIndex(vecCoreIdx, LD_V2_BN2_IDX_INDEX, aicNum, true);
+        uint32_t ldMIdxIndex = GetAttrAbsIndex(vecCoreIdx, LD_V2_M_IDX_INDEX, aicNum, true);
+        uint32_t ldWorkspaceIdxIndex = GetAttrAbsIndex(vecCoreIdx, LD_V2_WORKSPACE_IDX_INDEX, aicNum, true);
+        uint32_t ldWorkspaceNumIndex = GetAttrAbsIndex(vecCoreIdx, LD_V2_WORKSPACE_NUM_INDEX, aicNum, true);
+        uint32_t ldMstartIndex = GetAttrAbsIndex(vecCoreIdx, LD_V2_M_START_INDEX, aicNum, true);
+        uint32_t ldMNumIndex = GetAttrAbsIndex(vecCoreIdx, LD_V2_M_NUM_INDEX, aicNum, true);
 
         liV2LoadInfo.bn2Idx = metadataGm.GetValue(ldBn2IdxIndex);
         liV2LoadInfo.bIdx = liV2LoadInfo.bn2Idx / liV2KernelConstInfo.kHeadNum;

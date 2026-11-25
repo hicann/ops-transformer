@@ -197,7 +197,7 @@ ge::graphStatus ParseAndCheckQLIV2Arch35(gert::TilingContext* context, QLIV2Tili
         static_cast<int64_t>(GetQliV2MetadataSize(platform.GetCoreNumAic(), platform.GetCoreNumAiv()));
     if (checkerInfo.metadata.GetShape()->GetShapeSize() < metadataSize) {
         const std::string actual = std::to_string(checkerInfo.metadata.GetShape()->GetShapeSize());
-        const std::string reason = "Metadata size must be at least " + std::to_string(metadataSize);
+        const std::string reason = "Metadata size must be " + std::to_string(metadataSize);
         OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(tilingInfo.opName, "metadata", actual.c_str(), reason.c_str());
         return ge::GRAPH_FAILED;
     }

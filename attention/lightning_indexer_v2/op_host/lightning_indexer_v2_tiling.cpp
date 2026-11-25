@@ -19,6 +19,7 @@
 #include "base/err_msg.h"
 #include "log/log.h"
 #include "lightning_indexer_v2_tiling.h"
+#include "../op_kernel/lightning_indexer_v2_metadata.h"
 #include "../op_kernel/lightning_indexer_v2_template_tiling_key.h"
 #include "lightning_indexer_v2_tiling_info_parser.h"
 
@@ -1128,12 +1129,15 @@ ge::graphStatus LIV2InfoParser::ValidateInputShapesMatch()
                         "The last dim of sparse_values must be same as topk"),
                     return ge::GRAPH_FAILED);
     }
+    platform_ascendc::PlatformAscendC metadataPlatform(platformInfo_);
+    const int64_t metadataSize =
+        GetLiV2MetadataSize(metadataPlatform.GetCoreNumAic(), metadataPlatform.GetCoreNumAiv());
     // -----------------------check metadata-------------------
     OP_CHECK_IF(
-        ((liV2Params_.metadata.tensor != nullptr) && (liV2Params_.metadata.tensor->GetShapeSize() != METADATA_LIMIT)),
+        ((liV2Params_.metadata.tensor != nullptr) && (liV2Params_.metadata.tensor->GetShapeSize() != metadataSize)),
         OP_LOGE_FOR_INVALID_SHAPESIZE_WITH_REASON(opName_, "metadata",
                                                   std::to_string(liV2Params_.metadata.tensor->GetShapeSize()).c_str(),
-                                                  "The dim 0 of metadata must be " + std::to_string(METADATA_LIMIT)),
+                                                  "The shape size of metadata must be " + std::to_string(metadataSize)),
         return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
@@ -1378,6 +1382,8 @@ ge::graphStatus LightningIndexerV2Tiling::DoTiling(LIV2TilingInfo* tilingInfo)
     }
     tilingData_.set_s1BaseSize(adaptiveS1Base);
     tilingData_.set_usedCoreNum(blockDim);
+    tilingData_.set_aicNum(aicNum);
+    tilingData_.set_aivNum(aivNum);
     tilingData_.set_batchSupperFlag(tilingInfo->batchSupperFlag);
     tilingData_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(tilingData_.GetDataSize());

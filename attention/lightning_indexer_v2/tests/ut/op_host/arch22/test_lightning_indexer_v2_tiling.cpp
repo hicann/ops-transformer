@@ -16,6 +16,7 @@ using namespace std;
 
 namespace {
 constexpr uint64_t SKIP_TILING_KEY = UINT64_MAX;
+constexpr size_t EXPECTED_TILING_DATA_SIZE = 14U * sizeof(int64_t);
 } // namespace
 
 class LightningIndexerV2Tiling : public testing::Test {
@@ -175,8 +176,9 @@ TEST_F(LightningIndexerV2Tiling, LightningIndexerV2_910b_tiling_3)
     int64_t expectTilingKey = 203547;
     // 尾槽: -4294967296=[returnValue(0)|candidateTopkBlocks(-1)], 8=[candidateBlockSize|batchInvariant],
     // 8589934593=[fastPathCandidate(1)|s1BaseSize(2)](BSND 泛化准入 + N1=64 自适应)
+    // 274877907008=[aicNum(64)|aivNum(64)]，来自 UT 模拟平台核数
     std::string expectTilingData = "2 167503724608 8796093022272 274877906944 0 3 "
-                                   "9223372036854775807 9223372036854775807 1 0 -4294967296 8 8589934593 ";
+                                   "9223372036854775807 9223372036854775807 1 0 -4294967296 8 8589934593 274877907008 ";
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData);
 }
 
@@ -218,8 +220,9 @@ TEST_F(LightningIndexerV2Tiling, LightningIndexerV2_910b_tiling_4)
     int64_t expectTilingKey = 1090722587;
     // 尾槽: -4294967296=[returnValue(0)|candidateTopkBlocks(-1)], 8=[candidateBlockSize|batchInvariant],
     // 8589934593=[fastPathCandidate(1)|s1BaseSize(2)](BSND 泛化准入 + N1=64 自适应)
+    // 274877907008=[aicNum(64)|aivNum(64)]，来自 UT 模拟平台核数
     std::string expectTilingData = "2 167503724608 8796093022224 274877906944 4294967312 3 "
-                                   "9223372036854775807 9223372036854775807 1 0 -4294967296 8 8589934593 ";
+                                   "9223372036854775807 9223372036854775807 1 0 -4294967296 8 8589934593 274877907008 ";
     ExecuteTestCase(tilingContextPara, ge::GRAPH_SUCCESS, expectTilingKey, expectTilingData);
 }
 
@@ -1381,19 +1384,23 @@ TEST_F(LightningIndexerV2Tiling, LightningIndexerV2_910b_tiling_tnd_candidate_s1
         TilingInfo info;
         ASSERT_TRUE(ExecuteTiling(buildTndCase(64), info));
         const int64_t* data = reinterpret_cast<const int64_t*>(info.tilingData.get());
-        ASSERT_EQ(info.tilingDataSize / sizeof(int64_t), 13U);
-        EXPECT_EQ(static_cast<uint32_t>(data[1] >> 32), 78U); // s1Size = q.dim0
-        EXPECT_EQ(data[10], static_cast<int64_t>(64) << 32);  // returnValue=0 | candTopk=64
-        EXPECT_EQ(data[11], 8);                               // candidateBlockSize 缺省 8
+        ASSERT_EQ(info.tilingDataSize, EXPECTED_TILING_DATA_SIZE);
+        EXPECT_EQ(static_cast<uint32_t>(data[1] >> 32), 78U);                         // s1Size = q.dim0
+        EXPECT_EQ(data[10], static_cast<int64_t>(64) << 32);                          // returnValue=0 | candTopk=64
+        EXPECT_EQ(data[11], 8);                                                       // candidateBlockSize 缺省 8
+        EXPECT_EQ(static_cast<uint32_t>(data[13]), 64U);                              // aicNum
+        EXPECT_EQ(static_cast<uint32_t>(static_cast<uint64_t>(data[13]) >> 32), 64U); // aivNum
     }
     // candidate off（缺省，不传属性）：s1Size = 0（与既有单级 TopK 行为逐位一致）
     {
         TilingInfo info;
         ASSERT_TRUE(ExecuteTiling(buildTndCase(-1), info));
         const int64_t* data = reinterpret_cast<const int64_t*>(info.tilingData.get());
-        ASSERT_EQ(info.tilingDataSize / sizeof(int64_t), 13U);
-        EXPECT_EQ(static_cast<uint32_t>(data[1] >> 32), 0U);        // s1Size 保持 0
-        EXPECT_EQ(data[10], static_cast<int64_t>(-1) * 4294967296); // returnValue=0 | candTopk=-1
-        EXPECT_EQ(data[11], 8);                                     // candidateBlockSize 缺省 8
+        ASSERT_EQ(info.tilingDataSize, EXPECTED_TILING_DATA_SIZE);
+        EXPECT_EQ(static_cast<uint32_t>(data[1] >> 32), 0U);                          // s1Size 保持 0
+        EXPECT_EQ(data[10], static_cast<int64_t>(-1) * 4294967296);                   // returnValue=0 | candTopk=-1
+        EXPECT_EQ(data[11], 8);                                                       // candidateBlockSize 缺省 8
+        EXPECT_EQ(static_cast<uint32_t>(data[13]), 64U);                              // aicNum
+        EXPECT_EQ(static_cast<uint32_t>(static_cast<uint64_t>(data[13]) >> 32), 64U); // aivNum
     }
 }

@@ -12,7 +12,7 @@
 #include <algorithm>
 #include <climits>
 
-namespace aicpu {
+namespace aicpu::liv2_metadata {
 using namespace optiling;
 namespace {
 struct LiV2FastSequenceWork {
@@ -31,7 +31,7 @@ struct CubeFillVectorSplitContext {
 };
 
 struct CubeFillVectorSplitPlan {
-    uint32_t coreMetadata[AIC_CORE_MAX_NUM][LI_V2_FAST_CORE_INFO_SIZE]{};
+    uint32_t coreMetadata[FAST_ARCH22_CORE_MAX_NUM][LI_V2_FAST_CORE_INFO_SIZE]{};
     uint64_t maxCoreWorkBlockNum{0U};
 };
 
@@ -199,6 +199,10 @@ bool CheckCubeFillVectorPerformance(const CubeFillVectorSplitPlan& splitPlan,
 
 void LightningIndexerV2MetadataCpuKernel::GenFastMetadataArch22()
 {
+    if (GetLiV2MetadataExtensionCapacity(aicCoreNum_, aivCoreNum_) <
+        sizeof(detail::LiV2FastMetadataArch22) / sizeof(uint32_t)) {
+        return;
+    }
     // Compute 已清零 Fast 区，准入失败时保持 enable 为 0，由 Kernel 执行普通路径
     // Metadata 接口不提供 weight dtype、returnValue、outputIdxOffset、deterministic level
     // 和 candidate 属性；host 检查这些静态条件。AICPU 使用实际序列长度检查分核与性能准入。
@@ -209,7 +213,7 @@ void LightningIndexerV2MetadataCpuKernel::GenFastMetadataArch22()
         (maskMode_ != SPARSE_MODE_LOWER && maskMode_ != 0) || (numHeadsQ_ < 8 || numHeadsQ_ > 64) ||
         (numHeadsQ_ % 8U != 0U) || (numHeadsK_ != 1) || (headDim_ != HEAD_DIM_LIMIT) ||
         ((topk_ > TOPK_NUM_2048) && ((topk_ % 1024U != 0U) || (topk_ > 8192U))) || (aicCoreNum_ == 0) ||
-        (aicCoreNum_ > AIC_CORE_MAX_NUM)) {
+        (aicCoreNum_ > FAST_ARCH22_CORE_MAX_NUM)) {
         return;
     }
     // cmpRatio 泛化: 放开 [2,128] 压缩域 + cmpResidualK
@@ -312,7 +316,9 @@ void LightningIndexerV2MetadataCpuKernel::GenFastMetadataArch22()
     if (!cubeFillVector) {
         return;
     }
-    auto& fastMetadata = static_cast<detail::LiV2MetadataArch22*>(metadata_->GetData())->fastMetadata;
+    auto* metadataWords = static_cast<uint32_t*>(metadata_->GetData());
+    auto& fastMetadata = *reinterpret_cast<detail::LiV2FastMetadataArch22*>(
+        metadataWords + GetLiV2MetadataExtensionOffset(aicCoreNum_, aivCoreNum_));
     fastMetadata.coreNum = splitContext.coreNum;
     for (uint32_t coreIdx = 0; coreIdx < splitContext.coreNum; ++coreIdx) {
         std::copy_n(splitPlan.coreMetadata[coreIdx], LI_V2_FAST_CORE_INFO_SIZE, fastMetadata.coreInfo[coreIdx]);
@@ -320,4 +326,4 @@ void LightningIndexerV2MetadataCpuKernel::GenFastMetadataArch22()
     fastMetadata.enable = 1U;
 }
 
-} // namespace aicpu
+} // namespace aicpu::liv2_metadata

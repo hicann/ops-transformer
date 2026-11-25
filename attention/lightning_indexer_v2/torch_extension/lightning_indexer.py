@@ -12,7 +12,20 @@ import torch
 from torch.library import impl
 from cann_ops_transformer.op_builder import OpBuilder, get_as_library
 
-LI_METADATA_SIZE = 2048
+
+LI_METADATA_ALIGNMENT = 1024
+
+
+def _calculate_metadata_size(device=None):
+    properties = torch.npu.get_device_properties(device)
+    core_size = 8 * (properties.cube_core_num + properties.vector_core_num)
+    return (
+        (core_size + LI_METADATA_ALIGNMENT - 1)
+        // LI_METADATA_ALIGNMENT
+        * LI_METADATA_ALIGNMENT
+    )
+
+
 LI_METADATA_OP_NAME = "lightning_indexer_metadata"
 # candidate（两级 TopK source 模式）以 lightning_indexer 的 overload 形式注册：
 # 传 candidate pool 可选参数走该 overload，返回 4 输出；不传走 default overload（2 输出，兼容）
@@ -81,7 +94,9 @@ class LightningIndexerOpBuilder(OpBuilder):
             mask_mode: Optional[int] = None,
             cmp_ratio: Optional[int] = None,
         ):
-            return torch.empty((LI_METADATA_SIZE), dtype=torch.int32, device="npu")
+            return torch.empty(
+                (_calculate_metadata_size()), dtype=torch.int32, device="npu"
+            )
 
         @impl(get_as_library(), self.name, "Meta")
         def lightning_indexer_meta(
@@ -251,6 +266,8 @@ def lightning_indexer_metadata(
     cmp_ratio = 1 if cmp_ratio is None else cmp_ratio
 
     op_module = lightning_indexer_op_builder.load()
+    tensors = (cu_seqlens_q, cu_seqlens_k, seqused_q, seqused_k, cmp_residual_k)
+    device = next((t.device for t in tensors if t is not None), None)
     return op_module.lightning_indexer_metadata(
         num_heads_q,
         num_heads_k,
@@ -268,6 +285,7 @@ def lightning_indexer_metadata(
         layout_k,
         mask_mode,
         cmp_ratio,
+        _calculate_metadata_size(device),
     )
 
 

@@ -446,7 +446,7 @@ aclnnStatus CheckConsistencyQliV2(int64_t batchSize, const aclTensor* cuSeqlensQ
         }
         // 校验 metadata 元素数
         if (metadata->GetViewShape().GetDim(0) < optiling::GetQliV2MetadataSize(aicCoreNum, aivCoreNum)) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The element num of metadata must be at least %llu, but got %lld",
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The element num of metadata must be %llu, but got %lld",
                     static_cast<unsigned long long>(optiling::GetQliV2MetadataSize(aicCoreNum, aivCoreNum)),
                     metadata->GetViewShape().GetDim(0));
             return ACLNN_ERR_PARAM_INVALID;
