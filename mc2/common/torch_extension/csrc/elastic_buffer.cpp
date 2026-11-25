@@ -25,7 +25,6 @@
 #include <utility>
 #include <vector>
 #include <cstring>
-#include <cstdio>
 #include <atomic>
 #include <cstdint>
 #include <algorithm>
@@ -36,6 +35,7 @@
 #include <cstdlib>
 #include <fcntl.h>
 #include <unistd.h>
+#include <thread>
 
 // CANN ACL Runtime API
 #include "acl/acl.h"
@@ -81,6 +81,10 @@ constexpr uint32_t MIX_CLOS_SLOT = 0U;
 constexpr uint32_t MIX_MESH_SLOT = 1U;
 constexpr uint32_t MIX_LAYERED_RANK_SIZE = 8U;
 constexpr uint64_t VMM_RESERVE_MEM_FLAG = 1U;
+constexpr uint32_t RAIL_IMPORT_RETRY_TIMES = 5U;
+constexpr uint32_t RAIL_IMPORT_RETRY_STEP_US = 1000000U;
+constexpr char kEngramRailSharedQueueTag[] = "engram_embd_rail_sq_v1";
+constexpr char kEngramRailInferSharedQueueTag[] = "engram_embd_rail_infer_sq_v1";
 
 // RAII guard for multi-step host buffer allocation
 struct HostBufferGuard {
@@ -507,6 +511,73 @@ static bool ParseEnvUint32(const char* name, const char* raw, uint32_t& value, s
     return true;
 }
 
+static void RailAclnnBarrier(const std::string& groupName, int64_t rankSize)
+{
+    auto dummyX = at::ones({1}, at::TensorOptions().dtype(at::kLong).device(c10::DeviceType::PrivateUse1));
+    ACLNN_CMD(aclnnDistributeBarrier, dummyX, groupName, rankSize);
+}
+
+static void WarmupAclnnBarrierCtx(const std::string& groupName)
+{
+    HcclComm comm = nullptr;
+    auto ret = HcomGetCommHandleByGroupFunc(groupName.c_str(), &comm);
+    TORCH_CHECK(ret == HCCL_SUCCESS, "barrier warmup: get comm handle of group '", groupName, "' failed, ret=", ret);
+    uint32_t world = 0;
+    ret = HcclGetRankSizeFunc(comm, &world);
+    TORCH_CHECK(ret == HCCL_SUCCESS && world > 0, "barrier warmup: get rank size of group '", groupName,
+                "' failed, ret=", ret);
+    RailAclnnBarrier(groupName, static_cast<int64_t>(world));
+    aclError syncRet = aclrtSynchronizeDevice();
+    TORCH_CHECK(syncRet == ACL_SUCCESS, "barrier warmup: aclrtSynchronizeDevice failed, ret: ", syncRet);
+}
+
+struct HcclChannelConfigGuard {
+    HcclChannelConfig config = nullptr;
+    ~HcclChannelConfigGuard()
+    {
+        if (config != nullptr) {
+            (void)HcclChannelConfigDestroyFunc(config);
+        }
+    }
+};
+
+static void InitHcclSharedQueueFunctions()
+{
+    HcclChannelConfigCreateFunc = GetHcclFwkFuncAddr<_HcclChannelConfigCreate>("HcclChannelConfigCreate");
+    TORCH_CHECK(HcclChannelConfigCreateFunc != nullptr, "getHcclChannelConfigCreate failed.");
+    HcclChannelConfigDestroyFunc = GetHcclFwkFuncAddr<_HcclChannelConfigDestroy>("HcclChannelConfigDestroy");
+    TORCH_CHECK(HcclChannelConfigDestroyFunc != nullptr, "getHcclChannelConfigDestroy failed.");
+    HcclChannelConfigSetIntFunc = GetHcclFwkFuncAddr<_HcclChannelConfigSetInt>("HcclChannelConfigSetInt");
+    TORCH_CHECK(HcclChannelConfigSetIntFunc != nullptr, "getHcclChannelConfigSetInt failed.");
+    HcclChannelConfigSetStrFunc = GetHcclFwkFuncAddr<_HcclChannelConfigSetStr>("HcclChannelConfigSetStr");
+    TORCH_CHECK(HcclChannelConfigSetStrFunc != nullptr, "getHcclChannelConfigSetStr failed.");
+    HcclChannelAcquireWithConfigFunc =
+        GetHcclFwkFuncAddr<_HcclChannelAcquireWithConfig>("HcclChannelAcquireWithConfig");
+    TORCH_CHECK(HcclChannelAcquireWithConfigFunc != nullptr, "getHcclChannelAcquireWithConfig failed.");
+}
+
+static void AcquireRailSharedQueueChannel(const HcclComm& commHandle, const HcclChannelDesc& desc, const char* queueTag,
+                                          ChannelHandle& channel)
+{
+    HcclChannelConfigGuard guard;
+    auto hcclRet = HcclChannelConfigCreateFunc(&guard.config);
+    TORCH_CHECK(hcclRet == HCCL_SUCCESS, "Create channel config failed, ret: ", hcclRet);
+
+    hcclRet = HcclChannelConfigSetIntFunc(guard.config, HCCL_CHANNEL_CONFIG_TYPE_IS_SHARED_QUEUE, 1U);
+    TORCH_CHECK(hcclRet == HCCL_SUCCESS, "Set channel config shared queue flag failed, ret: ", hcclRet);
+
+    hcclRet = HcclChannelConfigSetStrFunc(guard.config, HCCL_CHANNEL_CONFIG_TYPE_SHARED_QUEUE_TAG, queueTag);
+    TORCH_CHECK(hcclRet == HCCL_SUCCESS, "Set channel config queue tag failed, ret: ", hcclRet);
+
+    hcclRet =
+        HcclChannelAcquireWithConfigFunc(commHandle, CommEngine::COMM_ENGINE_AIV, &desc, 1U, guard.config, &channel);
+    TORCH_CHECK(hcclRet == HCCL_SUCCESS, "Acquire shared queue channel failed, ret: ", hcclRet);
+
+    hcclRet = HcclChannelConfigDestroyFunc(guard.config);
+    guard.config = nullptr;
+    TORCH_CHECK(hcclRet == HCCL_SUCCESS, "Destroy channel config failed, ret: ", hcclRet);
+}
+
 class HcclContextBuilderBase {
 public:
     // 按通信组名包装的拓扑探测入口（EnsureEngramContext 预探测用）
@@ -867,7 +938,8 @@ protected:
     static std::vector<ChannelHandle> AcquireRailChannels(const HcclComm& commHandle, const uint32_t* layerList,
                                                           uint32_t layerNum, uint32_t myRank,
                                                           const std::vector<RailPeerSpec>& peers,
-                                                          HcclMemHandle& memHandle)
+                                                          HcclMemHandle& memHandle,
+                                                          const char* sharedQueueTag = nullptr)
     {
         std::vector<ChannelHandle> handles(peers.size(), 0);
         if (peers.empty()) {
@@ -922,6 +994,12 @@ protected:
             desc.memHandles = &memHandle; // V1 同款：channel 绑定存储注册内存
             desc.memHandleNum = 1;
             descs.push_back(desc);
+        }
+        if (sharedQueueTag != nullptr) {
+            for (size_t i = 0; i < descs.size(); ++i) {
+                AcquireRailSharedQueueChannel(commHandle, descs[i], sharedQueueTag, handles[i]);
+            }
+            return handles;
         }
         AcquireChannels(commHandle, CommEngine::COMM_ENGINE_AIV, descs, handles.data());
         return handles;
@@ -1128,6 +1206,38 @@ struct EngramRailStorage {
     uint64_t slotBytes = 0;
 };
 
+struct RailMemoryGuard {
+    aclrtDrvMemHandle physHandle = nullptr;
+    void* shareVa = nullptr;
+    std::vector<void*> mappedSlotVas;
+    std::vector<aclrtDrvMemHandle> importedHandles;
+
+    void Dismiss()
+    {
+        physHandle = nullptr;
+        shareVa = nullptr;
+        mappedSlotVas.clear();
+        importedHandles.clear();
+    }
+
+    ~RailMemoryGuard()
+    {
+        // 异常路径回滚已申请的槽位映射/导入句柄/VA预留/物理内存，顺序与申请严格互逆
+        for (void* slotVa : mappedSlotVas) {
+            (void)aclrtUnmapMem(slotVa);
+        }
+        for (aclrtDrvMemHandle handle : importedHandles) {
+            (void)aclrtFreePhysical(handle);
+        }
+        if (shareVa != nullptr) {
+            (void)aclrtReleaseMemAddress(shareVa);
+        }
+        if (physHandle != nullptr) {
+            (void)aclrtFreePhysical(physHandle);
+        }
+    }
+};
+
 class EngramContextBuilder : public HcclContextBuilderBase {
 public:
     EngramContextBuilder(int64_t hybridMode = 0, aclrtStream commStream = nullptr)
@@ -1178,8 +1288,7 @@ public:
     }
 
     // rail_aligned推理 交换共享内存句柄
-    static std::vector<aclrtMemFabricHandle> ExchangeRailHandles(const std::string& groupName, HcclComm shareComm,
-                                                                 aclrtStream commStream, uint32_t rankId,
+    static std::vector<aclrtMemFabricHandle> ExchangeRailHandles(const std::string& groupName, uint32_t rankId,
                                                                  uint32_t rankSize, uint32_t ranksPerMachine,
                                                                  uint32_t machineStartRank,
                                                                  aclrtMemFabricHandle& shareBlob)
@@ -1191,7 +1300,8 @@ public:
         constexpr uint32_t exchangeElems = handleBlobU64 + 1U;
         constexpr uint64_t exchangeBytes = static_cast<uint64_t>(exchangeElems) * sizeof(uint64_t);
         std::vector<uint64_t> sendVals(exchangeElems, 0);
-        memcpy(sendVals.data(), shareBlob.data, sizeof(shareBlob.data));
+        const errno_t sendRet = memcpy_s(sendVals.data(), exchangeBytes, shareBlob.data, sizeof(shareBlob.data));
+        TORCH_CHECK(sendRet == EOK, "memcpy_s(send blob) failed, ret=", sendRet);
         sendVals[handleBlobU64] = static_cast<uint64_t>(bareTgid);
 
         std::string shmName;
@@ -1209,25 +1319,21 @@ public:
         const ssize_t wRet = pwrite(fd, sendVals.data(), exchangeBytes, static_cast<off_t>(exchangeBytes * rankId));
         TORCH_CHECK(wRet == static_cast<ssize_t>(exchangeBytes), "pwrite(own slot) failed, errno=", errno);
 
-        auto barrierRet = HcclBarrierFunc(shareComm, commStream);
-        TORCH_CHECK(barrierRet == HCCL_SUCCESS,
-                    "HcclBarrier(handle exchange sync) failed, ret=", static_cast<int>(barrierRet));
-        ret = aclrtSynchronizeStream(commStream);
-        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtSynchronizeStream(handle exchange sync) failed, ret=", ret);
-
-        std::vector<uint64_t> recvVals(static_cast<size_t>(exchangeElems) * rankSize, 0);
-        for (uint32_t g = machineStartRank; g < machineStartRank + ranksPerMachine; ++g) {
-            const ssize_t rRet = pread(fd, &recvVals[static_cast<size_t>(g) * exchangeElems], exchangeBytes,
-                                       static_cast<off_t>(exchangeBytes * g));
-            TORCH_CHECK(rRet == static_cast<ssize_t>(exchangeBytes), "pread(slot=", g, ") failed, errno=", errno);
-        }
+        RailAclnnBarrier(groupName, static_cast<int64_t>(rankSize));
+        ret = aclrtSynchronizeDevice();
+        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtSynchronizeDevice(handle exchange sync) failed, ret=", ret);
 
         std::vector<aclrtMemFabricHandle> sharePeerBlobs(rankSize, aclrtMemFabricHandle{});
         std::vector<int32_t> peerPids(rankSize, 0);
-        for (uint32_t rank = 0; rank < rankSize; ++rank) {
-            memcpy(sharePeerBlobs[rank].data, &recvVals[static_cast<size_t>(rank) * exchangeElems],
-                   sizeof(sharePeerBlobs[rank].data));
-            peerPids[rank] = static_cast<int32_t>(recvVals[static_cast<size_t>(rank) * exchangeElems + handleBlobU64]);
+        for (uint32_t localRank = machineStartRank; localRank < machineStartRank + ranksPerMachine; ++localRank) {
+            uint64_t recvVals[exchangeElems] = {0};
+            const ssize_t rRet = pread(fd, recvVals, exchangeBytes, static_cast<off_t>(exchangeBytes * localRank));
+            TORCH_CHECK(rRet == static_cast<ssize_t>(exchangeBytes), "pread(slot=", localRank,
+                        ") failed, errno=", errno);
+            const errno_t memRet = memcpy_s(sharePeerBlobs[localRank].data, sizeof(sharePeerBlobs[localRank].data),
+                                            recvVals, sizeof(sharePeerBlobs[localRank].data));
+            TORCH_CHECK(memRet == EOK, "memcpy_s(share handle, slot=", localRank, ") failed, ret=", memRet);
+            peerPids[localRank] = static_cast<int32_t>(recvVals[handleBlobU64]);
         }
 
         if (rankId == machineStartRank) {
@@ -1235,27 +1341,24 @@ public:
         }
 
         std::vector<int32_t> peerPidList;
-        peerPidList.reserve(ranksPerMachine - 1U);
-        for (uint32_t rank = machineStartRank; rank < machineStartRank + ranksPerMachine; ++rank) {
-            if (rank != rankId) {
-                peerPidList.push_back(peerPids[rank]);
+        for (uint32_t localRank = machineStartRank; localRank < machineStartRank + ranksPerMachine; ++localRank) {
+            if (localRank != rankId) {
+                peerPidList.push_back(peerPids[localRank]);
             }
         }
-        std::string pidStr;
-        for (int32_t p : peerPidList) {
-            pidStr += (pidStr.empty() ? "" : ",") + std::to_string(p);
+        if (peerPidList.empty()) {
+            ASCEND_LOGW("rail_aligned: no local peers to whitelist, rank=%u ranksPerMachine=%u", rankId,
+                        ranksPerMachine);
+        } else {
+            ret = aclrtMemSetPidToShareableHandleV2(shareBlob.data, ACL_MEM_SHARE_HANDLE_TYPE_DEFAULT,
+                                                    peerPidList.data(), peerPidList.size());
+            TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMemSetPidToShareableHandleV2(peers=", peerPidList.size(),
+                        ") failed, ret=", ret);
         }
-        ASCEND_LOGI("rail_aligned collect handle: rank=%u machineStartRank=%u rpm=%u pidNum=%zu pids=[%s]", rankId,
-                    machineStartRank, ranksPerMachine, peerPidList.size(), pidStr.c_str());
-        ret = aclrtMemSetPidToShareableHandleV2(shareBlob.data, ACL_MEM_SHARE_HANDLE_TYPE_DEFAULT, peerPidList.data(),
-                                                peerPidList.size());
-        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMemSetPidToShareableHandleV2(peers=", peerPidList.size(),
-                    ") failed, ret=", ret);
-        barrierRet = HcclBarrierFunc(shareComm, commStream);
-        TORCH_CHECK(barrierRet == HCCL_SUCCESS,
-                    "HcclBarrier(handle whitelist sync) failed, ret=", static_cast<int>(barrierRet));
-        ret = aclrtSynchronizeStream(commStream);
-        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtSynchronizeStream(whitelist sync) failed, ret=", ret);
+        RailAclnnBarrier(groupName, static_cast<int64_t>(rankSize));
+        ret = aclrtSynchronizeDevice();
+        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtSynchronizeDevice(whitelist sync) failed, ret=", ret);
+
         return sharePeerBlobs;
     }
 
@@ -1263,7 +1366,7 @@ public:
     static void MapRailMemory(uint32_t rankId, uint32_t ranksPerMachine, uint32_t machineStartRank, int32_t deviceId,
                               uint64_t totalBytes, uint64_t slotBytes, aclrtDrvMemHandle sharePhysHandle,
                               std::vector<aclrtMemFabricHandle>& sharePeerBlobs, void*& shareVa, void*& shareOwnSlotVa,
-                              std::vector<aclrtDrvMemHandle>& shareImportedHandles)
+                              std::vector<aclrtDrvMemHandle>& shareImportedHandles, std::vector<void*>& mappedSlotVas)
     {
         aclError ret = ACL_SUCCESS;
         int32_t logicDeviceId = deviceId;
@@ -1286,27 +1389,44 @@ public:
         ret = aclrtReserveMemAddress(&shareVa, totalBytes, 0, nullptr, VMM_RESERVE_MEM_FLAG);
         TORCH_CHECK(ret == ACL_SUCCESS, "aclrtReserveMemAddress(", totalBytes, " B) failed, ret=", ret);
 
-        auto slotVaOf = [&](uint32_t g) {
-            return static_cast<uint8_t*>(shareVa) + static_cast<uint64_t>(g - machineStartRank) * slotBytes;
+        auto slotVaOf = [&](uint32_t localRank) {
+            return static_cast<uint8_t*>(shareVa) + static_cast<uint64_t>(localRank - machineStartRank) * slotBytes;
         };
 
-        for (uint32_t g = machineStartRank; g < machineStartRank + ranksPerMachine; ++g) {
+        for (uint32_t localRank = machineStartRank; localRank < machineStartRank + ranksPerMachine; ++localRank) {
             aclrtDrvMemHandle slotHandle = sharePhysHandle;
-            if (g != rankId) {
-                ret = aclrtMemImportFromShareableHandleV2(sharePeerBlobs[g].data, ACL_MEM_SHARE_HANDLE_TYPE_DEFAULT, 0,
-                                                          &slotHandle);
-                TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMemImportFromShareableHandleV2(rank=", g, ") failed, ret=", ret);
+            if (localRank != rankId) {
+                for (uint32_t attempt = 0U; attempt < RAIL_IMPORT_RETRY_TIMES; ++attempt) {
+                    if (attempt != 0U) {
+                        std::this_thread::sleep_for(std::chrono::microseconds(RAIL_IMPORT_RETRY_STEP_US));
+                    }
+                    ret = aclrtMemImportFromShareableHandleV2(sharePeerBlobs[localRank].data,
+                                                              ACL_MEM_SHARE_HANDLE_TYPE_DEFAULT, 0, &slotHandle);
+                    if (ret == ACL_SUCCESS) {
+                        if (attempt != 0U) {
+                            ASCEND_LOGI("rail_aligned import rank=%u succeeded on attempt %u (whitelist settle)",
+                                        localRank, attempt + 1U);
+                        }
+                        break;
+                    }
+                    ASCEND_LOGW("rail_aligned import rank=%u attempt %u failed, ret=%d", localRank, attempt + 1U,
+                                static_cast<int>(ret));
+                }
+                TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMemImportFromShareableHandleV2(rank=", localRank,
+                            ") failed, ret=", ret);
                 shareImportedHandles.push_back(slotHandle);
             }
-            void* slotVa = slotVaOf(g);
+            void* slotVa = slotVaOf(localRank);
             ret = aclrtMapMem(slotVa, slotBytes, 0, slotHandle, 0);
-            TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMapMem(slot=", g, ") failed, ret=", ret);
+            TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMapMem(slot=", localRank, ") failed, ret=", ret);
+            mappedSlotVas.push_back(slotVa);
         }
 
-        for (uint32_t g = machineStartRank; g < machineStartRank + ranksPerMachine; ++g) {
-            void* slotVa = slotVaOf(g);
+        for (uint32_t localRank = machineStartRank; localRank < machineStartRank + ranksPerMachine; ++localRank) {
+            void* slotVa = slotVaOf(localRank);
             ret = aclrtMemSetAccess(slotVa, slotBytes, &accessDesc, 1);
-            TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMemSetAccess(slot=", g, ") failed: va=", slotVa, ", ret=", ret);
+            TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMemSetAccess(slot=", localRank, ") failed: va=", slotVa,
+                        ", ret=", ret);
         }
         shareOwnSlotVa = static_cast<uint8_t*>(shareVa) + static_cast<uint64_t>(rankId - machineStartRank) * slotBytes;
 
@@ -1342,24 +1462,24 @@ public:
         }
         const uint64_t slotBytes = (static_cast<uint64_t>(numCpuBytes) + granularity - 1U) / granularity * granularity;
         const uint64_t totalBytes = slotBytes * ranksPerMachine;
+        RailMemoryGuard guard;
         aclrtDrvMemHandle sharePhysHandle = nullptr;
         ret = aclrtMallocPhysical(&sharePhysHandle, slotBytes, &prop, 0);
         TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMallocPhysical(ACL_MEM_P2P_HUGE@HOST, ", slotBytes,
                     " B) failed, ret=", ret);
+        guard.physHandle = sharePhysHandle;
 
         aclrtMemFabricHandle shareBlob = {};
         ret = aclrtMemExportToShareableHandleV2(sharePhysHandle, 0, ACL_MEM_SHARE_HANDLE_TYPE_DEFAULT, shareBlob.data);
         TORCH_CHECK(ret == ACL_SUCCESS, "aclrtMemExportToShareableHandleV2(DEFAULT) failed, ret=", ret);
 
         std::vector<aclrtMemFabricHandle> sharePeerBlobs =
-            ExchangeRailHandles(groupName_, resources.hcclComm, commStream_, rankId, rankSize, ranksPerMachine,
-                                machineStartRank, shareBlob);
+            ExchangeRailHandles(groupName_, rankId, rankSize, ranksPerMachine, machineStartRank, shareBlob);
 
-        void* shareVa = nullptr;        // 虚拟映射首地址
+        void*& shareVa = guard.shareVa; // 虚拟映射首地址
         void* shareOwnSlotVa = nullptr; // 虚拟映射当前分段地址
-        std::vector<aclrtDrvMemHandle> shareImportedHandles;
         MapRailMemory(rankId, ranksPerMachine, machineStartRank, deviceId, totalBytes, slotBytes, sharePhysHandle,
-                      sharePeerBlobs, shareVa, shareOwnSlotVa, shareImportedHandles);
+                      sharePeerBlobs, shareVa, shareOwnSlotVa, guard.importedHandles, guard.mappedSlotVas);
         ASCEND_LOGI("rail_aligned alloc: rank=%u va=%p ownSlotVa=%p slotBytes=%lu totalBytes=%lu", rankId, shareVa,
                     shareOwnSlotVa, slotBytes, totalBytes);
 
@@ -1371,17 +1491,16 @@ public:
         TORCH_CHECK(memRegRet == HCCL_SUCCESS, "HcclCommMemReg(tag='", memBufferTag, "', size=", mem.size,
                     ") failed, ret=", memRegRet);
 
-        auto barrierRet = HcclBarrierFunc(resources.hcclComm, commStream_);
-        TORCH_CHECK(barrierRet == HCCL_SUCCESS,
-                    "HcclBarrier(rail build reg sync) failed, ret=", static_cast<int>(barrierRet));
-        ret = aclrtSynchronizeStream(commStream_);
-        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtSynchronizeStream(rail build reg sync) failed, ret=", ret);
+        RailAclnnBarrier(groupName_, static_cast<int64_t>(resources.context.rankSize));
+        ret = aclrtSynchronizeDevice();
+        TORCH_CHECK(ret == ACL_SUCCESS, "aclrtSynchronizeDevice(rail build reg sync) failed, ret=", ret);
 
         railStorage_.shareVa = shareVa;
         railStorage_.shareOwnSlotVa = shareOwnSlotVa;
         railStorage_.slotBytes = slotBytes;
         resources.hostBufPtr = shareOwnSlotVa;
         resources.deviceBufPtr = shareOwnSlotVa;
+        guard.Dismiss();
     }
 
     // rail_aligned推理 通信建链
@@ -1414,9 +1533,14 @@ public:
             desc.notifyNum = MOE_CHANNEL_NOTIFY_NUM;
             desc.memHandles = &resources.memHandle;
             desc.memHandleNum = 1;
-            std::vector<HcclChannelDesc> descs{desc};
             ChannelHandle channel = 0;
-            AcquireChannels(commHandle, CommEngine::COMM_ENGINE_AIV, descs, &channel);
+            if (linkIter->second.protocol == CommProtocol::COMM_PROTOCOL_UB_CTP ||
+                linkIter->second.protocol == CommProtocol::COMM_PROTOCOL_UB_RTP) {
+                AcquireRailSharedQueueChannel(commHandle, desc, kEngramRailInferSharedQueueTag, channel);
+            } else {
+                std::vector<HcclChannelDesc> descs{desc};
+                AcquireChannels(commHandle, CommEngine::COMM_ENGINE_AIV, descs, &channel);
+            }
             linkedPeers.push_back({peer, inSuper});
             return channel;
         };
@@ -1679,8 +1803,8 @@ public:
         }
         std::vector<ChannelHandle> supernodeHandles =
             AcquireRailChannels(resources.hcclComm, layerList, layerNum, myRank, supernodeSpecs, resources.memHandle);
-        std::vector<ChannelHandle> railHandles =
-            AcquireRailChannels(resources.hcclComm, layerList, layerNum, myRank, railSpecs, resources.memHandle);
+        std::vector<ChannelHandle> railHandles = AcquireRailChannels(
+            resources.hcclComm, layerList, layerNum, myRank, railSpecs, resources.memHandle, kEngramRailSharedQueueTag);
         // spec 顺序 = 句柄顺序落表；filledIdx 显式记录已落槽下标（句柄值不做 0 哨兵假设）
         std::vector<uint32_t> supernodeIdx;
         supernodeIdx.reserve(supernodeSpecs.size());
@@ -3126,6 +3250,7 @@ ElasticBuffer::ElasticBuffer(const std::optional<std::string>& groupName, int64_
     if (!localFullVocab_) {
         InitHcclEngineCtxFunctions();
         InitHcclFunctions();
+        InitHcclSharedQueueFunctions();
     }
     if (hybridMode_ == NETWORK_HYBRID) {
         TORCH_CHECK(!localFullVocab_, "allow_hybrid_mode only supports grouped mode (group != None)");
@@ -3174,6 +3299,7 @@ void ElasticBuffer::EnsureEngramContext(void* externalHostPtr, int64_t externalB
                         "; set RANKS_PER_SUPERNODE for test clusters (ranks per supernode), "
                         "or check supernode wiring and HCCL topo");
             if (engramWorldSize_ > probeTopo.ranksPerSupernode) {
+                WarmupAclnnBarrierCtx(*groupName_);
                 EngramContextBuilder builder(hybridMode_, commStream_);
                 resources = builder.BuildRailContext(*groupName_, withGrad_ ? 0 : engramNumCpuBytes_, externalHostPtr,
                                                      externalBytes, sfHostPtr, sfBytes);
@@ -3182,6 +3308,7 @@ void ElasticBuffer::EnsureEngramContext(void* externalHostPtr, int64_t externalB
                 TORCH_CHECK(engramWorldSize_ <= HCCL_MAX_RANK_SIZE, "single supernode world=", engramWorldSize_,
                             " exceeds legacy builder rank limit 1024 (all-direct domain too large); "
                             "rail-aligned requires a multi-supernode rail topology");
+                WarmupAclnnBarrierCtx(*groupName_);
                 EngramContextBuilder builder;
                 resources = builder.Build(*groupName_, withGrad_ ? 0 : engramNumCpuBytes_, withGrad_, externalHostPtr,
                                           externalBytes, sfHostPtr, sfBytes, netLayer_);
@@ -3195,6 +3322,7 @@ void ElasticBuffer::EnsureEngramContext(void* externalHostPtr, int64_t externalB
                         " > 1024 requires rail-aligned link setup: pass "
                         "allow_hybrid_mode=1 to ElasticBuffer (training rail-aligned); "
                         "legacy builder cannot host world > 1024");
+            WarmupAclnnBarrierCtx(*groupName_);
             try {
                 EngramContextBuilder builder;
                 resources = builder.Build(*groupName_, withGrad_ ? 0 : engramNumCpuBytes_, withGrad_, externalHostPtr,
@@ -3531,22 +3659,20 @@ void ElasticBuffer::EngramBarrier(bool useCommStream, bool withCpuSync)
                 "engram_barrier cannot be called after destroy, please create a new ElasticBuffer instance");
     TORCH_CHECK(!localFullVocab_, "engram_barrier is not supported in local full-vocab mode");
     EnsureEngramContext();
-    TORCH_CHECK(engramHcclComm_ != nullptr, "HCCL comm not initialized");
 
     aclrtStream computeStream = c10_npu::getCurrentNPUStream().stream(false);
     aclrtStream stream = useCommStream ? commStream_ : computeStream;
-
-    if (useCommStream) {
-        NpuStreamWait(commStream_, computeStream);
-    }
 
     if (withCpuSync) {
         aclError aclRet = aclrtSynchronizeDevice();
         TORCH_CHECK(aclRet == ACL_SUCCESS, "aclrtSynchronizeDevice failed, ret: ", aclRet);
     }
 
-    HcclResult ret = HcclBarrierFunc(engramHcclComm_, stream);
-    TORCH_CHECK(ret == HCCL_SUCCESS, "HcclBarrier failed, ret: ", ret);
+    RailAclnnBarrier(*groupName_, GetRankSize());
+
+    if (useCommStream) {
+        NpuStreamWait(commStream_, computeStream);
+    }
 
     if (engramRailContext_) {
         ReZeroRailWindowHead(stream);
