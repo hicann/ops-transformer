@@ -254,9 +254,12 @@ static aclnnStatus aclnnGroupedMatmulAddGetWorkspaceSizeCommon(gmm_add_advanced:
                                          params.transposeWeight, params.groupType, params.groupListType, executorPtr);
     CHECK_RET(result != nullptr, ACLNN_ERR_INNER_NULLPTR);
 
-    // If the output tensor is non-contiguous, convert the calculated contiguous tensor to non-contiguous.
-    auto viewCopyResult = l0op::ViewCopy(result, params.yRef, executorPtr);
-    CHECK_RET(viewCopyResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    // The in-place operation already returns yRef. Avoid invalidating the executor cache
+    // through a redundant self-copy; retain writeback if a separate result is returned.
+    if (result != params.yRef) {
+        auto viewCopyResult = l0op::ViewCopy(result, params.yRef, executorPtr);
+        CHECK_RET(viewCopyResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    }
 
     // Standard syntax, get the size of workspace needed during computation.
     *workspaceSize = uniqueExecutor->GetWorkspaceSize();
