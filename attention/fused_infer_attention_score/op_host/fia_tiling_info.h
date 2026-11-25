@@ -125,7 +125,8 @@ enum class FiaTemplateId : uint32_t {
     EMPTY_TENSOR = 0,
     HIGH_PERFORMANCE_GQA = 3,
     GENERAL_GQA = 4,
-    HIGH_PERFORMANCE_MLA = 5
+    HIGH_PERFORMANCE_MLA = 5,
+    COMPACT_GQA = 6
 };
 
 enum class FiaFullQuantMode : uint32_t {

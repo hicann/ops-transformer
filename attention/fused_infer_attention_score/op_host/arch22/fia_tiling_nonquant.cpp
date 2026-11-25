@@ -198,8 +198,9 @@ void FiaTilingNonQuant::GenTilingKey()
     }
 
     originVal = inputQVal;
+    const FiaTemplateId keyPerfMode = UseCompactGqaPipeline() ? FiaTemplateId::COMPACT_GQA : perfMode_;
     uint64_t baseOffset =
-        modeVal * FIA_TILINGKEYOFFSET + (static_cast<uint64_t>(perfMode_)) * FIA_PERF_MODE_TILINGKEYOFFSET;
+        modeVal * FIA_TILINGKEYOFFSET + (static_cast<uint64_t>(keyPerfMode)) * FIA_PERF_MODE_TILINGKEYOFFSET;
     tilingKey_ = baseOffset + FIA_GET_TILINGKEY(layoutVal, inputQVal, inputKvVal, outputVal, originVal,
                                                 (softmaxBrcbFlagVal + paVal + splitKvVal), antiquantModeVal,
                                                 kvLayoutVal, enableTreeVal);
