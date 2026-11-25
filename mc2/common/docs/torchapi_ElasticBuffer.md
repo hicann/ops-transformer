@@ -45,6 +45,7 @@ class ElasticBuffer:
         explicitly_destroy: bool = False,
         netlayer: str = "auto",
         comm_alg: str = "auto",
+        allow_hybrid_mode: int = 0,
     )
 
     def engram_write(
@@ -140,6 +141,7 @@ class ElasticBuffer:
 - **explicitly_destroy** (`bool`)：可选参数，是否需要显式调用 [destroy](#destroy) 释放资源。默认为 `False`，实例被垃圾回收时会自动调用 `destroy` 释放资源；设为 `True` 时，调用方需要显式调用 `destroy` 释放资源。推荐设置为 `True` 并在使用结束后手动调用 `destroy` 释放资源，以确保资源释放时机确定。
 - **netlayer** (`str`)：可选参数，HCCL网络分层（netlayer）选择，仅作用于Engram建链。取值：`"auto"`（默认）自netlayer 0起逐层探测尝试建链；非负整数字符串（如 `"1"`）表示netlayer编号，仅在该分层内建链，失败则报错返回。建议按“d2d与h2d同die”的原则选择分层建链：使对端访问本卡host映射内存的d2d链路，与本卡NPU访问该内存的h2d路径位于同一die，避免跨die转发，获得更优通信带宽与时延。
 - **comm_alg** (`str`)：可选参数，指定Dispatch/Combine使用的通信端口策略。仅支持 `"auto"` 和 `"clos_only"`，默认值为 `"auto"`。`"auto"` 表示组网中的FullMesh端口和Clos端口都会使用；`"clos_only"` 表示只使用Clos端口、不使用FullMesh端口。在clos_only下，不支持UBG（UB_RTP）协议链路。
+- **allow_hybrid_mode** (`int`)：可选参数，分轨（rail-aligned）建链开关。默认 `0` 表示Engram使用默认建链与通信路径；设为 `1` 表示分轨通信：超节点内各rank fullmesh直连，跨超节点仅同卡号（轨道）建链（见[约束说明](#约束说明)）。支持slice模式（`group != None`）的推理与训练；推理分轨要求显式传入2MB对齐且大于0的 `num_cpu_bytes`。同一通信域的所有rank必须使用相同取值。
 
 **输出说明**：无返回值，构造ElasticBuffer实例。
 
@@ -147,9 +149,10 @@ class ElasticBuffer:
 
 **功能**：将本rank的Engram表注册为通信可达的Engram storage，使其他rank可读取该数据。按构造时的 `with_grad` 与 `zero_copy` 区分行为：
 
-- **推理**（`with_grad=False`，`zero_copy=False`）：将 `storage` 数据拷贝到内部host pinned共享内存段；`group=None` 且未显式指定容量时，内部按 `storage.nbytes()` 向上2MB对齐。当 `storage` 为FP8量化类型时，须同时传入SF量化表 `sf`。
-- **推理**（`with_grad=False`，`zero_copy=True`）：原地注册 `storage` 主机内存，注册或映射失败直接报错，不隐式回退到拷贝。当 `storage` 为FP8量化类型时，须同时传入SF量化表 `sf`。
+- **推理**（`with_grad=False`）：按 `zero_copy` 区分行为——`zero_copy=False` 时将 `storage` 数据拷贝到内部host pinned共享内存段，`group=None` 且未显式指定容量时，内部按 `storage.nbytes()` 向上2MB对齐；`zero_copy=True` 时原地注册 `storage` 主机内存，注册或映射失败直接报错，不隐式回退到拷贝。当 `storage` 为FP8量化类型时，须同时传入SF量化表 `sf`。
 - **训练**（`with_grad=True`）：将 `storage` 的锁页内存直接映射为Engram storage（零拷贝，无数据搬运），`storage` 的原地更新对后续 [engram_fetch](#engram_fetch) 可见。当 `storage` 为FP8量化类型时，须同时传入SF量化表 `sf`。
+- **分轨推理**（`allow_hybrid_mode=1`，`with_grad=False`）：将 `storage` 数据拷贝到内部host pinned共享内存段（分轨模式下该共享段为本rank在机器内共享内存中的分片，本卡NPU与同机各rank的NPU均可直接访问）。分轨模式不支持 `zero_copy=True` 零拷贝外部存储（传入直接报错）。当 `storage` 为FP8量化类型时，须同时传入SF量化表 `sf`。
+- **分轨训练**（`allow_hybrid_mode=1`，`with_grad=True`）：存储行为与训练模式一致，`storage`、`sf` 的锁页内存直接映射为Engram storage（零拷贝，无数据搬运），构造时的 `num_cpu_bytes` 不生效；建链走分轨拓扑，`storage` 的原地更新对后续 [engram_fetch](#engram_fetch) 可见。当 `storage` 为FP8量化类型时，须同时传入SF量化表 `sf`。
 
 写入完成后，内部都会获取通信上下文tensor、本地storage地址和rank数等信息，供后续 [engram_fetch](#engram_fetch) 使用。
 > **推理模式内存说明**：Engram storage的内存形态由 `zero_copy` 参数决定。`zero_copy=False` 时，使用内部host pinned共享内存段，即通过 `aclrtMallocHost` 分配的页锁定（pinned）主机内存，经 `aclrtHostRegisterV2` 映射后获得设备可访问地址，`storage` 数据拷贝写入其中，其大小由构造函数的 `num_cpu_bytes` 参数指定；`zero_copy=True` 时，不经过内部拷贝，直接将调用方提供的 `storage` 主机内存经 `aclrtHostRegisterV2` 注册并映射到设备地址，即调用方内存原地成为本rank的Engram storage，注册或映射失败直接报错，不隐式回退到拷贝路径，注册后 `storage` 的原地更新对后续 [engram_fetch](#engram_fetch) 可见，且在本ElasticBuffer生命周期内必须保持存活且地址不变。两种方式的内存均既可被本卡NPU直接访问，也可被远端rank的NPU通过URMA读取，从而实现跨rank的零拷贝数据共享。
@@ -194,7 +197,9 @@ ElasticBuffer.engram_write(storage, sf=None, *, zero_copy=None) -> None
 **功能**：根据输入的全局索引，从对应rank抓取Engram数据。推理和训练的行为由构造时的 `with_grad` 决定：
 
 - **推理**（`with_grad=False`）：通过URMA one-sided read从远端rank的Engram storage抓取数据，可读取远端 [engram_write](#engram_write) 写入内部host pinned共享内存段的数据，也可读取远端以 `zero_copy=True` 原地注册的调用方内存，两种注册方式对抓取侧透明。接口采用异步设计：调用后立即返回一个callable，执行该callable时阻塞等待URMA传输完成并返回结果tensor。[engram_write](#engram_write) 传入过 `sf` 时，callable额外返回每token对应的SF数据 `fetched_sf`，即返回 `(fetched, fetched_sf)`。
+- **分轨推理**（`allow_hybrid_mode=1`，`with_grad=False`）：通过分轨拓扑建链后抓取数据：同机器内各rank（含本rank）的数据直接从共享内存读取，不经过URMA；跨机器的远端rank数据通过URMA one-sided read从远端共享内存抓取，其中本super内各远端rank使用独立链路、跨super的每个远端机器使用一条共享链路。接口采用异步设计，索引映射与返回值规格均与推理模式一致。
 - **训练**（`with_grad=True`）：通过all-to-all通信从远端rank抓取数据（桶排序 → a2a交换indices → 本地gather → a2a交换data → 还原），返回一个callable，执行该callable时等待传输完成并返回 `(fetched, fetch_ctx)` 二元组，其中 `fetch_ctx` 为save-for-backward上下文 [EngramFetchCtx](#engramfetchctx)。[engram_write](#engram_write) 传入过 `sf` 时，callable额外返回每token对应的SF数据 `fetched_sf`，即返回 `(fetched, fetched_sf, fetch_ctx)`；SF数据与hidden数据同行存放、随token一起交换，反向无SF梯度。
+- **分轨训练**（`allow_hybrid_mode=1`，`with_grad=True`）：建链走分轨拓扑，a2a交换经由分轨链路执行（超节点内对端直连、跨超节点仅同号卡轨道）；桶排序、索引映射、SF同行存放与返回值规格均与训练模式一致。单超节点拓扑自动回退训练模式路径。
 
 **计算公式**：
 
@@ -354,7 +359,7 @@ ElasticBuffer.get_engram_storage_size_hint(
 
 **输出说明**：
 
-- **num_cpu_bytes** (`int`)：CPU buffer大小（MB），用于engram_write的本地存储区（仅推理模式使用），已按2MB对齐。
+- **num_cpu_bytes** (`int`)：CPU buffer大小（字节），用于engram_write的本地存储区（仅推理模式使用），已按2MB对齐。
 
 ### dispatch
 
@@ -554,6 +559,15 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
   - `netlayer` 仅作用于Engram建链选层（[engram_write](#engram_write) 触发的链路探测与channel创建）；Dispatch/Combine路径不使用该参数。
   - `netlayer` 必须为 `"auto"` 或非负整数字符串；且必须存在于HCCL netlayer列表中，否则建链失败。
   - 选层规则：`"auto"` 自netlayer 0起逐层尝试与对端卡建链；数字串仅在该分层内建链，该层所有对端都必须可达，指定分层的分层编号不存在，或该分层内任一对端无可达链路时，建链失败。
+
+- **Engram分轨（rail）模式约束**：
+  - `allow_hybrid_mode=1` 时仅支持slice模式（`group != None`），`group=None` 会被拒绝；支持推理与训练（`with_grad=True`）。
+  - 分轨推理要求显式传入2MB对齐、大于0的 `num_cpu_bytes`；分轨训练 `num_cpu_bytes` 无需传入。
+  - 通信域须为均匀分轨拓扑：各超节点卡数一致，且跨超节点同号卡间链路可达，不满足时建链报错；单超节点拓扑的训练自动回退默认建链。
+  - 组网信息自动探测，或可用环境变量覆盖自动探测：`RANKS_PER_SUPERNODE`（单独设置，仅训练分轨生效）或成对设置 `RANK_SIZE_PER_MACHINE`、`RANK_SIZE_PER_SUPERNODE`（推理与训练均生效）；取值须为正整数且与 `world_size` 满足整除关系，非法取值在建链时报错。
+  - 分轨推理不支持零拷贝外部存储：[engram_write](#engram_write) 传入 `zero_copy=True` 直接报错；分轨训练沿用训练模式的存储约束（`storage`、`sf` 锁页内存零拷贝直接映射）。
+  - 同通信域所有rank必须使用相同的 `allow_hybrid_mode` 取值，否则建链行为不一致。
+  - 机内对端不建链，数据经机内共享内存直接读取；跨机链路按 [init](#init) 的 `netlayer` 参数自指定分层起探测建链（`auto` 自首个网络分层起），指定分层不存在时建链报错。
 
 - **Dispatch/Combine配套约束**：
   - [dispatch](#dispatch) 和 [combine](#combine) 必须配套使用。

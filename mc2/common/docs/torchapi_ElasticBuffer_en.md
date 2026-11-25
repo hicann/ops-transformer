@@ -27,7 +27,7 @@
 
 The ElasticBuffer class provides unified distributed communication buffer management:
 
-- The Engram storage API is used for distributed Engram storage management. It supports registering the table of the local rank as communication-reachable storage (in inference mode, data is written to host pinned shared segments; in training mode, the upper-layer pinned table memory is directly mapped, with zero-copy), and fetching Engram data from remote ranks via RDMA. Must be used in conjunction with [get_engram_storage_size_hint](#get_engram_storage_size_hint-static-method).
+- The Engram storage API is used for distributed Engram storage management. It supports registering the table of the local rank as communication-reachable storage (in inference mode, data is written to the internal host pinned shared memory segment, or the caller's memory is explicitly registered as zero-copy; in training mode, the upper-layer pinned table memory is directly mapped), and fetching Engram data from remote ranks via URMA. `group=None` indicates full-vocab local inference without initializing HCCL.
 - The Engram training API is built on the inference API and enables training mode via `with_grad=True`. The forward [engram_fetch](#engram_fetch) saves the communication metadata required for backward propagation (encapsulated as [EngramFetchCtx](#engramfetchctx)) while fetching data. The backward [engram_fetch_grad](#engram_fetch_grad) exchanges gradients in reverse along the forward path based on this metadata, performs sparse accumulation by local entry, and produces sparse gradients for optimizer updates.
 - The Dispatch/Combine APIs are used for MoE Expert Parallelism (EP) deployment. Token data is dispatched to the corresponding expert devices via [dispatch](#dispatch), and the expert outputs are then aggregated back into the original sequence along the original routing via [combine](#combine). The required CCL communication buffers are automatically calculated and allocated by ElasticBuffer internally based on operator parameters, with no manual configuration required.
 
@@ -37,7 +37,7 @@ The ElasticBuffer class provides unified distributed communication buffer manage
 class ElasticBuffer:
     def __init__(
         self,
-        group: torch.distributed.ProcessGroup,
+        group: Optional[torch.distributed.ProcessGroup],
         *,
         num_cpu_bytes: int = 0,
         num_max_tokens_per_rank: Optional[int] = None,
@@ -45,9 +45,18 @@ class ElasticBuffer:
         num_topk: Optional[int] = None,
         with_grad: bool = False,
         explicitly_destroy: bool = False,
+        netlayer: str = "auto",
+        comm_alg: str = "auto",
+        allow_hybrid_mode: int = 0,
     )
 
-    def engram_write(self, storage: torch.Tensor) -> None
+    def engram_write(
+        self,
+        storage: torch.Tensor,
+        sf: Optional[torch.Tensor] = None,
+        *,
+        zero_copy: Optional[bool] = None,
+    ) -> None
 
     def engram_fetch(self, indices: torch.Tensor) -> Callable
 
@@ -121,7 +130,7 @@ The save-for-backward context returned by the forward [engram_fetch](#engram_fet
 
 **Parameters**:
 
-- **group** (`torch.distributed.ProcessGroup`): required parameter. Distributed process group, used for cross-rank communication and synchronization.
+- **group** (`Optional[torch.distributed.ProcessGroup]`): required parameter. When not `None`, it is an HCCL distributed process group; `None` indicates full-vocab local inference with a fixed `world_size=1`, without initializing HCCL and without training support.
 - <strong>*</strong>: Variables before it are positional; variables after it are optional parameters that must be assigned using key-value pairs. If not assigned, default values are used.
 - **num_cpu_bytes** (`int`): optional parameter, size of the CPU buffer in bytes, used for host pinned storage allocation (takes effect only in inference mode; in training mode, no internal storage is allocated and this parameter takes no effect). The default value is 0, and it must be 2MB-aligned.
 - **num_max_tokens_per_rank** (`int`): optional parameter, indicates the maximum quantity of tokens on each device. When using [dispatch](#dispatch) and [combine](#combine), it must be specified together with `hidden` and `num_topk`; in training mode with `with_grad=True`, it must be specified and must be greater than 0.
@@ -129,55 +138,68 @@ The save-for-backward context returned by the forward [engram_fetch](#engram_fet
 - **num_topk** (`int`): optional parameter, indicates the number of topK experts to select.
 - **with_grad** (`bool`): optional parameter, indicates whether training is enabled. The default value is `False` (inference). If set to `True`, the forward [engram_fetch](#engram_fetch) additionally saves the communication metadata required for backward propagation (encapsulated as [EngramFetchCtx](#engramfetchctx)), and backward can be performed via [engram_fetch_grad](#engram_fetch_grad).
 - **explicitly_destroy** (`bool`): optional parameter, indicates whether to explicitly call [destroy](#destroy) to release resources. The default value is `False`, and `destroy` is automatically called to release resources when the instance is garbage collected. If set to `True`, the caller must explicitly call `destroy` to release resources. It is recommended to set this parameter to `True` and manually call `destroy` to release resources after use, ensuring that resources are released at a deterministic time.
+- **netlayer** (`str`): optional parameter, HCCL network layer (netlayer) selection, applies only to Engram link establishment. Values: `"auto"` (default) probes and attempts link establishment layer by layer starting from netlayer 0; a non-negative integer string (e.g. `"1"`) indicates a netlayer ID, and links are established only within that layer; failures are reported as errors. It is recommended to select the layer for link establishment based on the principle that d2d and h2d are on the same die: the d2d link used by a peer to access the local host-mapped memory and the h2d path used by the local NPU to access that memory should be on the same die, avoiding cross-die forwarding for better communication bandwidth and latency.
+- **comm_alg** (`str`): optional parameter, specifies the communication port policy used by Dispatch/Combine. Only `"auto"` and `"clos_only"` are supported, and the default value is `"auto"`. `"auto"` means that both FullMesh and Clos ports in the network are used; `"clos_only"` means that only Clos ports are used and FullMesh ports are not used. In clos_only mode, UBG (UB_RTP) protocol links are not supported. <!-- codespell:ignore -->
+- **allow_hybrid_mode** (`int`): optional parameter, rail-aligned link establishment switch. The default value `0` indicates that Engram uses the default link establishment and communication path; the value `1` indicates rail-aligned communication: fullmesh direct connection for ranks within a supernode, and only same-card-ID (rail) links across supernodes (see [Constraints](#constraints)). Inference and training are supported in slice mode (`group != None`); rail-aligned inference requires an explicitly passed `num_cpu_bytes` that is 2MB-aligned and greater than 0. All ranks in the same communicator must use the same value.
 
 **Output**: No return value. Constructs an ElasticBuffer instance.
 
 ### engram_write
 
-**Function**: Registers the Engram table of the local rank as a communication-accessible Engram storage so that other ranks can read the data. Two behaviors apply depending on `with_grad` specified at construction:
+**Function**: Registers the Engram table of the local rank as a communication-accessible Engram storage so that other ranks can read the data. The behavior depends on `with_grad` and `zero_copy` specified at construction:
 
-- **Inference** (`with_grad=False`): Copies the `storage` data to the internal host pinned shared memory segment.
-- **Training** (`with_grad=True`): Directly maps the pinned memory of `storage` as the Engram storage (zero-copy, no data movement). In-place updates to `storage` are visible to subsequent [engram_fetch](#engram_fetch) calls.
+- **Inference** (`with_grad=False`): The behavior depends on `zero_copy`. When `zero_copy=False`, the `storage` data is copied to the internal host pinned shared memory segment; if `group=None` and no capacity is explicitly specified, the internal capacity is aligned up to 2MB based on `storage.nbytes()`. When `zero_copy=True`, the host memory of `storage` is registered in place; registration or mapping failures are reported as errors directly, without implicitly falling back to copying. When `storage` is an FP8 quantized type, the SF (scale factor) table `sf` must be passed in as well.
+- **Training** (`with_grad=True`): The pinned memory of `storage` is directly mapped as the Engram storage (zero-copy, no data movement). In-place updates to `storage` are visible to subsequent [engram_fetch](#engram_fetch) calls. When `storage` is an FP8 quantized type, the SF table `sf` must be passed in as well.
+- **Rail-aligned inference** (`allow_hybrid_mode=1`, `with_grad=False`): The `storage` data is copied to the internal host pinned shared memory segment (in rail-aligned mode, this shared segment is the shard of the local rank in the intra-machine shared memory, which can be directly accessed by the NPU of this device and the NPUs of all ranks on the same machine). Rail-aligned mode does not support `zero_copy=True` zero-copy external storage (an error is reported if it is passed). When `storage` is an FP8 quantized type, the SF table `sf` must be passed in as well.
+- **Rail-aligned training** (`allow_hybrid_mode=1`, `with_grad=True`): The storage behavior is the same as that in training mode. The pinned memory of `storage` and `sf` is directly mapped as the Engram storage (zero-copy, no data movement), and the `num_cpu_bytes` specified at construction takes no effect; link establishment uses the rail-aligned topology, and in-place updates to `storage` are visible to subsequent [engram_fetch](#engram_fetch) calls. When `storage` is an FP8 quantized type, the SF table `sf` must be passed in as well.
 
-After the write is complete in both modes, the communication context tensor, local storage address, communication buffer size, number of ranks, and other information are automatically obtained internally for use by subsequent [engram_fetch](#engram_fetch) calls.
+After the write is complete, the communication context tensor, local storage address, and number of ranks are automatically obtained internally for use by subsequent [engram_fetch](#engram_fetch) calls.
 
-> **Host pinned shared memory segment** (inference mode): Refers to the pinned host memory allocated through `aclrtMallocHost` and mapped through `aclrtHostRegisterV2` to obtain a device-accessible address. This memory segment can be directly accessed by the NPU of this device and read by the NPUs of remote ranks through RDMA, enabling cross-rank zero-copy data sharing. Its size is specified by the `num_cpu_bytes` parameter of the constructor.
+> **Inference mode memory description**: The memory form of the Engram storage is determined by the `zero_copy` parameter. When `zero_copy=False`, the internal host pinned shared memory segment is used, that is, the pinned host memory allocated through `aclrtMallocHost` and mapped through `aclrtHostRegisterV2` to obtain a device-accessible address, with the `storage` data copied into it; its size is specified by the `num_cpu_bytes` parameter of the constructor. When `zero_copy=True`, no internal copy is performed; the caller-provided `storage` host memory is registered through `aclrtHostRegisterV2` and mapped to a device address, that is, the caller's memory becomes the Engram storage of the local rank in place. Registration or mapping failures are reported as errors directly, without implicitly falling back to the copy path. After registration, in-place updates to `storage` are visible to subsequent [engram_fetch](#engram_fetch) calls, and `storage` must remain alive with an unchanged address throughout the lifetime of this ElasticBuffer. The memory in both modes can be directly accessed by the NPU of this device and read by the NPUs of remote ranks through URMA, enabling cross-rank zero-copy data sharing.
 > **Training mode memory mapping**: The pinned host memory of `storage` is registered through `aclrtHostRegisterV2` and mapped to a device address, and then registered to the HCCL communicator so that remote ranks can access it. Requirements: `storage` must be pinned memory (e.g., allocated by `pin_memory()` or `torch.empty(..., pin_memory=True)`); plain (non-pinned) CPU memory is not supported under the host registration path of the current driver, and `aclrtHostGetDevicePointer` fails on the first invocation; `storage` must remain alive with an unchanged address throughout the lifetime of this ElasticBuffer. Repeated calls to this API must pass the same `storage` (it can serve as a cross-rank synchronization point after in-place table updates); passing any other address raises an error.
 
 **Formula**:
 
-In inference mode, the data of `storage` is copied byte by byte to the starting position of the host pinned shared memory segment through `memcpy_s`:
+In inference mode (`zero_copy=False`), the data of `storage` is copied to the starting position of the internal host pinned shared memory segment through `memcpy_s`:
 
 $$HostPinnedBuf[0 : storage.nbytes()] \leftarrow storage.data()$$
 
-In training mode, no copy is performed; `storage` is directly used as the Engram table of the local rank:
+In inference mode (`zero_copy=True`), no copy is performed; the caller's host memory becomes the Engram table of the local rank after host registration mapping:
 
 $$EngramTable[rank\_id] \equiv storage$$
 
-In both modes, two `Barrier` operations are performed before and after the write, ensuring that writes from all ranks are complete and visible to each other:
+In training mode, no copy is performed; the pinned memory of `storage` becomes the Engram table of the local rank after host registration mapping:
+
+$$EngramTable[rank\_id] \equiv storage$$
+
+In distributed mode, one `Barrier` is performed before and after the write; local mode (`group=None`) has no communicator and does not perform `Barrier`:
 
 $$Barrier \rightarrow write(storage) \rightarrow Barrier$$
 
-Here, `storage.nbytes() = num_entries × hidden × dtype_size`, and `storage.nbytes() ≤ num_cpu_bytes` must be satisfied.
+Here, `storage.nbytes() = num_entries × hidden × dtype_size`, and when `zero_copy=False`, `storage.nbytes() ≤ num_cpu_bytes` must be satisfied.
 
 **Function Prototype**:
 
 ```python
-ElasticBuffer.engram_write(storage) -> None
+ElasticBuffer.engram_write(storage, sf=None, *, zero_copy=None) -> None
 ```
 
 **Input parameters**:
 
-- **storage** (`Tensor`): Required parameter. CPU tensor to be written, with shape `(num_entries, hidden)`, indicating `num_entries` entries, each of dimension `hidden`. Must be 2D and contiguous, and `hidden` must be greater than 0. Supported data types are `bfloat16`, `float16`, and `float32`.
+- **storage** (`Tensor`): Required parameter. CPU tensor to be written, with shape `(num_entries, hidden)`, indicating `num_entries` entries, each of dimension `hidden`. Must be 2D and contiguous, and `hidden` must be greater than 0. Supported data types are `bfloat16`, `float16`, and `float32` (without SF), and `float8_e4m3fn` and `float8_e5m2` (with SF).
+- **sf** (`Optional[Tensor]`): Optional parameter, the scale factor (SF) table for FP8 quantization, passed in only when `storage` is `float8_e4m3fn` or `float8_e5m2` (required in this case). It must be a 2D tensor with shape `(rows, num_sf_packs)`, where the number of columns `num_sf_packs = ceil(hidden / group_size)` and `group_size` is the group size of MX quantization (one SF per group), that is, the `hidden` elements of each entry are grouped with the number of groups rounded up, and `0 < num_sf_packs ≤ hidden` must be satisfied. The number of rows depends on the mode: in training mode, it is the SF table shard of the local rank with `num_entries_per_rank` rows and must be a CPU pinned tensor; in inference mode, it is the full SF table with `num_entries_per_rank × rank_size` rows and must be an NPU tensor. Supported data types are `float32` and `float8_e8m0`, and the data format is $ND$.
+- **zero_copy** (`Optional[bool]`): keyword-only parameter. If not passed, the default value is taken by mode: `False` for inference and `True` for training. In inference, `False` indicates copying to the internal host pinned window, and `True` indicates registering the caller's memory in place, with failures reported as errors; in training, the pinned storage is always registered in place, and explicitly passing `False` is rejected.
 
-**Output description**: No return value. In inference mode, data is written to host pinned memory; in training mode, the `storage` memory is registered as Engram storage.
+**Output description**: No return value. In inference mode with `zero_copy=False`, data is copied into the internal host pinned shared memory segment; in inference mode with `zero_copy=True`, the caller's memory of `storage` is registered in place as the Engram storage (no data movement); in training mode, the pinned memory of `storage` is registered as the Engram storage.
 
 ### engram_fetch
 
 **Function**: Fetches Engram data from the corresponding rank based on the input global indices. The behavior in inference and training modes is determined by `with_grad` specified at construction:
 
-- **Inference** (`with_grad=False`): Fetches data from the host pinned shared memory of remote ranks through RDMA one-sided read. The API adopts an asynchronous design: it returns a callable immediately after the call. When the callable is executed, it blocks until the RDMA transfer is complete and returns the result tensor.
-- **Training** (`with_grad=True`): Fetches data from remote ranks through all-to-all communication (bucket sort → a2a exchange of indices → local gather → a2a exchange of data → restore). It returns a callable. When the callable is executed, it waits for the transfer to complete and returns the `(fetched, fetch_ctx)` tuple, where `fetch_ctx` is the save-for-backward context [EngramFetchCtx](#engramfetchctx).
+- **Inference** (`with_grad=False`): Fetches data from the Engram storage of remote ranks through URMA one-sided read. It can read data written by remote ranks to the internal host pinned shared memory segment via [engram_write](#engram_write), as well as the caller's memory registered in place by remote ranks with `zero_copy=True`; both registration methods are transparent to the fetching side. The API adopts an asynchronous design: it returns a callable immediately after the call. When the callable is executed, it blocks until the URMA transfer is complete and returns the result tensor. If `sf` has been passed to [engram_write](#engram_write), the callable additionally returns the per-token SF data `fetched_sf`, that is, `(fetched, fetched_sf)`.
+- **Rail-aligned inference** (`allow_hybrid_mode=1`, `with_grad=False`): Data is fetched after link establishment over the rail-aligned topology: data of ranks on the same machine (including this rank) is read directly from the shared memory without URMA; data of remote ranks across machines is fetched from the remote shared memory through URMA one-sided read, where each remote rank within this supernode uses an independent link and each remote machine across supernodes uses one shared link. The API adopts an asynchronous design, and the index mapping and return value specifications are the same as those in inference mode.
+- **Training** (`with_grad=True`): Fetches data from remote ranks through all-to-all communication (bucket sort → a2a exchange of indices → local gather → a2a exchange of data → restore). It returns a callable. When the callable is executed, it waits for the transfer to complete and returns the `(fetched, fetch_ctx)` tuple, where `fetch_ctx` is the save-for-backward context [EngramFetchCtx](#engramfetchctx). If `sf` has been passed to [engram_write](#engram_write), the callable additionally returns the per-token SF data `fetched_sf`, that is, `(fetched, fetched_sf, fetch_ctx)`; SF data is stored in the same rows as the hidden data and exchanged together with tokens, and there is no SF gradient in backward.
+- **Rail-aligned training** (`allow_hybrid_mode=1`, `with_grad=True`): Link establishment uses the rail-aligned topology, and a2a exchanges are performed over rail-aligned links (direct connection for peers within a supernode, and only same-card-ID rail links across supernodes). Bucket sorting, index mapping, SF co-row storage, and return value specifications are the same as those in training mode. Training on a single-supernode topology automatically falls back to the training-mode path.
 
 **Formula**:
 
@@ -228,7 +250,7 @@ ElasticBuffer.engram_fetch(indices) -> Callable
 
 **Input Parameters**:
 
-- **indices** (`Tensor`): Required parameter. NPU tensor of query indices with shape `(num_tokens,)`, indicating the global indices of the entries to fetch (`len(indices)` must be the same on all devices in training use cases and can differ in inference use cases). The supported data type is `int32`, and the data format is $ND$. The value range of elements must be within `[0, world_size × num_entries)`. If the value of an element exceeds this range, the data at the corresponding position in the return value is 0.
+- **indices** (`Tensor`): Required parameter. NPU tensor of query indices with shape `(num_tokens,)`, indicating the global indices of the entries to fetch (`len(indices)` must be the same on all devices in training use cases and can differ in inference use cases). The supported data type is `int32`, and the data format is $ND$. The value range of elements must be within `[0, world_size × num_entries)`; out-of-range or negative indices are caller errors, and the output data at the corresponding positions is undefined.
 
 **Output Description**:
 
@@ -237,10 +259,12 @@ ElasticBuffer.engram_fetch(indices) -> Callable
 **Inference mode**: calling `wait_callable()` returns:
 
 - **fetched** (`Tensor`): NPU tensor with shape `(num_tokens, hidden)`. Its data type is the same as `storage.dtype` of [engram_write](#engram_write), and its data format is $ND$.
+- **fetched_sf** (`Tensor`): Optional return value, returned when SF quantization is enabled. NPU tensor with shape `(num_tokens, num_sf_packs)`. Its data type is the same as `sf.dtype` of [engram_write](#engram_write), and its data format is $ND$.
 
 **Training** call to `wait_callable()` returns:
 
 - **fetched** (`Tensor`): NPU tensor with shape `(num_tokens, hidden)`. The data type is the same as `storage.dtype`. The data format is $ND$.
+- **fetched_sf** (`Tensor`): Optional return value, returned when SF quantization is enabled; same specifications as those in inference mode.
 - **fetch_ctx** (`EngramFetchCtx`): save-for-backward context that contains 5 communication metadata tensors required for backward propagation (see [EngramFetchCtx](#engramfetchctx)). Must be passed as is to [engram_fetch_grad](#engram_fetch_grad).
 
 ### engram_fetch_grad
@@ -457,7 +481,7 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
 
 ### destroy
 
-**Function**: Releases the resources held by the ElasticBuffer instance, including the Dispatch/Combine communication context. Note: The host pinned memory for Engram communication (including the self-created host pinned memory in inference mode and the registered mapping of the caller's zero-copy storage in training mode) is registered into the HCCL engine context at creation, and no deregistration API is available. After destroy, this part of memory is retained by the process-level shared pool by communicator and released uniformly when the process exits; destroy does not release this part of memory (the caller's storage memory itself is never released). When an ElasticBuffer is destroyed and then recreated on the same communicator, the shared pool memory is reused directly. Reuse constraints: the capacity of a rebuilt self-created buffer must not exceed the value at initial creation; when an external zero-copy buffer is rebuilt, its address and size must be the same as those registered at initial creation; otherwise, the API reports an error, in which case a new communicator is required. In training mode, the default HCCL communication buffer is managed by the framework, and no manual intervention is required for its release. When constructed with `explicitly_destroy=False` (default), this method is automatically called when the instance is garbage collected; when `explicitly_destroy=True`, it must be explicitly called by the caller.
+**Function**: Releases the resources held by the ElasticBuffer instance, including the Dispatch/Combine communication context. Note: The host pinned memory for Engram communication (including the self-created host pinned memory in inference mode and the registered mapping of the caller's zero-copy storage in training mode) is registered into the HCCL engine context at creation, and no deregistration API is available. After destroy, this part of memory is retained by the process-level shared pool by communicator and released uniformly when the process exits; destroy does not release this part of memory (the caller's storage memory itself is never released). When an ElasticBuffer is destroyed and then recreated on the same communicator, the shared pool memory is reused directly. Reuse constraints: the capacity of a rebuilt self-created buffer must not exceed the value at initial creation; when an external zero-copy buffer is rebuilt, its address and size must be the same as those registered at initial creation (the same applies to the SF table); the `netlayer` value at rebuild must be the same as that at initial creation; otherwise, the API reports an error, in which case a new communicator is required. In training mode, the default HCCL communication buffer is managed by the framework, and no manual intervention is required for its release. When constructed with `explicitly_destroy=False` (default), this method is automatically called when the instance is garbage collected; when `explicitly_destroy=True`, it must be explicitly called by the caller.
 
 **Input parameters**: None.
 
@@ -475,8 +499,15 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
   - `indices` must be a 1D tensor.
 
 - **Engram dtype constraints**:
-  - `storage.dtype` supports only `bfloat16`, `float16`, and `float32`.
+  - `storage.dtype` supports only `bfloat16`, `float16`, `float32` (without SF), and `float8_e4m3fn`/`float8_e5m2` (with SF).
   - `indices.dtype` must be `int32`.
+
+- **Engram SF quantization constraints**:
+  - `sf` must match `storage.dtype`: `sf` is required when `storage` is `float8_e4m3fn`/`float8_e5m2`, and `sf` must not be passed when `storage` is `bfloat16`/`float16`/`float32`.
+  - `sf` must be a 2D tensor, and `sf.dtype` supports only `float32` and `float8_e8m0`.
+  - Training mode: `sf` has shape `(storage.size(0), num_sf_packs)`, with the number of columns `num_sf_packs = ceil(hidden / group_size)`, where `group_size` is the group size of MX quantization, and `0 < num_sf_packs ≤ hidden` must be satisfied; `sf` must be CPU pinned memory (directly mapped together with `storage`, zero-copy); `sf` must remain alive with an unchanged address throughout the ElasticBuffer lifecycle.
+  - Inference mode: `sf` has shape `(world_size × num_entries, num_sf_packs)` (full SF table, one SF group per entry), is an NPU tensor, and is addressed by global indices; in local mode (`group=None`), `world_size=1` and the number of rows is `num_entries`.
+  - [engram_fetch_grad](#engram_fetch_grad) does not produce SF gradients: `fetched_sf` is regarded as a non-differentiable tensor, and backward propagates gradients only for the hidden data.
 
 - **Engram device constraints**:
   - `storage` must be on the CPU.
@@ -486,6 +517,18 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
   - [engram_write](#engram_write) must be called at least once before [engram_fetch](#engram_fetch) is called.
   - Concurrent [engram_fetch](#engram_fetch) calls are not allowed on the same ElasticBuffer instance (the callable of the previous fetch must complete execution).
   - In training mode, call [engram_fetch](#engram_fetch) (training mode) first to obtain `fetch_ctx` before calling [engram_fetch_grad](#engram_fetch_grad).
+
+- **full-vocab local constraints**:
+  - `group=None` supports inference only; `with_grad=True`, MoE parameters, and [barrier](#barrier) are all rejected.
+  - The caller should call `torch.npu.set_device(local_rank)` before creating the instance and keep the current NPU device unchanged during the first [engram_write](#engram_write), subsequent [engram_fetch](#engram_fetch), and [destroy](#destroy); local runtime resources are bound to the current NPU device at the first `engram_write`.
+  - `storage` is the complete global vocabulary, `indices` are global row numbers, and `num_entries_per_rank` equals `storage.size(0)`.
+  - With `zero_copy=True`, the Python instance keeps a reference to `storage`; the underlying owner of mmap/SharedMemory views must still be retained by the caller until all fetch calls are complete and `destroy()` succeeds.
+  - For multi-process sharing of the same vocabulary, `/dev/shm`, `mmap`, or `SharedMemory` is recommended; do not use a private copy of `pin_memory()` as a cross-process sharing solution.
+  - `indices` must all fall within the valid global index range; out-of-range or negative indices are caller errors, and the output behavior is undefined.
+
+- **Engram inference mode constraints**:
+  - In slice mode (`group` is not `None`, cross-rank distributed inference), only offload memory created through URMA communication is supported; communication currently does not support accessing offload memory through PCIE, only through UB.
+  - In local mode (`group=None`, full-vocab local inference), the offload memory is the full Engram table and does not go through distributed communication.
 
 - **Engram Training Mode Constraints**:
   - If `with_grad=True`, `num_max_tokens_per_rank` must be a positive integer.
@@ -497,9 +540,26 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
 - **Engram Numerical Constraints**:
   - `num_cpu_bytes` and `num_entries` must be non-negative.
   - `hidden` must be greater than 0.
-  - `storage.nbytes()` must be less than or equal to `num_cpu_bytes`. `storage.nbytes()` indicates the actual number of bytes occupied by the tensor, that is, `num_entries × hidden × dtype_size` (where
+  - When `zero_copy=False` (data is written to the internal host pinned shared memory segment), `storage.nbytes() ≤ num_cpu_bytes` must be satisfied. `storage.nbytes()` indicates the actual number of bytes occupied by the tensor, that is, `num_entries × hidden × dtype_size` (where
   `dtype_size` is the byte size of a single element, for example, 2 bytes for `bfloat16` and 4 bytes for `float32`).
   - The total number of global entries `world_size × num_entries` must be less than 2^31 (the maximum value of int32) to ensure the indices do not overflow.
+  - When `group=None`, `num_entries < 2^31` must be satisfied.
+
+- **Engram netlayer constraints**:
+  - `netlayer` applies only to Engram link layer selection (link probing and channel creation triggered by [engram_write](#engram_write)); the Dispatch/Combine path does not use this parameter.
+  - `netlayer` must be `"auto"` or a non-negative integer string, and must exist in the HCCL netlayer list; otherwise, link establishment fails.
+  - Layer selection rule: with `"auto"`, link establishment with peer devices is attempted layer by layer starting from netlayer 0; with a numeric string, links are established only within that layer. All peers in that layer must be reachable. If the specified layer ID does not exist, or any peer in that layer has no reachable link, link establishment fails.
+
+- **Engram rail-aligned (rail) mode constraints**:
+  - When `allow_hybrid_mode=1`, only slice mode (`group != None`) is supported, and `group=None` is rejected; inference and training (`with_grad=True`) are supported.
+  - Rail-aligned inference requires an explicitly passed `num_cpu_bytes` that is 2MB-aligned and greater than 0; rail-aligned training does not require `num_cpu_bytes`.
+  - The communicator must be a uniform rail-aligned topology: each supernode has the same number of devices, and same-card-ID links across supernodes are reachable; otherwise, link establishment is reported as an error. Training on a single-supernode topology automatically falls back to the default link establishment.
+  - Environment variables can override automatic topology probing: `RANKS_PER_SUPERNODE` (set alone, effective only for rail-aligned training) or `RANK_SIZE_PER_MACHINE` and `RANK_SIZE_PER_SUPERNODE` set in pairs (effective for both inference and training). Values must be positive integers and satisfy the divisibility relationship with `world_size`; invalid values are reported as errors during link establishment.
+  - Rail-aligned and default link establishment cannot share the same communicator: using rail-aligned after default link establishment on the same communicator (or vice versa) is reported as an error, and a new communicator is required.
+  - Rail-aligned inference does not support zero-copy external storage: passing `zero_copy=True` to [engram_write](#engram_write) is reported as an error; rail-aligned training inherits the storage constraints of training mode (`storage` and `sf` pinned memory directly mapped, zero-copy).
+  - All ranks in the same communicator must use the same `allow_hybrid_mode` value; otherwise, link establishment behavior is inconsistent.
+  - The rail-aligned shared memory file name is generated by extracting letters, digits, and `_`/`-` characters from the group name; other characters in the group name (such as `/`) are removed.
+  - Peers on the same machine do not require link establishment, and data is read directly from the intra-machine shared memory; cross-machine links are probed for establishment starting from the layer specified by the `netlayer` parameter of [init](#init) (`auto` starts from the first network layer). If the specified layer does not exist, link establishment is reported as an error.
 
 - **Dispatch/Combine constraints**:
   - [dispatch](#dispatch) and [combine](#combine) must be used in conjunction.
@@ -519,7 +579,7 @@ ElasticBuffer.get_moe_ep_ccl_buffer_size(world_size, num_max_tokens_per_rank, hi
   - a2a send and receive in Engram training mode (`with_grad=True`) still uses the default HCCL communication buffer. The `HCCL_BUFFSIZE` environment variable only takes effect for this path (the default value is 200MB if the variable is not configured).
 
 - **Communicator constraints**:
-  - The `world_size` range of the Engram communicator is `[2, 1024]`, and multi-card distributed use cases are supported.
+  - The Engram communicator supports multi-card distributed use cases.
   - The [dispatch](#dispatch) and [combine](#combine) operators in a model only support the same EP communicator, and no other operators are allowed in the communicator.
 
 - **Special Case Handling**:
@@ -576,10 +636,20 @@ def run_elastic_buffer(queue, rank, world_size, storage, indices):
     )
     print(f"[INFO] device_{rank} num_cpu_bytes={num_cpu_bytes}")
 
-    buffer = ElasticBuffer(group, num_cpu_bytes=num_cpu_bytes, explicitly_destroy=True)
+    buffer = ElasticBuffer(
+        group,
+        num_cpu_bytes=num_cpu_bytes,
+        explicitly_destroy=True,
+        netlayer="auto",
+    )
 
     print(f"[INFO] device_{rank} run engram_write")
     buffer.engram_write(storage)
+    # SF quantization (optional): when storage is fp8, the scale factor table must be passed in as well (NPU tensor, full SF table):
+    #   num_sf_packs = (hidden + 31) // 32  # MX quantization group_size=32, i.e., ceil(hidden/group_size)
+    #   sf = torch.rand(num_entries * world_size, num_sf_packs, dtype=torch.float32, device="npu")
+    #   buffer.engram_write(storage_fp8, sf)
+    #   fetched, fetched_sf = buffer.engram_fetch(indices_npu)()
 
     print(f"[INFO] device_{rank} run engram_fetch")
     indices_npu = indices.npu()
@@ -688,10 +758,17 @@ def train_worker(rank):
         num_max_tokens_per_rank=num_tokens,
         with_grad=True,
         explicitly_destroy=True,
+        netlayer="auto",
     )
 
     # ==================== Write to the storage ====================
     buffer.engram_write(storage)
+    # SF quantization (optional): when storage is fp8, the scale factor table must be passed in as well (per-rank table, pinned):
+    #   num_sf_packs = (hidden + 31) // 32  # MX quantization group_size=32, i.e., ceil(hidden/group_size)
+    #   sf = torch.rand(num_entries, num_sf_packs, dtype=torch.float32).pin_memory()
+    #   buffer.engram_write(storage_fp8, sf)
+    #   fetched, fetched_sf, fetch_ctx = buffer.engram_fetch(indices_npu)()
+    # fetched_sf has no backward gradient; backward still only needs grad_fetched and fetch_ctx
     dist.barrier()
     torch.npu.synchronize()
 
