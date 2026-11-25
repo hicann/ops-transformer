@@ -1,237 +1,82 @@
 /**
- * Copyright (c) 2025 Huawei Technologies Co., Ltd.
- * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
- * CANN Open Software License Agreement Version 2.0 (the "License").
- * Please refer to the License for details. You may not use this file except in compliance with the License.
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
- * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
- * See LICENSE in the root of the software repository for the full text of the License.
- */
+ * Copyright (c) 2025 Huawei Technologies Co., Ltd.
+ * This program is free software, you can redistribute it and/or modify it under the terms and conditions of
+ * CANN Open Software License Agreement Version 2.0 (the "License").
+ * Please refer to the License for details. You may not use this file except in compliance with the License.
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.
+ * See LICENSE in the root of the software repository for the full text of the License.
+ */
 
 /*!
  * \file test_aclnn_all_gather_add.cpp
- * \brief
+ * \brief AllGatherAdd 测试入口：按平台/开关选择用例。
+ *        本文件仅保留 BASIC（随机矩阵单次调用）用例，其余用例在独立 header 中：
+ *        CONSECUTIVE → test_all_gather_add_consecutive.h
+ *        TIMEOUT     → test_all_gather_add_timeout.h
+ *        UB_BOUNDARY → test_all_gather_add_ub_boundary.h
+ *        共享 helper → test_all_gather_add_common.h / test_all_gather_add_small_shape.h
  */
 
-#include <thread>
-#include <future>
-#include <iostream>
-#include <algorithm>
-#include <cmath>
-#include <random>
-#include <chrono>
-#include <iomanip>
-#include <string>
-#include <vector>
-#include "hccl/hccl.h"
-#include "aclnn/opdev/fp16_t.h"
-#include "../op_host/op_api/aclnn_all_gather_add.h"
+#include "test_all_gather_add_common.h"
+#include "test_all_gather_add_small_shape.h"
+#include "test_all_gather_add_consecutive.h"
+#include "test_all_gather_add_timeout.h"
+#include "test_all_gather_add_ub_boundary.h"
+#include "test_all_gather_add_align_reject.h"
 
-#define CHECK_RET(cond, return_expr) \
-    do { \
-        if (!(cond)) { \
-            LOG_PRINT("Example failed.\n"); \
-            return_expr; \
-        } \
-    } while (0)
-
-#define LOG_PRINT(message, ...) \
-    do { \
-        printf(message, ##__VA_ARGS__); \
-    } while (0)
-
-constexpr int RANK_DIM = 2;
-typedef struct {
-    std::vector<op::fp16_t> rank0_a;
-    std::vector<op::fp16_t> rank0_b;
-    std::vector<op::fp16_t> rank1_a;
-    std::vector<op::fp16_t> rank1_b;
-
-    std::vector<op::fp16_t> gatherOut;
-    std::vector<op::fp16_t> rank0_c;
-    std::vector<op::fp16_t> rank1_c;
-} TestData;
-
-int64_t GetShapeSize(const std::vector<int64_t>& shape)
-{
-    int64_t shapeSize = 1;
-    for (auto i : shape) {
-        shapeSize *= i;
-    }
-    return shapeSize;
-}
-
-// 本示例固定shape
-const std::vector<int64_t> aShape = {240, 256};
-const std::vector<int64_t> bShape = {240 * RANK_DIM, 256};
-
-const long long aShapeSize = GetShapeSize(aShape);
-const long long bShapeSize = GetShapeSize(bShape);
-
-template <typename T>
-int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
-                    aclDataType dataType, aclTensor** tensor)
-{
-    auto size = GetShapeSize(shape) * sizeof(T);
-    auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtMalloc failed. ret: %d\n", ret); return ret);
-    ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtMemcpy failed. ret: %d\n", ret); return ret);
-    std::vector<int64_t> strides(shape.size(), 1);
-    for (int64_t i = shape.size() - 2; i >= 0; i--) {
-        strides[i] = shape[i + 1] * strides[i + 1];
-    }
-    *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
-                              shape.data(), shape.size(), *deviceAddr);
-    return 0;
-}
-
-int CompareVector(std::vector<op::fp16_t>& vec1, const std::vector<op::fp16_t>& vec2)
-{
-    const float tolerance = 0.001f; // 千分之一
-    for (size_t i = 0; i < vec1.size(); ++i) {
-        float a = static_cast<float>(vec1[i]);
-        float b = static_cast<float>(vec2[i]);
-
-        float diff = std::fabs(a - b);
-        float maxAbs = std::max(std::fabs(a), std::fabs(b));
-        if (maxAbs > 1e-6f) {
-            float relativeError = diff / maxAbs;
-            if (relativeError > tolerance) {
-                return 1;
-            }
-        } else {
-            if (diff > tolerance) {
-                return 1;
-            }
-        }
-    }
-    return 0;
-}
-
-struct Args {
-    int rankId;
-    HcclComm hcclComm;
-    aclrtStream stream;
+// ==================== 测试用例开关 ====================
+// 按运行平台自动选择用例（也可手动把 kTestMode 改成其它值强制跑某个）：
+//   A5(950)      → CONSECUTIVE：连续两次调用，验证 MTE 0/1 双缓冲
+//   A2/A3(910b)  → BASIC：单次调用（高层 Hccl 路径）
+//   TIMEOUT      → 对端缺失 READY → WaitPeers 超时 trap（仅 A5 有意义，跑得慢）
+//   UB_BOUNDARY  → 大 shape 越过 MTE UB 容量 → 封顶分块后正确出结果（仅 A5 MTE 路径）
+//   ALIGN_REJECT → 每核数据量非 240 对齐 → tiling 拒绝（仅 A5 MTE 路径）
+enum class TestMode {
+    AUTO = 0,
+    BASIC,
+    CONSECUTIVE,
+    TIMEOUT,
+    UB_BOUNDARY,
+    ALIGN_REJECT,
 };
+static const TestMode kTestMode = TestMode::AUTO;
 
-int LaunchOneThreadAllGatherAdd(Args& args, const TestData& testData)
+static bool IsA5Platform()
+{
+    const char* socName = aclrtGetSocName();
+    return socName != nullptr && std::string(socName).find("950") != std::string::npos;
+}
+
+static TestMode ResolveTestMode()
+{
+    if (kTestMode != TestMode::AUTO) {
+        return kTestMode;
+    }
+    return IsA5Platform() ? TestMode::CONSECUTIVE : TestMode::BASIC;
+}
+
+// BASIC 用例：随机矩阵单次调用（两平台通用，A2/A3 高层 Hccl / A5 MTE 均走单次调用）
+static int LaunchBasicTest(Args& args, const TestData& round1)
 {
     int ret = aclrtSetDevice(args.rankId);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSetDevice failed. ret = %d \n", ret); return ret);
 
-    char hcomName[128] = {0};
-    ret = HcclGetCommName(args.hcclComm, hcomName);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclGetCommName failed. ret: %d\n", ret); return -1);
-    LOG_PRINT("[INFO] rank = %d, hcomName = %s, stream = %p\n", args.rankId, hcomName, args.stream);
-
-    void* aDeviceAddr = nullptr;
-    void* bDeviceAddr = nullptr;
-    void* outDeviceAddr = nullptr;
-    void* gatherOutDeviceAddr = nullptr;
-    aclTensor* a = nullptr;
-    aclTensor* b = nullptr;
-    aclTensor* out = nullptr;
-    aclTensor* gatherOut = nullptr;
-
-    uint64_t workspaceSize = 0;
-    aclOpExecutor* executor = nullptr;
-    void* workspaceAddr = nullptr;
-
-    std::vector<op::fp16_t> aHostData(aShapeSize, 0);
-    std::vector<op::fp16_t> bHostData(bShapeSize, 0);
-
-    // 根据随机生成的测试数据填充host侧输入
-    if (args.rankId == 0) {
-        std::copy(testData.rank0_a.begin(), testData.rank0_a.end(), aHostData.begin());
-        std::copy(testData.rank0_b.begin(), testData.rank0_b.end(), bHostData.begin());
-    } else {
-        std::copy(testData.rank1_a.begin(), testData.rank1_a.end(), aHostData.begin());
-        std::copy(testData.rank1_b.begin(), testData.rank1_b.end(), bHostData.begin());
-    }
-
-    std::vector<op::fp16_t> outHostData(bShapeSize, 0);
-    std::vector<op::fp16_t> gatherOutHostData(bShapeSize, 0);
-
-    ret = CreateAclTensor(aHostData, aShape, &aDeviceAddr, aclDataType::ACL_FLOAT16, &a);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(bHostData, bShape, &bDeviceAddr, aclDataType::ACL_FLOAT16, &b);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(outHostData, bShape, &outDeviceAddr, aclDataType::ACL_FLOAT16, &out);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = CreateAclTensor(gatherOutHostData, bShape, &gatherOutDeviceAddr, aclDataType::ACL_FLOAT16, &gatherOut);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
-
-    // 调用第一阶段接口
-    ret = aclnnAllGatherAddGetWorkspaceSize(a, b, hcomName, RANK_DIM, out, gatherOut, &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclnnAllGatherAddGetWorkspaceSize failed. ret = %d \n", ret);
+    // 创建 tensor（真实输入由 RunOneRound 填充）
+    TensorSet ts;
+    ret = CreateTensorSet(ts, aShape, bShape);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] rank %d create tensors failed. ret = %d\n", args.rankId, ret);
               return ret);
-    // 根据第一阶段接口计算出的workspaceSize申请device内存
-    if (workspaceSize > 0) {
-        ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
-        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtMalloc workspace failed. ret = %d \n", ret); return ret);
-    }
-    // 调用第二阶段接口
-    ret = aclnnAllGatherAdd(workspaceAddr, workspaceSize, executor, args.stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclnnAllGatherAdd failed. ret = %d \n", ret); return ret);
-    // 同步等待任务执行结束
-    ret = aclrtSynchronizeStreamWithTimeout(args.stream, 10000);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtSynchronizeStreamWithTimeout failed. ret = %d \n", ret);
+
+    // 单次调用
+    ret = RunOneRound(args, round1, "round1", ts.a, ts.b, ts.out, ts.gatherOut, ts.aDeviceAddr, ts.bDeviceAddr,
+                      ts.outDeviceAddr, ts.gatherOutDeviceAddr, aShapeSize, bShapeSize);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] round1 failed on rank %d. ret = %d\n", args.rankId, ret);
               return ret);
-    LOG_PRINT("[INFO] device_%d aclnnAllGatherAdd execute successfully.\n", args.rankId);
-
-    // 算子计算结果与golden数据进行对比
-    std::vector<op::fp16_t> gatherOutData(bShapeSize, 0);
-    // 将计算结果从device侧拷贝到host侧
-    ret = aclrtMemcpy(gatherOutData.data(), bShapeSize * sizeof(gatherOutData[0]), gatherOutDeviceAddr,
-                      bShapeSize * sizeof(gatherOutData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
-    // 比较AllGather结果
-    ret = CompareVector(gatherOutData, testData.gatherOut);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] gatherOut compare failed. ret = %d \n", ret); return ret);
-
-    std::vector<op::fp16_t> outputData(bShapeSize, 0);
-    ret = aclrtMemcpy(outputData.data(), bShapeSize * sizeof(outputData[0]), outDeviceAddr,
-                      bShapeSize * sizeof(outputData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
-    // 比较AllGatherAdd结果
-    if (args.rankId == 0) {
-        ret = CompareVector(outputData, testData.rank0_c);
-        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] output compare failed. ret = %d \n", ret); return ret);
-    } else {
-        ret = CompareVector(outputData, testData.rank1_c);
-        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] output compare failed. ret = %d \n", ret); return ret);
-    }
-    LOG_PRINT("[INFO] device_%d aclnnAllGatherAdd golden compare successfully.\n", args.rankId);
 
     auto hcclRet = HcclCommDestroy(args.hcclComm);
     CHECK_RET(hcclRet == HCCL_SUCCESS, LOG_PRINT("[ERROR] HcclCommDestroy failed. ret = %d \n", hcclRet));
-    // 释放device资源，需要根据具体API的接口定义修改
-    if (a != nullptr) {
-        aclDestroyTensor(a);
-    }
-    if (b != nullptr) {
-        aclDestroyTensor(b);
-    }
-    if (out != nullptr) {
-        aclDestroyTensor(out);
-    }
-    if (gatherOut != nullptr) {
-        aclDestroyTensor(gatherOut);
-    }
-    if (aDeviceAddr != nullptr) {
-        aclrtFree(aDeviceAddr);
-    }
-    if (bDeviceAddr != nullptr) {
-        aclrtFree(bDeviceAddr);
-    }
-    if (outDeviceAddr != nullptr) {
-        aclrtFree(outDeviceAddr);
-    }
-    if (gatherOutDeviceAddr != nullptr) {
-        aclrtFree(gatherOutDeviceAddr);
-    }
-    if (workspaceSize > 0) {
-        aclrtFree(workspaceAddr);
-    }
+    DestroyTensorSet(ts);
     ret = aclrtDestroyStream(args.stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] aclrtDestroyStream failed. ret = %d \n", ret); return ret);
     ret = aclrtResetDevice(args.rankId);
@@ -239,81 +84,33 @@ int LaunchOneThreadAllGatherAdd(Args& args, const TestData& testData)
     return 0;
 }
 
-// 随机生成[-5, 5]之间的数据填充vector
-int RandomVectorGenerator(std::vector<op::fp16_t>& vec, long long size)
-{
-    unsigned seed = static_cast<unsigned>(std::chrono::system_clock::now().time_since_epoch().count());
-    std::mt19937 generator(seed);
-    std::uniform_real_distribution<float> distribution(-5.0f, 5.0f);
-    for (auto& elem : vec) {
-        elem = static_cast<op::fp16_t>(distribution(generator));
-    }
-    return 0;
-}
-
-// 拼接两个大小相同的vector
-int GatherVectors(std::vector<op::fp16_t>& vec1, std::vector<op::fp16_t>& vec2, std::vector<op::fp16_t>& vec3)
-{
-    vec3.clear();
-    vec3.reserve(vec1.size() + vec2.size());
-    vec3.insert(vec3.end(), vec1.begin(), vec1.end());
-    vec3.insert(vec3.end(), vec2.begin(), vec2.end());
-    return 0;
-}
-
-// 对两个大小相同的vector执行加法
-int AddVectors(std::vector<op::fp16_t>& vec1, std::vector<op::fp16_t>& vec2, std::vector<op::fp16_t>& vec3)
-{
-    vec3.clear();
-    vec3.resize(vec1.size());
-    for (size_t i = 0; i < vec1.size(); ++i) {
-        vec3[i] = vec1[i] + vec2[i];
-    }
-    return 0;
-}
-
-int GenerateTestData(TestData& testData)
-{
-    // 随机生成输入
-    int ret = RandomVectorGenerator(testData.rank0_a, testData.rank0_a.size());
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] RandomVectorGenerate rank0_a failed. ret = %d \n", ret);
-              return ret);
-    ret = RandomVectorGenerator(testData.rank0_b, testData.rank0_b.size());
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] RandomVectorGenerate rank0_b failed. ret = %d \n", ret);
-              return ret);
-    ret = RandomVectorGenerator(testData.rank1_a, testData.rank1_a.size());
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] RandomVectorGenerate rank1_a failed. ret = %d \n", ret);
-              return ret);
-    ret = RandomVectorGenerator(testData.rank1_b, testData.rank1_b.size());
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] RandomVectorGenerate rank1_b failed. ret = %d \n", ret);
-              return ret);
-
-    // 计算golden数据
-    ret = GatherVectors(testData.rank0_a, testData.rank1_a, testData.gatherOut);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] Generate gatherOut failed. ret = %d \n", ret); return ret);
-    ret = AddVectors(testData.gatherOut, testData.rank0_b, testData.rank0_c);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] Generate rank0 output failed. ret = %d \n", ret); return ret);
-    ret = AddVectors(testData.gatherOut, testData.rank1_b, testData.rank1_c);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] Generate rank1 output failed. ret = %d \n", ret); return ret);
-
-    return 0;
-}
-
 int main(int argc, char* argv[])
 {
-    // 生成测试数据
-    TestData testData = {
+    // 生成测试数据：第 1 轮随机（BASIC/TIMEOUT 用），第 2 轮确定性（CONSECUTIVE 用）
+    TestData round1 = {
         std::vector<op::fp16_t>(aShapeSize, 0.0f), // rank0_a
-        std::vector<op::fp16_t>(bShapeSize, 0.0f), // rank1_a
-        std::vector<op::fp16_t>(aShapeSize, 0.0f), // rank0_b
+        std::vector<op::fp16_t>(bShapeSize, 0.0f), // rank0_b
+        std::vector<op::fp16_t>(aShapeSize, 0.0f), // rank1_a
         std::vector<op::fp16_t>(bShapeSize, 0.0f), // rank1_b
 
         std::vector<op::fp16_t>(bShapeSize, 0.0f), // gatherOut
         std::vector<op::fp16_t>(bShapeSize, 0.0f), // rank0_c
         std::vector<op::fp16_t>(bShapeSize, 0.0f)  // rank1_c
     };
-    int ret = GenerateTestData(testData);
+    TestData round2 = {
+        std::vector<op::fp16_t>(aShapeSize, 0.0f), // rank0_a
+        std::vector<op::fp16_t>(bShapeSize, 0.0f), // rank0_b
+        std::vector<op::fp16_t>(aShapeSize, 0.0f), // rank1_a
+        std::vector<op::fp16_t>(bShapeSize, 0.0f), // rank1_b
+
+        std::vector<op::fp16_t>(bShapeSize, 0.0f), // gatherOut
+        std::vector<op::fp16_t>(bShapeSize, 0.0f), // rank0_c
+        std::vector<op::fp16_t>(bShapeSize, 0.0f)  // rank1_c
+    };
+    int ret = GenerateTestData(round1);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] GenerateTestData failed. ret = %d \n", ret); return ret);
+    ret = GenerateConstTestData(round2, 3.0f, 4.0f, 1.0f, 2.0f);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] GenerateConstTestData failed. ret = %d \n", ret); return ret);
 
     // AscendCL初始化
     ret = aclInit(nullptr);
@@ -334,15 +131,35 @@ int main(int argc, char* argv[])
     ret = HcclCommInitAll(RANK_DIM, devices, comms);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("[ERROR] HcclCommInitAll failed. ret = %d \n", ret); return ret);
 
+    TestMode mode = ResolveTestMode();
+    LOG_PRINT("[INFO] test mode = %d (1=BASIC, 2=CONSECUTIVE, 3=TIMEOUT, 4=UB_BOUNDARY, 5=ALIGN_REJECT)\n",
+              static_cast<int>(mode));
+
     Args args[RANK_DIM];
+    std::atomic<bool> rank0Done{false}; // 超时用例：rank1 等 rank0 记录结果后再统一清理
     // 启动多线程
     std::vector<std::future<int>> futures;
     for (uint32_t rankId = 0; rankId < RANK_DIM; rankId++) {
         args[rankId].rankId = rankId;
         args[rankId].hcclComm = comms[rankId];
         args[rankId].stream = stream[rankId];
-        futures.push_back(
-            std::async(std::launch::async, &LaunchOneThreadAllGatherAdd, std::ref(args[rankId]), std::ref(testData)));
+        if (mode == TestMode::BASIC) {
+            futures.push_back(
+                std::async(std::launch::async, &LaunchBasicTest, std::ref(args[rankId]), std::ref(round1)));
+        } else if (mode == TestMode::CONSECUTIVE) {
+            futures.push_back(std::async(std::launch::async, &LaunchConsecutiveTest, std::ref(args[rankId]),
+                                         std::ref(round1), std::ref(round2)));
+        } else if (mode == TestMode::TIMEOUT) {
+            // rank0 跑算子、rank1 跳过（缺失 READY）；rank1 等 rank0 记录结果后再清理
+            futures.push_back(std::async(std::launch::async, &RunTimeoutTest, std::ref(args[rankId]), std::ref(round1),
+                                         std::ref(rank0Done)));
+        } else if (mode == TestMode::UB_BOUNDARY) {
+            // UB 容量边界：大 shape 越过 MTE UB，封顶分块后正确出结果
+            futures.push_back(std::async(std::launch::async, &RunUbBoundaryTest, std::ref(args[rankId])));
+        } else {
+            // 每核 240 对齐：每核数据量非 240 对齐 → tiling 拒绝
+            futures.push_back(std::async(std::launch::async, &RunAlignRejectTest, std::ref(args[rankId])));
+        }
     }
 
     int finalRet = 0;

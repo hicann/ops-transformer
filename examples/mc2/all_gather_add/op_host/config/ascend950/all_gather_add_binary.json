@@ -1,0 +1,68 @@
+{
+    "op_type": "AllGatherAdd",
+    "op_list": [
+      {
+        "bin_filename": "AllGatherAdd_ND_ND_FP16_FP16",
+        "inputs": [
+          {
+            "name": "a",
+            "index": 0,
+            "dtype": "float16",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "b",
+            "index": 1,
+            "dtype": "float16",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "c",
+            "index": 0,
+            "dtype": "float16",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          },
+          {
+            "name": "gather_out",
+            "index": 1,
+            "dtype": "float16",
+            "format": "ND",
+            "paramType": "required",
+            "shape": [
+              -2
+            ],
+            "format_match_mode": "FormatAgnostic"
+          }
+        ],
+        "attrs": [
+          {
+            "name": "group",
+            "dtype": "string",
+            "value": ""
+          },
+          {
+            "name": "rank_size",
+            "dtype": "int",
+            "value": 0
+          }
+        ]
+      }
+    ]
+  }

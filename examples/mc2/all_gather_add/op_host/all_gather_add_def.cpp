@@ -28,8 +28,35 @@ public:
         this->Attr("group").AttrType(REQUIRED).String(); // 通算融合算子属性，表示通信域名称
         this->Attr("rank_size").AttrType(REQUIRED).Int(0);
 
-        this->AICore().AddConfig("ascend910b");
-        this->AICore().AddConfig("ascend910_93");
+        // arch22(A2/A3) 入口: op_kernel/all_gather_add_a3.cpp，AICPU 高层 Hccl。
+        OpAICoreConfig aicore_config_arch22;
+        aicore_config_arch22.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
+            .ExtendCfgInfo("jitCompile.flag", "static_true")
+            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
+            .ExtendCfgInfo("opFile.value", "all_gather_add_a3");
+
+        // arch35(A5) 入口: op_kernel/all_gather_add_apt.cpp，MTE 裸窗口直写。
+        OpAICoreConfig aicore_config_arch35;
+        aicore_config_arch35.DynamicCompileStaticFlag(true)
+            .DynamicFormatFlag(true)
+            .DynamicRankSupportFlag(true)
+            .DynamicShapeSupportFlag(true)
+            .NeedCheckSupportFlag(false)
+            .PrecisionReduceFlag(true)
+            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
+            .ExtendCfgInfo("jitCompile.flag", "static_true")
+            .ExtendCfgInfo("multiKernelSupportDynamicGraph.value", "multi_kernel")
+            .ExtendCfgInfo("opFile.value", "all_gather_add_apt");
+
+        this->AICore().AddConfig("ascend910b", aicore_config_arch22);
+        this->AICore().AddConfig("ascend910_93", aicore_config_arch22);
+        this->AICore().AddConfig("ascend950", aicore_config_arch35);
         this->MC2().HcclGroup("group"); // group 属性配置为该算子的通信域名称
     }
 };

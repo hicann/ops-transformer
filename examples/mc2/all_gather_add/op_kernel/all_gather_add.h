@@ -22,6 +22,9 @@
 constexpr int32_t ADD_BUFFER_NUM = 2;
 
 namespace AscendC {
+// 仅 arch22(A2/A3) 走本模板的高层 Hccl(GetHcclContext)，AICPU 引擎；
+// A5(arch35) 走 all_gather_add_mte.h 的 MTE 裸窗口路径。
+template <HcclServerType ServerType>
 class AllGatherAdd {
 public:
     __aicore__ inline AllGatherAdd(){};
@@ -40,7 +43,7 @@ private:
 private:
     AllGatherAddTilingData* tilingData_;
 
-    Hccl<HCCL_SERVER_TYPE_AICPU> hccl_;
+    Hccl<ServerType> hccl_;
 
     TQue<QuePosition::VECIN, ADD_BUFFER_NUM> inputQueueGather;
     TQue<QuePosition::VECIN, ADD_BUFFER_NUM> inputQueueB;
@@ -64,8 +67,9 @@ private:
     HcclHandle handleId_{INVALID_HANDLE_ID};
 };
 
-__aicore__ inline void AllGatherAdd::Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR gatherGM,
-                                          AllGatherAddTilingData* tilingData, TPipe* tPipe)
+template <HcclServerType ServerType>
+__aicore__ inline void AllGatherAdd<ServerType>::Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM, GM_ADDR gatherGM,
+                                                      AllGatherAddTilingData* tilingData, TPipe* tPipe)
 {
     aGM_ = aGM;
     bGM_ = bGM;
@@ -88,16 +92,19 @@ __aicore__ inline void AllGatherAdd::Init(GM_ADDR aGM, GM_ADDR bGM, GM_ADDR cGM,
     tPipe->InitBuffer(outputQueueC, ADD_BUFFER_NUM, addTileElemNum_ * sizeof(half));
 }
 
-__aicore__ inline void AllGatherAdd::HcclPrepare()
+template <HcclServerType ServerType>
+__aicore__ inline void AllGatherAdd<ServerType>::HcclPrepare()
 {
     elemNumPerRank_ = tilingData_->gatherTileElemNum *
                       tilingData_->commTurn; // 通信多轮切分，多张卡的数据拼接到gatherOutGM时，相邻数据块的起始地址偏移
-    // 下发通信任务
-    handleId_ = hccl_.AllGather<true>(aGM_, gatherGM_, tilingData_->gatherTileElemNum,
-                                      HcclDataType::HCCL_DATA_TYPE_FP16, elemNumPerRank_, tilingData_->commTurn);
+    // 下发通信任务（hccl_ 为依赖模板参数的类型，成员模板 AllGather 前需加 template 关键字）
+    handleId_ =
+        hccl_.template AllGather<true>(aGM_, gatherGM_, tilingData_->gatherTileElemNum,
+                                       HcclDataType::HCCL_DATA_TYPE_FP16, elemNumPerRank_, tilingData_->commTurn);
 }
 
-__aicore__ inline void AllGatherAdd::CopyIn(int32_t progress)
+template <HcclServerType ServerType>
+__aicore__ inline void AllGatherAdd<ServerType>::CopyIn(int32_t progress)
 {
     AscendC::LocalTensor<half> gatherLocal = inputQueueGather.AllocTensor<half>();
     AscendC::LocalTensor<half> bLocal = inputQueueB.AllocTensor<half>();
@@ -107,7 +114,8 @@ __aicore__ inline void AllGatherAdd::CopyIn(int32_t progress)
     inputQueueB.EnQue(bLocal);
 }
 
-__aicore__ inline void AllGatherAdd::Compute()
+template <HcclServerType ServerType>
+__aicore__ inline void AllGatherAdd<ServerType>::Compute()
 {
     AscendC::LocalTensor<half> gatherLocal = inputQueueGather.DeQue<half>();
     AscendC::LocalTensor<half> bLocal = inputQueueB.DeQue<half>();
@@ -118,20 +126,23 @@ __aicore__ inline void AllGatherAdd::Compute()
     inputQueueB.FreeTensor(bLocal);
 }
 
-__aicore__ inline void AllGatherAdd::CopyOut(int32_t progress)
+template <HcclServerType ServerType>
+__aicore__ inline void AllGatherAdd<ServerType>::CopyOut(int32_t progress)
 {
     AscendC::LocalTensor<half> cLocal = outputQueueC.DeQue<half>();
     AscendC::DataCopy(outputCGM[progress * addTileElemNum_], cLocal, addTileElemNum_);
     outputQueueC.FreeTensor(cLocal);
 }
 
-__aicore__ inline void AllGatherAdd::HcclFinalize()
+template <HcclServerType ServerType>
+__aicore__ inline void AllGatherAdd<ServerType>::HcclFinalize()
 {
     AscendC::SyncAll<true>();
     hccl_.Finalize();
 }
 
-__aicore__ inline void AllGatherAdd::CalcAddGmAddr(int32_t commTurn)
+template <HcclServerType ServerType>
+__aicore__ inline void AllGatherAdd<ServerType>::CalcAddGmAddr(int32_t commTurn)
 {
     uint32_t commOffset = commTurn * tilingData_->gatherTileElemNum; // 1.根据通信轮次偏移单个通信数据大小
     uint32_t blockOffset = blockIdx_ / tilingData_->addCoresPerRank *
@@ -144,7 +155,8 @@ __aicore__ inline void AllGatherAdd::CalcAddGmAddr(int32_t commTurn)
     outputCGM.SetGlobalBuffer((__gm__ half*)cGM_ + totalOffset, blockElemNum_);
 }
 
-__aicore__ inline void AllGatherAdd::Process()
+template <HcclServerType ServerType>
+__aicore__ inline void AllGatherAdd<ServerType>::Process()
 {
     HcclPrepare();
     int addLoop = tileNum_ * ADD_BUFFER_NUM;

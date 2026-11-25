@@ -128,23 +128,23 @@ The AllGather operation reorders the inputs of all cards in the communicator by 
 
 The number of cards rank_size in the communicator of this sample is fixed to 2. If the communication is not split into turns, the communication and computation proceed serially. The operator semantics diagram is as follows:
 
-![all_gather_add_compute_semantics_diagram.png](figures/all_gather_add_compute_semantics_diagram.png)
+![all_gather_add_compute_semantics_diagram.png](../../../../docs/zh/figures/all_gather_add/all_gather_add_compute_semantics_diagram.png)
 
 The data of the AllGatherAdd operator performs AllGather communication between cards and Add computation within a card, and the communication and computation parts can proceed in parallel without affecting each other.
 Therefore, the communication data can be split into multiple blocks, each communication transmits only one block of data, and each computation only operates on the communication result of the previous turn, with the pipelining covering each other. The communication-computation overlap diagram is as follows:
 
-![all_gather_add_comm_compute_overlap_diagram.png](figures/all_gather_add_comm_compute_overlap_diagram.png)
+![all_gather_add_comm_compute_overlap_diagram.png](../../../../docs/zh/figures/all_gather_add/all_gather_add_comm_compute_overlap_diagram.png)
 
 **Schematic diagram of the AllGatherAdd operator computation process**: (when the communication is split into 2 turns)
 
 1. The AI Core writes the communication information to be executed into the message area in Global Memory, implementing task dispatch. The message area is Global Memory at a specific address. The AI Core and AI CPU pass messages between them by writing to it and polling it, and these operations are uniformly encapsulated in the [Hccl](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/API/ascendcopapi/atlasascendc_api_07_0869.html) high-level API.
 2. The AI CPU reads the information of all communication tasks from the message area and starts to execute the first round of AllGather collective communication tasks over the HCCS (Huawei Cache Coherence System, a high-speed interconnection between CPUs and NPUs) link. The following figure shows the schematic diagram of the first round of AllGather communication.
 
-![all_gather_add_first_round_comm_diagram.png](figures/all_gather_add_first_round_comm_diagram.png)
+![all_gather_add_first_round_comm_diagram.png](../../../../docs/zh/figures/all_gather_add/all_gather_add_first_round_comm_diagram.png)
 
 3. After the AI CPU completes the first round of communication tasks, it writes the status that the first round of communication tasks has completed into the message area and starts to execute the second round of communication tasks. Meanwhile, the AI Vector starts to perform the Add computation on the first-round AllGather communication result. The following figure shows the schematic diagram of the second round of communication and the first round of Add computation on rank0.
 
-![all_gather_add_rank0_first_round_add_diagram.png](figures/all_gather_add_rank0_first_round_add_diagram.png)
+![all_gather_add_rank0_first_round_add_diagram.png](../../../../docs/zh/figures/all_gather_add/all_gather_add_rank0_first_round_add_diagram.png)
 
 4. Complete the communication and computation of all data blocks turn by turn according to the communication splitting turns.
 
@@ -391,7 +391,7 @@ extern "C" __global__ __aicore__ void all_gather_add(GM_ADDR aGM, GM_ADDR bGM, G
 
     After the first round of communication tasks completes, the operator starts the first round of Add computation. Before starting the computation, the addresses of the data participating in the computation need to be confirmed. The CalcAddGmAddr function computes the start address of the data that this core needs to process based on the communication turn and the number of cards. To achieve communication-computation overlap and multi-core parallelism and improve computation efficiency, the operands of the Add computation are split, and the split data is allocated to different cores for processing. This sample only splits the Y axis of the operands, as shown in the following diagram. In this scenario, each core needs to compute the offsets of the two addends relative to the original data, and the offset data block is passed into the Unified Buffer of the AIV core as an input parameter for the Add computation.
 
-    ![all_gather_add_core_partition_diagram.png](figures/all_gather_add_core_partition_diagram.png)
+    ![all_gather_add_core_partition_diagram.png](../../../../docs/zh/figures/all_gather_add/all_gather_add_core_partition_diagram.png)
 
     As shown in the preceding figure, assume that the first Add computation is currently performed on core AIV-26. According to the logic of the Process() function, when i = 0, the CalcAddGmAddr function is triggered for the first time. According to the description of the [hccl.wait()](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/API/ascendcopapi/atlasascendc_api_07_0878.html) interface, the first round of communication has completed and the second round has started at this point. Therefore, when the CalcAddGmAddr function computes the start address offset of the data that this core needs to process, it first offsets by i * the data length of a single communication, as shown by commOffset in the figure. Each Add operation computes on the result of the previous round of communication. Since the communication is split into multiple turns, the start addresses of the adjacent data blocks of each card in gatherOutGM have an offset (that is, strideCount). Therefore, the rank whose communication data the current core is assigned to process needs to be determined based on the number of cards and the index of the current core. As shown in the figure, 40 AIV cores in total are evenly allocated to two ranks, so AIV-26 is assigned to process the data from rank1, as shown by blockOffset in the figure. After the rank processed by the current core is determined, the final offset additionally needs to include the offset within the data of that rank, that is, 6 * the number of data elements processed by each core.
     The implementation of the CalcAddGmAddr function is as follows:
@@ -410,7 +410,7 @@ extern "C" __global__ __aicore__ void all_gather_add(GM_ADDR aGM, GM_ADDR bGM, G
 
     After each core completes the computation of the data addresses, the entire computation of the AllGatherAdd operator can be completed following the [programming paradigm of typical operators](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/latest/opdevg/Ascendcopdevg/atlas_ascendc_10_00033.html): CopyIn (moves data from GM to on-chip Local Memo) -> Compute (calls the Add arithmetic API to complete the computation) -> CopyOut (moves the computation result from Local Memo out to GM). The memory diagram of the Add computation within each core:
 
-    ![all_gather_add_memory_transfer_diagram.png](figures/all_gather_add_memory_transfer_diagram.png)
+    ![all_gather_add_memory_transfer_diagram.png](../../../../docs/zh/figures/all_gather_add/all_gather_add_memory_transfer_diagram.png)
 
     - Poll and wait for the completion of the communication and computation of each block, and finally release the resources.
 

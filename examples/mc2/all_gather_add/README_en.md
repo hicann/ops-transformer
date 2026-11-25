@@ -6,6 +6,7 @@ English | [简体中文](./README.md)
 
 | Product                                                         | Supported |
 | :----------------------------------------------------------- | :------: |
+| <term>Atlas A5 products</term>     |    √     |
 | <term>Atlas A3 products</term>     |    √     |
 | <term>Atlas A2 products</term> |    √     |
 
@@ -111,7 +112,7 @@ English | [简体中文](./README.md)
 
 ## Constraints
 
-* Currently, this example operator only supports fixed shapes: a(240, 256), b(240 * 2, 256), and a fixed rank_size = 2.
+* Currently, this example operator only supports fixed shapes on the A2/A3 platforms: a(240, 256), b(240 × 2, 256), with a fixed rank_size of 2. The A5 platform supports larger shapes, but requires both the per-rank data amount (the element count of a) and the per-core data amount to be multiples of 240 .
 * Empty tensors are not supported for all inputs, and the value range is [-5,5].
 * Deterministic computation:
   - The allGatherAdd operator implements deterministic computation by default.
@@ -167,7 +168,7 @@ With the build.sh script in the project root directory, you can quickly invoke t
 
 - **Run the operator sample**
 
-    - Currently, this example operator only supports invoking the operator based on the single-operator API execution mode, that is, the [two-phase aclnn interface](../../../docs/zh/context/two_phase_api_en.md) invocation. The aclnn interface of this example is defined in the [op_api](../all_gather_add/op_host/op_api) path.
+    - Currently, this example operator only supports invoking the operator based on the single-operator API execution mode, that is, the [two-phase aclnn interface](../../../docs/zh/context/two_phase_api.md) invocation. The aclnn interface of this example is defined in the [op_api](../all_gather_add/op_host/op_api) path.
 
       To run this sample operator, perform the following steps:
 

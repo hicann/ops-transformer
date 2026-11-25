@@ -29,6 +29,7 @@ struct AllGatherAddTilingData {
     uint32_t addTileElemNum;
     uint32_t gatherTileElemNum;
     uint32_t addCoresPerRank;
+    uint32_t rankSize; // 通信域总 rank 数（all_gather 的 rankDim）
 };
 
 #endif // ALL_GATHER_ADD_TILING_H

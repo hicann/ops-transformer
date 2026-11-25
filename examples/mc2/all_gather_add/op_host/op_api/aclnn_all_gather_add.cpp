@@ -17,6 +17,7 @@
 #include "opdev/op_executor.h"
 #include "opdev/op_log.h"
 #include "opdev/platform.h"
+#include "op_host/util/op_const_def.h" // 提供 Ops::Base::DAV_3510 等 NpuArch 枚举
 #include "common/utils/hccl_util.h"
 
 using namespace op;
@@ -31,6 +32,7 @@ enum NnopbaseHcclServerType : uint32_t {
     NNOPBASE_HCCL_SERVER_TYPE_END
 };
 
+// 单算子 AllGatherAdd：原型输入为 a, b。
 extern aclnnStatus aclnnInnerAllGatherAddGetWorkspaceSize(const aclTensor* a, const aclTensor* b, char* group,
                                                           int64_t rankSize, const aclTensor* cOut,
                                                           const aclTensor* gatherOutOut, uint64_t* workspaceSize,
@@ -111,8 +113,15 @@ aclnnStatus aclnnAllGatherAddGetWorkspaceSize(const aclTensor* a, const aclTenso
 
 aclnnStatus aclnnAllGatherAdd(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor, aclrtStream stream)
 {
+    // 通信服务端类型按代际选择：
+    //     A5(DAV_3510) → MTE  （裸窗口，kernel 经 GetHcclContext 读 windowsIn 直写）
+    //     A2/A3        → AICPU（高层 Hccl kernel，GetHcclContext）
     if (NnopbaseSetHcclServerType) {
-        NnopbaseSetHcclServerType(executor, NNOPBASE_HCCL_SERVER_TYPE_AICPU);
+        if (GetCurrentPlatformInfo().GetCurNpuArch() == Ops::Base::DAV_3510) {
+            NnopbaseSetHcclServerType(executor, NNOPBASE_HCCL_SERVER_TYPE_MTE); // A5
+        } else {
+            NnopbaseSetHcclServerType(executor, NNOPBASE_HCCL_SERVER_TYPE_AICPU); // A2/A3
+        }
     }
     auto ret = aclnnInnerAllGatherAdd(workspace, workspaceSize, executor, stream);
     if (ret != 0) {
