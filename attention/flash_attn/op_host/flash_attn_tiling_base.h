@@ -56,6 +56,7 @@ public:
 protected:
     // 架构差异：由 arch35 / arch92 子类实现
     virtual void SplitPolicy() = 0;
+    virtual void GenTilingKey() = 0;
     virtual void UpdateTilingKeyConfig() = 0;
     virtual void UpdateTilingKeyInfo() = 0;
     virtual void UpdateTilingKeyTemplateId() {}
@@ -63,7 +64,6 @@ protected:
     // 公共流程
     ge::graphStatus SetPlatMemoryInfo();
     void ComputeTilingData();
-    void GenTilingKey();
     void CalcWorkspaceSize();
     void UpdateTilingKeyLayout();
     void UpdateTilingKeyKvLayout();

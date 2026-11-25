@@ -14,7 +14,11 @@
  *        参考 quant_flash_attn.cpp 单层 __global__ 风格。
  */
 
-#include "flash_attn_template_tiling_key.h"
+#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202)
+#include "arch92/flash_attn_template_tiling_key_arch92.h"
+#else
+#include "arch35/flash_attn_template_tiling_key.h"
+#endif
 #include "utils/flash_attn_common_def.h"
 #include "../../common/op_kernel/arch35/flash_attention_score_common_regbase_arch35.h"
 // 合轴 DN 模板仅 arch35 提供; arch92 的 DN 即不合轴模板(经 templateId=2 路由), host 不会下发 templateId=1
@@ -115,12 +119,8 @@ __global__ __aicore__ void flash_attn(__gm__ uint8_t* query, __gm__ uint8_t* key
     constexpr FA_LAYOUT kvLayout = GetKvLayout<inOutLayoutType, KvLayoutType>();
     constexpr bool pageAttention = IsPageAttention<KvLayoutType>();
 
-    // 按架构选择 config 档位表: arch35 与 arch92 的 config 编号语义不同
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
+    // 配置表随各代际的 tiling key 头文件选择。
     constexpr const ConfigParams& cfg = ConfigValue[config];
-#else
-    constexpr const ConfigParams& cfg = ConfigValueArch92[config];
-#endif
 
     constexpr S1TemplateType s1TemplateType = static_cast<S1TemplateType>(cfg.s1);
     constexpr S2TemplateType s2TemplateType = static_cast<S2TemplateType>(cfg.s2);

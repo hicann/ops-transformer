@@ -23,7 +23,7 @@
 #include <graph/utils/type_utils.h>
 #include "log/log.h"
 #include "../flash_attn_tiling_utils.h"
-#include "../../op_kernel/flash_attn_template_tiling_key.h"
+#include "../../op_kernel/arch92/flash_attn_template_tiling_key_arch92.h"
 #include "../../../common/op_host/fia_tiling_templates_registry.h"
 
 using namespace ge;
@@ -88,6 +88,20 @@ void FlashAttnTilingImplArch92::UpdateTilingKeyInfo()
     tilingKeyInfo_.templateId = templateId_;
 
     UpdateTilingKeyConfig();
+}
+
+void FlashAttnTilingImplArch92::GenTilingKey()
+{
+    UpdateTilingKeyInfo();
+    tilingKey_ =
+        GET_TPL_TILING_KEY(tilingKeyInfo_.inputLayout, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.hasAttenMask,
+                           tilingKeyInfo_.hasDrop, tilingKeyInfo_.templateId, tilingKeyInfo_.config);
+    OP_LOGI(faInfo_->opName, "The tilingkey is %llu.", tilingKey_);
+    OP_LOGI(faInfo_->opName,
+            "The tilingkey param is inOutLayoutType: %llu, kvLayoutType: %llu, hasAttenMask: %llu, hasDrop: %llu, "
+            "templateId: %llu, config: %llu.",
+            tilingKeyInfo_.inputLayout, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.hasAttenMask,
+            tilingKeyInfo_.hasDrop, tilingKeyInfo_.templateId, tilingKeyInfo_.config);
 }
 
 } // namespace flash_attn

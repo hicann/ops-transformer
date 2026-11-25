@@ -26,6 +26,7 @@ public:
 
 protected:
     void SplitPolicy() override;
+    void GenTilingKey() override;
     void UpdateTilingKeyConfig() override;
     void UpdateTilingKeyInfo() override;
     void UpdateTilingKeyTemplateId() override;

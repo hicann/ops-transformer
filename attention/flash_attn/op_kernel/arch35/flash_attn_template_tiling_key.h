@@ -10,15 +10,15 @@
 
 /*!
  * \file flash_attn_template_tiling_key.h
- * \brief FlashAttn TilingKey定义（非量化，仅FP16/BF16）
+ * \brief FlashAttn arch35 tiling-key declarations and template selections.
  */
 
-#ifndef TEMPLATE_TILING_KEY_FLASH_ATTN_H_
-#define TEMPLATE_TILING_KEY_FLASH_ATTN_H_
+#ifndef TEMPLATE_TILING_KEY_FLASH_ATTN_ARCH35_H_
+#define TEMPLATE_TILING_KEY_FLASH_ATTN_ARCH35_H_
 
 #include "ascendc/host_api/tiling/template_argument.h"
-#include "utils/flash_attn_common_def.h"
-#include "flash_attn_tiling_data.h"
+#include "flash_attn_config_def_arch35.h"
+#include "../flash_attn_tiling_data.h"
 
 #ifndef ORIG_DTYPE_QUERY
 #define ORIG_DTYPE_QUERY (DT_BF16)
@@ -66,22 +66,11 @@ ASCENDC_TPL_ARGS_DECL(FlashAttn,
                       //    2: DN模板(不合轴)
                       ASCENDC_TPL_UINT_DECL(TemplateId, ASCENDC_TPL_8_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 2),
 
-                      // config (4-bit): arch35 使用下表；arch92 使用 ConfigValueArch92 独立档位。
-                      // D/DV 为模板宽度；originalDV 为真实 V/输出 head dim，决定输出拷贝 ROW_PAD。
-                      //    config=0: sOuter=64, sInner=128, D=64, DV=64, originalDV=64
-                      //    config=1: sOuter=32, sInner=256, D=64, DV=64, originalDV=64
-                      //    config=2: sOuter=64, sInner=128, D=128, DV=128, originalDV=128
-                      //    config=3: sOuter=32, sInner=256, D=128, DV=128, originalDV=128
-                      //    config=4: sOuter=64, sInner=128, D=256, DV=256, originalDV=256
-                      //    config=5: sOuter=32, sInner=256, D=256, DV=256, originalDV=256
-                      //    config=6: sOuter=64, sInner=128, D=192, DV=128, originalDV=128
-                      //    config=7: sOuter=32, sInner=256, D=192, DV=128, originalDV=128
-                      //    config=8: sOuter=64, sInner=128, D=128, DV=128, originalDV=72
-                      //    config=9: sOuter=32, sInner=256, D=128, DV=128, originalDV=72
+                      // Config (4-bit): dimensions, buffer counts and selections are defined per architecture.
                       ASCENDC_TPL_UINT_DECL(Config, ASCENDC_TPL_4_BW, ASCENDC_TPL_UI_RANGE, 1, 0, 15), );
 
 ASCENDC_TPL_SEL(
-    // ND模板（templateId=0）：全组合
+    // ND: all supported head dimensions.
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
                                               InOutLayoutType_BNSD, InOutLayoutType_TND, InOutLayoutType_BNSD_BSND),
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3),
@@ -89,8 +78,6 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_UINT_SEL(TemplateId, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
                          ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)),
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
-    // Dropout: continuous KV, ND only.
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
                                               InOutLayoutType_BNSD, InOutLayoutType_TND, InOutLayoutType_BNSD_BSND),
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, 0),
@@ -98,8 +85,7 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_UINT_SEL(TemplateId, ASCENDC_TPL_UI_LIST, 0),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
                          ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)),
-#endif
-    // DN模板（templateId=1）：仅无attenMask且config=0/2/6/8（sOuter=64, D=64/128, QK D=192/DV=128, 8 为 Dk=72 克隆档）
+    // Merged DN: no attention mask, S1=128, D=64/128/192.
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
                                               InOutLayoutType_BNSD, InOutLayoutType_TND, InOutLayoutType_BNSD_BSND),
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3),
@@ -107,29 +93,13 @@ ASCENDC_TPL_SEL(
                          ASCENDC_TPL_UINT_SEL(TemplateId, ASCENDC_TPL_UI_LIST, 1),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 2, 6, 8),
                          ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)),
-// DN不合轴模板（templateId=2）：kernel 侧为独立文件(*_dn_unmerged.h),
-#if (defined(__NPU_ARCH__) && (__NPU_ARCH__ == 9201 || __NPU_ARCH__ == 9202))
-    // arch92 排除仅由 ND 支持的 D=256 config=4/5，其余已注册档位与有无 attenMask 全量实例化;
-    // arch35: vHeadDim<=128、maxSeqQ>=256 且 maskMode 为 0/3；arch92 使用 GetConfigInfo。
-    ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
-                                              InOutLayoutType_BNSD, InOutLayoutType_TND, InOutLayoutType_BNSD_BSND),
-                         ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3),
-                         ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true), ASCENDC_TPL_BOOL_SEL(HasDrop, false),
-                         ASCENDC_TPL_UINT_SEL(TemplateId, ASCENDC_TPL_UI_LIST, 2),
-                         ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3, 6, 7, 8, 9),
-                         ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)),
-#endif
-#if defined(__NPU_ARCH__) && (__NPU_ARCH__ == 3510)
-    // config 10-13 为 S2=Aligned256 专用档(D=64/128/192-128/D=72, originalDV 与真实 V 一致);
-    // arch35: vHeadDim<=128、maxSeqQ>=256 且 maskMode 为 0/3；arch92 使用 GetConfigInfo。
+    // Unmerged DN: S1=128, S2=256.
     ASCENDC_TPL_ARGS_SEL(ASCENDC_TPL_UINT_SEL(InOutLayoutType, ASCENDC_TPL_UI_LIST, InOutLayoutType_BSND,
                                               InOutLayoutType_BNSD, InOutLayoutType_TND, InOutLayoutType_BNSD_BSND),
                          ASCENDC_TPL_UINT_SEL(KvLayoutType, ASCENDC_TPL_UI_LIST, 0, 1, 2, 3),
                          ASCENDC_TPL_BOOL_SEL(HasAttenMask, false, true), ASCENDC_TPL_BOOL_SEL(HasDrop, false),
                          ASCENDC_TPL_UINT_SEL(TemplateId, ASCENDC_TPL_UI_LIST, 2),
                          ASCENDC_TPL_UINT_SEL(Config, ASCENDC_TPL_UI_LIST, 10, 11, 12, 13),
-                         ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)),
-#endif
-);
+                         ASCENDC_TPL_TILING_STRUCT_SEL(FlashAttnTilingData)));
 
-#endif // TEMPLATE_TILING_KEY_FLASH_ATTN_H_
+#endif // TEMPLATE_TILING_KEY_FLASH_ATTN_ARCH35_H_

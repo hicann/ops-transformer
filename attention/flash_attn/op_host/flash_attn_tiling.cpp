@@ -19,23 +19,15 @@
 #include "op_host/tiling_templates_registry.h"
 #include "flash_attn_tiling.h"
 #include "flash_attn_tiling_common.h"
-#include "../op_kernel/flash_attn_template_tiling_key.h"
 #include "flash_attn_tiling_info_parser.h"
 #include "checkers/fa_checker.h"
 #include "../../common/op_host/fia_tiling_templates_registry.h"
 
 using namespace ge;
-using namespace AscendC;
 using namespace Ops::Transformer::OpTiling;
 
 namespace optiling {
 using namespace flash_attn;
-
-static bool IsEmptyInput(gert::TilingContext* context)
-{
-    (void)context;
-    return false;
-}
 
 ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttn(gert::TilingContext* context)
 {
@@ -43,11 +35,6 @@ ASCENDC_EXTERN_C ge::graphStatus TilingFlashAttn(gert::TilingContext* context)
 
     auto platformInfoPtr = context->GetPlatformInfo();
     OP_CHECK_IF(platformInfoPtr == nullptr, OP_LOGE(context, "platformInfoPtr is null"), return ge::GRAPH_FAILED);
-
-    auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
-    if (IsEmptyInput(context)) {
-        return ge::GRAPH_SUCCESS;
-    }
 
     FaTilingInfo faInfo;
     FaInfoParser faInfoParser(context);

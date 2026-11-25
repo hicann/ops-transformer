@@ -90,17 +90,17 @@ public:
     static constexpr uint32_t L0C_BUFFER_ID3 = 13U;
 
     // UB
-    static constexpr uint32_t UB_MM_RES_BUFCNT = (dBaseSize > 128) ? 2U : 4U;
+    static constexpr uint32_t UB_MM_RES_BUFCNT = FA_T::UB_MM1_RES_BUFCNT;
     static constexpr uint32_t UB_MM_RES_BUF_BYTES =
         mBaseSize / CV_RATIO * (s2BaseSize > dVBaseSize ? s2BaseSize : dVBaseSize) * sizeof(MM_T);
     LocalTensor<uint8_t> ubMmResBuffers_;
     // L1
-    static constexpr uint32_t L1_P_BUFCNT = 3U;
+    static constexpr uint32_t L1_P_BUFCNT = FA_T::L1_P_BUFCNT;
     static constexpr uint32_t L1_P_BUF_BYTES = mBaseSize * s2BaseSize * sizeof(INPUT_T);
-    static constexpr uint32_t L1_Q_BUFCNT = 2U;
+    static constexpr uint32_t L1_Q_BUFCNT = FA_T::L1_Q_BUFCNT;
     static constexpr uint32_t L1_Q_BUF_BYTES = mBaseSize * dBaseSize * sizeof(Q_T);
     static constexpr bool L1_KV_LARGE_BUF = (s2BaseSize == 256U && dBaseSize > 128U);
-    static constexpr uint32_t L1_KV_BUFCNT = L1_KV_LARGE_BUF ? 2U : 4U;
+    static constexpr uint32_t L1_KV_BUFCNT = FA_T::L1_KV_BUFCNT;
     static constexpr uint32_t L1_KV_BUF_BYTES = L1_KV_LARGE_BUF ? (128U * 1024U) : (64U * 1024U);
     // buffer位置+用途+Buffers, 例如l1PBuffers; 使用时命名: 用途+buffer位置+Tensor, 例如pL1Tensor
     LocalTensor<uint8_t> l1PBuffers_;

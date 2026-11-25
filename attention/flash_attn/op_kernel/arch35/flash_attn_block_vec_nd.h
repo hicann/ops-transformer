@@ -123,12 +123,12 @@ public:
     static constexpr uint32_t UB_IN_MASK_EVENT1 = 7;
 
     // L1
-    static constexpr uint32_t L1_P_BUFCNT = 3U;
+    static constexpr uint32_t L1_P_BUFCNT = FA_T::L1_P_BUFCNT;
     static constexpr uint32_t L1_P_BUF_BYTES = mBaseSize * s2BaseSize * sizeof(INPUT_T);
     LocalTensor<uint8_t> l1PBuffers_;
 
     // UB
-    static constexpr uint32_t UB_MM_RES_BUFCNT = (dBaseSize > 128) ? 2U : 4U;
+    static constexpr uint32_t UB_MM_RES_BUFCNT = FA_T::UB_MM1_RES_BUFCNT;
     static constexpr uint32_t UB_MM_RES_BUF_BYTES =
         mBaseSize / CV_RATIO * (s2BaseSize > dVBaseSize ? s2BaseSize : dVBaseSize) * sizeof(T);
     // bmm1/bmm2(mmRes) 区域总字节数：FD block 以此作为 FD 业务区的 UB 起始偏移
@@ -141,7 +141,7 @@ public:
     LocalTensor<uint8_t> ubMmResBuffers_;
     uint32_t mmResBufId_ = 0;
 
-    static constexpr uint32_t UB_MASK_BUFCNT = 2U;
+    static constexpr uint32_t UB_MASK_BUFCNT = FA_T::UB_MASK_BUFCNT;
     static constexpr uint32_t UB_MASK_BUF_BYTES = 8192U;
     LocalTensor<uint8_t> ubMaskBuffers_;
 
@@ -150,7 +150,7 @@ public:
 
     // 保留Vec1双缓冲，复用attention mask合并后空闲的另一块缓冲。
     static constexpr bool REUSE_MASK_BUF = HAS_DROP && dBaseSize == 256 && mBaseSize == 128 && s2BaseSize == 128;
-    static constexpr uint32_t UB_VEC1_RES_BUFCNT = 2U;
+    static constexpr uint32_t UB_VEC1_RES_BUFCNT = FA_T::UB_VEC1_RES_BUFCNT;
     static constexpr uint32_t UB_VEC1_RES_BUF_BYTES = (mBaseSize / CV_RATIO + 1U) * s2BaseSize * sizeof(INPUT_T);
     LocalTensor<uint8_t> ubVec1ResBuffers_;
     uint32_t vec1ResUbBufId_ = 0;

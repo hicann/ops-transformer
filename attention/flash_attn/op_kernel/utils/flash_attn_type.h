@@ -121,7 +121,6 @@ struct FAType {
     static constexpr regbaseutil::DTemplateType originalDV = ORIGINAL_DV;
     static constexpr bool hasMask = HAS_MASK;
     static constexpr bool hasDrop = HAS_DROP;
-    // buffer 档位: 由入口按 config 从 ConfigValue/ConfigValueArch92 填充; arch35 block 不读取, 保持默认 0
     static constexpr uint32_t UB_MM1_RES_BUFCNT = ubMm1ResBufcnt;
     static constexpr uint32_t UB_MM2_RES_BUFCNT = ubMm2ResBufcnt;
     static constexpr uint32_t UB_VEC1_RES_BUFCNT = ubVec1ResBufcnt;

@@ -16,7 +16,6 @@
 #include "flash_attn_tiling_base.h"
 
 #include "tiling/platform/platform_ascendc.h"
-#include "../op_kernel/flash_attn_template_tiling_key.h"
 #include "flash_attn_tiling_utils.h"
 #include "log/log.h"
 
@@ -122,20 +121,6 @@ void FlashAttnTilingBase::UpdateTilingKeyKvLayout()
     } else if (faInfo_->kvLayout == FaLayout::PA_NZ) {
         tilingKeyInfo_.kvLayoutType = KvLayoutType_PA_NZ;
     }
-}
-void FlashAttnTilingBase::GenTilingKey()
-{
-    UpdateTilingKeyInfo();
-    tilingKey_ =
-        GET_TPL_TILING_KEY(tilingKeyInfo_.inputLayout, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.hasAttenMask,
-                           tilingKeyInfo_.hasDrop, tilingKeyInfo_.templateId, tilingKeyInfo_.config);
-    OP_LOGI(faInfo_->opName, "The tilingkey is %llu.", tilingKey_);
-    OP_LOGI(faInfo_->opName,
-            "The tilingkey param is inOutLayoutType: %llu, kvLayoutType: %llu, hasAttenMask: %llu, hasDrop: %llu, "
-            "templateId: %llu, "
-            "config: %llu.",
-            tilingKeyInfo_.inputLayout, tilingKeyInfo_.kvLayoutType, tilingKeyInfo_.hasAttenMask,
-            tilingKeyInfo_.hasDrop, tilingKeyInfo_.templateId, tilingKeyInfo_.config);
 }
 void FlashAttnTilingBase::CalcNumBlocks(uint32_t aicNum)
 {
