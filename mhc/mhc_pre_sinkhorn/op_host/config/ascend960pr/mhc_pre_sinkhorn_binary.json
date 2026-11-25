@@ -2,7 +2,7 @@
     "op_type": "MhcPreSinkhorn",
     "op_list": [
         {
-            "bin_filename": "MhcPreSinkhorn_bd8e37c67f2294e1437f03bb2bace96c",
+            "bin_filename": "MhcPreSinkhorn_4816849e625bf304dc93de98b6a811d7",
             "inputs": [
                 {
                     "name": "x",
@@ -40,6 +40,16 @@
                     "dtype": "float32",
                     "format": "ND",
                     "paramType": "required",
+                    "shape": [
+                        -2
+                    ]
+                },
+                {
+                    "name": "premix",
+                    "index": 4,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "optional",
                     "shape": [
                         -2
                     ]
@@ -152,11 +162,16 @@
                     "name": "need_backward",
                     "dtype": "bool",
                     "value": true
+                },
+                {
+                    "name": "enable_hf32",
+                    "dtype": "bool",
+                    "value": true
                 }
             ]
         },
         {
-            "bin_filename": "MhcPreSinkhorn_5d39354b089359785ccbee74e3ea8182",
+            "bin_filename": "MhcPreSinkhorn_846b69b253a76f8bbbf70890e6d50a4e",
             "inputs": [
                 {
                     "name": "x",
@@ -194,6 +209,16 @@
                     "dtype": "float32",
                     "format": "ND",
                     "paramType": "required",
+                    "shape": [
+                        -2
+                    ]
+                },
+                {
+                    "name": "premix",
+                    "index": 4,
+                    "dtype": "float32",
+                    "format": "ND",
+                    "paramType": "optional",
                     "shape": [
                         -2
                     ]
@@ -304,6 +329,11 @@
                 },
                 {
                     "name": "need_backward",
+                    "dtype": "bool",
+                    "value": true
+                },
+                {
+                    "name": "enable_hf32",
                     "dtype": "bool",
                     "value": true
                 }
